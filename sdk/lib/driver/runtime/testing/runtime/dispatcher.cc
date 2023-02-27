@@ -34,8 +34,8 @@ zx::result<> WaitForCompletion(libsync::Completion& completion) {
     return zx::error(status);
   }
 
-  auto status = completion.Wait();
-  return zx::make_result(status);
+  completion.Wait();
+  return zx::ok();
 }
 
 TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {

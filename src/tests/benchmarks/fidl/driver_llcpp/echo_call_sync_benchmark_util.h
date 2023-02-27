@@ -92,8 +92,8 @@ bool EchoCallSyncBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
 
   client_dispatcher->ShutdownAsync();
   server_dispatcher->ShutdownAsync();
-  ZX_ASSERT(ZX_OK == client_dispatcher_shutdown.Wait());
-  ZX_ASSERT(ZX_OK == server_dispatcher_shutdown.Wait());
+  client_dispatcher_shutdown.Wait();
+  server_dispatcher_shutdown.Wait();
 
   return true;
 }

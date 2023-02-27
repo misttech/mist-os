@@ -32,10 +32,7 @@ void NetworkPort::RemovePort() {
     return;
   }
   netdev_ifc_.RemovePort(port_id_);
-  zx_status_t status = port_removed_.Wait();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to wait for port removed completion: %s", zx_status_get_string(status));
-  }
+  port_removed_.Wait();
   netdev_ifc_.clear();
 }
 

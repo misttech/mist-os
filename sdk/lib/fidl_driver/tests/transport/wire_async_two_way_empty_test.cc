@@ -57,10 +57,10 @@ TEST(DriverTransport, WireTwoWayEmptyArgAsyncShared) {
         ASSERT_OK(result.status());
         done.Signal();
       });
-  ASSERT_OK(done.Wait());
+  done.Wait();
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

@@ -527,7 +527,7 @@ TEST(GenAPITestCase, ResponseContextOwnershipReleasedOnError) {
 
   fidl::AsyncClientBuffer<Values::Echo> buffer;
   client.buffer(buffer.view())->Echo("foo").ThenExactlyOnce(&context);
-  ASSERT_OK(error.Wait());
+  error.Wait();
 }
 
 TEST(GenAPITestCase, AsyncNotifySendError) {

@@ -108,7 +108,7 @@ TEST(TaskQueue, AddFromOtherThread) {
     added.Signal();
   });
 
-  EXPECT_OK(added.Wait());
+  added.Wait();
   EXPECT_FALSE(called.signaled());
 
   EXPECT_OK(loop.RunUntilIdle());

@@ -104,7 +104,7 @@ TEST_F(RealLoopFixtureTest, PerformBlockingWork) {
   auto result = PerformBlockingWork([&] {
     libsync::Completion work_done;
     EXPECT_OK(async::PostTask(dispatcher(), [&] { work_done.Signal(); }));
-    EXPECT_OK(work_done.Wait());
+    work_done.Wait();
     return 42;
   });
 

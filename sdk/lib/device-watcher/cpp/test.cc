@@ -58,7 +58,7 @@ TEST(DeviceWatcherTest, Smoke) {
     shutdown_complete.Signal();
   });
 
-  ASSERT_OK(shutdown_complete.Wait());
+  shutdown_complete.Wait();
 }
 
 TEST(DeviceWatcherTest, OpenInNamespace) {
@@ -116,7 +116,7 @@ TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
     shutdown_complete.Signal();
   });
 
-  ASSERT_OK(shutdown_complete.Wait());
+  shutdown_complete.Wait();
 }
 
 TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
@@ -155,7 +155,7 @@ TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
     shutdown_complete.Signal();
   });
 
-  ASSERT_OK(shutdown_complete.Wait());
+  shutdown_complete.Wait();
 }
 
 }  // namespace

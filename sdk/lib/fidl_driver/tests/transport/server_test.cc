@@ -54,7 +54,7 @@ TEST(Server, OnUnboundFnCalledOnClientReset) {
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 // This test tears down the binding from within a message handler.
@@ -112,12 +112,12 @@ TEST(Server, UnbindInMethodHandler) {
     sync_call.Signal();
   };
   async::PostTask(client_dispatcher->async_dispatcher(), run_on_dispatcher_thread);
-  ASSERT_OK(sync_call.Wait());
+  sync_call.Wait();
 
   client_dispatcher->ShutdownAsync();
   server_dispatcher->ShutdownAsync();
-  ASSERT_OK(client_dispatcher_shutdown.Wait());
-  ASSERT_OK(server_dispatcher_shutdown.Wait());
+  client_dispatcher_shutdown.Wait();
+  server_dispatcher_shutdown.Wait();
 }
 
 }  // namespace

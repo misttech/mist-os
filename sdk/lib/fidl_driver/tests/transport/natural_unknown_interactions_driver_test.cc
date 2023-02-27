@@ -138,7 +138,7 @@ class UnknownInteractions : public ::zxtest::Test {
         client.AsyncTeardown();
         unbound.Signal();
       });
-      ASSERT_OK(unbound.Wait());
+      unbound.Wait();
     }
 
     if (unbind_) {
@@ -150,11 +150,11 @@ class UnknownInteractions : public ::zxtest::Test {
                         { auto s = std::move(server); }
                         unbound.Signal();
                       });
-      ASSERT_OK(unbound.Wait());
+      unbound.Wait();
     }
 
     dispatcher_->ShutdownAsync();
-    ASSERT_OK(dispatcher_shutdown_->Wait());
+    dispatcher_shutdown_->Wait();
   }
 
   template <typename ServerImpl>
@@ -173,7 +173,7 @@ class UnknownInteractions : public ::zxtest::Test {
           bound.Signal();
         }));
 
-    EXPECT_OK(bound.Wait());
+    bound.Wait();
 
     return server;
   }
@@ -209,7 +209,7 @@ class UnknownInteractions : public ::zxtest::Test {
       client.Bind(std::move(client_end), dispatcher);
       bound.Signal();
     }));
-    EXPECT_OK(bound.Wait());
+    bound.Wait();
     return client;
   }
 
@@ -222,7 +222,7 @@ class UnknownInteractions : public ::zxtest::Test {
       func(client);
       done.Signal();
     });
-    ASSERT_OK(done.Wait());
+    done.Wait();
   }
 
   // Run code using the AsyncClient on the dispatcher thread. Caller is
@@ -301,9 +301,7 @@ struct ReadResult {
     status = channel_read->Begin(dispatcher);
     if (status != ZX_OK)
       return;
-    status = read_completion.Wait();
-    if (status != ZX_OK)
-      return;
+    read_completion.Wait();
 
     auto result = channel.Read(0);
     status = result.status_value();
@@ -359,10 +357,7 @@ struct ResponseCompleter {
   }
 
   zx::result<T> WaitForResponse() const {
-    auto status = inner_->completion.Wait();
-    if (status != ZX_OK) {
-      return fit::error(status);
-    }
+    inner_->completion.Wait();
     return fit::ok(std::move(inner_->response.value()));
   }
 
@@ -1204,7 +1199,7 @@ TEST_F(UnknownInteractions, UnknownFlexibleOneWay) {
       MakeMessage<FakeUnknownMethod>(0, ::fidl::MessageDynamicFlags::kFlexibleMethod);
   ChannelWrite(client, client_request);
 
-  ASSERT_OK(server->ran_unknown_interaction_handler.Wait());
+  server->ran_unknown_interaction_handler.Wait();
 
   // Write again to test that the channel is still open.
   ChannelWrite(client, client_request);
@@ -1246,7 +1241,7 @@ TEST_F(UnknownInteractions, UnknownFlexibleTwoWay) {
       MakeMessage<FakeUnknownMethod>(0xABCD, ::fidl::MessageDynamicFlags::kFlexibleMethod);
   ChannelWrite(client, client_request);
 
-  ASSERT_OK(server->ran_unknown_interaction_handler.Wait());
+  server->ran_unknown_interaction_handler.Wait();
 
   auto received = ReadResult<32>::ReadFromChannel(client, Dispatcher());
   EXPECT_EQ(ZX_OK, received.status);
@@ -1297,7 +1292,7 @@ TEST_F(UnknownInteractions, UnknownFlexibleOneWayAjarPotocol) {
       MakeMessage<FakeUnknownMethod>(0, ::fidl::MessageDynamicFlags::kFlexibleMethod);
   ChannelWrite(client, client_request);
 
-  ASSERT_OK(server->ran_unknown_interaction_handler.Wait());
+  server->ran_unknown_interaction_handler.Wait();
 
   // Write again to test that the channel is still open.
   ChannelWrite(client, client_request);
@@ -1358,7 +1353,7 @@ TEST_F(UnknownInteractions, UnknownStrictOneWayClosedProtocol) {
   EXPECT_EQ(ZX_ERR_PEER_CLOSED, received.status);
 }
 
-TEST_F(UnknownInteractions, UnknownFlexibleOneWayClosedPotocol) {
+TEST_F(UnknownInteractions, UnknownFlexibleOneWayClosedProtocol) {
   auto client = TakeClientChannel();
   class Server : public ::fdf::Server<::test::UnknownInteractionsClosedDriverProtocol>,
                  public TestServerBase {};

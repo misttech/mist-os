@@ -1200,7 +1200,7 @@ TEST_F(DispatcherTest, ChannelPeerWriteDuringShutdown) {
     ASSERT_EQ(ZX_OK,
               remote[i].Write(0, arena, nullptr, 0, cpp20::span<zx_handle_t>()).status_value());
   }
-  ASSERT_OK(shutdown.Wait());
+  shutdown.Wait();
 }
 
 //
@@ -1424,7 +1424,7 @@ TEST_F(DispatcherTest, CancelWaitFromWithinCanceledWait) {
     driver_shutdown_completion.Signal();
   }));
 
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
 }
 
 TEST_F(DispatcherTest, CancelWaitRaceCondition) {
@@ -1472,7 +1472,7 @@ TEST_F(DispatcherTest, CancelWaitRaceCondition) {
     });
 
     // Make sure all the async tasks finish before exiting the test.
-    ASSERT_OK(completion.Wait());
+    completion.Wait();
   }
 }
 
@@ -1585,7 +1585,7 @@ TEST_F(DispatcherTest, Irq) {
 
   for (uint32_t i = 0; i < kNumCallbacks; i++) {
     irq_object.trigger(0, zx::time());
-    ASSERT_OK(irq_signal.Wait());
+    irq_signal.Wait();
     irq_signal.Reset();
   }
 
@@ -1596,7 +1596,7 @@ TEST_F(DispatcherTest, Irq) {
     ASSERT_EQ(ZX_ERR_NOT_FOUND, irq.Cancel());
     unbind_complete.Signal();
   }));
-  ASSERT_OK(unbind_complete.Wait());
+  unbind_complete.Wait();
 }
 
 // Tests that the client will stop receiving callbacks after unbinding the irq.
@@ -1622,7 +1622,7 @@ TEST_F(DispatcherTest, UnbindIrq) {
     ASSERT_OK(irq.Cancel());
     unbind_complete.Signal();
   }));
-  ASSERT_OK(unbind_complete.Wait());
+  unbind_complete.Wait();
 
   // The irq has been unbound, so this should not call the handler.
   irq_object.trigger(0, zx::time());
@@ -1656,7 +1656,7 @@ TEST_F(DispatcherTest, IrqCancelOnShutdown) {
 
   // This should unbind the irq and call the handler with ZX_ERR_CANCELED.
   fdf_dispatcher->ShutdownAsync();
-  ASSERT_OK(irq_completion.Wait());
+  irq_completion.Wait();
   ASSERT_OK(completion.Wait(zx::time::infinite()));
 }
 
@@ -1695,9 +1695,9 @@ TEST_F(DispatcherTest, IrqCancelOnShutdownCallbackOnlyOnce) {
   libsync::Completion complete_task;
   ASSERT_OK(async::PostTask(dispatcher, [&] {
     entered_task.Signal();
-    ASSERT_OK(complete_task.Wait());
+    complete_task.Wait();
   }));
-  ASSERT_OK(entered_task.Wait());
+  entered_task.Wait();
 
   // Trigger the irq to queue a callback request.
   irq_object.trigger(0, zx::time());
@@ -1707,7 +1707,7 @@ TEST_F(DispatcherTest, IrqCancelOnShutdownCallbackOnlyOnce) {
   libsync::Completion task_complete;
   ASSERT_OK(async::PostTask(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher2),
                             [&] { task_complete.Signal(); }));
-  ASSERT_OK(task_complete.Wait());
+  task_complete.Wait();
 
   // This should remove the in-flight irq, unbind the irq and call the handler with ZX_ERR_CANCELED.
   fdf_dispatcher_shutdown_async(fdf_dispatcher);
@@ -1716,7 +1716,7 @@ TEST_F(DispatcherTest, IrqCancelOnShutdownCallbackOnlyOnce) {
   complete_task.Signal();
 
   ASSERT_OK(shutdown_observer->WaitUntilShutdown());
-  ASSERT_OK(irq_completion.Wait());
+  irq_completion.Wait();
   fdf_dispatcher_destroy(fdf_dispatcher);
 }
 
@@ -1779,7 +1779,7 @@ TEST_F(DispatcherTest, IrqSynchronized) {
   async::Irq irq1(irq_object1.get(), 0,
                   [&](async_dispatcher_t* dispatcher_arg, async::Irq* irq_arg, zx_status_t status,
                       const zx_packet_interrupt_t* interrupt) {
-                    ASSERT_OK(task_completion.Wait());
+                    task_completion.Wait();
                     irq_object1.ack();
                     ASSERT_EQ(irq_arg, &irq1);
                     ASSERT_EQ(ZX_OK, status);
@@ -1790,7 +1790,7 @@ TEST_F(DispatcherTest, IrqSynchronized) {
   async::Irq irq2(irq_object2.get(), 0,
                   [&](async_dispatcher_t* dispatcher_arg, async::Irq* irq_arg, zx_status_t status,
                       const zx_packet_interrupt_t* interrupt) {
-                    ASSERT_OK(task_completion.Wait());
+                    task_completion.Wait();
                     irq_object2.ack();
                     ASSERT_EQ(irq_arg, &irq2);
                     ASSERT_EQ(ZX_OK, status);
@@ -1807,11 +1807,11 @@ TEST_F(DispatcherTest, IrqSynchronized) {
   // Unblock the irq handler.
   ASSERT_OK(async::PostTask(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher2),
                             [&] { task_completion.Signal(); }));
-  ASSERT_OK(task_completion.Wait());
+  task_completion.Wait();
 
   // The order of observing these completions does not matter.
-  ASSERT_OK(irq_completion2.Wait());
-  ASSERT_OK(irq_completion1.Wait());
+  irq_completion2.Wait();
+  irq_completion1.Wait();
 
   // Must unbind irqs from dispatcher thread.
   libsync::Completion unbind_complete;
@@ -1820,7 +1820,7 @@ TEST_F(DispatcherTest, IrqSynchronized) {
     ASSERT_OK(irq2.Cancel());
     unbind_complete.Signal();
   }));
-  ASSERT_OK(unbind_complete.Wait());
+  unbind_complete.Wait();
 }
 
 TEST_F(DispatcherTest, UnbindIrqRemovesPacketFromPort) {
@@ -1852,7 +1852,7 @@ TEST_F(DispatcherTest, UnbindIrqRemovesPacketFromPort) {
     ASSERT_OK(irq.Cancel());
     task_complete.Signal();
   }));
-  ASSERT_OK(task_complete.Wait());
+  task_complete.Wait();
 
   fdf_dispatcher->ShutdownAsync();
   ASSERT_OK(completion.Wait(zx::time::infinite()));
@@ -1887,11 +1887,11 @@ TEST_F(DispatcherTest, UnbindIrqRemovesQueuedIrqs) {
   ASSERT_OK(async::PostTask(dispatcher, [&] {
     task_started.Signal();
     // We will cancel the irq once the test has confirmed that the irq |OnSignal| has happened.
-    ASSERT_OK(complete_task.Wait());
+    complete_task.Wait();
     ASSERT_OK(irq.Cancel());
     task_complete.Signal();
   }));
-  ASSERT_OK(task_started.Wait());
+  task_started.Wait();
 
   irq_object.trigger(0, zx::time());
 
@@ -1901,10 +1901,10 @@ TEST_F(DispatcherTest, UnbindIrqRemovesQueuedIrqs) {
   libsync::Completion task2_completion;
   ASSERT_OK(async::PostTask(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher2),
                             [&] { task2_completion.Signal(); }));
-  ASSERT_OK(task2_completion.Wait());
+  task2_completion.Wait();
 
   complete_task.Signal();
-  ASSERT_OK(task_complete.Wait());
+  task_complete.Wait();
 
   // The task unbound the irq, so any queued irq callback request should be cancelled.
   // If not, the irq handler will be called and assert.
@@ -1966,14 +1966,14 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
       ASSERT_OK(irq.Cancel());
       unbind_complete.Signal();
     }));
-    ASSERT_OK(unbind_complete.Wait());
+    unbind_complete.Wait();
   }
 
   fdf_dispatcher->ShutdownAsync();
   for (uint32_t i = 0; i < kNumThreads - 1; i++) {
     unused_dispatchers[i].ShutdownAsync();
   }
-  ASSERT_OK(shutdown_completion.Wait());
+  shutdown_completion.Wait();
 
   fdf_dispatcher->reset();
   for (uint32_t i = 0; i < kNumThreads - 1; i++) {
@@ -2034,14 +2034,14 @@ TEST_F(DispatcherTest, UnbindIrqFromWrongDispatcher) {
     ASSERT_EQ(ZX_ERR_BAD_STATE, async_unbind_irq(dispatcher, &irq));
     task_complete.Signal();
   }));
-  ASSERT_OK(task_complete.Wait());
+  task_complete.Wait();
 
   task_complete.Reset();
   ASSERT_OK(async::PostTask(dispatcher, [&] {
     ASSERT_EQ(ZX_OK, async_unbind_irq(dispatcher, &irq));
     task_complete.Signal();
   }));
-  ASSERT_OK(task_complete.Wait());
+  task_complete.Wait();
 }
 
 //
@@ -2454,7 +2454,7 @@ TEST_F(DispatcherTest, GetCurrentDispatcherShutdownCallback) {
   dispatcher.ShutdownAsync();
 
   ASSERT_OK(wait_complete.Wait(zx::time::infinite()));
-  ASSERT_OK(shutdown_completion.Wait());
+  shutdown_completion.Wait();
 }
 
 TEST_F(DispatcherTest, HasQueuedTasks) {
@@ -2484,7 +2484,7 @@ TEST_F(DispatcherTest, HasQueuedTasks) {
 
   complete_blocking_read.Signal();
 
-  ASSERT_OK(entered_task.Wait());
+  entered_task.Wait();
   ASSERT_FALSE(dispatcher->HasQueuedTasks());
 
   WaitUntilIdle(dispatcher);
@@ -2518,7 +2518,7 @@ TEST_F(DispatcherTest, ShutdownAllDriverDispatchers) {
 
   ASSERT_OK(observers[1].WaitUntilShutdown());
   ASSERT_OK(observers[2].WaitUntilShutdown());
-  ASSERT_OK(driver2_shutdown_completion.Wait());
+  driver2_shutdown_completion.Wait();
 
   // Shutdown the first driver, dispatchers[0] should be shutdown.
   fdf_env::DriverShutdown driver_shutdown;
@@ -2529,7 +2529,7 @@ TEST_F(DispatcherTest, ShutdownAllDriverDispatchers) {
   }));
 
   ASSERT_OK(observers[0].WaitUntilShutdown());
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
 
   for (uint32_t i = 0; i < kNumDispatchers; i++) {
     dispatchers[i]->Destroy();
@@ -2560,8 +2560,8 @@ TEST_F(DispatcherTest, DriverDestroysDispatcherShutdownByDriverHost) {
     driver_shutdown_completion.Signal();
   }));
 
-  ASSERT_OK(completion.Wait());
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  completion.Wait();
+  driver_shutdown_completion.Wait();
 }
 
 TEST_F(DispatcherTest, CannotCreateNewDispatcherDuringDriverShutdown) {
@@ -2597,7 +2597,7 @@ TEST_F(DispatcherTest, CannotCreateNewDispatcherDuringDriverShutdown) {
   driver_shutting_down.Signal();
 
   ASSERT_OK(completion.Wait(zx::time::infinite()));
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
 }
 
 // Tests shutting down all dispatchers for a driver, but the dispatchers are already in a shutdown
@@ -2622,7 +2622,7 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersAlreadyShutdown) {
     ASSERT_EQ(fake_driver, driver);
     driver_shutdown_completion.Signal();
   }));
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
 }
 
 // Tests shutting down all dispatchers for a driver, but the dispatcher is in the shutdown observer
@@ -2632,7 +2632,7 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersCurrentlyInShutdownCallback) {
   libsync::Completion complete_shutdown_handler;
   auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) {
     entered_shutdown_handler.Signal();
-    ASSERT_OK(complete_shutdown_handler.Wait());
+    complete_shutdown_handler.Wait();
   };
 
   auto fake_driver = CreateFakeDriver();
@@ -2643,7 +2643,7 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersCurrentlyInShutdownCallback) {
   ASSERT_FALSE(dispatcher.is_error());
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(entered_shutdown_handler.Wait());
+  entered_shutdown_handler.Wait();
 
   fdf_env::DriverShutdown driver_shutdown;
   libsync::Completion driver_shutdown_completion;
@@ -2655,7 +2655,7 @@ TEST_F(DispatcherTest, ShutdownAllDispatchersCurrentlyInShutdownCallback) {
   // The dispatcher is still in the dispatcher shutdown handler.
   ASSERT_FALSE(driver_shutdown_completion.signaled());
   complete_shutdown_handler.Signal();
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
 }
 
 TEST_F(DispatcherTest, DestroyAllDispatchers) {
@@ -2687,14 +2687,14 @@ TEST_F(DispatcherTest, DestroyAllDispatchers) {
     ASSERT_EQ(fake_driver, driver);
     driver_shutdown_completion.Signal();
   }));
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
   driver_shutdown_completion.Reset();
 
   ASSERT_OK(driver_shutdown.Begin(fake_driver2, [&](const void* driver) {
     ASSERT_EQ(fake_driver2, driver);
     driver_shutdown_completion.Signal();
   }));
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
 
   // This will stop memory from leaking.
   fdf_env_destroy_all_dispatchers();
@@ -2726,7 +2726,7 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyed) {
     wait_complete = true;
   });
 
-  ASSERT_OK(thread_started.Wait());
+  thread_started.Wait();
   for (uint32_t i = 0; i < kNumDispatchers; i++) {
     // Not all dispatchers have been destroyed yet.
     ASSERT_FALSE(wait_complete);
@@ -2756,7 +2756,7 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedHasDriverShutdownObserver) {
     wait_complete = true;
   });
 
-  ASSERT_OK(thread_started.Wait());
+  thread_started.Wait();
 
   fdf_env::DriverShutdown driver_shutdown;
   libsync::Completion driver_shutdown_completion;
@@ -2764,7 +2764,7 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedHasDriverShutdownObserver) {
     ASSERT_EQ(fake_driver, driver);
     driver_shutdown_completion.Signal();
   }));
-  ASSERT_OK(driver_shutdown_completion.Wait());
+  driver_shutdown_completion.Wait();
 
   thread.join();
   ASSERT_TRUE(wait_complete);
@@ -2787,10 +2787,10 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedDuringDriverShutdownHandler)
   ASSERT_OK(driver_shutdown.Begin(fake_driver, [&](const void* driver) {
     ASSERT_EQ(fake_driver, driver);
     driver_shutdown_started.Signal();
-    ASSERT_OK(complete_driver_shutdown.Wait());
+    complete_driver_shutdown.Wait();
   }));
 
-  ASSERT_OK(driver_shutdown_started.Wait());
+  driver_shutdown_started.Wait();
 
   // Start waiting for all dispatchers to be destroyed. This should not complete
   // until the shutdown handler completes.
@@ -2802,7 +2802,7 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedDuringDriverShutdownHandler)
     wait_complete = true;
   });
 
-  ASSERT_OK(thread_started.Wait());
+  thread_started.Wait();
 
   // Shutdown handler has not returned yet.
   ASSERT_FALSE(wait_complete);
@@ -2839,7 +2839,7 @@ TEST_F(DispatcherTest, GetSequenceIdSynchronizedDispatcher) {
     ASSERT_NULL(error);
     task_completion.Signal();
   }));
-  ASSERT_OK(task_completion.Wait());
+  task_completion.Wait();
 
   // Get the sequence id for the second dispatcher.
   task_completion.Reset();
@@ -2854,7 +2854,7 @@ TEST_F(DispatcherTest, GetSequenceIdSynchronizedDispatcher) {
     ASSERT_NULL(error);
     task_completion.Signal();
   }));
-  ASSERT_OK(task_completion.Wait());
+  task_completion.Wait();
 
   ASSERT_NE(dispatcher_id.value, dispatcher2_id.value);
 
@@ -2872,7 +2872,7 @@ TEST_F(DispatcherTest, GetSequenceIdSynchronizedDispatcher) {
     ASSERT_EQ(id.value, dispatcher_id.value);
     task_completion.Signal();
   }));
-  ASSERT_OK(task_completion.Wait());
+  task_completion.Wait();
 
   // Get the sequence id from a non-managed thread.
   async_sequence_id_t id;
@@ -2902,7 +2902,7 @@ TEST_F(DispatcherTest, GetSequenceIdUnsynchronizedDispatcher) {
     ASSERT_SUBSTR(error, "UNSYNCHRONIZED");
     task_completion.Signal();
   }));
-  ASSERT_OK(task_completion.Wait());
+  task_completion.Wait();
 
   // Get the sequence id from a non-managed thread.
   async_sequence_id_t id;
@@ -2968,7 +2968,7 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
     dispatcher->Destroy();
 
     // Ideally we would be back down 1 thread at this point, but that is challenging. A future
-    // change may rememdy this.
+    // change may remedy this.
     ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 2);
   }
 
@@ -3046,7 +3046,7 @@ TEST_F(DispatcherTest, DISABLED_ConcurrentDispatcherDestroy) {
   fdf_env::DriverShutdown driver_shutdown;
   libsync::Completion completion;
   ASSERT_OK(driver_shutdown.Begin(fake_driver, [&](const void* driver) { completion.Signal(); }));
-  ASSERT_OK(completion.Wait());
+  completion.Wait();
 
   // Wait for the driver to be removed from the dispatcher coordinator's |driver_state_| map as
   // |Reset| expects it to be empty.
@@ -3080,7 +3080,7 @@ TEST_F(DispatcherTest, ShutdownCallbackSequenceId) {
     completion.Signal();
   }));
 
-  ASSERT_OK(completion.Wait());
+  completion.Wait();
 
   fdf_env::DriverShutdown driver_shutdown;
   libsync::Completion shutdown;
@@ -3093,7 +3093,7 @@ TEST_F(DispatcherTest, ShutdownCallbackSequenceId) {
     shutdown.Signal();
   }));
 
-  ASSERT_OK(shutdown.Wait());
+  shutdown.Wait();
 }
 
 // Tests that the outgoing directory can be destructed on driver shutdown.
@@ -3120,7 +3120,7 @@ TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
     completion.Signal();
   }));
 
-  ASSERT_OK(completion.Wait());
+  completion.Wait();
 
   fdf_env::DriverShutdown driver_shutdown;
   libsync::Completion shutdown;
@@ -3131,7 +3131,7 @@ TEST_F(DispatcherTest, OutgoingDirectoryDestructionOnShutdown) {
     shutdown.Signal();
   }));
 
-  ASSERT_OK(shutdown.Wait());
+  shutdown.Wait();
 }
 
 TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
@@ -3150,7 +3150,7 @@ TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
 
     fdf::SynchronizedDispatcher dispatcher2 = *std::move(dispatcher);
     dispatcher2.ShutdownAsync();
-    ASSERT_OK(completion.Wait());
+    completion.Wait();
   }
   {
     libsync::Completion completion;
@@ -3163,7 +3163,7 @@ TEST_F(DispatcherTest, SynchronizedDispatcherWrapper) {
     ASSERT_EQ(*options,
               FDF_DISPATCHER_OPTION_SYNCHRONIZED | FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS);
     blocking_dispatcher->ShutdownAsync();
-    ASSERT_OK(completion.Wait());
+    completion.Wait();
   }
 }
 
@@ -3183,7 +3183,7 @@ TEST_F(DispatcherTest, UnsynchronizedDispatcherWrapper) {
 
     fdf::UnsynchronizedDispatcher dispatcher2 = *std::move(dispatcher);
     dispatcher2.ShutdownAsync();
-    ASSERT_OK(completion.Wait());
+    completion.Wait();
   }
 }
 
@@ -3212,14 +3212,14 @@ TEST_F(DispatcherTest, SetDefaultDispatcher) {
     ASSERT_EQ(fdf_dispatcher_get_current_dispatcher(), dispatcher2->get());
     task_completion.Signal();
   }));
-  ASSERT_OK(task_completion.Wait());
+  task_completion.Wait();
 
   ASSERT_EQ(fdf_dispatcher_get_current_dispatcher(), dispatcher->get());
 
   dispatcher->ShutdownAsync();
   dispatcher2->ShutdownAsync();
-  ASSERT_OK(shutdown_completion.Wait());
-  ASSERT_OK(shutdown_completion2.Wait());
+  shutdown_completion.Wait();
+  shutdown_completion2.Wait();
 
   ASSERT_OK(fdf_testing_set_default_dispatcher(nullptr));
   // A default dispatcher has not been set, so creating a dispatcher should fail.

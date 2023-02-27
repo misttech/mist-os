@@ -76,7 +76,7 @@ class RuntimeDispatcher : public AsyncDispatcher {
   ~RuntimeDispatcher() {
     dispatcher_.ShutdownAsync();
     ASSERT_OK(RunUntilIdleIfNoThreads());
-    ASSERT_OK(shutdown_completion_.Wait());
+    shutdown_completion_.Wait();
 
     // Make sure all dispatchers are destroyed, otherwise |fdf_env_start| will assert.
     dispatcher_.reset();
@@ -150,7 +150,7 @@ bool DispatcherTaskTest(perftest::RepeatState* state, AsyncDispatcher::Type disp
     ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(),
                               [&task_completion] { task_completion.Signal(); }));
     ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
-    ASSERT_OK(task_completion.Wait());
+    task_completion.Wait();
   }
 
   return true;
@@ -178,7 +178,7 @@ bool DispatcherWaitTest(perftest::RepeatState* state, AsyncDispatcher::Type disp
     ASSERT_OK(wait.Begin(dispatcher->async_dispatcher()));
     ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_0));
     ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
-    ASSERT_OK(wait_completion.Wait());
+    wait_completion.Wait();
     wait_completion.Reset();
   }
 
@@ -229,7 +229,7 @@ bool DispatcherChannelReadTest(perftest::RepeatState* state, bool use_threads) {
     ASSERT_OK(
         channels->end0.Write(0, arena, msg, kMsgSize, cpp20::span<zx_handle_t>()).status_value());
     ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
-    ASSERT_OK(read_completion.Wait());
+    read_completion.Wait();
     read_completion.Reset();
   }
 
@@ -259,7 +259,7 @@ bool DispatcherIrqTest(perftest::RepeatState* state, AsyncDispatcher::Type dispa
   while (state->KeepRunning()) {
     irq_object.trigger(0, zx::time());
     ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
-    ASSERT_OK(irq_completion.Wait());
+    irq_completion.Wait();
     irq_completion.Reset();
   }
 
@@ -270,7 +270,7 @@ bool DispatcherIrqTest(perftest::RepeatState* state, AsyncDispatcher::Type dispa
     unbind_complete.Signal();
   }));
   ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
-  ASSERT_OK(unbind_complete.Wait());
+  unbind_complete.Wait();
 
   return true;
 }

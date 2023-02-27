@@ -57,7 +57,7 @@ bool SendEventBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
     client.Bind(std::move(endpoints->client), loop.dispatcher(), &event_handler);
     bound.Signal();
   });
-  ZX_ASSERT(ZX_OK == bound.Wait());
+  bound.Wait();
 
   while (state->KeepRunning()) {
     FidlType aligned_value = builder();
@@ -74,7 +74,7 @@ bool SendEventBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
   libsync::Completion destroyed;
   async::PostTask(loop.dispatcher(),
                   [client = std::move(client), &destroyed]() { destroyed.Signal(); });
-  ZX_ASSERT(ZX_OK == destroyed.Wait());
+  destroyed.Wait();
 
   return true;
 }

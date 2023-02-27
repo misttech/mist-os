@@ -43,7 +43,7 @@ TEST(Client, ServerReset) {
   sync_completion_wait(&event_handler.completion, ZX_TIME_INFINITE);
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST(Client, ServerResetMidCall) {
@@ -87,5 +87,5 @@ TEST(Client, ServerResetMidCall) {
   sync_completion_wait(&call_completion, ZX_TIME_INFINITE);
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }

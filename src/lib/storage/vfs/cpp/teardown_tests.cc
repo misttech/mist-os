@@ -67,7 +67,7 @@ class AsyncTearDownVnode : public FdCountVnode {
       // A) Identify when the sync has started being processed.
       completions.sync_thread_start.Signal();
       // B) Wait until the connection has been closed.
-      EXPECT_OK(completions.sync_may_proceed.Wait());
+      completions.sync_may_proceed.Wait();
       callback(status_for_sync);
     });
   }
@@ -101,7 +101,7 @@ void SyncStart(AsyncTearDownSync& completions, async::Loop* loop,
   });
 
   // A) Wait for sync to begin.
-  ASSERT_OK(completions.sync_thread_start.Wait());
+  completions.sync_thread_start.Wait();
 }
 
 void CommonTestUnpostedTeardown(zx_status_t status_for_sync) {

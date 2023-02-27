@@ -61,7 +61,7 @@ bool EchoCallBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
     client.Bind(std::move(client_end), dispatcher->get());
     bound.Signal();
   });
-  ZX_ASSERT(ZX_OK == bound.Wait());
+  bound.Wait();
 
   while (state->KeepRunning()) {
     libsync::Completion completion;
@@ -82,16 +82,16 @@ bool EchoCallBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
                 completion.Signal();
               });
     });
-    ZX_ASSERT(ZX_OK == completion.Wait());
+    completion.Wait();
   }
 
   libsync::Completion destroyed;
   async::PostTask(dispatcher->async_dispatcher(),
                   [client = std::move(client), &destroyed]() { destroyed.Signal(); });
-  ZX_ASSERT(ZX_OK == destroyed.Wait());
+  destroyed.Wait();
 
   dispatcher->ShutdownAsync();
-  ZX_ASSERT(ZX_OK == dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 
   return true;
 }

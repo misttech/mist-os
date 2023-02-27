@@ -71,10 +71,10 @@ void TokenTest::SetUp() {
 
 void TokenTest::TearDown() {
   dispatcher_remote_.ShutdownAsync();
-  ASSERT_OK(dispatcher_remote_shutdown_completion_.Wait());
+  dispatcher_remote_shutdown_completion_.Wait();
 
   dispatcher_local_.ShutdownAsync();
-  ASSERT_OK(dispatcher_local_shutdown_completion_.Wait());
+  dispatcher_local_shutdown_completion_.Wait();
 }
 
 class ProtocolTest : public TokenTest {
@@ -110,7 +110,7 @@ void ProtocolTest::VerifyPeerClosed(fdf::Channel& channel, fdf::Dispatcher& disp
   zx_status_t status = channel_read->Begin(dispatcher.get());
   ASSERT_TRUE((status == ZX_OK) || (status == ZX_ERR_PEER_CLOSED));
   if (status == ZX_OK) {
-    ASSERT_OK(read_completion.Wait());
+    read_completion.Wait();
   }
 }
 
@@ -127,7 +127,7 @@ TEST_F(ProtocolTest, RegisterThenConnect) {
   ASSERT_OK(protocol.Register(std::move(token_remote_), dispatcher_remote_.get()));
 
   ASSERT_OK(fdf::ProtocolConnect(std::move(token_local_), std::move(fdf_remote_)));
-  ASSERT_OK(callback_received.Wait());
+  callback_received.Wait();
 }
 
 // Tests receiving a client connect request before the corresponding protocol
@@ -144,7 +144,7 @@ TEST_F(ProtocolTest, ConnectThenRegister) {
   };
   fdf::Protocol protocol(handler);
   ASSERT_OK(protocol.Register(std::move(token_remote_), dispatcher_remote_.get()));
-  ASSERT_OK(callback_received.Wait());
+  callback_received.Wait();
 }
 
 struct Conn {
@@ -186,7 +186,7 @@ TEST_F(ProtocolTest, MultiplePendingConnections) {
     };
     fdf::Protocol protocol(handler);
     ASSERT_OK(protocol.Register(std::move(conns[i].token_remote), dispatcher_remote_.get()));
-    ASSERT_OK(callback_received.Wait());
+    callback_received.Wait();
   }
 }
 
@@ -225,7 +225,7 @@ TEST_F(ProtocolTest, MultiplePendingConnectionsDifferentOrder) {
       };
       fdf::Protocol protocol(handler);
       ASSERT_OK(protocol.Register(std::move(conns[j].token_remote), dispatcher_remote_.get()));
-      ASSERT_OK(callback_received.Wait());
+      callback_received.Wait();
       num_conns++;
     }
   }
@@ -235,7 +235,7 @@ TEST_F(ProtocolTest, MultiplePendingConnectionsDifferentOrder) {
 // Tests registering a protocol to a dispatcher that has already started shutting down.
 TEST_F(ProtocolTest, RegisterAfterDispatcherShutdown) {
   dispatcher_remote_.ShutdownAsync();
-  ASSERT_OK(dispatcher_remote_shutdown_completion_.Wait());
+  dispatcher_remote_shutdown_completion_.Wait();
 
   auto handler = [&](fdf_dispatcher_t* dispatcher, fdf::Protocol* protocol, zx_status_t status,
                      fdf::Channel channel) { ASSERT_FALSE(true); };
@@ -258,9 +258,9 @@ TEST_F(ProtocolTest, DispatcherShutdown) {
   ASSERT_OK(protocol.Register(std::move(token_remote_), dispatcher_remote_.get()));
 
   dispatcher_remote_.ShutdownAsync();
-  ASSERT_OK(dispatcher_remote_shutdown_completion_.Wait());
+  dispatcher_remote_shutdown_completion_.Wait();
 
-  ASSERT_OK(callback_received.Wait());
+  callback_received.Wait();
 
   // Try connecting to the protocol. The user will not receive an error until they try to
   // communicate over the fdf channel.
@@ -286,9 +286,9 @@ TEST_F(ProtocolTest, DispatcherShutdownAndPeerClosed) {
   token_local_.reset();
   dispatcher_remote_.ShutdownAsync();
 
-  ASSERT_OK(dispatcher_remote_shutdown_completion_.Wait());
+  dispatcher_remote_shutdown_completion_.Wait();
 
-  ASSERT_OK(callback_received.Wait());
+  callback_received.Wait();
 }
 
 // Tests registering a protocol, and the other driver dropping their token handle
@@ -307,7 +307,7 @@ TEST_F(ProtocolTest, RegisterThenPeerClosed) {
   token_local_.reset();
 
   // Connect callback should get canceled status.
-  ASSERT_OK(callback_received.Wait());
+  callback_received.Wait();
 }
 
 // Tests the token peer closing, then the protocol being registered.
@@ -325,7 +325,7 @@ TEST_F(ProtocolTest, PeerClosedThenRegister) {
   ASSERT_OK(protocol.Register(std::move(token_remote_), dispatcher_remote_.get()));
 
   // Connect callback should get canceled status.
-  ASSERT_OK(callback_received.Wait());
+  callback_received.Wait();
 }
 
 // Tests requesting a protocol connection, and the token peer is dropped
@@ -408,5 +408,5 @@ TEST_F(ProtocolTest, RegisterSameProtocolHandlerTwice) {
                                                  &protocol_handler));
 
   ASSERT_OK(fdf::ProtocolConnect(std::move(token_local_), std::move(fdf_remote_)));
-  ASSERT_OK(protocol_handler.completion.Wait());
+  protocol_handler.completion.Wait();
 }

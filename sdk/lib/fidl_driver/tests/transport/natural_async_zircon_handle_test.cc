@@ -62,10 +62,10 @@ TEST(DriverTransport, NaturalSendZirconHandleAsync) {
             completion.Signal();
           });
 
-  ASSERT_OK(completion.Wait());
+  completion.Wait();
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST(DriverTransport, NaturalSendZirconHandleEncodeErrorShouldCloseHandle) {
@@ -91,7 +91,7 @@ TEST(DriverTransport, NaturalSendZirconHandleEncodeErrorShouldCloseHandle) {
   ASSERT_NO_FAILURES(fidl_driver_testing::AssertPeerClosed(c2));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

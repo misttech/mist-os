@@ -69,7 +69,7 @@ TEST(DriverTransport, NaturalTwoWayAsync) {
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST(DriverTransport, NaturalTwoWayAsyncShared) {
@@ -104,7 +104,7 @@ TEST(DriverTransport, NaturalTwoWayAsyncShared) {
   ASSERT_OK(sync_completion_wait(&done, ZX_TIME_INFINITE));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

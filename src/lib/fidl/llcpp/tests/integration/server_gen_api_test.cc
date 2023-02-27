@@ -1007,7 +1007,7 @@ TEST(BindServerTestCase, EnableNextDispatchInLongRunningHandler) {
   // Teardown should not complete unless |long_operation| completes.
   ASSERT_STATUS(ZX_ERR_TIMED_OUT, unbound.Wait(zx::msec(100)));
   long_operation.Signal();
-  ASSERT_OK(unbound.Wait());
+  unbound.Wait();
 
   for (auto& thread : threads)
     thread.join();
@@ -1188,7 +1188,7 @@ TEST(BindServerTestCase, UnbindInfoDecodeError) {
   EXPECT_STATUS(ZX_ERR_PEER_CLOSED,
                 local.channel().call(0, zx::time::infinite(), &args, nullptr, nullptr));
 
-  ASSERT_OK(observer.completion().Wait());
+  observer.completion().Wait();
 }
 
 TEST(BindServerTestCase, UnbindInfoDispatcherBeginsShutdownDuringMessageHandling) {
@@ -1229,7 +1229,7 @@ TEST(BindServerTestCase, UnbindInfoDispatcherBeginsShutdownDuringMessageHandling
   fidl::WireResult result = fidl::WireCall(local)->Echo("");
   EXPECT_OK(result.status());
 
-  ASSERT_OK(observer.completion().Wait());
+  observer.completion().Wait();
 }
 
 // Error sending reply should trigger binding teardown.
@@ -1260,7 +1260,7 @@ TEST(BindServerTestCase, UnbindInfoErrorSendingReply) {
   fidl::WireResult result = fidl::WireCall(local)->Echo("");
   EXPECT_EQ(ZX_ERR_PEER_CLOSED, result.status());
 
-  ASSERT_OK(observer.completion().Wait());
+  observer.completion().Wait();
 }
 
 // Error sending events should trigger binding teardown.

@@ -68,7 +68,7 @@ TEST(DriverTransport, WireOneWayVector) {
   ASSERT_OK(sync_completion_wait(&server->done, ZX_TIME_INFINITE));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST(DriverTransport, WireOneWayVectorSyncViaAsyncClient) {
@@ -101,7 +101,7 @@ TEST(DriverTransport, WireOneWayVectorSyncViaAsyncClient) {
   ASSERT_OK(sync_completion_wait(&server->done, ZX_TIME_INFINITE));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

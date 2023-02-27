@@ -105,15 +105,15 @@ class OneWayTest {
       ASSERT_OK(
           client_.Write(0, arena_, msg, msg_size_, cpp20::span<zx_handle_t>()).status_value());
     }
-    ASSERT_OK(completion.Wait());
+    completion.Wait();
     FX_CHECK(num_msgs_read == msg_count_);
   }
 
   void TearDown() {
     client_dispatcher_.ShutdownAsync();
     server_dispatcher_.ShutdownAsync();
-    ASSERT_OK(client_dispatcher_shutdown_.Wait());
-    ASSERT_OK(server_dispatcher_shutdown_.Wait());
+    client_dispatcher_shutdown_.Wait();
+    server_dispatcher_shutdown_.Wait();
 
     fdf_testing_pop_driver();
   }
@@ -207,7 +207,7 @@ class OneWayZirconTest {
       ASSERT_OK(client_.write(0, msg_buffer_.data(), msg_size_, nullptr, 0));
     }
 
-    ASSERT_OK(completion.Wait());
+    completion.Wait();
   }
 
   void TearDown() {

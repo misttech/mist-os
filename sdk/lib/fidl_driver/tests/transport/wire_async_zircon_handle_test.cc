@@ -87,7 +87,7 @@ void TestImpl() {
   ASSERT_OK(sync_completion_wait(&done, ZX_TIME_INFINITE));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST(DriverTransport, WireSendZirconHandleAsync) { TestImpl<TestServer, true>(); }
@@ -121,7 +121,7 @@ TEST(DriverTransport, WireSendZirconHandleEncodeErrorShouldCloseHandle) {
   ASSERT_NO_FAILURES(fidl_driver_testing::AssertPeerClosed(c2));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

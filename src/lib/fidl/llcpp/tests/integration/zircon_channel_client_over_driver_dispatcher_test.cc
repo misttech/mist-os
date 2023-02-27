@@ -73,7 +73,7 @@ TEST(WireClient, CannotDestroyInDifferentDispatcherThanBound) {
                     client->Bind(std::move(endpoints->client), async_dispatcher);
                     created.Signal();
                   });
-  ASSERT_OK(created.Wait());
+  created.Wait();
 
   // Destroy on another.
   libsync::Completion destroyed;
@@ -84,13 +84,13 @@ TEST(WireClient, CannotDestroyInDifferentDispatcherThanBound) {
                  "same |fdf_dispatcher_t|.");
     destroyed.Signal();
   });
-  ASSERT_OK(destroyed.Wait());
+  destroyed.Wait();
 
   dispatcher1.ShutdownAsync();
   dispatcher2.ShutdownAsync();
 
-  ASSERT_OK(dispatcher1_shutdown->Wait());
-  ASSERT_OK(dispatcher2_shutdown->Wait());
+  dispatcher1_shutdown->Wait();
+  dispatcher2_shutdown->Wait();
 }
 
 TEST(WireClient, CannotDestroyOnUnmanagedThread) {
@@ -111,7 +111,7 @@ TEST(WireClient, CannotDestroyOnUnmanagedThread) {
                     client->Bind(std::move(endpoints->client), async_dispatcher);
                     created.Signal();
                   });
-  ASSERT_OK(created.Wait());
+  created.Wait();
 
   // Destroy on another.
   libsync::Completion destroyed;
@@ -122,11 +122,11 @@ TEST(WireClient, CannotDestroyOnUnmanagedThread) {
         "driver dispatcher. Ensure the object is always used from a dispatcher managed thread.");
     destroyed.Signal();
   });
-  ASSERT_OK(destroyed.Wait());
+  destroyed.Wait();
   thread.join();
 
   dispatcher1.ShutdownAsync();
-  ASSERT_OK(dispatcher1_shutdown->Wait());
+  dispatcher1_shutdown->Wait();
 }
 
 using DispatcherOptions = uint32_t;
@@ -152,7 +152,7 @@ TEST_P(WireSharedClient, CanSendAcrossDispatcher) {
                     client->Bind(std::move(endpoints->client), async_dispatcher);
                     created.Signal();
                   });
-  ASSERT_OK(created.Wait());
+  created.Wait();
 
   // Destroy on another.
   libsync::Completion destroyed;
@@ -160,12 +160,12 @@ TEST_P(WireSharedClient, CanSendAcrossDispatcher) {
     client.reset();
     destroyed.Signal();
   });
-  ASSERT_OK(destroyed.Wait());
+  destroyed.Wait();
 
   dispatcher1.ShutdownAsync();
   dispatcher2.ShutdownAsync();
-  ASSERT_OK(dispatcher1_shutdown->Wait());
-  ASSERT_OK(dispatcher2_shutdown->Wait());
+  dispatcher1_shutdown->Wait();
+  dispatcher2_shutdown->Wait();
 }
 
 TEST_P(WireSharedClient, CanDestroyOnUnmanagedThread) {
@@ -187,15 +187,15 @@ TEST_P(WireSharedClient, CanDestroyOnUnmanagedThread) {
                                  fidl::ObserveTeardown([&] { destroyed.Signal(); }));
                     created.Signal();
                   });
-  ASSERT_OK(created.Wait());
+  created.Wait();
 
   // Destroy on another.
   std::thread thread([&] { client.reset(); });
-  ASSERT_OK(destroyed.Wait());
+  destroyed.Wait();
   thread.join();
 
   dispatcher1.ShutdownAsync();
-  ASSERT_OK(dispatcher1_shutdown->Wait());
+  dispatcher1_shutdown->Wait();
 }
 
 TEST(WireClient, CannotBindUnsynchronizedDispatcher) {
@@ -220,10 +220,10 @@ TEST(WireClient, CannotBindUnsynchronizedDispatcher) {
     client = {};
     created.Signal();
   });
-  ASSERT_OK(created.Wait());
+  created.Wait();
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST_P(WireSharedClient, CanBindAnyDispatcher) {
@@ -253,10 +253,10 @@ TEST_P(WireSharedClient, CanBindAnyDispatcher) {
     client = {};
     created.Signal();
   });
-  ASSERT_OK(created.Wait());
+  created.Wait();
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 INSTANTIATE_TEST_SUITE_P(WireSharedClientTests, WireSharedClient,

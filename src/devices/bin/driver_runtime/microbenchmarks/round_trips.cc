@@ -123,8 +123,8 @@ class ChannelDispatcherTest {
   void TearDown() {
     client_dispatcher_.ShutdownAsync();
     server_dispatcher_.ShutdownAsync();
-    ASSERT_OK(client_dispatcher_shutdown_.Wait());
-    ASSERT_OK(server_dispatcher_shutdown_.Wait());
+    client_dispatcher_shutdown_.Wait();
+    server_dispatcher_shutdown_.Wait();
   }
 
   void ShutdownHandler(fdf_dispatcher_t* dispatcher) {

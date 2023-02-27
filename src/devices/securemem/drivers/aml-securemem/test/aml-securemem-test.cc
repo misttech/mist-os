@@ -120,7 +120,7 @@ class AmlogicSecureMemTest : public zxtest::Test {
     completion.Wait();
 
     dispatcher_.ShutdownAsync();
-    ASSERT_OK(shutdown_completion_.Wait());
+    shutdown_completion_.Wait();
   }
 
   void ShutdownHandler(fdf_dispatcher_t* dispatcher) {

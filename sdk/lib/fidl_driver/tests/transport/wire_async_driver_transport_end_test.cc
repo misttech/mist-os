@@ -69,7 +69,7 @@ TEST(DriverTransport, WireSendDriverClientEnd) {
   ASSERT_OK(sync_completion_wait(&done, ZX_TIME_INFINITE));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST(DriverTransport, WireSendDriverClientEndEncodeErrorShouldCloseHandle) {
@@ -94,7 +94,7 @@ TEST(DriverTransport, WireSendDriverClientEndEncodeErrorShouldCloseHandle) {
   ASSERT_NO_FAILURES(fidl_driver_testing::AssertPeerClosed(*send_endpoints->server.handle()));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

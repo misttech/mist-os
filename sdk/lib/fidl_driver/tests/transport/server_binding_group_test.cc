@@ -66,7 +66,7 @@ TEST(ServerBindingGroup, Control) {
   });
 
   dispatcher.ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown->Wait());
+  dispatcher_shutdown->Wait();
 
   // Unbind does not call CloseHandler.
   EXPECT_FALSE(close_handler_called);
@@ -104,14 +104,14 @@ TEST(ServerBindingGroup, CloseHandler) {
         client_end.reset();
       });
 
-  ASSERT_OK(got_error.Wait());
+  got_error.Wait();
   ASSERT_TRUE(error.has_value());
   EXPECT_TRUE(error->is_peer_closed());
   EXPECT_EQ(1, close_handler_count);
 
   async::PostTask(dispatcher.async_dispatcher(), [&] { binding.reset(); });
   dispatcher.ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown->Wait());
+  dispatcher_shutdown->Wait();
   EXPECT_EQ(1, close_handler_count);
 }
 
@@ -143,10 +143,10 @@ TEST(ServerBindingGroup, CannotBindUnsynchronizedDispatcher) {
     binding.reset();
     created.Signal();
   });
-  ASSERT_OK(created.Wait());
+  created.Wait();
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

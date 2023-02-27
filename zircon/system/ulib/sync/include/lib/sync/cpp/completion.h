@@ -7,6 +7,8 @@
 
 #include <lib/sync/completion.h>
 #include <lib/zx/time.h>
+#include <zircon/assert.h>
+#include <zircon/status.h>
 
 namespace libsync {
 
@@ -19,19 +21,23 @@ namespace libsync {
 /// This class is thread-safe.
 class Completion {
  public:
-  /// Returns ZX_OK if woken by a call to |Signal| or if the completion has
-  /// already been signaled. Otherwise, waits forever.
-  zx_status_t Wait() { return Wait(zx::time::infinite()); }
+  /// Waits until woken by a call to |Signal| or if the completion has
+  /// already been signaled.
+  void Wait() {
+    zx_status_t status = Wait(zx::time::infinite());
+    ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Wait with infinite deadline cannot fail. Got %s",
+                        zx_status_get_string(status));
+  }
 
   /// Returns ZX_ERR_TIMED_OUT if |timeout| elapses, and ZX_OK if woken by a
   /// call to |Signal| or if the completion has already been signaled.
-  zx_status_t Wait(zx::duration timeout) {
+  [[nodiscard]] zx_status_t Wait(zx::duration timeout) {
     return sync_completion_wait(&completion_, timeout.get());
   }
 
   /// Returns ZX_ERR_TIMED_OUT if |deadline| elapses, and ZX_OK if woken by a
   /// call to |Signal| or if the completion has already been signaled.
-  zx_status_t Wait(zx::time deadline) {
+  [[nodiscard]] zx_status_t Wait(zx::time deadline) {
     return sync_completion_wait_deadline(&completion_, deadline.get());
   }
 

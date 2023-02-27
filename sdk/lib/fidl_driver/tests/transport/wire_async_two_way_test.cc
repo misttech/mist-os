@@ -82,7 +82,7 @@ TEST(DriverTransport, WireTwoWayAsync) {
   ASSERT_OK(sync_completion_wait(&destroyed, ZX_TIME_INFINITE));
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 TEST(DriverTransport, WireTwoWayAsyncShared) {
@@ -119,7 +119,7 @@ TEST(DriverTransport, WireTwoWayAsyncShared) {
             ASSERT_EQ(server->fdf_response_arena.get(), result.arena().get());
             done.Signal();
           });
-  ASSERT_OK(done.Wait());
+  done.Wait();
 
   // Test |Then|.
   done.Reset();
@@ -131,10 +131,10 @@ TEST(DriverTransport, WireTwoWayAsyncShared) {
         ASSERT_EQ(server->fdf_response_arena.get(), result.arena().get());
         done.Signal();
       });
-  ASSERT_OK(done.Wait());
+  done.Wait();
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

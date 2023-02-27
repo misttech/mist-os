@@ -78,12 +78,12 @@ TEST(DriverTransport, WireSendFdfChannelSync) {
     server.reset();
   };
   async::PostTask(client_dispatcher->async_dispatcher(), run_on_dispatcher_thread);
-  ASSERT_OK(server_destruction.Wait());
+  server_destruction.Wait();
 
   client_dispatcher->ShutdownAsync();
   server_dispatcher->ShutdownAsync();
-  ASSERT_OK(client_dispatcher_shutdown.Wait());
-  ASSERT_OK(server_dispatcher_shutdown.Wait());
+  client_dispatcher_shutdown.Wait();
+  server_dispatcher_shutdown.Wait();
 }
 
 }  // namespace

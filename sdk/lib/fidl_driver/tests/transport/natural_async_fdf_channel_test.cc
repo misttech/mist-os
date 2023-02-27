@@ -59,10 +59,10 @@ TEST(DriverTransport, NaturalSendFdfChannelAsync) {
             completion.Signal();
           });
 
-  ASSERT_OK(completion.Wait());
+  completion.Wait();
 
   dispatcher->ShutdownAsync();
-  ASSERT_OK(dispatcher_shutdown.Wait());
+  dispatcher_shutdown.Wait();
 }
 
 }  // namespace

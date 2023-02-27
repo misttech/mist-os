@@ -116,7 +116,7 @@ TEST_F(DispatcherBound, Construct) {
     EXPECT_FALSE(obj.has_value());
   }};
 
-  EXPECT_OK(create.Wait());
+  create.Wait();
   EXPECT_EQ(0, object_count->load());
 
   EXPECT_OK(loop().RunUntilIdle());
@@ -154,7 +154,7 @@ TEST_F(DispatcherBound, Emplace) {
     will_destroy.Wait();
   }};
 
-  EXPECT_OK(did_create_1.Wait());
+  did_create_1.Wait();
   EXPECT_EQ(0, object_count_1->load());
   EXPECT_EQ(0, object_count_2->load());
 
@@ -163,7 +163,7 @@ TEST_F(DispatcherBound, Emplace) {
   EXPECT_EQ(0, object_count_2->load());
 
   will_create_2.Signal();
-  EXPECT_OK(did_create_2.Wait());
+  did_create_2.Wait();
   EXPECT_EQ(1, object_count_1->load());
   EXPECT_EQ(0, object_count_2->load());
 
