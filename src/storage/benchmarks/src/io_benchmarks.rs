@@ -384,6 +384,7 @@ impl Benchmark for WriteSequentialFsyncWarm {
         write_sequential(&mut file, self.op_size, self.op_count);
         // To measure the exact performance of fsync, the previous written data must be synchronized.
         assert_eq!(unsafe { libc::fsync(file.as_raw_fd()) }, 0);
+        file.seek(SeekFrom::Start(0)).unwrap();
 
         // Benchmark
         write_sequential_fsync(&mut file, self.op_size, self.op_count)
