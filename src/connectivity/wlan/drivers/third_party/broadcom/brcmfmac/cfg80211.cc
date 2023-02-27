@@ -4905,6 +4905,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   bcme_status_t fw_err = BCME_OK;
   edcf_acparam_t ac_params[AC_COUNT];
   wlan_wmm_params_t resp;
+  uint32_t wme_bss_disable;
   brcmf_if* ifp = ndev_to_if(ndev);
 
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
@@ -4916,6 +4917,18 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   if (ifp == nullptr) {
     BRCMF_ERR("ifp is null");
     wlan_fullmac_impl_ifc_on_wmm_status_resp(&ndev->if_proto, ZX_ERR_INTERNAL, &resp);
+    return;
+  }
+  // Retrieve the value of iovar wme_bss_disable. If the iovar is not present or
+  // it returns a non-zero value, indicate the error to SME.
+  status = brcmf_fil_bsscfg_int_get(ifp, "wme_bss_disable", &wme_bss_disable);
+  if ((status != ZX_OK) || wme_bss_disable) {
+    if (status != ZX_OK) {
+      BRCMF_ERR("get wme_bss_disable error (%d)", status);
+    } else {
+      status = ZX_ERR_NOT_SUPPORTED;
+    }
+    wlan_fullmac_impl_ifc_on_wmm_status_resp(&ndev->if_proto, status, &resp);
     return;
   }
 
