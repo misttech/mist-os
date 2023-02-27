@@ -28,12 +28,7 @@ import("//build/security/verifier/verify_structured_config.gni")
 #   assembly_image_name (required)
 #     [string] The image name used to assemble the system.
 #
-#   product_assembly_config_file (required)
-#     [string] The product assembly configuration file for the assembled system.
-#     Usually copied from the global gn arg fuchsia_product_assembly_config_file
-#     (defined in //build/product.gni).
-#
-#   product_assembly_config_dep (optional)
+#   product_assembly_config_label (optional)
 #     [string] The product assembly configuration dependency for the assembled
 #     system. Usually derived from the global gn arg
 #     fuchsia_product_assembly_config_label (defined in //build/product.gni).
@@ -85,8 +80,6 @@ template("scrutiny_verifiers") {
   assert(defined(invoker.assembly_image_name),
          "assembly_image_name is required for scrutiny_verifiers()")
 
-  assert(defined(invoker.product_assembly_config_file),
-         "product_assembly_config_file is required for scrutiny_verifiers()")
   assert(defined(invoker.route_sources_config) &&
              invoker.route_sources_config != "",
          "route_sources_config is required for scrutiny_verifiers()")
@@ -122,6 +115,16 @@ template("scrutiny_verifiers") {
              invoker.zbi_kernel_cmdline_goldens != [],
          "zbi_kernel_cmdline_goldens is required for scrutiny_verifiers()")
 
+  # TODO(https://fxbug.dev/122450): Remove this when usage in other repos are
+  # removed.
+  not_needed(invoker, [ "product_assembly_config_file" ])
+
+  if (defined(invoker.product_assembly_config_label)) {
+    product_assembly_config_label = invoker.product_assembly_config_label
+  } else {
+    product_assembly_config_label = "//build/assembly:default_product_config"
+  }
+
   if (defined(invoker.product_bundle_path)) {
     pb_dir = invoker.product_bundle_path
   } else {
@@ -137,12 +140,12 @@ template("scrutiny_verifiers") {
                              "testonly",
                              "visiblity",
                            ])
-    product_assembly_config_file = invoker.product_assembly_config_file
+    product_assembly_config_file =
+        get_label_info(product_assembly_config_label, "target_out_dir") + "/" +
+        get_label_info(product_assembly_config_label, "name") +
+        "/product_assembly_config.json"
     structured_config_policy = invoker.structured_config_policy
-    deps = []
-    if (defined(invoker.product_assembly_config_dep)) {
-      deps += [ invoker.product_assembly_config_dep ]
-    }
+    deps = [ product_assembly_config_label ]
   }
 
   verify_bootfs_filelist(

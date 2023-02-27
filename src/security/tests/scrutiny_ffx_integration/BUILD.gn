@@ -26,6 +26,7 @@ if (is_fuchsia) {
   # `assembled_system` builds a zbi and blob.blk for consumption by the test.
   assembled_system(_assemble_system_target_name) {
     testonly = true
+    product_assembly_config_label = "//build/assembly:default_product_config"
     bootfs_labels = []
     base_packages = [
       ":empty-pkg",
@@ -38,6 +39,7 @@ if (is_fuchsia) {
   # extracted as part of the zbi, such as in recovery images.
   assembled_system(_assemble_system_recovery_target_name) {
     testonly = true
+    product_assembly_config_label = "//build/assembly:default_product_config"
     bootfs_labels = []
     ramdisk_fvm_in_zbi = true
     base_packages = [

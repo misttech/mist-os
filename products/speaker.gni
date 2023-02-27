@@ -105,6 +105,6 @@ product_bootfs_labels += [
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
 
-# Use the product assembly config file to specify the product configuration.
-fuchsia_product_assembly_config_file =
-    "//build/assembly/default_product_config.json"
+# Use the product assembly config target to specify the product configuration.
+fuchsia_product_assembly_config_label =
+    "//build/assembly:default_product_config"

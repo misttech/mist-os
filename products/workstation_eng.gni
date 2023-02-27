@@ -6,7 +6,5 @@ import("//products/common/workstation_eng.gni")
 
 legacy_base_package_labels += [ "//src/sys/pkg:system-update-checker" ]
 
-# Use the product assembly config file to specify the session manager (and the
-# deps for the session).
+# Use the product assembly config target to specify the session manager.
 fuchsia_product_assembly_config_label = "//products/workstation"
-fuchsia_product_assembly_config_file = "${root_build_dir}/obj/products/workstation/workstation/product_assembly_config.json"

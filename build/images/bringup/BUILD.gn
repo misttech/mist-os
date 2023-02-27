@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/images/vboot/vboot.gni")
@@ -11,13 +12,24 @@ import("//build/images/vboot/vboot.gni")
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
+product_assembly_configuration("product_assembly_config") {
+  platform = {
+    feature_set_level = "bootstrap"
+    build_type = "eng"
+  }
+
+  # The bringup product can't specify anything in base/cache packages, as it
+  # doesn't have an fvm with blobfs.
+  product = {
+  }
+}
+
 bringup_base = {
   testonly = true
   output_dir = root_build_dir
   generate_fvm = false
 
-  product_assembly_config_file =
-      "//products/bringup/bringup_eng.product_assembly_config.json5"
+  product_assembly_config_label = ":product_assembly_config"
   allow_eng_platform_bundle_use = true
 
   include_component_id_index = true

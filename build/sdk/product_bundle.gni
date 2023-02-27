@@ -67,8 +67,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [scope] The scrutiny arguments that are forwarded to scrutiny_verifiers,
 #     which must include:
 #       assembly_image_name
-#       product_assembly_config_file
-#       product_assembly_config_dep
+#       product_assembly_config_label
 #       route_sources_config
 #       static_pkgs_golden
 #       verify_component_resolvers_allowlist

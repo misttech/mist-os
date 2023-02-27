@@ -8,4 +8,3 @@
 import("//products/workstation_eng.gni")
 fuchsia_product_assembly_config_label =
     "//products/workstation:workstation_paused"
-fuchsia_product_assembly_config_file = "${root_build_dir}/obj/products/workstation/workstation_paused/product_assembly_config.json"

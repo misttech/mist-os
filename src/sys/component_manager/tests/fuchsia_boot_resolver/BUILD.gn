@@ -47,6 +47,7 @@ if (current_toolchain == default_toolchain) {
   # `assembled_system` builds a zbi and blob.blk for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
+    product_assembly_config_label = "//build/assembly:default_product_config"
     bootfs_labels = []
     bootfs_package_labels = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]
     base_packages = [

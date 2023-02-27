@@ -17,6 +17,7 @@ core_realm_definition("core") {
 
 assembled_system("overnet") {
   testonly = true
+  product_assembly_config_label = "//build/assembly:default_product_config"
 
   base_packages = [
     "//src/connectivity/overnet/overnetstack",

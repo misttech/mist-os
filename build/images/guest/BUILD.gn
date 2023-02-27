@@ -81,10 +81,7 @@ if (labels.images == "//build/images/bringup") {
     # The guest image always needs to have an fvm, because it has base packages.
     generate_fvm = true
 
-    product_assembly_config_file =
-        get_label_info(":product_assembly_config", "target_out_dir") +
-        "/product_assembly_config/product_assembly_config.json"
-    product_assembly_config_dep = ":product_assembly_config"
+    product_assembly_config_label = ":product_assembly_config"
 
     # As `:product_assembly_config` specifies an `eng` build-type, the assembly
     # needs to be allowed to use the "eng" platform bundles as deps / inputs.

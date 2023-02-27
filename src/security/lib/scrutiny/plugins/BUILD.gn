@@ -66,9 +66,7 @@ if (is_fuchsia) {
       "def",
     ]
 
-    product_assembly_config_dep = ":assembly_config"
-    product_assembly_config_file =
-        "$target_out_dir/assembly_config/product_assembly_config.json"
+    product_assembly_config_label = ":assembly_config"
   }
 
   product_bundle("product_bundle") {

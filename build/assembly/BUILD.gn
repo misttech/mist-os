@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembly_input_bundle.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/python/python_action.gni")
 import("//build/security.gni")
 
@@ -23,6 +24,24 @@ if (is_fuchsia) {
       "--source-root",
       rebase_path("//", root_build_dir),
     ]
+  }
+
+  product_assembly_configuration("default_product_config") {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "bootstrap"
+    }
+    product = {
+    }
+  }
+
+  product_assembly_configuration("bootable_product_config") {
+    platform = {
+      build_type = "user"
+      feature_set_level = "bootstrap"
+    }
+    product = {
+    }
   }
 }
 

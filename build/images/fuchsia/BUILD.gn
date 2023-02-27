@@ -41,6 +41,9 @@ if (is_fuchsia) {
       !use_bringup_assembly,
       "The bringup product config cannot rely on the fuchsia assembly.  Bringup has it's own in //build/images/bringup")
 
+  assert(fuchsia_product_assembly_config_label != false,
+         "fuchsia_product_assembly_config_label must be defined for the build")
+
   ##################################################
   # Shared parameters across assemblies in this file
   ##################################################
@@ -63,18 +66,17 @@ if (is_fuchsia) {
     packages_json = "${outdir}/packages.json"
     images_json = "${outdir}/images.json"
 
-    # If the product definition is specifying a product assembly config file, then
-    # pass that to the assembled_system() call(s).
-    if (fuchsia_product_assembly_config_file != false) {
-      product_assembly_config_file = fuchsia_product_assembly_config_file
-    } else {
-      product_assembly_config_file =
-          "//build/assembly/default_product_config.json"
-    }
+    product_assembly_config_file =
+        get_label_info(fuchsia_product_assembly_config_label,
+                       "target_out_dir") + "/" +
+        get_label_info(fuchsia_product_assembly_config_label, "name") +
+        "/product_assembly_config.json"
 
     # Recovery currently should use the bootable user config.
     recovery_product_assembly_config_file =
-        "//build/assembly/bootable_product_config.json"
+        get_label_info("//build/assembly:bootable_product_config",
+                       "target_out_dir") +
+        "/bootable_product_config/product_assembly_config.json"
 
     # Outputs of prime assembly.
     outdir_prime = target_out_dir + "/fuchsia_prime_assembly"
@@ -154,10 +156,7 @@ if (is_fuchsia) {
       assembly_images_config_label = images_config_label
     }
 
-    product_assembly_config_file = files.product_assembly_config_file
-    if (fuchsia_product_assembly_config_label != false) {
-      product_assembly_config_dep = fuchsia_product_assembly_config_label
-    }
+    product_assembly_config_label = fuchsia_product_assembly_config_label
 
     cmdline_deps = [ "//build/input:bootfs" ]
 
@@ -452,8 +451,8 @@ if (is_fuchsia) {
         zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
         zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
         zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
-        product_assembly_config_dep = fuchsia_base.product_assembly_config_dep
-        product_assembly_config_file = fuchsia_base.product_assembly_config_file
+        product_assembly_config_label =
+            fuchsia_base.product_assembly_config_label
       }
     }
   }
@@ -495,10 +494,11 @@ if (is_fuchsia) {
       files.product_assembly_config_file,
       files.recovery_product_assembly_config_file,
     ]
-    deps += [ recovery_label ]
-    if (fuchsia_product_assembly_config_label != false) {
-      deps += [ fuchsia_product_assembly_config_label ]
-    }
+    deps += [
+      "//build/assembly:bootable_product_config",
+      fuchsia_product_assembly_config_label,
+      recovery_label,
+    ]
 
     # Add the security configs and goldens.
     sources += fuchsia_static_pkgs_goldens

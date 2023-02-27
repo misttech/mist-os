@@ -86,6 +86,7 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     testonly = true
+    product_assembly_config_label = "//build/assembly:default_product_config"
 
     # Needed for scrutiny to find root.cm and other component config.
     bootfs_labels = [ "//build/input:bootfs" ]

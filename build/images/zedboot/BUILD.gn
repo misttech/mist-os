@@ -24,6 +24,8 @@ assembled_system("zedboot_assembly") {
   fshost_config = board_zedboot_fshost_config
   allow_eng_platform_bundle_use = true
 
+  product_assembly_config_label = "//build/assembly:default_product_config"
+
   if (zedboot_images_config_label != false) {
     assembly_images_config_label = zedboot_images_config_label
   }

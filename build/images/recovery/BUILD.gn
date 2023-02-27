@@ -243,10 +243,7 @@ if (is_fuchsia) {
     base_packages = recovery_eng_packages
     core_realm_definition = ":core-eng"
 
-    product_assembly_config_file =
-        get_label_info(":for-eng", "target_out_dir") +
-        "/for-eng/product_assembly_config.json"
-    product_assembly_config_dep = ":for-eng"
+    product_assembly_config_label = ":for-eng"
   }
 
   product_assembly_configuration("for-fastboot") {
@@ -264,10 +261,7 @@ if (is_fuchsia) {
     base_packages = []
     core_realm_definition = ":core-eng"
 
-    product_assembly_config_file =
-        get_label_info(":for-fastboot", "target_out_dir") +
-        "/for-fastboot/product_assembly_config.json"
-    product_assembly_config_dep = ":for-fastboot"
+    product_assembly_config_label = ":for-fastboot"
 
     base_packages = [
       "//build/info:build-info",
@@ -348,10 +342,7 @@ if (is_fuchsia) {
     devmgr_config = [ "virtcon.disable=true" ]
     cmdline = []
 
-    product_assembly_config_file =
-        get_label_info(":for-fdr", "target_out_dir") +
-        "/for-fdr/product_assembly_config.json"
-    product_assembly_config_dep = ":for-fdr"
+    product_assembly_config_label = ":for-fdr"
 
     bootfs_labels = [
       "//build/input:recovery_bootfs",
@@ -388,10 +379,7 @@ if (is_fuchsia) {
     forward_variables_from(recovery_base, "*")
     base_packages = recovery_installer_packages
 
-    product_assembly_config_file =
-        get_label_info(":for-installer", "target_out_dir") +
-        "/for-installer/product_assembly_config.json"
-    product_assembly_config_dep = ":for-installer"
+    product_assembly_config_label = ":for-installer"
 
     core_realm_definition = ":core-installer"
 
