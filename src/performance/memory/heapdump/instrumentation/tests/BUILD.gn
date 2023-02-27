@@ -4,6 +4,27 @@
 
 import("//build/components.gni")
 
+executable("bind") {
+  testonly = true
+  sources = [ "bind_test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.heapdump:fuchsia.heapdump.process_cpp_wire",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/performance/memory/heapdump/instrumentation",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_unittest_component("bind-test") {
+  deps = [
+    ":bind",
+
+    # Needed for ASSERT_DEATH and ASSERT_EXIT tests.
+    "//src/sys/test_runners/gtest:death_test",
+  ]
+}
+
 executable("stats") {
   testonly = true
   sources = [ "stats_test.cc" ]
@@ -19,5 +40,8 @@ fuchsia_unittest_component("stats-test") {
 
 fuchsia_test_package("tests") {
   package_name = "heapdump-instrumentation-tests"
-  test_components = [ ":stats-test" ]
+  test_components = [
+    ":bind-test",
+    ":stats-test",
+  ]
 }

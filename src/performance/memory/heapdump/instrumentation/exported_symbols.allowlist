@@ -1,3 +1,5 @@
 __scudo_allocate_hook
 __scudo_deallocate_hook
+heapdump_bind_with_channel
+heapdump_bind_with_fdio
 heapdump_get_stats

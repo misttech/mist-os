@@ -1,0 +1,54 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/sys/core/build/core_shard.gni")
+
+core_shard("core_shard") {
+  shard_file = "meta/collector.core_shard.cml"
+}
+
+rustc_binary("bin") {
+  output_name = "heapdump-collector"
+  with_unit_tests = true
+
+  edition = "2021"
+  sources = [
+    "src/main.rs",
+    "src/process.rs",
+    "src/process_v1.rs",
+    "src/registry.rs",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.heapdump:fuchsia.heapdump.process_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-runtime",
+    "//src/performance/memory/heapdump/vmo_types",
+    "//third_party/rust_crates:test-case",
+  ]
+}
+
+fuchsia_package_with_single_component("collector") {
+  package_name = "heapdump-collector"
+  manifest = "meta/collector.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_unittest_package("tests") {
+  package_name = "heapdump-collector-tests"
+  deps = [ ":bin_test" ]
+}

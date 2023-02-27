@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_zircon::{self as zx, sys::zx_handle_t, AsHandleRef};
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::ffi::c_void;
@@ -45,6 +46,18 @@ pub extern "C" fn __scudo_deallocate_hook(ptr: *mut c_void) {
             PROFILER.forget_allocation(&mut thread_data.borrow_mut(), ptr as u64);
         });
     }
+}
+
+/// # Safety
+/// The caller must pass either a channel handle or an invalid handle.
+#[no_mangle]
+pub unsafe extern "C" fn heapdump_bind_with_channel(registry_channel: zx_handle_t) {
+    let handle = zx::Handle::from_raw(registry_channel);
+    if !handle.is_invalid() {
+        assert_eq!(handle.basic_info().unwrap().object_type, zx::ObjectType::CHANNEL);
+    }
+
+    PROFILER.bind(handle.into());
 }
 
 /// # Safety

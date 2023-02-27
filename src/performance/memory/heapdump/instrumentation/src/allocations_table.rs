@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use vmo_types::allocations_table_v1::AllocationsTableWriter;
 
 /// We cap the size of our backing VMO at 2 GiB, then preallocate it and map it entirely.
@@ -15,7 +15,6 @@ const VMO_NAME: &std::ffi::CStr =
 
 /// Tracks live allocations by storing their metadata in a dedicated VMO.
 pub struct AllocationsTable {
-    #[allow(dead_code)] // TODO(fdurso): To be removed once VMO sharing is implemented.
     vmo: zx::Vmo,
     writer: AllocationsTableWriter,
 }
@@ -31,6 +30,11 @@ impl Default for AllocationsTable {
 }
 
 impl AllocationsTable {
+    /// Duplicate the handle to the underlying VMO.
+    pub fn share_vmo(&self) -> zx::Vmo {
+        self.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed to share allocations VMO")
+    }
+
     pub fn record_allocation(&mut self, address: u64, size: u64) {
         let inserted = self.writer.insert_allocation(address, size).expect("out of space");
         assert!(inserted, "Block 0x{:x} was already allocated", address);

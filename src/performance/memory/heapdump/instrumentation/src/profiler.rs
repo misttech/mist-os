@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl_fuchsia_heapdump_process as fheapdump_process;
+use fuchsia_zircon as zx;
 use std::sync::Mutex;
 
 use crate::allocations_table::AllocationsTable;
@@ -15,12 +18,15 @@ use crate::{
 /// This is the root of all the instrumentation's data structures except for per-thread data, which
 /// is stored separately.
 pub struct Profiler {
+    _snapshot_sink: fheapdump_process::SnapshotSinkV1SynchronousProxy,
     inner: Mutex<ProfilerInner>,
 }
 
+#[derive(Default)]
 struct ProfilerInner {
     allocations_table: AllocationsTable,
     global_stats: HeapdumpGlobalStats,
+    snapshot_sink_server: Option<ServerEnd<fheapdump_process::SnapshotSinkV1Marker>>,
 }
 
 /// Per-thread instrumentation data.
@@ -31,12 +37,31 @@ pub struct PerThreadData {
 
 impl Default for Profiler {
     fn default() -> Profiler {
-        let inner = ProfilerInner {
-            allocations_table: Default::default(),
-            global_stats: Default::default(),
-        };
+        let (client, server) = create_endpoints();
+        let proxy = fheapdump_process::SnapshotSinkV1SynchronousProxy::new(client.into_channel());
 
-        Profiler { inner: Mutex::new(inner) }
+        let inner = ProfilerInner { snapshot_sink_server: Some(server), ..Default::default() };
+        Profiler { _snapshot_sink: proxy, inner: Mutex::new(inner) }
+    }
+}
+
+impl Profiler {
+    pub fn bind(&self, registry_channel: zx::Channel) {
+        let process_dup = fuchsia_runtime::process_self()
+            .duplicate(zx::Rights::SAME_RIGHTS)
+            .expect("failed to duplicate process handle");
+
+        let (snapshot_sink_server, allocations_table_dup) = {
+            let mut inner = self.inner.lock().unwrap();
+            (inner.snapshot_sink_server.take(), inner.allocations_table.share_vmo())
+        };
+        let snapshot_sink_server = snapshot_sink_server.expect("bind called more than once");
+
+        let registry_proxy = fheapdump_process::RegistrySynchronousProxy::new(registry_channel);
+
+        // Ignore result.
+        let _ =
+            registry_proxy.register_v1(process_dup, allocations_table_dup, snapshot_sink_server);
     }
 }
 

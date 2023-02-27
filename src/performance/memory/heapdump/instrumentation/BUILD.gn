@@ -21,17 +21,26 @@ rustc_staticlib("core") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.heapdump:fuchsia.heapdump.process_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/memory/heapdump/vmo_types",
     "//third_party/rust_crates:once_cell",
   ]
 }
 
+# Processes that link to this library must call either `heapdump_bind_with_channel`
+# or `heapdump_bind_with_fdio` themselves.
 shared_library("instrumentation") {
   output_name = "heapdump_instrumentation"
 
+  sources = [ "bind_with_fdio.cc" ]
+
   deps = [
     ":core",
+    "//sdk/fidl/fuchsia.heapdump:fuchsia.heapdump.process_cpp_wire",
+    "//sdk/lib/fdio",
     "//src/zircon/lib/zircon",
   ]
 
@@ -48,12 +57,17 @@ shared_library("instrumentation") {
     ldflags += [ "-Wl,--undefined=" + symbol ]
   }
 
-  # We do not want to depend on anything but the C library.
+  # We do not want to depend on anything but the C library and FDIO.
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
 library_headers("instrumentation.headers") {
   visibility = [ ":*" ]
+
   include_dir = "include"
-  headers = [ "heapdump/stats.h" ]
+  headers = [
+    "heapdump/bind_with_channel.h",
+    "heapdump/bind_with_fdio.h",
+    "heapdump/stats.h",
+  ]
 }
