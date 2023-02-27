@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, sys::zx_handle_t, AsHandleRef};
-use once_cell::sync::Lazy;
+use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::ffi::c_void;
 
@@ -12,7 +12,11 @@ mod profiler;
 
 use crate::profiler::{PerThreadData, Profiler};
 
-static PROFILER: Lazy<Profiler> = Lazy::new(Default::default);
+// WARNING! Do not change this to use once_cell: once_cell uses parking_lot, which may allocate in
+// the contended case.
+lazy_static! {
+    static ref PROFILER: Profiler = Default::default();
+}
 
 thread_local! {
     static THREAD_DATA: RefCell<PerThreadData> = RefCell::new(Default::default());
