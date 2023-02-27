@@ -6,7 +6,7 @@
 #include <lib/virtio/driver_utils.h>
 
 #include "netdevice.h"
-#include "src/connectivity/ethernet/drivers/virtio/virtio_ethernet-bind.h"
+#include "src/connectivity/ethernet/drivers/virtio/virtio_netdevice-bind.h"
 
 static const zx_driver_ops_t virtio_ethernet_driver_ops = []() {
   zx_driver_ops_t ops = {};

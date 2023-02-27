@@ -56,7 +56,7 @@ fuchsia_driver_component("gvnic") {
   component_name = "gvnic"
   deps = [ ":gvnic-driver" ]
   info = "gvnic-info.json"
-  colocate = true
+  manifest = "meta/gvnic.cml"
 }
 
 fuchsia_driver_package("gvnic-package") {

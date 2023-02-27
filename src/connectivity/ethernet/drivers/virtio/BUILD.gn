@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("virtio_ethernet_bind") {
-  rules = "virtio_ethernet.bind"
-  header_output = "virtio_ethernet-bind.h"
+  rules = "virtio_netdevice.bind"
+  header_output = "virtio_netdevice-bind.h"
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.driver.framework",
@@ -66,7 +66,7 @@ fuchsia_driver_component("virtio_netdevice") {
   component_name = "virtio_netdevice"
   deps = [ ":virtio_netdevice-driver" ]
   info = "virtio_ethernet-info.json"
-  colocate = true
+  manifest = "meta/virtio_netdevice.cml"
 }
 
 group("tests") {

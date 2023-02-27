@@ -59,8 +59,7 @@ fuchsia_driver_component("igc") {
   component_name = "igc"
   deps = [ ":igc-driver" ]
   info = "igc-info.json"
-  colocate = true
-  root_resource = true
+  manifest = "meta/igc.cml"
 }
 
 group("tests") {
