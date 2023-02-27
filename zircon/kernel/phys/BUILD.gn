@@ -235,6 +235,7 @@ if (toolchain_environment == "kernel.phys" ||
     public_deps = [
       ":allocation",
       ":handoff",
+      ":symbolize",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/ktl",
     ]
@@ -519,7 +520,9 @@ if (toolchain_environment == "kernel.phys" ||
 
     public_deps = [
       ":handoff",
+      ":uart",
       ":zbitl-allocation",
+      "//sdk/lib/fit",
       "//src/lib/trivial-allocator",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/ktl",
@@ -688,6 +691,8 @@ if (toolchain_environment == "kernel.phys") {
 
   source_set("physboot-main") {
     public = [ "physboot.h" ]
+    allow_circular_includes_from = [ ":handoff-prep" ]
+
     sources = [ "physboot.cc" ]
     deps = [
       ":allocation",

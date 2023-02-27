@@ -99,17 +99,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
 }  // namespace
 
 [[noreturn]] void BootZircon(UartDriver& uart, KernelStorage kernel_storage) {
-  debugf("%s: Finding kernel package...\n", gSymbolize->name());
-  KernelStorage::Bootfs kernelfs;
-  if (auto result = kernel_storage.root().subdir(kDefaultKernelPackage); result.is_error()) {
-    printf("physboot: Failed to read kernel package %.*s: ",
-           static_cast<int>(kDefaultKernelPackage.size()), kDefaultKernelPackage.data());
-    zbitl::PrintBootfsError(result.error_value());
-    abort();
-  } else {
-    kernelfs = ktl::move(result).value();
-  }
-  ChainBoot boot = LoadZirconZbi(kernelfs);
+  ChainBoot boot = LoadZirconZbi(kernel_storage.GetKernelPackage());
 
   // Repurpose the storage item as a place to put the handoff payload.
   KernelStorage::Zbi::iterator handoff_item = kernel_storage.item();
@@ -155,43 +145,16 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
     handoff_item = it;
   }
 
+  ktl::span zbi = boot.DataZbi().storage();
+
   // Prepare the handoff data structures.
   HandoffPrep prep;
   prep.Init(handoff_item->payload);
 
-  // Hand off the boot options first, which don't really change.  But keep a
-  // mutable reference to update boot_options.serial later to include live
-  // driver state and not just configuration like other BootOptions members do.
-  BootOptions& handoff_options = prep.SetBootOptions(*gBootOptions);
-
-  // Use the updated copy from now on.
-  gBootOptions = &handoff_options;
-
-  prep.SummarizeMiscZbiItems(boot.DataZbi().storage());
-  gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
-
-  prep.SetInstrumentation();
-
-  // This transfers the log, so logging after this is not preserved.
-  // Extracting the log buffer will automatically detach it from stdout.
-  // TODO(mcgrathr): Rename to physboot.log with some prefix.
-  prep.PublishLog("data/phys/symbolizer.log", ktl::move(*ktl::exchange(gLog, nullptr)));
-
-  // Finalize the published VMOs, including the log just published above.
-  prep.FinishVmos();
-
-  // Now that all time samples have been collected, copy gBootTimes into the
-  // hand-off.
-  prep.handoff()->times = gBootTimes;
-
-  // Copy any post-Init() serial state from the live driver here in physboot
-  // into the handoff BootOptions.  There should be no more printing from here
-  // on.  TODO(fxbug.dev/84107): Actually there is some printing in BootZbi,
-  // but no current drivers carry post-Init() state so it's harmless for now.
-  uart.Visit([&handoff_options](const auto& driver) { handoff_options.serial = driver.uart(); });
-
-  // Even though the kernel is still a ZBI and mostly using the ZBI protocol
-  // for booting, the PhysHandoff pointer (physical address) is now the
-  // argument to the kernel, not the data ZBI address.
-  boot.Boot(prep.handoff());
+  prep.DoHandoff(uart, zbi, [&boot](PhysHandoff* handoff) {
+    // Even though the kernel is still a ZBI and mostly using the ZBI protocol
+    // for booting, the PhysHandoff pointer (physical address) is now the
+    // argument to the kernel, not the data ZBI address.
+    boot.Boot(handoff);
+  });
 }

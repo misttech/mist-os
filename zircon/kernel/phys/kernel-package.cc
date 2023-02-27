@@ -19,6 +19,7 @@
 #include <ktl/string_view.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
+#include <phys/symbolize.h>
 #include <phys/zbitl-allocation.h>
 #include <pretty/cpp/sizes.h>
 
@@ -112,4 +113,18 @@ void KernelStorage::Init(Zbi zbi) {
   } else {
     bootfs_reader_ = ktl::move(result).value();
   }
+}
+
+KernelStorage::Bootfs KernelStorage::GetKernelPackage() const {
+  ktl::string_view package_name = kDefaultKernelPackage;
+  debugf("%s: Finding kernel package %.*s...\n", gSymbolize->name(),
+         static_cast<int>(package_name.size()), package_name.data());
+  auto result = root().subdir(package_name);
+  if (result.is_error()) {
+    printf("%s: Failed to read kernel package %.*s: ", gSymbolize->name(),
+           static_cast<int>(package_name.size()), package_name.data());
+    zbitl::PrintBootfsError(result.error_value());
+    abort();
+  }
+  return ktl::move(result).value();
 }

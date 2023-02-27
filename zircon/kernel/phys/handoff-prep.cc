@@ -25,6 +25,7 @@
 #include <phys/symbolize.h>
 
 #include "log.h"
+#include "physboot.h"
 
 #include <ktl/enforce.h>
 
@@ -181,4 +182,41 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
   ktl::span copy = PublishVmo(name, content_size);
   ZX_ASSERT(copy.size_bytes() == content_size);
   memcpy(copy.data(), buffer.get(), content_size);
+}
+
+[[noreturn]] void HandoffPrep::DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
+                                         fit::inline_function<void(PhysHandoff*)> boot) {
+  // Hand off the boot options first, which don't really change.  But keep a
+  // mutable reference to update boot_options.serial later to include live
+  // driver state and not just configuration like other BootOptions members do.
+  BootOptions& handoff_options = SetBootOptions(*gBootOptions);
+
+  // Use the updated copy from now on.
+  gBootOptions = &handoff_options;
+
+  SummarizeMiscZbiItems(zbi);
+  gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
+
+  SetInstrumentation();
+
+  // This transfers the log, so logging after this is not preserved.
+  // Extracting the log buffer will automatically detach it from stdout.
+  // TODO(mcgrathr): Rename to physboot.log with some prefix.
+  PublishLog("data/phys/symbolizer.log", ktl::move(*ktl::exchange(gLog, nullptr)));
+
+  // Finalize the published VMOs, including the log just published above.
+  FinishVmos();
+
+  // Now that all time samples have been collected, copy gBootTimes into the
+  // hand-off.
+  handoff()->times = gBootTimes;
+
+  // Copy any post-Init() serial state from the live driver here in physboot
+  // into the handoff BootOptions.  There should be no more printing from here
+  // on.  TODO(fxbug.dev/84107): Actually there is some printing in BootZbi,
+  // but no current drivers carry post-Init() state so it's harmless for now.
+  uart.Visit([&handoff_options](const auto& driver) { handoff_options.serial = driver.uart(); });
+
+  boot(handoff());
+  ZX_PANIC("HandoffPrep::DoHandoff boot function returned!");
 }

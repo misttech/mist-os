@@ -62,6 +62,10 @@ class KernelStorage {
     times.Set(PhysBootTimes::kDecompressEnd, decompress_end_ts_);
   }
 
+  // Get the subdir of root() for the kernel package to boot.
+  // If it's not found, this doesn't return.
+  KernelStorage::Bootfs GetKernelPackage() const;
+
  private:
   using BootfsReader = zbitl::Bootfs<ktl::span<ktl::byte>>;
 
