@@ -67,7 +67,9 @@ foreach(name, platform_aib_names) {
 # The names of all of the platform's Assembly Input Bundles.
 # LINT.IfChange
 _eng_aib_names = [
-  # minimal feature-set-level:
+  # the core realm additions for eng build-type assemblies
+  "core_realm_eng",
+
   "common_minimal_eng",
 
   # SWD (Software Delivery)

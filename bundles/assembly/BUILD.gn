@@ -238,8 +238,49 @@ assembly_input_bundle("core_realm") {
   ]
 }
 
-# This corresponds to the "minimal" platform configuration, the most-basic
-# configuration that has pkg_resolver and pkg_cache, and can OTA itself.
+# This is common across all eng-mode products that include the core realm.
+#
+assembly_input_bundle("core_realm_eng") {
+  testonly = true
+  base_packages = [
+    # Empty placeholder for now, this is setting up the pattern, before actually
+    # moving packages into it (the next CL)
+
+    # Dash launcher should be available in every engineering-mode product.
+    "//src/sys/tools/debug-dash-launcher",
+
+    # The fs_realm component should be available in every engineering-mode product.
+    "//src/storage/fs_realm",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        core = [
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          rebase_path(
+              "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
+              root_build_dir),
+          rebase_path("//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
+                      root_build_dir),
+        ]
+      }
+    },
+  ]
+}
+
+########
+#
+# The "minimal" AIBs
+#
+# These correspond to the use of "minimal.gni" as a platform configuration.  Its
+# contents are being moved into the `core_realm` and feature- or subsystem-
+# specific AIBs that are are included in various different combinations of the
+# feature_set_level and the build-type.
+#
+# TODO(http://fxbug.dev/113922) Move the contents of common_minimal to the right
+# feature- or subsystem-specific AIBs (if not to the core realm AIBs).
 #
 # WARNING:  The only way to remove items from this AIB for a given product is to
 # move them to other AIBs that are included by all other products.
@@ -384,32 +425,7 @@ assembly_input_bundle("common_minimal") {
 #
 assembly_input_bundle("common_minimal_eng") {
   testonly = true
-  base_packages = [
-    # Dash launcher should be available in every engineering-mode product.
-    "//src/sys/tools/debug-dash-launcher",
-
-    # The fs_realm component should be available in every engineering-mode product.
-    "//src/storage/fs_realm",
-
-    "//src/performance/trace_manager:trace_manager_pkg",
-  ]
-
-  compiled_packages = [
-    {
-      name = "core"
-      component_shards = {
-        core = [
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
-          rebase_path(
-              "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
-              root_build_dir),
-          rebase_path("//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
-                      root_build_dir),
-        ]
-      }
-    },
-  ]
+  base_packages = [ "//src/performance/trace_manager:trace_manager_pkg" ]
 }
 
 # This is common across all eng-mode and user-debug products, at the minimal or
@@ -437,7 +453,20 @@ assembly_input_bundle("common_minimal_userdebug") {
   ]
 }
 
+########
+#
+# Feature- and Subsystem-specific AIBs
+#
+# These are optionally present in all products that include the `/core` realm
+# (via the `:core_realm` AIB).  Each should list which feature_set_level and
+# build type that it is valid for.
+
 # Core starnix support.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
 assembly_input_bundle("starnix_support") {
   base_packages = [ "//src/proc/bin/starnix_manager:starnix_package" ]
   if (target_cpu == "x64") {
@@ -455,25 +484,17 @@ assembly_input_bundle("starnix_support") {
   ]
 }
 
-# This is the "emulator support" bundle, which provides the kernel that can be
-# booted by an emulator, and which knows how to then boot the Fuchsia kernel
-# itself (Zircon).
-assembly_input_bundle("emulator_support") {
-  # Which label and file the qemu kernel is at is dependent on the arch of the
-  # target we are compiling for.
-  if (target_cpu == "x64") {
-    _qemu_kernel_file = "$root_build_dir/multiboot.bin"
-    _qemu_kernel_target =
-        "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim"
-  } else if (target_cpu == "arm64") {
-    _qemu_kernel_file = "$root_build_dir/qemu-boot-shim.bin"
-    _qemu_kernel_target = "//zircon/kernel/target/arm64/boot-shim:qemu"
-  } else {
-    assert(false, "Unsupported target cpu: $target_cpu")
-  }
-
-  qemu_kernel = _qemu_kernel_file
-  deps = [ _qemu_kernel_target ]
+# AIB containing the default variant of fshost with fxfs enabled
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
+assembly_input_bundle("fshost_fxfs") {
+  bootfs_files_labels = [
+    "//src/storage/fshost-rust:fshost_rust_fxfs_bootfs",
+    "//src/storage/bin/blobfs:bootfs",
+  ]
 }
 
 assembly_input_bundle("system_update_checker") {
@@ -484,6 +505,11 @@ assembly_input_bundle("omaha_client") {
 }
 
 # AIB to enable virtualization support.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
 assembly_input_bundle("virtualization_support") {
   base_packages = [ "//src/virtualization/bin/vmm_launcher" ]
   compiled_packages = [
@@ -498,6 +524,11 @@ assembly_input_bundle("virtualization_support") {
   ]
 }
 
+# WLAN base support
+#
+# feature_set_levels: minimal
+# build-types: all
+#
 assembly_input_bundle("wlan_base") {
   base_packages = [
     "//src/connectivity/location/regulatory_region",
@@ -505,14 +536,29 @@ assembly_input_bundle("wlan_base") {
   ]
 }
 
+# WLAN support for WEP and WPA
+#
+# feature_set_levels: minimal
+# build-types: all
+#
 assembly_input_bundle("wlan_legacy_privacy_support") {
   base_packages = []
 }
 
+# WLAN support for WPA2 and later
+#
+# feature_set_levels: minimal
+# build-types: all
+#
 assembly_input_bundle("wlan_contemporary_privacy_only_support") {
   base_packages = []
 }
 
+# WLAN support for drivers that provide their own MAC
+#
+# feature_set_levels: minimal
+# build-types: all
+#
 assembly_input_bundle("wlan_fullmac_support") {
   base_packages = [
     # This is temporarily placed here while USME migration is ongoing.
@@ -528,6 +574,11 @@ assembly_input_bundle("wlan_fullmac_support") {
   ]
 }
 
+# WLAN support for drivers that utilize a software MAC
+#
+# feature_set_levels: minimal
+# build-types: all
+#
 assembly_input_bundle("wlan_softmac_support") {
   base_packages = [
     # This is temporarily placed here while USME migration is ongoing.
@@ -555,6 +606,9 @@ assembly_input_bundle("empty_live_usb") {
 }
 
 # Example assembly input bundle for testing
+#
+# Restricted for testing assembly itself (and to provide example code)
+#
 assembly_input_bundle("example_assembly_bundle") {
   testonly = true
   compiled_packages = [
@@ -590,10 +644,32 @@ assembly_input_bundle("example_assembly_bundle") {
   ]
 }
 
-# AIB containing the default variant of fshost with fxfs enabled
-assembly_input_bundle("fshost_fxfs") {
-  bootfs_files_labels = [
-    "//src/storage/fshost-rust:fshost_rust_fxfs_bootfs",
-    "//src/storage/bin/blobfs:bootfs",
-  ]
+########
+#
+# Hardware Support AIBs
+#
+# These are used to provide support for specific hardware
+
+# Emulator Support
+#
+# This is the "emulator support" bundle, which provides the kernel that can be
+# booted by an emulator, and which knows how to then boot the Fuchsia kernel
+# itself (Zircon).
+#
+assembly_input_bundle("emulator_support") {
+  # Which label and file the qemu kernel is at is dependent on the arch of the
+  # target we are compiling for.
+  if (target_cpu == "x64") {
+    _qemu_kernel_file = "$root_build_dir/multiboot.bin"
+    _qemu_kernel_target =
+        "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim"
+  } else if (target_cpu == "arm64") {
+    _qemu_kernel_file = "$root_build_dir/qemu-boot-shim.bin"
+    _qemu_kernel_target = "//zircon/kernel/target/arm64/boot-shim:qemu"
+  } else {
+    assert(false, "Unsupported target cpu: $target_cpu")
+  }
+
+  qemu_kernel = _qemu_kernel_file
+  deps = [ _qemu_kernel_target ]
 }

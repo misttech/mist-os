@@ -29,6 +29,7 @@ PLATFORM_AIB_NAMES = [
 
 # The names of all of the platform's Assembly Input Bundles.
 ENG_PLATFORM_AIB_NAMES = PLATFORM_AIB_NAMES + [
+    "core_realm_eng",
     "common_minimal_eng",
     "system_update_checker",
     "kernel_args_eng",
