@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include <re2/re2.h>
@@ -76,10 +77,10 @@ class LibFuzzerRunner : public Runner {
   OptionsPtr options_;
 
   // Immutable set of inputs. These will be kept on merge.
-  std::vector<std::string> seed_corpus_;
+  std::unordered_set<std::string> seed_corpus_;
 
   // Dynamic set of inputs. Inputs may be added during fuzzing, and/or may be removed when merging.
-  std::vector<std::string> live_corpus_;
+  std::unordered_set<std::string> live_corpus_;
 
   bool has_dictionary_ = false;
   zx::time start_;

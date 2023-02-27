@@ -130,12 +130,14 @@ zx_status_t LibFuzzerRunner::AddToCorpus(CorpusType corpus_type, Input input) {
   auto filename = MakeFilename(input);
   switch (corpus_type) {
     case CorpusType::SEED:
-      WriteInputToFile(std::move(input), files::JoinPath(kSeedCorpusPath, filename));
-      seed_corpus_.push_back(filename);
+      if (auto [iter, inserted] = seed_corpus_.insert(filename); inserted) {
+        WriteInputToFile(std::move(input), files::JoinPath(kSeedCorpusPath, filename));
+      }
       break;
     case CorpusType::LIVE:
-      WriteInputToFile(std::move(input), files::JoinPath(kLiveCorpusPath, filename));
-      live_corpus_.push_back(filename);
+      if (auto [iter, inserted] = live_corpus_.insert(filename); inserted) {
+        WriteInputToFile(std::move(input), files::JoinPath(kLiveCorpusPath, filename));
+      }
       break;
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -166,13 +168,13 @@ std::vector<Input> LibFuzzerRunner::GetCorpus(CorpusType corpus_type) {
 
 void LibFuzzerRunner::ReloadLiveCorpus() {
   live_corpus_.clear();
-  std::vector<std::string> dups;
+  std::unordered_set<std::string> dups;
   for (const auto& dir_entry : std::filesystem::directory_iterator(kLiveCorpusPath)) {
     auto filename = dir_entry.path().filename().string();
     if (files::IsFile(files::JoinPath(kSeedCorpusPath, filename))) {
-      dups.push_back(files::JoinPath(kLiveCorpusPath, filename));
+      dups.insert(files::JoinPath(kLiveCorpusPath, filename));
     } else {
-      live_corpus_.push_back(std::move(filename));
+      live_corpus_.insert(std::move(filename));
     }
   }
   for (const auto& dup_path : dups) {
