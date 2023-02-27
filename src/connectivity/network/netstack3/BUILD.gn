@@ -45,6 +45,10 @@ common_deps = [
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
   "//zircon/system/ulib/backtrace-request/rust",
+
+  # TODO(https://fxbug.dev/122464): Replace this with
+  # #![feature(async_fn_in_trait)] when available.
+  "//third_party/rust_crates:async-trait",
 ]
 
 common_test_deps = [
@@ -76,6 +80,7 @@ common_sources = [
   "src/bindings/socket/packet.rs",
   "src/bindings/socket/raw.rs",
   "src/bindings/socket/stream.rs",
+  "src/bindings/socket/worker.rs",
   "src/bindings/stack_fidl_worker.rs",
   "src/bindings/timers.rs",
   "src/bindings/util.rs",

@@ -19,12 +19,13 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use assert_matches::assert_matches;
-use async_utils::stream::OneOrMany;
+// TODO(https://fxbug.dev/122464): Use #![feature(async_fn_in_trait)] when
+// available.
+use async_trait::async_trait;
 use explicit::ResultExt as _;
-use fidl::endpoints::{ControlHandle as _, RequestStream as _};
-use fuchsia_async as fasync;
+use fidl::endpoints::RequestStream as _;
+use fidl_fuchsia_unknown::CloseableCloseResult;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
-use futures::{StreamExt as _, TryFutureExt as _};
 use log::{error, trace, warn};
 use net_types::{
     ip::{Ip, IpVersion, Ipv4, Ipv6},
@@ -54,11 +55,12 @@ use packet_formats::{
 use thiserror::Error;
 
 use crate::bindings::{
+    socket::worker::{self, SocketWorker},
     util::{
-        self, DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
+        DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, CommonInfo, StackTime,
+    BindingsNonSyncCtxImpl, CommonInfo, NetstackContext, StackTime,
 };
 
 use super::{
@@ -86,7 +88,7 @@ pub(crate) enum DatagramProtocol {
 }
 
 /// A minimal abstraction over transport protocols that allows bindings-side state to be stored.
-pub(crate) trait Transport<I>: Debug + Sized {
+pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
     const PROTOCOL: DatagramProtocol;
     type UnboundId: Debug + Copy + IdMapCollectionKey + Send + Sync;
     type ConnId: Debug + Copy + IdMapCollectionKey + Send + Sync;
@@ -211,7 +213,7 @@ pub(crate) trait OptionFromU16: Sized {
 }
 
 /// An abstraction over transport protocols that allows generic manipulation of Core state.
-pub(crate) trait TransportState<I: Ip>: Transport<I> {
+pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type CreateConnError: IntoErrno;
     type CreateListenerError: IntoErrno;
     type ConnectListenerError: IntoErrno;
@@ -1437,31 +1439,29 @@ pub(super) fn spawn_worker(
 ) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
-            SocketWorker::<Ipv4, Udp>::spawn(ctx, properties, events)
+            SocketWorker::<BindingData<Ipv4, Udp>>::spawn(ctx, properties, events)
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
-            SocketWorker::<Ipv6, Udp>::spawn(ctx, properties, events)
+            SocketWorker::<BindingData<Ipv6, Udp>>::spawn(ctx, properties, events)
         }
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            SocketWorker::<Ipv4, IcmpEcho>::spawn(ctx, properties, events)
+            SocketWorker::<BindingData<Ipv4, IcmpEcho>>::spawn(ctx, properties, events)
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            SocketWorker::<Ipv6, IcmpEcho>::spawn(ctx, properties, events)
+            SocketWorker::<BindingData<Ipv6, IcmpEcho>>::spawn(ctx, properties, events)
         }
+    }
+    Ok(())
+}
+
+impl worker::CloseResponder for fposix_socket::SynchronousDatagramSocketCloseResponder {
+    fn send(self, arg: &mut CloseableCloseResult) -> Result<(), fidl::Error> {
+        fposix_socket::SynchronousDatagramSocketCloseResponder::send(self, arg)
     }
 }
 
-struct SocketWorker<I: Ip, T: Transport<I>> {
-    ctx: crate::bindings::NetstackContext,
-    data: BindingData<I, T>,
-    _marker: PhantomData<(I, T)>,
-}
-
-struct NewStream {
-    stream: fposix_socket::SynchronousDatagramSocketRequestStream,
-}
-
-impl<I, T> SocketWorker<I, T>
+#[async_trait]
+impl<I, T> worker::SocketWorkerHandler for BindingData<I, T>
 where
     I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
     T: Transport<Ipv4>,
@@ -1475,12 +1475,15 @@ where
         TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
     BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
 {
-    /// Starts servicing events from the provided event stream.
-    fn spawn(
-        ctx: crate::bindings::NetstackContext,
+    type Request = fposix_socket::SynchronousDatagramSocketRequest;
+    type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
+    type CloseResponder = fposix_socket::SynchronousDatagramSocketCloseResponder;
+
+    fn new(
+        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         properties: SocketWorkerProperties,
-        events: fposix_socket::SynchronousDatagramSocketRequestStream,
-    ) -> Result<(), fposix::Errno> {
+    ) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
         // signal peer that OUTGOING is available.
         // TODO(brunodalbo): We're currently not enforcing any sort of
@@ -1490,96 +1493,26 @@ where
         if let Err(e) = local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
             error!("socket failed to signal peer: {:?}", e);
         }
-        fasync::Task::spawn(
-            async move {
-                let data = {
-                    let mut guard = ctx.lock().await;
-                    let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
-
-                    let unbound_id = T::create_unbound(sync_ctx);
-                    let SocketCollection { conns: _, listeners: _ } =
-                        I::get_collection_mut(non_sync_ctx);
-                    BindingData::new(unbound_id, local_event, peer_event, properties)
-                };
-                let worker = Self { ctx, data, _marker: PhantomData };
-
-                worker.handle_stream(events).await
-            }
-            // When the closure above finishes, that means `self` goes out of
-            // scope and is dropped, meaning that the event stream's underlying
-            // channel is closed. If any errors occurred as a result of the
-            // closure, we just log them.
-            .unwrap_or_else(|e: fidl::Error| error!("socket control request error: {:?}", e)),
-        )
-        .detach();
-        Ok(())
+        let unbound_id = T::create_unbound(sync_ctx);
+        let SocketCollection { conns: _, listeners: _ } = I::get_collection_mut(non_sync_ctx);
+        Self::new(unbound_id, local_event, peer_event, properties)
     }
 
-    /// Handles [a stream of POSIX socket requests].
-    ///
-    /// Returns when getting the first `Close` request.
-    ///
-    /// [a stream of POSIX socket requests]: fposix_socket::SynchronousDatagramSocketRequestStream
-    async fn handle_stream(
-        mut self,
-        events: fposix_socket::SynchronousDatagramSocketRequestStream,
-    ) -> Result<(), fidl::Error> {
-        let mut futures = OneOrMany::new(events.into_future());
-        let deferred_close = loop {
-            let Some((request, request_stream)) = futures.next().await else {
-                // No close request needs to be deferred.
-                break None
-            };
-            let request = match request {
-                None => continue,
-                Some(Err(e)) => {
-                    log::log!(
-                        util::fidl_err_log_level(&e),
-                        "got error while polling for datagram requests: {}",
-                        e
-                    );
-                    // Continuing implicitly drops the request stream that
-                    // produced the error, which would otherwise be re-enqueued
-                    // below.
-                    continue;
-                }
-                Some(Ok(t)) => t,
-            };
-            match RequestHandler::new(&mut self).handle_request(request).await {
-                ControlFlow::Continue(None) => {}
-                ControlFlow::Break(close_responder) => {
-                    let do_close = move || {
-                        responder_send!(close_responder, &mut Ok(()));
-                        request_stream.control_handle().shutdown();
-                    };
-                    if futures.is_empty() {
-                        // Save the final close request to be performed
-                        // after the socket state is removed from Core.
-                        break Some(do_close);
-                    }
-                    do_close();
-                    continue;
-                }
-                ControlFlow::Continue(Some(NewStream { stream })) => {
-                    futures.push(stream.into_future())
-                }
-            };
-            futures.push(request_stream.into_future());
-        };
-
-        self.close_core().await;
-
-        if let Some(do_close) = deferred_close {
-            do_close();
-        }
-        Ok(())
+    async fn handle_request(
+        &mut self,
+        ctx: &NetstackContext,
+        request: Self::Request,
+    ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
+        RequestHandler { ctx, data: self }.handle_request(request).await
     }
 
-    async fn close_core(self) {
-        let Self { ctx, data: BindingData { peer_event: _, info, messages: _ }, _marker } = self;
-        let mut ctx = ctx.lock().await;
-        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-        let SocketControlInfo { _properties, state } = info;
+    fn close(
+        self,
+        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+    ) {
+        let Self { info: SocketControlInfo { _properties, state }, messages: _, peer_event: _ } =
+            self;
         match state {
             SocketState::Unbound { unbound_id } => {
                 T::remove_unbound(sync_ctx, non_sync_ctx, unbound_id)
@@ -1637,13 +1570,6 @@ struct RequestHandler<'a, I: Ip, T: Transport<I>> {
     data: &'a mut BindingData<I, T>,
 }
 
-impl<'a, I: Ip, T: Transport<I>> RequestHandler<'a, I, T> {
-    fn new(worker: &'a mut SocketWorker<I, T>) -> Self {
-        let SocketWorker { ctx, data, _marker } = worker;
-        Self { ctx, data }
-    }
-}
-
 impl<'a, I, T> RequestHandler<'a, I, T>
 where
     I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
@@ -1661,8 +1587,10 @@ where
     async fn handle_request(
         mut self,
         request: fposix_socket::SynchronousDatagramSocketRequest,
-    ) -> ControlFlow<fposix_socket::SynchronousDatagramSocketCloseResponder, Option<NewStream>>
-    {
+    ) -> ControlFlow<
+        fposix_socket::SynchronousDatagramSocketCloseResponder,
+        Option<fposix_socket::SynchronousDatagramSocketRequestStream>,
+    > {
         match request {
             fposix_socket::SynchronousDatagramSocketRequest::Describe { responder } => {
                 match self.describe() {
@@ -1689,7 +1617,7 @@ where
                     .expect("failed to create async channel");
                 let stream =
                     fposix_socket::SynchronousDatagramSocketRequestStream::from_channel(channel);
-                return ControlFlow::Continue(Some(NewStream { stream }));
+                return ControlFlow::Continue(Some(stream));
             }
             fposix_socket::SynchronousDatagramSocketRequest::Close { responder } => {
                 return ControlFlow::Break(responder);

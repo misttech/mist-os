@@ -8,6 +8,7 @@ pub(crate) mod datagram;
 pub(crate) mod packet;
 pub(crate) mod raw;
 pub(crate) mod stream;
+pub(crate) mod worker;
 
 use std::convert::Infallible as Never;
 use std::num::NonZeroU64;
@@ -44,7 +45,7 @@ const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
 
 /// Common properties for socket workers.
 #[derive(Debug)]
-struct SocketWorkerProperties {}
+pub(crate) struct SocketWorkerProperties {}
 
 pub(crate) async fn serve(
     ctx: crate::bindings::NetstackContext,
