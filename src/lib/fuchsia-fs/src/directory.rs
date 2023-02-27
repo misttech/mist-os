@@ -16,6 +16,9 @@ use {
     thiserror::Error,
 };
 
+mod watcher;
+pub use watcher::{WatchEvent, WatchMessage, Watcher};
+
 /// Error returned by fuchsia_fs::directory library.
 #[derive(Debug, Error)]
 pub enum Error {

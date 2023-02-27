@@ -59,14 +59,14 @@ trait New {
 async fn get_devices<DeviceType: New + New<Output = DeviceType>>(
     dir: &fio::DirectoryProxy,
 ) -> Result<Vec<DeviceType>> {
-    let mut watcher = fuchsia_vfs_watcher::Watcher::new(dir).await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(dir).await?;
     let mut devices = Vec::new();
     while let Some(msg) = watcher.try_next().await? {
-        if msg.event == fuchsia_vfs_watcher::WatchEvent::IDLE {
+        if msg.event == fuchsia_fs::directory::WatchEvent::IDLE {
             return Ok(devices);
         }
-        if msg.event != fuchsia_vfs_watcher::WatchEvent::EXISTING
-            && msg.event != fuchsia_vfs_watcher::WatchEvent::ADD_FILE
+        if msg.event != fuchsia_fs::directory::WatchEvent::EXISTING
+            && msg.event != fuchsia_fs::directory::WatchEvent::ADD_FILE
         {
             continue;
         }

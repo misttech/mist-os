@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy},
     fidl_fuchsia_io as fio,
     fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_vfs_watcher::{WatchEvent, Watcher},
+    fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_zircon as zx,
     futures::TryStreamExt,
     std::path::{Path, PathBuf},

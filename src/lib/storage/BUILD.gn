@@ -17,7 +17,6 @@ group("tests") {
   deps = [
     "block_client:tests",
     "fs_management:tests",
-    "fuchsia-vfs-watcher:tests",
     "key-bag:tests",
     "ramdevice_client:tests",
     "storage_device:tests",

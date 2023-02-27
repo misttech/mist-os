@@ -35,7 +35,7 @@ use fidl_fuchsia_net_virtualization as fnet_virtualization;
 use fuchsia_async::DurationExt as _;
 use fuchsia_component::client::{clone_namespace_svc, new_protocol_connector_in_dir};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
-use fuchsia_vfs_watcher as fvfs_watcher;
+use fuchsia_fs::directory as fvfs_watcher;
 use fuchsia_zircon::{self as zx, DurationNum as _};
 
 use anyhow::{anyhow, bail, Context as _};

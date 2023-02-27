@@ -18,14 +18,14 @@ pub async fn find_codecs<T: Configurator>(
     break_count: u32,
     configurator: Arc<Mutex<T>>,
 ) -> Result<(), Error> {
-    let mut watcher = fuchsia_vfs_watcher::Watcher::new(dev_proxy).await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(dev_proxy).await?;
 
     let mut codecs_found = 0;
 
     while let Some(msg) = watcher.try_next().await? {
         match msg.event {
-            fuchsia_vfs_watcher::WatchEvent::EXISTING
-            | fuchsia_vfs_watcher::WatchEvent::ADD_FILE => {
+            fuchsia_fs::directory::WatchEvent::EXISTING
+            | fuchsia_fs::directory::WatchEvent::ADD_FILE => {
                 if msg.filename == Path::new(".") {
                     continue;
                 }
@@ -60,15 +60,15 @@ pub async fn find_dais<T: Configurator>(
     break_count: u32,
     configurator: Arc<Mutex<T>>,
 ) -> Result<(), Error> {
-    let mut watcher = fuchsia_vfs_watcher::Watcher::new(dev_proxy).await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(dev_proxy).await?;
 
     let mut dais_found = 0;
     let mut stream_config_serve_tasks = Vec::new();
 
     while let Some(msg) = watcher.try_next().await? {
         match msg.event {
-            fuchsia_vfs_watcher::WatchEvent::EXISTING
-            | fuchsia_vfs_watcher::WatchEvent::ADD_FILE => {
+            fuchsia_fs::directory::WatchEvent::EXISTING
+            | fuchsia_fs::directory::WatchEvent::ADD_FILE => {
                 if msg.filename == Path::new(".") {
                     continue;
                 }

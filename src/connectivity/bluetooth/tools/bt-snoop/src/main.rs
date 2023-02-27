@@ -13,8 +13,8 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_bluetooth::bt_fidl_status,
     fuchsia_component::server::ServiceFs,
+    fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher},
     fuchsia_inspect as inspect, fuchsia_trace as trace,
-    fuchsia_vfs_watcher::{WatchEvent, WatchMessage, Watcher},
     futures::{
         future::{join, ready, Join, Ready, TryFutureExt},
         select,

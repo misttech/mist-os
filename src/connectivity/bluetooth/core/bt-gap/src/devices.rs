@@ -7,8 +7,8 @@
 //! the system
 
 use fuchsia_bluetooth::constants::HOST_DEVICE_DIR;
+use fuchsia_fs::directory::{self as vfs_watcher, WatchEvent, WatchMessage};
 use fuchsia_fs::OpenFlags;
-use fuchsia_vfs_watcher::{self as vfs_watcher, WatchEvent, WatchMessage};
 use futures::{future, FutureExt, Stream, TryStreamExt};
 use std::ffi::OsStr;
 use std::io;

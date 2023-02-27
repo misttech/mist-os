@@ -11,10 +11,10 @@ use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_input::{ControllerMarker, DeviceMarker, DeviceProxy};
 use fuchsia_async as fasync;
+use fuchsia_fs::directory as vfs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
-use fuchsia_vfs_watcher as vfs;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::{

@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
     fuchsia_async::TimeoutExt,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_vfs_watcher::{WatchEvent, Watcher},
+    fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_zircon::{self as zx, Duration},
     futures::StreamExt,
 };

@@ -6,7 +6,7 @@ use {
     anyhow::{format_err, Context, Result},
     fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_io as fio,
-    fuchsia_vfs_watcher::{WatchEvent, Watcher},
+    fuchsia_fs::directory::{WatchEvent, Watcher},
     futures::stream::{Stream, StreamExt as _, TryStreamExt as _},
     std::path::PathBuf,
 };
@@ -90,10 +90,10 @@ pub async fn watch_for_files(
 }
 
 async fn wait_for_file(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
-    let mut watcher = fuchsia_vfs_watcher::Watcher::new(dir).await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(dir).await?;
     while let Some(msg) = watcher.try_next().await? {
-        if msg.event != fuchsia_vfs_watcher::WatchEvent::EXISTING
-            && msg.event != fuchsia_vfs_watcher::WatchEvent::ADD_FILE
+        if msg.event != fuchsia_fs::directory::WatchEvent::EXISTING
+            && msg.event != fuchsia_fs::directory::WatchEvent::ADD_FILE
         {
             continue;
         }

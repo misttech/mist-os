@@ -9,7 +9,7 @@ use {
     fidl::{endpoints::Proxy, HandleBased},
     fidl_fuchsia_io as fio,
     fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_vfs_watcher::{WatchEvent, Watcher as VfsWatcher},
+    fuchsia_fs::directory::{WatchEvent, Watcher as VfsWatcher},
     fuchsia_zircon as zx,
     futures::{Future, TryStreamExt},
     std::{

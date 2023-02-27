@@ -5,7 +5,7 @@
 use {
     anyhow::Context as _,
     fidl_fuchsia_io as fio, fidl_fuchsia_wlan_device as fidl_wlan_dev,
-    fuchsia_vfs_watcher::{WatchEvent, WatchMessage, Watcher},
+    fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher},
     futures::{
         future::TryFutureExt as _,
         stream::{Stream, TryStreamExt as _},

@@ -25,7 +25,7 @@ use euclid::{point2, size2};
 use fidl_fuchsia_boot::ArgumentsMarker;
 use fidl_fuchsia_hardware_display::VirtconMode;
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_vfs_watcher::{WatchEvent, Watcher};
+use fuchsia_fs::directory::{WatchEvent, Watcher};
 use fuchsia_zircon as zx;
 use futures::StreamExt;
 use recovery_ui_config::Config as UiConfig;

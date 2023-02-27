@@ -15,7 +15,6 @@ rustc_binary("bin") {
     ":password_authenticator_config",
     "//sdk/fidl/fuchsia.identity.account:fuchsia.identity.account_rust",
     "//sdk/fidl/fuchsia.identity.authentication:fuchsia.identity.authentication_rust",
-    "//sdk/fidl/fuchsia.identity.authentication:fuchsia.identity.authentication_rust",
     "//sdk/fidl/fuchsia.identity.credential:fuchsia.identity.credential_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
@@ -40,7 +39,6 @@ rustc_binary("bin") {
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing",
   ]
 

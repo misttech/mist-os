@@ -218,12 +218,12 @@ impl RamdiskClient {
         let ramctl =
             device_watcher::recursive_wait_and_open_directory(&self.dev_root, RAMCTL_PATH).await?;
         // Create the watcher before unbinding the device so the remove event won't be missed.
-        let mut watcher = fuchsia_vfs_watcher::Watcher::new(&ramctl).await?;
+        let mut watcher = fuchsia_fs::directory::Watcher::new(&ramctl).await?;
 
         ramdisk_controller.schedule_unbind().await?.map_err(zx::Status::from_raw)?;
 
         while let Some(msg) = watcher.try_next().await? {
-            if msg.event == fuchsia_vfs_watcher::WatchEvent::REMOVE_FILE
+            if msg.event == fuchsia_fs::directory::WatchEvent::REMOVE_FILE
                 && msg.filename == self.instance_name
             {
                 break;

@@ -9,8 +9,8 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_io::DirectoryProxy,
     fuchsia_async as fasync,
+    fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_inspect::{self as inspect, NumericProperty, Property},
-    fuchsia_vfs_watcher::{WatchEvent, Watcher},
     futures::lock::Mutex,
     futures::TryStreamExt,
     std::path::PathBuf,
@@ -133,7 +133,6 @@ impl CtapAgent {
         Arc::new(CtapAgent { metrics: Arc::new(CtapAgentMetrics::new(node)), device_watcher })
     }
 
-    /// Returns a `fuchsia_vfs_watcher::Watcher` to the fido report directory.
     async fn get_watcher() -> Result<Watcher, Error> {
         let fido_report_dir_proxy = fuchsia_fs::directory::open_in_namespace(
             CTAPHID_PATH,

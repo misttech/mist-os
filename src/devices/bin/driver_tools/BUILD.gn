@@ -58,7 +58,7 @@ rustc_library("lib") {
               "//src/devices/lib/driver-static-checks:lib",
               "//src/devices/pci/bin/lspci:lib",
               "//src/devices/usb/bin/lsusb:lib",
-              "//src/lib/storage/fuchsia-vfs-watcher",
+              "//src/lib/fuchsia-fs",
               "//third_party/rust_crates:async-trait",
               "//third_party/rust_crates:blocking",
               "//third_party/rust_crates:lazy_static",

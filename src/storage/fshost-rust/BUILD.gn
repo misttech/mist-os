@@ -36,7 +36,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/storage/block_client/rust:remote-block-device",
     "//src/lib/storage/fs_management/rust:fs_management",
-    "//src/lib/storage/fuchsia-vfs-watcher",
     "//src/lib/storage/key-bag",
     "//src/lib/storage/ramdevice_client/rust",
     "//src/lib/storage/vfs/rust:vfs",

@@ -189,8 +189,8 @@ impl<'a> VfsWatchMsg<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::OpenFlags;
     use fuchsia_async::{DurationExt, TimeoutExt};
-    use fuchsia_fs::OpenFlags;
     use fuchsia_zircon::prelude::*;
     use futures::prelude::*;
     use std::fmt::Debug;
@@ -216,7 +216,7 @@ mod tests {
         let tmp_dir = tempdir().unwrap();
         let _ = File::create(tmp_dir.path().join("file1")).unwrap();
 
-        let dir = fuchsia_fs::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE,
         )
@@ -241,7 +241,7 @@ mod tests {
     async fn test_add() {
         let tmp_dir = tempdir().unwrap();
 
-        let dir = fuchsia_fs::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE,
         )
@@ -271,7 +271,7 @@ mod tests {
         let filepath = tmp_dir.path().join(filename);
         let _ = File::create(&filepath).unwrap();
 
-        let dir = fuchsia_fs::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE,
         )
@@ -291,31 +291,5 @@ mod tests {
         let msg = one_step(&mut w).await;
         assert_eq!(WatchEvent::REMOVE_FILE, msg.event);
         assert_eq!(Path::new(filename), msg.filename);
-    }
-
-    #[fuchsia::test]
-    #[should_panic]
-    async fn test_timeout() {
-        let tmp_dir = tempdir().unwrap();
-
-        let dir = fuchsia_fs::directory::open_in_namespace(
-            tmp_dir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
-        let mut w = Watcher::new(&dir).await.unwrap();
-
-        loop {
-            let msg = one_step(&mut w).await;
-            match msg.event {
-                WatchEvent::EXISTING => continue,
-                WatchEvent::IDLE => break,
-                _ => panic!("Unexpected watch event!"),
-            }
-        }
-
-        // Ensure that our test timeouts actually work by waiting for another event that will never
-        // arrive.
-        let _ = one_step(&mut w).await;
     }
 }

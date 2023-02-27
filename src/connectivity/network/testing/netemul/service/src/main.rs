@@ -888,7 +888,7 @@ mod tests {
         fidl::endpoints::Proxy as _, fidl_fuchsia_device as fdevice,
         fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_netemul_test as fnetemul_test,
         fidl_fuchsia_netemul_test::CounterMarker, fixture::fixture, fuchsia_async as fasync,
-        fuchsia_vfs_watcher as fvfs_watcher, std::convert::TryFrom as _,
+        fuchsia_fs::directory as fvfs_watcher, std::convert::TryFrom as _,
     };
 
     // We can't just use a counter for the sandbox identifier, as we do in `main`, because tests

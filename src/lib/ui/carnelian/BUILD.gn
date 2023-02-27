@@ -62,7 +62,6 @@ rustc_library("carnelian") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/mapped-vmo",
-    "//src/lib/storage/fuchsia-vfs-watcher",
     "//src/lib/trace/rust:trace",
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",

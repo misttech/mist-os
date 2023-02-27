@@ -60,7 +60,6 @@ power_manager_deps = [
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-component",
   "//src/lib/fuchsia-fs",
-  "//src/lib/storage/fuchsia-vfs-watcher",
   "//src/lib/syslog/rust:syslog",
   "//src/lib/trace/rust:trace",
   "//src/lib/trace/rust:trace-provider",

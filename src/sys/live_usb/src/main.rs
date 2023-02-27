@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_boot::{ArgumentsMarker, BoolPair},
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
     fidl_fuchsia_io as fio,
-    fuchsia_vfs_watcher::{WatchEvent, Watcher},
+    fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_zircon as zx,
     futures::prelude::*,
     tracing::{error, info},

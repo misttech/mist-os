@@ -66,7 +66,7 @@ impl PathSource {
         let dir_proxy =
             fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
                 .context(format!("Failed to open directory at {path}"))?;
-        let watcher = fuchsia_vfs_watcher::Watcher::new(&dir_proxy)
+        let watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await
             .context(format!("Failed to watch {path}"))?;
         Ok(Box::pin(
@@ -83,12 +83,12 @@ impl PathSource {
                     })
                 })
                 .filter(|message| futures::future::ready(message.filename.as_os_str() != "."))
-                .filter_map(move |fuchsia_vfs_watcher::WatchMessage { event, filename }| {
+                .filter_map(move |fuchsia_fs::directory::WatchMessage { event, filename }| {
                     futures::future::ready({
                         let file_path = format!("{}/{}", path, filename.to_str().unwrap());
                         match event {
-                            fuchsia_vfs_watcher::WatchEvent::ADD_FILE => Some(file_path),
-                            fuchsia_vfs_watcher::WatchEvent::EXISTING => {
+                            fuchsia_fs::directory::WatchEvent::ADD_FILE => Some(file_path),
+                            fuchsia_fs::directory::WatchEvent::EXISTING => {
                                 if ignore_existing {
                                     None
                                 } else {

@@ -13,7 +13,7 @@ use {
         self as fs,
         filesystem::{Filesystem, ServingSingleVolumeFilesystem},
     },
-    fuchsia_vfs_watcher::{WatchEvent, WatchMessage, Watcher},
+    fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher},
     fuchsia_zircon as zx,
     futures::prelude::*,
     std::path::Path,
