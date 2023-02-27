@@ -1487,7 +1487,7 @@ func (eps *endpointWithSocket) handleEndpointWriteError(err tcpip.Error, transPr
 			_ = syslog.DebugTf("zx_socket_set_disposition", "%p: disposition=0, disposition_peer=ZX_SOCKET_DISPOSITION_WRITE_DISABLED", eps)
 		}
 		return true
-	case *tcpip.ErrNetworkUnreachable, *tcpip.ErrInvalidEndpointState:
+	case *tcpip.ErrNetworkUnreachable, *tcpip.ErrHostUnreachable, *tcpip.ErrInvalidEndpointState:
 		// These errors can be returned when we attempt to write to an interface
 		// that has been removed, or is in the process of removal. Since this
 		// error is not propagated to the client and can occur in normal usage,
