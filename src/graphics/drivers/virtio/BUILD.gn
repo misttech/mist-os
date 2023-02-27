@@ -56,8 +56,8 @@ fuchsia_driver("virtio_gpu-driver") {
 fuchsia_driver_component("virtio_gpu") {
   info = "virtio_gpu-info.json"
   component_name = "virtio_gpu"
+  manifest = "meta/virtio_gpu.cml"
   deps = [ ":virtio_gpu-driver" ]
-  colocate = true
 }
 
 test("virtio-gpu-test") {
