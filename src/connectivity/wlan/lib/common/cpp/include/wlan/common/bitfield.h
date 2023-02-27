@@ -26,7 +26,6 @@ class BitField {
   constexpr size_t len() { return sizeof(ValueType); }
   void clear() { val_ = 0; }
   void set_val(ValueType val) { val_ = val; }
-  ValueType* mut_val() { return &val_; }
 
   ValueType val() const { return val_; }
 
