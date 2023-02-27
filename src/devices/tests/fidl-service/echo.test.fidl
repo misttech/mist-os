@@ -19,7 +19,3 @@ closed protocol Echo {
 service EchoService {
     echo client_end:Echo;
 };
-
-service EchoService2 {
-    echo client_end:Echo;
-};

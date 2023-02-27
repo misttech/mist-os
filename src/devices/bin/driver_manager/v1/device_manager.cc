@@ -376,7 +376,7 @@ zx_status_t DeviceManager::RemoveDevice(const fbl::RefPtr<Device>& dev, bool for
     dev->DetachFromParent();
     if (!(dev->flags & DEV_CTX_PROXY)) {
       if (parent->children().empty()) {
-        parent->clear_bound_driver();
+        parent->flags &= (~DEV_CTX_BOUND);
 
         // TODO: This code is to cause the bind process to
         //      restart and get a new driver_host to be launched

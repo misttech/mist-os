@@ -38,11 +38,6 @@ fuchsia_unittest_package("fidl-service-test") {
     ":test",
     "//src/devices/misc/drivers/test-parent",
   ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 }
 
 driver_bind_rules("parent-driver-bind") {

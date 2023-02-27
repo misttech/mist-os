@@ -48,15 +48,6 @@ class Device : public DeviceParent, public fidl::WireServer<fidl_examples_echo::
       return result.status_value();
     }
 
-    fidl_examples_echo::EchoService2::InstanceHandler handler2({.echo = std::move(echo_handler)});
-
-    result =
-        device->outgoing_dir_.AddService<fidl_examples_echo::EchoService2>(std::move(handler2));
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to add service the outgoing directory");
-      return result.status_value();
-    }
-
     result = device->outgoing_dir_.Serve(std::move(endpoints->server));
     if (result.is_error()) {
       zxlogf(ERROR, "Failed to serve the outgoing directory");
@@ -68,7 +59,6 @@ class Device : public DeviceParent, public fidl::WireServer<fidl_examples_echo::
     };
     std::array offers = {
         fidl_examples_echo::EchoService::Name,
-        fidl_examples_echo::EchoService2::Name,
     };
 
     auto status = device->DdkAdd(ddk::DeviceAddArgs("parent")

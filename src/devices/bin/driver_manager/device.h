@@ -376,9 +376,6 @@ class Device final
   // Returns true if this device already has a driver bound.
   bool IsAlreadyBound() const;
 
-  void set_bound_driver(const Driver* driver);
-  void clear_bound_driver();
-
  private:
   // fuchsia_device_manager::Coordinator methods.
   void AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& _completer) override;
@@ -513,10 +510,6 @@ class Device final
 
   // If this is not null, there is a DFv2 driver bound to this device.
   std::shared_ptr<dfv2::Device> dfv2_bound_device_;
-
-  // If not null, links to the driver which has bound to this device.
-  // This is set when the driver is bound in `Coordinator::BindDriverToDevice`.
-  const Driver* bound_driver_ = nullptr;
 
   DeviceInspect inspect_;
 };

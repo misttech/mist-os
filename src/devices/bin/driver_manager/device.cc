@@ -887,19 +887,6 @@ void Device::ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
     return;
   }
 
-  if (request->service_name.is_null() == false) {
-    ZX_ASSERT_MSG(bound_driver_ != nullptr, "Expected device  '%s' to have a driver bound to it",
-                  name().c_str());
-    auto it = std::find(bound_driver_->service_uses.begin(), bound_driver_->service_uses.end(),
-                        std::string("/svc/").append(request->service_name.get()));
-    if (it == bound_driver_->service_uses.end()) {
-      LOGF(ERROR, "`%s` attempted to use `%s`, but it is not declared in its component manifest",
-           name().c_str(), std::string(request->service_name.get()).c_str());
-      completer.ReplyError(ZX_ERR_NOT_FOUND);
-      return;
-    }
-  }
-
   fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
   path.Append("svc/");
   if (request->service_name.is_null() == false) {
@@ -1032,21 +1019,6 @@ bool Device::DriverLivesInSystemStorage() const {
 bool Device::IsAlreadyBound() const {
   return (flags & DEV_CTX_BOUND) && !(flags & DEV_CTX_ALLOW_MULTI_COMPOSITE) &&
          !(flags & DEV_CTX_MULTI_BIND);
-}
-
-void Device::set_bound_driver(const Driver* driver) {
-  ZX_ASSERT_MSG(bound_driver_ == nullptr,
-                "Device  '%s' already has driver %s bound to it, cannot bind %s, flags: 0x%x",
-                name().c_str(), bound_driver_->libname.c_str(), driver->libname.c_str(), flags);
-  if (!(flags & DEV_CTX_ALLOW_MULTI_COMPOSITE)) {
-    flags |= DEV_CTX_BOUND;
-    bound_driver_ = driver;
-  }
-}
-
-void Device::clear_bound_driver() {
-  flags &= (~DEV_CTX_BOUND);
-  bound_driver_ = nullptr;
 }
 
 std::shared_ptr<dfv2::Node> Device::GetBoundNode() {
