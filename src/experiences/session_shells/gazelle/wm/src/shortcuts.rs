@@ -13,8 +13,9 @@ use num_derive::{FromPrimitive, ToPrimitive};
 pub(crate) enum ShortcutAction {
     FocusNext = 1,
     FocusPrev = 2,
-    Close = 3,
-    Logout = 4,
+    ToggleFullscreen = 3,
+    Close = 4,
+    Logout = 5,
 }
 
 /// Returns an array of keyboard shortcut definitions.
@@ -63,6 +64,15 @@ pub(crate) fn all_shortcuts() -> Vec<ui_shortcut2::Shortcut> {
                 KeyMeaning::NonPrintableKey(NonPrintableKey::Control),
                 KeyMeaning::NonPrintableKey(NonPrintableKey::Shift),
                 KeyMeaning::Codepoint('w' as u32),
+            ],
+        ),
+        // Ctrl+Shift+f to toggle fullscreen.
+        create_shortcut(
+            ShortcutAction::ToggleFullscreen.to_u32().unwrap(),
+            vec![
+                KeyMeaning::NonPrintableKey(NonPrintableKey::Control),
+                KeyMeaning::NonPrintableKey(NonPrintableKey::Shift),
+                KeyMeaning::Codepoint('f' as u32),
             ],
         ),
         // Ctrl+Shift+q to logout from the application shell.

@@ -14,6 +14,7 @@ rustc_binary("bin") {
 
   source_root = "src/main.rs"
   sources = [
+    "src/frame.rs",
     "src/main.rs",
     "src/shortcuts.rs",
     "src/tests.rs",
@@ -31,6 +32,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.ui.shortcut2:fuchsia.ui.shortcut2_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/experiences/session_shells/gazelle/appkit",
+    "//src/experiences/session_shells/gazelle/lib/layout",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
@@ -41,6 +43,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:indexmap",
+    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",

@@ -35,6 +35,7 @@
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.focus.FocusChainListenerRegistry",
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.shortcut2.Registry",
             ],

@@ -18,14 +18,19 @@ use futures::{
     Stream, StreamExt,
 };
 use indexmap::IndexMap;
+use layout::{FloatingLayout, Frame, FrameState, Layout, LayoutChange, Pointer, SetActiveFrame};
+use lazy_static::lazy_static;
 use num::FromPrimitive;
 use tracing::{debug, error, warn};
 
-use crate::shortcuts::{all_shortcuts, ShortcutAction};
+use crate::{
+    frame::WindowFrame,
+    shortcuts::{all_shortcuts, ShortcutAction},
+};
 
-// Background color: Fuchsia Green 04 [Opacity 0.3].
-const BACKGROUND_COLOR: ui_comp::ColorRgba =
-    ui_comp::ColorRgba { red: 0.075, green: 0.698, blue: 0.58, alpha: 0.3 };
+lazy_static! {
+    static ref BACKGROUND_COLOR: ui_comp::ColorRgba = srgb_to_linear(0x263338FF);
+}
 
 // The annotation namespace used by the window manager.
 pub(crate) const WM_ANNOTATION_NS: &str = "wm_ns";
@@ -49,6 +54,13 @@ const APP_LAUNCHER_HEIGHT: u32 = 32;
 // Dimensions of keyboard shortcuts image.
 const SHORTCUTS_IMAGE_WIDTH: u32 = 400;
 const SHORTCUTS_IMAGE_HEIGHT: u32 = 300;
+
+/// Defines an enumeration of all view types.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum ViewKind {
+    ChildView,
+    ShellView(ShellViewKind),
+}
 
 /// Defines an enumeration of all shell view types.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -76,11 +88,17 @@ pub(crate) enum Notification {
 /// The window manager holds child views from applications provided to it by GraphicalPresenter and
 /// shell views from components launched by itself. It places them in a certain display order:
 ///
-///              Bottom layer: -----window manager background-----
+///                     ----- Bottom -----
 ///
-///              Middle layer: -----     child views         -----
+///              -----window manager background-----
 ///
-///              Top layer:    -----     shell views         -----
+///              -----     child views         -----
+///
+///              -----     shell views         -----
+///
+///              -----     fullscreen view     -----
+///
+///                     ----- top -----
 ///
 pub(crate) struct WindowManager {
     // The event sender used to route events.
@@ -89,23 +107,18 @@ pub(crate) struct WindowManager {
     notification_sender: UnboundedSender<Notification>,
     // The main application [Window] of the Window Manager.
     window: Window,
-    // The map of all launched [ChildView] views by their [ChildViewId].
-    child_views: IndexMap<ChildViewId, ChildView>,
+    // The layout manager used to layout all application child views.
+    layout: Box<dyn Layout<ChildViewId, WindowFrame>>,
     // The map of all shell views by their [ChildViewId].
     shell_views: IndexMap<ChildViewId, (ChildView, ShellViewKind)>,
-    // The map of all incoming [ChildView]s views by their [ChildViewId] that are not assigned a
-    // flatland transform yet.
-    pending_child_views: IndexMap<ChildViewId, ChildView>,
-    // The flatland transforms that hold the [ChildView]'s content. The transforms always stay in
-    // back-to-front order, so when child_views gets rearranged, the child-to-transform mapping
-    // changes.
-    child_view_transforms: Vec<ui_comp::TransformId>,
     // The flatland content id for background color on the root transform.
     background_content: ui_comp::ContentId,
     // The layer (parent transform) for holding all child views.
     child_views_layer: ui_comp::TransformId,
     // The layer (parent transform) for holding all shell component views.
     shell_views_layer: ui_comp::TransformId,
+    // The layer (parent transform) for holding a child view in fullscreen.
+    fullscreen_view_layer: ui_comp::TransformId,
     // The child transform to hold the image for keyboard shortcuts.
     shortcuts_image_transform: ui_comp::TransformId,
     // The current width of the application window.
@@ -138,29 +151,23 @@ impl WindowManager {
         let mut root_transform_id = window.get_root_transform_id();
         flatland.set_content(&mut root_transform_id, &mut background)?;
 
-        let mut shortcuts_image_transform = window.next_transform_id();
-        flatland.create_transform(&mut shortcuts_image_transform)?;
-        flatland.add_child(&mut root_transform_id, &mut shortcuts_image_transform)?;
+        let shortcuts_image_transform = window.create_transform(Some(&mut root_transform_id))?;
+        let child_views_layer = window.create_transform(Some(&mut root_transform_id))?;
+        let shell_views_layer = window.create_transform(Some(&mut root_transform_id))?;
+        let fullscreen_view_layer = window.create_transform(Some(&mut root_transform_id))?;
 
-        let mut child_views_layer = window.next_transform_id();
-        flatland.create_transform(&mut child_views_layer)?;
-        flatland.add_child(&mut root_transform_id, &mut child_views_layer)?;
-
-        let mut shell_views_layer = window.next_transform_id();
-        flatland.create_transform(&mut shell_views_layer)?;
-        flatland.add_child(&mut root_transform_id, &mut shell_views_layer)?;
+        let layout = Box::new(FloatingLayout::new());
 
         Ok(WindowManager {
             event_sender,
             notification_sender,
             window,
-            child_views: IndexMap::new(),
+            layout,
             shell_views: IndexMap::new(),
-            pending_child_views: IndexMap::new(),
-            child_view_transforms: vec![],
             background_content: background,
             child_views_layer,
             shell_views_layer,
+            fullscreen_view_layer,
             shortcuts_image_transform,
             width: 0,
             height: 0,
@@ -172,8 +179,7 @@ impl WindowManager {
     // Closes the window of the window manager and initiates shutdown.
     fn close(&mut self) -> Result<(), Error> {
         self.pending_child_view_present_specs.clear();
-        self.pending_child_views.clear();
-        self.child_views.clear();
+        self.layout.clear();
         self.shell_views.clear();
 
         // Calling close() on window manager's window releases its Flatland resources and
@@ -203,34 +209,16 @@ impl WindowManager {
                     // Create a [ChildView] from GraphicalPresenter's ViewSpec.
                     SystemEvent::PresentViewSpec { view_spec_holder } => {
                         if self.is_ready {
-                            let shell_view_kind = shell_view_kind_from_view_spec(
-                                &view_spec_holder.view_spec.annotations,
-                            );
+                            let view_kind =
+                                view_kind_from_view_spec(&view_spec_holder.view_spec.annotations);
 
-                            let height = match shell_view_kind {
-                                Some(_) => APP_LAUNCHER_HEIGHT,
-                                _ => self.height - APP_LAUNCHER_HEIGHT,
-                            };
-                            let child_view = self.window.create_child_view(
-                                view_spec_holder,
-                                self.width,
-                                height,
-                                self.event_sender.clone(),
-                            )?;
-                            self.window.redraw();
-
-                            match shell_view_kind {
-                                Some(shell_view_kind) => {
-                                    self.add_shell_view(child_view, shell_view_kind)?;
-                                }
-                                None => {
-                                    // Save child_view to pending_child_views until it's component
-                                    // has finished loading and rendered a frame. The child view can
-                                    // then be attached to the display tree in
-                                    // [ChildViewEvent::Available].
-                                    self.pending_child_views.insert(child_view.id(), child_view);
+                            match view_kind {
+                                ViewKind::ChildView => self.add_child_view(view_spec_holder)?,
+                                ViewKind::ShellView(shell_view_kind) => {
+                                    self.add_shell_view(view_spec_holder, shell_view_kind)?
                                 }
                             }
+                            self.window.redraw();
                         } else {
                             self.pending_child_view_present_specs.push(view_spec_holder);
                         }
@@ -277,21 +265,19 @@ impl WindowManager {
                                 match action {
                                     ShortcutAction::FocusNext => {
                                         self.focus_next()?;
-                                        self.layout()?;
-                                        self.refocus()?;
                                     }
 
                                     ShortcutAction::FocusPrev => {
                                         self.focus_previous()?;
-                                        self.layout()?;
-                                        self.refocus()?;
+                                    }
+
+                                    ShortcutAction::ToggleFullscreen => {
+                                        self.toggle_fullscreen()?;
                                     }
 
                                     ShortcutAction::Close => {
-                                        if let Some((child_view_id, _)) = self.child_views.last() {
-                                            self.remove_child_view(*child_view_id)?;
-                                            self.layout()?;
-                                            self.refocus()?;
+                                        if let Some(child_view_id) = self.layout.get_active() {
+                                            self.remove_child_view(child_view_id)?;
                                         }
                                     }
 
@@ -309,31 +295,55 @@ impl WindowManager {
                         }
                         WindowEvent::ChildViewFocused { view_ref, .. } => {
                             // Get the child view with view_ref.
-                            for (child_view_id, child_view) in &self.child_views {
-                                let child_view_ref = child_view
-                                    .get_view_ref()
+                            for child_view_frame in self.layout.iter() {
+                                let child_view_ref = child_view_frame
+                                    .get_child_view()
+                                    .and_then(|child_view| child_view.get_view_ref())
                                     .expect("Failed to get child view ref");
                                 if view_ref_is_same(&child_view_ref, &view_ref) {
                                     self.notify(Notification::FocusChanged {
-                                        target: Either::Right(*child_view_id),
+                                        target: Either::Right(child_view_frame.get_id()),
                                     })?;
                                     break;
                                 }
                             }
                         }
-                        WindowEvent::NeedsRedraw { .. } | WindowEvent::Pointer { .. } => {}
+                        WindowEvent::Pointer { event } => {
+                            let point = fmath::PointF { x: event.logical_x, y: event.logical_y };
+                            let delta = fmath::PointF {
+                                x: event.logical_delta_x,
+                                y: event.logical_delta_y,
+                            };
+                            let pointer = match event.phase {
+                                Phase::Hover => Pointer::Hover { point },
+                                Phase::Down => Pointer::Down { point },
+                                Phase::Move => Pointer::Move { point, delta },
+                                Phase::Up => Pointer::Up { point },
+                                Phase::Cancel | Phase::Remove => Pointer::Cancel,
+                                Phase::Add => continue,
+                            };
+
+                            match self.layout.on_pointer(pointer) {
+                                Ok(LayoutChange::DisplayOrder) => self.layout()?,
+                                Ok(_) => {}
+                                Err(_) => continue,
+                            }
+                            self.window.redraw();
+                        }
+                        WindowEvent::NeedsRedraw { .. } => {}
                     }
                 }
 
                 Event::ChildViewEvent { child_view_id, event, .. } => match event {
                     ChildViewEvent::Available => {
-                        self.add_child_view(child_view_id)?;
-                        self.window.redraw();
+                        // TODO(sanjayc): Dismiss loading indicator on the frame.
                     }
 
                     ChildViewEvent::Attached { view_ref } => {
-                        if let Some(child_view) = self.child_views.get_mut(&child_view_id) {
-                            child_view.set_view_ref(view_ref);
+                        if let Some(child_view_frame) = self.layout.get_frame_mut(child_view_id) {
+                            child_view_frame
+                                .get_child_view_mut()
+                                .map(|child_view| child_view.set_view_ref(view_ref));
                             self.refocus()?;
                         } else if let Some((_, kind)) = self.shell_views.get(&child_view_id) {
                             self.notify(Notification::AddedShellView {
@@ -345,8 +355,6 @@ impl WindowManager {
 
                     ChildViewEvent::Detached | ChildViewEvent::Dismissed => {
                         self.remove_child_view(child_view_id)?;
-                        self.layout()?;
-                        self.refocus()?;
                         self.window.redraw();
                     }
                 },
@@ -394,7 +402,7 @@ impl WindowManager {
             // to just width and height.
             &mut fmath::SizeU {
                 width: width.saturating_sub(1).clamp(1, u32::MAX),
-                height: height.saturating_sub(1).clamp(1, u32::MAX) - APP_LAUNCHER_HEIGHT,
+                height: height.saturating_sub(1).clamp(1, u32::MAX),
             },
         )?;
 
@@ -403,39 +411,45 @@ impl WindowManager {
             &mut self.shortcuts_image_transform,
             &mut fmath::Vec_ {
                 x: (width - SHORTCUTS_IMAGE_WIDTH) as i32,
-                y: (height - SHORTCUTS_IMAGE_HEIGHT - APP_LAUNCHER_HEIGHT) as i32,
+                y: (height - SHORTCUTS_IMAGE_HEIGHT) as i32,
             },
         )?;
 
-        // Resize child views.
-        for child_view in self.child_views.values_mut() {
-            child_view.set_size(width, height - APP_LAUNCHER_HEIGHT)?;
-        }
+        self.layout.set_rect(fmath::Rect {
+            x: 0,
+            y: 0,
+            width: width as i32,
+            height: (height - APP_LAUNCHER_HEIGHT) as i32,
+        })?;
+
+        self.layout()?;
 
         Ok(())
     }
 
-    // Layout all child view transforms and set their content to a child view.
+    // Layout all child view transforms based on the display order in the layout.
     //
-    // The application holds a list of flatland transforms equal to the number of child views. Since
+    // The `layout` holds a list of `Frame` object with a flatland transform per frame. Since
     // Flatland does not provide an API to change the order of transforms, we instead set their
-    // contents in a display order, back-to-front to a child_view in [child_views].
+    // contents in a display order, back-to-front for each Frame in the layout.
     fn layout(&mut self) -> Result<(), Error> {
-        assert_eq!(self.child_views.len(), self.child_view_transforms.len());
-
-        for ((_, child_view), child_view_transform) in
-            self.child_views.iter().zip(self.child_view_transforms.iter())
-        {
-            self.window.set_content(child_view_transform.clone(), child_view.get_content_id())?;
+        let flatland = self.window.get_flatland();
+        for child_view_frame in self.layout.iter() {
+            let mut child_view_transform = child_view_frame.get_frame_transform();
+            flatland.remove_child(&mut self.child_views_layer, &mut child_view_transform)?;
+            flatland.add_child(&mut self.child_views_layer, &mut child_view_transform)?;
         }
+        self.refocus()?;
 
         Ok(())
     }
 
     // Requests focus to the top-most child view.
     fn refocus(&self) -> Result<(), Error> {
-        if let Some((_, child_view)) = self.child_views.last() {
-            if let Some(view_ref) = child_view.get_view_ref() {
+        if let Some(child_view_frame) = self.layout.iter().last() {
+            if let Some(view_ref) =
+                child_view_frame.get_child_view().and_then(|child_view| child_view.get_view_ref())
+            {
                 let focuser = self.window.get_focuser().expect("Failed to retrieve window focuser");
                 set_focus(focuser, view_ref);
             }
@@ -445,7 +459,18 @@ impl WindowManager {
     }
 
     // Add the child_view as a shell view to shell_view layer.
-    fn add_shell_view(&mut self, shell_view: ChildView, kind: ShellViewKind) -> Result<(), Error> {
+    fn add_shell_view(
+        &mut self,
+        view_spec_holder: ViewSpecHolder,
+        kind: ShellViewKind,
+    ) -> Result<(), Error> {
+        let shell_view = self.window.create_child_view(
+            view_spec_holder,
+            self.width,
+            APP_LAUNCHER_HEIGHT,
+            self.event_sender.clone(),
+        )?;
+
         let shell_view_id = shell_view.id();
         let mut shell_view_content_id = shell_view.get_content_id();
 
@@ -455,7 +480,7 @@ impl WindowManager {
         flatland.create_transform(&mut shell_view_transform)?;
         flatland.set_translation(
             &mut shell_view_transform,
-            &mut fmath::Vec_ { x: 0, y: self.height as i32 - APP_LAUNCHER_HEIGHT as i32 },
+            &mut fmath::Vec_ { x: 16, y: self.height as i32 - APP_LAUNCHER_HEIGHT as i32 - 16 },
         )?;
 
         flatland.add_child(&mut self.shell_views_layer, &mut shell_view_transform)?;
@@ -466,14 +491,36 @@ impl WindowManager {
         Ok(())
     }
 
-    // Move the child_view from pending_child_views to child_views and create a transform to hold
-    // it's content.
-    fn add_child_view(&mut self, child_view_id: ChildViewId) -> Result<(), Error> {
-        if let Some(child_view) = self.pending_child_views.remove(&child_view_id) {
-            let content_id = child_view.get_content_id();
-            let child_view_transform = self.create_child_view_transform(content_id)?;
-            self.child_views.insert(child_view_id, child_view);
-            self.child_view_transforms.push(child_view_transform);
+    /// Creates a child view from `view_spec_holder` and adds it to the layout.
+    fn add_child_view(&mut self, view_spec_holder: ViewSpecHolder) -> Result<(), Error> {
+        if let Some(token) = view_spec_holder.view_spec.viewport_creation_token.as_ref() {
+            let child_view_id = ChildViewId::from_viewport_creation_token(token);
+
+            // Create a window frame to hold the child view and add it to the layout. We do this
+            // before creating the actual child view, because Flatland wants the size information
+            // to be supplied before creation.
+            let child_view_frame = WindowFrame::new(child_view_id, &mut self.window)?;
+            self.layout.add(child_view_frame)?;
+
+            // Get the window frame from the layout to get its size.
+            let child_view_frame =
+                self.layout.get_frame_mut(child_view_id).expect("Failed to get child view frame");
+            let rect = child_view_frame.get_rect()?;
+
+            // Create the child view given it's view_spec, width and height and set it on the frame.
+            let child_view = self.window.create_child_view(
+                view_spec_holder,
+                rect.width as u32,
+                rect.height as u32,
+                self.event_sender.clone(),
+            )?;
+            assert_eq!(child_view_id, child_view.id());
+            child_view_frame.set_child_view(child_view)?;
+
+            // Add the frame's transform to the window manager's `child_views_layer`.
+            let flatland = self.window.get_flatland();
+            let mut child_view_transform = child_view_frame.get_frame_transform();
+            flatland.add_child(&mut self.child_views_layer, &mut child_view_transform)?;
 
             self.notify(Notification::AddedChildView { id: child_view_id })?;
         }
@@ -481,77 +528,72 @@ impl WindowManager {
         Ok(())
     }
 
-    // Removes a child_view from [child_views] and a transform from [child_view_transforms] to keep
-    // their 1-1 association.
+    // Removes a child_view from from the layout.
     fn remove_child_view(&mut self, child_view_id: ChildViewId) -> Result<(), Error> {
-        if self.child_views.contains_key(&child_view_id) {
-            assert!(self.child_views.len() == self.child_view_transforms.len());
-            // We pop a transform [child_view_transforms] to keep them in sync with [child_views].
-            // It does not matter where we remove it from. We re-associate child views to transform
-            // in [layout].
-            let mut child_view_transform =
-                self.child_view_transforms.pop().expect("Failed to find child_view_transform");
-
+        if let Some(child_view_frame) = self.layout.get_frame(child_view_id) {
+            // Remove the frame's transform from the window manager's `child_views_layer`.
             let flatland = self.window.get_flatland();
+            let mut child_view_transform = child_view_frame.get_frame_transform();
+
             flatland.remove_child(&mut self.child_views_layer, &mut child_view_transform)?;
             flatland.release_transform(&mut child_view_transform)?;
 
-            self.child_views.remove(&child_view_id);
+            // Remove the child view, by it's id from the layout and update the wm's layout.
+            self.layout.remove(child_view_id)?;
+            self.layout()?;
 
             self.notify(Notification::RemovedChildView { id: child_view_id })?;
-        } else if self.pending_child_views.contains_key(&child_view_id) {
-            self.pending_child_views.remove(&child_view_id);
         }
-
-        Ok(())
-    }
-
-    // Creates a transform to hold the child view's content. We maintain a 1-1 association of a
-    // child view's content to a transform. The transform is added to the [child_views_layer].
-    fn create_child_view_transform(
-        &mut self,
-        mut content_id: ui_comp::ContentId,
-    ) -> Result<ui_comp::TransformId, Error> {
-        let flatland = self.window.get_flatland();
-        let mut child_view_transform = self.window.next_transform_id();
-        flatland.create_transform(&mut child_view_transform)?;
-        flatland.add_child(&mut self.child_views_layer, &mut child_view_transform)?;
-        flatland.set_content(&mut child_view_transform, &mut content_id)?;
-
-        Ok(child_view_transform)
-    }
-
-    // Moves a child view to the top of the display list. This can also be used to implement
-    // "Focus Next", where the next view to a top view is the view at index 0.
-    fn bring_to_top(&mut self, index: usize) -> Result<(), Error> {
-        if self.child_view_transforms.len() <= 1 || index >= self.child_view_transforms.len() {
-            return Ok(());
-        }
-
-        // Move the view at index to the top.
-        self.child_views.move_index(index, self.child_views.len() - 1);
-
-        self.refocus()?;
 
         Ok(())
     }
 
     /// Focus to the next-from-last child view, which is at index 0, in the display list.
     fn focus_next(&mut self) -> Result<(), Error> {
-        self.bring_to_top(0)
+        if let Ok(LayoutChange::DisplayOrder) = self.layout.set_active(SetActiveFrame::NextFrame) {
+            self.layout()
+        } else {
+            Ok(())
+        }
     }
 
     /// Focus to the second-to-last child view in the display list.
     fn focus_previous(&mut self) -> Result<(), Error> {
-        if self.child_view_transforms.len() <= 1 {
-            return Ok(());
+        if let Ok(LayoutChange::DisplayOrder) = self.layout.set_active(SetActiveFrame::PrevFrame) {
+            self.layout()
+        } else {
+            Ok(())
         }
+    }
 
-        // Move the top-most view to the bottom, thereby making the previous view top-most.
-        self.child_views.move_index(self.child_views.len() - 1, 0);
+    /// Toggle fullscreen on the currently active child view.
+    fn toggle_fullscreen(&mut self) -> Result<(), Error> {
+        if let Some(frame_id) = self.layout.get_active() {
+            if let Some(state) = self.layout.get_state(frame_id) {
+                if state == FrameState::Fullscreen {
+                    // Restore back to normal state.
+                    self.layout.set_state(frame_id, FrameState::Normal)?;
 
-        self.refocus()?;
+                    // Reset content of the fullscreen layer.
+                    self.window
+                        .set_content(self.fullscreen_view_layer, ui_comp::ContentId { value: 0 })?;
+                } else {
+                    // Set the frame state to fullscreen.
+                    self.layout.set_state(frame_id, FrameState::Fullscreen)?;
 
+                    // Set the fullscreen layer content to the child view of the frame.
+                    if let Some(child_view) = self
+                        .layout
+                        .get_frame_mut(frame_id)
+                        .and_then(|frame| frame.get_child_view_mut())
+                    {
+                        self.window
+                            .set_content(self.fullscreen_view_layer, child_view.get_content_id())?;
+                        child_view.set_size(self.width, self.height)?;
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -593,26 +635,26 @@ pub async fn get_first_view_creation_token(
     unreachable!()
 }
 
-fn shell_view_kind_from_view_spec(
-    annotations: &Option<Vec<felement::Annotation>>,
-) -> Option<ShellViewKind> {
+fn view_kind_from_view_spec(annotations: &Option<Vec<felement::Annotation>>) -> ViewKind {
     let shell_view_name_key = felement::AnnotationKey {
         namespace: WM_ANNOTATION_NS.to_string(),
         value: WM_ANNOTATION_SHELLVIEW_NAME.to_string(),
     };
+    // Check annotations for shell view metadata.
     if let Some(annotations) = annotations {
         for annotation in annotations {
             if annotation.key == shell_view_name_key {
                 if let felement::AnnotationValue::Text(shell_view_name) = &annotation.value {
                     if shell_view_name == WM_SHELLVIEW_APP_LAUNCHER {
-                        return Some(ShellViewKind::AppLauncher);
+                        return ViewKind::ShellView(ShellViewKind::AppLauncher);
                     }
                 }
                 break;
             }
         }
     }
-    None
+    // This is a child view.
+    ViewKind::ChildView
 }
 
 pub(crate) fn shell_view_name_annotation(name: &str) -> felement::Annotation {
