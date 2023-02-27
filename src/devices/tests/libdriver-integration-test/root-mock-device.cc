@@ -21,8 +21,7 @@
 
 #include "lib/stdcompat/string_view.h"
 
-#define DRIVER_TEST_DIR "/boot/driver"
-#define MOCK_DEVICE_LIB "/boot/driver/mock-device.so"
+constexpr char kMockDeviceLib[] = "/boot/meta/mock-device.cm";
 
 namespace libdriver_integration_test {
 
@@ -140,7 +139,7 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
     controller_client.Bind(fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value())),
                            dispatcher);
   }
-  controller_client->Bind(MOCK_DEVICE_LIB)
+  controller_client->Bind(kMockDeviceLib)
       .Then([client = controller_client.Clone()](
                 fidl::WireUnownedResult<fuchsia_device::Controller::Bind>& result) {
         // TODO(https://fxbug.dev/120616): Since no one waits for this call, there's a good chance

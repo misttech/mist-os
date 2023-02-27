@@ -27,13 +27,13 @@ constexpr uint64_t kDefaultF2fsMinBytes = 100ull * 1024ull * 1024ull;
 constexpr std::string_view kBlockDeviceClassPrefix = "/dev/class/block";
 constexpr std::string_view kNandDeviceClassPrefix = "/dev/class/nand";
 
-constexpr char kFVMDriverPath[] = "fvm.so";
-constexpr char kGPTDriverPath[] = "gpt.so";
-constexpr char kMBRDriverPath[] = "mbr.so";
-constexpr char kZxcryptDriverPath[] = "zxcrypt.so";
-constexpr char kBootpartDriverPath[] = "bootpart.so";
-constexpr char kBlockVerityDriverPath[] = "block-verity.so";
-constexpr char kNandBrokerDriverPath[] = "nand-broker.so";
+constexpr char kFVMDriverPath[] = "fvm.cm";
+constexpr char kGPTDriverPath[] = "gpt.cm";
+constexpr char kMBRDriverPath[] = "mbr.cm";
+constexpr char kZxcryptDriverPath[] = "zxcrypt.cm";
+constexpr char kBootpartDriverPath[] = "bootpart.cm";
+constexpr char kBlockVerityDriverPath[] = "block-verity.cm";
+constexpr char kNandBrokerDriverPath[] = "nand-broker.cm";
 
 }  // namespace fshost
 

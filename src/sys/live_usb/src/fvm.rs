@@ -165,7 +165,7 @@ impl FvmRamdisk {
         let client_end =
             fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());
         let controller = client_end.into_proxy()?;
-        controller.rebind("gpt.so").await?.map_err(zx::Status::from_raw)?;
+        controller.rebind("gpt.cm").await?.map_err(zx::Status::from_raw)?;
         Ok(())
     }
 }

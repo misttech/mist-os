@@ -156,7 +156,8 @@ bool is_driver_eager_fallback(fidl::WireSyncClient<fuchsia_boot::Arguments>* boo
 
 void found_driver(zircon_driver_note_payload_t* note,
                   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                  std::string_view libname, zx::vmo& driver_vmo, DriverLoadCallback& func) {
+                  std::string_view libname, zx::vmo& driver_vmo,
+                  const std::vector<std::string>& service_uses, DriverLoadCallback& func) {
   // ensure strings are terminated
   note->name[sizeof(note->name) - 1] = 0;
   note->vendor[sizeof(note->vendor) - 1] = 0;
@@ -174,6 +175,7 @@ void found_driver(zircon_driver_note_payload_t* note,
   drv->flags = note->flags;
   drv->libname = libname;
   drv->name = note->name;
+  drv->service_uses = service_uses;
   if (note->version[0] == '*') {
     drv->fallback = true;
     // TODO(fxbug.dev/44586): remove this once a better solution for driver prioritization is
@@ -195,16 +197,33 @@ void found_driver(zircon_driver_note_payload_t* note,
   func(drv.release(), note->version);
 }
 
+zx::result<zx::vmo> SetVmoName(zx::vmo vmo, const std::string& path) {
+  // Path is either a URL or a filesystem path.
+  // Set the vmo_name to the final part of the path, i.e the characters after the last slash '/'.
+  const char* vmo_name = path.c_str();
+  size_t last_slash = path.rfind('/');
+  if (last_slash != std::string::npos) {
+    vmo_name = &path[last_slash + 1];
+  }
+
+  if (zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name, strlen(vmo_name));
+      status != ZX_OK) {
+    LOGF(ERROR, "Cannot set name on driver VMO to '%s'", path.c_str());
+    return zx::error(status);
+  }
+  return zx::ok(std::move(vmo));
+}
+
 }  // namespace
 
-zx_status_t load_driver_vmo(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                            std::string_view libname_view, zx::vmo driver_vmo,
-                            DriverLoadCallback func) {
+zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
+                        std::string_view libname_view, zx::vmo driver_vmo,
+                        const std::vector<std::string>& service_uses, DriverLoadCallback func) {
   std::string libname(libname_view);
   zx::unowned_vmo dso = driver_vmo.borrow();
 
   zx_status_t status = ReadDriverInfo(std::move(dso), [&](zircon_driver_note_payload_t* note) {
-    found_driver(note, boot_args, libname, driver_vmo, func);
+    found_driver(note, boot_args, libname, driver_vmo, service_uses, func);
   });
 
   if (status == ZX_ERR_NOT_FOUND) {
@@ -216,7 +235,7 @@ zx_status_t load_driver_vmo(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_
   return status;
 }
 
-zx::result<zx::vmo> load_vmo(std::string_view libname_view) {
+zx::result<zx::vmo> load_driver_vmo(std::string_view libname_view) {
   std::string libname(libname_view);
   fbl::unique_fd fd;
   constexpr uint32_t file_rights = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
@@ -234,18 +253,25 @@ zx::result<zx::vmo> load_vmo(std::string_view libname_view) {
     return zx::error(status);
   }
 
-  // Libname is either a URL or a filesystem path.
-  // Set the vmo_name to the final part of the path, i.e the characters after the last slash '/'.
-  const char* vmo_name = libname.c_str();
-  size_t last_slash = libname.rfind('/');
-  if (last_slash != std::string::npos) {
-    vmo_name = &libname[last_slash + 1];
+  return SetVmoName(std::move(vmo), libname);
+}
+
+zx::result<zx::vmo> load_manifest_vmo(std::string_view path_view) {
+  std::string path(path_view);
+  fbl::unique_fd fd;
+  constexpr uint32_t file_rights = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable);
+  if (zx_status_t status = fdio_open_fd(path.c_str(), file_rights, fd.reset_and_get_address());
+      status != ZX_OK) {
+    LOGF(ERROR, "Cannot open manifest '%s': %d", path.c_str(), status);
+    return zx::error(ZX_ERR_IO);
   }
 
-  if (zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name, strlen(vmo_name));
+  zx::vmo vmo;
+  if (zx_status_t status = fdio_get_vmo_clone(fd.get(), vmo.reset_and_get_address());
       status != ZX_OK) {
-    LOGF(ERROR, "Cannot set name on driver VMO to '%s'", libname.c_str());
+    LOGF(ERROR, "Cannot get manifest VMO '%s'", path.c_str());
     return zx::error(status);
   }
-  return zx::ok(std::move(vmo));
+
+  return SetVmoName(std::move(vmo), path);
 }

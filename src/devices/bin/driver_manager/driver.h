@@ -38,6 +38,9 @@ struct Driver : public fbl::DoublyLinkedListable<std::unique_ptr<Driver>> {
 
   // If true, this driver never tries to match against new devices.
   bool never_autoselect = false;
+
+  // A list of service uses parsed out of the driver's component manifest.
+  std::vector<std::string> service_uses;
 };
 
 struct Dfv2Driver {
@@ -70,8 +73,10 @@ using MatchedDriver =
 
 using DriverLoadCallback = fit::function<void(Driver* driver, const char* version)>;
 
-zx_status_t load_driver_vmo(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                            std::string_view libname, zx::vmo vmo, DriverLoadCallback func);
-zx::result<zx::vmo> load_vmo(std::string_view libname);
+zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
+                        std::string_view libname, zx::vmo driver_vmo,
+                        const std::vector<std::string>& service_uses, DriverLoadCallback func);
+zx::result<zx::vmo> load_driver_vmo(std::string_view libname);
+zx::result<zx::vmo> load_manifest_vmo(std::string_view path);
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_H_

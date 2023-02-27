@@ -3,14 +3,16 @@
     "name": "not-block",
     "expected": "abort",
     "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.usb.BIND_PROTOCOL.FUNCTION"
+      "fuchsia.BIND_PROTOCOL": "fuchsia.usb.BIND_PROTOCOL.FUNCTION",
+      "fuchsia.compat.LIBNAME": "\"block-verity.cm\""
     }
   },
   {
     "name": "block",
     "expected": "match",
     "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.DEVICE"
+      "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.DEVICE",
+      "fuchsia.compat.LIBNAME": "\"block-verity.cm\""
     }
   }
 ]

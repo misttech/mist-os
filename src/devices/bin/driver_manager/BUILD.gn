@@ -48,14 +48,35 @@ source_set("binding") {
 }
 
 source_set("manifest_parser") {
+  visibility = [ ":*" ]
   sources = [
     "manifest_parser.cc",
     "manifest_parser.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/lib/fdio",
     "//src/devices/lib/log",
     "//src/lib/pkg_url",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+source_set("driver") {
+  visibility = [ ":*" ]
+  sources = [
+    "driver.cc",
+    "driver.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/lib/fdio",
+    "//sdk/lib/fit",
+    "//src/devices/lib/log",
+    "//src/lib/ddk:ddk-deprecated-binding-headers",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -82,8 +103,6 @@ source_set("lib") {
     "device.h",
     "device_v2.cc",
     "device_v2.h",
-    "driver.cc",
-    "driver.h",
     "driver_host.cc",
     "driver_host.h",
     "driver_host_loader_service.cc",
@@ -119,6 +138,7 @@ source_set("lib") {
 
   public_deps = [
     ":binding",
+    ":driver",
     ":manifest_parser",
     "composite_node_spec:lib",
     "devfs",
@@ -265,13 +285,37 @@ executable("manifest_parser_test") {
   sources = [ "tests/manifest_parser_test.cc" ]
 
   deps = [
+    ":driver",
     ":manifest_parser",
     "//zircon/system/ulib/zxtest",
   ]
 }
 
+fuchsia_component("manifest-test-driver") {
+  testonly = true
+  component_name = "manifest-test"
+  manifest = "meta/manifest-test-driver.cml"
+}
+
+fuchsia_component("manifest-missing-driver") {
+  testonly = true
+  component_name = "manifest-missing-driver"
+  manifest = "meta/manifest-missing-driver.cml"
+}
+
+fuchsia_component("manifest-no-services") {
+  testonly = true
+  component_name = "manifest-no-services"
+  manifest = "meta/manifest-no-services.cml"
+}
+
 fuchsia_unittest_component("manifest_parser_test_component") {
-  deps = [ ":manifest_parser_test" ]
+  deps = [
+    ":manifest-missing-driver",
+    ":manifest-no-services",
+    ":manifest-test-driver",
+    ":manifest_parser_test",
+  ]
 }
 
 fuchsia_test_package("driver-manager-tests") {

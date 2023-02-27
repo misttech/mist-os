@@ -30,7 +30,7 @@
 #include "src/devices/bin/driver_manager/tests/fake_driver_index.h"
 
 constexpr char kDriverPath[] = "/pkg/driver/mock-device.so";
-constexpr char kDriverUrl[] = "#driver/mock-device.so";
+constexpr char kDriverUrl[] = "#meta/mock-device.cml";
 
 static CoordinatorConfig NullConfig() { return DefaultConfig(nullptr, nullptr, nullptr); }
 
@@ -38,12 +38,13 @@ namespace {
 
 zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                         DriverLoadCallback func) {
-  zx::result vmo_result = load_vmo(kDriverPath);
+  zx::result vmo_result = load_driver_vmo(kDriverPath);
   if (vmo_result.is_error()) {
     return vmo_result.status_value();
   }
 
-  return load_driver_vmo(boot_args, kDriverUrl, std::move(*vmo_result), std::move(func));
+  return load_driver(boot_args, kDriverUrl, std::move(*vmo_result), std::vector<std::string>{},
+                     std::move(func));
 }
 
 class FidlTransaction : public fidl::Transaction {
@@ -364,7 +365,7 @@ TEST(MiscTestCase, InvalidStringProperties) {
 }
 
 TEST(MiscTestCase, DeviceAlreadyBoundFromDriverIndex) {
-  constexpr const char kFakeDriverUrl[] = "#driver/mock-device.so";
+  constexpr const char kFakeDriverUrl[] = "#meta/mock-device.cm";
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   async::Loop index_loop(&kAsyncLoopConfigNeverAttachToThread);
   ASSERT_OK(index_loop.StartThread("test-thread"));

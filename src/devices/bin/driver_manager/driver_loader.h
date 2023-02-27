@@ -67,7 +67,7 @@ class DriverLoader {
 
   const Driver* LibnameToDriver(std::string_view libname) const;
 
-  const Driver* LoadDriverUrl(const std::string& driver_url, bool use_universe_resolver = false);
+  const Driver* LoadDriverUrl(const std::string& manifest_url, bool use_universe_resolver = false);
   const Driver* LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_info);
 
   // This API is used for debugging, for GetDriverInfo and DumpDrivers.

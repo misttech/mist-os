@@ -21,7 +21,7 @@
 namespace block_verity {
 namespace {
 
-const char* kDriverLib = "/boot/driver/block-verity.so";
+const char* kDriverLib = "block-verity.cm";
 
 zx_status_t BindVerityDriver(fidl::UnownedClientEnd<fuchsia_device::Controller> channel) {
   const fidl::WireResult result =

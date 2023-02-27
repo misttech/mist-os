@@ -42,7 +42,7 @@ class NandDevice {
     if (parent.IsBroker()) {
       controller = parent.controller().borrow();
     } else {
-      constexpr char kBroker[] = "nand-broker.so";
+      constexpr char kBroker[] = "nand-broker.cm";
       const fidl::WireResult result =
           fidl::WireCall(parent.controller().borrow())->Rebind(fidl::StringView(kBroker));
       if (!result.ok()) {

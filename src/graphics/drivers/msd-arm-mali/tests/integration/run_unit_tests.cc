@@ -26,7 +26,7 @@ TEST(UnitTests, UnitTests) {
   test_base->ShutdownDevice();
   test_base.reset();
 
-  const char* kTestDriverPath = "libmsd_arm_test.so";
+  const char* kTestDriverPath = "libmsd_arm_test.cm";
   // The test driver will run unit tests on startup.
   magma::TestDeviceBase::BindDriver(parent_device, kTestDriverPath);
 

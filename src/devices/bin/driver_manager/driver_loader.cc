@@ -81,10 +81,10 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
       });
 }
 
-const Driver* DriverLoader::LoadDriverUrl(const std::string& driver_url,
+const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
                                           bool use_universe_resolver) {
   // Check if we've already loaded this driver. If we have then return it.
-  auto driver = LibnameToDriver(driver_url);
+  auto driver = LibnameToDriver(manifest_url);
   if (driver != nullptr) {
     return driver;
   }
@@ -96,9 +96,9 @@ const Driver* DriverLoader::LoadDriverUrl(const std::string& driver_url,
   }
 
   // We've never seen the driver before so add it, then return it.
-  auto fetched_driver = resolver->FetchDriver(driver_url);
+  auto fetched_driver = resolver->FetchDriver(manifest_url);
   if (fetched_driver.is_error()) {
-    LOGF(ERROR, "Error fetching driver: %s: %d", driver_url.data(), fetched_driver.error_value());
+    LOGF(ERROR, "Error fetching driver: %s: %d", manifest_url.data(), fetched_driver.error_value());
     return nullptr;
   }
   // It's possible the driver is nullptr if it was disabled.
@@ -116,11 +116,15 @@ const Driver* DriverLoader::LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_in
     LOGF(ERROR, "Driver info is missing the driver URL");
     return nullptr;
   }
+  if (!driver_info.has_url()) {
+    LOGF(ERROR, "Driver info is missing the URL");
+    return nullptr;
+  }
 
-  std::string driver_url(driver_info.driver_url().get());
+  std::string url(driver_info.url().get());
   bool use_universe_resolver =
       driver_info.has_package_type() && ShouldUseUniversalResolver(driver_info.package_type());
-  return LoadDriverUrl(driver_url, use_universe_resolver);
+  return LoadDriverUrl(url, use_universe_resolver);
 }
 
 bool DriverLoader::MatchesLibnameDriverIndex(const std::string& driver_url,

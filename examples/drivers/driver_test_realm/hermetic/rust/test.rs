@@ -45,7 +45,7 @@ async fn test_platform_bus() -> Result<()> {
     let instance = builder.build().await?;
     // Start DriverTestRealm.
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#driver/platform-bus.so".to_string()),
+        root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
         ..fdt::RealmArgs::EMPTY
     };
     instance.driver_test_realm_start(args).await?;

@@ -5,5 +5,5 @@
 declare_args() {
   # Temporary to help migration to cml paths in OOT repos.
   # TODO(http://fxbug.dev/122463): Remove this.
-  dfv1_use_cml_path = false
+  dfv1_use_cml_path = true
 }

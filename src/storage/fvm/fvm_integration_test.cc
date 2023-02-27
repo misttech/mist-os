@@ -66,7 +66,7 @@
 #include "src/storage/fvm/fvm_check.h"
 #include "src/storage/minfs/format.h"
 
-#define FVM_DRIVER_LIB "fvm.so"
+constexpr char kFvmDriverLib[] = "fvm.cm";
 #define STRLEN(s) (sizeof(s) / sizeof((s)[0]))
 
 namespace {
@@ -189,8 +189,7 @@ void FvmTest::CreateFVM(uint64_t block_size, uint64_t block_count, uint64_t slic
   ASSERT_OK(fs_management::FvmInitPreallocated(ramdisk_block_interface(), block_count * block_size,
                                                block_count * block_size, slice_size));
 
-  auto resp =
-      fidl::WireCall(ramdisk_controller_interface())->Bind(fidl::StringView(FVM_DRIVER_LIB));
+  auto resp = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
   ASSERT_OK(resp.status());
   ASSERT_TRUE(resp->is_ok());
 
@@ -198,8 +197,7 @@ void FvmTest::CreateFVM(uint64_t block_size, uint64_t block_count, uint64_t slic
 }
 
 void FvmTest::FVMRebind() {
-  auto resp =
-      fidl::WireCall(ramdisk_controller_interface())->Rebind(fidl::StringView(FVM_DRIVER_LIB));
+  auto resp = fidl::WireCall(ramdisk_controller_interface())->Rebind(kFvmDriverLib);
   ASSERT_OK(resp.status());
   ASSERT_TRUE(resp->is_ok());
 
@@ -542,8 +540,7 @@ TEST_F(FvmTest, TestLarge) {
 
   ASSERT_EQ(fs_management::FvmInit(ramdisk_block_interface(), kSliceSize), ZX_OK);
 
-  auto resp =
-      fidl::WireCall(ramdisk_controller_interface())->Bind(fidl::StringView(FVM_DRIVER_LIB));
+  auto resp = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
   ASSERT_OK(resp.status());
   ASSERT_TRUE(resp->is_ok());
 
@@ -2791,8 +2788,7 @@ TEST_F(FvmTest, TestAbortDriverLoadSmallDevice) {
   // Try to bind an fvm to the disk.
   //
   // Bind should return ZX_ERR_IO when the load of a driver fails.
-  auto resp =
-      fidl::WireCall(ramdisk_controller_interface())->Bind(fidl::StringView(FVM_DRIVER_LIB));
+  auto resp = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
   ASSERT_OK(resp.status());
   ASSERT_FALSE(resp->is_ok());
   ASSERT_EQ(resp->error_value(), ZX_ERR_INTERNAL);
@@ -2804,8 +2800,7 @@ TEST_F(FvmTest, TestAbortDriverLoadSmallDevice) {
   // unloaded but Controller::Bind above does not wait until
   // the device is removed. Controller::Rebind ensures nothing is
   // bound to the device, before it tries to bind the driver again.
-  auto resp2 =
-      fidl::WireCall(ramdisk_controller_interface())->Rebind(fidl::StringView(FVM_DRIVER_LIB));
+  auto resp2 = fidl::WireCall(ramdisk_controller_interface())->Rebind(kFvmDriverLib);
   ASSERT_OK(resp2.status());
   ASSERT_TRUE(resp2->is_ok());
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root().get(), fvm_path().c_str()));

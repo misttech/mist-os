@@ -7,5 +7,5 @@ library fuchsia.compat;
 /// This property is filled out by the compat driver when someone requests
 /// to do a specific bind. Drivers that want to have autobind disabled
 /// should match against their specific libname.
-/// An example of this would be '/boot/driver/test-driver.so'.
+/// An example of this would be 'test-driver.cm'.
 string LIBNAME;

@@ -1,17 +1,17 @@
 [
-  {
-    "name": "Protocol",
-    "expected": "abort",
-    "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
+    {
+        "name": "Protocol",
+        "expected": "abort",
+        "device": {
+            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
+        }
+    },
+    {
+        "name": "Vendor",
+        "expected": "match",
+        "device": {
+            "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.DEVICE",
+            "fuchsia.compat.LIBNAME": "\"gpt.cm\""
+        }
     }
-  },
-  {
-    "name": "Vendor",
-    "expected": "match",
-    "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.block.BIND_PROTOCOL.DEVICE",
-      "fuchsia.compat.LIBNAME": "\"gpt.so\""
-    }
-  }
 ]
