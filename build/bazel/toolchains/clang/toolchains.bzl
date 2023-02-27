@@ -17,7 +17,7 @@ load(
 )
 load("@prebuilt_clang//:generated_constants.bzl", clang_constants = "constants")
 load("@//:build/bazel/toolchains/clang/sanitizer.bzl", "sanitizer_features")
-load("@//build/bazel/platforms:utils.bzl", "to_bazel_cpu_name")
+load("@//build/bazel/platforms:utils.bzl", "to_bazel_cpu_name", "to_bazel_os_name")
 
 def _prebuilt_clang_cc_toolchain_config_impl(ctx):
     clang_binprefix = "bin/"
@@ -265,11 +265,11 @@ def prebuilt_clang_cc_toolchain(
     native.toolchain(
         name = name + "_cc_toolchain",
         exec_compatible_with = [
-            "@platforms//os:" + host_os,
+            "@platforms//os:" + to_bazel_os_name(host_os),
             "@platforms//cpu:" + to_bazel_cpu_name(host_arch),
         ],
         target_compatible_with = [
-            "@platforms//os:" + target_os,
+            "@platforms//os:" + to_bazel_os_name(target_os),
             "@platforms//cpu:" + to_bazel_cpu_name(target_arch),
         ],
         toolchain = ":" + name,
