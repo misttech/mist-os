@@ -11,9 +11,15 @@ rustc_library("windowed-stats") {
   edition = "2021"
   with_unit_tests = true
 
-  deps = [ "//third_party/rust_crates:num-traits" ]
+  deps = [
+    "//src/lib/diagnostics/inspect/rust",
+    "//third_party/rust_crates:num-traits",
+  ]
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/aggregation_fns.rs",
+    "src/lib.rs",
+  ]
 }
 
 fuchsia_unittest_package("windowed-stats-tests") {
