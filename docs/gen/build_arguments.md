@@ -2597,7 +2597,7 @@ From //src/ui/tests/integration_flutter_tests/embedder/flutter_build_config.gni:
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:55
+From //build/product.gni:53
 
 ### emu_window_size_width
 
@@ -2605,7 +2605,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:54
+From //build/product.gni:52
 
 ### enable_api_diff
 
@@ -3369,13 +3369,11 @@ From //build/product.gni:36
 
 ### fuchsia_product_assembly_config_file
 
-Used to provide assembly with a complete product assembly config.  This can
-be a static source file, the output of a build action, or a file created by
-GN using generated_file().
+TODO(https://fxbug.dev/122450): Remove once usage OOT usage is removed.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:41
+From //build/product.gni:39
 
 ### fuchsia_product_assembly_config_label
 
@@ -3384,7 +3382,7 @@ it needs to be specified as well.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:45
+From //build/product.gni:43
 
 ### fuchsia_route_sources_config
 
@@ -3710,7 +3708,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -5538,7 +5536,7 @@ From //boards/arm64.gni:45
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:127
+From //build/board.gni:128
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
@@ -5546,7 +5544,7 @@ From //boards/x64.gni:95
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:127
+From //build/board.gni:128
 
 ### partitions_config_label
 
@@ -5559,7 +5557,7 @@ From //boards/arm64.gni:44
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
-From //build/board.gni:126
+From //build/board.gni:127
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5567,7 +5565,7 @@ From //boards/x64.gni:94
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
-From //build/board.gni:126
+From //build/board.gni:127
 
 ### perfetto_build_with_android
 
@@ -6935,19 +6933,14 @@ From //src/recovery/system/system_recovery_args.gni:11
 
 ### recovery_fdr_images_config_label
 
-TODO(jayzhuang): Remove recovery_fdr_images_config_label.
-
-**Current value (from the default):** `false`
-
-From //build/board.gni:115
-
-### recovery_images_config_label
-
 The images config information used for recovery images, including
-recovery-fdr and recovery-ota, and potentially other recovery images.
+recovery-fdr and recovery-ota.
 
-Only one recovery image can be selected for a build configuration, so it's
-OK to share the same arg for different images.
+NOTE: Only one recovery image can be selected for a build configuration.
+However, images config is selected based on board, while recovery images are
+selected based on product, so the build system doesn't always have full
+information to match them. Also this is expected to be temporary until we
+fully migrate assembly to Bazel.
 
 **Current value (from the default):** `false`
 
@@ -6982,6 +6975,12 @@ assembly work until that's been addressed.
 **Current value (from the default):** `false`
 
 From //build/images/args.gni:19
+
+### recovery_ota_images_config_label
+
+**Current value (from the default):** `false`
+
+From //build/board.gni:123
 
 ### recovery_route_sources_config
 
@@ -7940,7 +7939,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8509,7 +8508,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:51
+From //build/product.gni:49
 
 ### vm_tracing_level
 
