@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import(
+    "//src/connectivity/network/testing/netemul/guest/fuchsia_netemul_guest_test_package.gni")
 
 resource("test_script") {
   sources = [ "//src/virtualization/lib/guest_interaction/test/test_script.sh" ]
@@ -36,34 +38,10 @@ fuchsia_test_component("netemul-guest-self-test") {
   deps = [ ":guest" ]
 }
 
-fuchsia_test_package("netemul-guest-self-tests") {
+fuchsia_netemul_guest_test_package("netemul-guest-self-tests") {
   test_components = [ ":netemul-guest-self-test" ]
-
   deps = [
     # netemul-sandbox is used to create hermetic test realms.
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
-
-    # netemul-guest expose FIDL APIs for creating and controlling guests.
-    "//src/connectivity/network/testing/netemul/guest:netemul-guest",
   ]
-
-  subpackages = [
-    # guest-manager is used by netemul-guest to create and interact with guests.
-    "//src/virtualization/bin/guest_manager:debian_guest_manager",
-  ]
-
-  test_specs = {
-    environments = guest_envs
-
-    # Allow error logs since they are emitted by guest-manager.
-    # TODO(https://fxbug.dev/117767): Remove error logging in clean shutdown paths.
-    log_settings = {
-      max_severity = "ERROR"
-    }
-
-    # Don't run tests in parallel, because the guest sandbox only supports
-    # one guest at a time.
-    # TODO(https://fxbug.dev/118321): Enable parallelized guest tests.
-    parallel = 1
-  }
 }

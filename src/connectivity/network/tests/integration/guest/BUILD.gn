@@ -1,0 +1,46 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_test.gni")
+import(
+    "//src/connectivity/network/testing/netemul/guest/fuchsia_netemul_guest_test_package.gni")
+
+guest_tests = [
+  "dhcpv4",
+  "dhcpv6",
+]
+
+foreach(test, guest_tests) {
+  name = "netstack-${test}-guest-integration-test"
+  fuchsia_test_component(name) {
+    manifest = "meta/${name}.cml"
+    deps = [ "${test}" ]
+  }
+}
+
+fuchsia_netemul_guest_test_package("netstack-guest-integration-tests") {
+  test_components = []
+  foreach(test, guest_tests) {
+    test_components += [ ":netstack-${test}-guest-integration-test" ]
+  }
+
+  deps = [
+    # netemul-sandbox is used to create hermetic test realms.
+    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+
+    # netstack is under test.
+    "//src/connectivity/network/netstack:component",
+    "//src/connectivity/network/netstack:component-debug",
+    "//src/connectivity/network/netstack:component-with-fast-udp-debug",
+
+    # DHCPv6 client is under test.
+    "//src/connectivity/network/dhcpv6/client:component",
+  ]
+}
+
+resource("dhcp_setup") {
+  sources = [ "data/dhcp_setup.sh" ]
+  outputs = [ "data/dhcp_setup.sh" ]
+}

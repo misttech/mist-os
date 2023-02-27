@@ -181,6 +181,7 @@ group("tests") {
   deps = [
            ":netstack-integration-tests",
            ":netstack-integration-tests-with-expectations",
+           "guest:netstack-guest-integration-tests",
            "macros:netstack_testing_macros_test",
          ] + err_log_package_deps
 
