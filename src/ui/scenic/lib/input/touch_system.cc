@@ -67,13 +67,6 @@ glm::vec2 GetViewportNDCPoint(const InternalTouchEvent& internal_event) {
   };
 }
 
-void ChattyA11yLog(const fuchsia::ui::input::accessibility::PointerEvent& event) {
-  static uint32_t chatty = 0;
-  if (chatty++ < ChattyMax()) {
-    FX_LOGS(INFO) << "Ptr-A11y[" << chatty << "/" << ChattyMax() << "]: " << event;
-  }
-}
-
 }  // namespace
 
 TouchSystem::TouchSystem(sys::ComponentContext* context,
@@ -109,7 +102,6 @@ TouchSystem::TouchSystem(sys::ComponentContext* context,
               }
 
               for (auto& a11y_event : a11y_events) {
-                ChattyA11yLog(a11y_event);
                 accessibility_pointer_event_listener()->OnEvent(std::move(a11y_event));
               }
             },
