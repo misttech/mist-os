@@ -12,7 +12,7 @@ use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::fuchsia::new_remote_file;
 use crate::fs::{
     fs_node_impl_dir_readonly, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString,
     MemoryDirectoryFile, NamespaceNode, SeekOrigin, SpecialNode,
 };
 use crate::lock::{
@@ -2053,6 +2053,7 @@ impl std::fmt::Display for Handle {
 /// Abstraction over a thread that has a connection to the binder driver.
 trait BinderTask: std::fmt::Debug + MemoryAccessor {
     fn creds(&self) -> Credentials;
+    fn get_current_selinux_context(&self) -> FsString;
 
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno>;
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno>;
@@ -2092,6 +2093,9 @@ impl<'a> MemoryAccessor for CurrentBinderTask<'a> {
 impl<'a> BinderTask for CurrentBinderTask<'a> {
     fn creds(&self) -> Credentials {
         self.task.creds()
+    }
+    fn get_current_selinux_context(&self) -> FsString {
+        self.task.thread_group.read().selinux.current_context.clone()
     }
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
         self.task.files.close(fd)
@@ -2187,6 +2191,11 @@ impl BinderTask for RemoteBinderTask {
         Credentials::root()
     }
 
+    fn get_current_selinux_context(&self) -> FsString {
+        // TODO(fxb/108648): Compute the correct security context.
+        b"user:role:type:level".to_vec()
+    }
+
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
         self.run_file_request(fbinder::FileRequest {
             close_requests: Some(vec![fd.raw()]),
@@ -2268,6 +2277,9 @@ impl MemoryAccessor for LocalBinderTask {
 impl BinderTask for LocalBinderTask {
     fn creds(&self) -> Credentials {
         self.task.creds()
+    }
+    fn get_current_selinux_context(&self) -> FsString {
+        self.task.thread_group.read().selinux.current_context.clone()
     }
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
         self.task.files.close(fd)
@@ -2695,12 +2707,13 @@ impl BinderDriver {
         };
 
         let target_task = self.get_binder_task(current_task.kernel(), &target_proc)?;
-        let security_context: Option<&[u8]> = if object.flags
+        let security_context: Option<FsString> = if object.flags
             & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
             == uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
         {
-            // TODO(fxb/108648): Compute the correct security context.
-            Some(b"unconfined:role:type:level\0")
+            let mut security_context = target_task.get_current_selinux_context();
+            security_context.push(b'\0');
+            Some(security_context)
         } else {
             None
         };
@@ -2713,7 +2726,7 @@ impl BinderDriver {
             target_task.as_ref().as_ref(),
             &target_proc,
             &data,
-            security_context,
+            security_context.as_deref(),
         )?;
 
         let transaction = TransactionData {

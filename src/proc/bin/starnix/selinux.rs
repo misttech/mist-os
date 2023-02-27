@@ -269,9 +269,9 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
 #[derivative(Default)]
 pub struct SeLinuxThreadGroupState {
     #[derivative(Default(value = "b\"user:role:type:level\".to_vec()"))]
-    current_context: FsString,
-    fscreate_context: FsString,
-    exec_context: FsString,
+    pub current_context: FsString,
+    pub fscreate_context: FsString,
+    pub exec_context: FsString,
 }
 
 pub fn selinux_proc_attrs(task: &Arc<Task>, dir: &mut StaticDirectoryBuilder<'_>) {
