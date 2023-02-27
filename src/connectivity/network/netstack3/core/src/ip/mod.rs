@@ -491,7 +491,9 @@ impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<S, W> {
 }
 
 /// An IP device ID.
-pub trait IpDeviceId: Clone + Display + Debug + Eq + Hash + PartialEq + Send + Sync {
+pub(crate) trait IpDeviceId:
+    Clone + Display + Debug + Eq + Hash + PartialEq + Send + Sync
+{
     /// Returns true if the device is a loopback device.
     fn is_loopback(&self) -> bool;
 }
