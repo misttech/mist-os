@@ -4,6 +4,6 @@
 
 import("//build/bind/bind.gni")
 
-bind_library("fuchsia.hdmi") {
-  source = "fuchsia.hdmi.bind"
+bind_library("fuchsia.hardware.hdmi") {
+  source = "fuchsia.hardware.hdmi.bind"
 }

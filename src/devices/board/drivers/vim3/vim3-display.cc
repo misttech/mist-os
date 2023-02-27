@@ -14,7 +14,7 @@
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
-#include <bind/fuchsia/hdmi/cpp/bind.h>
+#include <bind/fuchsia/hardware/hdmi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -83,11 +83,12 @@ static const fpbus::Node display_dev = []() {
 
 zx_status_t Vim3::DisplayInit() {
   auto hdmi_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_hdmi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_hdmi::BIND_PROTOCOL_DEVICE),
   };
 
   auto hdmi_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hdmi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_hdmi::BIND_PROTOCOL_DEVICE),
   };
 
   auto gpio_bind_rules = std::vector{

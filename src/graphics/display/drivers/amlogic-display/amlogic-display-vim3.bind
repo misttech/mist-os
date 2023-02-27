@@ -4,7 +4,7 @@
 
 composite display;
 
-using fuchsia.hdmi;
+using fuchsia.hardware.hdmi;
 using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.sysmem;
@@ -31,6 +31,6 @@ node "canvas" {
 }
 
 node "hdmi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hdmi.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.hdmi.BIND_PROTOCOL.DEVICE;
 }
 

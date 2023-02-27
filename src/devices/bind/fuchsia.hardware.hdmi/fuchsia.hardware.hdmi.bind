@@ -2,8 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.hdmi;
+library fuchsia.hardware.hdmi;
 
 extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 157,
 };
+
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  DEVICE = 15,
+};
+
