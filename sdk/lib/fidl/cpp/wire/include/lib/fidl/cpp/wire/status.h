@@ -36,13 +36,14 @@ namespace fidl {
 //   |fidl::UnbindInfo| are sufficient.
 // - Whether the error may be propagated outwards and eventually logged at the
 //   top level.
-enum class Reason {
+enum class Reason : uint16_t {
   // The value zero is reserved as a sentinel value that indicates an
   // uninitialized reason; it will never be returned to user code.
   // NOLINTNEXTLINE
   __DoNotUse = 0,
 
-  // The user invoked `Unbind()`.
+  // The user initiated unbinding. For example they invoked `Unbind()`
+  // on the server side or destroyed their client object.
   //
   // If this reason is observed when making a call or sending an event or reply,
   // it indicates that the client/server endpoint has already been unbound, and
@@ -59,6 +60,18 @@ enum class Reason {
   //
   // |status| is the result of sending the epitaph.
   kClose,
+
+  // Some other operation on this connection experienced an error that requires
+  // the runtime to unbind the endpoint and teardown the bindings.
+  //
+  // This reason is provided when the terminal error was specific to a
+  // particular operation. For example, if one FIDL call triggered an encode
+  // error, other in-progress FIDL call will be canceled with this reason.
+  // On the other hand, if the binding received a malformed message, then
+  // all operations will fail with that universal error.
+  //
+  // |status| will be |ZX_ERR_CANCELED|.
+  kCanceledDueToOtherError,
 
   // The endpoint peer was closed while the bindings runtime was reading,
   // or waiting to read a message.
@@ -155,7 +168,16 @@ extern const char* const kCallerAllocatedBufferTooSmall;
 extern const char* const kUnknownMethod;
 extern const char* const kUnsupportedTransportError;
 
+// Given a fatal error, |IsFatalErrorUniversal| detects if it universally
+// applies to all operations on the connection. For example, if the async
+// dispatcher is going down, then all in-progress operations should be
+// notified of that same error. On the other hand, an encode error is not
+// universal and only specific to a particular operation that caused it.
+bool IsFatalErrorUniversal(fidl::Reason error);
+
 }  // namespace internal
+
+class UnbindInfo;
 
 // |Status| represents the result of an operation.
 //
@@ -185,6 +207,12 @@ class [[nodiscard]] Status {
   constexpr static Status Unbound() {
     return Status(ZX_ERR_CANCELED, ::fidl::Reason::kUnbind, ::fidl::internal::kErrorChannelUnbound);
   }
+
+  // Constructs a result indicating that the operation is being canceled due to
+  // a problem somewhere else that forced the endpoint to be unbound. For
+  // example, we'd like to inform the user that their FIDL call "B" now has to
+  // be canceled due to a fatal error in FIDL call "A".
+  static Status Canceled(fidl::UnbindInfo cause);
 
   // Constructs a result indicating that the operation cannot proceed
   // because a unknown message was received. Specifically, the method or event
@@ -239,11 +267,16 @@ class [[nodiscard]] Status {
   // Generally, logging this status alone wouldn't be very useful, since its
   // interpretation is dependent on the reason.
   // Prefer logging |error| or via |FormatDescription|.
-  [[nodiscard]] zx_status_t status() const { return status_; }
+  [[nodiscard]] constexpr zx_status_t status() const {
+    if (reason_ == Reason::kCanceledDueToOtherError) {
+      return ZX_ERR_CANCELED;
+    }
+    return status_;
+  }
 
 #ifdef __Fuchsia__
   // Returns the string representation of the status value.
-  [[nodiscard]] const char* status_string() const { return zx_status_get_string(status_); }
+  [[nodiscard]] const char* status_string() const { return zx_status_get_string(status()); }
 #endif  // __Fuchsia__
 
   // A high-level reason for the failure.
@@ -251,9 +284,24 @@ class [[nodiscard]] Status {
   // Generally, logging this value alone wouldn't be the most convenient for
   // debugging, since it requires developers to check back to the enum.
   // Prefer logging |error| or via |FormatDescription|.
-  [[nodiscard]] ::fidl::Reason reason() const {
+  [[nodiscard]] constexpr ::fidl::Reason reason() const {
     ZX_ASSERT(reason_ != internal::kUninitializedReason);
     return reason_;
+  }
+
+  // A high-level reason for the underlying failure. An underlying reason
+  // is present if and only if |reason| is |Reason::kCanceledDueToOtherError|,
+  // that is, the operation was canceled due to a previous fatal error.
+  //
+  // Generally, logging this value alone wouldn't be the most convenient for
+  // debugging, since it requires developers to check back to the enum.
+  // Prefer logging |error| or via |FormatDescription|.
+  [[nodiscard]] constexpr std::optional<::fidl::Reason> underlying_reason() const {
+    if (reason() == Reason::kCanceledDueToOtherError) {
+      ZX_DEBUG_ASSERT(underlying_reason_ != internal::kUninitializedReason);
+      return underlying_reason_;
+    }
+    return std::nullopt;
   }
 
   // Returns if the operation failed because the peer endpoint was closed while
@@ -268,18 +316,20 @@ class [[nodiscard]] Status {
   // Note that if a FIDL operation only involves writing to a transport (e.g.
   // one way calls), then peer closed errors are hidden, to discourage race
   // conditions.
-  bool is_peer_closed() const { return reason_ == Reason::kPeerClosedWhileReading; }
+  constexpr bool is_peer_closed() const { return reason_ == Reason::kPeerClosedWhileReading; }
 
   // Returns if the operation failed because the async dispatcher is shutting
   // down.
-  bool is_dispatcher_shutdown() const {
+  constexpr bool is_dispatcher_shutdown() const {
     return reason_ == fidl::Reason::kDispatcherError && status() == ZX_ERR_CANCELED;
   }
 
   // Returns if the operation failed because it was canceled (i.e. the user or
   // another unrelated error tore down the binding in the meantime).
-  bool is_canceled() const {
-    return reason_ == fidl::Reason::kUnbind && status_ == ZX_ERR_CANCELED;
+  constexpr bool is_canceled() const {
+    bool directly_unbound = reason_ == fidl::Reason::kUnbind && status_ == ZX_ERR_CANCELED;
+    bool indirectly_unbound = reason_ == fidl::Reason::kCanceledDueToOtherError;
+    return directly_unbound || indirectly_unbound;
   }
 
   // Renders a full description of the success or error.
@@ -303,7 +353,7 @@ class [[nodiscard]] Status {
   [[nodiscard]] const char* lossy_description() const;
 
   // If the operation was successful.
-  [[nodiscard]] bool ok() const { return status_ == ZX_OK; }
+  [[nodiscard]] constexpr bool ok() const { return status_ == ZX_OK; }
 
   // If the operation failed, returns information about the error.
   //
@@ -315,19 +365,22 @@ class [[nodiscard]] Status {
   //     FX_LOGS(ERROR) << "GetBar failed: " << bar.error();
   //   }
   //
-  const Status& error() const {
+  constexpr const Status& error() const {
     ZX_ASSERT(status_ != ZX_OK);
     return *this;
   }
 
  protected:
-  void SetStatus(const Status& other) { operator=(other); }
+  constexpr void SetStatus(const Status& other) { operator=(other); }
 
   // Returns a pointer to populate additional error message.
-  [[nodiscard]] const char** error_address() { return &error_; }
+  [[nodiscard]] constexpr const char** error_address() { return &error_; }
 
   // A human readable description of |reason|.
   [[nodiscard]] const char* reason_description() const;
+
+  // A human readable description of |underlying_reason|.
+  [[nodiscard]] const char* underlying_reason_description() const;
 
   // Renders the description into a buffer |destination| that is of size
   // |length|. The description will cut off at `length - 1`. It inserts a
@@ -347,8 +400,14 @@ class [[nodiscard]] Status {
   constexpr Status(zx_status_t status, ::fidl::Reason reason, const char* error)
       : status_(status), reason_(reason), error_(error) {}
 
+  __ALWAYS_INLINE
+  constexpr Status(zx_status_t status, ::fidl::Reason reason, ::fidl::Reason underlying_reason,
+                   const char* error)
+      : status_(status), reason_(reason), underlying_reason_(underlying_reason), error_(error) {}
+
   zx_status_t status_ = ZX_ERR_INTERNAL;
   ::fidl::Reason reason_ = internal::kUninitializedReason;
+  ::fidl::Reason underlying_reason_ = internal::kUninitializedReason;
   const char* error_ = nullptr;
 };
 
@@ -501,7 +560,7 @@ class UnbindInfo : private Status {
   // side `on_fidl_error` method on the event handler is never called with an
   // |UnbindInfo| that is user initiated - `on_fidl_error` is meant to handle
   // errors.
-  [[nodiscard]] bool is_user_initiated() const {
+  [[nodiscard]] constexpr bool is_user_initiated() const {
     switch (reason()) {
       case internal::kUninitializedReason:
         return false;
@@ -517,7 +576,7 @@ class UnbindInfo : private Status {
   //
   // This error is of interest since some protocol users may consider the peer
   // going away to be part of its normal operation, while others might not.
-  bool is_peer_closed() const { return reason_ == Reason::kPeerClosedWhileReading; }
+  constexpr bool is_peer_closed() const { return reason_ == Reason::kPeerClosedWhileReading; }
 
   // Returns if the transport was unbound because the async dispatcher is
   // shutting down.
@@ -529,10 +588,16 @@ class UnbindInfo : private Status {
   // This case is only observable from the server side.
   //
   // |status| is the result of sending the epitaph.
-  bool did_send_epitaph() const { return reason() == Reason::kClose; }
+  constexpr bool did_send_epitaph() const { return reason() == Reason::kClose; }
 
   // Reinterprets the |UnbindInfo| as the cause of an operation failure.
-  fidl::Status ToError() const { return Status(*this); }
+  constexpr fidl::Error ToError() const {
+    if (reason_ == Reason::kUnbind) {
+      // See |UnbindInfo::Unbind| for reason behind this conversion.
+      return Status::Unbound();
+    }
+    return Status(*this);
+  }
 
  private:
   friend std::ostream& operator<<(std::ostream& ostream, const UnbindInfo& info);

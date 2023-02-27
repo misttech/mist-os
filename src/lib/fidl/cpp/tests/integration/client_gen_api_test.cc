@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.cpp.constraint.protocol.test/cpp/fidl.h>
 #include <fidl/test.basic.protocol/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/defer.h>
@@ -77,5 +78,32 @@ void ThenExactlyOnceTest() {
 TEST(Client, ThenExactlyOnce) { ThenExactlyOnceTest<fidl::Client<Values>>(); }
 
 TEST(SharedClient, ThenExactlyOnce) { ThenExactlyOnceTest<fidl::SharedClient<Values>>(); }
+
+TEST(Client, PropagateEncodeError) {
+  using ::fidl_cpp_constraint_protocol_test::Bits;
+  using ::fidl_cpp_constraint_protocol_test::Constraint;
+  auto endpoints = fidl::CreateEndpoints<Constraint>();
+  ASSERT_OK(endpoints.status_value());
+  auto [local, remote] = std::move(*endpoints);
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::Client client(std::move(local), loop.dispatcher());
+
+  static_assert(Bits::TryFrom(0xff) == std::nullopt, "0xff should have invalid bits");
+  client->Echo({{.bits = Bits(0xff)}}).ThenExactlyOnce([&](fidl::Result<Constraint::Echo>& result) {
+    // 0xff leads to strict bits constraint validation error.
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().reason(), fidl::Reason::kEncodeError);
+  });
+
+  client->Echo({{.bits = Bits::kA}}).ThenExactlyOnce([&](fidl::Result<Constraint::Echo>& result) {
+    // |Bits::kA| is valid, but this call is canceled due to the previous error.
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().reason(), fidl::Reason::kCanceledDueToOtherError);
+    EXPECT_EQ(result.error_value().underlying_reason().value(), fidl::Reason::kEncodeError);
+    loop.Quit();
+  });
+
+  loop.Run();
+}
 
 }  // namespace

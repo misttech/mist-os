@@ -8,6 +8,14 @@
 
 #include <zxtest/zxtest.h>
 
+namespace {
+
+static_assert(sizeof(fidl::Status) <= sizeof(uint64_t) * 2, "Status should be reasonably small.");
+static_assert(std::is_trivially_destructible_v<fidl::Status>,
+              "Status should not add destruction overhead");
+static_assert(std::is_trivially_copy_constructible_v<fidl::Status>,
+              "Status should not add copying overhead");
+
 TEST(Status, ReasonShouldNotBeUsedInOkStatus) {
 #ifdef __Fuchsia__
   fidl::Status ok_status = fidl::Status::Ok();
@@ -27,7 +35,7 @@ TEST(OneWayStatus, ConvertToFromStatus) {
 
 // TODO(fxbug.dev/49971): We would be able to remove the differences between
 // fuchsia/host if |zx_status_get_string| is available on host.
-static std::string SelectErrorDescription(const std::string& fuchsia, const std::string& host) {
+std::string SelectErrorDescription(const std::string& fuchsia, const std::string& host) {
 #ifdef __Fuchsia__
   return fuchsia;
 #else
@@ -98,6 +106,36 @@ TEST(Status, UnexpectedMessageDescription) {
             fidl::Status::UnexpectedMessage(ZX_ERR_INVALID_ARGS, "foo").FormatDescription());
 }
 
+TEST(Status, CanceledDescription) {
+  std::string expected = SelectErrorDescription(
+      "FIDL operation failed due to being canceled by failure from another operation: "
+      "encode error, status: ZX_ERR_CANCELED (-23), detail: string too long",
+      "FIDL operation failed due to being canceled by failure from another operation: "
+      "encode error, status: -23, detail: string too long");
+  auto canceled = fidl::Status::Canceled(
+      fidl::UnbindInfo{fidl::Status::EncodeError(ZX_ERR_INVALID_ARGS, "string too long")});
+  ASSERT_EQ(expected, canceled.FormatDescription());
+}
+
+TEST(Status, Canceled) {
+  {
+    auto canceled = fidl::Status::Canceled(
+        fidl::UnbindInfo{fidl::Status::EncodeError(ZX_ERR_INVALID_ARGS, "string too long")});
+    EXPECT_EQ(canceled.reason(), fidl::Reason::kCanceledDueToOtherError);
+    EXPECT_EQ(canceled.underlying_reason().value(), fidl::Reason::kEncodeError);
+    EXPECT_EQ(canceled.status(), ZX_ERR_CANCELED);
+    EXPECT_TRUE(canceled.is_canceled());
+  }
+
+  {
+    auto regular = fidl::Status::UnknownMethod();
+    EXPECT_EQ(regular.reason(), fidl::Reason::kUnknownMethod);
+    EXPECT_EQ(regular.underlying_reason(), std::nullopt);
+    EXPECT_EQ(regular.status(), ZX_ERR_NOT_SUPPORTED);
+    EXPECT_FALSE(regular.is_canceled());
+  }
+}
+
 TEST(Status, FormatDisplayError) {
   auto r = fidl::Status::Ok();
   char buffer[100];
@@ -142,3 +180,15 @@ TEST(UnbindInfo, DispatcherErrorDescription) {
       "FIDL endpoint was unbound due to dispatcher error, status: -30");
   ASSERT_EQ(expected, fidl::UnbindInfo::DispatcherError(ZX_ERR_ACCESS_DENIED).FormatDescription());
 }
+
+TEST(UnbindInfo, ToError) {
+  fidl::Error unbound = fidl::UnbindInfo::Unbind().ToError();
+  EXPECT_EQ(unbound.reason(), fidl::Reason::kUnbind);
+  EXPECT_EQ(unbound.status(), ZX_ERR_CANCELED);
+
+  fidl::Error peer_closed = fidl::UnbindInfo::PeerClosed(ZX_ERR_PEER_CLOSED).ToError();
+  EXPECT_EQ(peer_closed.reason(), fidl::Reason::kPeerClosedWhileReading);
+  EXPECT_EQ(peer_closed.status(), ZX_ERR_PEER_CLOSED);
+}
+
+}  // namespace

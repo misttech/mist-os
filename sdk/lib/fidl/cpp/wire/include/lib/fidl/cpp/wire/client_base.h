@@ -396,6 +396,8 @@ class ClientBase final : public std::enable_shared_from_this<ClientBase> {
   friend class ::fidl_testing::ClientBaseChecker;
 
   // Weak reference to the internal binding state.
+  // TODO(fxbug.dev/87788): remember the error that caused the binding to teardown.
+  // We can store a tombstone instead of an expired weak pointer.
   std::weak_ptr<AsyncClientBinding> binding_;
 
   std::weak_ptr<ClientControlBlock> client_object_lifetime_;

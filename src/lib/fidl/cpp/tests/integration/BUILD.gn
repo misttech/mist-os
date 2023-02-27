@@ -26,6 +26,11 @@ fidl("fidl.cpp.wire.bindinggroup.test") {
   sources = [ "fidl.cpp.wire.bindinggroup.test.fidl" ]
 }
 
+fidl("fidl.cpp.constraint.protocol.test") {
+  visibility = [ ":*" ]
+  sources = [ "fidl.cpp.constraint.protocol.test.fidl" ]
+}
+
 test("fidl_cpp_binding_group_tests_bin") {
   output_name = "fidl_cpp_binding_group_tests"
   sources = [ "binding_group_test.cc" ]
@@ -68,6 +73,7 @@ test("fidl_cpp_gen_api_tests_bin") {
     "server_gen_api_test.cc",
   ]
   deps = [
+    ":fidl.cpp.constraint.protocol.test_cpp",
     "//sdk/testing/fidl/protocols_tests:test.basic.protocol_cpp",
     "//sdk/testing/fidl/protocols_tests:test.error.methods_cpp",
     "//zircon/system/ulib/async:async-cpp",

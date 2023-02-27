@@ -82,31 +82,16 @@ void ClientBase::ReleaseResponseContexts(fidl::UnbindInfo info) {
   list_for_every_safe(&delete_list, node, temp_node) {
     list_delete(node);
     auto* context = static_cast<ResponseContext*>(node);
-    // Depending on what kind of error caused teardown, we may want to propgate
+    // |kClose| is never used on the client side.
+    ZX_DEBUG_ASSERT(info.reason() != fidl::Reason::kClose);
+    // Depending on what kind of error caused teardown, we may want to propagate
     // the error to all other outstanding contexts.
-    switch (info.reason()) {
-      case fidl::Reason::kClose:
-        // |kClose| is never used on the client side.
-        __builtin_abort();
-      case fidl::Reason::kUnbind:
-        // The user explicitly initiated teardown.
-      case fidl::Reason::kEncodeError:
-      case fidl::Reason::kDecodeError:
-        // These errors are specific to one call, whose corresponding context
-        // would have been notified during |Dispatch| or making the call.
-        context->OnError(fidl::Status::Unbound());
-        break;
-      case fidl::Reason::kPeerClosedWhileReading:
-      case fidl::Reason::kDispatcherError:
-      case fidl::Reason::kTransportError:
-      case fidl::Reason::kUnexpectedMessage:
-        // These errors apply to all calls.
-        context->OnError(info.ToError());
-        break;
-      default:
-        // Should not reach here, but there is no compile-time approach to
-        // guarantee it.
-        ZX_PANIC("Unknown reason %d", static_cast<int>(info.reason()));
+    if (IsFatalErrorUniversal(info.reason())) {
+      context->OnError(info.ToError());
+    } else {
+      // These errors are specific to one call, whose corresponding context
+      // would have been notified during |Dispatch| or making the call.
+      context->OnError(fidl::Status::Canceled(info));
     }
   }
 }
@@ -124,6 +109,7 @@ void ClientBase::SendTwoWay(fidl::OutgoingMessage& message, ResponseContext* con
     }
     return;
   }
+  // TODO(fxbug.dev/87788): propagate the error that caused the binding to teardown.
   TryAsyncDeliverError(fidl::Status::Unbound(), context);
 }
 
@@ -138,6 +124,7 @@ fidl::OneWayStatus ClientBase::SendOneWay(::fidl::OutgoingMessage& message,
     }
     return fidl::OneWayStatus{fidl::Status::Ok()};
   }
+  // TODO(fxbug.dev/87788): propagate the error that caused the binding to teardown.
   return fidl::OneWayStatus{fidl::Status::Unbound()};
 }
 

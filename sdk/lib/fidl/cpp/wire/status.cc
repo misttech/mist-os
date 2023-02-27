@@ -30,9 +30,57 @@ const char* const kUnknownMethod = "server did not recognize this method";
 const char* const kUnsupportedTransportError =
     "server sent a transport_err value that is not supported";
 
+bool IsFatalErrorUniversal(fidl::Reason error) {
+  switch (error) {
+    case Reason::__DoNotUse:
+    case Reason::kCanceledDueToOtherError:
+    case Reason::kUnknownMethod:
+      // These are not concrete errors.
+      __builtin_abort();
+    case Reason::kUnbind:
+    case Reason::kClose:
+    case Reason::kPeerClosedWhileReading:
+    case Reason::kDispatcherError:
+    case Reason::kTransportError:
+    case Reason::kUnexpectedMessage:
+      return true;
+    case Reason::kEncodeError:
+    case Reason::kDecodeError:
+      return false;
+  }
+}
+
 }  // namespace internal
 
 namespace {
+
+constexpr const char* DescribeReason(Reason reason) {
+  // The error descriptions are quite terse to save binary size.
+  switch (reason) {
+    case internal::kUninitializedReason:
+      return nullptr;
+    case Reason::kUnbind:
+      return "user initiated unbind";
+    case Reason::kClose:
+      return "(server) user initiated close with epitaph";
+    case Reason::kCanceledDueToOtherError:
+      return "being canceled by failure from another operation: ";
+    case Reason::kPeerClosedWhileReading:
+      return "peer closed";
+    case Reason::kDispatcherError:
+      return "dispatcher error";
+    case Reason::kTransportError:
+      return internal::kErrorTransport;
+    case Reason::kEncodeError:
+      return "encode error";
+    case Reason::kDecodeError:
+      return "decode error";
+    case Reason::kUnexpectedMessage:
+      return "unexpected message";
+    case Reason::kUnknownMethod:
+      return "unknown interaction";
+  }
+}
 
 // A buffer of 256 bytes is sufficient for all tested results.
 // If the description exceeds this length at runtime,
@@ -41,6 +89,13 @@ namespace {
 using StatusFormattingBuffer = std::array<char, 256>;
 
 }  // namespace
+
+Status Status::Canceled(UnbindInfo cause) {
+  Status status = cause.ToError();
+  // Universal errors should be directly passed instead of tucked under a nested error.
+  ZX_DEBUG_ASSERT(!internal::IsFatalErrorUniversal(status.reason_));
+  return Status(ZX_ERR_CANCELED, Reason::kCanceledDueToOtherError, status.reason_, status.error_);
+}
 
 [[nodiscard]] std::string Status::FormatDescription() const {
   StatusFormattingBuffer buf;
@@ -57,30 +112,11 @@ using StatusFormattingBuffer = std::array<char, 256>;
   return reason_description();
 }
 
-[[nodiscard]] const char* Status::reason_description() const {
-  // The error descriptions are quite terse to save binary size.
-  switch (reason_) {
-    case internal::kUninitializedReason:
-      return nullptr;
-    case Reason::kUnbind:
-      return "user initiated unbind";
-    case Reason::kClose:
-      return "(server) user initiated close with epitaph";
-    case Reason::kPeerClosedWhileReading:
-      return "peer closed";
-    case Reason::kDispatcherError:
-      return "dispatcher error";
-    case Reason::kTransportError:
-      return internal::kErrorTransport;
-    case Reason::kEncodeError:
-      return "encode error";
-    case Reason::kDecodeError:
-      return "decode error";
-    case Reason::kUnexpectedMessage:
-      return "unexpected message";
-    case Reason::kUnknownMethod:
-      return "unknown interaction";
-  }
+[[nodiscard]] const char* Status::reason_description() const { return DescribeReason(reason_); }
+
+[[nodiscard]] const char* Status::underlying_reason_description() const {
+  ZX_DEBUG_ASSERT(underlying_reason_ != Reason::kCanceledDueToOtherError);
+  return DescribeReason(underlying_reason_);
 }
 
 size_t Status::FormatImpl(char* destination, size_t length, bool from_unbind_info) const {
@@ -114,14 +150,19 @@ size_t Status::FormatImpl(char* destination, size_t length, bool from_unbind_inf
     const char* detail_prefix = error_ ? ", detail: " : "";
     const char* detail = error_ ? error_ : "";
 
+    const char* underlying_description = underlying_reason_description();
+    if (!underlying_description) {
+      underlying_description = "";
+    }
+
 #ifdef __Fuchsia__
-    num_would_write = snprintf(destination, length, "%s due to %s, %s: %s (%d)%s%s", prelude,
-                               reason_description(), status_meaning, status_string(), status_,
-                               detail_prefix, detail);
+    num_would_write = snprintf(destination, length, "%s due to %s%s, %s: %s (%d)%s%s", prelude,
+                               reason_description(), underlying_description, status_meaning,
+                               zx_status_get_string(status_), status_, detail_prefix, detail);
 #else
     num_would_write =
-        snprintf(destination, length, "%s due to %s, %s: %d%s%s", prelude, reason_description(),
-                 status_meaning, status_, detail_prefix, detail);
+        snprintf(destination, length, "%s due to %s%s, %s: %d%s%s", prelude, reason_description(),
+                 underlying_description, status_meaning, status_, detail_prefix, detail);
 #endif  // __Fuchsia__
   }
 
