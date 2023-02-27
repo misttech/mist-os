@@ -339,23 +339,20 @@ impl DeviceHandler {
 fn add_default_routes<NonSyncCtx: NonSyncContext>(
     sync_ctx: &mut SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
-    loopback: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx::Instant>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
     use netstack3_core::ip::types::AddableEntry;
     use netstack3_core::ip::types::AddableEntryEither;
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
     for entry in [
-        AddableEntryEither::from(AddableEntry::without_gateway(
-            LINK_LOCAL_SUBNET,
-            loopback.clone(),
-        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(LINK_LOCAL_SUBNET, device.clone())),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv4::MULTICAST_SUBNET,
-            loopback.clone(),
+            device.clone(),
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv6::MULTICAST_SUBNET,
-            loopback.clone(),
+            device.clone(),
         )),
     ] {
         netstack3_core::add_route(sync_ctx, non_sync_ctx, entry)?;
