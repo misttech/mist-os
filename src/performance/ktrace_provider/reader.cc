@@ -29,6 +29,14 @@ const uint64_t* Reader::ReadNextRecord() {
 
   auto record = reinterpret_cast<const uint64_t*>(current_);
   size_t record_size_bytes = fxt::RecordFields::RecordSize::Get<size_t>(*record) * 8;
+  if (record_size_bytes == 0) {
+    // This can happen if the kernel writes a trace record without
+    // committing it.  We can't skip over the record because we don't
+    // know how large it is.
+    FX_LOGS(WARNING) << "Uncommitted kernel trace record; stopping processing";
+    return nullptr;
+  }
+
   if (AvailableBytes() < record_size_bytes) {
     ReadMoreData();
   }

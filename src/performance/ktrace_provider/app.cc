@@ -231,12 +231,6 @@ void App::StopKTrace() {
   if (reader.Init() == ZX_OK) {
     zx::time start = zx::clock::get_monotonic();
     while (const uint64_t* fxt_header = reader.ReadNextRecord()) {
-      // A record header 0 is a padding record.  It contains no info, and is just used to pad the
-      // kernel's ring buffer to maintain continuity when need.  Skip it.
-      if (*fxt_header == 0) {
-        continue;
-      }
-
       size_t record_size_bytes = fxt::RecordFields::RecordSize::Get<size_t>(*fxt_header) * 8;
       void* dst = trace_context_alloc_record(buffer_context, record_size_bytes);
       if (dst != nullptr) {
