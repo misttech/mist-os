@@ -9,7 +9,7 @@
 #include <fuchsia/hardware/thermal/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 
 #include <algorithm>
 #include <memory>

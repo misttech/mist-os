@@ -6,7 +6,7 @@
 #define SRC_DEVICES_I2C_DRIVERS_DW_I2C_DW_I2C_H_
 
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/event.h>
 #include <lib/zx/interrupt.h>

@@ -6,7 +6,7 @@
 #define SRC_DEVICES_USB_DRIVERS_NELSON_USB_PHY_NELSON_USB_PHY_H_
 
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/interrupt.h>

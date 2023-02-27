@@ -7,7 +7,7 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 
 #include <chrono>
 #include <memory>

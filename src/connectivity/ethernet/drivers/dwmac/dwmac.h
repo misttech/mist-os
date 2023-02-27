@@ -10,7 +10,7 @@
 #include <fuchsia/hardware/ethernet/mac/cpp/banjo.h>
 #include <fuchsia/hardware/test/c/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/interrupt.h>

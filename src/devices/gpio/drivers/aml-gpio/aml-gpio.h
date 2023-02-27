@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <lib/ddk/hw/reg.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
@@ -65,10 +65,10 @@ class AmlGpio : public DeviceType, public ddk::GpioImplProtocol<AmlGpio, ddk::ba
 
  protected:
   // for AmlGpioTest
-  explicit AmlGpio(pdev_protocol_t* proto, fdf::MmioBuffer mmio_gpio,
-                      fdf::MmioBuffer mmio_gpio_a0, fdf::MmioBuffer mmio_interrupt,
-                      const AmlGpioBlock* gpio_blocks, const AmlGpioInterrupt* gpio_interrupt,
-                      size_t block_count, pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
+  explicit AmlGpio(pdev_protocol_t* proto, fdf::MmioBuffer mmio_gpio, fdf::MmioBuffer mmio_gpio_a0,
+                   fdf::MmioBuffer mmio_interrupt, const AmlGpioBlock* gpio_blocks,
+                   const AmlGpioInterrupt* gpio_interrupt, size_t block_count,
+                   pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
       : DeviceType(nullptr),
         pdev_(proto),
         mmios_{std::move(mmio_gpio), std::move(mmio_gpio_a0)},
@@ -82,9 +82,9 @@ class AmlGpio : public DeviceType, public ddk::GpioImplProtocol<AmlGpio, ddk::ba
 
  private:
   explicit AmlGpio(zx_device_t* parent, fdf::MmioBuffer mmio_gpio, fdf::MmioBuffer mmio_gpio_a0,
-                      fdf::MmioBuffer mmio_interrupt, const AmlGpioBlock* gpio_blocks,
-                      const AmlGpioInterrupt* gpio_interrupt, size_t block_count,
-                      pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
+                   fdf::MmioBuffer mmio_interrupt, const AmlGpioBlock* gpio_blocks,
+                   const AmlGpioInterrupt* gpio_interrupt, size_t block_count,
+                   pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
       : DeviceType(parent),
         pdev_(parent),
         mmios_{std::move(mmio_gpio), std::move(mmio_gpio_a0)},

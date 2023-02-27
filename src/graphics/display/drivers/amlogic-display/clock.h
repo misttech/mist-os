@@ -7,7 +7,7 @@
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/result.h>
 #include <unistd.h>

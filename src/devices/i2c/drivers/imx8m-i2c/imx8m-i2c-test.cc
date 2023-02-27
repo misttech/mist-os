@@ -8,7 +8,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fdf/env.h>
 #include <lib/fdf/testing.h>
 #include <lib/sync/completion.h>

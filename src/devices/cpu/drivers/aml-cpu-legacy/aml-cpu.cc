@@ -9,7 +9,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/errors.h>

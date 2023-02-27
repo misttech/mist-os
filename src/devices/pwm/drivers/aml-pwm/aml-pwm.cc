@@ -5,7 +5,7 @@
 #include "aml-pwm.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 
 #include <soc/aml-a1/a1-pwm.h>
 #include <soc/aml-a113/a113-pwm.h>

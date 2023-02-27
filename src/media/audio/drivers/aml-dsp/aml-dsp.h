@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/svc/outgoing.h>
 #include <lib/zx/bti.h>

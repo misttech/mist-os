@@ -7,7 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <string.h>
 #include <threads.h>
 #include <unistd.h>

@@ -10,7 +10,7 @@
 #include <mock-mmio-reg/mock-mmio-reg.h>
 
 #include "a113-blocks.h"
-#include "lib/device-protocol/pdev.h"
+#include "lib/device-protocol/pdev-fidl.h"
 #include "s905d2-blocks.h"
 
 namespace {
@@ -44,8 +44,8 @@ namespace gpio {
 class FakeAmlGpio : public AmlGpio {
  public:
   static FakeAmlGpio *Create(pdev_device_info info, ddk_mock::MockMmioRegRegion *mock_mmio_gpio,
-                                ddk_mock::MockMmioRegRegion *mock_mmio_gpio_a0,
-                                ddk_mock::MockMmioRegRegion *mock_mmio_interrupt) {
+                             ddk_mock::MockMmioRegRegion *mock_mmio_gpio_a0,
+                             ddk_mock::MockMmioRegRegion *mock_mmio_interrupt) {
     const AmlGpioBlock *gpio_blocks;
     const AmlGpioInterrupt *gpio_interrupt;
     size_t block_count;
@@ -96,12 +96,12 @@ class FakeAmlGpio : public AmlGpio {
 
  private:
   explicit FakeAmlGpio(fdf::MmioBuffer mock_mmio_gpio, fdf::MmioBuffer mock_mmio_gpio_a0,
-                          fdf::MmioBuffer mock_mmio_interrupt, const AmlGpioBlock *gpio_blocks,
-                          const AmlGpioInterrupt *gpio_interrupt, size_t block_count,
-                          pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
+                       fdf::MmioBuffer mock_mmio_interrupt, const AmlGpioBlock *gpio_blocks,
+                       const AmlGpioInterrupt *gpio_interrupt, size_t block_count,
+                       pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
       : AmlGpio(&fake_proto, std::move(mock_mmio_gpio), std::move(mock_mmio_gpio_a0),
-                   std::move(mock_mmio_interrupt), gpio_blocks, gpio_interrupt, block_count,
-                   std::move(info), std::move(irq_info)) {}
+                std::move(mock_mmio_interrupt), gpio_blocks, gpio_interrupt, block_count,
+                std::move(info), std::move(irq_info)) {}
 };
 
 class A113AmlGpioTest : public zxtest::Test {

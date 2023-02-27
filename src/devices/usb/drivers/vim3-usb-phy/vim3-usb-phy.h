@@ -9,7 +9,7 @@
 #include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 #include <threads.h>

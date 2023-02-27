@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <threads.h>
 
 #include <array>

@@ -4,7 +4,7 @@
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>

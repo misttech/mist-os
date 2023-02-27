@@ -6,7 +6,7 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_PDM_AUDIO_STREAM_IN_H_
 
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/simple-audio-stream/simple-audio-stream.h>
 #include <lib/zircon-internal/thread_annotations.h>

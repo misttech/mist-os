@@ -9,7 +9,7 @@
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <fuchsia/hardware/vreg/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/result.h>
 #include <threads.h>
 

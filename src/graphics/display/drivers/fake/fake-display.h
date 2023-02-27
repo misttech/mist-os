@@ -12,7 +12,7 @@
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <sys/types.h>
 #include <unistd.h>

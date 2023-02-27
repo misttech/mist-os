@@ -12,7 +12,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmo.h>

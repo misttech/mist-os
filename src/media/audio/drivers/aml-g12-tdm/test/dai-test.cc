@@ -7,7 +7,7 @@
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/sync/completion.h>
 
 #include <thread>

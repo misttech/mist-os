@@ -9,7 +9,7 @@
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>

@@ -8,7 +8,6 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <lib/device-protocol/pdev.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-resource/resource.h>
 

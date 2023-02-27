@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_AS370_USB_PHY_AS370_USB_PHY_H_
 #define SRC_DEVICES_USB_DRIVERS_AS370_USB_PHY_AS370_USB_PHY_H_
 
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 
 #include <ddktl/device.h>

@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.dsp/cpp/wire.h>
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/simple-audio-stream/simple-audio-stream.h>
 #include <lib/zircon-internal/thread_annotations.h>

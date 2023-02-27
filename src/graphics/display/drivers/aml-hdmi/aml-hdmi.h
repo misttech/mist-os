@@ -10,7 +10,7 @@
 #include <fuchsia/hardware/hdmi/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/hdmi-dw/hdmi-dw.h>
 #include <lib/hdmi/base.h>
 #include <lib/mmio/mmio.h>

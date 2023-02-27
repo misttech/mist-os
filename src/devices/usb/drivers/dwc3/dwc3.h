@@ -6,7 +6,7 @@
 #define SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 
 #include <lib/ddk/io-buffer.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>

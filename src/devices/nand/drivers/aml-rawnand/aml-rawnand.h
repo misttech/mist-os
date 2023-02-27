@@ -11,7 +11,7 @@
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/time.h>
 #include <string.h>

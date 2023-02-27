@@ -15,7 +15,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/phys-iter.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/mmio/mmio.h>

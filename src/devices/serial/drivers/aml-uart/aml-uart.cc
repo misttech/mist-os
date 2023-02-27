@@ -9,7 +9,7 @@
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/vmo.h>
 #include <stdint.h>

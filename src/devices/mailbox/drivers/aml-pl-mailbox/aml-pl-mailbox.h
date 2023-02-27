@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 

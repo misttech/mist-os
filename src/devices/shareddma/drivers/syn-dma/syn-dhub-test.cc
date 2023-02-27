@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #include "syn-dhub.h"
 
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/clock.h>
 

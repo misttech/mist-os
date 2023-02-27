@@ -10,7 +10,7 @@
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
 #include <threads.h>

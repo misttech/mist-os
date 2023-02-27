@@ -12,7 +12,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/device-protocol/pci.h>
-#include <lib/device-protocol/pdev.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/promise.h>
