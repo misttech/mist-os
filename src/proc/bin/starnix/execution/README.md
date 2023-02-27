@@ -49,26 +49,26 @@ This diagram shows the process, thread, and exception handler arrangement for a 
 containing 2 threads running in the restricted executor:
 
 ```
-                           Exception handler
-  Zircon process ────────────────────────────────────────────────────────┐
-                                                                         │
-  Root vmar                                                              │
-                                                                         │
-  0x0...020000          0x8000...1000                                    │
-                                                                         ▼
- ┌──────────────────────────────────┐                        Exception executor
- │Linux thread group                │
- │                                  │           ZX_EXCP_POLICY_BAD_SYSCALL    ZX_EXCP_....
- │ Thread 1 │  Thread 2 │ Thread 3  │                         │                      │
- │          │           │           │                         ▼                      ▼
- │          │           │           │             execute_syscall()            task.process_exception()
- │          │           │           │
- │          │           │           │
- │          │           │           │
- │          │           │           │
- │          │           │           │
- │          │           │           │
- └──────────┴───────────┴───────────┘
+                               Exception handler
+ Zircon process --------------------------------------------------------+
+                                                                        |
+ Root vmar                                                              |
+                                                                        |
+ 0x0...020000   0x8000...1000                                           v
+                                              starnix_runner.cm
++----------------------+                    +---------------------------------------------------------+
+|Linux thread group    |                    |               Exception executor                        |
+|                      |                    |                                                         |
+| Thread 1 |  Thread 2 |                    |  ZX_EXCP_POLICY_BAD_SYSCALL    ZX_EXCP_....             |
+|          |           |                    |                |                      |                 |
+|          |           |                    |                v                      v                 |
+|          |           |                    |    execute_syscall()            task.process_exception()|
+|          |           |                    |                                                         |
+|          |           |                    |                                                         |
+|          |           |                    |                                                         |
+|          |           |                    |                                                         |
+|          |           |                    |                                                         |
++----------+-----------+                    +---------------------------------------------------------+
 ```
 
 ### Restricted Executor
@@ -94,43 +94,43 @@ This diagram shows the process, address space, and thread relationships for a Li
 containing 2 threads running in the restricted executor:
 
 ```
-                   Zircon process
+                  Zircon process
 
-                   Restricted vmar
+                  Restricted vmar
 
-                   0x...020000 0x4000...100000
+                  0x...020000 0x4000...100000
 
-                  ┌──────────────────────┐
-                  │Linux thread group    │
-                  │                      │
-                  │ Thread 1 │  Thread 2 │
-                  │          │           │
- restricted_enter │          │           │
- ┌────────────────┼────►     │  fault    │      ZX_EXCP_...
- │                │          │     ──────┼────────────────────────┐
- │                │ syscall  │           │                        │
- │            ┌───┼─────     │           │                        │
- │            │   │          │           │                        │
- │            │   │          │           │                        │
- │            │   └──────────┴───────────┘                        │
- │            │                                                   │
- │            │   Shared (aka root) vmar                          │
- │            │                                                   │
- │            │   0x4000...100000  0x8000...1000                  │
- │            │                                                   │
- │            │   ┌─────────────────────────────────────────────┐ │
- │            │   │          Restricted executor                │ │
- │            │   │                                             │ │
- │            │   │ Thread 1 │ Thread 1  │ Thread 2 │ Thread 2  │ │
- │            │   │          │ exception │          │ exception │ │
- │            │   │          │ handler   │          │ handler   │ │
- └────────────┼───┼─────     │ thread    │          │ thread    │ │
-              │   │          │           │          │    ◄──────┼─┘
-              └───┼────►     │           │          │           │
-                  │          │           │          │           │
-                  │          │           │          │           │
-                  │          │           │          │           │
-                  └──────────┴───────────┴──────────┴───────────┘
+                 +----------------------+
+                 |Linux thread group    |
+                 |                      |
+                 | Thread 1 |  Thread 2 |
+                 |          |           |
+restricted_enter |          |           |
++----------------+---->     |  fault    |      ZX_EXCP_...
+|                |          |     ------+------------------------+
+|                | syscall  |           |                        |
+|            +---+-----     |           |                        |
+|            |   |          |           |                        |
+|            |   |          |           |                        |
+|            |   +----------+-----------+                        |
+|            |                                                   |
+|            |   Shared (aka root) vmar                          |
+|            |                                                   |
+|            |   0x4000...100000  0x8000...1000                  |
+|            |                                                   |
+|            |   +---------------------------------------------+ |
+|            |   |          Restricted executor                | |
+|            |   |                                             | |
+|            |   | Thread 1 | Thread 1  | Thread 2 | Thread 2  | |
+|            |   |          | exception |          | exception | |
+|            |   |          | handler   |          | handler   | |
++------------+---+-----     | thread    |          | thread    | |
+             |   |          |           |          |    <------+-+
+             +---+---->     |           |          |           |
+                 |          |           |          |           |
+                 |          |           |          |           |
+                 |          |           |          |           |
+                 +----------+-----------+----------+-----------+
 ```
 
 The shared portion of the address space is shared between all Linux thread groups in the same
