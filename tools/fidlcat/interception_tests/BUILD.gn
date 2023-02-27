@@ -51,6 +51,7 @@ if (is_host) {
       "timer_test.cc",
       "trace_decode_test.cc",
       "vcpu_test.cc",
+      "version_string_test.cc",
       "vmar_test.cc",
       "vmo_test.cc",
     ]

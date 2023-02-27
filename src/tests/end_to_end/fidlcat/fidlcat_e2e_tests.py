@@ -244,59 +244,51 @@ class FidlcatE2eTests(unittest.TestCase):
                 'Error: Cannot generate tests for more than one process.',
                 fidlcat.stdout)
 
+    # To regenerate test data:
+    # $ fx debug fidl --to src/tests/end_to_end/fidlcat/echo_client.pb --remote-component echo_client.cm \
+    #    run fuchsia-pkg://fuchsia.com/echo_realm_placeholder#meta/echo_realm.cm
+    # $ fx debug fidl --with generate-tests=/tmp --from src/tests/end_to_end/fidlcat/echo_client.pb
+    # $ cp /tmp/test_placeholders__echo_0.cc src/tests/end_to_end/fidlcat/goldens/test_placeholders__echo_0.cc.golden
     def test_with_generate_tests(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             fidlcat = Fidlcat(
                 '--with=generate-tests=' + temp_dir, '--from',
                 TEST_DATA_DIR + '/echo_client.pb')
             self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
-
+            self.maxDiff = None
             self.assertEqual(
                 fidlcat.stdout, 'Writing tests on disk\n'
-                '  process name: echo_client_cpp\n'
+                '  process name: echo_client.cm\n'
                 '  output directory: "{temp_dir}"\n'
-                '1412899975 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_0.cc"\n'
-                '\n'
-                '1416045099 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_1.cc"\n'
-                '\n'
-                '1428628083 zx_channel_write fidl.examples.echo/Echo.EchoString\n'
-                '1428628083 zx_channel_read fidl.examples.echo/Echo.EchoString\n'
-                '... Writing to "{temp_dir}/fidl_examples_echo__echo_0.cc"\n'
-                '\n'
-                '1430725227 zx_channel_write fuchsia.io/Openable.Open\n'
-                '... Writing to "{temp_dir}/fuchsia_io__openable_2.cc"\n'
-                '\n'
-                '1435967747 zx_channel_write fuchsia.io/Node1.OnOpen\n'
+                '127791359 zx_channel_read fuchsia.io/Node1.Clone\n'
                 '... Writing to "{temp_dir}/fuchsia_io__node1_0.cc"\n'
                 '\n'
-                '1457988959 zx_channel_write fuchsia.sys/Launcher.CreateComponent\n'
-                '... Writing to "{temp_dir}/fuchsia_sys__launcher_0.cc"\n'
-                '\n'
-                '1466376519 zx_channel_read fuchsia.sys/ComponentController.OnDirectoryReady\n'
-                '... Writing to "{temp_dir}/fuchsia_sys__component_controller_0.cc"\n'
-                '\n'
-                '1492595047 zx_channel_read fuchsia.io/Node1.Clone\n'
+                '740159839 zx_channel_write fuchsia.io/Node1.Clone\n'
                 '... Writing to "{temp_dir}/fuchsia_io__node1_1.cc"\n'
+                '\n'
+                '802026935 zx_channel_write test.placeholders/Echo.EchoString\n'
+                '802026935 zx_channel_read test.placeholders/Echo.EchoString\n'
+                '... Writing to "{temp_dir}/test_placeholders__echo_0.cc"\n'
+                '\n'
+                '2781737595 zx_channel_write fuchsia.io/Node1.Clone\n'
+                '... Writing to "{temp_dir}/fuchsia_io__node1_2.cc"\n'
+                '\n'
+                '3158176887 zx_channel_write fuchsia.io/Openable.Open\n'
+                '... Writing to "{temp_dir}/fuchsia_io__openable_0.cc"\n'
                 '\n'.format(temp_dir=temp_dir))
 
             # Checks that files exist on disk
             temp = Path(temp_dir)
-            self.assertTrue((temp / 'fuchsia_io__openable_0.cc').exists())
-            self.assertTrue((temp / 'fuchsia_io__openable_1.cc').exists())
-            self.assertTrue((temp / 'fidl_examples_echo__echo_0.cc').exists())
-            self.assertTrue((temp / 'fuchsia_io__openable_2.cc').exists())
             self.assertTrue((temp / 'fuchsia_io__node1_0.cc').exists())
-            self.assertTrue((temp / 'fuchsia_sys__launcher_0.cc').exists())
-            self.assertTrue(
-                (temp / 'fuchsia_sys__component_controller_0.cc').exists())
             self.assertTrue((temp / 'fuchsia_io__node1_1.cc').exists())
+            self.assertTrue((temp / 'test_placeholders__echo_0.cc').exists())
+            self.assertTrue((temp / 'fuchsia_io__node1_2.cc').exists())
+            self.assertTrue((temp / 'fuchsia_io__openable_0.cc').exists())
 
             # Checks that the generated code is identical to the golden file
-            golden = TEST_DATA_DIR + '/fidl_examples_echo__echo.test.cc.golden'
+            golden = TEST_DATA_DIR + '/test_placeholders__echo_0.cc.golden'
             self.assertEqual(
-                (temp / 'fidl_examples_echo__echo_0.cc').read_bytes(),
+                (temp / 'test_placeholders__echo_0.cc').read_bytes(),
                 Path(golden).read_bytes())
 
     def test_with_generate_tests_sync(self):

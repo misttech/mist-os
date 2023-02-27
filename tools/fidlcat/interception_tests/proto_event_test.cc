@@ -98,8 +98,13 @@ TEST_F(ProtoEventTest, InvokedAndOutputEvent) {
   invoked_event->AddInlineField(syscall->SearchInlineMember("options", /*invoked=*/true),
                                 std::make_unique<fidl_codec::IntegerValue>(0, false));
 
-  auto output_event = std::make_shared<OutputEvent>(
-      kEventTimestampOutput, dispatcher()->SearchThread(kTid), syscall, ZX_OK, invoked_event);
+  auto return_event = std::make_shared<ReturnEvent>(
+      kEventTimestampOutput, dispatcher()->SearchThread(kTid), syscall, ZX_OK);
+
+  return_event->SetReturnValue(std::make_unique<fidl_codec::IntegerValue>(ZX_OK, false));
+  auto output_event =
+      std::make_shared<OutputEvent>(kEventTimestampOutput, dispatcher()->SearchThread(kTid),
+                                    syscall, return_event, invoked_event);
   zx_handle_disposition_t handle_0 = {.operation = fidl_codec::kNoHandleDisposition,
                                       .handle = kHandle0,
                                       .type = ZX_OBJ_TYPE_CHANNEL,

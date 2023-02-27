@@ -114,7 +114,7 @@ class SyscallDecoder : public SyscallDecoderInterface {
   int64_t timestamp() const { return timestamp_; }
   const std::vector<zxdb::Location>& caller_locations() const { return caller_locations_; }
   uint64_t return_address() const { return return_address_; }
-  uint64_t syscall_return_value() const { return syscall_return_value_; }
+  uint64_t syscall_result_status() const { return syscall_return_event_->return_code(); }
   int pending_request_count() const { return pending_request_count_; }
 
   // True if the decoder has been aborted. That means that the process for this decoder
@@ -236,7 +236,10 @@ class SyscallDecoder : public SyscallDecoderInterface {
   uint64_t return_address_ = 0;
   std::vector<SyscallDecoderArgument> decoded_arguments_;
   std::map<std::pair<Stage, uint64_t>, SyscallDecoderBuffer> buffers_;
-  uint64_t syscall_return_value_ = 0;
+
+  // The value returned by the function as a fidl_codec::Value
+  std::shared_ptr<ReturnEvent> syscall_return_event_;
+
   int pending_request_count_ = 0;
   bool input_arguments_loaded_ = false;
   bool aborted_ = false;

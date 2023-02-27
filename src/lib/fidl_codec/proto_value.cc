@@ -411,7 +411,7 @@ std::unique_ptr<Value> DecodeValue(LibraryLoader* loader, const proto::Value& pr
           proto_value.actual_and_requested_value().actual(),
           proto_value.actual_and_requested_value().requested());
     default:
-      FX_LOGS_OR_CAPTURE(ERROR) << "Unknown value.";
+      FX_LOGS_OR_CAPTURE(ERROR) << "Unknown value: " << proto_value.Kind_case();
       return nullptr;
   }
 }

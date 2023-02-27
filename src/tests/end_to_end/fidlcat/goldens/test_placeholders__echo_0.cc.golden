@@ -7,9 +7,8 @@
 
 #include "lib/sys/cpp/component_context.h"
 
-#include <fidl/examples/echo/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
-#include <fuchsia/sys/cpp/fidl.h>
+#include <test/placeholders/cpp/fidl.h>
 
 class Proxy {
  public:
@@ -37,7 +36,7 @@ class Proxy {
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigAttachToCurrentThread);
   std::unique_ptr<sys::ComponentContext> context_ = sys::ComponentContext::CreateAndServeOutgoingDirectory();
   fuchsia::sys::ComponentControllerPtr controller_;
-  std::string server_url = "fuchsia-pkg://fuchsia.com/echo_server_cpp#meta/echo_server_cpp.cmx";
+  std::string server_url = "";
   EchoStringPtr proxy_;
 };
 
@@ -52,7 +51,7 @@ void Proxy::group_0() {
   });
 }
 
-TEST(echo_client_cpp, fidl_examples_echo__echo) {
+TEST(echo_client_cm, test_placeholders__echo) {
   Proxy proxy;
   proxy.run();
 }

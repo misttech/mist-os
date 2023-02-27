@@ -171,9 +171,12 @@ void ReplayBuffer::Dispatch(SyscallDisplayDispatcher* dispatcher) {
   }
   dispatcher->AddInvokedEvent(invoked_event);
 
+  auto return_event =
+      std::make_shared<ReturnEvent>(output_timestamp_, invoked_event->thread(), syscall, status_);
+
   // Creates the output event.
   auto output_event = std::make_shared<OutputEvent>(output_timestamp_, invoked_event->thread(),
-                                                    syscall, status_, invoked_event);
+                                                    syscall, return_event, invoked_event);
 
   if (((kind_ == Kind::kRead) || (kind_ == Kind::kCall)) && (status_ == ZX_OK)) {
     // Decodes the incoming message.
@@ -418,8 +421,11 @@ void Replay::DecodeTraceLine(std::istream& is) {
       std::shared_ptr<InvokedEvent> invoked_event =
           CreateInvoked(dispatcher(), timestamp, process_id, thread_id, syscall);
       dispatcher()->AddInvokedEvent(invoked_event);
+
+      auto return_event =
+          std::make_shared<ReturnEvent>(timestamp, invoked_event->thread(), syscall, status);
       auto output_event = std::make_shared<OutputEvent>(timestamp, invoked_event->thread(), syscall,
-                                                        status, invoked_event);
+                                                        return_event, invoked_event);
       zx_handle_disposition_t handle;
       handle.operation = fidl_codec::kNoHandleDisposition;
       handle.handle = out0;

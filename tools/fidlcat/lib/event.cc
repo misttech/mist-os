@@ -224,12 +224,41 @@ void InvokedEvent::PrettyPrint(FidlcatPrinter& printer) const {
   printer.DisplayOutline(syscall()->input_outline_members(), outline_fields());
 }
 
+void ReturnEvent::Write(proto::Event* dst) const {
+  proto::OutputEvent* event = dst->mutable_output();
+  event->set_returned_value(scalar_return_value_.first_word);
+
+  fidl_codec::proto::Value value;
+  fidl_codec::ProtoVisitor visitor(&value);
+  GetValue()->Visit(&visitor, nullptr);
+  fidl_codec::proto::Value* v = event->mutable_decoded_return_value();
+  *v = value;
+}
+
+void ReturnEvent::SetValue(SyscallDecoder* decoder) {
+  if (syscall()->return_type() == SyscallReturnType::kStringView) {
+    const uint8_t* data = decoder->BufferContent(Stage::kExit, return_code());
+    SetReturnValue(std::make_unique<fidl_codec::StringValue>(reinterpret_cast<const char*>(data)));
+  } else {
+    SetReturnValue(std::make_unique<fidl_codec::IntegerValue>(return_code(), false));
+  }
+}
+
+std::unique_ptr<fidl_codec::Type> ReturnEvent::Type() {
+  if (syscall()->return_type() == SyscallReturnType::kStringView) {
+    return std::make_unique<fidl_codec::StringType>();
+  }
+  return std::make_unique<fidl_codec::Uint64Type>();
+}
+
 void OutputEvent::Write(proto::Event* dst) const {
   dst->set_timestamp(timestamp());
   proto::OutputEvent* event = dst->mutable_output();
   event->set_thread_koid(thread()->koid());
   event->set_syscall(syscall()->name());
-  event->set_returned_value(returned_value());
+
+  returned_value_->Write(dst);
+
   event->set_invoked_event_id(invoked_event()->id());
   for (const auto& field : inline_fields()) {
     fidl_codec::proto::Value value;
@@ -365,23 +394,27 @@ void OutputEvent::PrettyPrint(FidlcatPrinter& printer) const {
       break;
     case SyscallReturnType::kStatus:
       printer << "-> ";
-      printer.DisplayStatus(static_cast<zx_status_t>(returned_value_));
+      printer.DisplayStatus(static_cast<zx_status_t>(returned_value_->return_code()));
+      break;
+    case SyscallReturnType::kStringView:
+      printer << "-> " << fidl_codec::Blue << returned_value_->GetValue()->AsStringValue()->string()
+              << fidl_codec::ResetColor;
       break;
     case SyscallReturnType::kTicks:
       printer << "-> " << fidl_codec::Green << "ticks" << fidl_codec::ResetColor << ": "
-              << fidl_codec::Blue << static_cast<uint64_t>(returned_value_)
+              << fidl_codec::Blue << static_cast<uint64_t>(returned_value_->return_code())
               << fidl_codec::ResetColor;
       break;
     case SyscallReturnType::kTime:
       printer << "-> " << fidl_codec::Green << "time" << fidl_codec::ResetColor << ": ";
-      printer.DisplayTime(static_cast<zx_time_t>(returned_value_));
+      printer.DisplayTime(static_cast<zx_time_t>(returned_value_->return_code()));
       break;
     case SyscallReturnType::kUint32:
-      printer << "-> " << fidl_codec::Blue << static_cast<uint32_t>(returned_value_)
+      printer << "-> " << fidl_codec::Blue << static_cast<uint32_t>(returned_value_->return_code())
               << fidl_codec::ResetColor;
       break;
     case SyscallReturnType::kUint64:
-      printer << "-> " << fidl_codec::Blue << static_cast<uint64_t>(returned_value_)
+      printer << "-> " << fidl_codec::Blue << static_cast<uint64_t>(returned_value_->return_code())
               << fidl_codec::ResetColor;
       break;
   }
@@ -489,8 +522,24 @@ bool EventDecoder::DecodeAndDispatchEvent(const proto::Event& proto_event) {
                        << " not found for ouput event.";
         return false;
       }
+      auto return_event = std::make_shared<ReturnEvent>(proto_event.timestamp(), thread, syscall,
+                                                        content.returned_value());
+      auto return_type = return_event->Type();
+      if (content.decoded_return_value().Kind_case() == 0) {
+        // Old format of protobuf that doesn't allow for string return values.
+        // We don't know that people have stored old pbs, and we don't know if
+        // they haven't, and it is probably not worth the effort to find out.
+        // Recommend removing this branch if this code requires more upkeep, but
+        // wait until 6/2023 for the dust to settle.  Removal will require
+        // fixing e2e tests.
+        return_event->SetReturnValue(
+            std::make_unique<fidl_codec::IntegerValue>(content.returned_value(), false));
+      } else {
+        return_event->SetReturnValue(fidl_codec::DecodeValue(
+            dispatcher_->loader(), content.decoded_return_value(), return_type.get()));
+      }
       auto event = std::make_shared<OutputEvent>(proto_event.timestamp(), thread, syscall,
-                                                 content.returned_value(), invoked_event->second);
+                                                 return_event, invoked_event->second);
       if (!DecodeValues(event.get(), content.inline_fields(), content.inline_id_fields(),
                         content.outline_fields(), content.outline_id_fields(),
                         /*invoked=*/false)) {

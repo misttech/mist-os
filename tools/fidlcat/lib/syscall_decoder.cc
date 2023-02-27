@@ -361,7 +361,28 @@ void SyscallDecoder::LoadSyscallReturnValue() {
 
   debug::RegisterID result_register =
       (arch_ == debug::Arch::kX64) ? debug::RegisterID::kX64_rax : debug::RegisterID::kARMv8_x0;
-  syscall_return_value_ = GetRegisterValue(*general_registers, result_register);
+  uint64_t syscall_result_status = GetRegisterValue(*general_registers, result_register);
+
+  // This could probably use a layer of abstraction around it, but it is for
+  // the only case where syscalls don't return an int, so it's not clear it
+  // is worth the cost.
+  if (syscall_->return_type() == SyscallReturnType::kStringView) {
+    debug::RegisterID length_register =
+        (arch_ == debug::Arch::kX64) ? debug::RegisterID::kX64_rdx : debug::RegisterID::kARMv8_x1;
+    result128_t retval;
+    retval.first_word = syscall_result_status;
+    retval.second_word = GetRegisterValue(*general_registers, length_register);
+    syscall_return_event_ =
+        std::make_shared<ReturnEvent>(timestamp_, fidlcat_thread_, syscall_, retval);
+
+    // String length does not include the null terminator, but string is
+    // guaranteed to be null terminated, so we grab the NUL for ease of internal
+    // handling.
+    LoadBuffer(Stage::kExit, syscall_result_status, retval.second_word + 1);
+  } else {
+    syscall_return_event_ =
+        std::make_shared<ReturnEvent>(timestamp_, fidlcat_thread_, syscall_, syscall_result_status);
+  }
 
   LoadOutputs();
 }
@@ -374,7 +395,7 @@ void SyscallDecoder::LoadOutputs() {
     return;
   }
   for (const auto& output : syscall_->outputs()) {
-    if ((output->error_code() == static_cast<zx_status_t>(syscall_return_value_)) &&
+    if ((output->error_code() == static_cast<zx_status_t>(syscall_return_event_->return_code())) &&
         output->ConditionsAreTrue(this, Stage::kExit)) {
       output->Load(this, Stage::kExit);
     }
@@ -393,14 +414,19 @@ void SyscallDecoder::DecodeOutputs() {
   if (pending_request_count_ > 0) {
     return;
   }
+
+  syscall_return_event_->SetValue(this);
+
   // Creates the output event.
   output_event_ = std::make_shared<OutputEvent>(timestamp(), fidlcat_thread_, syscall_,
-                                                syscall_return_value_, invoked_event_);
+                                                syscall_return_event_, invoked_event_);
+
   auto inline_member = syscall_->output_inline_members().begin();
   auto outline_member = syscall_->output_outline_members().begin();
   for (const auto& output : syscall_->outputs()) {
     if (output->InlineValue()) {
-      if ((output->error_code() == static_cast<zx_status_t>(syscall_return_value_)) &&
+      if ((output->error_code() ==
+           static_cast<zx_status_t>(syscall_return_event_->return_code())) &&
           (output->ConditionsAreTrue(this, Stage::kExit))) {
         FX_DCHECK(inline_member != syscall_->output_inline_members().end());
         std::unique_ptr<fidl_codec::Value> value = output->GenerateValue(this, Stage::kExit);
@@ -409,7 +435,8 @@ void SyscallDecoder::DecodeOutputs() {
       }
       ++inline_member;
     } else {
-      if ((output->error_code() == static_cast<zx_status_t>(syscall_return_value_)) &&
+      if ((output->error_code() ==
+           static_cast<zx_status_t>(syscall_return_event_->return_code())) &&
           (output->ConditionsAreTrue(this, Stage::kExit))) {
         FX_DCHECK(outline_member != syscall_->output_outline_members().end());
         std::unique_ptr<fidl_codec::Value> value = output->GenerateValue(this, Stage::kExit);

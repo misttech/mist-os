@@ -429,16 +429,59 @@ class InvokedEvent final : public SyscallEvent {
   HandleInfo* handle_info_ = nullptr;
 };
 
+// The result of a function that returns >64 bits.
+using result128_t = struct {
+  int64_t first_word;
+  uint64_t second_word;
+};
+
+// Represents the return of a value from the syscall.  Typically, this is an
+// integer status code, but zx_system_get_version_string returns a zx_string_view_t, so
+// we provide something generic.
+class ReturnEvent final : public SyscallEvent {
+ public:
+  ReturnEvent(int64_t timestamp, Thread* thread, const Syscall* syscall,
+              int64_t scalar_return_value)
+      : SyscallEvent(timestamp, thread, syscall),
+        scalar_return_value_({.first_word = scalar_return_value, .second_word = 0}) {}
+
+  ReturnEvent(int64_t timestamp, Thread* thread, const Syscall* syscall,
+              result128_t scalar_return_value)
+      : SyscallEvent(timestamp, thread, syscall), scalar_return_value_(scalar_return_value) {}
+
+  void SetReturnValue(std::unique_ptr<fidl_codec::Value> value) {
+    return_value_ = std::move(value);
+  }
+
+  void Write(proto::Event* dst) const override;
+
+  const fidl_codec::Value* GetValue() const { return return_value_.get(); }
+
+  void SetValue(SyscallDecoder* decoder);
+
+  // Returns a fidl_codec::Type corresponding to the return type of the syscall.
+  std::unique_ptr<fidl_codec::Type> Type();
+
+  // Returns the first 64 bits of the raw return value, which is typically the
+  // result status of the function.
+  uint64_t return_code() const { return scalar_return_value_.first_word; }
+
+ private:
+  const result128_t scalar_return_value_;
+  std::unique_ptr<fidl_codec::Value> return_value_;
+};
+
 // Event that represents the return value and out parameters when a syscall returns.
 class OutputEvent final : public SyscallEvent {
  public:
-  OutputEvent(int64_t timestamp, Thread* thread, const Syscall* syscall, int64_t returned_value,
+  OutputEvent(int64_t timestamp, Thread* thread, const Syscall* syscall,
+              std::shared_ptr<ReturnEvent> return_event,
               std::shared_ptr<InvokedEvent> invoked_event)
       : SyscallEvent(timestamp, thread, syscall),
-        returned_value_(returned_value),
+        returned_value_(return_event),
         invoked_event_(std::move(invoked_event)) {}
 
-  int64_t returned_value() const { return returned_value_; }
+  const fidl_codec::Value* returned_value() const { return returned_value_->GetValue(); }
   const InvokedEvent* invoked_event() const { return invoked_event_.get(); }
 
   OutputEvent* AsOutputEvent() override { return this; }
@@ -450,7 +493,9 @@ class OutputEvent final : public SyscallEvent {
   void PrettyPrint(FidlcatPrinter& printer) const;
 
  private:
-  const int64_t returned_value_;
+  // const int64_t returned_value_;
+  std::shared_ptr<ReturnEvent> returned_value_;
+
   // The event which describes the input arguments for this syscall output event.
   std::shared_ptr<InvokedEvent> invoked_event_;
 };

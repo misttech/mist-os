@@ -98,6 +98,7 @@ enum class SyscallReturnType {
   kNoReturn,
   kVoid,
   kStatus,
+  kStringView,
   kTicks,
   kTime,
   kUint32,

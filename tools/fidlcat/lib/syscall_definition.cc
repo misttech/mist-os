@@ -2709,6 +2709,8 @@ void SyscallDecoderDispatcher::Populate() {
 
   { Add("zx_system_get_num_cpus", SyscallReturnType::kUint32); }
 
+  { Add("zx_system_get_version_string", SyscallReturnType::kStringView); }
+
   { Add("zx_system_get_physmem", SyscallReturnType::kUint64); }
 
   {

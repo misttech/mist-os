@@ -56,18 +56,28 @@ extern SyscallDecoderDispatcher* global_dispatcher;
 class SystemCallTest {
  public:
   SystemCallTest(const char* name, int64_t result, std::string_view result_name)
-      : name_(name), result_(result), result_name_(result_name) {}
+      : name_(name),
+        result_({.first_word = result, .second_word = 0}),
+        enable_overflow_(false),
+        result_name_(result_name) {}
+
+  SystemCallTest(const char* name, result128_t result, std::string_view result_name)
+      : name_(name), result_(result), enable_overflow_(true), result_name_(result_name) {}
 
   const std::string& name() const { return name_; }
-  int64_t result() const { return result_; }
+  int64_t result() const { return result_.first_word; }
   const std::string& result_name() const { return result_name_; }
   const std::vector<uint64_t>& inputs() const { return inputs_; }
 
   void AddInput(uint64_t input) { inputs_.push_back(input); }
 
+  bool HasOverflow() const { return enable_overflow_; }
+  uint64_t overflow_result() const { return result_.second_word; }
+
  private:
   const std::string name_;
-  const int64_t result_;
+  const result128_t result_;
+  const bool enable_overflow_;
   const std::string result_name_;
   std::vector<uint64_t> inputs_;
 };
@@ -169,8 +179,14 @@ class DataForSyscallTest {
       } else {
         if (arch_ == debug::Arch::kArm64) {
           PopulateRegister(debug::RegisterID::kARMv8_x0, syscall_->result(), registers);
+          if (syscall_->HasOverflow()) {
+            PopulateRegister(debug::RegisterID::kARMv8_x1, syscall_->overflow_result(), registers);
+          }
         } else {
           PopulateRegister(debug::RegisterID::kX64_rax, syscall_->result(), registers);
+          if (syscall_->HasOverflow()) {
+            PopulateRegister(debug::RegisterID::kX64_rdx, syscall_->overflow_result(), registers);
+          }
         }
       }
     }

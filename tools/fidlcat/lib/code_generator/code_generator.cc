@@ -108,7 +108,13 @@ std::unique_ptr<FidlCallInfo> OutputEventToFidlCallInfo(OutputEvent* output_even
       output_event->invoked_event()->GetHandleValue(handle_member);
   zx_handle_t handle_id = handle->handle().handle;
 
-  bool crashed = output_event->returned_value() == ZX_ERR_PEER_CLOSED;
+  // If it is a FIDL call, we know it returns a zx_status_t, so can assume return value
+  // is an integer.
+  uint64_t absolute;
+  bool negative;
+  output_event->returned_value()->GetIntegerValue(&absolute, &negative);
+  bool crashed = (negative ? -static_cast<int64_t>(absolute) : static_cast<int64_t>(absolute)) ==
+                 ZX_ERR_PEER_CLOSED;
 
   return std::make_unique<FidlCallInfo>(
       crashed, method->enclosing_protocol().name(), handle_id, txid, syscall_kind, method->name(),
