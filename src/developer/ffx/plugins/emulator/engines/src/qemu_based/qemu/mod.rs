@@ -61,12 +61,15 @@ impl EmulatorEngine for QemuEngine {
         let result = <Self as QemuBasedEngine>::stage(&mut self)
             .await
             .and_then(|()| self.validate_staging());
-        if result.is_ok() {
-            self.data.set_engine_state(EngineState::Staged);
-            self.save_to_disk().await
-        } else {
-            self.data.set_engine_state(EngineState::Error);
-            self.save_to_disk().await.with_context(|| format!("{:?}", result.unwrap_err()))
+        match result {
+            Ok(()) => {
+                self.data.set_engine_state(EngineState::Staged);
+                self.save_to_disk().await
+            }
+            Err(e) => {
+                self.data.set_engine_state(EngineState::Error);
+                self.save_to_disk().await.with_context(|| format!("{:?}", &e)).and(Err(e))
+            }
         }
     }
 
