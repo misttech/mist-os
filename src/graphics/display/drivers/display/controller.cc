@@ -829,6 +829,11 @@ zx_status_t Controller::CreateClient(
   return task.release()->Post(loop_.dispatcher());
 }
 
+uint64_t Controller::GetNextBufferCollectionId() {
+  fbl::AutoLock lock(mtx());
+  return next_buffer_collection_id_++;
+}
+
 void Controller::OpenVirtconController(OpenVirtconControllerRequestView request,
                                        OpenVirtconControllerCompleter::Sync& completer) {
   completer.Reply(CreateClient(/*is_vc=*/true, std::move(request->controller)));

@@ -122,6 +122,8 @@ class Controller : public ControllerParent,
   zx_status_t CreateClient(bool is_vc, fidl::ServerEnd<fuchsia_hardware_display::Controller> client,
                            fit::function<void()> on_client_dead = nullptr);
 
+  uint64_t GetNextBufferCollectionId();
+
  private:
   friend ControllerTest;
   friend IntegrationTest;
@@ -156,6 +158,7 @@ class Controller : public ControllerParent,
 
   bool supports_capture_ = false;
 
+  uint64_t next_buffer_collection_id_ __TA_GUARDED(mtx()) = 1;
   uint32_t next_client_id_ __TA_GUARDED(mtx()) = 1;
   ClientProxy* vc_client_ __TA_GUARDED(mtx()) = nullptr;
   bool vc_ready_ __TA_GUARDED(mtx());
