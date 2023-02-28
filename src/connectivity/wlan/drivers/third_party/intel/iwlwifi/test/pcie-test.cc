@@ -16,6 +16,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mock-function/mock-function.h>
 #include <lib/sync/completion.h>
@@ -23,6 +25,7 @@
 #include <zircon/listnode.h>
 
 #include <array>
+#include <future>
 #include <string>
 #include <thread>
 #include <vector>
@@ -53,7 +56,9 @@ namespace {
 constexpr int kTestDeviceId = 0x095a;
 constexpr int kTestSubsysDeviceId = 0x9e10;
 
-TEST(MockDdkTesterPci, DeviceLifeCycle) {
+class MockDdkTesterPci : public zxtest::Test, public loop_fixture::RealLoop {};
+
+TEST_F(MockDdkTesterPci, DeviceLifeCycle) {
   auto parent = MockDevice::FakeRootParent();
 
   // Set up a fake pci:
@@ -72,17 +77,18 @@ TEST(MockDdkTesterPci, DeviceLifeCycle) {
 
   // Now add the protocol to the parent.
   // PCI is the only protocol of interest here.
-  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
-  parent->AddFidlProtocol(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-      [&loop, &fake_pci](zx::channel channel) {
-        fidl::BindServer(loop.dispatcher(),
-                         fidl::ServerEnd<fuchsia_hardware_pci::Device>(std::move(channel)),
-                         &fake_pci);
-        return ZX_OK;
-      },
-      "pci");
-  loop.StartThread("pci-fidl-server-thread");
+  component::OutgoingDirectory outgoing(dispatcher());
+
+  auto service_result = outgoing.AddService<fuchsia_hardware_pci::Service>(
+      fuchsia_hardware_pci::Service::InstanceHandler(
+          {.device = fake_pci.bind_handler(dispatcher())}));
+  ZX_ASSERT(service_result.is_ok());
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ZX_ASSERT(endpoints.is_ok());
+  ZX_ASSERT(outgoing.Serve(std::move(endpoints->server)).is_ok());
+
+  parent->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client), "pci");
 
   // Create() allocates and binds the device.
   ASSERT_OK(wlan::iwlwifi::PcieDevice::Create(parent.get()), "Bind failed");
@@ -94,10 +100,12 @@ TEST(MockDdkTesterPci, DeviceLifeCycle) {
   // anyways.
   pcie_device->SetFirmware(std::string(4, '\0'));
 
-  // TODO(fxbug.dev/76744) the Create() call will succeed, but since there is no hardware backing
-  // this PcieDevice, initialization will ultimately fail and the PcieDevice instance will be
-  // automatically removed without explicitly reporting an error.
-  pcie_device->InitOp();  // Calls DdkInit for ddktl devices.
+  PerformBlockingWork([&] {
+    // TODO(fxbug.dev/76744) the Create() call will succeed, but since there is no hardware backing
+    // this PcieDevice, initialization will ultimately fail and the PcieDevice instance will be
+    // automatically removed without explicitly reporting an error.
+    pcie_device->InitOp();  // Calls DdkInit for ddktl devices.
+  });
 
   // If another thread is spawned during the init call, wait until InitReply is called:
   pcie_device->WaitUntilInitReplyCalled();

@@ -26,6 +26,8 @@ __END_CDECLS
 
 #include <optional>
 
+#include <ddktl/device.h>
+
 namespace fdf {
 class MmioBuffer;
 }
@@ -48,14 +50,11 @@ class Pci {
   // Check `is_valid()` after calling to check for proper initialization. This can fail if the
   // parent does not expose a FIDL PCI interface.
   explicit Pci(zx_device_t* parent) {
-    zx::channel local, remote;
-    ZX_ASSERT(zx::channel::create(0, &local, &remote) == ZX_OK);
-    zx_status_t status = device_connect_fidl_protocol(
-        parent, fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>, remote.release());
+    zx::result client =
+        ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_pci::Service::Device>(parent);
 
-    if (status == ZX_OK) {
-      client_ =
-          fidl::WireSyncClient(fidl::ClientEnd<fuchsia_hardware_pci::Device>(std::move(local)));
+    if (client.is_ok()) {
+      client_.Bind(std::move(*client));
     }
   }
 
@@ -65,15 +64,12 @@ class Pci {
 
   // Prefer Pci::FromFragment(parent) to construct.
   Pci(zx_device_t* parent, const char* fragment_name) {
-    zx::channel local, remote;
-    ZX_ASSERT(zx::channel::create(0, &local, &remote) == ZX_OK);
-    zx_status_t status = device_connect_fragment_fidl_protocol(
-        parent, fragment_name, fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-        remote.release());
+    zx::result client =
+        ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_pci::Service::Device>(
+            parent, fragment_name);
 
-    if (status == ZX_OK) {
-      client_ = fidl::WireSyncClient<fuchsia_hardware_pci::Device>(
-          fidl::ClientEnd<fuchsia_hardware_pci::Device>(std::move(local)));
+    if (client.is_ok()) {
+      client_.Bind(std::move(*client));
     }
   }
 

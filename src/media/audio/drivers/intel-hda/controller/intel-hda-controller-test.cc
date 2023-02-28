@@ -4,7 +4,8 @@
 
 #include "intel-hda-controller.h"
 
-#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <zxtest/zxtest.h>
 
@@ -24,8 +25,9 @@ struct TestIntelHDAController : public IntelHDAController {
   }
 };
 
-class HdaControllerTest : public zxtest::Test {
+class HdaControllerTest : public zxtest::Test, public loop_fixture::RealLoop {
  protected:
+  HdaControllerTest() : outgoing_(dispatcher()) {}
   void SetUp() final {
     auto& vmo = pci_.CreateBar(0, kHdaBar0Size, true);
     fuchsia_hardware_pci::wire::DeviceInfo info = {.vendor_id = INTEL_HDA_PCI_VID,
@@ -43,16 +45,18 @@ class HdaControllerTest : public zxtest::Test {
     config_vmo_ = pci_.GetConfigVmo();
 
     parent_ = MockDevice::FakeRootParent();
-    parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-        [this](zx::channel channel) {
-          fidl::BindServer(loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_pci::Device>(std::move(channel)),
-                           &pci_);
-          return ZX_OK;
-        },
-        "pci");
-    loop_.StartThread("pci-fidl-server-thread");
+
+    auto service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+        fuchsia_hardware_pci::Service::InstanceHandler(
+            {.device = pci_.bind_handler(dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
+                            "pci");
   }
 
   MockDevice* parent() const { return parent_.get(); }
@@ -62,8 +66,8 @@ class HdaControllerTest : public zxtest::Test {
  private:
   static constexpr size_t kHdaBar0Size = 0x4000;
 
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   pci::FakePciProtocol pci_;
+  component::OutgoingDirectory outgoing_;
   std::shared_ptr<MockDevice> parent_;
   hda_all_registers_t* regs_;
   zx::unowned_vmo config_vmo_;
@@ -71,18 +75,18 @@ class HdaControllerTest : public zxtest::Test {
 
 TEST_F(HdaControllerTest, HardwareResetMiscellaneousBackboneDynamicClockGatingEnable) {
   acpi::mock::Device mock_acpi;
-  async::Loop acpi_async_loop(&kAsyncLoopConfigNeverAttachToThread);
-  auto acpi_client = mock_acpi.CreateClient(acpi_async_loop.dispatcher());
-  TestIntelHDAController controller(std::move(acpi_client.value()));
+  auto acpi_client = mock_acpi.CreateClient(dispatcher());
+  std::optional<TestIntelHDAController> controller(std::move(acpi_client.value()));
+  auto cleanup = fit::defer([&] { PerformBlockingWork([&] { controller.reset(); }); });
 
-  ASSERT_OK(controller.SetupPCIDevice(parent()));
+  PerformBlockingWork([&] { ASSERT_OK(controller->SetupPCIDevice(parent())); });
 
   // Before resetting the controller HW the BDCGE bit is not set.
   uint32_t val = 0;
   config()->read(&val, kPciRegCgctl, sizeof(uint32_t));
   ASSERT_EQ(val, 0);
 
-  ASSERT_OK(controller.ResetControllerHardware());
+  PerformBlockingWork([&] { ASSERT_OK(controller->ResetControllerHardware()); });
 
   // After resetting the controller HW the BDCGE bit is set.
   config()->read(&val, kPciRegCgctl, sizeof(uint32_t));
@@ -91,9 +95,9 @@ TEST_F(HdaControllerTest, HardwareResetMiscellaneousBackboneDynamicClockGatingEn
 
 TEST_F(HdaControllerTest, HardwareResetStateSts) {
   acpi::mock::Device mock_acpi;
-  async::Loop acpi_async_loop(&kAsyncLoopConfigNeverAttachToThread);
-  auto acpi_client = mock_acpi.CreateClient(acpi_async_loop.dispatcher());
-  TestIntelHDAController controller(std::move(acpi_client.value()));
+  auto acpi_client = mock_acpi.CreateClient(dispatcher());
+  std::optional<TestIntelHDAController> controller(std::move(acpi_client.value()));
+  auto cleanup = fit::defer([&] { PerformBlockingWork([&] { controller.reset(); }); });
 
   // We set the HW to initially not be in reset.
   // During HW reset the driver will clear this bit and wait until it is cleared in the hardware.
@@ -106,8 +110,10 @@ TEST_F(HdaControllerTest, HardwareResetStateSts) {
   // Before resetting the controller HW the STATUSSTS register is not cleared.
   ASSERT_EQ(regs()->regs.statests, 0);
 
-  ASSERT_OK(controller.SetupPCIDevice(parent()));
-  ASSERT_OK(controller.ResetControllerHardware());
+  PerformBlockingWork([&] {
+    ASSERT_OK(controller->SetupPCIDevice(parent()));
+    ASSERT_OK(controller->ResetControllerHardware());
+  });
 
   // After resetting the controller HW the STATUSSTS register is cleared.
   ASSERT_EQ(regs()->regs.statests, HDA_REG_STATESTS_MASK);
@@ -115,15 +121,17 @@ TEST_F(HdaControllerTest, HardwareResetStateSts) {
 
 TEST_F(HdaControllerTest, HardwareResetError) {
   acpi::mock::Device mock_acpi;
-  async::Loop acpi_async_loop(&kAsyncLoopConfigNeverAttachToThread);
-  auto acpi_client = mock_acpi.CreateClient(acpi_async_loop.dispatcher());
-  TestIntelHDAController controller(std::move(acpi_client.value()));
+  auto acpi_client = mock_acpi.CreateClient(dispatcher());
+  std::optional<TestIntelHDAController> controller(std::move(acpi_client.value()));
+  auto cleanup = fit::defer([&] { PerformBlockingWork([&] { controller.reset(); }); });
 
   // We set the HDA HW version to be incorrect such that reset fails even after retries.
   regs()->regs.vmaj = 0x99;
 
-  ASSERT_OK(controller.SetupPCIDevice(parent()));
-  ASSERT_EQ(controller.ResetControllerHardware(), ZX_ERR_NOT_SUPPORTED);
+  PerformBlockingWork([&] {
+    ASSERT_OK(controller->SetupPCIDevice(parent()));
+    ASSERT_EQ(controller->ResetControllerHardware(), ZX_ERR_NOT_SUPPORTED);
+  });
 }
 
 }  // namespace audio::intel_hda

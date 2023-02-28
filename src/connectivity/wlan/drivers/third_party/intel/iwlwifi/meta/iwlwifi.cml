@@ -16,6 +16,9 @@
     capabilities: [
         { service: "fuchsia.wlan.softmac.Service" },
     ],
+    use: [
+        { service: "fuchsia.hardware.pci.Service" },
+    ],
     expose: [
         {
             service: "fuchsia.wlan.softmac.Service",

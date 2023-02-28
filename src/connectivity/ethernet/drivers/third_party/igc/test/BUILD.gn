@@ -16,6 +16,7 @@ executable("igc_interface_tests") {
   defines = [ "IGC_TEST" ]
 
   deps = [
+    "//sdk/lib/component/outgoing/cpp",
     "//src/connectivity/ethernet/drivers/third_party/igc:igc_core",
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/devices/testing/mock-ddk",

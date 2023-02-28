@@ -12,6 +12,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/mmio-ptr/fake.h>
@@ -47,14 +49,19 @@ struct Framebuffer {
   uint32_t height = 0u;
   uint32_t stride = 0u;
 };
-thread_local Framebuffer g_framebuffer;
+std::mutex g_lock_;
+Framebuffer g_framebuffer;
 
-void SetFramebuffer(const Framebuffer& buffer) { g_framebuffer = buffer; }
+void SetFramebuffer(const Framebuffer& buffer) {
+  std::lock_guard guard(g_lock_);
+  g_framebuffer = buffer;
+}
 
 }  // namespace
 
 zx_status_t zx_framebuffer_get_info(zx_handle_t resource, uint32_t* format, uint32_t* width,
                                     uint32_t* height, uint32_t* stride) {
+  std::lock_guard guard(g_lock_);
   *format = g_framebuffer.format;
   *width = g_framebuffer.width;
   *height = g_framebuffer.height;
@@ -220,9 +227,12 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 
-class IntegrationTest : public ::testing::Test {
+class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
  protected:
-  IntegrationTest() : loop_(&kAsyncLoopConfigNeverAttachToThread), sysmem_(loop_.dispatcher()) {}
+  IntegrationTest()
+      : loop_(&kAsyncLoopConfigNeverAttachToThread),
+        sysmem_(loop_.dispatcher()),
+        outgoing_(dispatcher()) {}
 
   void SetUp() final {
     SetFramebuffer({});
@@ -251,15 +261,18 @@ class IntegrationTest : public ::testing::Test {
           return ZX_OK;
         },
         "sysmem-fidl");
-    parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-        [this](zx::channel channel) {
-          fidl::BindServer(loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_pci::Device>(std::move(channel)),
-                           &pci_);
-          return ZX_OK;
-        },
-        "pci");
+
+    auto service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+        fuchsia_hardware_pci::Service::InstanceHandler(
+            {.device = pci_.bind_handler(loop_.dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
+                            "pci");
     loop_.StartThread("pci-fidl-server-thread");
   }
 
@@ -275,6 +288,7 @@ class IntegrationTest : public ::testing::Test {
   // Emulated parent protocols.
   pci::FakePciProtocol pci_;
   FakeSysmem sysmem_;
+  component::OutgoingDirectory outgoing_;
 
   // mock-ddk parent device of the Controller under test.
   std::shared_ptr<MockDevice> parent_;
@@ -458,7 +472,7 @@ TEST(IntelI915Display, SysmemInvalidType) {
 
 // Tests that DDK basic DDK lifecycle hooks function as expected.
 TEST_F(IntegrationTest, BindAndInit) {
-  ASSERT_OK(Controller::Create(parent()));
+  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
 
   // There should be two published devices: one "intel_i915" device rooted at |parent()|, and a
   // grandchild "intel-gpu-core" device.
@@ -483,7 +497,7 @@ TEST_F(IntegrationTest, BindAndInit) {
 TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
 
-  ASSERT_EQ(ZX_OK, Controller::Create(parent()));
+  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
   auto dev = parent()->GetLatestChild();
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
@@ -509,7 +523,7 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
       .height = kHeight,
       .stride = kStride,
   });
-  ASSERT_OK(Controller::Create(parent()));
+  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
 
   // There should be two published devices: one "intel_i915" device rooted at |parent()|, and a
   // grandchild "intel-gpu-core" device.
@@ -523,7 +537,7 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
 }
 
 TEST_F(IntegrationTest, SysmemImport) {
-  ASSERT_OK(Controller::Create(parent()));
+  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
   // grandchild "intel-gpu-core" device.
@@ -533,25 +547,23 @@ TEST_F(IntegrationTest, SysmemImport) {
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(endpoints.status_value());
-  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   image_t image = {};
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
   image.width = 128;
   image.height = kImageHeight;
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
+  ASSERT_OK(fidl::BindSingleInFlightOnly(dispatcher(), std::move(endpoints->server), &collection));
 
   EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(
-      &image, client_channel.channel().get()));
+      &image, endpoints->client.channel().get()));
 
-  loop.RunUntilIdle();
+  RunLoopUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
-  loop.StartThread();
-  EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, client_channel.channel().get(), 0));
+  PerformBlockingWork([&] {
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, endpoints->client.channel().get(), 0));
+  });
 
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_IDENTITY);
   EXPECT_LT(image.width * 4, kBytesPerRowDivisor);
@@ -560,7 +572,7 @@ TEST_F(IntegrationTest, SysmemImport) {
 }
 
 TEST_F(IntegrationTest, SysmemRotated) {
-  ASSERT_OK(Controller::Create(parent()));
+  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
   // grandchild "intel-gpu-core" device.
@@ -570,11 +582,9 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(endpoints.status_value());
-  auto& [client_channel, server_channel] = endpoints.value();
 
   MockNoCpuBufferCollection collection;
   collection.set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   image_t image = {};
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
@@ -582,17 +592,17 @@ TEST_F(IntegrationTest, SysmemRotated) {
   image.height = kImageHeight;
   // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
+  ASSERT_OK(fidl::BindSingleInFlightOnly(dispatcher(), std::move(endpoints->server), &collection));
 
   EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(
-      &image, client_channel.channel().get()));
+      &image, endpoints->client.channel().get()));
 
-  loop.RunUntilIdle();
+  RunLoopUntilIdle();
   EXPECT_TRUE(collection.set_constraints_called());
-  loop.StartThread();
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
-  EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, client_channel.channel().get(), 0));
+  PerformBlockingWork([&]() mutable {
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, endpoints->client.channel().get(), 0));
+  });
 
   // Check that rotating the image doesn't hang.
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_ROT_90);

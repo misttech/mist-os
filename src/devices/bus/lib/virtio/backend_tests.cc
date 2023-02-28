@@ -4,8 +4,9 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/async-loop/loop.h>
-#include <lib/async/cpp/task.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio/mmio.h>
@@ -115,6 +116,33 @@ class TestLegacyIoInterface : public virtio::PciLegacyIoInterface {
   fdf::MmioView view_;
 };
 
+class AsyncState {
+ public:
+  AsyncState() : outgoing_(async_get_default_dispatcher()) {}
+
+  fidl::ClientEnd<fuchsia_io::Directory> SetUpProtocol() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+
+    zx::result service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+        fuchsia_hardware_pci::Service::InstanceHandler(
+            {.device = bindings_.CreateHandler(&fake_pci, async_get_default_dispatcher(),
+                                               fidl::kIgnoreBindingClosure)}));
+    ZX_ASSERT(service_result.is_ok());
+
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    return std::move(endpoints->client);
+  }
+
+  pci::FakePciProtocol fake_pci;
+
+ private:
+  // |bindings_| borrows |async_|.
+  fidl::ServerBindingGroup<fuchsia_hardware_pci::Device> bindings_;
+  // |outgooing_| borrows |bindings_|.
+  component::OutgoingDirectory outgoing_;
+};
+
 fx_log_severity_t kTestLogLevel = FX_LOG_INFO;
 class VirtioTests : public zxtest::Test {
  public:
@@ -122,40 +150,35 @@ class VirtioTests : public zxtest::Test {
   static constexpr uint32_t kLegacyBar = 0u;
   static constexpr uint32_t kModernBar = 4u;
 
+  VirtioTests() : async_(loop_.dispatcher(), std::in_place) {}
+
  protected:
   void SetUp() final {
     mock_ddk::SetMinLogSeverity(kTestLogLevel);
     fake_parent_ = MockDevice::FakeRootParent();
+    ASSERT_OK(loop_.StartThread("async-state-thread"));
   }
 
   void TearDown() final {
-    loop_.Shutdown();
-
     device_async_remove(fake_parent_.get());
-
-    // Now that the thread has shut down, it's safe to directly make calls on
-    // fake_pci again.
-    fake_pci_.Reset();
+    async_.SyncCall([](AsyncState* async) { async->fake_pci.Reset(); });
   }
 
-  pci::FakePciProtocol& fake_pci() { return fake_pci_; }
+  async_patterns::TestDispatcherBound<AsyncState>& async_state() { return async_; }
   std::array<std::optional<fdf::MmioBuffer>, PCI_MAX_BAR_REGS>& bars() { return bars_; }
 
   void SetUpProtocol() {
-    fake_parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>, [this](zx::channel channel) {
-          fidl::BindServer(loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_pci::Device>(std::move(channel)),
-                           &fake_pci_);
-          return ZX_OK;
-        });
-    loop_.StartThread("pci-fidl-server-thread");
+    fidl::ClientEnd client = async_.SyncCall(&AsyncState::SetUpProtocol);
+
+    fake_parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(client));
   }
 
   void SetUpModernBars() {
     size_t bar_size = 0x3000 + 0x1000;  // 0x3000 is the offset of the last capability in the bar,
                                         // and 0x1000 is the length.
-    pci::RunAsync(loop_, [&] { fake_pci_.CreateBar(kModernBar, bar_size, /*is_mmio=*/true); });
+    async_.SyncCall([&](AsyncState* async) {
+      async->fake_pci.CreateBar(kModernBar, bar_size, /*is_mmio=*/true);
+    });
 
     ddk::Pci pci(fake_parent_.get());
     ZX_ASSERT(pci.is_valid());
@@ -164,14 +187,13 @@ class VirtioTests : public zxtest::Test {
   }
 
   void SetUpModernCapabilities() {
-    for (uint32_t i = 0; i < std::size(kCapabilities); i++) {
-      pci::RunAsync(loop_, [&] {
-        fake_pci_.AddVendorCapability(kCapabilityOffsets[i], kCapabilities[i].cap_len);
-      });
-    }
+    zx::unowned_vmo config = async_.SyncCall([](AsyncState* async) {
+      for (uint32_t i = 0; i < std::size(kCapabilities); i++) {
+        async->fake_pci.AddVendorCapability(kCapabilityOffsets[i], kCapabilities[i].cap_len);
+      }
+      return async->fake_pci.GetConfigVmo();
+    });
 
-    zx::unowned_vmo config;
-    pci::RunAsync(loop_, [&] { config = fake_pci().GetConfigVmo(); });
     for (uint32_t i = 0; i < std::size(kCapabilities); i++) {
       config->write(&kCapabilities[i], kCapabilityOffsets[i], sizeof(virtio_pci_cap_t));
     }
@@ -184,9 +206,9 @@ class VirtioTests : public zxtest::Test {
   }
 
   void SetUpModernMsiX() {
-    pci::RunAsync(loop_, [&] {
-      fake_pci_.AddMsixInterrupt();
-      fake_pci_.AddMsixInterrupt();
+    async_.SyncCall([](AsyncState* async) {
+      async->fake_pci.AddMsixInterrupt();
+      async->fake_pci.AddMsixInterrupt();
     });
 
     // Virtio stores a configuration register for MSI-X in a field in the common
@@ -200,14 +222,17 @@ class VirtioTests : public zxtest::Test {
 
   void SetUpLegacyBar() {
     zx::vmo vmo{};
-    pci::RunAsync(loop_, [&] {
-      size_t bar_size = 0x64;  // Matches the bar size on GCE for Bar0.
-      fake_pci_.CreateBar(kLegacyBar, bar_size, /*is_mmio=*/false);
-
-      // Legacy BARs identified as IO in PCI cannot be mapped by pci::MapMmio, so we need to do it
-      // by hand.
-      ZX_ASSERT(fake_pci().GetBar(kLegacyBar).duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo) == ZX_OK);
+    size_t bar_size = 0x64;  // Matches the bar size on GCE for Bar0.
+    async_.SyncCall([&](AsyncState* async) {
+      async->fake_pci.CreateBar(kLegacyBar, bar_size, /*is_mmio=*/false);
     });
+
+    // Legacy BARs identified as IO in PCI cannot be mapped by pci::MapMmio, so we need to do it
+    // by hand.
+    ZX_ASSERT(async_.SyncCall([&](AsyncState* async) {
+      return async->fake_pci.GetBar(kLegacyBar).duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+    }) == ZX_OK);
+
     size_t size = 0;
     vmo.get_size(&size);
     zx_status_t status = fdf::MmioBuffer::Create(
@@ -220,7 +245,8 @@ class VirtioTests : public zxtest::Test {
   // places depending on whether MSI has been enabled or not.
   uint16_t LegacyDeviceCfgOffset() {
     pci_interrupt_mode_t interrupt_mode;
-    pci::RunAsync(loop_, [&] { interrupt_mode = fake_pci().GetIrqMode(); });
+    interrupt_mode =
+        async_.SyncCall([](AsyncState* async) { return async->fake_pci.GetIrqMode(); });
     return (interrupt_mode == PCI_INTERRUPT_MODE_MSI_X) ? VIRTIO_PCI_CONFIG_OFFSET_MSIX
                                                         : VIRTIO_PCI_CONFIG_OFFSET_NOMSIX;
   }
@@ -228,11 +254,11 @@ class VirtioTests : public zxtest::Test {
   void SetUpLegacyQueue() { bars_[kLegacyBar]->Write(kQueueSize, VIRTIO_PCI_QUEUE_SIZE); }
 
   std::shared_ptr<MockDevice> fake_parent_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 
  private:
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<AsyncState> async_;
   std::array<std::optional<fdf::MmioBuffer>, PCI_MAX_BAR_REGS> bars_;
-  pci::FakePciProtocol fake_pci_;
 };
 
 class TestVirtioDevice;
@@ -285,7 +311,7 @@ TEST_F(VirtioTests, LegacyInterruptBindSuccess) {
   SetUpModernCapabilities();
   SetUpModernBars();
   SetUpModernQueue();
-  pci::RunAsync(loop_, [&] { fake_pci().AddLegacyInterrupt(); });
+  async_state().SyncCall([&](AsyncState* async) { async->fake_pci.AddLegacyInterrupt(); });
 
   ASSERT_OK(virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
 }
@@ -294,7 +320,7 @@ TEST_F(VirtioTests, FailureOneMsixBind) {
   SetUpProtocol();
   SetUpModernCapabilities();
   SetUpModernBars();
-  pci::RunAsync(loop_, [&] { fake_pci().AddMsixInterrupt(); });
+  async_state().SyncCall([&](AsyncState* async) { async->fake_pci.AddMsixInterrupt(); });
 
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED,
             virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
@@ -314,7 +340,7 @@ TEST_F(VirtioTests, TwoMsixBindSuccess) {
 // Ensure that the Legacy interface looks for IO Bar 0 and succeeds up until it
 // tries to make IO writes using in/out instructions.
 TEST_F(VirtioTests, DISABLED_LegacyIoBackendError) {
-  pci::RunAsync(loop_, [&] { fake_pci().AddLegacyInterrupt(); });
+  async_state().SyncCall([&](AsyncState* async) { async->fake_pci.AddLegacyInterrupt(); });
   SetUpProtocol();
   SetUpLegacyBar();
   SetUpLegacyQueue();
@@ -332,7 +358,7 @@ TEST_F(VirtioTests, LegacyIoBackendSuccess) {
   SetUpProtocol();
   SetUpLegacyBar();
   SetUpLegacyQueue();
-  pci::RunAsync(loop_, [&] { fake_pci().AddLegacyInterrupt(); });
+  async_state().SyncCall([&](AsyncState* async) { async->fake_pci.AddLegacyInterrupt(); });
 
   // With a manually crafted backend using the test interface it should succeed.
   ddk::Pci pci(fake_parent_.get());
@@ -342,9 +368,10 @@ TEST_F(VirtioTests, LegacyIoBackendSuccess) {
   zx::bti bti{};
   ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-  // Feed the same vmo backing FakePci's BAR 0 into the interface so the view
+  // Feed the same vmo backing AsyncState's BAR 0 into the interface so the view
   // from PCI, Virtio, and the test all align.
   TestLegacyIoInterface interface(bars()[kLegacyBar]->View(0));
+
   auto backend = std::make_unique<virtio::PciLegacyBackend>(std::move(pci), info, &interface);
   ASSERT_OK(backend->Bind());
 
@@ -359,9 +386,9 @@ TEST_F(VirtioTests, LegacyMsiX) {
   SetUpProtocol();
   SetUpLegacyBar();
   SetUpLegacyQueue();
-  pci::RunAsync(loop_, [&] {
-    fake_pci().AddMsixInterrupt();
-    fake_pci().AddMsixInterrupt();
+  async_state().SyncCall([](AsyncState* async) {
+    async->fake_pci.AddMsixInterrupt();
+    async->fake_pci.AddMsixInterrupt();
   });
 
   ddk::Pci pci(fake_parent_.get());
@@ -382,7 +409,8 @@ TEST_F(VirtioTests, LegacyMsiX) {
   [[maybe_unused]] auto ptr = device.release();
 
   // Verify MSI-X state
-  pci::RunAsync(loop_, [&] { ASSERT_EQ(fake_pci().GetIrqMode(), PCI_INTERRUPT_MODE_MSI_X); });
+  ASSERT_EQ(async_state().SyncCall([](AsyncState* async) { return async->fake_pci.GetIrqMode(); }),
+            PCI_INTERRUPT_MODE_MSI_X);
   uint16_t value{};
   value = bars()[kLegacyBar]->Read16(VIRTIO_PCI_MSI_CONFIG_VECTOR);
   ASSERT_EQ(value, virtio::PciBackend::kMsiConfigVector);

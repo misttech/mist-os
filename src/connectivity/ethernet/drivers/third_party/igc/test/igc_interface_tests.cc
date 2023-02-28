@@ -15,13 +15,14 @@
  */
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <gtest/gtest.h>
 
 #include "src/connectivity/ethernet/drivers/third_party/igc/igc_driver.h"
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 namespace {
 
@@ -34,12 +35,12 @@ constexpr uint32_t kTestSubsysVendorId = 0x0abe;
 constexpr uint32_t kTestCommand = 0x0033;
 constexpr uint8_t kVmoId = 0;
 
-class IgcInterfaceTest : public gtest::TestLoopFixture {
+class IgcInterfaceTest : public gtest::RealLoopFixture {
  public:
-  IgcInterfaceTest() = default;
+  IgcInterfaceTest() : outgoing_(dispatcher()) {}
 
   void SetUp() override {
-    TestLoopFixture::SetUp();
+    RealLoopFixture::SetUp();
     parent_ = MockDevice::FakeRootParent();
 
     pci::FakePciProtocol fake_pci;
@@ -59,26 +60,25 @@ class IgcInterfaceTest : public gtest::TestLoopFixture {
     fake_pci_.AddLegacyInterrupt();
 
     // Add proper PCI protocol
-    loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNeverAttachToThread);
-    parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-        [this](zx::channel channel) {
-          fidl::BindServer(loop_->dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_pci::Device>(std::move(channel)),
-                           &fake_pci_);
-          return ZX_OK;
-        },
-        "pci");
-    loop_->StartThread("pci-fidl-server-thread");
+    auto service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+        fuchsia_hardware_pci::Service::InstanceHandler(
+            {.device = fake_pci_.bind_handler(dispatcher())}));
+    ASSERT_EQ(service_result.status_value(), ZX_OK);
 
-    driver_ = std::make_unique<ei::IgcDriver>(parent_.get());
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
+
+    parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
+                            "pci");
+    PerformBlockingWork([&] { driver_ = std::make_unique<ei::IgcDriver>(parent_.get()); });
 
     // Create the VMO like what netdev driver does.
     zx::vmo::create(ei::kEthRxBufCount * ei::kEthRxBufSize + ei::kEthTxBufCount * ei::kEthTxBufSize,
                     kVmoId, &test_vmo_);
 
     // Initialize the driver, including mapping MmioBuffer.
-    driver_->Init();
+    PerformBlockingWork([&] { driver_->Init(); });
 
     // Verify that the netdev has been created during initialization process.
     EXPECT_EQ(1U, parent_->child_count());
@@ -90,8 +90,9 @@ class IgcInterfaceTest : public gtest::TestLoopFixture {
   void TearDown() override {
     // Release the driver unique_ptr here because mock_ddk will destroy the driver.
     driver_.release();
-    loop_->Shutdown();
-    TestLoopFixture::TearDown();
+    device_async_remove(parent_->GetLatestChild());
+    PerformBlockingWork([&] { mock_ddk::ReleaseFlaggedDevices(parent_.get()); });
+    RealLoopFixture::TearDown();
   }
 
   // network_device_ifc_protocol_ops_t implementations
@@ -122,8 +123,8 @@ class IgcInterfaceTest : public gtest::TestLoopFixture {
   // The instance of IGC driver under test.
   std::unique_ptr<ei::IgcDriver> driver_;
 
-  // The loop whose dispatcher binds to the ServerEnd of fuchsia_hardware_pci::Device.
-  std::unique_ptr<async::Loop> loop_;
+  // The directory used to setting connections to fake pci.
+  component::OutgoingDirectory outgoing_;
 
   // The VMO faked by this test class to simulate the one that netdevice creates in real case.
   zx::vmo test_vmo_;

@@ -143,11 +143,13 @@ test("controller_test") {
   ]
   deps = [
     ":src",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//src/devices/lib/acpi/mock:mock-acpi",
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/devices/testing/mock-ddk",
     "//src/media/audio/drivers/lib/intel-hda",
+    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
     "//zircon/system/ulib/zx",

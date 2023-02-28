@@ -17,9 +17,12 @@ test("virtio-backend-test") {
   sources = [ "backend_tests.cc" ]
   deps = [
     ":virtio",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",

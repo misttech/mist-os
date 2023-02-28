@@ -9,6 +9,8 @@
 #include <fidl/fuchsia.hardware.pci/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/zx/channel.h>
@@ -148,31 +150,34 @@ class FakePci : public fidl::testing::WireTestBase<fuchsia_hardware_pci::Device>
 
 }  // namespace
 
-class AddressSpaceDeviceTest : public zxtest::Test {
+class AddressSpaceDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
   AddressSpaceDeviceTest()
       : async_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        pci_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+        pci_loop_(&kAsyncLoopConfigNeverAttachToThread),
+        outgoing_(dispatcher()) {}
 
   // |zxtest::Test|
   void SetUp() override {
     fake_root_ = MockDevice::FakeRootParent();
 
-    fake_root_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-        [this](zx::channel channel) {
-          fidl::BindServer(pci_loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_pci::Device>(std::move(channel)),
-                           &fake_pci_);
-          return ZX_OK;
-        },
-        "pci");
+    auto service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+        fuchsia_hardware_pci::Service::InstanceHandler(
+            {.device = fake_pci_.bind_handler(pci_loop_.dispatcher())}));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    fake_root_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
+                               "pci");
 
     pci_loop_.StartThread("pci-fidl-server-thread");
 
     std::unique_ptr<AddressSpaceDevice> dut(
         new AddressSpaceDevice(fake_root_.get(), async_loop_.dispatcher()));
-    ASSERT_OK(dut->Bind());
+    PerformBlockingWork([&]() { ASSERT_OK(dut->Bind()); });
     dut_ = dut.release();
   }
 
@@ -205,6 +210,7 @@ class AddressSpaceDeviceTest : public zxtest::Test {
   async::Loop async_loop_;
   async::Loop pci_loop_;
   FakePci fake_pci_;
+  component::OutgoingDirectory outgoing_;
   std::shared_ptr<MockDevice> fake_root_;
   AddressSpaceDevice* dut_;
 };

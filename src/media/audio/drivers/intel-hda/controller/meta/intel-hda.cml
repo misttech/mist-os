@@ -16,5 +16,6 @@
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.acpi.Service" },
+        { service: "fuchsia.hardware.pci.Service" },
     ],
 }

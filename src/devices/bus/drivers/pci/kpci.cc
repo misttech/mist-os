@@ -733,9 +733,11 @@ void KernelPciFidl::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& com
 
 zx_status_t KernelPciFidl::SetUpOutgoingDirectory(
     fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  zx::result status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_pci::Device>(
-      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-      fidl::DiscoverableProtocolName<fpci::Device>);
+  zx::result status = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+      fuchsia_hardware_pci::Service::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+
   if (status.is_error()) {
     return status.status_value();
   }

@@ -591,22 +591,15 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
 zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
                                          uint32_t width, uint32_t height, uint32_t stride,
                                          zx_pixel_format_t format) {
-  auto pci_endpoints = fidl::CreateEndpoints<fuchsia_hardware_pci::Device>();
-  if (pci_endpoints.is_error()) {
-    zxlogf(ERROR, "%s: could not create PCI FIDL endpoints: %s", name,
-           pci_endpoints.status_string());
-    return pci_endpoints.status_value();
-  }
-
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      dev, "pci", fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-      pci_endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: could not get PCI protocol: %s", name, zx_status_get_string(status));
+  zx::result client =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_pci::Service::Device>(
+          dev, "pci");
+  if (client.is_error()) {
+    zxlogf(ERROR, "%s: could not get PCI protocol: %s", name, client.status_string());
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci(std::move(pci_endpoints->client));
+  fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci(std::move(*client));
 
   auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
   if (sysmem_endpoints.is_error()) {
@@ -617,7 +610,7 @@ zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uin
 
   // For important information about the fragment name, see the note in bind_simple_pci_display
   // above.
-  status = device_connect_fragment_fidl_protocol(
+  zx_status_t status = device_connect_fragment_fidl_protocol(
       dev, "sysmem-fidl", fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
       sysmem_endpoints->server.TakeHandle().release());
   if (status != ZX_OK) {

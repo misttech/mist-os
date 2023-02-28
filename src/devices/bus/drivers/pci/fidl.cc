@@ -48,25 +48,31 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
   auto pci_bind_topo = static_cast<uint32_t>(
       BIND_PCI_TOPO_PACK(device->bus_id(), device->dev_id(), device->func_id()));
   // clang-format off
-zx_device_prop_t pci_device_props[] = {
-    {BIND_FIDL_PROTOCOL, 0, ZX_FIDL_PROTOCOL_PCI},
-    {BIND_PCI_VID, 0, device->vendor_id()},
-    {BIND_PCI_DID, 0, device->device_id()},
-    {BIND_PCI_CLASS, 0, device->class_id()},
-    {BIND_PCI_SUBCLASS, 0, device->subclass()},
-    {BIND_PCI_INTERFACE, 0, device->prog_if()},
-    {BIND_PCI_REVISION, 0, device->rev_id()},
-    {BIND_PCI_TOPO, 0, pci_bind_topo},
-};
+  zx_device_prop_t pci_device_props[] = {
+      {BIND_FIDL_PROTOCOL, 0, ZX_FIDL_PROTOCOL_PCI},
+      {BIND_PCI_VID, 0, device->vendor_id()},
+      {BIND_PCI_DID, 0, device->device_id()},
+      {BIND_PCI_CLASS, 0, device->class_id()},
+      {BIND_PCI_SUBCLASS, 0, device->subclass()},
+      {BIND_PCI_INTERFACE, 0, device->prog_if()},
+      {BIND_PCI_REVISION, 0, device->rev_id()},
+      {BIND_PCI_TOPO, 0, pci_bind_topo},
+  };
   // clang-format on
-  std::array offers = {
+  std::array protocol_offers = {
       fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
   };
 
-  zx::result result = fidl_dev->outgoing_dir().AddUnmanagedProtocol<fuchsia_hardware_pci::Device>(
-      fidl_dev->bindings_.CreateHandler(fidl_dev.get(),
-                                        fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                        fidl::kIgnoreBindingClosure));
+  std::array offers = {
+      fidl::DiscoverableProtocolName<fpci::Device>,
+  };
+
+  zx::result result = fidl_dev->outgoing_dir().AddService<fuchsia_hardware_pci::Service>(
+      fuchsia_hardware_pci::Service::InstanceHandler({
+          .device = fidl_dev->bindings_.CreateHandler(
+              fidl_dev.get(), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+              fidl::kIgnoreBindingClosure),
+      }));
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to add service the outgoing directory");
     return result.take_error();
@@ -85,7 +91,8 @@ zx_device_prop_t pci_device_props[] = {
                                             .set_props(pci_device_props)
                                             .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                             .set_outgoing_dir(endpoints->client.TakeChannel())
-                                            .set_fidl_protocol_offers(offers));
+                                            .set_fidl_protocol_offers(protocol_offers)
+                                            .set_fidl_service_offers(offers));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to create pci fidl fragment %s: %s", device->config()->addr(),
            zx_status_get_string(status));
