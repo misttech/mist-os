@@ -40,10 +40,6 @@ pub struct RunParams {
     /// Time in seconds to wait for events to drain after timeout.
     pub timeout_grace_seconds: u32,
 
-    /// If set, time in seconds to wait before timing out waiting for a test suite to start.
-    /// This timeout is intended to handle timeouts such as those arising from network issues.
-    pub suite_start_timeout_seconds: Option<std::num::NonZeroU32>,
-
     /// If set, stop executing tests after this number of normal test failures occur.
     pub stop_after_failures: Option<std::num::NonZeroU32>,
 

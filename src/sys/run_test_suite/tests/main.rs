@@ -70,7 +70,6 @@ fn new_run_params() -> run_test_suite_lib::RunParams {
     run_test_suite_lib::RunParams {
         timeout_behavior: run_test_suite_lib::TimeoutBehavior::TerminateRemaining,
         timeout_grace_seconds: 0,
-        suite_start_timeout_seconds: None,
         stop_after_failures: None,
         experimental_parallel_execution: None,
         accumulate_debug_data: false,
@@ -1196,7 +1195,6 @@ async fn test_continue_on_timeout(test_chunk_size: usize) {
         run_test_suite_lib::RunParams {
             timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
             timeout_grace_seconds: 0,
-            suite_start_timeout_seconds: None,
             stop_after_failures: None,
             experimental_parallel_execution: None,
             accumulate_debug_data: false,
@@ -1269,7 +1267,6 @@ async fn test_stop_after_n_failures(test_chunk_size: usize) {
                 run_test_suite_lib::RunParams {
                     timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
                     timeout_grace_seconds: 0,
-                    suite_start_timeout_seconds: None,
                     stop_after_failures: Some(5u32.try_into().unwrap()),
                     experimental_parallel_execution: None,
                     accumulate_debug_data: false,
@@ -1355,7 +1352,7 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_realm.
 #[fuchsia::test]
 async fn test_logging_component(subcase: &'static str, iterator_option: LogsIteratorOption) {
     run_with_reporter(
-        &format!("test_logging_component_{}", subcase), 
+        &format!("test_logging_component_{}", subcase),
         |reporter: TestMuxMuxReporter, output: TestOutputView, output_dir: tempfile::TempDir| async move {
             let mut test_params = new_test_params(
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm",
@@ -1422,7 +1419,7 @@ async fn test_logging_component_min_severity(
     iterator_option: LogsIteratorOption,
 ) {
     run_with_reporter(
-        &format!("test_logging_component_{}", subcase), 
+        &format!("test_logging_component_{}", subcase),
         |reporter: TestMuxMuxReporter, output: TestOutputView, _output_dir: tempfile::TempDir| async move {
 
         let mut test_params = new_test_params(

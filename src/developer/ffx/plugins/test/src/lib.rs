@@ -124,16 +124,6 @@ async fn run_test<W: 'static + Write + Send + Sync>(
         },
         timeout_grace_seconds: ffx_config::get::<u64, _>("test.timeout_grace_seconds").await?
             as u32,
-        suite_start_timeout_seconds: match ffx_config::get::<Option<u64>, _>(
-            "test.suite_start_timeout_seconds",
-        )
-        .await?
-        .map(|seconds| std::num::NonZeroU32::new(seconds as u32))
-        {
-            None => None,
-            Some(None) => ffx_bail!("test.suite_start_timeout_seconds must be greater than zero."),
-            Some(Some(timeout)) => Some(timeout),
-        },
         stop_after_failures: match cmd.stop_after_failures.map(std::num::NonZeroU32::new) {
             None => None,
             Some(None) => ffx_bail!("--stop-after-failures should be greater than zero."),

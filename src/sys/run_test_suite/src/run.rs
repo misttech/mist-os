@@ -156,23 +156,12 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
     let cancel_fut = cancel_fut.shared();
     let cancel_fut_clone = cancel_fut.clone();
 
-    let suite_start_timeout_duration = run_params
-        .suite_start_timeout_seconds
-        .map(|secs| std::time::Duration::from_secs(secs.get() as u64));
-
     let handle_suite_fut = async move {
         let mut stopped_prematurely = false;
         // for now, we assume that suites are run serially.
         loop {
-            let suite_start_timeout = match suite_start_timeout_duration {
-                Some(duration) => fasync::Timer::new(duration).boxed(),
-                None => futures::future::pending::<()>().boxed(),
-            };
-            let suite_stop_fut = futures::future::select(cancel_fut.clone(), suite_start_timeout)
-                .map(|result| match result {
-                    Either::Left(_) => Outcome::Cancelled,
-                    Either::Right(_) => Outcome::Timedout,
-                });
+            let suite_stop_fut = cancel_fut.clone().map(|_| Outcome::Cancelled);
+
             let (running_suite, suite_id) = match suite_start_futs
                 .next()
                 .named("suite_start")
@@ -456,7 +445,6 @@ mod test {
         fidl::endpoints::ServerEnd,
         fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::future::join3,
-        std::task::Poll,
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
             file::vmo::read_only, pseudo_directory,
@@ -579,7 +567,6 @@ mod test {
             RunParams {
                 timeout_behavior: TimeoutBehavior::Continue,
                 timeout_grace_seconds: 0,
-                suite_start_timeout_seconds: None,
                 stop_after_failures: None,
                 experimental_parallel_execution: None,
                 accumulate_debug_data: false,
@@ -610,46 +597,6 @@ mod test {
         let reports = reporter.get_reports();
         assert_eq!(1usize, reports.len());
         assert_eq!(reports[0].id, EntityId::TestRun);
-    }
-
-    #[cfg(target_os = "fuchsia")]
-    #[fuchsia::test]
-    fn suite_start_timeout() {
-        let mut executor = fasync::TestExecutor::new_with_fake_time();
-
-        // Create a RunBuilder stream that doesn't process requests to simulate a timeout.
-        let (builder_proxy, _run_builder_stream) =
-            create_proxy_and_stream::<ftest_manager::RunBuilderMarker>()
-                .expect("create builder proxy");
-
-        let reporter = InMemoryReporter::new();
-        let run_reporter = RunReporter::new(reporter.clone());
-        let mut run_fut = run_tests_and_get_outcome(
-            SingleRunConnector::new(builder_proxy),
-            vec![TestParams {
-                test_url: "fuchsia-pkg://fuchsia.com/nothing#meta/nothing.cm".to_string(),
-                ..TestParams::default()
-            }],
-            RunParams {
-                timeout_behavior: TimeoutBehavior::Continue,
-                timeout_grace_seconds: 0,
-                suite_start_timeout_seconds: Some(std::num::NonZeroU32::new(1).unwrap()),
-                stop_after_failures: None,
-                experimental_parallel_execution: None,
-                accumulate_debug_data: false,
-                log_protocol: None,
-                min_severity_logs: None,
-                show_full_moniker: false,
-            },
-            run_reporter,
-            futures::future::pending(),
-        )
-        .boxed_local();
-
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        executor.set_fake_time(executor.now() + fuchsia_zircon::Duration::from_seconds(1));
-        assert!(executor.wake_expired_timers());
-        assert_eq!(executor.run_until_stalled(&mut run_fut), Poll::Ready(Outcome::Timedout));
     }
 
     #[fuchsia::test]
@@ -944,7 +891,6 @@ mod test {
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,
             timeout_grace_seconds: 0,
-            suite_start_timeout_seconds: None,
             stop_after_failures: None,
             experimental_parallel_execution: Some(max_parallel_suites),
             accumulate_debug_data: false,
@@ -975,7 +921,6 @@ mod test {
         let run_params = RunParams {
             timeout_behavior: TimeoutBehavior::Continue,
             timeout_grace_seconds: 0,
-            suite_start_timeout_seconds: None,
             stop_after_failures: None,
             experimental_parallel_execution: None,
             accumulate_debug_data: false,
