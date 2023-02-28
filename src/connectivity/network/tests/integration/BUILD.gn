@@ -9,10 +9,7 @@ import(
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
-tests = [
-  "reachability",
-  "sys",
-]
+tests = [ "sys" ]
 
 tests_with_expectations = [
   "device",
@@ -29,6 +26,7 @@ tests_with_expectations_with_err_logs = [
   "ipv6",
   "management",
   "product-flow",
+  "reachability",
   "socket",
 ]
 

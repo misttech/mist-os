@@ -1,0 +1,35 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/120099): Flakes. ns3 doesn't implement
+                // fuchsia.net.routes, and in these tests, reachability will
+                // panic if it hits PEER_CLOSED before the test finishes
+                // execution.
+                "test_cannot_call_set_options_after_watch_ns3",
+                "test_hanging_get_multiple_clients_ns3",
+            ],
+        },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "test_gateway_goes_down_ns3*",
+                "test_internet_available_ns3*",
+                "test_internet_comes_up_ns3*",
+                "test_internet_goes_down_ns3*",
+                "test_internet_to_gateway_state_ns3",
+                "test_state_ns3*",
+            ],
+        },
+    ],
+}
