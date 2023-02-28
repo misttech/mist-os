@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -61,9 +62,7 @@ class Display : public DisplayType,
   }
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                           zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t collection,
                                                uint32_t index);
   zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
@@ -108,6 +107,11 @@ class Display : public DisplayType,
     return ZX_ERR_NOT_SUPPORTED;
   }
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
+
+  void SetSysmemAllocatorForTesting(
+      fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client) {
+    sysmem_allocator_client_ = std::move(sysmem_allocator_client);
+  }
 
   // TESTING ONLY
   void CreateDevices(int num_devices) {
@@ -183,6 +187,13 @@ class Display : public DisplayType,
     std::list<async::WaitOnce> pending_config_waits = {};
   };
 
+  // Initializes the sysmem Allocator client used to import incoming buffer
+  // collection tokens.
+  //
+  // On success, returns ZX_OK and the sysmem allocator client will be open
+  // until the device is released.
+  zx_status_t InitSysmemAllocatorClientLocked() TA_REQ(lock_);
+
   zx_status_t ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset);
   zx_status_t PresentDisplayConfig(RenderControl::DisplayId display_id,
                                    const DisplayConfig& display_config);
@@ -194,6 +205,14 @@ class Display : public DisplayType,
   fbl::Mutex lock_;
   ddk::GoldfishControlProtocolClient control_ TA_GUARDED(lock_);
   fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_ TA_GUARDED(lock_);
+
+  // The sysmem allocator client used to bind incoming buffer collection tokens.
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+
+  // Imported sysmem buffer collections.
+  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+      buffer_collections_;
+
   std::unique_ptr<RenderControl> rc_;
   int32_t id_ = 0;
   zx::bti bti_;

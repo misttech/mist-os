@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "display.h"
 
+#include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
@@ -23,6 +24,13 @@ namespace {
 constexpr size_t kNumDisplays = 2;
 constexpr size_t kMaxLayerCount = 3;  // This is the max size of layer array.
 }  // namespace
+
+// TODO(fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// testing doubles instead of writing mocks for each display driver test.
+class FakeAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+ public:
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {}
+};
 
 class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::GoldfishPipe> {};
 
@@ -45,8 +53,10 @@ class GoldfishDisplayTest : public zxtest::Test {
   std::unique_ptr<Display> display_ = {};
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_sysmem::Allocator>> allocator_binding_;
   async::Loop loop_;
   FakePipe* fake_pipe_;
+  FakeAllocator mock_allocator_;
 };
 
 void GoldfishDisplayTest::SetUp() {
@@ -64,9 +74,18 @@ void GoldfishDisplayTest::SetUp() {
   // Need CreateDevices and RemoveDevices to ensure we can test CheckConfiguration without any
   // dependency on proper driver binding/loading
   display_->CreateDevices(kNumDisplays);
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  ASSERT_TRUE(endpoints.is_ok());
+  allocator_binding_ =
+      fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_allocator_);
+  display_->SetSysmemAllocatorForTesting(fidl::WireSyncClient(std::move(endpoints->client)));
 }
 
-void GoldfishDisplayTest::TearDown() { display_->RemoveDevices(); }
+void GoldfishDisplayTest::TearDown() {
+  allocator_binding_->Unbind();
+  display_->RemoveDevices();
+}
 
 TEST_F(GoldfishDisplayTest, CheckConfigNoDisplay) {
   // Test No display
@@ -360,6 +379,31 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
     // TODO(payamm): Driver will pretend it supports color conversion for now
     // EXPECT_EQ(CLIENT_COLOR_CONVERSION, results_[i][0] & CLIENT_COLOR_CONVERSION);
   }
+}
+
+TEST_F(GoldfishDisplayTest, ImportBufferCollection) {
+  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token1_endpoints.is_ok());
+  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token2_endpoints.is_ok());
+
+  // Test ImportBufferCollection().
+  const uint64_t kValidCollectionId = 1u;
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(
+      kValidCollectionId, token1_endpoints->client.TakeChannel()));
+
+  // `collection_id` must be unused.
+  EXPECT_EQ(display_->DisplayControllerImplImportBufferCollection(
+                kValidCollectionId, token2_endpoints->client.TakeChannel()),
+            ZX_ERR_ALREADY_EXISTS);
+
+  // Test ReleaseBufferCollection().
+  const uint64_t kInvalidCollectionId = 2u;
+  EXPECT_EQ(display_->DisplayControllerImplReleaseBufferCollection(kInvalidCollectionId),
+            ZX_ERR_NOT_FOUND);
+  EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kValidCollectionId));
+
+  loop_.Shutdown();
 }
 
 }  // namespace goldfish

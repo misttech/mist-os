@@ -57,6 +57,8 @@ source_set("common") {
     "//src/devices/lib/goldfish/pipe_io",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//src/lib/fsl",
+    "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",

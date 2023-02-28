@@ -38,6 +38,8 @@
 #include "src/devices/lib/goldfish/pipe_headers/include/base.h"
 #include "src/graphics/display/drivers/goldfish-display/goldfish-display-bind.h"
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
+#include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace goldfish {
 namespace {
@@ -114,6 +116,12 @@ zx_status_t Display::Bind() {
   if (!pipe_.is_valid()) {
     zxlogf(ERROR, "%s: no pipe protocol", kTag);
     return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  status = InitSysmemAllocatorClientLocked();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: cannot initialize sysmem allocator: %s", kTag, zx_status_get_string(status));
+    return status;
   }
 
   // Create a second FIDL connection for use by RenderControl.
@@ -257,6 +265,32 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
   }
 }
 
+zx_status_t Display::InitSysmemAllocatorClientLocked() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
+    return endpoints.status_value();
+  }
+  auto& [client, server] = endpoints.value();
+  auto connect_result = pipe_->ConnectSysmem(server.TakeChannel());
+  if (!connect_result.ok()) {
+    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
+           connect_result.status_string());
+    return connect_result.status();
+  }
+  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+
+  std::string debug_name = fxl::StringPrintf("goldfish-display[%lu]", fsl::GetCurrentProcessKoid());
+  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
+      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+  if (!set_debug_status.ok()) {
+    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+    return set_debug_status.status();
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t Display::ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
 
@@ -289,16 +323,52 @@ zx_status_t Display::ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset) 
 
 zx_status_t Display::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                                  zx::channel collection_token) {
-  // Tell sysmem we're withdrawing from the negotiation, so it doesn't assume we
-  // crashed and won't cause other shared token to fail.
-  fidl::Status status = fidl::WireCall(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
-                                           std::move(collection_token)))
-                            ->Close();
-  if (!status.ok()) {
-    zxlogf(WARNING, "Cannot safely close imported buffer collection token: %s",
-           status.status_string());
+  if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
+    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", collection_id);
+    return ZX_ERR_ALREADY_EXISTS;
   }
-  return ZX_ERR_NOT_SUPPORTED;
+
+  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  if (!endpoints.is_ok()) {
+    zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+  auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
+
+  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
+      std::move(collection_server_endpoint));
+  if (!bind_result.ok()) {
+    zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
+           bind_result.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
+  buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+
+  // TODO(fxbug.dev/121411): This BufferCollection is currently a placeholder so
+  // we need to set null constraints in order not to block the sysmem Allocator.
+  // Remove this once SetBufferCollectionConstraints() using `collection_id` is
+  // correctly implemented.
+  fidl::OneWayStatus status = buffer_collections_.at(collection_id)->SetConstraints(false, {});
+  if (!status.ok()) {
+    zxlogf(ERROR, "Failed to set BufferCollection constraints: %s", status.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t Display::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
+  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  buffer_collections_.erase(collection_id);
+  return ZX_OK;
 }
 
 zx_status_t Display::DisplayControllerImplImportImage(image_t* image,
