@@ -25,6 +25,8 @@ declare_args() {
   # ```
   # mkdir build/secondary/third_party/ffmpeg
   # git clone https://fuchsia.googlesource.com/third_party/ffmpeg build/secondary/third_party/ffmpeg
+  # mkdir third_party/yasm
+  # git clone https://fuchsia.googlesource.com/third_party/yasm third_party/yasm
   # mkdir third_party/ffmpeg/src
   # git clone https://chromium.googlesource.com/chromium/third_party/ffmpeg third_party/ffmpeg/src
   # ```
