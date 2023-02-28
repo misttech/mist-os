@@ -9,6 +9,7 @@ ffx_plugin("ffx_process_explorer") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.process.explorer:fuchsia.process.explorer_rust",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",

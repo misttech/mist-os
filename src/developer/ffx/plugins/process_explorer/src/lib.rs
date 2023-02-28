@@ -12,12 +12,14 @@ use anyhow::Result;
 use ffx_core::ffx_plugin;
 use ffx_process_explorer_args::{Args, QueryCommand};
 use ffx_writer::Writer;
+use fidl_fuchsia_buildinfo::BuildInfo;
+use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_process_explorer::QueryProxy;
 use fuchsia_map::json;
 use fuchsia_zircon_types::zx_koid_t;
 use futures::AsyncReadExt;
 use processes_data::{processed, raw};
-use std::{collections::HashSet, io::Write};
+use std::collections::HashSet;
 use write_human_readable_output::{
     pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };
@@ -25,21 +27,25 @@ use write_human_readable_output::{
 // TODO(fxbug.dev/107973): The plugin must remain experimental until the FIDL API is strongly typed.
 #[ffx_plugin(
     "ffx_process_explorer",
-    QueryProxy = "core/process_explorer:expose:fuchsia.process.explorer.Query"
+    QueryProxy = "core/process_explorer:expose:fuchsia.process.explorer.Query",
+    ProviderProxy = "core/build-info:expose:fuchsia.buildinfo.Provider"
 )]
 /// Prints processes data.
 pub async fn print_processes_data(
     query_proxy: QueryProxy,
+    buildinfo_provider_proxy: ProviderProxy,
     cmd: QueryCommand,
     #[ffx(machine = processed::ProcessesData)] writer: Writer,
 ) -> Result<()> {
     let processes_data = get_processes_data(query_proxy).await?;
     let output = processed::ProcessesData::from(processes_data);
 
+    let build_info = buildinfo_provider_proxy.get_build_info().await?;
+
     match cmd.arg {
         Args::List(arg) => list_subcommand(writer, output, arg.verbose),
         Args::Filter(arg) => filter_subcommand(writer, output, arg.process_koids),
-        Args::GenerateFuchsiaMap(_) => generate_fuchsia_map_subcommand(writer, output),
+        Args::GenerateFuchsiaMap(_) => generate_fuchsia_map_subcommand(writer, build_info, output),
     }
 }
 
@@ -133,11 +139,11 @@ fn filter_subcommand(
 
 fn generate_fuchsia_map_subcommand(
     mut w: Writer,
+    build_info: BuildInfo,
     processes_data: processed::ProcessesData,
 ) -> Result<()> {
-    let json = json::Json::from(processes_data);
-    let serialized = serde_json::to_string(&json).unwrap();
-    writeln!(w, "{}", serialized)?;
+    let json = json::make_fuchsia_map_json(processes_data, build_info);
+    serde_json::to_writer(&mut w, &json)?;
     Ok(())
 }
 
