@@ -92,7 +92,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
 
     # List all the static properties in alphabetical order
     @property
-    @lru_cache
     def device_type(self) -> str:
         """Returns the device type.
 
@@ -102,9 +101,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        return ffx_cli.get_target_type(self.name)
+        return self._device_type
 
-    # Not decorating with @lru_cache as self._product_info is already decorated.
     @property
     def manufacturer(self) -> str:
         """Returns the manufacturer of the device.
@@ -117,7 +115,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         """
         return self._product_info["manufacturer"]
 
-    # Not decorating with @lru_cache as self._product_info is already decorated.
     @property
     def model(self) -> str:
         """Returns the model of the device.
@@ -130,7 +127,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         """
         return self._product_info["model"]
 
-    # Not decorating with @lru_cache as self._product_info is already decorated.
     @property
     def product_name(self) -> str:
         """Returns the product name of the device.
@@ -144,7 +140,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         return self._product_info["name"]
 
     @property
-    @lru_cache
     def serial_number(self) -> str:
         """Returns the serial number of the device.
 
@@ -154,9 +149,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        get_device_info_resp = self._send_sl4f_command(
-            method=_SL4F_METHODS["GetDeviceInfo"])
-        return get_device_info_resp["result"]["serial_number"]
+        return self._serial_number
 
     # List all the dynamic properties in alphabetical order
     @property
@@ -296,6 +289,23 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
                 f"Failed to connect to '{self.name}' via SSH.")
         _LOGGER.info("%s is available via ssh.", self.name)
 
+    @property
+    @lru_cache
+    def _device_type(self) -> str:
+        """Returns the device type.
+
+        Returns:
+            Device type.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+
+        Note:
+            Created this method instead of directly calling this method's
+            implementation in `device_type` to address type hinting error.
+        """
+        return ffx_cli.get_target_type(self.name)
+
     def _get_device_ip_address(self, timeout: float):
         """Returns the device IP(V4|V6) address used for SSHing from host.
 
@@ -381,6 +391,25 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         output = subprocess.check_output(
             ssh_command.split(), timeout=timeout).decode()
         return output
+
+    @property
+    @lru_cache
+    def _serial_number(self) -> str:
+        """Returns the serial number of the device.
+
+        Returns:
+            Serial number of device.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+
+        Note:
+            Created this method instead of directly calling this method's
+            implementation in `device_type` to address type hinting error.
+        """
+        get_device_info_resp = self._send_sl4f_command(
+            method=_SL4F_METHODS["GetDeviceInfo"])
+        return get_device_info_resp["result"]["serial_number"]
 
     # pylint: disable=too-many-arguments
     def _send_sl4f_command(
