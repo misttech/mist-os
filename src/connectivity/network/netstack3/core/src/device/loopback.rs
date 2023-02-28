@@ -9,9 +9,9 @@ use core::{
     convert::Infallible as Never,
     fmt::{self, Debug, Display, Formatter},
 };
-use lock_order::{lock::LockFor, Locked};
 
 use derivative::Derivative;
+use lock_order::{lock::LockFor, relation::LockBefore, Locked};
 use net_types::{
     ip::{Ip as _, IpAddress, IpVersion, Ipv4, Ipv6},
     SpecifiedAddr,
@@ -27,7 +27,8 @@ use crate::{
             ReceiveQueueState, ReceiveQueueTypes,
         },
         state::IpLinkDeviceState,
-        with_loopback_state, Device, DeviceIdContext, DeviceLayerEventDispatcher, FrameDestination,
+        with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
+        DeviceLayerEventDispatcher, FrameDestination,
     },
     sync::{StrongRc, WeakRc},
     DeviceId, Instant, NonSyncContext, SyncCtx,
@@ -144,8 +145,9 @@ pub(super) fn send_ip_frame<
     NonSyncCtx: NonSyncContext,
     A: IpAddress,
     S: Serializer<Buffer = B>,
+    L: LockBefore<crate::lock_ordering::LoopbackRxQueue>,
 >(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx::Instant>,
     _local_addr: SpecifiedAddr<A>,
@@ -166,7 +168,7 @@ pub(super) fn send_ip_frame<
     // this decoupling of RX/TX paths, sending a packet while holding onto
     // the socket lock will result in a deadlock.
     match BufferReceiveQueueHandler::queue_rx_packet(
-        &mut sync_ctx,
+        sync_ctx,
         ctx,
         device_id,
         A::Version::VERSION,
@@ -183,13 +185,11 @@ pub(super) fn send_ip_frame<
 }
 
 /// Gets the MTU associated with this device.
-pub(super) fn get_mtu<NonSyncCtx: NonSyncContext>(
-    ctx: &SyncCtx<NonSyncCtx>,
+pub(super) fn get_mtu<NonSyncCtx: NonSyncContext, L>(
+    ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     device_id: &LoopbackDeviceId<NonSyncCtx::Instant>,
 ) -> Mtu {
-    with_loopback_state(&mut Locked::new(ctx), device_id, |mut state| {
-        state.cast_with(|s| &s.link.mtu).copied()
-    })
+    with_loopback_state(ctx, device_id, |mut state| state.cast_with(|s| &s.link.mtu).copied())
 }
 
 impl<C: NonSyncContext> ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<C::Instant>>
@@ -200,11 +200,13 @@ impl<C: NonSyncContext> ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDevic
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<C: NonSyncContext> ReceiveQueueTypes<LoopbackDevice, C> for &'_ SyncCtx<C> {
     type Meta = IpVersion;
     type Buffer = Buf<Vec<u8>>;
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C> {
     fn with_receive_queue_mut<
         O,
@@ -214,7 +216,39 @@ impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C
         device_id: &LoopbackDeviceId<C::Instant>,
         cb: F,
     ) -> O {
-        with_loopback_state(&mut Locked::new(self), device_id, |mut state| {
+        Locked::new(*self).with_receive_queue_mut(device_id, cb)
+    }
+
+    fn handle_packet(
+        &mut self,
+        ctx: &mut C,
+        device_id: &LoopbackDeviceId<C::Instant>,
+        meta: IpVersion,
+        buf: Buf<Vec<u8>>,
+    ) {
+        Locked::new(*self).handle_packet(ctx, device_id, meta, buf)
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
+    ReceiveQueueTypes<LoopbackDevice, C> for Locked<'_, SyncCtx<C>, L>
+{
+    type Meta = IpVersion;
+    type Buffer = Buf<Vec<u8>>;
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
+    ReceiveQueueContext<LoopbackDevice, C> for Locked<'_, SyncCtx<C>, L>
+{
+    fn with_receive_queue_mut<
+        O,
+        F: FnOnce(&mut ReceiveQueueState<Self::Meta, Self::Buffer>) -> O,
+    >(
+        &mut self,
+        device_id: &LoopbackDeviceId<C::Instant>,
+        cb: F,
+    ) -> O {
+        with_loopback_state(self, device_id, |mut state| {
             let mut x = state.lock::<crate::lock_ordering::LoopbackRxQueue>();
             cb(&mut x)
         })
@@ -227,16 +261,19 @@ impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C
         meta: IpVersion,
         buf: Buf<Vec<u8>>,
     ) {
+        // TODO(https://fxbug.dev/120973): Remove this and push the Locked
+        // wrapper through the receive path.
+        let sync_ctx = self.unwrap_lock_order_protection();
         match meta {
             IpVersion::V4 => crate::ip::receive_ip_packet::<_, _, Ipv4>(
-                self,
+                sync_ctx,
                 ctx,
                 &device_id.clone().into(),
                 FrameDestination::Unicast,
                 buf,
             ),
             IpVersion::V6 => crate::ip::receive_ip_packet::<_, _, Ipv6>(
-                self,
+                sync_ctx,
                 ctx,
                 &device_id.clone().into(),
                 FrameDestination::Unicast,
@@ -246,12 +283,16 @@ impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<C: NonSyncContext> ReceiveDequeContext<LoopbackDevice, C> for &'_ SyncCtx<C> {
-    type ReceiveQueueCtx = Self;
+    type ReceiveQueueCtx<'a> = Self;
 
     fn with_dequed_packets_and_rx_queue_ctx<
         O,
-        F: FnOnce(&mut ReceiveDequeueState<IpVersion, Buf<Vec<u8>>>, &mut Self::ReceiveQueueCtx) -> O,
+        F: FnOnce(
+            &mut ReceiveDequeueState<IpVersion, Buf<Vec<u8>>>,
+            &mut Self::ReceiveQueueCtx<'_>,
+        ) -> O,
     >(
         &mut self,
         device_id: &LoopbackDeviceId<C::Instant>,
@@ -260,6 +301,30 @@ impl<C: NonSyncContext> ReceiveDequeContext<LoopbackDevice, C> for &'_ SyncCtx<C
         with_loopback_state(&mut Locked::new(self), device_id, |mut state| {
             let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
             cb(&mut x, self)
+        })
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
+    ReceiveDequeContext<LoopbackDevice, C> for Locked<'_, SyncCtx<C>, L>
+{
+    type ReceiveQueueCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::LoopbackRxDequeue>;
+
+    fn with_dequed_packets_and_rx_queue_ctx<
+        O,
+        F: FnOnce(
+            &mut ReceiveDequeueState<IpVersion, Buf<Vec<u8>>>,
+            &mut Self::ReceiveQueueCtx<'_>,
+        ) -> O,
+    >(
+        &mut self,
+        device_id: &LoopbackDeviceId<C::Instant>,
+        cb: F,
+    ) -> O {
+        with_loopback_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+            let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
+            let mut locked = sync_ctx.cast_locked();
+            cb(&mut x, &mut locked)
         })
     }
 }

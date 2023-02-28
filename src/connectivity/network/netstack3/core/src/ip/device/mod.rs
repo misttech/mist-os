@@ -414,7 +414,7 @@ where
 
     /// Returns the ID of the loopback interface, if one exists on the system
     /// and is initialized.
-    fn loopback_id(&self) -> Option<Self::DeviceId>;
+    fn loopback_id(&mut self) -> Option<Self::DeviceId>;
 }
 
 /// The execution context for an IPv6 device.

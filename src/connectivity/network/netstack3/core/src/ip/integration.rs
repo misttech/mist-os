@@ -4,6 +4,7 @@
 
 //! The integrations for protocols built on top of IP.
 
+use lock_order::{relation::LockBefore, Locked};
 use net_types::{
     ip::{Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     MulticastAddr, SpecifiedAddr,
@@ -29,7 +30,19 @@ impl<C: NonSyncContext> FragmentStateContext<Ipv4, C::Instant> for &'_ SyncCtx<C
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.state.ipv4.inner.fragment_cache.lock())
+        FragmentStateContext::<Ipv4, _>::with_state_mut(&mut Locked::new(*self), cb)
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache<Ipv4>>>
+    FragmentStateContext<Ipv4, C::Instant> for Locked<'_, SyncCtx<C>, L>
+{
+    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv4, C::Instant>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let mut cache = self.lock::<crate::lock_ordering::IpStateFragmentCache<Ipv4>>();
+        cb(&mut cache)
     }
 }
 
@@ -38,19 +51,49 @@ impl<C: NonSyncContext> FragmentStateContext<Ipv6, C::Instant> for &'_ SyncCtx<C
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.state.ipv6.inner.fragment_cache.lock())
+        FragmentStateContext::<Ipv6, _>::with_state_mut(&mut Locked::new(*self), cb)
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache<Ipv6>>>
+    FragmentStateContext<Ipv6, C::Instant> for Locked<'_, SyncCtx<C>, L>
+{
+    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv6, C::Instant>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let mut cache = self.lock::<crate::lock_ordering::IpStateFragmentCache<Ipv6>>();
+        cb(&mut cache)
     }
 }
 
 impl<C: NonSyncContext> PmtuStateContext<Ipv4, C::Instant> for &'_ SyncCtx<C> {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, C::Instant>) -> O>(&mut self, cb: F) -> O {
-        cb(&mut self.state.ipv4.inner.pmtu_cache.lock())
+        PmtuStateContext::<Ipv4, _>::with_state_mut(&mut Locked::new(*self), cb)
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv4>>>
+    PmtuStateContext<Ipv4, C::Instant> for Locked<'_, SyncCtx<C>, L>
+{
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, C::Instant>) -> O>(&mut self, cb: F) -> O {
+        let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv4>>();
+        cb(&mut cache)
     }
 }
 
 impl<C: NonSyncContext> PmtuStateContext<Ipv6, C::Instant> for &'_ SyncCtx<C> {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, C::Instant>) -> O>(&mut self, cb: F) -> O {
-        cb(&mut self.state.ipv6.inner.pmtu_cache.lock())
+        PmtuStateContext::<Ipv6, _>::with_state_mut(&mut Locked::new(*self), cb)
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv6>>>
+    PmtuStateContext<Ipv6, C::Instant> for Locked<'_, SyncCtx<C>, L>
+{
+    fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, C::Instant>) -> O>(&mut self, cb: F) -> O {
+        let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv6>>();
+        cb(&mut cache)
     }
 }
 

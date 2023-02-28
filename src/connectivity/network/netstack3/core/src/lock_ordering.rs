@@ -14,6 +14,8 @@ pub(crate) enum Ipv4StateNextPacketId {}
 // This is not a real lock level, but it is useful for writing bounds that
 // require "before IPv4" or "before IPv6".
 pub(crate) struct IpState<I>(PhantomData<I>, Never);
+pub(crate) struct IpStatePmtuCache<I>(PhantomData<I>, Never);
+pub(crate) struct IpStateFragmentCache<I>(PhantomData<I>, Never);
 pub(crate) struct IpStateRoutingTable<I>(PhantomData<I>, Never);
 
 pub(crate) enum DeviceLayerStateOrigin {}
@@ -28,19 +30,33 @@ pub(crate) enum EthernetIpv6Nud {}
 pub(crate) enum LoopbackRxQueue {}
 pub(crate) enum LoopbackRxDequeue {}
 
-impl LockAfter<Unlocked> for LoopbackRxQueue {}
-impl_lock_after!(LoopbackRxQueue => LoopbackRxDequeue);
+impl LockAfter<Unlocked> for LoopbackRxDequeue {}
 
 impl_lock_after!(LoopbackRxDequeue => IpState<Ipv4>);
-impl_lock_after!(LoopbackRxDequeue => IpState<Ipv6>);
 
 impl_lock_after!(IpState<Ipv4> => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpState<Ipv6> => IpStateRoutingTable<Ipv6>);
-
+impl_lock_after!(IpState<Ipv4> => IpStatePmtuCache<Ipv4>);
+impl_lock_after!(IpState<Ipv6> => IpStatePmtuCache<Ipv6>);
+impl_lock_after!(IpState<Ipv4> => IpStateFragmentCache<Ipv4>);
+impl_lock_after!(IpState<Ipv6> => IpStateFragmentCache<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => EthernetIpv4Arp);
 impl_lock_after!(IpState<Ipv6> => EthernetIpv6Nud);
 
-impl LockAfter<Unlocked> for DeviceLayerState {}
+// Ideally we'd say `IpState<Ipv4> => SomeLowerLock` and then separately
+// `IpState<Ipv6> => SomeLowerLock`. The compiler doesn't like that because
+// it introduces duplicate blanket impls of `LockAfter<L> for SomeLowerLock`
+// that we need to get the transitivity of lock ordering. It's safe to linearize
+// IPv4 and IPv6 state access and it lets us continue getting transitivity, so
+// we do that here.
+impl_lock_after!(IpState<Ipv4> => IpState<Ipv6>);
+
+// The loopback data path operates at L3 so we can enqueue packets without going
+// through the device layer lock.
+impl_lock_after!(IpState<Ipv6> => LoopbackRxQueue);
+
+impl_lock_after!(IpState<Ipv6> => DeviceLayerState);
+
 impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
 // TODO(https://fxbug.dev/120973): Double-check that locking IPv4 ethernet state
 // before IPv6 is correct and won't interfere with dual-stack sockets.

@@ -337,6 +337,19 @@ impl<T, L> Locked<'_, T, L> {
         Locked(f(t), PhantomData)
     }
 
+    /// Restrict locking as if a lock was acquired.
+    ///
+    /// Like `lock_and` but doesn't actually acquire the lock `M`. This is
+    /// safe because any locks that could be acquired with the lock `M` held can
+    /// also be acquired without `M` being held.
+    pub fn cast_locked<M>(&mut self) -> Locked<'_, T, M>
+    where
+        L: LockBefore<M>,
+    {
+        let Self(t, _marker) = self;
+        Locked(t, PhantomData)
+    }
+
     /// Convenience function for accessing copyable state.
     ///
     /// This, combined with `cast` or `cast_with`, makes it easy to access
@@ -347,6 +360,19 @@ impl<T, L> Locked<'_, T, L> {
     {
         let Self(t, PhantomData) = self;
         **t
+    }
+
+    /// Escape hatch for retrieving &T to enable un-guarded locking.
+    ///
+    /// This allowes calling code to access the locking object directly. This
+    /// function should be used with care, since it allows callers to violate
+    /// the lock ordering guarantees of `Locked` and potentially introduce
+    /// deadlocks!
+    pub fn unwrap_lock_order_protection(&self) -> &T {
+        // TODO(https://fxbug.dev/121205): Remove this dangerous escape hatch
+        // when it is no longer used.
+        let Self(t, _marker) = self;
+        *t
     }
 }
 

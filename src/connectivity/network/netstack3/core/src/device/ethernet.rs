@@ -8,13 +8,14 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, num::NonZeroU32};
 use lock_order::{
     lock::{LockFor, RwLockFor, UnlockedAccess},
+    relation::LockBefore,
     Locked,
 };
 
 use log::trace;
 use net_types::{
     ethernet::Mac,
-    ip::{IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     BroadcastAddress, MulticastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, UnicastAddress,
     Witness,
 };
@@ -117,6 +118,7 @@ pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncConte
     ) -> O;
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
     for &'_ SyncCtx<NonSyncCtx>
 {
@@ -125,7 +127,43 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(&mut Locked::new(self), device_id, |state| {
+        Locked::new(*self).with_static_ethernet_device_state(device_id, cb)
+    }
+
+    fn with_ethernet_device_state<
+        O,
+        F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+        cb: F,
+    ) -> O {
+        Locked::new(*self).with_ethernet_device_state(device_id, cb)
+    }
+
+    fn with_ethernet_device_state_mut<
+        O,
+        F: FnOnce(&StaticEthernetDeviceState, &mut DynamicEthernetDeviceState) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+        cb: F,
+    ) -> O {
+        Locked::new(*self).with_ethernet_device_state_mut(device_id, cb)
+    }
+}
+
+impl<
+        NonSyncCtx: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
+    > EthernetIpLinkDeviceContext<NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+{
+    fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
+        &mut self,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+        cb: F,
+    ) -> O {
+        with_ethernet_state(self, device_id, |state| {
             cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>())
         })
     }
@@ -138,7 +176,7 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+        with_ethernet_state(self, device_id, |mut state| {
             let (dynamic_state, locked) =
                 state.read_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
             cb(
@@ -156,7 +194,7 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+        with_ethernet_state(self, device_id, |mut state| {
             let (mut dynamic_state, locked) =
                 state.write_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
             cb(
@@ -191,6 +229,7 @@ impl<
 {
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx>
     for &'_ SyncCtx<NonSyncCtx>
 {
@@ -198,7 +237,40 @@ impl<NonSyncCtx: NonSyncContext> NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx
         &mut self,
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
     ) -> NonZeroDuration {
-        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+        NudContext::<Ipv6, _, _>::retrans_timer(&mut Locked::new(*self), device_id)
+    }
+
+    fn with_nud_state_mut<O, F: FnOnce(&mut NudState<Ipv6, Mac>) -> O>(
+        &mut self,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+        cb: F,
+    ) -> O {
+        NudContext::<Ipv6, _, _>::with_nud_state_mut(&mut Locked::new(*self), device_id, cb)
+    }
+
+    fn send_neighbor_solicitation(
+        &mut self,
+        ctx: &mut NonSyncCtx,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+        lookup_addr: SpecifiedAddr<Ipv6Addr>,
+    ) {
+        NudContext::<Ipv6, _, _>::send_neighbor_solicitation(
+            &mut Locked::new(*self),
+            ctx,
+            device_id,
+            lookup_addr,
+        )
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+    NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+{
+    fn retrans_timer(
+        &mut self,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+    ) -> NonZeroDuration {
+        with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
             let ipv6 = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>();
             ipv6.retrans_timer
@@ -210,7 +282,7 @@ impl<NonSyncCtx: NonSyncContext> NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+        with_ethernet_state(self, device_id, |mut state| {
             let mut nud = state.lock::<crate::lock_ordering::EthernetIpv6Nud>();
             cb(&mut nud)
         })
@@ -276,8 +348,33 @@ fn send_ip_frame_to_dst<
         .map_err(|ser| ser.into_inner())
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
     BufferNudContext<B, Ipv6, EthernetLinkDevice, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx>
+{
+    fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut NonSyncCtx,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+        dst_mac: Mac,
+        body: S,
+    ) -> Result<(), S> {
+        BufferNudContext::<_, Ipv6, _, _>::send_ip_packet_to_neighbor_link_addr(
+            &mut Locked::new(*self),
+            ctx,
+            device_id,
+            dst_mac,
+            body,
+        )
+    }
+}
+
+impl<
+        B: BufferMut,
+        NonSyncCtx: BufferNonSyncContext<B>,
+        L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
+    > BufferNudContext<B, Ipv6, EthernetLinkDevice, NonSyncCtx>
+    for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,
@@ -579,8 +676,7 @@ pub(super) fn send_ip_frame<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceContext<C>
         + SendFrameContext<C, B, <SC as DeviceIdContext<EthernetLinkDevice>>::DeviceId>
-        + BufferNudHandler<B, Ipv4, EthernetLinkDevice, C>
-        + BufferNudHandler<B, Ipv6, EthernetLinkDevice, C>,
+        + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>,
     A: IpAddress,
     S: Serializer<Buffer = B>,
 >(
@@ -609,18 +705,9 @@ where
             A::Version::ETHER_TYPE,
         )
     } else {
-        match local_addr.into() {
-            IpAddr::V4(local_addr) => {
-                BufferNudHandler::<_, Ipv4, _, _>::send_ip_packet_to_neighbor(
-                    sync_ctx, ctx, device_id, local_addr, body,
-                )
-            }
-            IpAddr::V6(local_addr) => {
-                BufferNudHandler::<_, Ipv6, _, _>::send_ip_packet_to_neighbor(
-                    sync_ctx, ctx, device_id, local_addr, body,
-                )
-            }
-        }
+        BufferNudHandler::<_, A::Version, _, _>::send_ip_packet_to_neighbor(
+            sync_ctx, ctx, device_id, local_addr, body,
+        )
     }
     .map_err(Nested::into_inner)
 }
@@ -889,13 +976,42 @@ impl<
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<C: NonSyncContext> ArpContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
+    fn get_protocol_addr(
+        &mut self,
+        ctx: &mut C,
+        device_id: &EthernetDeviceId<C::Instant>,
+    ) -> Option<Ipv4Addr> {
+        Locked::new(*self).get_protocol_addr(ctx, device_id)
+    }
+
+    fn get_hardware_addr(
+        &mut self,
+        ctx: &mut C,
+        device_id: &EthernetDeviceId<C::Instant>,
+    ) -> UnicastAddr<Mac> {
+        Locked::new(*self).get_hardware_addr(ctx, device_id)
+    }
+
+    fn with_arp_state_mut<O, F: FnOnce(&mut ArpState<EthernetLinkDevice>) -> O>(
+        &mut self,
+        device_id: &EthernetDeviceId<C::Instant>,
+        cb: F,
+    ) -> O {
+        Locked::new(*self).with_arp_state_mut(device_id, cb)
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    ArpContext<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+{
     fn get_protocol_addr(
         &mut self,
         _ctx: &mut C,
         device_id: &EthernetDeviceId<C::Instant>,
     ) -> Option<Ipv4Addr> {
-        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+        with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
             let ipv4 = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
             let ret = ipv4.ip_state.iter_addrs().next().cloned().map(|addr| addr.addr().get());
@@ -916,15 +1032,39 @@ impl<C: NonSyncContext> ArpContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
         device_id: &EthernetDeviceId<C::Instant>,
         cb: F,
     ) -> O {
-        with_ethernet_state(&mut Locked::new(self), device_id, |mut state| {
+        with_ethernet_state(self, device_id, |mut state| {
             let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
             cb(&mut arp)
         })
     }
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<B: BufferMut, C: BufferNonSyncContext<B>> BufferArpContext<EthernetLinkDevice, C, B>
     for &'_ SyncCtx<C>
+{
+    fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+        &mut self,
+        ctx: &mut C,
+        device_id: &EthernetDeviceId<C::Instant>,
+        dst_mac: Mac,
+        body: S,
+    ) -> Result<(), S> {
+        BufferArpContext::send_ip_packet_to_neighbor_link_addr(
+            &mut Locked::new(*self),
+            ctx,
+            device_id,
+            dst_mac,
+            body,
+        )
+    }
+}
+
+impl<
+        B: BufferMut,
+        C: BufferNonSyncContext<B>,
+        L: LockBefore<crate::lock_ordering::IpState<Ipv4>>,
+    > BufferArpContext<EthernetLinkDevice, C, B> for Locked<'_, SyncCtx<C>, L>
 {
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,
@@ -986,7 +1126,7 @@ mod tests {
     use alloc::{collections::hash_map::HashMap, vec, vec::Vec};
 
     use ip_test_macro::ip_test;
-    use net_types::ip::{AddrSubnet, Ip, IpVersion};
+    use net_types::ip::{AddrSubnet, Ip, IpAddr, IpVersion};
     use packet::Buf;
     use packet_formats::{
         icmp::IcmpDestUnreachable,

@@ -26,13 +26,14 @@ use core::{
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
-
-use derivative::Derivative;
 use lock_order::{
-    lock::{RwLockFor, UnlockedAccess},
+    lock::{LockFor, RwLockFor},
     relation::LockBefore,
     Locked,
 };
+
+use derivative::Derivative;
+use lock_order::lock::UnlockedAccess;
 use log::{debug, trace};
 use net_types::{
     ip::{
@@ -76,7 +77,7 @@ use crate::{
             IpSockUnroutableError, IpSocketContext, IpSocketHandler,
         },
     },
-    sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
@@ -1245,6 +1246,38 @@ impl<I: Instant, StrongDeviceId: StrongIpDeviceId> AsRef<IpStateInner<Ipv6, I, S
 {
     fn as_ref(&self) -> &IpStateInner<Ipv6, I, StrongDeviceId> {
         &self.inner
+    }
+}
+
+impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStateFragmentCache<Ipv4>> for SyncCtx<C> {
+    type Data<'l> = LockGuard<'l, IpPacketFragmentCache<Ipv4, C::Instant>> where Self: 'l;
+
+    fn lock(&self) -> Self::Data<'_> {
+        self.state.ipv4.inner.fragment_cache.lock()
+    }
+}
+
+impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStateFragmentCache<Ipv6>> for SyncCtx<C> {
+    type Data<'l> = LockGuard<'l, IpPacketFragmentCache<Ipv6, C::Instant>> where Self: 'l;
+
+    fn lock(&self) -> Self::Data<'_> {
+        self.state.ipv6.inner.fragment_cache.lock()
+    }
+}
+
+impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStatePmtuCache<Ipv4>> for SyncCtx<C> {
+    type Data<'l> = LockGuard<'l, PmtuCache<Ipv4, C::Instant>> where Self: 'l;
+
+    fn lock(&self) -> Self::Data<'_> {
+        self.state.ipv4.inner.pmtu_cache.lock()
+    }
+}
+
+impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStatePmtuCache<Ipv6>> for SyncCtx<C> {
+    type Data<'l> = LockGuard<'l, PmtuCache<Ipv6, C::Instant>> where Self: 'l;
+
+    fn lock(&self) -> Self::Data<'_> {
+        self.state.ipv6.inner.pmtu_cache.lock()
     }
 }
 
