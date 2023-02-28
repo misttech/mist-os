@@ -9,9 +9,9 @@
 #include <fidl/fuchsia.hardware.pci/cpp/wire_types.h>
 #include <fuchsia/hardware/pci/c/banjo.h>
 #include <fuchsia/hardware/pci/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/inspector.h>
-#include <lib/svc/outgoing.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <sys/types.h>
@@ -476,7 +476,7 @@ class FidlDevice : public FidlDeviceType, public fidl::WireServer<fuchsia_hardwa
                                GetExtendedCapabilitiesCompleter::Sync& completer) override;
   void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override;
   pci::Device* device() { return device_; }
-  svc::Outgoing& outgoing_dir() { return outgoing_dir_; }
+  component::OutgoingDirectory& outgoing_dir() { return outgoing_dir_; }
 
   void DdkRelease() { delete this; }
   void DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
@@ -487,7 +487,8 @@ class FidlDevice : public FidlDeviceType, public fidl::WireServer<fuchsia_hardwa
         device_(device),
         outgoing_dir_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
   pci::Device* device_;
-  svc::Outgoing outgoing_dir_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pci::Device> bindings_;
+  component::OutgoingDirectory outgoing_dir_;
 };
 
 }  // namespace pci

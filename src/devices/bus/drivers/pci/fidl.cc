@@ -63,30 +63,29 @@ zx_device_prop_t pci_device_props[] = {
       fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
   };
 
-  fidl_dev->outgoing_dir().svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-      fbl::MakeRefCounted<fs::Service>(
-          [device = fidl_dev.get()](fidl::ServerEnd<fuchsia_hardware_pci::Device> request) mutable {
-            fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request),
-                             device);
-            zxlogf(TRACE, "[%s] received FIDL connection", device->device()->config()->addr());
-            return ZX_OK;
-          }));
+  zx::result result = fidl_dev->outgoing_dir().AddUnmanagedProtocol<fuchsia_hardware_pci::Device>(
+      fidl_dev->bindings_.CreateHandler(fidl_dev.get(),
+                                        fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                        fidl::kIgnoreBindingClosure));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service the outgoing directory");
+    return result.take_error();
+  }
 
-  zx_status_t status = fidl_dev->outgoing_dir().Serve(std::move(endpoints->server));
-  if (status != ZX_OK) {
+  result = fidl_dev->outgoing_dir().Serve(std::move(endpoints->server));
+  if (result.is_error()) {
     zxlogf(ERROR, "Failed to service the outgoing directory");
-    return zx::error(status);
+    return result.take_error();
   }
 
   // Create an isolated devhost to load the proxy pci driver containing the PciProxy
   // instance which will talk to this device.
   const auto name = std::string(device->config()->addr()) + "_";
-  status = fidl_dev->DdkAdd(ddk::DeviceAddArgs(name.c_str())
-                                .set_props(pci_device_props)
-                                .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                                .set_outgoing_dir(endpoints->client.TakeChannel())
-                                .set_fidl_protocol_offers(offers));
+  zx_status_t status = fidl_dev->DdkAdd(ddk::DeviceAddArgs(name.c_str())
+                                            .set_props(pci_device_props)
+                                            .set_flags(DEVICE_ADD_MUST_ISOLATE)
+                                            .set_outgoing_dir(endpoints->client.TakeChannel())
+                                            .set_fidl_protocol_offers(offers));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to create pci fidl fragment %s: %s", device->config()->addr(),
            zx_status_get_string(status));
