@@ -598,6 +598,10 @@ build_api_module("images") {
 
     # Images who are pulled as part of host interaction tests.
     ":host",
+
+    # There are standalone images outside of the main assembly dependency graph
+    # which may be specified as data dependencies of select tests.
+    ":tests",
   ]
 }
 
