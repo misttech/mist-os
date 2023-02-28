@@ -102,6 +102,7 @@ fuchsia_driver("pci_protocol_test_driver-driver") {
     "//sdk/fidl/fuchsia.device.test:fuchsia.device.test_cpp_wire",
     "//src/devices/bus/drivers/pci:user_pci",
     "//src/devices/lib/driver",
+    "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/zxtest",

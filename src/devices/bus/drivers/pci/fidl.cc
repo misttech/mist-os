@@ -257,7 +257,10 @@ void FidlDevice::SetBusMastering(SetBusMasteringRequestView request,
   RETURN_DEBUG(status, "");
 }
 
-void FidlDevice::ResetDevice(ResetDeviceCompleter::Sync& completer) { completer.ReplySuccess(); }
+void FidlDevice::ResetDevice(ResetDeviceCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  RETURN_DEBUG(ZX_ERR_NOT_SUPPORTED, "");
+}
 
 void FidlDevice::AckInterrupt(AckInterruptCompleter::Sync& completer) {
   fbl::AutoLock dev_lock(device_->dev_lock());

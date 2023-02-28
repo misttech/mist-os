@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.device.test/cpp/wire.h>
 #include <fuchsia/hardware/pci/cpp/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/device-protocol/pci.h>
 
 #include <ddktl/device.h>
 #include <pretty/hexdump.h>
@@ -47,7 +48,7 @@ class ProtocolTestDriver : public ProtocolTestDriverType, public TestObserver {
   }
 
   static ProtocolTestDriver* GetInstance() { return instance_; }
-  const ddk::PciProtocolClient& pci() { return pci_; }
+  const ddk::Pci& pci() { return pci_; }
 
   void RunTests(RunTestsCompleter::Sync& completer) override;
   void DdkRelease() { delete this; }
@@ -56,7 +57,7 @@ class ProtocolTestDriver : public ProtocolTestDriverType, public TestObserver {
   explicit ProtocolTestDriver(zx_device_t* parent) : ProtocolTestDriverType(parent), pci_(parent) {}
 
   static ProtocolTestDriver* instance_;
-  ddk::PciProtocolClient pci_;
+  ddk::Pci pci_;
 };
 
 #endif  // SRC_DEVICES_BUS_DRIVERS_PCI_TEST_DRIVER_PROTOCOL_TEST_DRIVER_H_

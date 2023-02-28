@@ -168,6 +168,10 @@ zx_status_t Pci::ReadConfig8(uint16_t offset, uint8_t* out_value) const {
   return ZX_OK;
 }
 
+zx_status_t Pci::ReadConfig8(fpci::Config offset, uint8_t* out_value) const {
+  return ReadConfig8(static_cast<uint16_t>(offset), out_value);
+}
+
 zx_status_t Pci::ReadConfig16(uint16_t offset, uint16_t* out_value) const {
   auto result = client_->ReadConfig16(offset);
   if (!result.ok()) {
@@ -180,6 +184,10 @@ zx_status_t Pci::ReadConfig16(uint16_t offset, uint16_t* out_value) const {
   return ZX_OK;
 }
 
+zx_status_t Pci::ReadConfig16(fpci::Config offset, uint16_t* out_value) const {
+  return ReadConfig16(static_cast<uint16_t>(offset), out_value);
+}
+
 zx_status_t Pci::ReadConfig32(uint16_t offset, uint32_t* out_value) const {
   auto result = client_->ReadConfig32(offset);
   if (!result.ok()) {
@@ -190,6 +198,10 @@ zx_status_t Pci::ReadConfig32(uint16_t offset, uint32_t* out_value) const {
   }
   *out_value = result->value()->value;
   return ZX_OK;
+}
+
+zx_status_t Pci::ReadConfig32(fpci::Config offset, uint32_t* out_value) const {
+  return ReadConfig32(static_cast<uint16_t>(offset), out_value);
 }
 
 zx_status_t Pci::WriteConfig8(uint16_t offset, uint8_t value) const {

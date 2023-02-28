@@ -95,8 +95,11 @@ class Pci {
   zx_status_t SetInterruptMode(fuchsia_hardware_pci::InterruptMode mode,
                                uint32_t requested_irq_count) const;
   zx_status_t ReadConfig8(uint16_t offset, uint8_t* out_value) const;
+  zx_status_t ReadConfig8(fuchsia_hardware_pci::Config offset, uint8_t* out_value) const;
   zx_status_t ReadConfig16(uint16_t offset, uint16_t* out_value) const;
+  zx_status_t ReadConfig16(fuchsia_hardware_pci::Config offset, uint16_t* out_value) const;
   zx_status_t ReadConfig32(uint16_t offset, uint32_t* out_value) const;
+  zx_status_t ReadConfig32(fuchsia_hardware_pci::Config offset, uint32_t* out_value) const;
   zx_status_t WriteConfig8(uint16_t offset, uint8_t value) const;
   zx_status_t WriteConfig16(uint16_t offset, uint16_t value) const;
   zx_status_t WriteConfig32(uint16_t offset, uint32_t value) const;
