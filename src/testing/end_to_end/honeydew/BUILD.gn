@@ -21,6 +21,8 @@ python_library("honeydew") {
     "interfaces/device_classes/__init__.py",
     "interfaces/device_classes/component_capable_device.py",
     "interfaces/device_classes/fuchsia_device.py",
+    "mobly_controller/__init__.py",
+    "mobly_controller/fuchsia_device.py",
     "utils/__init__.py",
     "utils/ffx_cli.py",
     "utils/host_utils.py",
