@@ -16,11 +16,15 @@ pub(crate) struct Counter {
     // Stores the exponential moving average of the time between two frames, using the above
     // `ALPHA` as the weight.
     avg_time_delta_ns: f32,
+
+    // Total number of frames
+    num_frames: i64,
 }
 
 pub(crate) struct Counts {
     pub sample_rate_hz: f32,
     pub sample_time_delta_ms: f32,
+    pub num_frames: i64,
 }
 
 impl Counter {
@@ -28,6 +32,7 @@ impl Counter {
         Counter {
             last_sample_timestamp: zx::Time::get_monotonic(),
             avg_time_delta_ns: 0.0,
+            num_frames: 0,
         }
     }
 
@@ -40,12 +45,15 @@ impl Counter {
         // This is arithmetically equivalent to:
         // ALPHA * delta + (1 - ALPHA) * self.avg_time_delta_ns
         self.avg_time_delta_ns += ALPHA * (delta - self.avg_time_delta_ns);
+
+        self.num_frames += 1;
     }
 
     pub fn stats(&self) -> Counts {
         Counts {
             sample_rate_hz: 1000000000f32 / self.avg_time_delta_ns,
             sample_time_delta_ms: self.avg_time_delta_ns / 1000000f32,
+            num_frames: self.num_frames,
         }
     }
 }

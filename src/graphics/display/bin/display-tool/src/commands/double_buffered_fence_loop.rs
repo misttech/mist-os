@@ -12,6 +12,7 @@ use {
         Controller, DisplayConfig, DisplayInfo, Image, ImageId, ImageParameters, Layer,
         LayerConfig, PixelFormat,
     },
+    fuchsia_trace::duration,
     std::{borrow::Borrow, cmp::min, io::Write},
 };
 
@@ -137,29 +138,41 @@ pub async fn run(controller: &Controller, display: &DisplayInfo) -> Result<()> {
         current_config ^= 1;
         let next_image = &images[current_config];
 
-        // Draw the next frame.
-        next_image.zero().context("failed to clear background")?;
-        for s in &mut squares {
-            next_image.fill_region(&s.color, &s.frame).context("failed to draw bouncing square")?;
-            s.update(width, height);
-        }
-        next_image.cache_clean()?;
+        {
+            duration!("gfx", "frame", "id" => stats.num_frames);
 
-        // Request the swap.
-        controller
-            .apply_config(&[DisplayConfig {
-                id: display.id(),
-                layers: vec![Layer {
-                    id: layer,
-                    config: LayerConfig::Primary {
-                        image_id: images[current_config].id(),
-                        image_config: params.borrow().into(),
-                        unblock_event: None,
-                        retirement_event: Some(retirement_events[current_config].id()),
-                    },
-                }],
-            }])
-            .await?;
+            // Draw the next frame.
+            {
+                duration!("gfx", "draw frame");
+                next_image.zero().context("failed to clear background")?;
+                for s in &mut squares {
+                    next_image
+                        .fill_region(&s.color, &s.frame)
+                        .context("failed to draw bouncing square")?;
+                    s.update(width, height);
+                }
+                next_image.cache_clean()?;
+            }
+
+            // Request the swap.
+            {
+                duration!("gfx", "apply config");
+                controller
+                    .apply_config(&[DisplayConfig {
+                        id: display.id(),
+                        layers: vec![Layer {
+                            id: layer,
+                            config: LayerConfig::Primary {
+                                image_id: images[current_config].id(),
+                                image_config: params.borrow().into(),
+                                unblock_event: None,
+                                retirement_event: Some(retirement_events[current_config].id()),
+                            },
+                        }],
+                    }])
+                    .await?;
+            }
+        }
 
         // Wait for the previous frame image to retire before drawing on it.
         retirement.wait().await?;

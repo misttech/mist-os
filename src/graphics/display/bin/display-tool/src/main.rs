@@ -6,7 +6,7 @@ use {
     anyhow::Error,
     argh::FromArgs,
     display_utils::Controller,
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, fuchsia_trace_provider,
     futures::{
         future::{FutureExt, TryFutureExt},
         select,
@@ -65,6 +65,8 @@ enum SubCommands {
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+
     let args: Args = argh::from_env();
     let controller = Controller::init().await?;
 
