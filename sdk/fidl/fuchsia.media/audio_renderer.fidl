@@ -166,6 +166,12 @@ protocol AudioRenderer {
     /// Then the packet is late, and some (or all) of the packet's payload will
     /// need to be skipped in order to present the packet at the scheduled time.
     ///
+    /// The value `min_lead_time_nsec = 0` is a special value which indicates
+    /// that the AudioRenderer is not yet routed to an output device. If `Play`
+    /// is called before the AudioRenderer is routed, any played packets will be
+    /// dropped. Clients should wait until `min_lead_time_nsec > 0` before
+    /// calling `Play`.
+    ///
     // TODO(mpuryear): What should the units be here?  Options include...
     //
     // 1. Normalized to nanoseconds (this is the current API)
