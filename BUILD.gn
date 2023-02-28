@@ -598,12 +598,6 @@ build_api_module("images") {
 
     # Images who are pulled as part of host interaction tests.
     ":host",
-
-    # There are standalone images outside of the main assembly dependency graph
-    # which may be externally specified.
-    ":developer_base_packages",
-    ":developer_cache_packages",
-    ":developer_universe_packages",
   ]
 }
 
@@ -1352,7 +1346,6 @@ group("developer_base_driver_packages") {
 group("developer_base_packages") {
   testonly = base_cache_packages_testonly
   visibility = [
-    ":images",
     ":tests",
     "//build/images/*",
   ]
@@ -1365,7 +1358,6 @@ group("developer_base_packages") {
 group("developer_cache_packages") {
   testonly = base_cache_packages_testonly
   visibility = [
-    ":images",
     ":tests",
     "//build/images/*",
   ]
@@ -1376,7 +1368,6 @@ group("developer_cache_packages") {
 group("developer_universe_packages") {
   testonly = fuchsia_zbi_testonly
   visibility = [
-    ":images",
     ":tests",
     "//build/images/*",
   ]
