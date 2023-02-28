@@ -195,6 +195,9 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   // Helper function to test for collision with vdso_code_mapping_.
   bool IntersectsVdsoCodeLocked(vaddr_t base, size_t size) const TA_REQ(lock_);
 
+  // Returns whether this aspace is currently set to be a high memory priority.
+  bool IsHighMemoryPriority() const;
+
  protected:
   // Share the aspace lock with VmAddressRegion/VmMapping so they can serialize
   // changes to the aspace.
@@ -243,11 +246,15 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
 
   static AslrConfig CreateAslrConfig(Type type);
 
-  // Returns whether this aspace is marked as latency sensitive.
-  bool IsLatencySensitive() const;
-
+  // TODO(fxbug.dev/101641): Once priorities are applied via profiles this method can be removed.
   // Sets this aspace as being latency sensitive. This cannot be undone.
   void MarkAsLatencySensitive();
+
+  // Increments or decrements the priority count of this aspace. The high priority count is used to
+  // control active page table reclamation, and applies to the whole aspace. The count is never
+  // allowed to go negative and so callers must only subtract what they have already added. Further,
+  // callers are required to remove any additions before the aspace is destroyed.
+  void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
   // Returns whether this aspace is a guest physical address space.
   // TODO(fxbug.dev/103417): Rationalize usage of `is_user` and `is_guest_physical`.
@@ -276,13 +283,10 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   char name_[32] TA_GUARDED(lock_);
   bool aspace_destroyed_ TA_GUARDED(lock_) = false;
 
-  // TODO(fxb/101641): This is a temporary solution and needs to be replaced with something that is
-  // formalized.
-  // Indicates whether or not this aspace is considered a latency sensitive object. For an aspace,
-  // being latency sensitive means it will not perform page table reclamation, and will also pass
-  // on this tag to any VMOs that get mapped into it. This is an atomic so that it can be safely
-  // read outside the lock, however writes should occur inside the lock.
-  ktl::atomic<bool> is_latency_sensitive_ = false;
+  // The high priority count is used to determine whether this aspace should perform page table
+  // reclamation, with any non-zero count completely disabling reclamation. This is an atomic so
+  // that it can be safely read outside the lock, however writes should occur inside the lock.
+  ktl::atomic<int64_t> high_priority_count_ = 0;
 
   mutable DECLARE_CRITICAL_MUTEX(VmAspace) lock_;
 

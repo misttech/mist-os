@@ -57,8 +57,7 @@
 
 namespace {
 
-KCOUNTER(vm_vmo_marked_latency_sensitive, "vm.vmo.latency_sensitive.marked")
-KCOUNTER(vm_vmo_latency_sensitive_destroyed, "vm.vmo.latency_sensitive.destroyed")
+KCOUNTER(vm_vmo_high_priority, "vm.vmo.high_priority")
 
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
@@ -329,6 +328,9 @@ void VmCowPages::fbl_recycle() {
   // dropped, but that is always done without holding the lock.
   {  // scope guard
     Guard<CriticalMutex> guard{lock()};
+    // At the point of destruction we should no longer have any mappings or children still
+    // referencing us, and by extension our priority count must therefore be back to zero.
+    DEBUG_ASSERT(high_priority_count_ == 0);
     VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
     // If we're not a hidden vmo, then we need to remove ourself from our parent. This needs
     // to be done before emptying the page list so that a hidden parent can't merge into this
@@ -398,11 +400,6 @@ void VmCowPages::fbl_recycle() {
     if (page_source_) {
       page_source_->Close();
     }
-
-    // Update counters
-    if (is_latency_sensitive_) {
-      vm_vmo_latency_sensitive_destroyed.Add(1);
-    }
   }  // ~guard
 
   // Release the ref that VmCowPages keeps on VmCowPagesContainer.
@@ -427,9 +424,8 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 
   Guard<CriticalMutex> guard{lock()};
 
-  // TODO(fxb/101641): Formalize this.
-  // Forbid zero page deduping if this is latency sensitive.
-  if (is_latency_sensitive_) {
+  // Forbid zero page deduping if this is high priority.
+  if (high_priority_count_ != 0) {
     return false;
   }
 
@@ -572,6 +568,12 @@ void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t roo
 
   child->page_list_.InitializeSkew(page_list_.GetSkew(), offset);
 
+  // If the child has a non-zero high priority count, then it is counting as an incoming edge to our
+  // count.
+  if (child->high_priority_count_ > 0) {
+    ChangeSingleHighPriorityCountLocked(1);
+  }
+
   child->parent_ = fbl::RefPtr(this);
   children_list_.push_front(child);
   children_list_len_++;
@@ -645,6 +647,8 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
   children_list_len_ = 0;
   child->eviction_event_count_ = eviction_event_count_;
   child->page_attribution_user_id_ = page_attribution_user_id_;
+  child->high_priority_count_ = high_priority_count_;
+  high_priority_count_ = 0;
   AddChildLocked(child.get(), 0, root_parent_offset_, size_);
 
   // Time to change the VmCowPages that our paged_ref_ is pointing to.
@@ -876,6 +880,24 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
       }
     }
   }
+
+  // We can have a priority count of at most 1, and only if the remaining child is the one
+  // contributing to it.
+  DEBUG_ASSERT(high_priority_count_ == 0 ||
+               (high_priority_count_ == 1 && child->high_priority_count_ > 0));
+  // Similarly if we have a priority count, and we have a parent, then our parent must have a
+  // non-zero count.
+  if (parent_) {
+    AssertHeld(parent_->lock_ref());
+    DEBUG_ASSERT(high_priority_count_ == 0 || parent_->high_priority_count_ != 0);
+  }
+  // If our child has a non-zero count, then it is propagating a +1 count to us, and we in turn are
+  // propagating a +1 count to our parent. In the final arrangement after ReplaceChildLocked then
+  // the +1 count child was giving to us needs to go to parent, but as we were already giving a +1
+  // count to parent, everything is correct.
+  // Although the final hierarchy has correct counts, there is still an assertion in our destructor
+  // that our count is zero, so subtract of any count that we might have.
+  ChangeSingleHighPriorityCountLocked(-high_priority_count_);
 
   // Drop the child from our list, but don't recurse back into this function. Then
   // remove ourselves from the clone tree.
@@ -3733,13 +3755,31 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
   }
 }
 
-void VmCowPages::MarkAsLatencySensitiveLocked() {
-  // Mark this and all our parents as latency sensitive if they haven't already been.
+int64_t VmCowPages::ChangeSingleHighPriorityCountLocked(int64_t delta) {
+  const bool was_zero = high_priority_count_ == 0;
+  high_priority_count_ += delta;
+  DEBUG_ASSERT(high_priority_count_ >= 0);
+  const bool is_zero = high_priority_count_ == 0;
+  // Any change to or from zero means we need to add or remove a count from our parent (if we have
+  // one).
+  if (is_zero && !was_zero) {
+    delta = -1;
+  } else if (was_zero && !is_zero) {
+    delta = 1;
+  } else {
+    delta = 0;
+  }
+  vm_vmo_high_priority.Add(delta);
+  return delta;
+}
+
+void VmCowPages::ChangeHighPriorityCountLocked(int64_t delta) {
   VmCowPages* cur = this;
   AssertHeld(cur->lock_ref());
-  while (cur && !cur->is_latency_sensitive_) {
-    vm_vmo_marked_latency_sensitive.Add(1);
-    cur->is_latency_sensitive_ = true;
+  // Any change to or from zero requires updating a count in the parent, so we need to walk up the
+  // parent chain as long as a transition is happening.
+  while (cur && delta != 0) {
+    delta = cur->ChangeSingleHighPriorityCountLocked(delta);
     cur = cur->parent_.get();
   }
 }
@@ -5708,6 +5748,13 @@ bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintActio
     return false;
   }
 
+  if (high_priority_count_ != 0) {
+    // Not allowed to reclaim. To avoid this page remaining in a reclamation list we simulate an
+    // access.
+    UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+    return false;
+  }
+
   // See if we can reclaim by eviction.
   if (can_evict()) {
     return RemovePageForEvictionLocked(page, offset, hint_action);
@@ -6397,6 +6444,12 @@ vm_page_t* VmCowPages::DebugGetPageLocked(uint64_t offset) const {
 uint64_t VmCowPages::DebugGetSupplyZeroOffset() const {
   Guard<CriticalMutex> guard{lock()};
   return supply_zero_offset_;
+}
+
+bool VmCowPages::DebugIsHighMemoryPriority() const {
+  Guard<CriticalMutex> guard{lock()};
+  DEBUG_ASSERT(high_priority_count_ >= 0);
+  return high_priority_count_ != 0;
 }
 
 VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() const {

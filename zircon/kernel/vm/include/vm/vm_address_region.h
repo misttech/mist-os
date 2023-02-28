@@ -142,6 +142,15 @@ class VmAddressRegionOrMapping
     return base >= base_ && offset < size_ && size_ - offset >= size;
   }
 
+  // Memory priorities that can be applied to VMARs and mappings to propagate to VMOs and page
+  // tables.
+  enum class MemoryPriority : bool {
+    // Default overcommit priority where reclamation is allowed.
+    DEFAULT,
+    // High priority prevents all reclamation.
+    HIGH,
+  };
+
  private:
   fbl::Canary<fbl::magic("VMRM")> canary_;
   const bool is_mapping_;
@@ -205,6 +214,10 @@ class VmAddressRegionOrMapping
 
   virtual AttributionCounts AllocatedPagesLocked() const TA_REQ(lock()) = 0;
 
+  // Applies the given memory priority to this VMAR, which may or may not result in a change. Up to
+  // the derived type to know how to apply and update the |memory_priority_| field.
+  virtual zx_status_t SetMemoryPriorityLocked(MemoryPriority priority) TA_REQ(lock()) = 0;
+
   // Transition from NOT_READY to READY, and add references to self to related
   // structures.
   virtual void Activate() TA_REQ(lock()) = 0;
@@ -212,6 +225,10 @@ class VmAddressRegionOrMapping
   // current state of the VMAR.  If LifeCycleState::DEAD, then all other
   // fields are invalid.
   LifeCycleState state_ TA_GUARDED(lock()) = LifeCycleState::ALIVE;
+
+  // Priority of the VMAR. This starts at DEFAULT and must be reset back to default as part of the
+  // destroy path to ensure any propagation is undone correctly.
+  MemoryPriority memory_priority_ TA_GUARDED(lock()) = MemoryPriority::DEFAULT;
 
   // flags from VMAR creation time
   const uint32_t flags_;
@@ -572,6 +589,9 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   zx_status_t PageFault(vaddr_t va, uint pf_flags, LazyPageRequest* page_request)
       TA_REQ(lock()) override;
 
+  // Apply a memory priority to this VMAR and all of its subregions.
+  zx_status_t SetMemoryPriority(MemoryPriority priority);
+
   // Constructors are public as LazyInit cannot use them otherwise, even if friended, but
   // otherwise should be considered private and Create...() should be used instead.
   VmAddressRegion(VmAspace& aspace, vaddr_t base, size_t size, uint32_t vmar_flags);
@@ -591,6 +611,8 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   // Used to implement VmAspace::EnumerateChildren.
   // |aspace_->lock()| must be held.
   zx_status_t EnumerateChildrenLocked(VmEnumerator* ve) TA_REQ(lock());
+
+  zx_status_t SetMemoryPriorityLocked(MemoryPriority priority) override TA_REQ(lock());
 
   friend class VmMapping;
   template <VmAddressRegionEnumeratorType>
@@ -906,14 +928,6 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return GetMappingGenerationCountLocked();
   }
 
-  // Calls MarkAsLatencySensitive on the object_.
-  // Exposed so that the parent aspace can call this.
-  void MarkObjectAsLatencySensitiveLocked() const TA_REQ(lock()) {
-    if (object_) {
-      object_->MarkAsLatencySensitive();
-    }
-  }
-
   // Enumerates any different protection ranges that exist inside this mapping. The virtual range
   // specified by range_base and range_size must be within this mappings base_ and size_. The
   // provided callback is called in virtual address order for each protection type. ZX_ERR_NEXT
@@ -964,6 +978,9 @@ class VmMapping final : public VmAddressRegionOrMapping,
                                     uint new_arch_mmu_flags);
 
   AttributionCounts AllocatedPagesLocked() const TA_REQ(lock()) override;
+
+  zx_status_t SetMemoryPriorityLocked(VmAddressRegion::MemoryPriority priority) override
+      TA_REQ(lock());
 
   void Activate() TA_REQ(lock()) override;
 

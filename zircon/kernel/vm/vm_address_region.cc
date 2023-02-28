@@ -196,8 +196,13 @@ zx_status_t VmAddressRegion::CreateSubVmarInternal(size_t offset, size_t size, u
 
   AssertHeld(vmar->lock_ref());
   vmar->Activate();
-  *out = ktl::move(vmar);
 
+  // Propagate any memory priority settings. This should only fail if not alive, but we hold the
+  // lock and just made it alive, so that cannot happen.
+  zx_status_t status = vmar->SetMemoryPriorityLocked(memory_priority_);
+  DEBUG_ASSERT_MSG(status == ZX_OK, "status: %d", status);
+
+  *out = ktl::move(vmar);
   return ZX_OK;
 }
 
@@ -277,11 +282,6 @@ zx_status_t VmAddressRegion::CreateVmMapping(size_t mapping_offset, size_t size,
   if (status != ZX_OK) {
     return status;
   }
-  // TODO(fxb/101641): For the moment we forward the latency sensitivity permanently onto any VMO
-  // that gets mapped.
-  if (aspace_->IsLatencySensitive()) {
-    vmo->MarkAsLatencySensitive();
-  }
   // TODO(teisenbe): optimize this
   *out = res->as_vm_mapping();
   return ZX_OK;
@@ -312,6 +312,12 @@ zx_status_t VmAddressRegion::OverwriteVmMappingLocked(vaddr_t base, size_t size,
 
   AssertHeld(vmar->lock_ref());
   vmar->Activate();
+
+  // Propagate any memory priority settings. This should only fail if not alive, but we hold the
+  // lock and just made it alive, so that cannot happen.
+  status = vmar->SetMemoryPriorityLocked(memory_priority_);
+  DEBUG_ASSERT_MSG(status == ZX_OK, "status: %d", status);
+
   *out = ktl::move(vmar);
   return ZX_OK;
 }
@@ -319,6 +325,10 @@ zx_status_t VmAddressRegion::OverwriteVmMappingLocked(vaddr_t base, size_t size,
 zx_status_t VmAddressRegion::DestroyLocked() {
   canary_.Assert();
   LTRACEF("%p '%s'\n", this, name_);
+
+  // Remove any applied memory priority.
+  zx_status_t status = SetMemoryPriorityLocked(MemoryPriority::DEFAULT);
+  DEBUG_ASSERT(status == ZX_OK);
 
   // The cur reference prevents regions from being destructed after dropping
   // the last reference to them when removing from their parent.
@@ -333,7 +343,7 @@ zx_status_t VmAddressRegion::DestroyLocked() {
       if (child->is_mapping()) {
         AssertHeld(child->lock_ref());
         // DestroyLocked should remove this child from our list on success.
-        zx_status_t status = child->DestroyLocked();
+        status = child->DestroyLocked();
         if (status != ZX_OK) {
           // TODO(teisenbe): Do we want to handle this case differently?
           return status;
@@ -1077,4 +1087,45 @@ zx_status_t VmAddressRegion::ReserveSpace(const char* name, vaddr_t base, size_t
   } else {
     return aspace_->arch_aspace().Protect(base, size / PAGE_SIZE, arch_mmu_flags);
   }
+}
+
+zx_status_t VmAddressRegion::SetMemoryPriority(MemoryPriority priority) {
+  canary_.Assert();
+  Guard<CriticalMutex> guard{lock()};
+
+  return SetMemoryPriorityLocked(priority);
+}
+
+zx_status_t VmAddressRegion::SetMemoryPriorityLocked(MemoryPriority priority) {
+  if (state_ != LifeCycleState::ALIVE) {
+    DEBUG_ASSERT(memory_priority_ == MemoryPriority::DEFAULT);
+    return ZX_ERR_BAD_STATE;
+  }
+
+  auto set_region_priority = [priority](VmAddressRegion* region) {
+    AssertHeld(region->lock_ref());
+    if (priority == region->memory_priority_) {
+      return;
+    }
+    region->memory_priority_ = priority;
+    // As a region we only need to inform the VmAspace of the change.
+    region->aspace_->ChangeHighPriorityCountLocked(priority == MemoryPriority::HIGH ? 1 : -1);
+  };
+
+  // Do our own priority change.
+  set_region_priority(this);
+
+  // Enumerate all of the subregions below us.
+  EnumerateChildrenInternalLocked(
+      0, UINT64_MAX,
+      [&set_region_priority](VmAddressRegion* vmar, uint depth) {
+        set_region_priority(vmar);
+        return true;
+      },
+      [priority](VmMapping* map, const VmAddressRegion* vmar, uint depth) {
+        AssertHeld(map->lock_ref());
+        map->SetMemoryPriorityLocked(priority);
+        return true;
+      });
+  return ZX_OK;
 }

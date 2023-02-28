@@ -4011,6 +4011,66 @@ static bool vmo_dedup_dirty_test() {
   END_TEST;
 }
 
+// Test that attempting to reclaim pages from a high priority VMO will not work.
+static bool vmo_high_priority_reclaim_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  fbl::RefPtr<VmObjectPaged> vmo;
+  vm_page_t* page;
+  zx_status_t status =
+      make_committed_pager_vmo(1, /*trap_dirty=*/false, /*resizable=*/false, &page, &vmo);
+  ASSERT_EQ(ZX_OK, status);
+
+  auto change_priority = [&vmo](int64_t delta) {
+    Guard<CriticalMutex> guard{vmo->lock()};
+    vmo->ChangeHighPriorityCountLocked(delta);
+  };
+
+  // Indicate our VMO is high priority.
+  change_priority(1);
+
+  // Our page should now be in a pager backed page queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBacked(page));
+
+  // Attempting to reclaim should fail.
+  EXPECT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Ignore,
+                                                    nullptr));
+
+  // Page should still be in the queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBacked(page));
+
+  // Switch to a regular anonymous VMO.
+  change_priority(-1);
+  vmo.reset();
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo);
+  ASSERT_EQ(ZX_OK, status);
+  change_priority(1);
+
+  // Commit a single page.
+  EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE));
+  page = vmo->DebugGetPage(0);
+
+  // Deduping as zero should fail.
+  EXPECT_FALSE(vmo->DebugGetCowPages()->DedupZeroPage(page, 0));
+  EXPECT_EQ(page, vmo->DebugGetPage(0));
+
+  // If we have a compressor, then compressing should also fail.
+  VmCompression* compression = pmm_page_compression();
+  if (compression) {
+    auto compressor = compression->AcquireCompressor();
+    EXPECT_OK(compressor.get().Arm());
+    EXPECT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(
+        page, 0, VmCowPages::EvictionHintAction::Ignore, &compressor.get()));
+    EXPECT_EQ(page, vmo->DebugGetPage(0));
+  }
+
+  change_priority(-1);
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vmo_tests)
 VM_UNITTEST(vmo_create_test)
 VM_UNITTEST(vmo_create_maximum_size)
@@ -4072,6 +4132,7 @@ VM_UNITTEST(vmo_supply_compressed_pages_test)
 VM_UNITTEST(vmo_zero_pinned_test)
 VM_UNITTEST(vmo_pinned_wrapper_test)
 VM_UNITTEST(vmo_dedup_dirty_test)
+VM_UNITTEST(vmo_high_priority_reclaim_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest

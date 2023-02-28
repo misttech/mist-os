@@ -54,8 +54,7 @@ fbl::DoublyLinkedList<VmAspace*> VmAspace::aspaces_list_ = {};
 
 namespace {
 
-KCOUNTER(vm_aspace_marked_latency_sensitive, "vm.aspace.latency_sensitive.marked")
-KCOUNTER(vm_aspace_latency_sensitive_destroyed, "vm.aspace.latency_sensitive.destroyed")
+KCOUNTER(vm_aspace_high_priority, "vm.aspace.high_priority")
 KCOUNTER(vm_aspace_accessed_harvests_performed, "vm.aspace.accessed_harvest.performed")
 KCOUNTER(vm_aspace_accessed_harvests_skipped, "vm.aspace.accessed_harvest.skipped")
 
@@ -252,10 +251,7 @@ VmAspace::~VmAspace() {
   zx_status_t status = arch_aspace_.Destroy();
   DEBUG_ASSERT(status == ZX_OK);
 
-  // Update any counters.
-  if (IsLatencySensitive()) {
-    vm_aspace_latency_sensitive_destroyed.Add(1);
-  }
+  DEBUG_ASSERT(!IsHighMemoryPriority());
 }
 
 fbl::RefPtr<VmAddressRegion> VmAspace::RootVmar() {
@@ -710,48 +706,51 @@ bool VmAspace::IntersectsVdsoCodeLocked(vaddr_t base, size_t size) const {
          Intersects(vdso_code_mapping_->base(), vdso_code_mapping_->size(), base, size);
 }
 
-bool VmAspace::IsLatencySensitive() const {
-  return is_latency_sensitive_.load(ktl::memory_order_relaxed);
+bool VmAspace::IsHighMemoryPriority() const {
+  int64_t val = high_priority_count_.load(ktl::memory_order_relaxed);
+  DEBUG_ASSERT(val >= 0);
+  return val != 0;
+}
+
+void VmAspace::ChangeHighPriorityCountLocked(int64_t delta) {
+  DEBUG_ASSERT(!aspace_destroyed_);
+
+  int64_t old = high_priority_count_.fetch_add(delta);
+  if (old == 0) {
+    vm_aspace_high_priority.Add(1);
+  } else if (delta + old == 0) {
+    vm_aspace_high_priority.Add(-1);
+  }
+  DEBUG_ASSERT(delta + old >= 0);
 }
 
 void VmAspace::MarkAsLatencySensitive() {
-  Guard<CriticalMutex> guard{&lock_};
-  if (root_vmar_ == nullptr || aspace_destroyed_) {
-    // Aspace hasn't been initialized or has already been destroyed.
+  if (IsHighMemoryPriority()) {
     return;
   }
+  fbl::RefPtr<VmAddressRegion> root_vmar;
+  {
+    Guard<CriticalMutex> guard{&lock_};
+    if (root_vmar_ == nullptr || aspace_destroyed_) {
+      // Aspace hasn't been initialized or has already been destroyed.
+      return;
+    }
 
-  // TODO(fxb/101641): Need a better mechanism than checking for the process name here. See
-  // fxbug.dev/85056 for more context.
-  char name[ZX_MAX_NAME_LEN];
-  if (Thread::Current::Get()->aspace() != this) {
-    return;
+    // TODO(fxb/101641): Need a better mechanism than checking for the process name here. See
+    // fxbug.dev/85056 for more context.
+    char name[ZX_MAX_NAME_LEN];
+    if (Thread::Current::Get()->aspace() != this) {
+      return;
+    }
+    ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
+    up->get_name(name);
+    if (strncmp(name, "audio_core.cm", ZX_MAX_NAME_LEN) != 0 &&
+        strncmp(name, "waves_host.cm", ZX_MAX_NAME_LEN) != 0) {
+      return;
+    }
+    root_vmar = root_vmar_;
   }
-  ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
-  up->get_name(name);
-  if (strncmp(name, "audio_core.cm", ZX_MAX_NAME_LEN) != 0 &&
-      strncmp(name, "waves_host.cm", ZX_MAX_NAME_LEN) != 0) {
-    return;
-  }
-
-  bool was_sensitive = is_latency_sensitive_.exchange(true);
-  // If this aspace was previously not latency sensitive, then we need to go and tag any VMOs that
-  // already have mappings. Although expensive, this only ever needs to be done once for an aspace.
-  if (!was_sensitive) {
-    vm_aspace_marked_latency_sensitive.Add(1);
-    class Enumerator : public VmEnumerator {
-     public:
-      bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth) override
-          TA_REQ(map->lock()) {
-        map->MarkObjectAsLatencySensitiveLocked();
-        return true;
-      }
-    };
-    Enumerator enumerator;
-    AssertHeld(root_vmar_->lock_ref());
-    [[maybe_unused]] zx_status_t result = root_vmar_->EnumerateChildrenLocked(&enumerator);
-    DEBUG_ASSERT(result == ZX_OK);
-  }
+  root_vmar->SetMemoryPriority(VmAddressRegion::MemoryPriority::HIGH);
 }
 
 void VmAspace::HarvestAllUserAccessedBits(NonTerminalAction non_terminal_action,
@@ -761,12 +760,11 @@ void VmAspace::HarvestAllUserAccessedBits(NonTerminalAction non_terminal_action,
 
   for (auto& a : aspaces_list_) {
     if (a.is_user()) {
-      // TODO(fxb/101641): Formalize this.
-      // Forbid PT reclamation and accessed bit harvesting on latency sensitive aspaces.
+      // Forbid PT reclamation and accessed bit harvesting on high priority aspaces.
       const NonTerminalAction apply_non_terminal_action =
-          a.IsLatencySensitive() ? NonTerminalAction::Retain : non_terminal_action;
+          a.IsHighMemoryPriority() ? NonTerminalAction::Retain : non_terminal_action;
       const TerminalAction apply_terminal_action =
-          a.IsLatencySensitive() ? TerminalAction::UpdateAge : terminal_action;
+          a.IsHighMemoryPriority() ? TerminalAction::UpdateAge : terminal_action;
       // The arch_aspace is only destroyed in the VmAspace destructor *after* the aspace is removed
       // from the aspaces list. As we presently hold the AspaceListLock::Get() we know that this
       // destructor has not completed, and so the arch_aspace has not been destroyed. Even if the

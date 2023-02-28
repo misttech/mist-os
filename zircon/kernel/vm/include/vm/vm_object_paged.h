@@ -304,9 +304,8 @@ class VmObjectPaged final : public VmObject {
   // consideration when reclaiming pages under memory pressure (if applicable).
   zx_status_t HintRange(uint64_t offset, uint64_t len, EvictionHint hint) override;
 
-  void MarkAsLatencySensitive() override {
-    Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->MarkAsLatencySensitiveLocked();
+  void ChangeHighPriorityCountLocked(int64_t delta) override TA_REQ(lock()) {
+    cow_pages_locked()->ChangeHighPriorityCountLocked(delta);
   }
 
  private:

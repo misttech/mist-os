@@ -356,6 +356,10 @@ zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
   AssertHeld(mapping->lock_ref());
   mapping->assert_object_lock();
   mapping->ActivateLocked();
+  // Release the VMO lock and then apply any memory priority to the new mapping portion.
+  guard.Release();
+  status = mapping->SetMemoryPriorityLocked(memory_priority_);
+  DEBUG_ASSERT(status == ZX_OK);
   return ZX_OK;
 }
 
@@ -774,13 +778,17 @@ zx_status_t VmMapping::DestroyLocked() {
     return ZX_ERR_ACCESS_DENIED;
   }
 
+  // Remove any priority.
+  zx_status_t status = SetMemoryPriorityLocked(MemoryPriority::DEFAULT);
+  DEBUG_ASSERT(status == ZX_OK);
+
   // grab the object lock to unmap and remove ourselves from its list.
   {
     Guard<CriticalMutex> guard{object_->lock()};
     // The unmap needs to be performed whilst the object lock is being held so that set_size_locked
     // can be called without there being an opportunity for mappings to be modified in between.
-    zx_status_t status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE,
-                                                      aspace_->EnlargeArchUnmap(), nullptr);
+    status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap(),
+                                          nullptr);
     if (status != ZX_OK) {
       return status;
     }
@@ -1064,6 +1072,9 @@ void VmMapping::TryMergeRightNeighborLocked(VmMapping* right_candidate) {
   // the same vmar parent. Doing so indicates something structurally wrong with the hierarchy.
   DEBUG_ASSERT(parent_ == right_candidate->parent_);
 
+  // Should not be able to have the same parent yet have gotten a different memory priority.
+  DEBUG_ASSERT(memory_priority_ == right_candidate->memory_priority_);
+
   // These tests are intended to be ordered such that we fail as fast as possible. As such testing
   // for mergeability, which we commonly expect to succeed and not fail, is done last.
 
@@ -1129,7 +1140,12 @@ void VmMapping::TryMergeRightNeighborLocked(VmMapping* right_candidate) {
     right_candidate->object_->RemoveMappingLocked(right_candidate);
   }
 
-  // Detach from the VMO.
+  // Detach from the VMO. As we have removed ourselves as a mapping we also need to remove any
+  // priority we might have been propagating to that VMO. Additionally, we're destroying this
+  // mapping and so to not trip the assert in the destructor we can accomplish both goals by
+  // setting our priority back to the default.
+  right_candidate->SetMemoryPriorityLocked(MemoryPriority::DEFAULT);
+
   right_candidate->object_.reset();
 
   // Detach the now dead region from the parent, ensuring our caller is correctly holding a refptr.
@@ -1200,6 +1216,19 @@ void VmMapping::MarkMergeable(fbl::RefPtr<VmMapping>&& mapping) {
   }
   mapping->mergeable_ = Mergeable::YES;
   mapping->TryMergeNeighborsLocked();
+}
+
+zx_status_t VmMapping::SetMemoryPriorityLocked(VmAddressRegion::MemoryPriority priority) {
+  DEBUG_ASSERT(state_ == LifeCycleState::ALIVE);
+  if (priority == memory_priority_) {
+    return ZX_OK;
+  }
+  memory_priority_ = priority;
+  const bool is_high = priority == VmAddressRegion::MemoryPriority::HIGH;
+  aspace_->ChangeHighPriorityCountLocked(is_high ? 1 : -1);
+  Guard<CriticalMutex> guard{object_->lock()};
+  object_->ChangeHighPriorityCountLocked(is_high ? 1 : -1);
+  return ZX_OK;
 }
 
 zx_status_t MappingProtectionRanges::EnumerateProtectionRanges(

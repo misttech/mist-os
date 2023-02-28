@@ -493,9 +493,11 @@ class VmObject : public VmHierarchyBase,
     return ZX_OK;
   }
 
-  // TODO(fxb/101641): This is a temporary solution and needs to be replaced with something that is
-  // formalized.
-  virtual void MarkAsLatencySensitive() {
+  // Increments or decrements the priority count of this VMO. The high priority count is used to
+  // control any page reclamation, and applies to the whole VMO, including its parents. The count is
+  // never allowed to go negative and so callers must only subtract what they have already added.
+  // Further, callers are required to remove any additions before the VMO is destroyed.
+  virtual void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock()) {
     // This does nothing by default.
   }
 

@@ -585,7 +585,8 @@ class VmCowPages final : public VmHierarchyBase,
   void ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
 
-  void MarkAsLatencySensitiveLocked() TA_REQ(lock());
+  // See VmObject::ChangeHighPriorityCountLocked
+  void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
   zx_status_t LockRangeLocked(uint64_t offset, uint64_t len, zx_vmo_lock_state_t* lock_state_out);
   zx_status_t TryLockRangeLocked(uint64_t offset, uint64_t len);
@@ -601,6 +602,8 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Exposed for testing.
   DiscardableVmoTracker* DebugGetDiscardableTracker() const { return discardable_tracker_.get(); }
+
+  bool DebugIsHighMemoryPriority() const TA_EXCL(lock());
 
   // Discard all the pages from a discardable vmo in the |kReclaimable| state. For this call to
   // succeed, the vmo should have been in the reclaimable state for at least
@@ -710,7 +713,7 @@ class VmCowPages final : public VmHierarchyBase,
     //
     // We also don't want to borrow a page that might get pinned again since we want to mitigate the
     // possibility of an invalid DMA-after-free.
-    bool excluded_from_borrowing_for_latency_reasons = is_latency_sensitive_ || ever_pinned_;
+    bool excluded_from_borrowing_for_latency_reasons = high_priority_count_ != 0 || ever_pinned_;
     // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
     // these from being compatible AFAICT - we're just avoiding overlap of these two things until
     // later.
@@ -1151,6 +1154,12 @@ class VmCowPages final : public VmHierarchyBase,
   // lists.
   bool RemovePageForEviction(vm_page_t* page, uint64_t offset);
 
+  // Internal helper for modifying just this value of high_priority_count_ without performing any
+  // propagating.
+  // Returns any delta that needs to be applied to the parent. If a zero value is returned then
+  // propagation can be halted.
+  int64_t ChangeSingleHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
+
   // magic value
   fbl::Canary<fbl::magic("VMCP")> canary_;
 
@@ -1277,6 +1286,18 @@ class VmCowPages final : public VmHierarchyBase,
   // Non-null if this is a discardable VMO.
   const ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker_;
 
+  // Count of how many references to this VMO are requesting this be high priority, where references
+  // include VmMappings and children. If this is >0 then it is considered high priority and any kind
+  // of reclamation will be disabled. Further, if this is >0 and this has a parent, then this will
+  // contribute a +1 count towards its parent.
+  //
+  // Due to the life cycle of a VmCowPages it is expected that at the point this is destroyed it has
+  // a count of 0. This is because that to be destroyed we must have no mappings and no children,
+  // i.e. no references, and so nothing can be contributing to a positive count.
+  //
+  // It is an error for this value to ever become negative.
+  int64_t high_priority_count_ TA_GUARDED(lock()) = 0;
+
   // Flag which is true if there was a call to ::ReleaseCowParentPagesLocked which was
   // not able to update the parent limits. When this is not set, it is sometimes
   // possible for ::MergeContentWithChildLocked to do significantly less work. This flag acts as a
@@ -1290,15 +1311,6 @@ class VmCowPages final : public VmHierarchyBase,
   // partial_cow_release_ must be set to indicate in the future we need to do more expensive
   // processing to check for such free regions.
   bool partial_cow_release_ TA_GUARDED(lock()) = false;
-
-  // TODO(fxb/101641): This is a temporary solution and needs to be replaced with something that is
-  // formalized.
-  // Marks whether or not this VMO is considered a latency sensitive object. For a VMO being latency
-  // sensitive means pages that get committed should not be decommitted (or made expensive to
-  // access) by any background kernel process, such as the zero page deduper.
-  // Note: This does not presently protect against user pager eviction, as there is already a
-  // separate mechanism for that. Once fxb/101641 is resolved this might change.
-  bool is_latency_sensitive_ TA_GUARDED(lock()) = false;
 
   // With this bool we achieve these things:
   //  * Avoid using loaned pages for a VMO that will just get pinned and replace the loaned pages

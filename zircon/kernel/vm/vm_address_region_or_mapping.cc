@@ -50,6 +50,7 @@ VmAddressRegionOrMapping::~VmAddressRegionOrMapping() {
   }
 
   DEBUG_ASSERT(!this->in_subregion_tree());
+  DEBUG_ASSERT(memory_priority_ == MemoryPriority::DEFAULT);
 }
 
 VmObject::AttributionCounts VmAddressRegionOrMapping::AllocatedPages() const {
