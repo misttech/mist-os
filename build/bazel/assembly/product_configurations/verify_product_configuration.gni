@@ -70,6 +70,9 @@ template("verify_product_configuration") {
   }
 
   action(target_name) {
+    # See https://fxbug.dev/122374#c4
+    hermetic_deps = false
+
     forward_variables_from(invoker,
                            [
                              "testonly",
