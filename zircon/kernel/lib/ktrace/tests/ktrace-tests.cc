@@ -24,14 +24,19 @@ class TestKTraceState : public ::internal::KTraceState {
   using StartMode = internal::KTraceState::StartMode;
   static constexpr uint32_t kDefaultBufferSize = 4096;
 
+  // Immediately after initialization, ktrace will write two metadata records
+  // expressing the version of the trace buffer format, as well as the
+  // resolution of the timestamps in the trace.  This initial offset value
+  // reflects that.
+  static constexpr uint32_t kInitialOffset = sizeof(uint64_t) * 3;
+
   // Figure out how many 32 byte records we should be able to fit into our
   // default buffer size, minus the two metadata records we consume up front.  Since we
   // always allocate buffers in multiples of page size, we should be able to
   // assert that this is an integral number of records.
-  static_assert(kDefaultBufferSize > (sizeof(uint64_t) * 3));
-  static_assert(((kDefaultBufferSize - (sizeof(uint64_t) * 3)) % 8) == 0);
-  static constexpr uint32_t kMaxWords =
-      (kDefaultBufferSize - (sizeof(uint64_t) * 3)) / sizeof(uint64_t);
+  static_assert(kDefaultBufferSize > kInitialOffset);
+  static_assert(((kDefaultBufferSize - kInitialOffset) % 8) == 0);
+  static constexpr uint32_t kMaxWords = (kDefaultBufferSize - kInitialOffset) / sizeof(uint64_t);
 
   static bool InitStartTest() {
     BEGIN_TEST;
@@ -127,8 +132,7 @@ class TestKTraceState : public ::internal::KTraceState {
     TestKTraceState state;
     ASSERT_TRUE(state.Init(kDefaultBufferSize, kGroups));
 
-    uint32_t expected_offset = sizeof(uint64_t) * 3;
-    ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
+    ASSERT_TRUE(state.CheckExpectedOffset(kInitialOffset));
     fxt::WriteInstantEventRecord(&state, 0xAAAA'AAAA'AAAA'AAAA, fxt::ThreadRef{0x0A},
                                  fxt::StringRef{1}, fxt::StringRef{2});
     fxt::WriteInstantEventRecord(&state, 1, fxt::ThreadRef{0x0B}, fxt::StringRef{3},
@@ -219,8 +223,7 @@ class TestKTraceState : public ::internal::KTraceState {
     TestKTraceState state;
     ASSERT_TRUE(state.Init(kDefaultBufferSize, kGroups));
 
-    uint32_t expected_offset = sizeof(uint64_t) * 3;
-    ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
+    ASSERT_TRUE(state.CheckExpectedOffset(kInitialOffset));
 
     // Write a couple of records.
     fxt::WriteInstantEventRecord(&state, 0, fxt::ThreadRef{0x0A}, fxt::StringRef{0x1},
@@ -232,7 +235,7 @@ class TestKTraceState : public ::internal::KTraceState {
     // The offset should have moved, and the number of records in the buffer should now be 2.
     uint32_t rcnt = 0;
     auto checker = [&](const uint64_t* hdr) -> bool { return true; };
-    EXPECT_TRUE(state.CheckExpectedOffset(expected_offset, CheckOp::LT));
+    EXPECT_TRUE(state.CheckExpectedOffset(kInitialOffset, CheckOp::LT));
     EXPECT_EQ(kGroups, state.grpmask());
     ASSERT_OK(state.Stop());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
@@ -241,7 +244,7 @@ class TestKTraceState : public ::internal::KTraceState {
     // Rewind.  The offset should return to the beginning, and there
     // should be no records in the buffer.
     ASSERT_OK(state.Rewind());
-    EXPECT_TRUE(state.CheckExpectedOffset(expected_offset));
+    EXPECT_TRUE(state.CheckExpectedOffset(kInitialOffset));
     EXPECT_EQ(0u, state.grpmask());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_EQ(0u, rcnt);
@@ -260,7 +263,7 @@ class TestKTraceState : public ::internal::KTraceState {
     // Finally, rewind again.  The offset should return to the
     // beginning, and there should be no records in the buffer.
     ASSERT_OK(state.Rewind());
-    EXPECT_TRUE(state.CheckExpectedOffset(expected_offset));
+    EXPECT_TRUE(state.CheckExpectedOffset(kInitialOffset));
     EXPECT_EQ(0u, state.grpmask());
     EXPECT_TRUE(state.TestAllRecords(rcnt, checker));
     EXPECT_EQ(0u, rcnt);
@@ -551,12 +554,7 @@ class TestKTraceState : public ::internal::KTraceState {
     TestKTraceState state;
     ASSERT_TRUE(state.Init(kDefaultBufferSize, kAllGroups));
 
-    // Immediately after initialization, ktrace will write two metadata records
-    // expressing the version of the trace buffer format, as well as the
-    // resolution of the timestamps in the trace.  Make sure that the offset
-    // reflects this.
-    uint32_t expected_offset = sizeof(uint64_t) * 3;
-    ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
+    ASSERT_TRUE(state.CheckExpectedOffset(kInitialOffset));
 
     // This test works with the Reservation objects directly
     // rather than using the libfxt functions. Here we build a valid string
@@ -611,7 +609,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
     TestKTraceState state;
     ASSERT_TRUE(state.Init(kDefaultBufferSize, KTRACE_GRP_ALL));
-    uint32_t expected_offset = sizeof(uint64_t) * 3;
+    uint32_t expected_offset = kInitialOffset;
     ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
 
     // Header for a metadata record with a size of 1 * 8 bytes.
