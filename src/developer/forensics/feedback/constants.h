@@ -100,6 +100,8 @@ constexpr char kDataRegisterPath[] = "/tmp/data_register.json";
 // terminated system log recording.
 constexpr char kDoNotLaunchSystemLogRecorder[] = "/tmp/do_not_launch_system_log_recorder.txt";
 
+constexpr size_t kRedactionIdCacheCapacity = 1500;
+
 }  // namespace forensics::feedback
 
 #endif  // SRC_DEVELOPER_FORENSICS_FEEDBACK_CONSTANTS_H_

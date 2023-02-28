@@ -85,5 +85,31 @@ TEST_F(RedactionIdCacheTest, StartingId) {
                              })))));
 }
 
+TEST_F(RedactionIdCacheTest, DeletesLeastRecentlyUsed) {
+  RedactionIdCache cache(InspectRoot().CreateUint("size", 0u), /*starting_id=*/0, /*capacity=*/2);
+
+  EXPECT_EQ(cache.GetId("value1"), 1);
+  EXPECT_EQ(cache.GetId("value2"), 2);
+  EXPECT_EQ(cache.GetId("value3"), 3);
+
+  // Entry for "value1" should have been deleted and will be assigned a new value.
+  EXPECT_EQ(cache.GetId("value1"), 4);
+}
+
+TEST_F(RedactionIdCacheTest, GetIdUpdatesLru) {
+  RedactionIdCache cache(InspectRoot().CreateUint("size", 0u), /*starting_id=*/0, /*capacity=*/2);
+
+  EXPECT_EQ(cache.GetId("value1"), 1);
+  EXPECT_EQ(cache.GetId("value2"), 2);
+
+  // Access "value1" to trigger update of lru ordering before adding "value3".
+  EXPECT_EQ(cache.GetId("value1"), 1);
+  EXPECT_EQ(cache.GetId("value3"), 3);
+
+  // Entry for "value2" should have been deleted and will be assigned a new value.
+  EXPECT_EQ(cache.GetId("value1"), 1);
+  EXPECT_EQ(cache.GetId("value2"), 4);
+}
+
 }  // namespace
 }  // namespace forensics

@@ -12,7 +12,10 @@ source_set("redact") {
     "replacer.h",
   ]
 
-  public_deps = [ "//sdk/lib/sys/inspect/cpp" ]
+  public_deps = [
+    "//sdk/lib/sys/inspect/cpp",
+    "//src/developer/forensics/feedback:constants",
+  ]
 
   deps = [
     "//sdk/lib/fit",
