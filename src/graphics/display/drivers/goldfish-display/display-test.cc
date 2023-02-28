@@ -406,4 +406,7 @@ TEST_F(GoldfishDisplayTest, ImportBufferCollection) {
   loop_.Shutdown();
 }
 
+// TODO(fxbug.dev/122687): Implement a fake sysmem and a fake goldfish-pipe
+// driver to test importing images using ImportImage().
+
 }  // namespace goldfish
