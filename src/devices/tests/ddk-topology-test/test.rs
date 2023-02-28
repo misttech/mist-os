@@ -16,7 +16,7 @@ async fn do_test(dfv2: bool) -> Result<(), Error> {
     let instance = builder.build().await?;
     let root_driver = match dfv2 {
         true => "fuchsia-boot:///#meta/test-parent-sys.cm",
-        false => "fuchsia-boot:///#driver/test-parent-sys.so",
+        false => "fuchsia-boot:///#meta/test-parent-sys.cm",
     };
     instance
         .driver_test_realm_start(fdt::RealmArgs {

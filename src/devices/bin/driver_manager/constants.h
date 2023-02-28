@@ -9,8 +9,8 @@
 
 namespace fdf {
 
-constexpr std::string_view kFragmentDriverUrl = "#driver/fragment.so";
-constexpr std::string_view kFragmentProxyDriverUrl = "#driver/fragment.proxy.so";
+constexpr std::string_view kFragmentDriverUrl = "#meta/fragment.cm";
+constexpr std::string_view kFragmentProxyDriverUrl = "#meta/fragment.proxy.cm";
 
 }  // namespace fdf
 

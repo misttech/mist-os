@@ -121,7 +121,7 @@ zx_status_t CompositeDeviceFragment::CreateProxy(const fbl::RefPtr<DriverHost> d
 
   // Create a Banjo proxy.
 
-  // We've already created our fragment's proxy, we're waiting for fragment.proxy.so's device.
+  // We've already created our fragment's proxy, we're waiting for fragment.proxy.cm's device.
   if (!fragment_device()->fidl_proxies().empty()) {
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -148,7 +148,7 @@ zx_status_t CompositeDeviceFragment::CreateProxy(const fbl::RefPtr<DriverHost> d
   if (status != ZX_OK) {
     return status;
   }
-  // We have to wait until our fragment.proxy.so device is created.
+  // We have to wait until our fragment.proxy.cm device is created.
   return ZX_ERR_SHOULD_WAIT;
 }
 

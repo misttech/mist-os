@@ -6,4 +6,4 @@ using fuchsia.hardware.block;
 using fuchsia.compat;
 
 fuchsia.BIND_PROTOCOL == fuchsia.hardware.block.BIND_PROTOCOL.DEVICE;
-fuchsia.compat.LIBNAME == "zxcrypt.so";
+fuchsia.compat.LIBNAME == "zxcrypt.cm";

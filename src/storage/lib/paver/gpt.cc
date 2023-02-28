@@ -106,7 +106,7 @@ zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_r
   if (pauser.is_error()) {
     return pauser.take_error();
   }
-  auto result = fidl::WireCall(controller)->Rebind(fidl::StringView("gpt.so"));
+  auto result = fidl::WireCall(controller)->Rebind(fidl::StringView("gpt.cm"));
   return zx::make_result(result.ok() ? (result->is_error() ? result->error_value() : ZX_OK)
                                      : result.status());
 }

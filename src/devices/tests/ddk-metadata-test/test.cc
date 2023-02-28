@@ -15,10 +15,10 @@ namespace {
 using devmgr_integration_test::IsolatedDevmgr;
 
 TEST(MetadataTest, RunTests) {
-  const char kDriver[] = "/boot/driver/ddk-metadata-test-driver.so";
+  const char kDriver[] = "/boot/meta/ddk-metadata-test-driver.cm";
   auto args = IsolatedDevmgr::DefaultArgs();
 
-  args.root_device_driver = "/boot/driver/test-parent-sys.so";
+  args.root_device_driver = "/boot/meta/test-parent-sys.cm";
 
   // NB: this loop is never run. RealmBuilder::Build is in the call stack, and insists on a non-null
   // dispatcher.

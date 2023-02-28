@@ -30,7 +30,7 @@ use {
     zerocopy::AsBytes,
 };
 
-const GPT_DRIVER_PATH: &str = "gpt.so";
+const GPT_DRIVER_PATH: &str = "gpt.cm";
 
 const RAMDISK_BLOCK_SIZE: u64 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;

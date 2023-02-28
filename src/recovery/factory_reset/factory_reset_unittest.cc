@@ -231,7 +231,7 @@ class FactoryResetTest : public Test {
   }
 
   void BindFvm() {
-    const std::string_view driver = "fvm.so";
+    const std::string_view driver = "fvm.cm";
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
         ramdisk_get_block_interface(ramdisk_client_));

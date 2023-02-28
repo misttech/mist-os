@@ -11,6 +11,7 @@
 
 #include <fbl/string_printf.h>
 
+#include "src/devices/bin/driver_manager/manifest_parser.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/storage/vfs/cpp/vfs.h"
 
@@ -18,21 +19,38 @@ namespace fio = fuchsia_io;
 
 namespace internal {
 
-zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::string& package_url) {
+zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::string& manifest_url) {
   component::FuchsiaPkgUrl parsed_url;
-  if (!parsed_url.Parse(std::string(package_url))) {
-    LOGF(ERROR, "Failed to parse package url: %s", package_url.data());
+  if (!parsed_url.Parse(std::string(manifest_url))) {
+    LOGF(ERROR, "Failed to parse manifest url: %s", manifest_url.data());
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  auto package_dir_result = Resolve(parsed_url);
+  zx::result package_dir_result = Resolve(parsed_url);
   if (!package_dir_result.is_ok()) {
     LOGF(ERROR, "Failed to resolve package url %s, err %d", parsed_url.ToString().c_str(),
          package_dir_result.status_value());
     return package_dir_result.take_error();
   }
 
-  auto driver_vmo_result = LoadDriver(package_dir_result.value(), parsed_url);
+  zx::result manifest_vmo = LoadManifest(package_dir_result.value(), parsed_url);
+  if (manifest_vmo.status_value()) {
+    return manifest_vmo.take_error();
+  }
+
+  // Parse manifest for driver_url
+  zx::result manifest = ParseComponentManifest(std::move(manifest_vmo.value()));
+  if (manifest.is_error()) {
+    LOGF(ERROR, "Failed to parse manifest: %s", manifest.status_string());
+    return manifest.take_error();
+  }
+
+  if (!parsed_url.Parse(std::string(manifest->driver_url))) {
+    LOGF(ERROR, "Failed to parse package url: %s", manifest->driver_url.data());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  zx::result driver_vmo_result = LoadDriver(package_dir_result.value(), parsed_url);
   if (driver_vmo_result.status_value()) {
     return driver_vmo_result.take_error();
   }
@@ -40,8 +58,9 @@ zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::stri
   Driver* driver = nullptr;
   DriverLoadCallback callback = [&driver](Driver* d, const char* version) mutable { driver = d; };
 
-  zx_status_t status = load_driver_vmo(boot_args_, std::string_view(parsed_url.ToString()),
-                                       std::move(driver_vmo_result.value()), std::move(callback));
+  zx_status_t status = load_driver(boot_args_, std::string_view(parsed_url.ToString()),
+                                   std::move(driver_vmo_result.value()),
+                                   std::move(manifest->service_uses), std::move(callback));
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -58,7 +77,7 @@ zx::result<std::unique_ptr<Driver>> PackageResolver::FetchDriver(const std::stri
 }
 
 zx_status_t PackageResolver::ConnectToResolverService() {
-  auto client_end = component::Connect<fuchsia_pkg::PackageResolver>();
+  zx::result client_end = component::Connect<fuchsia_pkg::PackageResolver>();
   if (client_end.is_error()) {
     return client_end.error_value();
   }
@@ -75,14 +94,14 @@ zx::result<fidl::WireSyncClient<fio::Directory>> PackageResolver::Resolve(
       return zx::error(status);
     }
   }
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
 
   // This is synchronous for now so we can get the proof of concept working.
   // Eventually we will want to do this asynchronously.
-  auto result = resolver_client_->Resolve(
+  fidl::WireResult result = resolver_client_->Resolve(
       ::fidl::StringView(fidl::StringView::FromExternal(package_url.package_path())),
       std::move(endpoints->server));
   if (!result.ok() || result->is_error()) {
@@ -122,11 +141,11 @@ zx::result<zx::vmo> PackageResolver::LoadDriver(
       fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute;
 
   // Open and duplicate the driver vmo.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
-  auto file_open_result = package_dir->Open(
+  fidl::OneWayStatus file_open_result = package_dir->Open(
       kFileRights, {} /* mode */, fidl::StringView::FromExternal(package_url.resource_path()),
       fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
   if (!file_open_result.ok()) {
@@ -140,12 +159,43 @@ zx::result<zx::vmo> PackageResolver::LoadDriver(
     LOGF(ERROR, "Failed to get driver vmo: %s", file_res.FormatDescription().c_str());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  const auto* res = file_res.Unwrap();
-  if (res->is_error()) {
-    LOGF(ERROR, "Failed to get driver vmo: %s", zx_status_get_string(res->error_value()));
+  if (file_res->is_error()) {
+    LOGF(ERROR, "Failed to get driver vmo: %s", zx_status_get_string(file_res->error_value()));
     return zx::error(ZX_ERR_INTERNAL);
   }
-  return zx::ok(std::move(res->value()->vmo));
+  return zx::ok(std::move(file_res->value()->vmo));
+}
+
+zx::result<zx::vmo> PackageResolver::LoadManifest(
+    const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
+    const component::FuchsiaPkgUrl& package_url) {
+  const fio::wire::OpenFlags kFileRights = fio::wire::OpenFlags::kRightReadable;
+  const fio::wire::VmoFlags kManifestVmoFlags = fio::wire::VmoFlags::kRead;
+
+  // Open and duplicate the driver vmo.
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  fidl::OneWayStatus file_open_result = package_dir->Open(
+      kFileRights, {} /* mode */, fidl::StringView::FromExternal(package_url.resource_path()),
+      fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+  if (!file_open_result.ok()) {
+    LOGF(ERROR, "Failed to open manifest file: %s", package_url.resource_path().c_str());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  fidl::WireSyncClient file_client{std::move(endpoints->client)};
+  fidl::WireResult file_res = file_client->GetBackingMemory(kManifestVmoFlags);
+  if (!file_res.ok()) {
+    LOGF(ERROR, "Failed to get manifest vmo: %s", file_res.FormatDescription().c_str());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  if (file_res->is_error()) {
+    LOGF(ERROR, "Failed to get manifest vmo: %s", zx_status_get_string(file_res->error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(std::move(file_res->value()->vmo));
 }
 
 }  // namespace internal

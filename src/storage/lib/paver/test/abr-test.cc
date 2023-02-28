@@ -181,7 +181,7 @@ class ChromebookX64AbrTests : public zxtest::Test {
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     auto result2 = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
                                       disk_->block_interface().channel()))
-                       ->Rebind(fidl::StringView("gpt.so"));
+                       ->Rebind(fidl::StringView("gpt.cm"));
     ASSERT_TRUE(result2.ok());
     ASSERT_FALSE(result2->is_error());
   }
@@ -307,7 +307,7 @@ class CurrentSlotUuidTest : public zxtest::Test {
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
                                      disk_->block_interface().channel()))
-                      ->Rebind(fidl::StringView("gpt.so"));
+                      ->Rebind(fidl::StringView("gpt.cm"));
     ASSERT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
   }

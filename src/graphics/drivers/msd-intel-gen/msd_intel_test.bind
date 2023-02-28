@@ -6,4 +6,4 @@ using fuchsia.compat;
 using fuchsia.intel.gpucore;
 
 fuchsia.BIND_PROTOCOL == fuchsia.intel.gpucore.BIND_PROTOCOL.DEVICE;
-fuchsia.compat.LIBNAME == "libmsd_intel_test.so";
+fuchsia.compat.LIBNAME == "libmsd_intel_test.cm";

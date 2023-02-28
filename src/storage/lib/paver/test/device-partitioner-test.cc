@@ -436,7 +436,7 @@ class GptDevicePartitionerTests : public zxtest::Test {
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
                                      gpt_dev->block_interface().channel()))
-                      ->Rebind(fidl::StringView("gpt.so"));
+                      ->Rebind(fidl::StringView("gpt.cm"));
     ASSERT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
   }
@@ -753,7 +753,7 @@ TEST_F(EfiDevicePartitionerTests, FindOldBootloaderPartitionName) {
   // TODO(https://fxbug.dev/112484): this relies on multiplexing.
   fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
       gpt_dev->block_interface().channel()->get());
-  auto result = fidl::WireCall(channel)->Rebind(fidl::StringView("gpt.so"));
+  auto result = fidl::WireCall(channel)->Rebind(fidl::StringView("gpt.cm"));
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
 
@@ -1318,7 +1318,7 @@ TEST_F(SherlockPartitionerTests, InitializePartitionTable) {
   // TODO(https://fxbug.dev/112484): this relies on multiplexing.
   auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
                                    gpt_dev->block_interface().channel()))
-                    ->Rebind(fidl::StringView("gpt.so"));
+                    ->Rebind(fidl::StringView("gpt.cm"));
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
 

@@ -12,7 +12,7 @@ use {
     fuchsia_zircon as zx,
 };
 
-const ZXCRYPT_DRIVER_PATH: &str = "zxcrypt.so";
+const ZXCRYPT_DRIVER_PATH: &str = "zxcrypt.cm";
 
 /// Binds the zxcrypt driver to the device at `controller`. Does not wait for the zxcrypt driver to
 /// be ready.
