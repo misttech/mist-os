@@ -157,9 +157,8 @@ class Debug {
   // unintentionally printed in logs.
   //
   // http://fxbug.dev/29792 - Remove WLAN_FULLMAC once things have stabilized.
-  static constexpr uint32_t kBrcmfMsgFilter = static_cast<uint32_t>(Filter::kWLANIF) |
-                                              static_cast<uint32_t>(Filter::kWLANPHY) |
-                                              static_cast<uint32_t>(Filter::kSIM);
+  static constexpr uint32_t kBrcmfMsgFilter =
+      static_cast<uint32_t>(Filter::kWLANIF) | static_cast<uint32_t>(Filter::kWLANPHY);
 
   // Check if a given debugging filter class is turned on.
   static constexpr bool IsFilterOn(Filter filter) {

@@ -118,7 +118,6 @@ class FakeAp final : public StationIfc {
   // StationIfc operations - these are the functions that allow the simulated AP to be used
   // inside of a sim-env environment.
   void Rx(std::shared_ptr<const SimFrame> frame, std::shared_ptr<const WlanRxInfo> info) override;
-  void AddAssocRespRawIes(cpp20::span<const uint8_t> raw_ies);
 
  private:
   void CancelNotification(uint64_t id);
@@ -203,7 +202,6 @@ class FakeAp final : public StationIfc {
   zx::duration data_forward_interval_ = zx::msec(1);
 
   std::list<std::shared_ptr<Client>> clients_;
-  std::vector<uint8_t> assoc_resp_raw_ies_;
 };
 
 }  // namespace wlan::simulation

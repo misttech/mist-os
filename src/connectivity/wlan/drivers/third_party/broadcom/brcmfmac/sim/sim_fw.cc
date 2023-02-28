@@ -1009,8 +1009,6 @@ void SimFirmware::AssocScanResultSeen(const ScanResult& scan_result) {
   }
 
   assoc_state_.scan_results.push_back(scan_result);
-  // The correct probe response has been received, stop scanning.
-  ScanComplete(BRCMF_E_STATUS_SUCCESS);
 }
 
 void SimFirmware::AssocScanDone(brcmf_fweh_event_status_t event_status) {
@@ -1075,13 +1073,9 @@ void SimFirmware::AssocHandleFailure(wlan_ieee80211::StatusCode status) {
       || assoc_state_.state == AssocState::AUTHENTICATION_CHALLENGE_FAILURE ||
       auth_state_.sec_type == simulation::SEC_PROTO_TYPE_WPA3) {
     BRCMF_DBG(SIM, "Assoc failed. Send E_SET_SSID with failure");
-    if (assoc_state_.num_attempts < assoc_max_retries_) {
-      status = fuchsia::wlan::ieee80211::StatusCode::REJECTED_SEQUENCE_TIMEOUT;
-    }
     SendEventToDriver(0, nullptr, BRCMF_E_ASSOC, BRCMF_E_STATUS_FAIL, kClientIfidx, nullptr, 0,
                       static_cast<uint32_t>(status), assoc_state_.opts->bssid);
-    SendEventToDriver(0, nullptr, BRCMF_E_SET_SSID, BRCMF_E_STATUS_FAIL, kClientIfidx, nullptr, 0,
-                      static_cast<uint32_t>(status));
+    SendEventToDriver(0, nullptr, BRCMF_E_SET_SSID, BRCMF_E_STATUS_FAIL, kClientIfidx);
     AssocClearContext();
   } else {
     assoc_state_.num_attempts++;
@@ -1097,7 +1091,7 @@ void SimFirmware::AuthStart() {
   common::MacAddr bssid(assoc_state_.opts->bssid);
 
   hw_.RequestCallback(std::bind(&SimFirmware::AssocHandleFailure, this,
-                                wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED),
+                                wlan_ieee80211::StatusCode::REJECTED_SEQUENCE_TIMEOUT),
                       kAuthTimeout, &auth_state_.auth_timer_id);
 
   ZX_ASSERT(auth_state_.state == AuthState::NOT_AUTHENTICATED);
@@ -1341,7 +1335,7 @@ zx_status_t SimFirmware::RemoteUpdateExternalSaeStatus(uint16_t seq_num,
   memcpy(buf->data() + sizeof(wlan::Authentication), sae_payload, text_len);
 
   hw_.RequestCallback(std::bind(&SimFirmware::AssocHandleFailure, this,
-                                wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED),
+                                wlan_ieee80211::StatusCode::REJECTED_SEQUENCE_TIMEOUT),
                       kAuthTimeout, &auth_state_.auth_timer_id);
 
   // Update state
@@ -1968,9 +1962,8 @@ zx_status_t SimFirmware::HandleJoinRequest(const void* value, size_t value_len) 
     return ZX_ERR_BAD_STATE;
   }
 
-  if (scan_state_.state == ScanState::SCANNING) {
-    BRCMF_DBG(SIM, "Scan in progress, aborting scan.");
-    ScanComplete(BRCMF_E_STATUS_NEWASSOC);
+  if (scan_state_.state != ScanState::STOPPED) {
+    BRCMF_DBG(SIM, "Attempt to associate while scan already in progress");
   }
 
   auto scan_opts = std::make_unique<ScanOpts>();
@@ -1986,7 +1979,9 @@ zx_status_t SimFirmware::HandleJoinRequest(const void* value, size_t value_len) 
       scan_opts->is_active = false;
       break;
     case BRCMF_SCANTYPE_ACTIVE:
-      scan_opts->is_active = true;
+      // FIXME: this should be true, but this is the mode used by the firmware and active scans are
+      // not supported yet.
+      scan_opts->is_active = false;
       break;
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -2010,21 +2005,25 @@ zx_status_t SimFirmware::HandleJoinRequest(const void* value, size_t value_len) 
 
   // Determine dwell time
   if (scan_opts->is_active) {
-    uint32_t active_time = join_params->scan_le.active_time;
-    if (active_time == static_cast<uint32_t>(-1)) {
-      // Setting this to an arbitrary value for now.
-      active_time = 100;
+    if (join_params->scan_le.active_time == static_cast<uint32_t>(-1)) {
+      // If we hit this, we need to determine how to set the default active time
+      ZX_ASSERT("Attempt to use default active scan time, but we don't know how to set this");
+    }
+    if (join_params->scan_le.active_time == 0) {
+      return ZX_ERR_INVALID_ARGS;
     }
     int32_t nprobes = (int32_t)join_params->scan_le.nprobes;
     scan_opts->active_scan_max_attempts = nprobes <= 0 ? 1 : nprobes;
     // Dwell time is equally split across the # of attempts
-    scan_opts->dwell_time = zx::msec(active_time) / scan_opts->active_scan_max_attempts;
-    BRCMF_DBG(SIM, "Join req - active scan: act time: %u nprobes: %d dwell: %zu", active_time,
-              join_params->scan_le.nprobes, scan_opts->dwell_time.get());
+    scan_opts->dwell_time =
+        zx::msec(join_params->scan_le.active_time) / scan_opts->active_scan_max_attempts;
+    BRCMF_DBG(SIM, "Join req - active scan: act time: %u nprobes: %d dwell: %zu",
+              join_params->scan_le.active_time, join_params->scan_le.nprobes,
+              scan_opts->dwell_time.get());
   } else if (join_params->scan_le.passive_time == static_cast<uint32_t>(-1)) {
     // Use default passive time
     if (default_passive_time_ == static_cast<uint32_t>(-1)) {
-      // If we hit this, we need to determine the default passive time
+      // If we hit this, we need to determine the default default passive time
       ZX_ASSERT("Attempt to use default passive scan time, but it hasn't been set yet");
     }
     scan_opts->dwell_time = zx::msec(default_passive_time_);

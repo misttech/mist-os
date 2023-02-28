@@ -653,7 +653,7 @@ TEST_F(AuthTest, WEPIgnoreTest) {
                                      wlan_ieee80211::StatusCode::SUCCESS);
   }
   VerifyAuthFrames();
-  EXPECT_EQ(connect_status_, STATUS_CODE_REFUSED_REASON_UNSPECIFIED);
+  EXPECT_EQ(connect_status_, STATUS_CODE_REJECTED_SEQUENCE_TIMEOUT);
 }
 
 TEST_F(AuthTest, WPA1Test) {
