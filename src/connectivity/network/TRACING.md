@@ -3,18 +3,9 @@
 _TODO(https://fxbug.dev/102863): Improve ergonomics of enabling tracing on the_
 _system netstack._
 
-You can enable tracing for the netstack by swapping out the component in the
-netstack package included in your build for the one that has tracing enabled.
-You can do this by replacing the deps for the
-"//src/connectivity/network:netstack2" rule:
-
-```diff
- fuchsia_package("netstack2") {
-   package_name = "netstack"
--  deps = [ "netstack:component" ]
-+  deps = [ "netstack:component-with-tracing" ]
- }
-```
+You can enable tracing for the netstack by setting the
+`enable_netstack2_tracing` GN arg to `true`. Note that this flag is mutually
+exclusive with `use_netstack3`; Netstack3 does not currently emit trace events.
 
 Ensure that your `fx set` includes `--with-base //bundles/tools`, otherwise
 Netstack will fail to connect to `trace_manager` at initialization time.

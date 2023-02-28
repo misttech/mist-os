@@ -10,13 +10,24 @@ declare_args() {
   # TODO(https://fxbug.dev/85450) - Convert this to a platform configuration
   # option in Product Assembly
   use_netstack3 = false
+
+  # TODO(https://fxbug.dev/122670): If we make tracing in netstack3
+  # conditionally compiled, make this flag generic over netstack and choose the
+  # appropriate netstack package based on the combination of netstack3
+  # (true/false) and tracing (true/false).
+  enable_netstack2_tracing = false
 }
 
 # TODO(https://fxbug.dev/85450): Convert this to a platform configuration
 # option in Product Assembly.
 _system_netstack_package = ":netstack2"
+assert(!(enable_netstack2_tracing && use_netstack3),
+       "cannot enable both Netstack3 and tracing in Netstack2")
 if (use_netstack3) {
   _system_netstack_package = ":netstack3"
+}
+if (enable_netstack2_tracing) {
+  _system_netstack_package = ":netstack2-with-tracing"
 }
 
 fuchsia_component("component") {
@@ -78,6 +89,12 @@ network_package("network-basic") {
 fuchsia_package("netstack2") {
   package_name = "netstack"
   deps = [ "netstack:component" ]
+  visibility = [ ":*" ]
+}
+
+fuchsia_package("netstack2-with-tracing") {
+  package_name = "netstack"
+  deps = [ "netstack:component-with-tracing" ]
   visibility = [ ":*" ]
 }
 
