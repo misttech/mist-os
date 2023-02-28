@@ -24,7 +24,7 @@ const _timeout = Timeout(Duration(minutes: 5));
 
 void printErrorHelp() {
   print('If this test fails, see '
-      'https://fuchsia.googlesource.com/a/fuchsia/+/HEAD/src/tests/end_to_end/package_manger/README.md'
+      'https://fuchsia.googlesource.com/fuchsia/+/HEAD/src/tests/end_to_end/package_manager/README.md'
       ' for details!');
 }
 
