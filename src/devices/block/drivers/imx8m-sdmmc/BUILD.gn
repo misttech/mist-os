@@ -59,7 +59,7 @@ fuchsia_driver_component("imx8m-sdmmc") {
   component_name = "imx8m-sdmmc"
   deps = [ ":imx8m-sdmmc-driver" ]
   info = "imx8m-sdmmc-info.json"
-  colocate = true
+  manifest = "meta/imx8m-sdmmc.cml"
 }
 
 test("imx8m-sdmmc-test-bin") {

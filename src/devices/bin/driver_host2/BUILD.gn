@@ -89,7 +89,7 @@ fuchsia_driver_component("test_driver") {
   testonly = true
   deps = [ ":test_driver_driver" ]
   info = "test_driver-info.json"
-  colocate = true
+  manifest = "meta/test_driver.cml"
 }
 
 fuchsia_driver("test_not_driver_driver") {
@@ -103,7 +103,7 @@ fuchsia_driver_component("test_not_driver") {
   testonly = true
   deps = [ ":test_not_driver_driver" ]
   info = "test_not_driver-info.json"
-  colocate = true
+  manifest = "meta/test_not_driver.cml"
 }
 
 executable("unittests") {

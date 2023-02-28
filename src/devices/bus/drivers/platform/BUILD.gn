@@ -85,7 +85,7 @@ fuchsia_driver_component("platform-bus.proxy") {
   component_name = "platform-bus.proxy"
   deps = [ ":platform-bus.proxy-driver" ]
   info = "platform-bus.proxy-info.json"
-  colocate = false
+  manifest = "meta/platform-bus.proxy.cml"
 }
 
 test("platform-bus-unittest") {

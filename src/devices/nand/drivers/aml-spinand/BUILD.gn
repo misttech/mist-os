@@ -17,7 +17,7 @@ fuchsia_driver_component("aml-spinand") {
   info = "aml-spinand-info.json"
   component_name = "aml-spinand"
   deps = [ ":aml-spinand-driver" ]
-  colocate = true
+  manifest = "meta/aml-spinand.cml"
 }
 
 driver_bind_rules("aml-spinand-bind") {

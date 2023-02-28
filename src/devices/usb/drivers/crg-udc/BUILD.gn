@@ -51,7 +51,7 @@ fuchsia_driver_component("crg-udc") {
   info = "crg-udc-info.json"
   component_name = "crg-udc"
   deps = [ ":crg-udc-driver" ]
-  colocate = true
+  manifest = "meta/crg-udc.cml"
 }
 
 test("crg-udc-test-bin") {

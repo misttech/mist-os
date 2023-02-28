@@ -43,7 +43,7 @@ fuchsia_driver_component("cadence-hpnfc") {
   info = "cadence-hpnfc-info.json"
   component_name = "cadence-hpnfc"
   deps = [ ":cadence-hpnfc-driver" ]
-  colocate = true
+  manifest = "meta/cadence-hpnfc.cml"
 }
 
 test("cadence-hpnfc-test-bin") {

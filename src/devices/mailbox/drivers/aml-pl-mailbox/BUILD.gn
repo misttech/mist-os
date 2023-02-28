@@ -46,5 +46,5 @@ fuchsia_driver_component("aml-pl-mailbox") {
   component_name = "aml-pl-mailbox"
   deps = [ ":aml-pl-mailbox-driver" ]
   info = "aml-pl-mailbox-info.json"
-  colocate = true
+  manifest = "meta/aml-pl-mailbox.cml"
 }

@@ -45,7 +45,7 @@ fuchsia_driver_component("nand-broker") {
   info = "nand-broker-info.json"
   component_name = "nand-broker"
   deps = [ ":nand-broker-driver" ]
-  colocate = true
+  manifest = "meta/nand-broker.cml"
 }
 
 group("tests") {

@@ -82,7 +82,7 @@ fuchsia_driver_component("fragment-component") {
 
   # Note that while this argument is required for the fuchsia_driver_component build rule, the
   # driver manager treats the fragment driver specially and does not actually examine this argument.
-  colocate = true
+  manifest = "meta/fragment-component.cml"
 }
 
 group("fragment") {
@@ -149,5 +149,5 @@ fuchsia_driver_component("fragment.proxy") {
   component_name = "fragment.proxy"
   deps = [ ":fragment.proxy-driver" ]
   info = "fragment.proxy-info.json"
-  colocate = true
+  manifest = "meta/fragment.proxy.cml"
 }

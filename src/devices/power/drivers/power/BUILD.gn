@@ -47,7 +47,7 @@ fuchsia_driver_component("power") {
   info = "power-info.json"
   component_name = "power"
   deps = [ ":power-driver" ]
-  colocate = true
+  manifest = "meta/power.cml"
 }
 
 test("power-test-bin") {

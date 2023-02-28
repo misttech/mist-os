@@ -48,5 +48,5 @@ fuchsia_driver_component("nelson-usb-phy") {
   info = "nelson-usb-phy-info.json"
   component_name = "nelson-usb-phy"
   deps = [ ":nelson-usb-phy-driver" ]
-  colocate = true
+  manifest = "meta/nelson-usb-phy.cml"
 }

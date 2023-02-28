@@ -42,7 +42,7 @@ fuchsia_driver_component("nelson-brownout-protection") {
   info = "nelson-brownout-protection-info.json"
   component_name = "nelson-brownout-protection"
   deps = [ ":nelson-brownout-protection-driver" ]
-  colocate = true
+  manifest = "meta/nelson-brownout-protection.cml"
 }
 
 test("nelson-brownout-protection-test-bin") {

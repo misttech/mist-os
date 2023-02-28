@@ -33,7 +33,7 @@ fuchsia_driver_component("pwm") {
   info = "pwm-info.json"
   component_name = "pwm"
   deps = [ ":pwm-driver" ]
-  colocate = true
+  manifest = "meta/pwm.cml"
 }
 
 test("pwm-test-bin") {

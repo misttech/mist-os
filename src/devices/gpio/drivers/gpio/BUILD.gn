@@ -44,7 +44,7 @@ fuchsia_driver_component("gpio") {
   component_name = "gpio"
   deps = [ ":gpio-driver" ]
   info = "gpio-info.json"
-  colocate = true
+  manifest = "meta/gpio.cml"
 }
 
 test("gpio-test-bin") {

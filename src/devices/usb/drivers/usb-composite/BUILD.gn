@@ -52,8 +52,7 @@ fuchsia_driver_component("usb-composite") {
   info = "usb-composite-info.json"
   component_name = "usb-composite"
   deps = [ ":usb-composite-driver" ]
-  colocate = true
-  fallback = true
+  manifest = "meta/usb-composite.cml"
 }
 
 test("usb-interface-test-bin") {

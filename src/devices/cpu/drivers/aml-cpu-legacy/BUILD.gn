@@ -49,7 +49,7 @@ fuchsia_driver_component("aml-cpu-legacy") {
   component_name = "aml-cpu-legacy"
   deps = [ ":aml-cpu-legacy-driver" ]
   info = "aml-cpu-legacy-info.json"
-  colocate = true
+  manifest = "meta/aml-cpu-legacy.cml"
 }
 
 test("aml-cpu-legacy-test-bin") {

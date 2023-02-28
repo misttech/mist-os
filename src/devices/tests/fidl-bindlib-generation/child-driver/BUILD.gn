@@ -33,5 +33,5 @@ fuchsia_driver_component("child-driver") {
   component_name = "fidl-bindlib-generation-child"
   deps = [ ":driver" ]
   info = "component-info.json"
-  colocate = true
+  manifest = "meta/child-driver.cml"
 }

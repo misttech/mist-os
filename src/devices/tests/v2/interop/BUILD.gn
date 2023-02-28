@@ -73,12 +73,12 @@ fuchsia_driver("v1_driver") {
 
 fuchsia_driver_component("v1") {
   testonly = true
-  colocate = true
   deps = [
     ":v1_driver",
     "//src/devices/misc/drivers/compat:driver",
   ]
   info = "v1-info.json"
+  manifest = "meta/v1.cml"
 }
 
 driver_bind_rules("interop_leaf_bind") {

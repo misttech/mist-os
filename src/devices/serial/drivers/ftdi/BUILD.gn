@@ -54,7 +54,7 @@ fuchsia_driver_component("ftdi") {
   info = "ftdi-info.json"
   component_name = "ftdi"
   deps = [ ":ftdi-driver" ]
-  colocate = true
+  manifest = "meta/ftdi.cml"
 }
 
 driver_bind_rules("ftdi_function_bind") {
@@ -96,7 +96,7 @@ fuchsia_driver_component("ftdi-fake-usb") {
   info = "ftdi-fake-usb-info.json"
   component_name = "ftdi-fake-usb"
   deps = [ ":ftdi-fake-usb-driver" ]
-  colocate = true
+  manifest = "meta/ftdi-fake-usb.cml"
 }
 
 group("tests") {

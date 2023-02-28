@@ -170,7 +170,7 @@ fuchsia_driver_component("block-verity") {
   component_name = "block-verity"
   deps = [ ":block-verity-driver" ]
   info = "block-verity-info.json"
-  colocate = true
+  manifest = "meta/block-verity.cml"
 }
 
 test("block-verity-test") {

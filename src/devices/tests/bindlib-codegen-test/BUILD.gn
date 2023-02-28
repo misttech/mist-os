@@ -91,7 +91,7 @@ fuchsia_driver_component("parent-driver") {
   component_name = "bindlib-codegen-parent"
   deps = [ ":parent-driver-driver" ]
   info = "parent-driver-info.json"
-  colocate = true
+  manifest = "meta/parent-driver.cml"
 }
 
 driver_bind_rules("child-driver-bind") {
@@ -122,7 +122,7 @@ fuchsia_driver_component("child-driver") {
   component_name = "bindlib-codegen-child"
   deps = [ ":child-driver-driver" ]
   info = "child-driver-info.json"
-  colocate = true
+  manifest = "meta/child-driver.cml"
 }
 
 rustc_test("bindlib-codegen-rust-test") {

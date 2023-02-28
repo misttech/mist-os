@@ -49,7 +49,7 @@ fuchsia_driver_component("aml-nna") {
   component_name = "aml-nna"
   deps = [ ":aml-nna-driver" ]
   info = "aml-nna-info.json"
-  colocate = false
+  manifest = "meta/aml-nna.cml"
 }
 
 test("aml-nna-test-bin") {

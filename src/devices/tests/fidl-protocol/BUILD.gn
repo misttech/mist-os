@@ -72,7 +72,7 @@ fuchsia_driver_component("parent") {
   component_name = "parent"
   deps = [ ":parent-driver" ]
   info = "parent-info.json"
-  colocate = true
+  manifest = "meta/parent.cml"
 }
 
 driver_bind_rules("child-driver-bind") {
@@ -99,7 +99,7 @@ fuchsia_driver_component("child") {
   component_name = "child"
   deps = [ ":child-driver" ]
   info = "child-info.json"
-  colocate = false
+  manifest = "meta/child.cml"
 }
 
 driver_bind_rules("isolated-child-driver-bind") {
@@ -126,7 +126,7 @@ fuchsia_driver_component("isolated-child") {
   info = "isolated-child-info.json"
 
   # The FidlProtocolTest.ColocateFlagIsRespected test checks that this flag has its intended effect.
-  colocate = false
+  manifest = "meta/isolated-child.cml"
 }
 
 group("tests") {

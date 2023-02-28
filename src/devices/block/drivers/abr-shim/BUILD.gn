@@ -42,7 +42,7 @@ fuchsia_driver_component("abr-shim") {
   component_name = "abr-shim"
   deps = [ ":abr-shim-driver" ]
   info = "abr-shim-info.json"
-  colocate = true
+  manifest = "meta/abr-shim.cml"
 }
 
 test("abr-shim-test-bin") {

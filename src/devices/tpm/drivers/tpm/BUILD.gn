@@ -39,7 +39,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("tpm-driver") {
   info = "tpm-driver-info.json"
   deps = [ ":fuchsia_driver" ]
-  colocate = true
+  manifest = "meta/tpm-driver.cml"
 }
 
 fuchsia_driver_package("tpm-pkg") {

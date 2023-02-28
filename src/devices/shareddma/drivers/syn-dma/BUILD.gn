@@ -78,7 +78,7 @@ fuchsia_driver_component("syn-dma") {
   component_name = "syn-dma"
   deps = [ ":syn-dma-driver" ]
   info = "syn-dhub-doc.json"
-  colocate = true
+  manifest = "meta/syn-dma.cml"
 }
 
 fuchsia_unittest_package("syn-dhub-test") {

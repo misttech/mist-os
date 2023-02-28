@@ -39,7 +39,7 @@ fuchsia_driver_component("aml-rtc") {
   info = "aml-rtc-info.json"
   component_name = "aml-rtc"
   deps = [ ":aml-rtc-driver" ]
-  colocate = true
+  manifest = "meta/aml-rtc.cml"
 }
 
 group("tests") {

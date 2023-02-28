@@ -58,7 +58,7 @@ fuchsia_driver_component("sdhci") {
   component_name = "sdhci"
   deps = [ ":sdhci-driver" ]
   info = "sdhci-info.json"
-  colocate = true
+  manifest = "meta/sdhci.cml"
 }
 
 test("sdhci-test-bin") {

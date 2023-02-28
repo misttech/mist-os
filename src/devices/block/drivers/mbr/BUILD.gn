@@ -56,7 +56,7 @@ fuchsia_driver_component("mbr") {
   component_name = "mbr"
   deps = [ ":mbr-driver" ]
   info = "mbr-info.json"
-  colocate = true
+  manifest = "meta/mbr.cml"
 }
 
 test("mbr-test-bin") {

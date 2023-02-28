@@ -46,7 +46,7 @@ fuchsia_driver_component("a1-usb-phy") {
   info = "a1-usb-phy-info.json"
   component_name = "a1-usb-phy"
   deps = [ ":a1-usb-phy-driver" ]
-  colocate = true
+  manifest = "meta/a1-usb-phy.cml"
 }
 
 test("a1-usb-phy-test-bin") {

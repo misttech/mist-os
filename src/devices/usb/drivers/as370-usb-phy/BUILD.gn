@@ -49,5 +49,5 @@ fuchsia_driver_component("as370-usb-phy") {
   info = "as370-usb-phy-info.json"
   component_name = "as370-usb-phy"
   deps = [ ":as370-usb-phy-driver" ]
-  colocate = true
+  manifest = "meta/as370-usb-phy.cml"
 }

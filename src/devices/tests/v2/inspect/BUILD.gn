@@ -52,7 +52,7 @@ fuchsia_driver_component("root") {
   component_name = "root"
   deps = [ ":root-driver" ]
   info = "root-info.json"
-  colocate = false
+  manifest = "meta/root.cml"
 }
 
 rustc_test("bin") {

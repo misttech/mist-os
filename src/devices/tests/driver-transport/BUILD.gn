@@ -68,7 +68,7 @@ fuchsia_driver_component("parent") {
   component_name = "parent"
   deps = [ ":parent-drv" ]
   info = "parent-info.json"
-  colocate = true
+  manifest = "meta/parent.cml"
 }
 
 driver_bind_rules("child-driver-bind") {
@@ -96,7 +96,7 @@ fuchsia_driver_component("child") {
   component_name = "child"
   deps = [ ":child-drv" ]
   info = "child-info.json"
-  colocate = true
+  manifest = "meta/child.cml"
 }
 
 group("tests") {

@@ -290,7 +290,7 @@ fuchsia_driver_component("buckeye") {
   component_name = "buckeye"
   deps = [ ":buckeye-driver" ]
   info = "buckeye-info.json"
-  colocate = true
+  manifest = "meta/buckeye.cml"
 }
 
 group("tests") {

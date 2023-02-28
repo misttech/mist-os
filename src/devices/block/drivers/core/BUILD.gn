@@ -25,8 +25,7 @@ fuchsia_driver_component("core") {
   component_name = "block.core"
   deps = [ ":core-driver" ]
   info = "core-info.json"
-  uses_profiles = true
-  colocate = true
+  manifest = "meta/core.cml"
 }
 
 group("tests") {

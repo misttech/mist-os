@@ -46,7 +46,7 @@ fuchsia_driver_component("as370-thermal") {
   info = "as370-thermal-info.json"
   component_name = "aml-thermal"
   deps = [ ":as370-thermal-driver" ]
-  colocate = true
+  manifest = "meta/as370-thermal.cml"
 }
 
 test("as370-thermal-test-bin") {

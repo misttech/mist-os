@@ -41,7 +41,7 @@ fuchsia_driver_component("mock-device") {
   component_name = "mock-device"
   deps = [ ":mock-device-driver" ]
   info = "mock-device-info.json"
-  colocate = true
+  manifest = "meta/mock-device.cml"
 }
 
 fidl("fuchsia.device.mock") {

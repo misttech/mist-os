@@ -43,7 +43,7 @@ fuchsia_driver_component("root") {
   component_name = "root-driver"
   deps = [ ":root-driver" ]
   info = "root-driver-info.json"
-  colocate = true
+  manifest = "meta/root.cml"
 }
 
 driver_bind_rules("leaf-driver-bind") {
@@ -69,7 +69,7 @@ fuchsia_driver_component("leaf") {
   component_name = "leaf-driver"
   deps = [ ":leaf-driver" ]
   info = "leaf-driver-info.json"
-  colocate = true
+  manifest = "meta/leaf.cml"
 }
 
 driver_bind_rules("node-group-bind") {
@@ -93,5 +93,5 @@ fuchsia_driver_component("node-group") {
   component_name = "node-group-driver"
   deps = [ ":node-group-driver" ]
   info = "node-group-driver-info.json"
-  colocate = true
+  manifest = "meta/node-group.cml"
 }

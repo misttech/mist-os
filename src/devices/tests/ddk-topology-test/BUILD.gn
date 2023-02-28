@@ -42,7 +42,7 @@ fuchsia_driver("ddk-topology-test") {
 fuchsia_driver_component("ddk-topology-test-driver") {
   deps = [ ":ddk-topology-test" ]
   info = "ddk-topology-test-driver-info.json"
-  colocate = true
+  manifest = "meta/ddk-topology-test-driver.cml"
 }
 
 rustc_test("ddk_topology_test") {

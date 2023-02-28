@@ -49,7 +49,7 @@ fuchsia_driver_component("nandpart") {
   info = "nandpart-info.json"
   component_name = "nandpart"
   deps = [ ":nandpart-driver" ]
-  colocate = true
+  manifest = "meta/nandpart.cml"
 }
 
 test("nandpart-test-bin") {

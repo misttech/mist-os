@@ -49,7 +49,7 @@ fuchsia_driver_component("usb-virtual-bus") {
   info = "usb-virtual-bus-info.json"
   component_name = "usb-virtual-bus"
   deps = [ ":usb-virtual-bus-driver" ]
-  colocate = true
+  manifest = "meta/usb-virtual-bus.cml"
 }
 
 bind_library("fuchsia.usb.test") {
@@ -96,7 +96,7 @@ fuchsia_driver_component("virtual-bus-tester") {
   info = "virtual-bus-tester-info.json"
   component_name = "virtual-bus-tester"
   deps = [ ":virtual-bus-tester-driver" ]
-  colocate = true
+  manifest = "meta/virtual-bus-tester.cml"
 }
 
 driver_bind_rules("usb-virtual-bus-tester-function-bind") {
@@ -135,7 +135,7 @@ fuchsia_driver_component("virtual-bus-tester-function") {
   info = "virtual-bus-tester-function-info.json"
   component_name = "virtual-bus-tester-function"
   deps = [ ":virtual-bus-tester-function-driver" ]
-  colocate = true
+  manifest = "meta/virtual-bus-tester-function.cml"
 }
 
 test("usb-virtual-bus-test-bin") {

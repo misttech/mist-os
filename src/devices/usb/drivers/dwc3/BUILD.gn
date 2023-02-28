@@ -51,7 +51,7 @@ fuchsia_driver_component("dwc3") {
   info = "dwc3-info.json"
   component_name = "dwc3"
   deps = [ ":dwc3-driver" ]
-  colocate = true
+  manifest = "meta/dwc3.cml"
 }
 
 test("dwc3-test-bin") {
