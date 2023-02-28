@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MessageBufEtc};
 use futures::ready;
 
-use crate::{OnSignals, RWHandle};
+use crate::{OnSignals, RWHandle, ReadableHandle as _};
 
 /// An I/O object representing a `Channel`.
 pub struct Channel(RWHandle<zx::Channel>);
@@ -39,14 +39,19 @@ impl Channel {
         Ok(Channel(RWHandle::new(channel)?))
     }
 
-    /// Tests to see if the channel received a OBJECT_PEER_CLOSED signal
+    /// Consumes `self` and returns the underlying `zx::Channel`.
+    pub fn into_zx_channel(self) -> zx::Channel {
+        self.0.into_inner()
+    }
+
+    /// Returns true if the channel received the `OBJECT_PEER_CLOSED` signal.
     pub fn is_closed(&self) -> bool {
         self.0.is_closed()
     }
 
     /// Returns a future that completes when `is_closed()` is true.
     pub fn on_closed<'a>(&'a self) -> OnSignals<'a> {
-        OnSignals::new(self, zx::Signals::CHANNEL_PEER_CLOSED)
+        self.0.on_closed()
     }
 
     /// Receives a message on the channel and registers this `Channel` as
@@ -60,10 +65,10 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::Handle>,
     ) -> Poll<Result<(), zx::Status>> {
-        ready!(self.0.poll_read(cx))?;
+        ready!(self.0.poll_readable(cx))?;
         let res = self.0.get_ref().read_split(bytes, handles);
         if res == Err(zx::Status::SHOULD_WAIT) {
-            self.0.need_read(cx)?;
+            self.0.need_readable(cx)?;
             return Poll::Pending;
         }
         Poll::Ready(res)
@@ -80,10 +85,10 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::HandleInfo>,
     ) -> Poll<Result<(), zx::Status>> {
-        ready!(self.0.poll_read(cx))?;
+        ready!(self.0.poll_readable(cx))?;
         let res = self.0.get_ref().read_etc_split(bytes, handles);
         if res == Err(zx::Status::SHOULD_WAIT) {
-            self.0.need_read(cx)?;
+            self.0.need_readable(cx)?;
             return Poll::Pending;
         }
         Poll::Ready(res)
@@ -141,11 +146,6 @@ impl Channel {
         handles: &mut [zx::HandleDisposition<'_>],
     ) -> Result<(), zx::Status> {
         self.0.get_ref().write_etc(bytes, handles)
-    }
-
-    /// Consumes self and returns the underlying zx::Channel
-    pub fn into_zx_channel(self) -> zx::Channel {
-        self.0.into_inner()
     }
 }
 

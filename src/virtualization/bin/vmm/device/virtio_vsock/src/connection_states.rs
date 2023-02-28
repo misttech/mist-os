@@ -61,15 +61,20 @@ use {
     anyhow::{anyhow, Error},
     fidl::client::QueryResponseFut,
     fidl_fuchsia_virtualization::HostVsockEndpointConnectResponder,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async::{
+        self as fasync, ReadableHandle as _, ReadableState, WritableHandle as _, WritableState,
+    },
+    fuchsia_zircon as zx,
     futures::{
         channel::mpsc::UnboundedSender,
         future::{self, poll_fn},
+        task::noop_waker_ref,
     },
     std::{
         cell::{Cell, RefCell},
         convert::TryFrom,
         io::Write,
+        task::Context,
     },
     virtio_device::{
         chain::{ReadableChain, WritableChain},
@@ -428,19 +433,17 @@ impl ReadWrite {
     async fn send_credit_update_when_credit_available(&self) -> Result<SocketState, Error> {
         // By default async sockets cache signals until a read or write failure, but the
         // device requires an accurate signal before sending the guest a credit update.
-        self.socket.reacquire_write_signal()?;
-        match poll_fn(move |cx| self.socket.poll_write_task(cx)).await {
-            Ok(signals) => {
-                if signals.contains(zx::Signals::OBJECT_PEER_CLOSED) {
-                    self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
-                    self.send_half_shutdown_packet();
-                    Ok(SocketState::Closed)
-                } else {
-                    self.send_credit_update()
-                        .map(|()| SocketState::Ready)
-                        .map_err(|err| anyhow!("failed to send credit update: {}", err))
-                }
+        self.socket.need_writable(&mut Context::from_waker(noop_waker_ref()))?;
+        match poll_fn(move |cx| self.socket.poll_writable(cx)).await {
+            Ok(WritableState::Closed) => {
+                self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
+                self.send_half_shutdown_packet();
+                Ok(SocketState::Closed)
             }
+            Ok(WritableState::Writable) => self
+                .send_credit_update()
+                .map(|()| SocketState::Ready)
+                .map_err(|err| anyhow!("failed to send credit update: {}", err)),
             Err(err) => Err(anyhow!("failed to poll write task: {}", err)),
         }
     }
@@ -474,19 +477,18 @@ impl ReadWrite {
     }
 
     async fn get_rx_socket_state(&self) -> SocketState {
-        if let Err(_) = self.socket.reacquire_read_signal() {
+        if let Err(_) = self.socket.need_readable(&mut Context::from_waker(noop_waker_ref())) {
             return SocketState::Closed;
         }
-
-        match poll_fn(move |cx| self.socket.poll_read_task(cx)).await {
-            Ok(signals) if !signals.contains(zx::Signals::OBJECT_PEER_CLOSED) => {
+        match poll_fn(move |cx| self.socket.poll_readable(cx)).await {
+            Ok(ReadableState::Readable) => {
                 if self.socket.as_ref().outstanding_read_bytes().unwrap_or(0) == 0 {
                     SocketState::SpuriousWakeup
                 } else {
                     SocketState::Ready
                 }
             }
-            _ => {
+            Err(_) | Ok(ReadableState::Closed | ReadableState::ReadableAndClosed) => {
                 match self.socket.as_ref().outstanding_read_bytes() {
                     Ok(size) if size > 0 => {
                         // The socket peer is closed, but bytes remain on the local socket that

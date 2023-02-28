@@ -9,7 +9,8 @@ use {
     cm_logger::scoped::ScopedLogger,
     fidl::prelude::*,
     fidl_fuchsia_logger::LogSinkMarker,
-    fidl_fuchsia_process as fproc, fuchsia_async as fasync,
+    fidl_fuchsia_process as fproc,
+    fuchsia_async::{self as fasync, ReadableHandle as _, ReadableState},
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon as zx,
     futures::{Stream, StreamExt},
@@ -202,31 +203,19 @@ impl Stream for NewlineChunker {
             return Poll::Ready(Some(Ok(chunk)));
         }
 
-        // we don't have a chunk to return, find out how much buffer we should make available
-        let bytes_in_socket = match this.socket.as_ref().outstanding_read_bytes()? {
-            0 => {
-                // if there are no bytes available this socket should not be considered readable
-                this.socket.reacquire_read_signal()?;
+        // we don't have a chunk to return, poll for reading the socket
+        match futures::ready!(this.socket.poll_readable(cx))? {
+            ReadableState::Closed => return this.end_of_stream(),
+            ReadableState::Readable | ReadableState::ReadableAndClosed => {}
+        }
 
-                // if the socket has no contents we need to wait for them or handle it being closed
-                let signals = futures::ready!(this.socket.poll_read_task(cx))?;
-                if !signals.contains(zx::Signals::OBJECT_READABLE) {
-                    return this.end_of_stream();
-                } else {
-                    // the socket got data in between our first call and poll_read_task,
-                    // otherwise poll_read_task would either have returned Poll::Pending (no data)
-                    // or `signals` would not have `OBJECT_READABLE`.
-                    let outstanding = this.socket.as_ref().outstanding_read_bytes()?;
-                    if outstanding == 0 {
-                        return Poll::Ready(Some(Err(anyhow::format_err!(
-                            "socket signals are readable but kernel says no bytes available"
-                        ))));
-                    }
-                    outstanding
-                }
-            }
-            n => n,
-        };
+        // find out how much buffer we should make available
+        let bytes_in_socket = this.socket.as_ref().outstanding_read_bytes()?;
+        if bytes_in_socket == 0 {
+            // if there are no bytes available this socket should not be considered readable
+            this.socket.need_readable(cx)?;
+            return Poll::Pending;
+        }
 
         // don't make the buffer bigger than necessary to get a chunk out
         let bytes_to_read = std::cmp::min(bytes_in_socket, MAX_MESSAGE_SIZE);
@@ -236,36 +225,34 @@ impl Stream for NewlineChunker {
         // to shrink it back down before any subsequent calls to poll_next
         this.buffer.resize(prev_len + bytes_to_read, 0);
 
-        let bytes_read = match this.socket.poll_read_ref(cx, &mut this.buffer[prev_len..]) {
-            Poll::Ready(Ok(b)) => b,
-            Poll::Ready(Err(e)) => {
+        let bytes_read = match this.socket.as_ref().read(&mut this.buffer[prev_len..]) {
+            Ok(b) => b,
+            Err(zx::Status::PEER_CLOSED) => return this.end_of_stream(),
+            Err(zx::Status::SHOULD_WAIT) => {
+                // reset the size of the buffer to exclude the 0's we wrote above
+                this.buffer.truncate(prev_len);
+                return Poll::Ready(Some(Err(anyhow!(
+                    "Got SHOULD_WAIT from socket read after confirming outstanding_read_bytes > 0"
+                ))));
+            }
+            Err(e) => {
                 // reset the size of the buffer to exclude the 0's we wrote above
                 this.buffer.truncate(prev_len);
                 return Poll::Ready(Some(Err(e.into())));
-            }
-            Poll::Pending => {
-                // reset the size of the buffer to exclude the 0's we wrote above
-                this.buffer.truncate(prev_len);
-                return Poll::Pending;
             }
         };
 
         // handle possible short reads
         this.buffer.truncate(prev_len + bytes_read);
 
-        if bytes_read == 0 {
-            // no bytes read and no pending returned, the socket is closed
-            this.end_of_stream()
+        // we got something out of the socket
+        if let Some(chunk) = this.next_chunk_from_buffer() {
+            // and its enough for a chunk
+            Poll::Ready(Some(Ok(chunk)))
         } else {
-            // we got something out of the socket
-            if let Some(chunk) = this.next_chunk_from_buffer() {
-                // and its enough for a chunk
-                Poll::Ready(Some(Ok(chunk)))
-            } else {
-                // it is not enough for a chunk, request notification when there's more
-                this.socket.need_read(cx)?;
-                Poll::Pending
-            }
+            // it is not enough for a chunk, request notification when there's more
+            this.socket.need_readable(cx)?;
+            Poll::Pending
         }
     }
 }

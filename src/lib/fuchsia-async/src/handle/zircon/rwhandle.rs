@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration},
+    crate::{
+        runtime::{EHandle, PacketReceiver, ReceiverRegistration},
+        OnSignals,
+    },
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::task::{AtomicWaker, Context, Poll},
     std::sync::{
@@ -15,6 +18,96 @@ use {
 const OBJECT_PEER_CLOSED: zx::Signals = zx::Signals::OBJECT_PEER_CLOSED;
 const OBJECT_READABLE: zx::Signals = zx::Signals::OBJECT_READABLE;
 const OBJECT_WRITABLE: zx::Signals = zx::Signals::OBJECT_WRITABLE;
+
+/// State of an object when it is ready for reading.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum ReadableState {
+    /// Received `OBJECT_READABLE`, or optimistically assuming the object is readable.
+    Readable,
+    /// Received `OBJECT_PEER_CLOSED`.
+    Closed,
+    /// Both `Readable` and `Closed` apply.
+    ReadableAndClosed,
+}
+
+/// State of an object when it is ready for writing.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum WritableState {
+    /// Received `OBJECT_WRITABLE`, or optimistically assuming the object is writable.
+    Writable,
+    /// Received `OBJECT_PEER_CLOSED`.
+    Closed,
+}
+
+/// A `Handle` that receives notifications when it is readable.
+///
+/// # Examples
+///
+/// ```
+/// ready!(self.poll_readable(cx))?;
+/// match /* make read syscall */ {
+///     Err(zx::Status::SHOULD_WAIT) => {
+///         self.need_readable(cx)?;
+///         Poll::Pending
+///     }
+///     status => Poll::Ready(status),
+/// }
+/// ```
+pub trait ReadableHandle {
+    /// If the object is ready for reading, returns `Ready` with the readable
+    /// state. If the implementor returns Pending, it should first ensure that
+    /// `need_readable` is called.
+    ///
+    /// This should be called in a poll function before making a read syscall.
+    /// If the syscall returns `SHOULD_WAIT`, you must call `need_readable` to
+    /// schedule wakeup when the object is readable.
+    ///
+    /// The returned `ReadableState` does not necessarily reflect an observed
+    /// `OBJECT_READABLE` signal. We optimistically assume the object remains
+    /// readable until `need_readable` is called. If you only want to read once
+    /// the object is confirmed to be readable, call `need_readable` with a
+    /// no-op waker before the first poll.
+    fn poll_readable(&self, cx: &mut Context<'_>) -> Poll<Result<ReadableState, zx::Status>>;
+
+    /// Arranges for the current task to be woken when the object receives an
+    /// `OBJECT_READABLE` or `OBJECT_PEER_CLOSED` signal.
+    fn need_readable(&self, cx: &mut Context<'_>) -> Result<(), zx::Status>;
+}
+
+/// A `Handle` that receives notifications when it is writable.
+///
+/// # Examples
+///
+/// ```
+/// ready!(self.poll_writable(cx))?;
+/// match /* make write syscall */ {
+///     Err(zx::Status::SHOULD_WAIT) => {
+///         self.need_writable(cx)?;
+///         Poll::Pending
+///     }
+///     status => Poll::Ready(status),
+/// }
+/// ```
+pub trait WritableHandle {
+    /// If the object is ready for writing, returns `Ready` with the writable
+    /// state. If the implementor returns Pending, it should first ensure that
+    /// `need_writable` is called.
+    ///
+    /// This should be called in a poll function before making a write syscall.
+    /// If the syscall returns `SHOULD_WAIT`, you must call `need_writable` to
+    /// schedule wakeup when the object is writable.
+    ///
+    /// The returned `WritableState` does not necessarily reflect an observed
+    /// `OBJECT_WRITABLE` signal. We optimistically assume the object remains
+    /// writable until `need_writable` is called. If you only want to write once
+    /// the object is confirmed to be writable, call `need_writable` with a
+    /// no-op waker before the first poll.
+    fn poll_writable(&self, cx: &mut Context<'_>) -> Poll<Result<WritableState, zx::Status>>;
+
+    /// Arranges for the current task to be woken when the object receives an
+    /// `OBJECT_WRITABLE` or `OBJECT_PEER_CLOSED` signal.
+    fn need_writable(&self, cx: &mut Context<'_>) -> Result<(), zx::Status>;
+}
 
 struct RWPacketReceiver {
     signals: AtomicU32,
@@ -92,67 +185,27 @@ where
         &mut self.handle
     }
 
-    /// Consumes this type, returning the inner handle.
+    /// Consumes `self` and returns the underlying handle.
     pub fn into_inner(self) -> T {
         self.handle
     }
 
-    /// Tests to see if the channel received a `OBJECT_PEER_CLOSED` signal
+    /// Returns true if the object received the `OBJECT_PEER_CLOSED` signal.
     pub fn is_closed(&self) -> bool {
         let signals =
             zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::Relaxed));
         signals.contains(OBJECT_PEER_CLOSED)
     }
 
-    /// Tests if the resource currently has either the provided `signal`
-    /// or the `OBJECT_PEER_CLOSED` signal set.
-    fn poll_signal_or_closed(
-        &self,
-        cx: &mut Context<'_>,
-        task: &AtomicWaker,
-        signal: zx::Signals,
-    ) -> Poll<Result<zx::Signals, zx::Status>> {
-        let signals =
-            zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::SeqCst));
-        let was_closed = signals.contains(OBJECT_PEER_CLOSED);
-        let was_signal = signals.contains(signal);
-        if was_closed || was_signal {
-            let mask = signal | OBJECT_PEER_CLOSED;
-            Poll::Ready(Ok(signals & mask))
-        } else {
-            self.need_signal(cx, task, signal)?;
-            Poll::Pending
-        }
-    }
-
-    /// Tests to see if this resource is ready to be read from.
-    /// If it is not, it arranges for the current task to receive a notification
-    /// when a "readable" or "closed" signal arrives.
-    /// Returns the cached signals, masked to `OBJECT_READABLE` and
-    /// `OBJECT_PEER_CLOSED`. If the read syscall returns `SHOULD_WAIT`, you
-    /// must call `need_read` to clear the cached state and wait for the
-    /// resource to become readable again.
-    pub fn poll_read(&self, cx: &mut Context<'_>) -> Poll<Result<zx::Signals, zx::Status>> {
-        self.poll_signal_or_closed(cx, &self.receiver.read_task, OBJECT_READABLE)
-    }
-
-    /// Tests to see if this resource is ready to be written to.
-    /// If it is not, it arranges for the current task to receive a notification
-    /// when a "writable" or "closed" signal arrives.
-    /// Returns the cached signals, masked to `OBJECT_WRITABLE` and
-    /// `OBJECT_PEER_CLOSED`. If the write syscall returns `SHOULD_WAIT`,
-    /// you must call `need_write` to clear the cached state and wait for the
-    /// resource to become writable again.
-    pub fn poll_write(&self, cx: &mut Context<'_>) -> Poll<Result<zx::Signals, zx::Status>> {
-        self.poll_signal_or_closed(cx, &self.receiver.write_task, OBJECT_WRITABLE)
+    /// Returns a future that completes when `is_closed()` is true.
+    pub fn on_closed<'a>(&'a self) -> OnSignals<'a> {
+        OnSignals::new(&self.handle, OBJECT_PEER_CLOSED)
     }
 
     fn receiver(&self) -> &RWPacketReceiver {
         self.receiver.receiver()
     }
 
-    /// Arranges for the current task to receive a notification when a
-    /// given signal arrives.
     fn need_signal(
         &self,
         cx: &mut Context<'_>,
@@ -170,18 +223,6 @@ where
         )
     }
 
-    /// Arranges for the current task to receive a notification when a
-    /// "readable" signal arrives.
-    pub fn need_read(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
-        self.need_signal(cx, &self.receiver.read_task, OBJECT_READABLE)
-    }
-
-    /// Arranges for the current task to receive a notification when a
-    /// "writable" signal arrives.
-    pub fn need_write(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
-        self.need_signal(cx, &self.receiver.write_task, OBJECT_WRITABLE)
-    }
-
     fn schedule_packet(&self, signals: zx::Signals) -> Result<(), zx::Status> {
         crate::runtime::schedule_packet(
             self.handle.as_handle_ref(),
@@ -189,5 +230,50 @@ where
             self.receiver.key(),
             signals,
         )
+    }
+}
+
+impl<T> ReadableHandle for RWHandle<T>
+where
+    T: AsHandleRef,
+{
+    fn poll_readable(&self, cx: &mut Context<'_>) -> Poll<Result<ReadableState, zx::Status>> {
+        let signals =
+            zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::SeqCst));
+        match (signals.contains(OBJECT_READABLE), signals.contains(OBJECT_PEER_CLOSED)) {
+            (true, false) => Poll::Ready(Ok(ReadableState::Readable)),
+            (false, true) => Poll::Ready(Ok(ReadableState::Closed)),
+            (true, true) => Poll::Ready(Ok(ReadableState::ReadableAndClosed)),
+            (false, false) => {
+                self.need_signal(cx, &self.receiver.read_task, OBJECT_READABLE)?;
+                Poll::Pending
+            }
+        }
+    }
+
+    fn need_readable(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
+        self.need_signal(cx, &self.receiver.read_task, OBJECT_READABLE)
+    }
+}
+
+impl<T> WritableHandle for RWHandle<T>
+where
+    T: AsHandleRef,
+{
+    fn poll_writable(&self, cx: &mut Context<'_>) -> Poll<Result<WritableState, zx::Status>> {
+        let signals =
+            zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::SeqCst));
+        match (signals.contains(OBJECT_WRITABLE), signals.contains(OBJECT_PEER_CLOSED)) {
+            (_, true) => Poll::Ready(Ok(WritableState::Closed)),
+            (true, _) => Poll::Ready(Ok(WritableState::Writable)),
+            (false, false) => {
+                self.need_signal(cx, &self.receiver.write_task, OBJECT_WRITABLE)?;
+                Poll::Pending
+            }
+        }
+    }
+
+    fn need_writable(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
+        self.need_signal(cx, &self.receiver.write_task, OBJECT_WRITABLE)
     }
 }

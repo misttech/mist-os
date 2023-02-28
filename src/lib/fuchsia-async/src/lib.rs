@@ -41,7 +41,7 @@ pub mod net;
 #[cfg(target_os = "fuchsia")]
 pub use self::handle::{
     fifo::{Fifo, FifoEntry, FifoReadable, FifoWritable, ReadEntries, ReadOne, WriteEntries},
-    rwhandle::RWHandle,
+    rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState},
 };
 
 /// An emulation library for Zircon handles on non-Fuchsia platforms.
