@@ -37,6 +37,7 @@ _sdk_versioned_source_sets_list = [
   "//sdk/lib/driver/runtime:driver_runtime_env",
   "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
   "//sdk/lib/component/incoming/cpp",
+  "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/fdio:fdio-spawn-actions",
   "//sdk/lib/fidl",
   "//sdk/lib/fidl/cpp",

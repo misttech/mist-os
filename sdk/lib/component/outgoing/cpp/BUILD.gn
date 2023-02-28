@@ -26,7 +26,7 @@ _shared_public_deps = [
 _shared_public_configs = [ "//sdk/config" ]
 
 sdk_source_set("cpp") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "component_outgoing_cpp"
   include_base = "//sdk"
 
