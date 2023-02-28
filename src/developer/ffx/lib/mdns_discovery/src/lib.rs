@@ -1,26 +1,27 @@
-use std::os::unix::prelude::AsRawFd;
-
-use mdns::protocol::Type;
-
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::MdnsProtocolInner;
+
 use anyhow::{Context as _, Result};
 use async_io::Async;
 use async_lock::Mutex;
 use async_net::UdpSocket;
-use ffx_config::get;
+use async_trait::async_trait;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use fuchsia_async::{Task, Timer};
 use futures::FutureExt;
 use mdns::protocol as dns;
+use mdns::protocol::Type;
 use netext::{get_mcast_interfaces, IsLocalAddr};
 use packet::{InnerPacketBuilder, ParseBuffer};
+use std::os::unix::prelude::AsRawFd;
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     fmt::Write,
+    hash::{Hash, Hasher},
+    marker::Copy,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     rc::{Rc, Weak},
     time::Duration,
@@ -30,20 +31,92 @@ use zerocopy::ByteSlice;
 const MDNS_MCAST_V4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
 const MDNS_MCAST_V6: Ipv6Addr = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 0x00fb);
 
-#[cfg(not(test))]
-const MDNS_PORT: u16 = 5353;
-#[cfg(test)]
-const MDNS_PORT: u16 = 0;
+#[derive(Debug)]
+pub struct CachedTarget {
+    target: ffx::TargetInfo,
+    // TODO(fxbug.dev/84729)
+    #[allow(unused)]
+    eviction_task: Option<Task<()>>,
+}
 
-pub(crate) struct DiscoveryConfig {
+impl CachedTarget {
+    fn new(target: ffx::TargetInfo) -> Self {
+        Self { target, eviction_task: None }
+    }
+
+    fn new_with_task(target: ffx::TargetInfo, eviction_task: Task<()>) -> Self {
+        Self { target, eviction_task: Some(eviction_task) }
+    }
+}
+
+impl Hash for CachedTarget {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.target.nodename.as_ref().unwrap_or(&"<unknown>".to_string()).hash(state);
+    }
+}
+
+impl PartialEq for CachedTarget {
+    fn eq(&self, other: &CachedTarget) -> bool {
+        self.target.nodename.eq(&other.target.nodename)
+    }
+}
+
+impl Eq for CachedTarget {}
+
+pub struct MdnsProtocol {
+    pub events_in: async_channel::Receiver<ffx::MdnsEventType>,
+    pub events_out: async_channel::Sender<ffx::MdnsEventType>,
+    pub target_cache: RefCell<HashSet<CachedTarget>>,
+}
+
+impl MdnsProtocol {
+    pub async fn handle_target(self: &Rc<Self>, t: ffx::TargetInfo, ttl: u32) {
+        let weak = Rc::downgrade(self);
+        let t_clone = t.clone();
+        let eviction_task = Task::local(async move {
+            fuchsia_async::Timer::new(Duration::from_secs(ttl.into())).await;
+            if let Some(this) = weak.upgrade() {
+                this.evict_target(t_clone).await;
+            }
+        });
+
+        if self
+            .target_cache
+            .borrow_mut()
+            .replace(CachedTarget::new_with_task(t.clone(), eviction_task))
+            .is_none()
+        {
+            self.publish_event(ffx::MdnsEventType::TargetFound(t)).await;
+        } else {
+            self.publish_event(ffx::MdnsEventType::TargetRediscovered(t)).await
+        }
+    }
+
+    async fn evict_target(&self, t: ffx::TargetInfo) {
+        if self.target_cache.borrow_mut().remove(&CachedTarget::new(t.clone())) {
+            self.publish_event(ffx::MdnsEventType::TargetExpired(t)).await
+        }
+    }
+
+    async fn publish_event(&self, event: ffx::MdnsEventType) {
+        let _ = self.events_out.send(event).await;
+    }
+
+    pub fn target_cache(&self) -> Vec<ffx::TargetInfo> {
+        self.target_cache.borrow().iter().map(|c| c.target.clone()).collect()
+    }
+}
+
+pub struct DiscoveryConfig {
     pub socket_tasks: Rc<Mutex<HashMap<IpAddr, Task<()>>>>,
-    pub mdns_protocol: Weak<MdnsProtocolInner>,
+    pub mdns_protocol: Weak<MdnsProtocol>,
     pub discovery_interval: Duration,
     pub query_interval: Duration,
     pub ttl: u32,
+    pub mdns_port: u16,
 }
 
-async fn propagate_bind_event(sock: &UdpSocket, svc: &Weak<MdnsProtocolInner>) -> u16 {
+async fn propagate_bind_event(sock: &UdpSocket, svc: &Weak<MdnsProtocol>) -> u16 {
     let port = match sock.local_addr().unwrap() {
         SocketAddr::V4(s) => s.port(),
         SocketAddr::V6(s) => s.port(),
@@ -58,15 +131,22 @@ async fn propagate_bind_event(sock: &UdpSocket, svc: &Weak<MdnsProtocolInner>) -
     port
 }
 
-async fn is_mdns_enabled() -> bool {
-    get("discovery.mdns.enabled").await.unwrap_or(true)
+#[async_trait(?Send)]
+pub trait MdnsEnabledChecker {
+    async fn enabled(&self) -> bool;
 }
 
 // discovery_loop iterates over all multicast interfaces and adds them to
 // the socket_tasks if there is not already a task for that interface.
-pub(crate) async fn discovery_loop(config: DiscoveryConfig) {
-    let DiscoveryConfig { socket_tasks, mdns_protocol, discovery_interval, query_interval, ttl } =
-        config;
+pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledChecker + 'static) {
+    let DiscoveryConfig {
+        socket_tasks,
+        mdns_protocol,
+        discovery_interval,
+        query_interval,
+        ttl,
+        mdns_port,
+    } = config;
     // See fxbug.dev/62617#c10 for details. A macOS system can end up in
     // a situation where the default routes for protocols are on
     // non-functional interfaces, and under such conditions the wildcard
@@ -85,127 +165,140 @@ pub(crate) async fn discovery_loop(config: DiscoveryConfig) {
     let mut v4_listen_socket: Weak<UdpSocket> = Weak::new();
     let mut v6_listen_socket: Weak<UdpSocket> = Weak::new();
 
+    let checker_strong = Rc::new(checker);
+    let checker = Rc::downgrade(&checker_strong);
+
     loop {
-        if is_mdns_enabled().await {
-            if v4_listen_socket.upgrade().is_none() {
-                match make_listen_socket((MDNS_MCAST_V4, MDNS_PORT).into())
-                    .context("make_listen_socket for IPv4")
-                {
-                    Ok(sock) => {
-                        // TODO(awdavies): Networking tests appear to fail when
-                        // using IPv6. Only propagates the port binding event for
-                        // IPv4.
-                        let _ = propagate_bind_event(&sock, &mdns_protocol).await;
-                        let sock = Rc::new(sock);
-                        v4_listen_socket = Rc::downgrade(&sock);
-                        Task::local(recv_loop(sock, mdns_protocol.clone())).detach();
-                        should_log_v4_listen_error = true;
-                    }
-                    Err(err) => {
-                        if should_log_v4_listen_error {
-                            tracing::error!(
-                                "unable to bind IPv4 listen socket: {}. Discovery may fail.",
-                                err
-                            );
-                            should_log_v4_listen_error = false;
-                        }
-                    }
-                }
-            }
+        let should_wait = match checker.upgrade() {
+            Some(c) => !c.enabled().await,
+            None => false,
+        };
 
-            if v6_listen_socket.upgrade().is_none() {
-                match make_listen_socket((MDNS_MCAST_V6, MDNS_PORT).into())
-                    .context("make_listen_socket for IPv6")
-                {
-                    Ok(sock) => {
-                        let sock = Rc::new(sock);
-                        v6_listen_socket = Rc::downgrade(&sock);
-                        Task::local(recv_loop(sock, mdns_protocol.clone())).detach();
-                        should_log_v6_listen_error = true;
-                    }
-                    Err(err) => {
-                        if should_log_v6_listen_error {
-                            tracing::error!(
-                                "unable to bind IPv6 listen socket: {}. Discovery may fail.",
-                                err
-                            );
-                            should_log_v6_listen_error = false;
-                        }
-                    }
-                }
-            }
+        if should_wait {
+            Timer::new(discovery_interval).await;
+            continue;
+        }
 
-            // As some operating systems will not error sendmsg/recvmsg for UDP
-            // sockets bound to addresses that no longer exist, they must be removed
-            // by ensuring that they still exist, otherwise we may be sending out
-            // unanswerable queries.
-            let mut to_delete = HashSet::<IpAddr>::new();
-            for ip in socket_tasks.lock().await.keys() {
-                to_delete.insert(*ip);
-            }
-
-            for iface in get_mcast_interfaces().unwrap_or_default() {
-                match iface.id() {
-                    Ok(id) => {
-                        if let Some(sock) = v6_listen_socket.upgrade() {
-                            let _ = sock.join_multicast_v6(&MDNS_MCAST_V6, id);
-                        }
-                    }
-                    Err(err) => {
-                        tracing::warn!("{}", err);
-                    }
-                }
-
-                for addr in iface.addrs.iter() {
-                    to_delete.remove(&addr.ip());
-
-                    let mut addr = *addr;
-                    addr.set_port(0);
-
-                    // TODO(raggi): remove duplicate joins, log unexpected errors
-                    if let SocketAddr::V4(addr) = addr {
-                        if let Some(sock) = v4_listen_socket.upgrade() {
-                            let _ = sock.join_multicast_v4(MDNS_MCAST_V4, *addr.ip());
-                        }
-                    }
-
-                    if socket_tasks.lock().await.get(&addr.ip()).is_some() {
-                        continue;
-                    }
-
-                    let sock = iface
-                        .id()
-                        .map(|id| match make_sender_socket(id, addr, ttl) {
-                            Ok(sock) => Some(sock),
-                            Err(err) => {
-                                tracing::error!("mdns: failed to bind {}: {}", &addr, err);
-                                None
-                            }
-                        })
-                        .ok()
-                        .flatten();
-
-                    if sock.is_some() {
-                        socket_tasks.lock().await.insert(
-                            addr.ip(),
-                            Task::local(query_recv_loop(
-                                Rc::new(sock.unwrap()),
-                                mdns_protocol.clone(),
-                                query_interval,
-                                socket_tasks.clone(),
-                            )),
-                        );
-                    }
-                }
-            }
-
-            // Drop tasks for IP addresses no longer found on the system.
+        if v4_listen_socket.upgrade().is_none() {
+            match make_listen_socket((MDNS_MCAST_V4, mdns_port).into())
+                .context("make_listen_socket for IPv4")
             {
-                let mut tasks = socket_tasks.lock().await;
-                for ip in to_delete {
-                    if let Some(handle) = tasks.remove(&ip) {
-                        handle.cancel().await;
+                Ok(sock) => {
+                    // TODO(awdavies): Networking tests appear to fail when
+                    // using IPv6. Only propagates the port binding event for
+                    // IPv4.
+                    let _ = propagate_bind_event(&sock, &mdns_protocol).await;
+                    let sock = Rc::new(sock);
+                    v4_listen_socket = Rc::downgrade(&sock);
+                    Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone())).detach();
+                    should_log_v4_listen_error = true;
+                }
+                Err(err) => {
+                    if should_log_v4_listen_error {
+                        tracing::error!(
+                            "unable to bind IPv4 listen socket: {}. Discovery may fail.",
+                            err
+                        );
+                        should_log_v4_listen_error = false;
                     }
+                }
+            }
+        }
+
+        if v6_listen_socket.upgrade().is_none() {
+            match make_listen_socket((MDNS_MCAST_V6, mdns_port).into())
+                .context("make_listen_socket for IPv6")
+            {
+                Ok(sock) => {
+                    let sock = Rc::new(sock);
+                    v6_listen_socket = Rc::downgrade(&sock);
+                    Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone())).detach();
+                    should_log_v6_listen_error = true;
+                }
+                Err(err) => {
+                    if should_log_v6_listen_error {
+                        tracing::error!(
+                            "unable to bind IPv6 listen socket: {}. Discovery may fail.",
+                            err
+                        );
+                        should_log_v6_listen_error = false;
+                    }
+                }
+            }
+        }
+
+        // As some operating systems will not error sendmsg/recvmsg for UDP
+        // sockets bound to addresses that no longer exist, they must be removed
+        // by ensuring that they still exist, otherwise we may be sending out
+        // unanswerable queries.
+        let mut to_delete = HashSet::<IpAddr>::new();
+        for ip in socket_tasks.lock().await.keys() {
+            to_delete.insert(*ip);
+        }
+
+        for iface in get_mcast_interfaces().unwrap_or_default() {
+            match iface.id() {
+                Ok(id) => {
+                    if let Some(sock) = v6_listen_socket.upgrade() {
+                        let _ = sock.join_multicast_v6(&MDNS_MCAST_V6, id);
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!("{}", err);
+                }
+            }
+
+            for addr in iface.addrs.iter() {
+                to_delete.remove(&addr.ip());
+
+                let mut addr = *addr;
+                addr.set_port(0);
+
+                // TODO(raggi): remove duplicate joins, log unexpected errors
+                if let SocketAddr::V4(addr) = addr {
+                    if let Some(sock) = v4_listen_socket.upgrade() {
+                        let _ = sock.join_multicast_v4(MDNS_MCAST_V4, *addr.ip());
+                    }
+                }
+
+                if socket_tasks.lock().await.get(&addr.ip()).is_some() {
+                    continue;
+                }
+
+                let sock = iface
+                    .id()
+                    .map(|id| match make_sender_socket(id, addr, ttl) {
+                        Ok(sock) => Some(sock),
+                        Err(err) => {
+                            tracing::error!("mdns: failed to bind {}: {}", &addr, err);
+                            None
+                        }
+                    })
+                    .ok()
+                    .flatten();
+
+                if sock.is_some() {
+                    socket_tasks.lock().await.insert(
+                        addr.ip(),
+                        Task::local(query_recv_loop(
+                            Rc::new(sock.unwrap()),
+                            mdns_protocol.clone(),
+                            query_interval,
+                            socket_tasks.clone(),
+                            checker.clone(),
+                            mdns_port,
+                        )),
+                    );
+                }
+            }
+        }
+
+        // Drop tasks for IP addresses no longer found on the system.
+        {
+            let mut tasks = socket_tasks.lock().await;
+            for ip in to_delete {
+                if let Some(handle) = tasks.remove(&ip) {
+                    handle.cancel().await;
                 }
             }
         }
@@ -214,7 +307,7 @@ pub(crate) async fn discovery_loop(config: DiscoveryConfig) {
     }
 }
 
-fn make_target<B: ByteSlice + Clone>(
+fn make_target<B: ByteSlice + Copy>(
     src: SocketAddr,
     msg: dns::Message<B>,
 ) -> Option<(ffx::TargetInfo, u32)> {
@@ -323,8 +416,16 @@ fn decode_txt_rdata(data: &[u8]) -> Result<Vec<String>> {
 // recv_loop reads packets from sock. If the packet is a Fuchsia mdns packet, a
 // corresponding mdns event is published to the queue. All other packets are
 // silently discarded.
-async fn recv_loop(sock: Rc<UdpSocket>, mdns_protocol: Weak<MdnsProtocolInner>) {
-    if !is_mdns_enabled().await {
+async fn recv_loop(
+    sock: Rc<UdpSocket>,
+    mdns_protocol: Weak<MdnsProtocol>,
+    checker: Weak<impl MdnsEnabledChecker>,
+) {
+    let should_break = match checker.upgrade() {
+        Some(check) => !check.enabled().await,
+        None => true,
+    };
+    if should_break {
         return;
     }
 
@@ -413,10 +514,10 @@ lazy_static::lazy_static! {
 }
 
 // query_loop broadcasts an mdns query on sock every interval.
-async fn query_loop(sock: Rc<UdpSocket>, interval: Duration) {
+async fn query_loop(sock: Rc<UdpSocket>, interval: Duration, mdns_port: u16) {
     let to_addr: SocketAddr = match sock.local_addr() {
-        Ok(SocketAddr::V4(_)) => (MDNS_MCAST_V4, MDNS_PORT).into(),
-        Ok(SocketAddr::V6(_)) => (MDNS_MCAST_V6, MDNS_PORT).into(),
+        Ok(SocketAddr::V4(_)) => (MDNS_MCAST_V4, mdns_port).into(),
+        Ok(SocketAddr::V6(_)) => (MDNS_MCAST_V6, mdns_port).into(),
         Err(err) => {
             tracing::error!("resolving local socket addr failed with: {}", err);
             return;
@@ -444,12 +545,14 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration) {
 // mdns query to discover Fuchsia devices every interval.
 async fn query_recv_loop(
     sock: Rc<UdpSocket>,
-    mdns_protocol: Weak<MdnsProtocolInner>,
+    mdns_protocol: Weak<MdnsProtocol>,
     interval: Duration,
     tasks: Rc<Mutex<HashMap<IpAddr, Task<()>>>>,
+    checker: Weak<impl MdnsEnabledChecker>,
+    mdns_port: u16,
 ) {
-    let mut recv = recv_loop(sock.clone(), mdns_protocol).boxed_local().fuse();
-    let mut query = query_loop(sock.clone(), interval).boxed_local().fuse();
+    let mut recv = recv_loop(sock.clone(), mdns_protocol, checker).boxed_local().fuse();
+    let mut query = query_loop(sock.clone(), interval, mdns_port).boxed_local().fuse();
 
     let addr = match sock.local_addr() {
         Ok(addr) => addr,
