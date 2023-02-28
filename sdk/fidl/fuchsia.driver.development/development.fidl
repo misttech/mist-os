@@ -56,11 +56,8 @@ type DeviceFlags = strict bits : uint32 {
     /// new driver_host attached to a proxy device
     MUST_ISOLATE = 0x0002;
 
-    /// This device may be bound multiple times
-    MULTI_BIND = 0x0004;
-
     /// This device is bound and not eligible for binding
-    /// again until unbound.  Not allowed on MULTI_BIND ctx.
+    /// again until unbound.  Not allowed on ALLOW_MULTI_COMPOSITE ctx.
     BOUND = 0x0008;
 
     /// Device has been remove()'d

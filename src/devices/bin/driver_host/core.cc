@@ -261,7 +261,7 @@ namespace internal {
 
 namespace {
 
-#define REMOVAL_BAD_FLAGS (DEV_FLAG_DEAD | DEV_FLAG_BUSY | DEV_FLAG_MULTI_BIND)
+#define REMOVAL_BAD_FLAGS (DEV_FLAG_DEAD | DEV_FLAG_BUSY)
 
 const char* removal_problem(uint32_t flags) {
   if (flags & DEV_FLAG_DEAD) {
@@ -269,9 +269,6 @@ const char* removal_problem(uint32_t flags) {
   }
   if (flags & DEV_FLAG_BUSY) {
     return "being created";
-  }
-  if (flags & DEV_FLAG_MULTI_BIND) {
-    return "multi-bind-able device";
   }
   return "?";
 }

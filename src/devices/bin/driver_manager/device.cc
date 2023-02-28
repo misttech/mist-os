@@ -1030,8 +1030,7 @@ bool Device::DriverLivesInSystemStorage() const {
 }
 
 bool Device::IsAlreadyBound() const {
-  return (flags & DEV_CTX_BOUND) && !(flags & DEV_CTX_ALLOW_MULTI_COMPOSITE) &&
-         !(flags & DEV_CTX_MULTI_BIND);
+  return (flags & DEV_CTX_BOUND) && !(flags & DEV_CTX_ALLOW_MULTI_COMPOSITE);
 }
 
 void Device::set_bound_driver(const Driver* driver) {

@@ -223,9 +223,6 @@ void DeviceInspect::set_flags(uint32_t flags) {
   if (flags & DEV_FLAG_BUSY) {
     flags_str.Append("busy ");
   }
-  if (flags & DEV_FLAG_MULTI_BIND) {
-    flags_str.Append("multi-bind ");
-  }
   if (flags & DEV_FLAG_ADDED) {
     flags_str.Append("added ");
   }

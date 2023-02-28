@@ -691,7 +691,7 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
     status = BindDriverToDevice(dev->proxy(), driver);
   }
   // TODO(swetland): arrange to mark us unbound when the proxy (or its driver_host) goes away
-  if ((status == ZX_OK) && !(dev->flags & DEV_CTX_MULTI_BIND)) {
+  if ((status == ZX_OK) && !(dev->flags & DEV_CTX_ALLOW_MULTI_COMPOSITE)) {
     dev->flags |= DEV_CTX_BOUND;
   }
   return status;

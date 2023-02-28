@@ -52,11 +52,8 @@ class DriverHost;
 // new driver_host attached to a proxy device
 #define DEV_CTX_MUST_ISOLATE           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kMustIsolate)
 
-// This device may be bound multiple times
-#define DEV_CTX_MULTI_BIND           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kMultiBind)
-
 // This device is bound and not eligible for binding
-// again until unbound.  Not allowed on MULTI_BIND ctx.
+// again until unbound.  Not allowed on ALLOW_MULTI_COMPOSITE ctx.
 #define DEV_CTX_BOUND           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kBound)
 
 // Device has been remove()'d
