@@ -16,8 +16,27 @@ pub enum Error {
 pub enum PacketError {
     #[error("Buffer is too small")]
     BufferTooSmall,
+    #[error("Invalid data length")]
+    DataLength,
+    #[error("Invalid data: {}", .0)]
+    Data(String),
     #[error("Invalid header identifier: {:?}", .0)]
     Identifier(u8),
+    #[error("Invalid header encoding")]
+    HeaderEncoding,
     #[error("Field is RFA.")]
     Reserved,
+    /// An error from another source
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl PacketError {
+    pub fn external(e: impl Into<anyhow::Error>) -> Self {
+        Self::Other(e.into())
+    }
+
+    pub fn data(e: impl Into<String>) -> Self {
+        Self::Data(e.into())
+    }
 }

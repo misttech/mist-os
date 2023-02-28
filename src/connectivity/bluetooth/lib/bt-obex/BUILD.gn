@@ -12,7 +12,9 @@ rustc_library("bt-obex") {
   deps = [
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/packet-encoding",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
