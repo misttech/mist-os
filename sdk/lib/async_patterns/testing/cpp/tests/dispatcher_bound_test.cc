@@ -39,6 +39,42 @@ TEST(TestDispatcherBound, SyncCallReturnMoveOnly) {
   EXPECT_EQ(*result, 1);
 }
 
+TEST(TestDispatcherBound, SyncCallReturnVoid) {
+  async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
+  remote_loop.StartThread();
+
+  class Object {
+   public:
+    explicit Object(std::shared_ptr<std::atomic_int> count) : count_(std::move(count)) {}
+    void Increment() { count_->fetch_add(1); }
+
+   private:
+    std::shared_ptr<std::atomic_int> count_;
+  };
+  std::shared_ptr<std::atomic_int> count = std::make_shared<std::atomic_int>();
+  async_patterns::TestDispatcherBound<Object> object{remote_loop.dispatcher(), std::in_place,
+                                                     count};
+  EXPECT_EQ(count->load(), 0);
+  static_assert(std::is_void_v<decltype(object.SyncCall(&Object::Increment))>);
+  object.SyncCall(&Object::Increment);
+  EXPECT_EQ(count->load(), 1);
+  object.SyncCall(&Object::Increment);
+  EXPECT_EQ(count->load(), 2);
+}
+
+TEST(TestDispatcherBound, SyncCallWithGeneralLambda) {
+  async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
+  remote_loop.StartThread();
+
+  class Object {
+   public:
+    int Get() { return 1; }
+  };
+  async_patterns::TestDispatcherBound<Object> object{remote_loop.dispatcher(), std::in_place};
+  int result = object.SyncCall([num = 2](Object* object) { return object->Get() + num; });
+  EXPECT_EQ(result, 3);
+}
+
 TEST(TestDispatcherBound, MakeTestDispatcherBound) {
   async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
   remote_loop.StartThread();

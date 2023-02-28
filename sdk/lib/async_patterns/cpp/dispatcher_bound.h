@@ -154,18 +154,13 @@ class DispatcherBound {
   template <typename Member, typename... Args>
   auto AsyncCall(Member T::*member, Args&&... args) {
     ZX_ASSERT(has_value());
-    using invoke_result = std::invoke_result<Member, Args...>;
     constexpr bool kIsInvocable = std::is_invocable_v<Member, Args...>;
     static_assert(kIsInvocable,
                   "|Member| must be callable with the provided |Args|. "
                   "Check that you specified each argument correctly to the |member| function.");
     if constexpr (kIsInvocable) {
       CheckArgs(typename fit::callable_traits<Member>::args{});
-      if constexpr (std::is_void_v<typename invoke_result::type>) {
-        return storage_.AsyncCall<T>(dispatcher_, member, std::forward<Args>(args)...);
-      } else {
-        return storage_.AsyncCallWithReply<T>(dispatcher_, member, std::forward<Args>(args)...);
-      }
+      return UnsafeAsyncCallImpl(member, std::forward<Args>(args)...);
     }
   }
 
@@ -196,6 +191,20 @@ class DispatcherBound {
 
   // Returns if this object holds an instance of |T|.
   bool has_value() const { return storage_.has_value(); }
+
+ protected:
+  // Calls an arbitrary |callable| asynchronously on the |dispatcher_|.
+  template <typename Callable, typename... Args>
+  auto UnsafeAsyncCallImpl(Callable&& callable, Args&&... args) {
+    using Result = std::invoke_result_t<Callable, T*, Args...>;
+    if constexpr (std::is_void_v<Result>) {
+      return storage_.AsyncCall<T>(dispatcher_, std::forward<Callable>(callable),
+                                   std::forward<Args>(args)...);
+    } else {
+      return storage_.AsyncCallWithReply<T>(dispatcher_, std::forward<Callable>(callable),
+                                            std::forward<Args>(args)...);
+    }
+  }
 
  private:
   template <typename... Args>

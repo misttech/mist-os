@@ -62,12 +62,13 @@ class DispatcherBoundStorage final {
                                      std::forward<Args>(args)...));
   }
 
-  template <typename T, typename Member, typename... Args>
-  void AsyncCall(async_dispatcher_t* dispatcher, Member T::*member, Args&&... args) {
+  template <typename T, typename Callable, typename... Args>
+  void AsyncCall(async_dispatcher_t* dispatcher, Callable&& callable, Args&&... args) {
     void* raw_ptr = op_fn_(Operation::kGetPointer);
     T* ptr = static_cast<T*>(raw_ptr);
     CallInternal(dispatcher,
-                 BindForSending(cpp20::bind_front(member, ptr), std::forward<Args>(args)...));
+                 BindForSending(cpp20::bind_front(std::forward<Callable>(callable), ptr),
+                                std::forward<Args>(args)...));
   }
 
   template <typename Task>
@@ -107,12 +108,13 @@ class DispatcherBoundStorage final {
     Task task_;
   };
 
-  template <typename T, typename Member, typename... Args>
-  auto AsyncCallWithReply(async_dispatcher_t* dispatcher, Member T::*member, Args&&... args) {
+  template <typename T, typename Callable, typename... Args>
+  auto AsyncCallWithReply(async_dispatcher_t* dispatcher, Callable&& callable, Args&&... args) {
     void* raw_ptr = op_fn_(Operation::kGetPointer);
     T* ptr = static_cast<T*>(raw_ptr);
     auto make_task = [&] {
-      return BindForSending(cpp20::bind_front(member, ptr), std::forward<Args>(args)...);
+      return BindForSending(cpp20::bind_front(std::forward<Callable>(callable), ptr),
+                            std::forward<Args>(args)...);
     };
     return AsyncCallBuilder<decltype(make_task())>(this, dispatcher, make_task());
   }
