@@ -9,9 +9,9 @@ script="$0"
 script_basename="$(basename "$script")"
 script_dir="$(dirname "$script")"
 
-function msg() {
-  echo "[$script_basename]: $@"
-}
+source "$script_dir"/common-setup.sh
+readonly HOST_OS="$_FUCHSIA_RBE_CACHE_VAR_host_os"
+readonly HOST_ARCH="$_FUCHSIA_RBE_CACHE_VAR_host_arch"
 
 readonly remote_action_wrapper="$script_dir"/fuchsia-rbe-action.sh
 readonly remote_compiler_swapper="$script_dir"/cxx-swap-remote-compiler.sh
@@ -20,7 +20,6 @@ readonly remote_compiler_swapper="$script_dir"/cxx-swap-remote-compiler.sh
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.
 # The value is an absolute path.
-readonly default_project_root="$(readlink -f "$script_dir"/../..)"
 
 # This is where the working directory happens to be in remote execution.
 # This assumed constant is only needed for a few workarounds elsewhere
@@ -120,45 +119,8 @@ case "$cpreprocess_strategy" in
     ;;
 esac
 
-# realpath doesn't ship with Mac OS X (provided by coreutils package).
-# We only want it for calculating relative paths.
-# Work around this using Python.
-if which realpath 2>&1 > /dev/null
-then
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    # Preserve symlinks.
-    realpath -s --relative-to="$from" "$to"
-  }
-else
-  # Point to our prebuilt python3.
-  python="$(ls "$project_root"/prebuilt/third_party/python3/*/bin/python3)" || {
-    echo "*** Python interpreter not found under $project_root/prebuilt/third_party/python3."
-    exit 1
-  }
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    "$python" -c "import os; print(os.path.relpath('$to', start='$from'))"
-  }
-fi
-
 build_subdir="$(relpath "$project_root" . )"
 project_root_rel="$(relpath . "$project_root")"
-
-detected_os="$(uname -s)"
-case "$detected_os" in
-  Darwin) readonly HOST_OS="mac" ;;
-  Linux) readonly HOST_OS="linux" ;;
-  *) echo >&2 "Unknown operating system: $detected_os" ; exit 1 ;;
-esac
-
-detected_arch="$(uname -m)"
-case "$detected_arch" in
-  x86_64) readonly HOST_ARCH="x64" ;;
-  *) echo >&2 "Unknown machine architecture: $detected_arch" ; exit 1 ;;
-esac
 
 cc=
 cc_command=()
@@ -376,7 +338,6 @@ test "$HOST_OS" = "linux" && test "$HOST_ARCH" = "x64" || {
   exit 1
 }
 
-
 # -E tells the compiler to stop after C-preprocessing
 cpreprocess_command+=( -E )
 # -fno-blocks works around an issue where C-preprocessing includes
@@ -486,7 +447,6 @@ test -z "$comma_remote_inputs" ||
 extra_outputs=()
 test -z "$comma_remote_outputs" ||
   IFS=, read -ra extra_outputs <<< "$comma_remote_outputs"
-
 
 test -z "$profile_list" || {
   extra_inputs+=( "$profile_list" )

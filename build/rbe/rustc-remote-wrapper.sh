@@ -10,20 +10,12 @@
 #   * cannot use <(...) redirection
 
 script="$0"
-script_basename="$(basename "$script")"
 script_dir="$(dirname "$script")"
 
-function msg() {
-  echo "[$script_basename]: $@"
-}
+source "$script_dir"/common-setup.sh
+readonly HOST_OS="$_FUCHSIA_RBE_CACHE_VAR_host_os"
 
-remote_action_wrapper="$script_dir"/fuchsia-rbe-action.sh
-
-# The project_root must cover all inputs, prebuilt tools, and build outputs.
-# This should point to $FUCHSIA_DIR for the Fuchsia project.
-# ../../ because this script lives in build/rbe.
-# The value is an absolute path.
-default_project_root="$(readlink -f "$script_dir"/../..)"
+readonly remote_action_wrapper="$script_dir"/fuchsia-rbe-action.sh
 
 # This is where the working directory happens to be in remote execution.
 # This assumed constant is only needed for a few workarounds elsewhere
@@ -104,13 +96,6 @@ to download, and removed from the command prior to local and remote execution.
 EOF
 }
 
-detected_os="$(uname -s)"
-case "$detected_os" in
-  Darwin) readonly HOST_OS="mac" ;;
-  Linux) readonly HOST_OS="linux" ;;
-  *) echo >&2 "Unknown operating system: $detected_os" ; exit 1 ;;
-esac
-
 local_only=0
 trace=0
 dry_run=0
@@ -162,26 +147,6 @@ do
   shift
 done
 test -z "$prev_out" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
-
-# realpath doesn't ship with Mac OS X (provided by coreutils package).
-# We only want it for calculating relative paths.
-# Work around this using Python.
-if which realpath 2>&1 > /dev/null
-then
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    # -s: preserve symlinks, do not follow them
-    # We want rewrapper to treat symlinks as inputs and set them up remotely.
-    realpath -s --relative-to="$from" "$to"
-  }
-else
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    "$python" -c "import os; print(os.path.relpath('$to', start='$from'))"
-  }
-fi
 
 build_subdir="$(relpath "$project_root" . )"
 project_root_rel="$(relpath . "$project_root")"

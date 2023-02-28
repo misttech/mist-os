@@ -10,35 +10,8 @@ set -uo pipefail
 script="$0"
 script_dir="$(dirname "$script")"
 
-# The project_root must cover all inputs, prebuilt tools, and build outputs.
-# This should point to $FUCHSIA_DIR for the Fuchsia project.
-# ../../ because this script lives in build/rbe.
-# The value is an absolute path.
-project_root="$(readlink -f "$script_dir"/../..)"
-
-# realpath doesn't ship with Mac OS X (provided by coreutils package).
-# We only want it for calculating relative paths.
-# Work around this using Python.
-if which realpath 2>&1 > /dev/null
-then
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    # Preserve symlinks.
-    realpath -s --relative-to="$from" "$to"
-  }
-else
-  # Point to our prebuilt python3.
-  python="$(ls "$project_root"/prebuilt/third_party/python3/*/bin/python3)" || {
-    echo "*** Python interpreter not found under $project_root/prebuilt/third_party/python3."
-    exit 1
-  }
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    "$python" -c "import os; print(os.path.relpath('$to', start='$from'))"
-  }
-fi
+source "$script_dir"/common-setup.sh
+project_root="$default_project_root"
 
 build_subdir="$(relpath "$project_root" . )"
 

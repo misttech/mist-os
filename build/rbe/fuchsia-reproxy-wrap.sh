@@ -10,55 +10,21 @@ set -e
 script="$0"
 script_dir="$(dirname "$script")"
 
+source "$script_dir"/common-setup.sh
+readonly PREBUILT_OS="$_FUCHSIA_RBE_CACHE_VAR_host_os"
+readonly PREBUILT_ARCH="$_FUCHSIA_RBE_CACHE_VAR_host_arch"
+
 # The project_root must cover all inputs, prebuilt tools, and build outputs.
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.
 # The value is an absolute path.
 project_root="$(readlink -f "$script_dir"/../..)"
-
-# realpath doesn't ship with Mac OS X (provided by coreutils package).
-# We only want it for calculating relative paths.
-# Work around this using Python.
-if which realpath 2>&1 > /dev/null
-then
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    # Preserve symlinks.
-    realpath -s --relative-to="$from" "$to"
-  }
-else
-  # Point to our prebuilt python3.
-  python="$(ls "$project_root"/prebuilt/third_party/python3/*/bin/python3)" || {
-    echo "*** Python interpreter not found under $project_root/prebuilt/third_party/python3."
-    exit 1
-  }
-  function relpath() {
-    local -r from="$1"
-    local -r to="$2"
-    "$python" -c "import os; print(os.path.relpath('$to', start='$from'))"
-  }
-fi
-
 project_root_rel="$(relpath . "$project_root")"
 
 # defaults
-config="$script_dir"/fuchsia-reproxy.cfg
+readonly config="$script_dir"/fuchsia-reproxy.cfg
 
-detected_os="$(uname -s)"
-case "$detected_os" in
-  Darwin) readonly PREBUILT_OS="mac" ;;
-  Linux) readonly PREBUILT_OS="linux" ;;
-  *) echo >&2 "Unknown operating system: $detected_os" ; exit 1 ;;
-esac
-
-detected_arch="$(uname -m)"
-case "$detected_arch" in
-  x86_64) readonly PREBUILT_ARCH="x64" ;;
-  *) echo >&2 "Unknown machine architecture: $detected_arch" ; exit 1 ;;
-esac
-
-PREBUILT_SUBDIR="$PREBUILT_OS"-"$PREBUILT_ARCH"
+readonly PREBUILT_SUBDIR="$PREBUILT_OS"-"$PREBUILT_ARCH"
 
 # location of reclient binaries relative to output directory where build is run
 reclient_bindir="$project_root_rel"/prebuilt/proprietary/third_party/reclient/"$PREBUILT_SUBDIR"
