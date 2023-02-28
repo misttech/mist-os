@@ -14,13 +14,15 @@ use {
 
 /// Given an uncompressed blob, generate a delivery blob.
 /// Requires /tmp directory in the namespace.
+/// See //src/storage/blobfs/delivery_blob.h for possible blob type values.
 pub async fn generate_delivery_blob(
     uncompressed_blob: impl AsRef<[u8]>,
+    blob_type: u32,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let tmp = tempfile::tempdir().context("create tmp")?;
     fs::write(tmp.path().join("uncompressed"), uncompressed_blob)
         .context("write uncompressed blob")?;
-    generate_delivery_blob_in_path(&tmp, "uncompressed", &tmp, "delivery").await?;
+    generate_delivery_blob_in_path(&tmp, "uncompressed", &tmp, "delivery", blob_type).await?;
     fs::read(tmp.path().join("delivery")).context("read delivery blob")
 }
 
@@ -29,13 +31,14 @@ pub(crate) async fn generate_delivery_blob_in_path(
     uncompressed_blob_path: impl fmt::Display,
     delivery_blob_dir: impl AsRef<Path>,
     delivery_blob_path: impl fmt::Display,
+    blob_type: u32,
 ) -> Result<(), anyhow::Error> {
     let process = fdio::SpawnBuilder::new()
         .options(fdio::SpawnOptions::CLONE_ALL - fdio::SpawnOptions::CLONE_NAMESPACE)
         .arg("blobfs-compression")?
-        // TODO(fxbug.dev/120322): Specify the type of delivery blob once blobfs-compression supports it.
         .arg(format!("--source_file=/in/{uncompressed_blob_path}"))?
         .arg(format!("--compressed_file=/out/{delivery_blob_path}"))?
+        .arg(format!("--type={blob_type}"))?
         .add_dir_to_namespace(
             "/in",
             File::open(uncompressed_blob_dir).context("open uncompressed_blob_dir")?,
@@ -55,11 +58,11 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn generate_delivery_blob_empty() {
-        generate_delivery_blob([]).await.unwrap();
+        generate_delivery_blob([], 1).await.unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn generate_delivery_blob_small() {
-        generate_delivery_blob([1; 234]).await.unwrap();
+        generate_delivery_blob([1; 234], 1).await.unwrap();
     }
 }

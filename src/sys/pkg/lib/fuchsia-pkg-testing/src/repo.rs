@@ -39,7 +39,7 @@ use {
 pub struct RepositoryBuilder<'a> {
     packages: Vec<MaybeOwned<'a, Package>>,
     repodir: Option<PathBuf>,
-    delivery_blob_type: Option<String>,
+    delivery_blob_type: Option<u32>,
 }
 
 impl<'a> RepositoryBuilder<'a> {
@@ -62,8 +62,8 @@ impl<'a> RepositoryBuilder<'a> {
     /// Set the type of delivery blob to generate, if set, in addition to exposing the blobs at
     /// "/blobs/", the repo will also expose an appropriately modified copy of each blob at
     /// "/blobs/{type}/".
-    pub fn delivery_blob_type(mut self, delivery_blob_type: impl Into<String>) -> Self {
-        self.delivery_blob_type = Some(delivery_blob_type.into());
+    pub fn delivery_blob_type(mut self, delivery_blob_type: u32) -> Self {
+        self.delivery_blob_type = Some(delivery_blob_type);
         self
     }
 
@@ -147,6 +147,7 @@ impl<'a> RepositoryBuilder<'a> {
                         format!("repository/blobs/{blob}"),
                         &repodir,
                         delivery_blob_path,
+                        delivery_blob_type,
                     )
                     .await
                     .context("generate_delivery_blob")?;
@@ -231,7 +232,7 @@ impl Repository {
     /// Reads the contents of requested delivery blob from the repository.
     pub fn read_delivery_blob(
         &self,
-        delivery_blob_type: impl std::fmt::Display,
+        delivery_blob_type: u32,
         merkle_root: &Hash,
     ) -> Result<Vec<u8>, io::Error> {
         fs::read(
@@ -448,7 +449,7 @@ mod tests {
     async fn test_repo_builder() {
         let same_contents = b"same contents";
         let repo = RepositoryBuilder::new()
-            .delivery_blob_type("1")
+            .delivery_blob_type(1)
             .add_package(
                 PackageBuilder::new("rolldice")
                     .add_resource_at("bin/rolldice", "#!/boot/bin/sh\necho 4\n".as_bytes())
@@ -489,8 +490,8 @@ mod tests {
         let same_contents_merkle = MerkleTree::from_reader(&same_contents[..]).unwrap().root();
         assert_eq!(repo.read_blob(&same_contents_merkle).unwrap(), same_contents);
         assert_eq!(
-            repo.read_delivery_blob("1", &same_contents_merkle).unwrap(),
-            crate::delivery_blob::generate_delivery_blob(same_contents).await.unwrap()
+            repo.read_delivery_blob(1, &same_contents_merkle).unwrap(),
+            crate::delivery_blob::generate_delivery_blob(same_contents, 1).await.unwrap()
         );
 
         let packages = repo.list_packages().unwrap();
