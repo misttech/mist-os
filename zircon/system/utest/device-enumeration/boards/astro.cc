@@ -12,6 +12,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:03:1/aml-gpio",
       "sys/platform/05:03:1/aml-gpio/gpio-5/astro-buttons/hid-buttons",
       "sys/platform/05:00:2/aml-i2c",
+      "sys/platform/05:00:2:1/aml-i2c",
+      "sys/platform/05:00:2:2/aml-i2c",
       "sys/platform/05:03:17/mali/aml-gpu",
       "sys/platform/05:00:18/aml-usb-phy-v2",
       "sys/platform/05:00:3/bt-uart/aml-uart/bt-transport-uart",
@@ -20,7 +22,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-controller",
       "sys/platform/00:00:1e/dw-dsi",
       "sys/platform/00:00:1e/dw-dsi/dw-dsi-base",
@@ -87,8 +89,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
 
   static const char* kTouchscreenDevicePaths[] = {
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch HidDevice/hid-device/InputReport",
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-1-93/gt92xx_touch/gt92xx HidDevice/hid-device/InputReport",
+      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch HidDevice/hid-device/InputReport",
+      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-93/gt92xx_touch/gt92xx HidDevice/hid-device/InputReport",
   };
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
       cpp20::span(kTouchscreenDevicePaths, std::size(kTouchscreenDevicePaths))));

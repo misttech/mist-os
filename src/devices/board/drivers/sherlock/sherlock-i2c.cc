@@ -119,11 +119,6 @@ constexpr I2cBus buses[]{
 
 zx_status_t AddI2cBus(const I2cBus& bus,
                       const fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  std::vector<i2c_channel_t> channels{bus.channels.begin(), bus.channels.end()};
-  for (auto& channel : channels) {
-    channel.bus_id = bus.bus_id;
-  }
-
   const std::vector<fpbus::Mmio> mmios{
       {{
           .base = bus.mmio,
@@ -152,8 +147,7 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   std::vector<fpbus::Metadata> fidl_metadata;
 
-  auto i2c_metadata_fidl =
-      fidl_metadata::i2c::I2CChannelsToFidl({channels.data(), channels.size()});
+  auto i2c_metadata_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus.bus_id, bus.channels);
   if (i2c_metadata_fidl.is_error()) {
     zxlogf(ERROR, "Failed to FIDL encode I2C channels: %s", i2c_metadata_fidl.status_string());
     return i2c_metadata_fidl.error_value();
