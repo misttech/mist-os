@@ -603,6 +603,71 @@ class TestKTraceState : public ::internal::KTraceState {
     END_TEST;
   }
 
+  // Check that Reserve() does not allocate any space in the trace
+  // buffer in the case where writes were disabled before Reserve()
+  // was called.  See https://fxbug.dev/122181.
+  static bool DisableWritesTest() {
+    BEGIN_TEST;
+
+    TestKTraceState state;
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, KTRACE_GRP_ALL));
+    uint32_t expected_offset = sizeof(uint64_t) * 3;
+    ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
+
+    // Header for a metadata record with a size of 1 * 8 bytes.
+    constexpr uint64_t fxt_header = 1 << 4;
+
+    // This initial Reserve() call should succeed and advance the
+    // buffer offset.
+    {
+      zx::result<PendingCommit> reservation = state.Reserve(fxt_header);
+      ASSERT_OK(reservation.status_value());
+    }
+    expected_offset += 8;
+    ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
+    ASSERT_EQ(0u, state.inflight_writes());
+
+    // With writes disabled, this Reserve() call should return an
+    // error without advancing the buffer offset.
+    state.ClearMaskDisableWrites();
+    {
+      zx::result<PendingCommit> reservation = state.Reserve(fxt_header);
+      ASSERT_EQ(reservation.status_value(), ZX_ERR_BAD_STATE);
+    }
+    ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
+    ASSERT_EQ(0u, state.inflight_writes());
+
+    ASSERT_OK(state.Stop());
+
+    END_TEST;
+  }
+
+  // Begin a write (Reserve), but disable writes before the PendingCommit is
+  // committed or destroy.  Make sure we don't fail any asserts.  See
+  // https://fxbug.dev/122043.
+  static bool DisableWritesDuringPendingCommitTest() {
+    BEGIN_TEST;
+
+    TestKTraceState state;
+    ASSERT_TRUE(state.Init(kDefaultBufferSize, KTRACE_GRP_ALL));
+    constexpr uint64_t fxt_header = 0x0;
+
+    {
+      zx::result<PendingCommit> reservation = state.Reserve(fxt_header);
+      ASSERT_OK(reservation.status_value());
+      reservation->WriteBytes("0123456789ABCDEF", 16);
+
+      ASSERT_EQ(1u, state.inflight_writes());
+      state.ClearMaskDisableWrites();
+      reservation->Commit();
+    }
+    ASSERT_EQ(0u, state.inflight_writes());
+
+    ASSERT_OK(state.Stop());
+
+    END_TEST;
+  }
+
  private:
   //////////////////////////////////////////////////////////////////////////////
   //
@@ -779,4 +844,7 @@ UNITTEST("rewind", ktrace_tests::TestKTraceState::RewindTest)
 UNITTEST("state check", ktrace_tests::TestKTraceState::StateCheckTest)
 UNITTEST("circular", ktrace_tests::TestKTraceState::CircularWriteTest)
 UNITTEST("fxt compat writer", ktrace_tests::TestKTraceState::FxtCompatWriterTest)
+UNITTEST("disable writes", ktrace_tests::TestKTraceState::DisableWritesTest)
+UNITTEST("disable writes during pending commit",
+         ktrace_tests::TestKTraceState::DisableWritesDuringPendingCommitTest)
 UNITTEST_END_TESTCASE(ktrace_tests, "ktrace", "KTrace tests")

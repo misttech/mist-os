@@ -130,15 +130,25 @@ void KTraceState::Init(uint32_t target_bufsize, uint32_t initial_groups) {
   // Allocations are rounded up to the nearest page size.
   target_bufsize_ = fbl::round_up(target_bufsize, static_cast<uint32_t>(PAGE_SIZE));
 
-  if (initial_groups != 0) {
-    if (AllocBuffer() == ZX_OK) {
-      ReportStaticNames();
-      ReportThreadProcessNames();
-      is_started_ = true;
-    }
+  if (initial_groups == 0) {
+    // Writes should be disabled and there should be no in-flight writes.
+    [[maybe_unused]] uint64_t observed;
+    DEBUG_ASSERT_MSG((observed = write_state_.load(ktl::memory_order_acquire)) == 0, "0x%lx",
+                     observed);
+    return;
   }
 
+  if (AllocBuffer() != ZX_OK) {
+    return;
+  }
+
+  EnableWrites();
+  // Now that writes have been enabled, we can report the names.
+  ReportStaticNames();
+  ReportThreadProcessNames();
+  // Finally, set the group mask to allow non-name writes to proceed.
   SetGroupMask(initial_groups);
+  is_started_ = true;
 }
 
 zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
@@ -166,6 +176,8 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   // If we are not yet started, we need to report the current thread and process
   // names.
   if (!is_started_) {
+    is_started_ = true;
+    EnableWrites();
     ReportStaticNames();
     ReportThreadProcessNames();
   }
@@ -184,7 +196,9 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
     }
   }
 
-  is_started_ = true;
+  // It's possible that a |ReserveRaw| failure may have disabled writes so make
+  // sure they are enabled.
+  EnableWrites();
   SetGroupMask(groups);
 
   DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", groups);
@@ -200,11 +214,11 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
 zx_status_t KTraceState::Stop() {
   Guard<Mutex> guard(&lock_);
 
-  // Start by setting the group mask to 0.  This should prevent any new
-  // writers from starting write operations.  The non-write lock should
-  // prevent anyone else from writing to this field while we are finishing
+  // Start by clearing the group mask and disabling writes.  This will prevent
+  // new writers from starting write operations.  The non-write lock prevent
+  // another thread from starting a another trace session until we have finished
   // the stop operation.
-  DisableGroupMask();
+  ClearMaskDisableWrites();
 
   // Now wait until any lingering write operations have finished.  This
   // should never take any significant amount of time.  If it does, we are
@@ -233,9 +247,10 @@ zx_status_t KTraceState::RewindLocked() {
     return ZX_ERR_BAD_STATE;
   }
 
+  // Writes should be disabled and there should be no in-flight writes.
   [[maybe_unused]] uint64_t observed;
-  DEBUG_ASSERT_MSG((observed = grpmask_and_inflight_writes_.load(ktl::memory_order_acquire)) == 0,
-                   "0x%lx", observed);
+  DEBUG_ASSERT_MSG((observed = write_state_.load(ktl::memory_order_acquire)) == 0, "0x%lx",
+                   observed);
 
   {
     Guard<SpinLock, IrqSave> write_guard{&write_lock_};
@@ -285,11 +300,11 @@ ssize_t KTraceState::ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) 
     return ZX_ERR_BAD_STATE;
   }
 
-  // If we are in the lock_, and we are stopped, then the group mask
-  // must be 0, and we must have synchronized with any in-flight writes by now.
+  // If we are in the lock_, and we are stopped, then new writes must be
+  // disabled, and we must have synchronized with any in-flight writes by now.
   [[maybe_unused]] uint64_t observed;
-  DEBUG_ASSERT_MSG((observed = grpmask_and_inflight_writes_.load(ktl::memory_order_acquire)) == 0,
-                   "0x%lx", observed);
+  DEBUG_ASSERT_MSG((observed = write_state_.load(ktl::memory_order_acquire)) == 0, "0x%lx",
+                   observed);
 
   // Grab the write lock, then figure out what we need to copy.  We need to make
   // sure to drop the lock before calling CopyToUser (holding spinlocks while
