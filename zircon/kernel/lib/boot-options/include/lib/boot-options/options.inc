@@ -691,6 +691,13 @@ This option controls the acceleration factor provided to the LZ4 compression imp
 to the current LZ4 implementation for how this value will be interpreted.
 )""")
 
+DEFINE_OPTION("kernel.compression.at_memory_pressure", bool, compression_at_memory_pressure, {false}, R"""(
+This option controls whether page compression should be performed in response to memory pressure.
+
+For this option to have any effect kernel.page-scanner.enable-eviction needs to be enabled and both
+kernel.compression.strategy and kernel.compression.storage-strategy need to be set.
+)""")
+
 DEFINE_OPTION("kernel.pmm-checker.action", SmallString, pmm_checker_action, {"oops"}, R"""(
 Supported actions:
 - `oops`

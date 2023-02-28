@@ -21,12 +21,14 @@ namespace vm_unittest {
 class TestPmmNode;
 }
 
-// Implements page eviction logic to free pages belonging to a PmmNode under memory pressure.
+// Implements page evictor logic to free pages belonging to a PmmNode under memory pressure.
 // Provides APIs for
 // 1) one-shot eviction, which involves arming an eviction target and triggering eviction
 // and
 // 2) continuous eviction, which creates a dedicated thread to perform periodic evictions to
 // maintain a free memory level.
+// Eviction in this context is both direct eviction of pager backed memory and discardable VMO
+// memory, as well as by performing compression.
 // This class is thread-safe.
 class Evictor {
  public:
@@ -66,6 +68,8 @@ class Evictor {
     uint64_t pager_backed_loaned = 0;
     // evicted from/via discardable VMO page count
     uint64_t discardable = 0;
+    // evicted from an anonymous VMO via compression
+    uint64_t compressed = 0;
   };
 
   explicit Evictor(PmmNode *node);
@@ -77,7 +81,9 @@ class Evictor {
   void SetContinuousEvictionInterval(zx_time_t eviction_interval);
   // Called from the scanner to enable eviction if required. Creates an eviction thread to process
   // asynchronous eviction requests (both one-shot and continuous).
-  void EnableEviction();
+  // By default this only enables user pager based eviction and |use_compression| can be used to
+  // also perform compression.
+  void EnableEviction(bool use_compression);
   // Called from the scanner to disable all eviction if needed, will shut down any in existing
   // eviction thread. It is a responsibility of the scanner to not have multiple concurrent calls
   // to this and EnableEviction.
@@ -133,6 +139,9 @@ class Evictor {
   // Whether any eviction (one-shot and continuous) can occur.
   bool IsEvictionEnabled() const;
 
+  // Whether eviction should attempt to use compression.
+  bool IsCompressionEnabled() const;
+
  private:
   // Private constructor for test code to specify |queues| not owned by |node|.
   Evictor(PmmNode *node, PageQueues *queues);
@@ -154,11 +163,11 @@ class Evictor {
   // number of pages evicted. This may acquire arbitrary vmo and aspace locks.
   uint64_t EvictDiscardable(uint64_t target_pages) const TA_EXCL(lock_);
 
-  // Evict the requested number of |target_pages| from pager-backed vmos. The returned struct has
-  // the number of pages evicted (discardable will be 0). The |eviction_level| is a rough control
-  // that maps to how old a page needs to be for being considered for eviction. This may acquire
-  // arbitrary vmo and aspace locks.
-  EvictedPageCounts EvictPagerBacked(uint64_t target_pages, EvictionLevel eviction_level) const
+  // Evict the requested number of |target_pages| from vmos by querying the page queues. The
+  // returned struct has the number of pages evicted (discardable will be 0). The |eviction_level|
+  // is a rough control that maps to how old a page needs to be for being considered for eviction.
+  // This may acquire arbitrary vmo and aspace locks.
+  EvictedPageCounts EvictPageQueues(uint64_t target_pages, EvictionLevel eviction_level) const
       TA_EXCL(lock_);
 
   // The main loop for the eviction thread.
@@ -207,6 +216,8 @@ class Evictor {
   // These parameters are initialized later from kernel cmdline options.
   // Whether eviction is enabled.
   bool eviction_enabled_ TA_GUARDED(lock_) = false;
+  // Whether eviction should attempt compression.
+  bool use_compression_ TA_GUARDED(lock_) = false;
   // A rough percentage of page evictions that should be satisfied from discardable vmos (as opposed
   // to pager-backed vmos). Will require tuning when discardable vmos start being used. Currently
   // sets the number of discardable pages to evict to 0, putting all the burden of eviction on

@@ -14,6 +14,7 @@
 
 #include <kernel/lockdep.h>
 #include <ktl/algorithm.h>
+#include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/evictor.h>
 #include <vm/pmm.h>
@@ -28,6 +29,7 @@
 namespace {
 
 KCOUNTER(pager_backed_pages_evicted, "vm.reclamation.pages_evicted_pager_backed")
+KCOUNTER(compression_evicted, "vm.reclamation.pages_evicted_compressed")
 KCOUNTER(discardable_pages_evicted, "vm.reclamation.pages_evicted_discardable")
 
 inline void CheckedIncrement(uint64_t* a, uint64_t b) {
@@ -50,12 +52,18 @@ bool Evictor::IsEvictionEnabled() const {
   return eviction_enabled_;
 }
 
-void Evictor::EnableEviction() {
+bool Evictor::IsCompressionEnabled() const {
+  Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
+  return use_compression_;
+}
+
+void Evictor::EnableEviction(bool use_compression) {
   {
     Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
     // It's an error to call this whilst the eviction thread is still exiting.
     ASSERT(!eviction_thread_exiting_);
     eviction_enabled_ = true;
+    use_compression_ = use_compression;
 
     if (eviction_thread_) {
       return;
@@ -169,6 +177,9 @@ Evictor::EvictedPageCounts Evictor::EvictOneShotFromPreloadedTarget() {
       printf("[EVICT]: Evicted %lu pages from discardable vmos\n",
              total_evicted_counts.discardable);
     }
+    if (total_evicted_counts.compressed > 0) {
+      printf("[EVICT]: Evicted %lu pages by compression\n", total_evicted_counts.compressed);
+    }
   }
 
   return total_evicted_counts;
@@ -190,7 +201,7 @@ uint64_t Evictor::EvictOneShotSynchronous(uint64_t min_mem_to_free, EvictionLeve
   });
 
   auto evicted_counts = EvictOneShotFromPreloadedTarget();
-  return evicted_counts.pager_backed + evicted_counts.discardable;
+  return evicted_counts.pager_backed + evicted_counts.discardable + evicted_counts.compressed;
 }
 
 void Evictor::EvictOneShotAsynchronous(uint64_t min_mem_to_free, uint64_t free_mem_target,
@@ -265,13 +276,15 @@ Evictor::EvictedPageCounts Evictor::EvictUntilTargetsMet(uint64_t min_pages_to_e
     // Free pager backed memory to get to |pages_to_free|.
     uint64_t pages_to_free_pager_backed = pages_to_free - pages_freed;
 
-    EvictedPageCounts pages_freed_pager_backed =
-        EvictPagerBacked(pages_to_free_pager_backed, level);
+    EvictedPageCounts pages_freed_pager_backed = EvictPageQueues(pages_to_free_pager_backed, level);
+    const uint64_t non_loaned_evicted =
+        pages_freed_pager_backed.pager_backed + pages_freed_pager_backed.compressed;
     total_evicted_counts.pager_backed += pages_freed_pager_backed.pager_backed;
     total_evicted_counts.pager_backed_loaned += pages_freed_pager_backed.pager_backed_loaned;
-    total_non_loaned_pages_freed += pages_freed_pager_backed.pager_backed;
+    total_evicted_counts.compressed += pages_freed_pager_backed.compressed;
+    total_non_loaned_pages_freed += non_loaned_evicted;
 
-    pages_freed += pages_freed_pager_backed.pager_backed;
+    pages_freed += non_loaned_evicted;
 
     // Should we fail to free any pages then we give up and consider the eviction request complete.
     if (pages_freed == 0) {
@@ -307,8 +320,8 @@ uint64_t Evictor::EvictDiscardable(uint64_t target_pages) const {
   return count;
 }
 
-Evictor::EvictedPageCounts Evictor::EvictPagerBacked(uint64_t target_pages,
-                                                     EvictionLevel eviction_level) const {
+Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
+                                                    EvictionLevel eviction_level) const {
   EvictedPageCounts counts = {};
 
   if (!IsEvictionEnabled()) {
@@ -334,8 +347,18 @@ Evictor::EvictedPageCounts Evictor::EvictPagerBacked(uint64_t target_pages,
   // We stack-own loaned pages from RemovePageForEviction() to FreeList() below.
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
+  ktl::optional<VmCompression::CompressorGuard> maybe_instance;
+  VmCompressor* compression_instance = nullptr;
+  if (IsCompressionEnabled()) {
+    VmCompression* compression = pmm_node_->GetPageCompression();
+    if (compression) {
+      maybe_instance.emplace(compression->AcquireCompressor());
+      compression_instance = &maybe_instance->get();
+    }
+  }
+
   DEBUG_ASSERT(page_queues_);
-  while (counts.pager_backed < target_pages) {
+  while (counts.pager_backed + counts.compressed < target_pages) {
     // TODO(rashaeqbal): The sequence of actions in PeekPagerBacked() and RemovePageForEviction()
     // implicitly guarantee forward progress in this loop, so that we're not stuck trying to evict
     // the same page (i.e. PeekPagerBacked keeps returning the same page). It would be nice to have
@@ -346,12 +369,25 @@ Evictor::EvictedPageCounts Evictor::EvictPagerBacked(uint64_t target_pages,
       if (!backlink->cow) {
         continue;
       }
-      if (backlink->cow->ReclaimPage(backlink->page, backlink->offset, hint_action, nullptr)) {
+      if (compression_instance) {
+        zx_status_t status = compression_instance->Arm();
+        if (status != ZX_OK) {
+          break;
+        }
+      }
+      if (backlink->cow->ReclaimPage(backlink->page, backlink->offset, hint_action,
+                                     compression_instance)) {
         list_add_tail(&freed_list, &backlink->page->queue_node);
         if (backlink->page->is_loaned()) {
           counts.pager_backed_loaned++;
         } else {
-          counts.pager_backed++;
+          if (backlink->cow->can_evict()) {
+            counts.pager_backed++;
+          } else {
+            // If the cow wasn't evictable, then the reclamation must have succeeded due to
+            // compression.
+            counts.compressed++;
+          }
         }
       }
     } else {
@@ -363,6 +399,7 @@ Evictor::EvictedPageCounts Evictor::EvictPagerBacked(uint64_t target_pages,
   pmm_node_->FreeList(&freed_list);
 
   pager_backed_pages_evicted.Add(counts.pager_backed + counts.pager_backed_loaned);
+  compression_evicted.Add(counts.compressed);
   return counts;
 }
 

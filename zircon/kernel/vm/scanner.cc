@@ -134,7 +134,7 @@ int scanner_request_thread(void *) {
       pmm_page_queues()->EnableAging();
       // Re-enable eviction if it was originally enabled.
       if (gBootOptions->page_scanner_enable_eviction) {
-        pmm_evictor()->EnableEviction();
+        pmm_evictor()->EnableEviction(gBootOptions->compression_at_memory_pressure);
       }
       disabled = false;
     }
@@ -368,7 +368,7 @@ static void scanner_init_func(uint level) {
       ZX_SEC(ktl::max(gBootOptions->page_scanner_page_table_eviction_period, 1u));
 
   if (gBootOptions->page_scanner_enable_eviction) {
-    pmm_evictor()->EnableEviction();
+    pmm_evictor()->EnableEviction(gBootOptions->compression_at_memory_pressure);
   }
   pmm_evictor()->SetDiscardableEvictionsPercent(
       gBootOptions->page_scanner_discardable_evictions_percent);

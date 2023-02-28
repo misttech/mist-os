@@ -15,7 +15,7 @@ namespace vm_unittest {
 // is not possible with the global pmm node.
 class TestPmmNode {
  public:
-  TestPmmNode() : evictor_(&node_, pmm_page_queues()) { evictor_.EnableEviction(); }
+  TestPmmNode() : evictor_(&node_, pmm_page_queues()) { evictor_.EnableEviction(true); }
 
   ~TestPmmNode() {
     // Pages that were evicted are being held in |node_|'s free list.

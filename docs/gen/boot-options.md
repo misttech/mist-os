@@ -812,6 +812,15 @@ Valid values are between 1 and 100, inclusive.
 This option controls the acceleration factor provided to the LZ4 compression implementation. Refer
 to the current LZ4 implementation for how this value will be interpreted.
 
+### kernel.compression.at_memory_pressure=\<bool>
+
+**Default:** `false`
+
+This option controls whether page compression should be performed in response to memory pressure.
+
+For this option to have any effect kernel.page-scanner.enable-eviction needs to be enabled and both
+kernel.compression.strategy and kernel.compression.storage-strategy need to be set.
+
 ### kernel.pmm-checker.action=\<string>
 
 **Default:** `oops`
