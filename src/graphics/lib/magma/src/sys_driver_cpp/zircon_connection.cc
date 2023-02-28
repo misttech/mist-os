@@ -151,13 +151,10 @@ struct AsyncHandleWait : public async_wait {
 };
 
 void ZirconConnection::NotificationChannelSend(cpp20::span<uint8_t> data) {
-  async::PostTask(async_loop_.dispatcher(),
-                  [this, data = std::vector<uint8_t>(data.begin(), data.end())]() {
-                    zx_status_t status = server_notification_endpoint_.write(
-                        0, data.data(), static_cast<uint32_t>(data.size()), nullptr, 0);
-                    if (status != ZX_OK)
-                      DLOG("Failed writing to channel: %s", zx_status_get_string(status));
-                  });
+  zx_status_t status = server_notification_endpoint_.write(
+      0, data.data(), static_cast<uint32_t>(data.size()), nullptr, 0);
+  if (status != ZX_OK)
+    DLOG("Failed writing to channel: %s", zx_status_get_string(status));
 }
 void ZirconConnection::ContextKilled() {
   async::PostTask(async_loop_.dispatcher(),

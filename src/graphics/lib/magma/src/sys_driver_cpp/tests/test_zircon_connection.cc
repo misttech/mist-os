@@ -308,12 +308,8 @@ class TestPlatformConnection {
   void TestNotificationChannel() {
     FlowControlSkip();
 
-    // Notification messages are written when the delegate is created (SetNotificationCallback).
-    // Notification callbacks post async tasks to the IpcThread.
-    // Busy wait to ensure those notification requests are sent.
-    while (connection_->get_request_count() < kNotificationCount) {
-      usleep(10 * 1000);
-    }
+    // Notification requests will be sent when the ZirconConnection is created, before this test is
+    // called.
 
     {
       uint8_t buffer_too_small;
@@ -803,9 +799,6 @@ TEST(PlatformConnection, NotificationChannel) {
   auto shared_data = std::make_shared<SharedData>();
 
   shared_data->notification_handler = [](msd::NotificationHandler* handler) {
-    msd_notification_t n = {.type = MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND};
-    *reinterpret_cast<uint32_t*>(n.u.channel_send.data) = kNotificationData;
-    n.u.channel_send.size = sizeof(uint32_t);
     uint32_t data_to_send = kNotificationData;
     uint8_t* data_ptr = reinterpret_cast<uint8_t*>(&data_to_send);
 
