@@ -46,10 +46,12 @@ class FakeDisplay : public DeviceType,
                     public ddk::DisplayControllerImplProtocol<FakeDisplay, ddk::base_protocol>,
                     public ddk::DisplayClampRgbImplProtocol<FakeDisplay> {
  public:
-  explicit FakeDisplay(zx_device_t* parent)
-      : DeviceType(parent),
-        dcimpl_proto_({&display_controller_impl_protocol_ops_, this}),
-        clamp_rgbimpl_proto_({&display_clamp_rgb_impl_protocol_ops_, this}) {}
+  explicit FakeDisplay(zx_device_t* parent);
+
+  FakeDisplay(const FakeDisplay&) = delete;
+  FakeDisplay& operator=(const FakeDisplay&) = delete;
+
+  ~FakeDisplay();
 
   // This function is called from the c-bind function upon driver matching.
   zx_status_t Bind(bool start_vsync);

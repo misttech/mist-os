@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fake-display.h"
+#include "src/graphics/display/drivers/fake/fake-display.h"
 
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -49,6 +49,15 @@ constexpr uint32_t kRefreshRateFps = 60;
 // TODO(payamm): Randomizing the delay value is more value
 constexpr uint64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
 }  // namespace
+
+FakeDisplay::FakeDisplay(zx_device_t* parent)
+    : DeviceType(parent),
+      dcimpl_proto_({&display_controller_impl_protocol_ops_, this}),
+      clamp_rgbimpl_proto_({&display_clamp_rgb_impl_protocol_ops_, this}) {
+  ZX_DEBUG_ASSERT(parent);
+}
+
+FakeDisplay::~FakeDisplay() = default;
 
 zx_status_t FakeDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
   clamp_rgb_value_ = minimum_rgb;
