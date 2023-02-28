@@ -52,10 +52,13 @@ class IgcInterfaceTest : public gtest::RealLoopFixture {
 
     // Setup the configuration for fake PCI.
     zx::unowned_vmo config = fake_pci_.GetConfigVmo();
-    config->write(&kTestSubsysId, PCI_CONFIG_SUBSYSTEM_ID, sizeof(kTestSubsysId));
-    config->write(&kTestSubsysVendorId, PCI_CONFIG_SUBSYSTEM_VENDOR_ID,
+    config->write(&kTestSubsysId, fidl::ToUnderlying(fuchsia_hardware_pci::Config::kSubsystemId),
+                  sizeof(kTestSubsysId));
+    config->write(&kTestSubsysVendorId,
+                  fidl::ToUnderlying(fuchsia_hardware_pci::Config::kSubsystemVendorId),
                   sizeof(kTestSubsysVendorId));
-    config->write(&kTestCommand, PCI_CONFIG_COMMAND, sizeof(kTestCommand));
+    config->write(&kTestCommand, fidl::ToUnderlying(fuchsia_hardware_pci::Config::kCommand),
+                  sizeof(kTestCommand));
 
     fake_pci_.AddLegacyInterrupt();
 

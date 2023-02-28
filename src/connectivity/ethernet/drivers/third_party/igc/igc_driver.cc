@@ -269,7 +269,7 @@ void IgcDriver::IdentifyHardware() {
   struct igc_hw* hw = &adapter_->hw;
 
   // Make sure our PCI configuration space has the necessary stuff set.
-  pci.ReadConfig16(PCI_CONFIG_COMMAND, &hw->bus.pci_cmd_word);
+  pci.ReadConfig16(fuchsia_hardware_pci::Config::kCommand, &hw->bus.pci_cmd_word);
 
   fuchsia_hardware_pci::wire::DeviceInfo pci_info;
   zx_status_t status = pci.GetDeviceInfo(&pci_info);
@@ -281,8 +281,8 @@ void IgcDriver::IdentifyHardware() {
   hw->vendor_id = pci_info.vendor_id;
   hw->device_id = pci_info.device_id;
   hw->revision_id = pci_info.revision_id;
-  pci.ReadConfig16(PCI_CONFIG_SUBSYSTEM_VENDOR_ID, &hw->subsystem_vendor_id);
-  pci.ReadConfig16(PCI_CONFIG_SUBSYSTEM_ID, &hw->subsystem_device_id);
+  pci.ReadConfig16(fuchsia_hardware_pci::Config::kSubsystemVendorId, &hw->subsystem_vendor_id);
+  pci.ReadConfig16(fuchsia_hardware_pci::Config::kSubsystemId, &hw->subsystem_device_id);
 
   // Do shared code init and setup.
   if (igc_set_mac_type(hw)) {

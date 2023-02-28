@@ -11,7 +11,6 @@
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_THIRD_PARTY_IGC_IGC_OSDEP_H_
 
 #include <assert.h>
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
