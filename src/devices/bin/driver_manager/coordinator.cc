@@ -246,7 +246,7 @@ zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, const Driver& dri
     return vmo.error_value();
   }
 
-  dev->flags |= DEV_CTX_BOUND;
+  dev->set_bound_driver(&driver);
   dev->device_controller()
       ->BindDriver(fidl::StringView::FromExternal(driver.libname.c_str()), std::move(*vmo))
       .ThenExactlyOnce([dev](fidl::WireUnownedResult<fdm::DeviceController::BindDriver>& result) {
@@ -255,19 +255,19 @@ zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, const Driver& dri
           // otherwise tests could flake.
           LOGF(WARNING, "Failed to bind driver to device '%s': %s", dev->name().data(),
                result.status_string());
-          dev->flags &= (~DEV_CTX_BOUND);
+          dev->clear_bound_driver();
           return;
         }
         if (!result.ok()) {
           LOGF(ERROR, "Failed to bind driver to device '%s': %s", dev->name().data(),
                result.status_string());
-          dev->flags &= (~DEV_CTX_BOUND);
+          dev->clear_bound_driver();
           return;
         }
         if (result.value().status != ZX_OK) {
           LOGF(ERROR, "Failed to bind driver to device '%s': %s", dev->name().data(),
                zx_status_get_string(result.value().status));
-          dev->flags &= (~DEV_CTX_BOUND);
+          dev->clear_bound_driver();
           return;
         }
       });
