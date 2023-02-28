@@ -118,7 +118,13 @@ async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
 }
 
 async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
-    let repo = PmRepository::builder(cmd.repo_path.clone()).copy_mode(cmd.copy_mode).build();
+    let mut repo_builder = PmRepository::builder(cmd.repo_path.clone())
+        .copy_mode(cmd.copy_mode)
+        .delivery_blob_type(cmd.delivery_blob_type);
+    if let Some(path) = &cmd.blobfs_compression_path {
+        repo_builder = repo_builder.blobfs_compression_path(path.clone());
+    }
+    let repo = repo_builder.build();
 
     let mut deps = BTreeSet::new();
 
@@ -304,20 +310,11 @@ mod tests {
             let depfile_path = root.join("deps");
 
             let cmd = RepoPublishCommand {
-                watch: false,
-                signing_keys: None,
-                trusted_keys: None,
-                trusted_root: None,
-                package_archives: vec![],
                 package_manifests: manifest_paths[0..2].to_vec(),
                 package_list_manifests: list_paths.clone(),
-                metadata_current_time: Utc::now(),
-                time_versioning: false,
-                refresh_root: false,
-                clean: false,
                 depfile: Some(depfile_path.clone()),
-                copy_mode: CopyMode::Copy,
                 repo_path: repo_path.to_path_buf(),
+                ..default_command_for_test()
             };
 
             TestEnv {
@@ -360,6 +357,27 @@ mod tests {
         }
     }
 
+    fn default_command_for_test() -> RepoPublishCommand {
+        RepoPublishCommand {
+            watch: false,
+            signing_keys: None,
+            trusted_keys: None,
+            trusted_root: None,
+            package_archives: vec![],
+            package_manifests: vec![],
+            package_list_manifests: vec![],
+            metadata_current_time: Utc::now(),
+            time_versioning: false,
+            refresh_root: false,
+            clean: false,
+            depfile: None,
+            copy_mode: CopyMode::Copy,
+            delivery_blob_type: None,
+            blobfs_compression_path: None,
+            repo_path: "".into(),
+        }
+    }
+
     fn create_manifest(name: &str, root: &Utf8Path) -> (PackageManifest, Utf8PathBuf) {
         let pkg_build_path = root.join(name);
         let pkg_manifest_path = root.join(format!("{name}.json"));
@@ -391,22 +409,8 @@ mod tests {
         let tempdir = tempfile::tempdir().unwrap();
         let repo_path = Utf8Path::from_path(tempdir.path()).unwrap();
 
-        let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
-            repo_path: repo_path.to_path_buf(),
-        };
+        let cmd =
+            RepoPublishCommand { repo_path: repo_path.to_path_buf(), ..default_command_for_test() };
 
         assert_matches!(cmd_repo_publish(cmd).await, Err(_));
     }
@@ -422,20 +426,9 @@ mod tests {
         test_utils::make_repo_keys_dir(&repo_keys_path);
 
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
             trusted_keys: Some(repo_keys_path),
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
 
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
@@ -474,20 +467,8 @@ mod tests {
         .unwrap();
 
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: test_repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
 
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
@@ -519,22 +500,8 @@ mod tests {
         assert_eq!(repo_client.database().trusted_snapshot().map(|m| m.version()), Some(1));
         assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(1));
 
-        let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
-            repo_path: repo_path.to_path_buf(),
-        };
+        let cmd =
+            RepoPublishCommand { repo_path: repo_path.to_path_buf(), ..default_command_for_test() };
 
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
 
@@ -564,20 +531,9 @@ mod tests {
         assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(1));
 
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
             refresh_root: true,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
 
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
@@ -603,41 +559,16 @@ mod tests {
         // the keys.
         std::fs::rename(repo_path.join("keys"), &keys_path).unwrap();
 
-        let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
-            repo_path: repo_path.to_path_buf(),
-        };
+        let cmd =
+            RepoPublishCommand { repo_path: repo_path.to_path_buf(), ..default_command_for_test() };
 
         assert_matches!(cmd_repo_publish(cmd).await, Err(_));
 
         // Explicitly specifying the keys path should work though.
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
             trusted_keys: Some(keys_path),
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
 
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
@@ -657,20 +588,10 @@ mod tests {
         test_utils::make_empty_pm_repo_dir(repo_path);
 
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
             metadata_current_time: now,
             time_versioning: true,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
 
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
@@ -718,20 +639,10 @@ mod tests {
 
         // Publish the packages.
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
             package_archives: archives,
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
             depfile: Some(depfile_path.clone()),
-            copy_mode: CopyMode::Copy,
             repo_path: repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
 
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
@@ -802,20 +713,9 @@ mod tests {
         serde_json::to_writer(File::create(&pkg3_manifest_path).unwrap(), &pkg3_manifest).unwrap();
 
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
             package_manifests: vec![pkg3_manifest_path],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
-            clean: false,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
 
@@ -838,20 +738,10 @@ mod tests {
         serde_json::to_writer(File::create(&pkg4_manifest_path).unwrap(), &pkg4_manifest).unwrap();
 
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
-            trusted_root: None,
-            package_archives: vec![],
             package_manifests: vec![pkg4_manifest_path],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
             clean: true,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: repo_path.to_path_buf(),
+            ..default_command_for_test()
         };
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
 
@@ -876,20 +766,10 @@ mod tests {
 
         // Refresh all the metadata using 1.root.json.
         let cmd = RepoPublishCommand {
-            watch: false,
-            signing_keys: None,
-            trusted_keys: None,
             trusted_root: Some(root.join("repository").join("1.root.json")),
-            package_archives: vec![],
-            package_manifests: vec![],
-            package_list_manifests: vec![],
-            metadata_current_time: Utc::now(),
-            time_versioning: false,
-            refresh_root: false,
             clean: true,
-            depfile: None,
-            copy_mode: CopyMode::Copy,
             repo_path: root.to_path_buf(),
+            ..default_command_for_test()
         };
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
 

@@ -60,6 +60,18 @@ impl PmRepositoryBuilder {
         self
     }
 
+    /// Set the type of delivery blob to generate when copying blobs into the repository.
+    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<u32>) -> Self {
+        self.builder = self.builder.delivery_blob_type(delivery_blob_type);
+        self
+    }
+
+    /// Set the path to the blobfs-compression tool.
+    pub fn blobfs_compression_path(mut self, blobfs_compression_path: Utf8PathBuf) -> Self {
+        self.builder = self.builder.blobfs_compression_path(blobfs_compression_path);
+        self
+    }
+
     pub fn build(self) -> PmRepository {
         PmRepository { pm_repo_path: self.pm_repo_path, repo: self.builder.build() }
     }

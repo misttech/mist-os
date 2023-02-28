@@ -182,6 +182,10 @@ declare_args() {
   #   is possible to modify the blob through the hard link, which would result
   #   in the blob not matching the blob's merkle.
   repository_publish_blob_copy_mode = "copy"
+
+  # Controls what type of delivery blob to generate in the repository.
+  # Supported types can be found in //src/storage/blobfs/delivery_blob.h
+  repository_publish_delivery_blob_type = -1
 }
 
 # Publish package manifests to a repository.
@@ -258,6 +262,13 @@ template("package_tool_repository_publish") {
       args += [
         "--trusted-root",
         rebase_path(invoker.initial_trusted_root_metadata, root_build_dir),
+      ]
+    }
+
+    if (repository_publish_delivery_blob_type != -1) {
+      args += [
+        "--delivery-blob-type",
+        "${repository_publish_delivery_blob_type}",
       ]
     }
 

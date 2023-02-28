@@ -8,14 +8,14 @@ use {
         repository::{Error, RepoProvider, RepoStorage, Resource},
         util::file_stream,
     },
-    anyhow::Result,
+    anyhow::{Context as _, Result},
     async_fs::DirBuilder,
     camino::{Utf8Component, Utf8Path, Utf8PathBuf},
     fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     fuchsia_merkle::Hash,
     futures::{
-        future::BoxFuture, io::SeekFrom, stream::BoxStream, AsyncRead, AsyncSeekExt as _,
-        FutureExt as _, Stream, StreamExt as _,
+        channel::oneshot, future::BoxFuture, io::SeekFrom, stream::BoxStream, AsyncRead,
+        AsyncSeekExt as _, FutureExt as _, Stream, StreamExt as _,
     },
     notify::{recommended_watcher, RecursiveMode, Watcher as _},
     std::{
@@ -64,6 +64,8 @@ pub struct FileSystemRepositoryBuilder {
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
     aliases: BTreeSet<String>,
+    delivery_blob_type: Option<u32>,
+    blobfs_compression_path: Utf8PathBuf,
 }
 
 impl FileSystemRepositoryBuilder {
@@ -75,6 +77,8 @@ impl FileSystemRepositoryBuilder {
             blob_repo_path,
             copy_mode: CopyMode::Copy,
             aliases: BTreeSet::new(),
+            delivery_blob_type: None,
+            blobfs_compression_path: "host_x64/blobfs-compression".into(),
         }
     }
 
@@ -98,6 +102,18 @@ impl FileSystemRepositoryBuilder {
         self
     }
 
+    /// Set the type of delivery blob to generate when copying blobs into the repository.
+    pub fn delivery_blob_type(mut self, delivery_blob_type: Option<u32>) -> Self {
+        self.delivery_blob_type = delivery_blob_type;
+        self
+    }
+
+    /// Set the path to the blobfs-compression tool.
+    pub fn blobfs_compression_path(mut self, blobfs_compression_path: Utf8PathBuf) -> Self {
+        self.blobfs_compression_path = blobfs_compression_path;
+        self
+    }
+
     /// Build a [FileSystemRepository].
     pub fn build(self) -> FileSystemRepository {
         FileSystemRepository {
@@ -105,6 +121,8 @@ impl FileSystemRepositoryBuilder {
             blob_repo_path: self.blob_repo_path,
             copy_mode: self.copy_mode,
             aliases: self.aliases,
+            delivery_blob_type: self.delivery_blob_type,
+            blobfs_compression_path: self.blobfs_compression_path,
             tuf_repo: TufFileSystemRepositoryBuilder::new(self.metadata_repo_path)
                 .targets_prefix("targets")
                 .build(),
@@ -119,6 +137,8 @@ pub struct FileSystemRepository {
     blob_repo_path: Utf8PathBuf,
     copy_mode: CopyMode,
     aliases: BTreeSet<String>,
+    delivery_blob_type: Option<u32>,
+    blobfs_compression_path: Utf8PathBuf,
     tuf_repo: TufFileSystemRepository<Pouf1>,
 }
 
@@ -342,32 +362,44 @@ impl TufRepositoryStorage<Pouf1> for FileSystemRepository {
 impl RepoStorage for FileSystemRepository {
     fn store_blob<'a>(&'a self, hash: &Hash, src: &Utf8Path) -> BoxFuture<'a, Result<()>> {
         let src = src.to_path_buf();
-        let dst = sanitize_path(&self.blob_repo_path, &hash.to_string());
+        let hash = hash.to_string();
 
         async move {
-            let dst = dst?;
+            let dst = sanitize_path(&self.blob_repo_path, &hash)?;
 
             match self.copy_mode {
                 CopyMode::Copy => {
-                    let exists = async_fs::File::open(&dst).await.is_ok();
-                    if !exists {
-                        copy_blob(src, dst).await?
+                    if !path_exists(&dst).await? {
+                        copy_blob(&src, &dst).await?
                     }
                 }
-                CopyMode::CopyOverwrite => copy_blob(src, dst).await?,
+                CopyMode::CopyOverwrite => copy_blob(&src, &dst).await?,
                 CopyMode::HardLink => {
-                    if async_fs::hard_link(&src, &dst).await.is_err() {
-                        let exists = async_fs::File::open(&dst).await.is_ok();
-                        if !exists {
-                            copy_blob(src, dst).await?
-                        }
+                    if async_fs::hard_link(&src, &dst).await.is_err() && !path_exists(&dst).await? {
+                        copy_blob(&src, &dst).await?
                     }
+                }
+            }
+
+            if let Some(blob_type) = &self.delivery_blob_type {
+                let dst = sanitize_path(&self.blob_repo_path, &format!("{blob_type}/{hash}"))?;
+                if self.copy_mode == CopyMode::CopyOverwrite || !path_exists(&dst).await? {
+                    generate_delivery_blob(&src, &dst, *blob_type, &self.blobfs_compression_path)
+                        .await?;
                 }
             }
 
             Ok(())
         }
         .boxed()
+    }
+}
+
+async fn path_exists(path: &Utf8Path) -> std::io::Result<bool> {
+    match async_fs::File::open(&path).await {
+        Ok(_) => Ok(true),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(err),
     }
 }
 
@@ -383,18 +415,50 @@ async fn create_temp_file(path: &Utf8Path) -> Result<TempPath> {
     Ok(temp_file.into_temp_path())
 }
 
-async fn copy_blob(src: Utf8PathBuf, dst: Utf8PathBuf) -> Result<()> {
-    let temp_path = create_temp_file(&dst).await?;
-    async_fs::copy(src, &temp_path).await?;
-    temp_path.persist(&dst)?;
-
-    // Set the blob to be read-only.
-    let file = async_fs::File::open(dst).await?;
+// Set the blob at `path` to be read-only.
+async fn set_blob_read_only(path: &Utf8Path) -> Result<()> {
+    let file = async_fs::File::open(path).await?;
     let mut permissions = file.metadata().await?.permissions();
     permissions.set_readonly(true);
     file.set_permissions(permissions).await?;
 
     Ok(())
+}
+
+async fn copy_blob(src: &Utf8Path, dst: &Utf8Path) -> Result<()> {
+    let temp_path = create_temp_file(dst).await?;
+    async_fs::copy(src, &temp_path).await?;
+    temp_path.persist(dst)?;
+
+    set_blob_read_only(dst).await
+}
+
+async fn generate_delivery_blob(
+    src: &Utf8Path,
+    dst: &Utf8Path,
+    blob_type: u32,
+    blobfs_compression_path: &Utf8Path,
+) -> Result<()> {
+    let temp_path = create_temp_file(dst).await?;
+
+    let mut compressed_file_arg = std::ffi::OsString::from("--compressed_file=");
+    compressed_file_arg.push(temp_path.as_os_str());
+    let mut child = std::process::Command::new(blobfs_compression_path)
+        .arg(format!("--source_file={src}"))
+        .arg(compressed_file_arg)
+        .arg(format!("--type={blob_type}"))
+        .spawn()
+        .context("spawn blobfs-compression")?;
+    let (sender, receiver) = oneshot::channel();
+    std::thread::spawn(move || sender.send(child.wait()));
+    let status = receiver.await?.context("wait blobfs-compression")?;
+    if !status.success() {
+        anyhow::bail!("blobfs-compression failed: {status}");
+    }
+
+    temp_path.persist(dst)?;
+
+    set_blob_read_only(dst).await
 }
 
 #[pin_project::pin_project]
@@ -691,5 +755,45 @@ mod tests {
 
         // Make sure the hard link count was incremented.
         check_links(&blob_path).await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_store_delivery_blob() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let metadata_repo_path = dir.join("metadata");
+        let blob_repo_path = dir.join("blobs");
+        std::fs::create_dir(&metadata_repo_path).unwrap();
+        std::fs::create_dir(&blob_repo_path).unwrap();
+
+        let repo = FileSystemRepository::builder(metadata_repo_path, blob_repo_path.clone())
+            .delivery_blob_type(Some(1))
+            .build();
+
+        // Store the blob.
+        let contents = b"hello world";
+        let path = dir.join("my-blob");
+        std::fs::write(&path, contents).unwrap();
+
+        let hash = fuchsia_merkle::from_slice(contents).root();
+        assert_matches!(repo.store_blob(&hash, &path).await, Ok(()));
+
+        // Make sure we can read the delivery blob.
+        let blob_path = blob_repo_path.join("1").join(hash.to_string());
+        let delivery_blob = std::fs::read(&blob_path).unwrap();
+        assert!(!delivery_blob.is_empty());
+
+        assert!(std::fs::metadata(&blob_path).unwrap().permissions().readonly());
+
+        // Next, we won't overwrite a blob that already exists.
+        let contents2 = b"another blob";
+        let path2 = dir.join("my-blob2");
+        std::fs::write(&path2, contents2).unwrap();
+        assert_matches!(repo.store_blob(&hash, &path2).await, Ok(()));
+
+        // Make sure we get the original contents back.
+        let actual = std::fs::read(&blob_path).unwrap();
+        assert_eq!(delivery_blob, actual);
     }
 }

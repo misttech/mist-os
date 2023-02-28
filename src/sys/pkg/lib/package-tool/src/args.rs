@@ -182,6 +182,15 @@ pub struct RepoPublishCommand {
     )]
     pub copy_mode: CopyMode,
 
+    #[argh(
+        option,
+        description = "the type of delivery blob to generate (default no delivery blobs are generated)"
+    )]
+    pub delivery_blob_type: Option<u32>,
+
+    #[argh(option, description = "path to the blobfs-compression tool")]
+    pub blobfs_compression_path: Option<Utf8PathBuf>,
+
     #[argh(positional, description = "path to the repository directory")]
     pub repo_path: Utf8PathBuf,
 
