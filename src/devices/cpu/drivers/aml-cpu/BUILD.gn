@@ -51,8 +51,8 @@ fuchsia_driver("aml-cpu-driver") {
 fuchsia_driver_component("aml-cpu") {
   component_name = "aml-cpu"
   deps = [ ":aml-cpu-driver" ]
+  manifest = "meta/aml-cpu.cml"
   info = "aml-cpu-info.json"
-  colocate = true
 }
 
 test("aml-cpu-test-bin") {
@@ -70,6 +70,8 @@ test("aml-cpu-test-bin") {
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_wire",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/bus/lib/device-protocol-pdev",

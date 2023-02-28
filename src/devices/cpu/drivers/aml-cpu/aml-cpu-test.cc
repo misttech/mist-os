@@ -8,6 +8,8 @@
 #include <fuchsia/hardware/power/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 
@@ -147,18 +149,42 @@ class FakeClockDevice : public ddk::ClockProtocol<FakeClockDevice, ddk::base_pro
   clock_protocol_t proto_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 class AmlCpuBindingTest : public zxtest::Test {
  public:
   AmlCpuBindingTest() {
-    pdev_.set_device_info(pdev_device_info_t{
-        .pid = PDEV_PID_ASTRO,
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    std::map<uint32_t, fake_pdev::MmioInfo> mmios;
+    mmios[0] = mmio_.mmio_info();
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    incoming_.SyncCall([mmios = std::move(mmios), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
+          .mmios = std::move(mmios),
+          .device_info =
+              pdev_device_info_t{
+                  .pid = PDEV_PID_ASTRO,
+              },
+      });
+
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
     });
-    pdev_.set_mmio(0, mmio_.mmio_info());
+    ASSERT_NO_FATAL_FAILURE();
 
     root_ = MockDevice::FakeRootParent();
     root_->SetMetadata(DEVICE_METADATA_AML_PERF_DOMAINS, &kPerfDomains, sizeof(kPerfDomains));
 
-    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                          std::move(outgoing_endpoints->client), "pdev");
+
     root_->AddProtocol(ZX_PROTOCOL_POWER, pwr_.proto()->ops, pwr_.proto()->ctx, "power-01");
     root_->AddProtocol(ZX_PROTOCOL_CLOCK, clk0_.proto()->ops, clk0_.proto()->ctx,
                        "clock-pll-div16-01");
@@ -172,7 +198,11 @@ class AmlCpuBindingTest : public zxtest::Test {
 
  protected:
   std::shared_ptr<MockDevice> root_;
-  fake_pdev::FakePDev pdev_;
+
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
+
   FakeMmio mmio_;
 
   FakePowerDevice pwr_;

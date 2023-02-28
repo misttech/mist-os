@@ -88,7 +88,7 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
   }
 
   // Map AOBUS registers
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Failed to get platform device fragment");
     return ZX_ERR_NO_RESOURCES;
