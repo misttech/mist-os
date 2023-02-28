@@ -41,9 +41,7 @@ use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, T
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
     ndp, ping,
-    realms::{
-        Netstack, Netstack2, Netstack2WithFastUdp, Netstack3, NetstackVersion, TestSandboxExt as _,
-    },
+    realms::{Netstack, Netstack2, Netstack2WithFastUdp, NetstackVersion, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -1138,14 +1136,13 @@ async fn tcp_socket_shutdown_connection<
     .await
 }
 
-// TODO(https://fxbug.dev/112135): Parametrize netstack.
 #[netstack_test]
-async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt>(name: &str) {
+async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     let client = sandbox
-        .create_netstack_realm::<Netstack3, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{}_client", name))
         .expect("failed to create client realm");
     let client_interface =
         client.join_network(&net, "client-ep").await.expect("failed to join network in realm");
@@ -1155,7 +1152,7 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt>(name: &s
         .expect("configure address");
 
     let server = sandbox
-        .create_netstack_realm::<Netstack3, _>(format!("{}_server", name))
+        .create_netstack_realm::<N, _>(format!("{}_server", name))
         .expect("failed to create server realm");
     let server_interface =
         server.join_network(&net, "server-ep").await.expect("failed to join network in realm");
@@ -1201,12 +1198,11 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt>(name: &s
 }
 
 #[netstack_test]
-async fn tcpv4_tcpv6_listeners_coexist(name: &str) {
+async fn tcpv4_tcpv6_listeners_coexist<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
-    let host =
-        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create server realm");
+    let host = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create server realm");
     let interface =
         host.join_network(&net, "server-ep").await.expect("failed to join network in realm");
     interface
@@ -1509,13 +1505,13 @@ fn base_ip_device_port_config() -> fnet_tun::BasePortConfig {
 }
 
 #[netstack_test]
-async fn ip_endpoints_socket(name: &str) {
+async fn ip_endpoints_socket<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let client = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
+        .create_netstack_realm::<N, _>(format!("{}_client", name))
         .expect("failed to create client realm");
     let server = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
+        .create_netstack_realm::<N, _>(format!("{}_server", name))
         .expect("failed to create server realm");
 
     let tun = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
@@ -1573,10 +1569,9 @@ async fn ip_endpoints_socket(name: &str) {
 }
 
 #[netstack_test]
-async fn ip_endpoint_packets(name: &str) {
+async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack2, _>(name).expect("failed to create client realm");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create client realm");
 
     let tun = fuchsia_component::client::connect_to_protocol::<fnet_tun::ControlMarker>()
         .expect("failed to connect to tun protocol");
@@ -1885,7 +1880,7 @@ async fn ip_endpoint_packets(name: &str) {
 }
 
 #[netstack_test]
-async fn ping(name: &str) {
+async fn ping<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -1894,7 +1889,7 @@ async fn ping(name: &str) {
         let net = &net;
         async move {
             let realm = sandbox
-                .create_netstack_realm::<Netstack2, _>(format!("{}_{}", name, suffix))
+                .create_netstack_realm::<N, _>(format!("{}_{}", name, suffix))
                 .expect("failed to create realm");
             let interface = realm
                 .join_network(&net, format!("ep_{}", suffix))
@@ -2377,13 +2372,7 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-// TODO(https://fxbug.dev/100759): Re-enable after device accesses are fallible.
-#[ignore]
-async fn tcp_connect_bound_to_device(name: &str) {
-    // TODO(https://github.com/google/gvisor/issues/8276): Run this against
-    // Netstack2 variants once gVisor uses the bound device when connecting TCP
-    // sockets.
-    type N = Netstack3;
+async fn tcp_connect_bound_to_device<N: Netstack>(name: &str) {
     const NUM_PEERS: u8 = 2;
     const PORT: u16 = 90;
 
@@ -2680,13 +2669,6 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-#[ignore]
-// Skip this test on Netstack2 since the second bind fails with an address
-// conflict.
-// TODO(https://github.com/google/gvisor/issues/8390): Un-skip this for
-// Netstack2.
-// TODO(https://fxbug.dev/100759): Re-enable this for Netstack3 once it supports
-// fallible device access.
 async fn tcp_bind_with_zone_connect_unzoned<N: Netstack>(name: &str) {
     const PORT: u16 = 80;
 

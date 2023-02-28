@@ -1,0 +1,39 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "ip_endpoint_packets_ns3",
+                "ip_endpoints_socket_ns3",
+                "tcp_bind_with_zone_connect_unzoned_ns2",
+                "tcp_connect_bound_to_device_ns2",
+                "tcp_socket_shutdown_listener_v4_ns2",
+                "tcp_socket_shutdown_listener_v6_ns2",
+            ],
+        },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "ping_ns3",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/100759): Flakes. Reenable once ns3
+                // device access is fallible.
+                "tcp_connect_bound_to_device_ns3",
+                "tcp_bind_with_zone_connect_unzoned_ns3",
+            ],
+        },
+    ],
+}

@@ -11,7 +11,6 @@ import(
 
 tests = [
   "reachability",
-  "socket",
   "sys",
 ]
 
@@ -30,6 +29,7 @@ tests_with_expectations_with_err_logs = [
   "ipv6",
   "management",
   "product-flow",
+  "socket",
 ]
 
 long_tests = [ "multicast-forwarding" ]
