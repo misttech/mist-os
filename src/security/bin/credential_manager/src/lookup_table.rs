@@ -49,7 +49,7 @@ pub enum LookupTableError {
     #[error("Failed to open: {0}")]
     OpenError(#[from] fuchsia_fs::node::OpenError),
     #[error("Failed to readdir: {0}")]
-    ReaddirError(#[from] fuchsia_fs::directory::Error),
+    ReaddirError(#[from] fuchsia_fs::directory::EnumerateError),
     #[error("Failed to read: {0}")]
     ReadError(#[from] fuchsia_fs::file::ReadError),
     #[error("Failed during FIDL call: {0}")]
@@ -256,10 +256,10 @@ impl LookupTable for PersistentLookupTable {
         fuchsia_fs::directory::remove_dir_recursive(&self.dir_proxy, &label.as_dir_name())
             .await
             .map_err(|e| match e {
-                fuchsia_fs::directory::Error::Fidl(_, fidl_err) => {
+                fuchsia_fs::directory::EnumerateError::Fidl(_, fidl_err) => {
                     LookupTableError::FidlError(fidl_err)
                 }
-                fuchsia_fs::directory::Error::Unlink(status) => {
+                fuchsia_fs::directory::EnumerateError::Unlink(status) => {
                     LookupTableError::UnlinkError(status)
                 }
                 _ => LookupTableError::Unknown,
@@ -277,10 +277,10 @@ impl LookupTable for PersistentLookupTable {
                 fuchsia_fs::directory::remove_dir_recursive(&self.dir_proxy, &entry.name)
                     .await
                     .map_err(|e| match e {
-                        fuchsia_fs::directory::Error::Fidl(_, fidl_err) => {
+                        fuchsia_fs::directory::EnumerateError::Fidl(_, fidl_err) => {
                             LookupTableError::FidlError(fidl_err)
                         }
-                        fuchsia_fs::directory::Error::Unlink(status) => {
+                        fuchsia_fs::directory::EnumerateError::Unlink(status) => {
                             LookupTableError::UnlinkError(status)
                         }
                         _ => LookupTableError::Unknown,

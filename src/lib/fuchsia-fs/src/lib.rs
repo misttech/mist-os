@@ -29,7 +29,6 @@ pub fn canonicalize_path(path: &str) -> &str {
 mod tests {
     use {
         super::*,
-        anyhow::Error,
         fidl::endpoints::ServerEnd,
         fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
         std::{fs, path::Path},
@@ -97,13 +96,13 @@ mod tests {
     }
 
     #[fasync::run_until_stalled(test)]
-    async fn flags_test() -> Result<(), Error> {
+    async fn flags_test() {
         let example_dir = pseudo_directory! {
             "read_only" => read_only("read_only"),
             "read_write" => read_write("read_write", /*capacity*/ None),
         };
         let (example_dir_proxy, example_dir_service) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let scope = ExecutionScope::new();
         example_dir.open(
             scope,
@@ -121,7 +120,7 @@ mod tests {
             ("read_write", OpenFlags::RIGHT_WRITABLE, true),
         ] {
             let file_proxy =
-                directory::open_file_no_describe(&example_dir_proxy, file_name, flags)?;
+                directory::open_file_no_describe(&example_dir_proxy, file_name, flags).unwrap();
             match (should_succeed, file_proxy.query().await) {
                 (true, Ok(_)) => (),
                 (false, Err(_)) => continue,
@@ -146,8 +145,7 @@ mod tests {
                     .map_err(zx_status::Status::from_raw)
                     .expect("write error");
             }
-            assert_eq!(file_proxy.close().await?, Ok(()));
+            assert_eq!(file_proxy.close().await.unwrap(), Ok(()));
         }
-        Ok(())
     }
 }

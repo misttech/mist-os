@@ -17,11 +17,27 @@ use {
 };
 
 mod watcher;
-pub use watcher::{WatchEvent, WatchMessage, Watcher};
+pub use watcher::{WatchEvent, WatchMessage, Watcher, WatcherCreateError, WatcherStreamError};
 
-/// Error returned by fuchsia_fs::directory library.
+/// Error returned by readdir_recursive.
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum RecursiveEnumerateError {
+    #[error("fidl error during {}: {:?}", _0, _1)]
+    Fidl(&'static str, fidl::Error),
+
+    #[error("Failed to read directory {}: {:?}", name, err)]
+    ReadDir { name: String, err: EnumerateError },
+
+    #[error("Failed to open directory {}: {:?}", name, err)]
+    Open { name: String, err: OpenError },
+
+    #[error("timeout")]
+    Timeout,
+}
+
+/// Error returned by readdir.
+#[derive(Debug, Error)]
+pub enum EnumerateError {
     #[error("a directory entry could not be decoded: {:?}", _0)]
     DecodeDirent(DecodeDirentError),
 
@@ -31,17 +47,14 @@ pub enum Error {
     #[error("`read_dirents` failed with status {:?}", _0)]
     ReadDirents(zx_status::Status),
 
-    #[error("`unlink` failed with status {:?}", _0)]
-    Unlink(zx_status::Status),
-
     #[error("timeout")]
     Timeout,
 
     #[error("`rewind` failed with status {:?}", _0)]
     Rewind(zx_status::Status),
 
-    #[error("Failed to read directory {}: {:?}", name, err)]
-    ReadDir { name: String, err: anyhow::Error },
+    #[error("`unlink` failed with status {:?}", _0)]
+    Unlink(zx_status::Status),
 }
 
 /// An error encountered while decoding a single directory entry.
@@ -50,7 +63,7 @@ pub enum DecodeDirentError {
     #[error("an entry extended past the end of the buffer")]
     BufferOverrun,
 
-    #[error("name is not valid utf-8")]
+    #[error("name is not valid utf-8: {}", _0)]
     InvalidUtf8(Utf8Error),
 }
 
@@ -397,7 +410,7 @@ pub fn readdir_recursive_filtered<'a, ResultFn, RecurseFn>(
     timeout: Option<Duration>,
     results_filter: ResultFn,
     recurse_filter: RecurseFn,
-) -> BoxStream<'a, Result<DirEntry, Error>>
+) -> BoxStream<'a, Result<DirEntry, RecursiveEnumerateError>>
 where
     ResultFn: Fn(&DirEntry, Option<&Vec<DirEntry>>) -> bool + Send + Sync + Copy + 'a,
     RecurseFn: Fn(&DirEntry) -> bool + Send + Sync + Copy + 'a,
@@ -424,30 +437,20 @@ where
                 // The directory that will be read now.
                 let dir_entry = pending.pop_front().unwrap();
 
-                let (subdir, subdir_server) =
-                    match fidl::endpoints::create_proxy::<fio::DirectoryMarker>() {
-                        Ok((subdir, server)) => (subdir, server),
-                        Err(e) => {
-                            return Some((Err(Error::Fidl("create_proxy", e)), (results, pending)))
-                        }
-                    };
+                let sub_dir;
                 let dir_ref = if dir_entry.is_root() {
                     dir
                 } else {
-                    let open_dir_result = dir.open(
-                        fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                        fio::ModeType::empty(),
-                        &dir_entry.name,
-                        ServerEnd::new(subdir_server.into_channel()),
-                    );
-                    if let Err(e) = open_dir_result {
-                        let error = Err(Error::ReadDir {
-                            name: dir_entry.name,
-                            err: anyhow::Error::new(e),
-                        });
-                        return Some((error, (results, pending)));
-                    } else {
-                        &subdir
+                    match open_directory_no_describe(dir, &dir_entry.name, fio::OpenFlags::empty())
+                    {
+                        Ok(dir) => {
+                            sub_dir = dir;
+                            &sub_dir
+                        }
+                        Err(err) => {
+                            let error = RecursiveEnumerateError::Open { name: dir_entry.name, err };
+                            return Some((Err(error), (results, pending)));
+                        }
                     }
                 };
 
@@ -457,11 +460,13 @@ where
                 };
                 let subentries = match readdir_result {
                     Ok(subentries) => subentries,
-                    Err(e) => {
-                        let error = Err(Error::ReadDir {
-                            name: dir_entry.name,
-                            err: anyhow::Error::new(e),
-                        });
+                    // Promote timeout error.
+                    Err(EnumerateError::Timeout) => {
+                        return Some((Err(RecursiveEnumerateError::Timeout), (results, pending)))
+                    }
+                    Err(err) => {
+                        let error =
+                            Err(RecursiveEnumerateError::ReadDir { name: dir_entry.name, err });
                         return Some((error, (results, pending)));
                     }
                 };
@@ -497,7 +502,7 @@ where
 pub fn readdir_recursive(
     dir: &fio::DirectoryProxy,
     timeout: Option<Duration>,
-) -> BoxStream<'_, Result<DirEntry, Error>> {
+) -> BoxStream<'_, Result<DirEntry, RecursiveEnumerateError>> {
     readdir_recursive_filtered(
         dir,
         timeout,
@@ -512,23 +517,25 @@ pub fn readdir_recursive(
 
 /// Returns a sorted Vec of directory entries contained directly in the given directory proxy. The
 /// returned entries will not include "." or nodes from any subdirectories.
-pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, Error> {
-    let status = dir.rewind().await.map_err(|e| Error::Fidl("rewind", e))?;
-    zx_status::Status::ok(status).map_err(Error::Rewind)?;
+pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, EnumerateError> {
+    let status = dir.rewind().await.map_err(|e| EnumerateError::Fidl("rewind", e))?;
+    zx_status::Status::ok(status).map_err(EnumerateError::Rewind)?;
 
     let mut entries = vec![];
 
     loop {
-        let (status, buf) =
-            dir.read_dirents(fio::MAX_BUF).await.map_err(|e| Error::Fidl("read_dirents", e))?;
-        zx_status::Status::ok(status).map_err(Error::ReadDirents)?;
+        let (status, buf) = dir
+            .read_dirents(fio::MAX_BUF)
+            .await
+            .map_err(|e| EnumerateError::Fidl("read_dirents", e))?;
+        zx_status::Status::ok(status).map_err(EnumerateError::ReadDirents)?;
 
         if buf.is_empty() {
             break;
         }
 
         for entry in parse_dir_entries(&buf) {
-            let entry = entry.map_err(Error::DecodeDirent)?;
+            let entry = entry.map_err(EnumerateError::DecodeDirent)?;
             if entry.name != "." {
                 entries.push(entry);
             }
@@ -546,12 +553,12 @@ pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, Error> 
 pub async fn readdir_with_timeout(
     dir: &fio::DirectoryProxy,
     timeout: Duration,
-) -> Result<Vec<DirEntry>, Error> {
-    readdir(&dir).on_timeout(timeout.after_now(), || Err(Error::Timeout)).await
+) -> Result<Vec<DirEntry>, EnumerateError> {
+    readdir(&dir).on_timeout(timeout.after_now(), || Err(EnumerateError::Timeout)).await
 }
 
 /// Returns `true` if an entry with the specified name exists in the given directory.
-pub async fn dir_contains(dir: &fio::DirectoryProxy, name: &str) -> Result<bool, Error> {
+pub async fn dir_contains(dir: &fio::DirectoryProxy, name: &str) -> Result<bool, EnumerateError> {
     Ok(readdir(&dir).await?.iter().any(|e| e.name == name))
 }
 
@@ -563,7 +570,7 @@ pub async fn dir_contains_with_timeout(
     dir: &fio::DirectoryProxy,
     name: &str,
     timeout: Duration,
-) -> Result<bool, Error> {
+) -> Result<bool, EnumerateError> {
     Ok(readdir_with_timeout(&dir, timeout).await?.iter().any(|e| e.name == name))
 }
 
@@ -636,12 +643,15 @@ const DIR_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
 /// Removes a directory and all of its children. `name` must be a subdirectory of `root_dir`.
 ///
 /// The async analogue of `std::fs::remove_dir_all`.
-pub async fn remove_dir_recursive(root_dir: &fio::DirectoryProxy, name: &str) -> Result<(), Error> {
+pub async fn remove_dir_recursive(
+    root_dir: &fio::DirectoryProxy,
+    name: &str,
+) -> Result<(), EnumerateError> {
     let (dir, dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
     root_dir
         .open(DIR_FLAGS, fio::ModeType::empty(), name, ServerEnd::new(dir_server.into_channel()))
-        .map_err(|e| Error::Fidl("open", e))?;
+        .map_err(|e| EnumerateError::Fidl("open", e))?;
     remove_dir_contents(dir).await?;
     root_dir
         .unlink(
@@ -652,12 +662,12 @@ pub async fn remove_dir_recursive(root_dir: &fio::DirectoryProxy, name: &str) ->
             },
         )
         .await
-        .map_err(|e| Error::Fidl("unlink", e))?
-        .map_err(|s| Error::Unlink(zx_status::Status::from_raw(s)))
+        .map_err(|e| EnumerateError::Fidl("unlink", e))?
+        .map_err(|s| EnumerateError::Unlink(zx_status::Status::from_raw(s)))
 }
 
 // Returns a `BoxFuture` instead of being async because async doesn't support recursion.
-fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<(), Error>> {
+fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<(), EnumerateError>> {
     let fut = async move {
         for dirent in readdir(&dir).await? {
             match dirent.kind {
@@ -671,15 +681,15 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
                         &dirent.name,
                         ServerEnd::new(subdir_server.into_channel()),
                     )
-                    .map_err(|e| Error::Fidl("open", e))?;
+                    .map_err(|e| EnumerateError::Fidl("open", e))?;
                     remove_dir_contents(subdir).await?;
                 }
                 _ => {}
             }
             dir.unlink(&dirent.name, fio::UnlinkOptions::EMPTY)
                 .await
-                .map_err(|e| Error::Fidl("unlink", e))?
-                .map_err(|s| Error::Unlink(zx_status::Status::from_raw(s)))?;
+                .map_err(|e| EnumerateError::Fidl("unlink", e))?
+                .map_err(|s| EnumerateError::Unlink(zx_status::Status::from_raw(s)))?;
         }
         Ok(())
     };
@@ -690,7 +700,6 @@ mod tests {
     use {
         super::*,
         crate::file::write,
-        anyhow::Context as _,
         assert_matches::assert_matches,
         fuchsia_async as fasync,
         futures::{channel::oneshot, stream::StreamExt},
@@ -1279,7 +1288,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_dir_contains() -> Result<(), anyhow::Error> {
+    async fn test_dir_contains() {
         let (dir_client, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let dir = pseudo_directory! {
@@ -1298,16 +1307,12 @@ mod tests {
         );
 
         for file in &["afile", "zzz", "subdir"] {
-            assert!(dir_contains(&dir_client, file)
-                .await
-                .with_context(|| format!("error checking if dir contains {}", file))?);
+            assert!(dir_contains(&dir_client, file).await.unwrap());
         }
 
         assert!(!dir_contains(&dir_client, "notin")
             .await
-            .context("error checking if dir contains notin")?);
-
-        Ok(())
+            .expect("error checking if dir contains notin"));
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1316,11 +1321,12 @@ mod tests {
         let dir = create_nested_dir(&tempdir).await;
         let first = dir_contains_with_timeout(&dir, "notin", LONG_DURATION)
             .await
-            .context("error checking dir contains notin");
+            .expect("error checking dir contains notin");
+        assert!(!first);
         let second = dir_contains_with_timeout(&dir, "a", LONG_DURATION)
             .await
-            .context("error checking dir contains a");
-        assert_matches::assert_matches!((first, second), (Ok(false), Ok(true)));
+            .expect("error checking dir contains a");
+        assert!(second);
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1333,7 +1339,7 @@ mod tests {
             let clone_dir = clone_no_describe(&dir, None).expect("clone dir");
             fasync::Task::spawn(async move {
                 let entries = readdir_recursive(&clone_dir, None)
-                    .collect::<Vec<Result<DirEntry, Error>>>()
+                    .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
                     .await
                     .into_iter()
                     .collect::<Result<Vec<_>, _>>()
@@ -1364,7 +1370,7 @@ mod tests {
         let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("could not create proxy");
         let result = readdir_recursive(&dir, Some(0.nanos()))
-            .collect::<Vec<Result<DirEntry, Error>>>()
+            .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>();
@@ -1376,7 +1382,7 @@ mod tests {
         let tempdir = TempDir::new().expect("failed to create tmp dir");
         let dir = create_nested_dir(&tempdir).await;
         let entries = readdir_recursive(&dir, Some(LONG_DURATION))
-            .collect::<Vec<Result<DirEntry, Error>>>()
+            .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
@@ -1401,7 +1407,7 @@ mod tests {
             let dir = create_nested_dir(&tempdir).await;
             remove_dir_recursive(&dir, "emptydir").await.expect("remove_dir_recursive failed");
             let entries = readdir_recursive(&dir, None)
-                .collect::<Vec<Result<DirEntry, Error>>>()
+                .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
@@ -1422,7 +1428,7 @@ mod tests {
             let dir = create_nested_dir(&tempdir).await;
             remove_dir_recursive(&dir, "subdir").await.expect("remove_dir_recursive failed");
             let entries = readdir_recursive(&dir, None)
-                .collect::<Vec<Result<DirEntry, Error>>>()
+                .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
@@ -1448,7 +1454,7 @@ mod tests {
             .expect("could not open subdir");
             remove_dir_recursive(&subdir, "subsubdir").await.expect("remove_dir_recursive failed");
             let entries = readdir_recursive(&dir, None)
-                .collect::<Vec<Result<DirEntry, Error>>>()
+                .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
@@ -1477,7 +1483,7 @@ mod tests {
                 .await
                 .expect("remove_dir_recursive failed");
             let entries = readdir_recursive(&dir, None)
-                .collect::<Vec<Result<DirEntry, Error>>>()
+                .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
                 .await
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
@@ -1503,7 +1509,7 @@ mod tests {
             let res = remove_dir_recursive(&dir, "baddir").await;
             let res = res.expect_err("remove_dir did not fail");
             match res {
-                Error::Fidl("rewind", fidl_error) if fidl_error.is_closed() => {}
+                EnumerateError::Fidl("rewind", fidl_error) if fidl_error.is_closed() => {}
                 _ => panic!("unexpected error {:?}", res),
             }
         }
@@ -1511,7 +1517,8 @@ mod tests {
             let tempdir = TempDir::new().expect("failed to create tmp dir");
             let dir = create_nested_dir(&tempdir).await;
             let res = remove_dir_recursive(&dir, ".").await;
-            let expected: Result<(), Error> = Err(Error::Unlink(zx_status::Status::INVALID_ARGS));
+            let expected: Result<(), EnumerateError> =
+                Err(EnumerateError::Unlink(zx_status::Status::INVALID_ARGS));
             assert_eq!(format!("{:?}", res), format!("{:?}", expected));
         }
     }

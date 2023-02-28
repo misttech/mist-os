@@ -30,7 +30,7 @@ pub enum BlobfsError {
     OpenDir(#[from] fuchsia_fs::node::OpenError),
 
     #[error("while listing blobfs dir")]
-    ReadDir(#[source] fuchsia_fs::directory::Error),
+    ReadDir(#[source] fuchsia_fs::directory::EnumerateError),
 
     #[error("while deleting blob")]
     Unlink(#[source] Status),

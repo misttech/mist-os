@@ -178,14 +178,14 @@ impl Directory {
     pub async fn entries(&self) -> Result<Vec<String>, Status> {
         match fuchsia_fs::directory::readdir(&self.proxy).await {
             Ok(entries) => Ok(entries.iter().map(|entry| entry.name.clone()).collect()),
-            Err(fuchsia_fs::directory::Error::Fidl(_, e)) => {
+            Err(fuchsia_fs::directory::EnumerateError::Fidl(_, e)) => {
                 if e.is_closed() {
                     Err(Status::PEER_CLOSED)
                 } else {
                     panic!("Unexpected FIDL error reading dirents: {}", e);
                 }
             }
-            Err(fuchsia_fs::directory::Error::ReadDirents(s)) => Err(s),
+            Err(fuchsia_fs::directory::EnumerateError::ReadDirents(s)) => Err(s),
             Err(e) => {
                 panic!("Unexpected error reading dirents: {}", e);
             }

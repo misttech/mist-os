@@ -162,7 +162,10 @@ pub(crate) async fn send_kernel_debug_data(
 const ITERATOR_BATCH_SIZE: usize = 10;
 
 async fn filter_map_filename(
-    entry_result: Result<fuchsia_fs::directory::DirEntry, fuchsia_fs::directory::Error>,
+    entry_result: Result<
+        fuchsia_fs::directory::DirEntry,
+        fuchsia_fs::directory::RecursiveEnumerateError,
+    >,
     dir_path: &str,
 ) -> Option<String> {
     match entry_result {

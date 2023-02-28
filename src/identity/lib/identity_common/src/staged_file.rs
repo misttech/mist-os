@@ -43,7 +43,7 @@ pub enum StagedFileError {
 
     /// Failed to readdir.
     #[error("Failed to readdir: {0}")]
-    ReaddirError(#[from] fuchsia_fs::directory::Error),
+    ReaddirError(#[from] fuchsia_fs::directory::EnumerateError),
 
     /// Failed to unlink file.
     #[error("Failed to unlink file: {0}")]

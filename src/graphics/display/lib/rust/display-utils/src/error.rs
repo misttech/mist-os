@@ -25,10 +25,6 @@ pub enum Error {
     #[error("device did not enumerate initial displays")]
     NoDisplays,
 
-    /// Failed to enumerate display-controller devices via devfs.
-    #[error("failed to watch files in device directory")]
-    VfsWatcherError,
-
     /// A request handling task (such as one that owns a FIDL event stream that can only be
     /// started once) was already been initiated before.
     #[error("a singleton task was already initiated")]
@@ -61,6 +57,14 @@ pub enum Error {
     /// Wrapper for errors from fuchsia-fs.
     #[error("filesystem error: {0}")]
     FsError(#[from] fuchsia_fs::node::OpenError),
+
+    /// Wrapper for errors from fuchsia-fs watcher creation.
+    #[error("failed to create directory watcher: {0}")]
+    WatcherCreateError(#[from] fuchsia_fs::directory::WatcherCreateError),
+
+    /// Wrapper for errors from the fuchsia-fs watcher stream.
+    #[error("directory watcher stream produced error: {0}")]
+    WatcherStreamError(#[from] fuchsia_fs::directory::WatcherStreamError),
 
     /// Error that occurred while notifying vsync event listeners over an in-process async channel.
     #[error("failed to notify vsync: {0}")]

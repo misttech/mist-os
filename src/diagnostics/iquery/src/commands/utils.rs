@@ -246,7 +246,7 @@ pub async fn get_accessor_selectors(
                             ));
                         }
                     }
-                    Err(fuchsia_fs::directory::Error::Timeout) => {
+                    Err(fuchsia_fs::directory::RecursiveEnumerateError::Timeout) => {
                         eprintln!(
                             "Warning: Read directory timed out after {} second(s).",
                             IQUERY_TIMEOUT_SECS,

@@ -55,7 +55,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
             Ok(v) => Ok(v),
             // If the service directory is unavailable, then mask the error as if
             // the protocol does not exist.
-            Err(fuchsia_fs::directory::Error::Fidl(
+            Err(fuchsia_fs::directory::EnumerateError::Fidl(
                 _,
                 fidl::Error::ClientChannelClosed { status, protocol_name: _ },
             )) if status == zx::Status::PEER_CLOSED => Ok(false),

@@ -101,7 +101,7 @@ async fn recursive_list_inspect_files(proxy: fio::DirectoryProxy) -> Vec<String>
                     None
                 }
             }
-            Err(fuchsia_fs::directory::Error::Timeout) => {
+            Err(fuchsia_fs::directory::RecursiveEnumerateError::Timeout) => {
                 eprintln!(
                     "Warning: Read directory timed out after {} second(s)",
                     IQUERY_TIMEOUT_SECS,

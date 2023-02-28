@@ -351,7 +351,7 @@ impl ControllerInner {
 async fn watch_first_file(path: &str) -> Result<PathBuf> {
     let dir = fuchsia_fs::directory::open_in_namespace(path, fio::OpenFlags::RIGHT_READABLE)?;
 
-    let mut watcher = Watcher::new(&dir).await.map_err(|_| Error::VfsWatcherError)?;
+    let mut watcher = Watcher::new(&dir).await?;
     while let Some(msg) = watcher.try_next().await? {
         match msg.event {
             WatchEvent::EXISTING | WatchEvent::ADD_FILE => {

@@ -32,7 +32,7 @@ pub enum DiskError {
     #[error("Failed to open: {0}")]
     OpenError(#[from] fuchsia_fs::node::OpenError),
     #[error("Failed to readdir: {0}")]
-    ReaddirError(#[from] fuchsia_fs::directory::Error),
+    ReaddirError(#[from] fuchsia_fs::directory::EnumerateError),
     #[error("Failed during FIDL call: {0}")]
     FidlError(#[from] fidl::Error),
     #[error("Failed to read first block of partition: {0}")]
@@ -42,9 +42,9 @@ pub enum DiskError {
     #[error("Block size too small for zxcrypt header")]
     BlockTooSmallForZxcryptHeader,
     #[error("Creating Watcher failed: {0}")]
-    WatcherError(#[source] anyhow::Error),
+    WatcherError(#[source] fuchsia_fs::directory::WatcherCreateError),
     #[error("Reading from Watcher stream failed: {0}")]
-    WatcherStreamError(#[source] std::io::Error),
+    WatcherStreamError(#[source] fuchsia_fs::directory::WatcherStreamError),
     #[error("Failed to bind zxcrypt driver to block device: {0}")]
     BindZxcryptDriverFailed(#[source] zx::Status),
     #[error("Failed to get topological path of device: {0}")]

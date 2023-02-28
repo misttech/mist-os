@@ -1831,7 +1831,7 @@ enum RealmBuilderError {
     /// Encountered an I/O error when attempting to read a component declaration referenced by a
     /// fragment-only URL from the test package.
     #[error("Could not read the manifest for component \"{0}\". {1:?}")]
-    DeclReadError(String, anyhow::Error),
+    DeclReadError(String, fuchsia_fs::file::ReadError),
 
     /// The `Build` function has been called multiple times on this channel.
     #[error("Build method was called multiple times. This method can only be called once. After it's called, the realm to be constructed can not be changed.")]

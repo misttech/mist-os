@@ -22,7 +22,7 @@ use {
 #[allow(missing_docs)]
 pub enum ResolveImagesError {
     #[error("while listing files in the update package")]
-    ListCandidates(#[source] fuchsia_fs::directory::Error),
+    ListCandidates(#[source] fuchsia_fs::directory::EnumerateError),
 }
 
 /// An error encountered while verifying an [`UnverifiedImageList`].

@@ -20,7 +20,7 @@ pub enum AccountMetadataStoreError {
     OpenError(#[from] fuchsia_fs::node::OpenError),
 
     #[error("Failed to readdir: {0}")]
-    ReaddirError(#[from] fuchsia_fs::directory::Error),
+    ReaddirError(#[from] fuchsia_fs::directory::EnumerateError),
 
     #[error("Failed during FIDL call: {0}")]
     FidlError(#[from] fidl::Error),

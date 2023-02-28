@@ -16,7 +16,6 @@ rustc_library("fuchsia-fs") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:rand",

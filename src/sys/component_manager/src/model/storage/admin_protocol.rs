@@ -80,7 +80,7 @@ enum StorageError {
 
 #[derive(Debug)]
 enum DeletionError {
-    DirectoryRead(ffs_dir::Error),
+    DirectoryRead(ffs_dir::EnumerateError),
     ContentError(Vec<DeletionErrorCause>),
 }
 
@@ -88,17 +88,16 @@ impl From<StorageError> for fsys::DeletionError {
     fn from(from: StorageError) -> fsys::DeletionError {
         match from {
             StorageError::NoStorageFound => fsys::DeletionError::NoneAvailable,
-            StorageError::Operation(DeletionError::DirectoryRead(ffs_dir::Error::Fidl(
-                _,
-                fidl::Error::ClientChannelClosed { .. },
-            ))) => fsys::DeletionError::Connection,
+            StorageError::Operation(DeletionError::DirectoryRead(
+                ffs_dir::EnumerateError::Fidl(_, fidl::Error::ClientChannelClosed { .. }),
+            )) => fsys::DeletionError::Connection,
             StorageError::Operation(DeletionError::DirectoryRead(_)) => {
                 fsys::DeletionError::Protocol
             }
             StorageError::Operation(DeletionError::ContentError(errors)) => match errors.get(0) {
                 None => fsys::DeletionError::Protocol,
                 Some(DeletionErrorCause::Directory(dir_read_err)) => match dir_read_err {
-                    ffs_dir::Error::Fidl(_, fidl::Error::ClientChannelClosed { .. }) => {
+                    ffs_dir::EnumerateError::Fidl(_, fidl::Error::ClientChannelClosed { .. }) => {
                         fsys::DeletionError::Connection
                     }
                     _ => fsys::DeletionError::Protocol,
@@ -116,7 +115,7 @@ impl From<StorageError> for fsys::DeletionError {
 #[derive(Debug)]
 enum DeletionErrorCause {
     /// There was an error removing a directory.
-    Directory(ffs_dir::Error),
+    Directory(ffs_dir::EnumerateError),
     /// The IPC to the I/O server succeeded, but the file operation
     /// returned an error.
     File(i32),

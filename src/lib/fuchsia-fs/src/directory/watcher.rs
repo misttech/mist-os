@@ -6,9 +6,20 @@
 
 #![deny(missing_docs)]
 
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_zircon_status::{self as zx, assoc_values};
+use {
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon_status::{self as zx, assoc_values},
+    futures::stream::{FusedStream, Stream},
+    std::{
+        ffi::OsStr,
+        marker::Unpin,
+        os::unix::ffi::OsStrExt,
+        path::PathBuf,
+        pin::Pin,
+        task::{Context, Poll},
+    },
+    thiserror::Error,
+};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon::MessageBuf;
@@ -16,14 +27,25 @@ use fuchsia_zircon::MessageBuf;
 #[cfg(not(target_os = "fuchsia"))]
 use fasync::emulated_handle::MessageBuf;
 
-use futures::stream::{FusedStream, Stream};
-use std::ffi::OsStr;
-use std::io;
-use std::marker::Unpin;
-use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+#[derive(Debug, Error)]
+#[allow(missing_docs)]
+pub enum WatcherCreateError {
+    #[error("while sending watch request: {0}")]
+    SendWatchRequest(#[source] fidl::Error),
+
+    #[error("watch failed with status: {0}")]
+    WatchError(#[source] zx::Status),
+
+    #[error("while converting client end to fasync channel: {0}")]
+    ChannelConversion(#[source] zx::Status),
+}
+
+#[derive(Debug, Error)]
+#[allow(missing_docs)]
+pub enum WatcherStreamError {
+    #[error("read from watch channel failed with status: {0}")]
+    ChannelRead(#[from] zx::Status),
+}
 
 /// Describes the type of event that occurred in the directory being watched.
 #[repr(C)]
@@ -65,14 +87,22 @@ impl Unpin for Watcher {}
 
 impl Watcher {
     /// Creates a new `Watcher` for the directory given by `dir`.
-    pub async fn new(dir: &fio::DirectoryProxy) -> Result<Watcher, anyhow::Error> {
+    pub async fn new(dir: &fio::DirectoryProxy) -> Result<Watcher, WatcherCreateError> {
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
         let options = 0u32;
-        let status = dir.watch(fio::WatchMask::all(), options, server_end).await?;
-        zx::Status::ok(status)?;
+        let status = dir
+            .watch(fio::WatchMask::all(), options, server_end)
+            .await
+            .map_err(WatcherCreateError::SendWatchRequest)?;
+        zx::Status::ok(status).map_err(WatcherCreateError::WatchError)?;
         let mut buf = MessageBuf::new();
         buf.ensure_capacity_bytes(fio::MAX_BUF as usize);
-        Ok(Watcher { ch: fasync::Channel::from_channel(client_end.into_channel())?, buf, idx: 0 })
+        Ok(Watcher {
+            ch: fasync::Channel::from_channel(client_end.into_channel())
+                .map_err(WatcherCreateError::ChannelConversion)?,
+            buf,
+            idx: 0,
+        })
     }
 
     fn reset_buf(&mut self) {
@@ -102,7 +132,7 @@ impl FusedStream for Watcher {
 }
 
 impl Stream for Watcher {
-    type Item = Result<WatchMessage, io::Error>;
+    type Item = Result<WatchMessage, WatcherStreamError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = &mut *self;
