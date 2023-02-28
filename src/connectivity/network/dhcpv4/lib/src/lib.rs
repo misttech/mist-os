@@ -5,6 +5,8 @@
 pub mod configuration;
 pub use dhcp_protocol as protocol;
 pub mod server;
+
+#[cfg(target_os = "fuchsia")]
 pub mod stash;
 
 //TODO(atait): Add tests exercising the public API of this library.

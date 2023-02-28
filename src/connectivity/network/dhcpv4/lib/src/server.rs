@@ -5,21 +5,33 @@
 use crate::{
     configuration::ServerParameters,
     protocol::{
-        identifier::ClientIdentifier, DhcpOption, FidlCompatible, FromFidlExt, IntoFidlExt,
-        Message, MessageType, OpCode, OptionCode, ProtocolError,
+        identifier::ClientIdentifier, DhcpOption, Message, MessageType, OpCode, OptionCode,
+        ProtocolError,
     },
 };
+
+#[cfg(target_os = "fuchsia")]
+use crate::protocol::{FidlCompatible, FromFidlExt, IntoFidlExt};
+
 use anyhow::{Context as _, Error};
+
+#[cfg(target_os = "fuchsia")]
 use fuchsia_zircon::Status;
+
+#[cfg(target_os = "fuchsia")]
+use std::convert::TryFrom;
+
+#[cfg(target_os = "fuchsia")]
+use tracing::info;
+
 use net_types::ethernet::Mac as MacAddr;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeSet, HashMap},
-    convert::TryFrom,
     net::Ipv4Addr,
 };
 use thiserror::Error;
-use tracing::{error, info, warn};
+use tracing::{error, warn};
 
 /// A minimal DHCP server.
 ///
@@ -821,6 +833,7 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
             })
     }
 
+    #[cfg(target_os = "fuchsia")]
     /// Saves current parameters to stash.
     fn save_params(&mut self) -> Result<(), Status> {
         if let Some(store) = self.store.as_mut() {
@@ -855,6 +868,7 @@ fn release_leased_addr<DS: DataStore>(
     Ok(())
 }
 
+#[cfg(target_os = "fuchsia")]
 /// The ability to dispatch fuchsia.net.dhcp.Server protocol requests and return a value.
 ///
 /// Implementers of this trait can be used as the backing server-side logic of the
@@ -895,6 +909,7 @@ pub trait ServerDispatcher {
     fn dispatch_clear_leases(&mut self) -> Result<(), Status>;
 }
 
+#[cfg(target_os = "fuchsia")]
 impl<DS: DataStore, TS: SystemTimeSource> ServerDispatcher for Server<DS, TS> {
     fn try_validate_parameters(&self) -> Result<&ServerParameters, Status> {
         if !self.params.is_valid() {

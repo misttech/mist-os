@@ -2,13 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(target_os = "fuchsia")]
 use crate::protocol::{FidlCompatible, FromFidlExt, IntoFidlExt};
+
+#[cfg(target_os = "fuchsia")]
 use anyhow::Context;
+
+#[cfg(target_os = "fuchsia")]
+use std::convert::Infallible as Never;
+
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
     collections::HashMap,
-    convert::{Infallible as Never, TryFrom, TryInto},
+    convert::{TryFrom, TryInto},
     io,
     net::Ipv4Addr,
     num::TryFromIntError,
@@ -83,6 +90,7 @@ pub struct LeaseLength {
     pub max_seconds: u32,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<fidl_fuchsia_net_dhcp::LeaseLength> for LeaseLength {
     type FromError = anyhow::Error;
     type IntoError = Never;
@@ -142,6 +150,7 @@ impl ManagedAddresses {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<fidl_fuchsia_net_dhcp::AddressPool> for ManagedAddresses {
     type FromError = anyhow::Error;
     type IntoError = Never;
@@ -198,6 +207,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::AddressPool> for ManagedAddresses {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PermittedMacs(pub Vec<fidl_fuchsia_net_ext::MacAddress>);
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<Vec<fidl_fuchsia_net::MacAddress>> for PermittedMacs {
     type FromError = Never;
     type IntoError = Never;
@@ -216,6 +226,7 @@ impl FidlCompatible<Vec<fidl_fuchsia_net::MacAddress>> for PermittedMacs {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StaticAssignments(pub HashMap<fidl_fuchsia_net_ext::MacAddress, Ipv4Addr>);
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<Vec<fidl_fuchsia_net_dhcp::StaticAssignment>> for StaticAssignments {
     type FromError = anyhow::Error;
     type IntoError = Never;
@@ -361,6 +372,7 @@ impl TryFrom<Ipv4Addr> for SubnetMask {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<fidl_fuchsia_net::Ipv4Address> for SubnetMask {
     type FromError = anyhow::Error;
     type IntoError = Never;
