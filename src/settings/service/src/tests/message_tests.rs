@@ -788,11 +788,8 @@ async fn test_roles_membership() {
         .expect("recipient messenger should be created");
 
     // Create messenger to send a message to the given participant.
-    let (sender, _) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .build()
-        .await
-        .expect("sending messenger should be created");
+    let (sender, _) =
+        delegate.create(MessengerType::Unbound).await.expect("sending messenger should be created");
 
     let message = test_message::FOO.clone();
     let audience = Audience::Role(ROLE_1);
@@ -819,19 +816,13 @@ async fn test_roles_audience() {
 
     // Create another messenger with no role to ensure messages are not routed
     // improperly to other messengers.
-    let (_, mut outside_receptor) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .build()
-        .await
-        .expect("other messenger should be created");
+    let (_, mut outside_receptor) =
+        delegate.create(MessengerType::Unbound).await.expect("other messenger should be created");
     let outside_signature = outside_receptor.get_signature();
 
     // Create messenger to send a message to the given participant.
-    let (sender, _) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .build()
-        .await
-        .expect("sending messenger should be created");
+    let (sender, _) =
+        delegate.create(MessengerType::Unbound).await.expect("sending messenger should be created");
 
     // Send message to role.
     {

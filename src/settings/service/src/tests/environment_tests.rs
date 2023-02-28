@@ -120,11 +120,8 @@ async fn test_message_hub() {
             .unwrap();
 
     // Send message for TestAgent to receive.
-    let (messenger, _) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .build()
-        .await
-        .expect("should be able to create messenger");
+    let (messenger, _) =
+        delegate.create(MessengerType::Unbound).await.expect("should be able to create messenger");
 
     let mut client_receptor = messenger.message(
         Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD))),
