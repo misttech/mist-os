@@ -229,6 +229,7 @@ template("assemble_security_pkg_test_system") {
   assembled_system(labels.assembly) {
     forward_variables_from(invoker, [ "fvm_truncate_to_length" ])
     testonly = true
+    product_assembly_config_label = "//build/assembly:default_product_config"
     board_name = invoker.board_name
     bootfs_labels = []
     base_packages = packages_for_assembly

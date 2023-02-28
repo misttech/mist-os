@@ -72,7 +72,7 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [label] A label for the above images config file. If not specified, global
 #     args will be used to generate an images config.
 #
-#   product_assembly_config_label (optional; default: //build/assembly:default_product_assembly_config)
+#   product_assembly_config_label (required)
 #     [label] A label for the product assembly config, should be a
 #     `product_assembly_configuration` target.
 #
@@ -230,10 +230,8 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 template("assembled_system") {
   assert(defined(invoker.base_packages), "Need to define base_packages")
   assert(defined(invoker.bootfs_labels), "Need to define bootfs_labels")
-
-  # TODO(https://fxbug.dev/122450): Remove this when usage in other repos are
-  # removed.
-  not_needed(invoker, [ "product_assembly_config_file" ])
+  assert(defined(invoker.product_assembly_config_label),
+         "Need to define product_assembly_config_label")
 
   generate_fvm = true
   if (defined(invoker.generate_fvm)) {
@@ -364,19 +362,7 @@ template("assembled_system") {
     validation_legacy_aib =
         "${namespace}.validation_legacy_assembly_input_bundle"
 
-    # TODO(https://fxbug.dev/122450): Make `product_assembly_config_label`
-    # required when targets from all other repos correctly set this parameter.
-    assert(
-        !(defined(invoker.product_assembly_config_label) &&
-              defined(product_assembly_config_dep)),
-        "product_assembly_config_label and product_assembly_config_dep should not be defined at the same time, the latter is being deprecated")
-    if (defined(invoker.product_assembly_config_label)) {
-      product_assembly_config = invoker.product_assembly_config_label
-    } else if (defined(invoker.product_assembly_config_dep)) {
-      product_assembly_config = invoker.product_assembly_config_dep
-    } else {
-      product_assembly_config = "//build/assembly:default_product_config"
-    }
+    product_assembly_config = invoker.product_assembly_config_label
   }
 
   # Intermediate files produced for Image Assembly.

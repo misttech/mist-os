@@ -35,11 +35,7 @@ declare_args() {
   # TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to build together
   fuchsia_async_trace_level_logging = true
 
-  # TODO(https://fxbug.dev/122450): Remove once usage OOT usage is removed.
-  fuchsia_product_assembly_config_file = false
-
-  # If the above file is created by a target in GN, then the label that creates
-  # it needs to be specified as well.
+  # The product assembly config used to configure the main Fuchsia image.
   fuchsia_product_assembly_config_label = false
 
   # TODO(fxbug.dev/94051): move to board definitions.

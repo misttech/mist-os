@@ -115,15 +115,8 @@ template("scrutiny_verifiers") {
              invoker.zbi_kernel_cmdline_goldens != [],
          "zbi_kernel_cmdline_goldens is required for scrutiny_verifiers()")
 
-  # TODO(https://fxbug.dev/122450): Remove this when usage in other repos are
-  # removed.
-  not_needed(invoker, [ "product_assembly_config_file" ])
-
-  if (defined(invoker.product_assembly_config_label)) {
-    product_assembly_config_label = invoker.product_assembly_config_label
-  } else {
-    product_assembly_config_label = "//build/assembly:default_product_config"
-  }
+  assert(defined(invoker.product_assembly_config_label),
+         "product_assembly_config_label is required for scrutiny_verifiers()")
 
   if (defined(invoker.product_bundle_path)) {
     pb_dir = invoker.product_bundle_path
@@ -141,11 +134,12 @@ template("scrutiny_verifiers") {
                              "visiblity",
                            ])
     product_assembly_config_file =
-        get_label_info(product_assembly_config_label, "target_out_dir") + "/" +
-        get_label_info(product_assembly_config_label, "name") +
+        get_label_info(invoker.product_assembly_config_label,
+                       "target_out_dir") + "/" +
+        get_label_info(invoker.product_assembly_config_label, "name") +
         "/product_assembly_config.json"
     structured_config_policy = invoker.structured_config_policy
-    deps = [ product_assembly_config_label ]
+    deps = [ invoker.product_assembly_config_label ]
   }
 
   verify_bootfs_filelist(
