@@ -22,6 +22,7 @@ TEST_F(CodecFactoryHwDetectTest, H264EncoderPresent) {
         });
     return factory != nullptr;
   });
+  loop().Shutdown();
 }
 
 TEST_F(CodecFactoryHwDetectTest, H265EncoderPresent) {
@@ -37,4 +38,5 @@ TEST_F(CodecFactoryHwDetectTest, H265EncoderPresent) {
         });
     return factory != nullptr;
   });
+  loop().Shutdown();
 }

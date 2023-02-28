@@ -16,7 +16,10 @@ class CodecFactoryHwDetectTest : public gtest::RealLoopFixture {
         std::make_unique<CodecFactoryApp>(dispatcher(), CodecFactoryApp::ProdOrTest::kTesting);
   }
 
-  void TearDown() override { codec_factory_.reset(); }
+  void TearDown() override {
+    loop().Shutdown();
+    codec_factory_.reset();
+  }
 
   std::unique_ptr<CodecFactoryApp> codec_factory_;
 };

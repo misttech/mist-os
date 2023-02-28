@@ -22,5 +22,8 @@ int main(int argc, char* argv[]) {
 
   loop.Run();
 
+  // Ensure callbacks that may reference CodecFactoryApp are destroyed before it is.
+  loop.Shutdown();
+
   return 0;
 }
