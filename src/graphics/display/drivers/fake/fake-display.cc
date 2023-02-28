@@ -15,6 +15,7 @@
 #include <threads.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
+#include <zircon/threads.h>
 
 #include <algorithm>
 #include <iterator>
@@ -659,7 +660,7 @@ void FakeDisplay::SendVsync() {
   }
 }
 
-zx_status_t FakeDisplay::Bind(bool start_vsync) {
+zx_status_t FakeDisplay::Bind(bool start_vsync_thread) {
   zx_status_t status = ddk::PDev::FromFragment(parent(), &pdev_);
   if (status != ZX_OK) {
     DISP_ERROR("Could not get PDEV protocol\n");
@@ -685,27 +686,22 @@ zx_status_t FakeDisplay::Bind(bool start_vsync) {
     return status;
   }
 
-  if (start_vsync) {
-    using Args = struct {
-      FakeDisplay* fake_display;
-    };
-    Args* pargs = new Args{this};
-    auto start_thread = [](void* opaque) {
-      Args* pargs = static_cast<Args*>(opaque);
-      Args args = *pargs;
-      delete pargs;
-      return args.fake_display->VSyncThread();
-    };
-    status = thrd_create_with_name(&vsync_thread_, start_thread, pargs, "vsync_thread");
+  if (start_vsync_thread) {
+    status = thrd_status_to_zx_status(thrd_create_with_name(
+        &vsync_thread_,
+        [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this,
+        "vsync_thread"));
     if (status != ZX_OK) {
       DISP_ERROR("Could not create vsync_thread\n");
       return status;
     }
+    vsync_thread_running_ = true;
   }
-  vsync_thread_running_ = start_vsync;
 
-  auto c_thread = [](void* arg) { return static_cast<FakeDisplay*>(arg)->CaptureThread(); };
-  status = thrd_create_with_name(&capture_thread_, c_thread, this, "capture_thread");
+  status = thrd_status_to_zx_status(thrd_create_with_name(
+      &capture_thread_,
+      [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,
+      "capture_thread"));
   if (status != ZX_OK) {
     DISP_ERROR("Could not create capture_thread\n");
     return status;

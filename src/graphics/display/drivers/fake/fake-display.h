@@ -54,7 +54,7 @@ class FakeDisplay : public DeviceType,
   ~FakeDisplay();
 
   // This function is called from the c-bind function upon driver matching.
-  zx_status_t Bind(bool start_vsync);
+  zx_status_t Bind(bool start_vsync_thread);
 
   // DisplayControllerImplProtocol implementation:
   void DisplayControllerImplSetDisplayControllerInterface(
