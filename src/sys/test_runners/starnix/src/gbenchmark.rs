@@ -4,7 +4,7 @@
 
 use {
     crate::helpers::*,
-    anyhow::{anyhow, Error},
+    anyhow::{anyhow, Context as _, Error},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_test::{self as ftest},
@@ -140,7 +140,7 @@ fn gbenchmark_to_fuchsiaperf(
     test_suite: String,
 ) -> Result<Vec<FuchsiaPerfBenchmarkResult>, Error> {
     let benchmark_output: BenchmarkOutput =
-        serde_json::from_str(results).expect("Failed to parse benchmark results.");
+        serde_json::from_str(results).context("Failed to parse benchmark results.")?;
 
     let mut perfs = vec![];
     let mut benchmark_count = 0;
@@ -343,7 +343,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_gbenchmark_to_fuchsiaperf_no_name() {
         let gbenchmark = r#"{
             "context": {
@@ -356,11 +355,10 @@ mod tests {
             ]
           }"#;
         let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE.to_owned())
-            .expect("Failed to parse benchmark results.");
+            .expect_err("Failed to parse benchmark results.");
     }
 
     #[test]
-    #[should_panic]
     fn test_gbenchmark_to_fuchsiaperf_no_time() {
         let gbenchmark = r#"{
             "context": {
@@ -374,11 +372,10 @@ mod tests {
           }"#;
 
         let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE.to_owned())
-            .expect("Failed to parse benchmark results.");
+            .expect_err("Failed to parse benchmark results.");
     }
 
     #[test]
-    #[should_panic]
     fn test_gbenchmark_to_fuchsiaperf_no_time_unit() {
         let gbenchmark = r#"{
             "context": {
@@ -392,6 +389,6 @@ mod tests {
           }"#;
 
         let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE.to_owned())
-            .expect("Failed to parse benchmark results.");
+            .expect_err("Failed to parse benchmark results.");
     }
 }
