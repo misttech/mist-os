@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_PCI_FIDL_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PLATFORM_PCI_FIDL_H_
 
-#include <fuchsia/hardware/pci/c/banjo.h>
+#include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/types.h>
 

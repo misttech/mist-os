@@ -69,7 +69,9 @@ TEST_F(MockDdkTesterPci, DeviceLifeCycle) {
   // Identify as the correct device.
   fake_pci.SetDeviceInfo({.device_id = kTestDeviceId});
   zx::unowned_vmo config = fake_pci.GetConfigVmo();
-  config->write(&kTestSubsysDeviceId, PCI_CONFIG_SUBSYSTEM_ID, sizeof(kTestSubsysDeviceId));
+  config->write(&kTestSubsysDeviceId,
+                fidl::ToUnderlying(fuchsia_hardware_pci::Config::kSubsystemId),
+                sizeof(kTestSubsysDeviceId));
 
   // Need an IRQ of some kind. Since Intel drivers are very specific in their
   // MSI-X handling we'll keep it simple and use a legacy interrupt.

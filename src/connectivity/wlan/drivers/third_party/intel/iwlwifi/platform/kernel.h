@@ -8,7 +8,6 @@
 // This file contains Fuchsia-specific kernel support code, including those kernel structs and
 // routines that are typically provided by the Linux kernel API.
 
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <lib/async/time.h>
 #include <limits.h>
 #include <netinet/if_ether.h>
@@ -112,7 +111,6 @@ struct iwl_pci_fidl;
 struct iwl_pci_dev {
   struct device dev;
   struct iwl_pci_fidl* fidl;
-  pci_protocol_t proto;
   unsigned short device;
   unsigned short subsystem_device;
   struct iwl_trans* drvdata;

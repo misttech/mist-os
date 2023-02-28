@@ -36,7 +36,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PCIE_INTERNAL_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_PCIE_INTERNAL_H_
 
-#include <fuchsia/hardware/pci/c/banjo.h>
+#include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/sync/completion.h>
 #include <threads.h>

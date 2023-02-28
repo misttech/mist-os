@@ -100,8 +100,9 @@ void PcieDevice::DdkInit(::ddk::InitTxn txn) {
       return status;
     }
     uint16_t subsystem_device_id = 0;
-    if ((status = iwl_pci_read_config16(pci_dev_.fidl, PCI_CONFIG_SUBSYSTEM_ID,
-                                        &subsystem_device_id)) != ZX_OK) {
+    if ((status = iwl_pci_read_config16(
+             pci_dev_.fidl, fidl::ToUnderlying(fuchsia_hardware_pci::Config::kSubsystemId),
+             &subsystem_device_id)) != ZX_OK) {
       IWL_ERR(nullptr, "Failed to read PCI subsystem device ID: %s\n",
               zx_status_get_string(status));
       return status;

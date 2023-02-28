@@ -58,7 +58,7 @@ source_set("platform") {
     "//src/connectivity/wlan/drivers/lib/log/c",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/mmio",
-    "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_c",
+    "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
     "//zircon/system/public",
     "//zircon/system/ulib/async",
