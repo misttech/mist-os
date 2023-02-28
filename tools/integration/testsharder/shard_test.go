@@ -248,8 +248,8 @@ func TestMakeShards(t *testing.T) {
 		}
 		expected := []*Shard{
 			isolateShard(fuchsiaShard(env1, 1), 1),
-			fuchsiaShard(env1, 2, 3),
 			isolateShard(fuchsiaShard(env2, 1), 1),
+			fuchsiaShard(env1, 2, 3),
 			isolateShard(fuchsiaShard(env2, 4), 2),
 		}
 		assertEqual(t, expected, actual)

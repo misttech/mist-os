@@ -156,35 +156,55 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 	if testListEntries == nil {
 		testListEntries = make(map[string]build.TestListEntry)
 	}
+
+	// Logic to get the environment name at this stage have to include information
+	// from the test specification that is not necessarily used in other
+	// usages of the environmentName function.
+	var calcShardName = func(env build.Environment, spec build.TestSpec) string {
+		envName := environmentName(env)
+		if spec.Test.Isolated {
+			envName = fmt.Sprintf("%s-%s", envName, normalizeTestName(spec.Test.Name))
+		}
+		return envName
+	}
+
+	type env struct {
+		shardName string
+		env       build.Environment
+	}
+
 	// Collect the order of the shards so our shard ordering is deterministic with
 	// respect to the input.
-	envToSuites := newEnvMap()
-	envs := []build.Environment{}
+	envs := []env{}
+	envToSuites := make(map[string][]build.TestSpec)
 	for _, spec := range specs {
-		for _, env := range spec.Envs {
-			if !stringSlicesEq(opts.Tags, env.Tags) {
+		for _, e := range spec.Envs {
+			if !stringSlicesEq(opts.Tags, e.Tags) {
 				continue
 			}
 
 			// Tags should not differ by ordering.
 			sortableTags := sort.StringSlice(opts.Tags)
 			sortableTags.Sort()
-			env.Tags = []string(sortableTags)
+			e.Tags = []string(sortableTags)
 
-			specs, ok := envToSuites.get(env)
+			shardName := calcShardName(e, spec)
+			specs, ok := envToSuites[shardName]
 			if !ok {
-				envs = append(envs, env)
+				envs = append(envs, env{shardName: shardName, env: e})
 			}
-			envToSuites.set(env, append(specs, spec))
+			envToSuites[shardName] = append(specs, spec)
 		}
 	}
 
 	shards := make([]*Shard, 0, len(envs))
-	for _, env := range envs {
-		specs, _ := envToSuites.get(env)
+	for _, e := range envs {
+		specs, _ := envToSuites[e.shardName]
+
 		sort.Slice(specs, func(i, j int) bool {
 			return specs[i].Test.Name < specs[j].Test.Name
 		})
+
 		tests := []Test{}
 		for _, spec := range specs {
 			test := Test{Test: spec.Test, Runs: 1}
@@ -194,9 +214,9 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 			}
 			if spec.Test.Isolated {
 				shards = append(shards, &Shard{
-					Name:  fmt.Sprintf("%s-%s", environmentName(env), normalizeTestName(spec.Test.Name)),
+					Name:  e.shardName,
 					Tests: []Test{test},
-					Env:   env,
+					Env:   e.env,
 				})
 			} else {
 				tests = append(tests, test)
@@ -204,9 +224,9 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 		}
 		if len(tests) > 0 {
 			shards = append(shards, &Shard{
-				Name:  environmentName(env),
+				Name:  e.shardName,
 				Tests: tests,
-				Env:   env,
+				Env:   e.env,
 			})
 		}
 	}
@@ -239,25 +259,6 @@ func environmentName(env build.Environment) string {
 		addToken(name)
 	}
 	return strings.Join(tokens, "-")
-}
-
-// Abstracts a mapping build.Environment -> []string, as build.Environment contains non-comparable
-// members (e.g., string slices), which makes it invalid for a map key.
-type envMap struct {
-	m map[string][]build.TestSpec
-}
-
-func newEnvMap() envMap {
-	return envMap{m: make(map[string][]build.TestSpec)}
-}
-
-func (em envMap) get(e build.Environment) ([]build.TestSpec, bool) {
-	specs, ok := em.m[fmt.Sprintf("%v", e)]
-	return specs, ok
-}
-
-func (em *envMap) set(e build.Environment, specs []build.TestSpec) {
-	em.m[fmt.Sprintf("%v", e)] = specs
 }
 
 func stringSlicesEq(s []string, t []string) bool {
