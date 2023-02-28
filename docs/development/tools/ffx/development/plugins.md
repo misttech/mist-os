@@ -1,5 +1,10 @@
 # Developing an ffx plugin
 
+Note: This document describes the legacy plugin macro system and is here only
+as a reference while we still have some plugins using it around. See
+[the top level ffx development docs](/docs/development/tools/ffx/development/README.md)
+for documentation on writing subtools.
+
 This page describes the basic steps for creating a plugin for `ffx`.
 
 The plugin system employs a combination of GN build rules and Rust attributes

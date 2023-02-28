@@ -8,3 +8,5 @@
 toc:
 - title: "CLI"
   path: /docs/development/tools/ffx/architecture/cli.md
+- title: "FHO subtool interface"
+  path: /docs/development/tools/ffx/architecture/fho.md

@@ -1,5 +1,10 @@
 # Advanced Plugin Internals
 
+Note: This document describes the legacy plugin macro system and is here only
+as a reference while we still have some plugins using it around. See
+[the top level ffx development docs](/docs/development/tools/ffx/development/README.md)
+for documentation on writing subtools.
+
 This page is intended for developers who want to understand FFX's plugin system
 better. FFX is built on top of the [argh](https://docs.rs/argh/0.1.3/argh/)
 crate. This crate imposes the Google standard for CLI parameters. The structure
