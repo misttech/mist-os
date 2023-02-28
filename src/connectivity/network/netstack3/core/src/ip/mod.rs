@@ -2479,7 +2479,7 @@ pub(crate) fn del_route<
     subnet: Subnet<I::Addr>,
 ) -> Result<(), NotFoundError> {
     sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table.del_route(subnet).map(|removed| {
+        table.del_subnet_routes(subnet).map(|removed| {
             removed.into_iter().for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry)))
         })
     })
@@ -2491,11 +2491,14 @@ pub(crate) fn del_device_routes<
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
 >(
     sync_ctx: &mut SC,
-    _ctx: &mut C,
+    ctx: &mut C,
     to_delete: &SC::DeviceId,
 ) {
     sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table.retain(|types::Entry { subnet: _, device, gateway: _ }| device != to_delete)
+        table
+            .del_device_routes(to_delete.clone())
+            .into_iter()
+            .for_each(|entry| ctx.on_event(IpLayerEvent::RouteRemoved(entry)))
     })
 }
 
@@ -3110,6 +3113,7 @@ mod tests {
     use core::{convert::TryFrom, num::NonZeroU16, time::Duration};
 
     use ip_test_macro::ip_test;
+    use net_declare::{net_subnet_v4, net_subnet_v6};
     use net_types::{
         ethernet::Mac,
         ip::{AddrSubnet, GenericOverIp, IpAddr, IpInvariant, Ipv4Addr, Ipv6Addr},
@@ -4999,45 +5003,45 @@ mod tests {
                 gateway: None
             })]
         );
+        let gateway_subnet = I::map_ip(
+            (),
+            |()| net_subnet_v4!("10.0.0.0/16"),
+            |()| net_subnet_v6!("::0a00:0000/112"),
+        );
         assert_eq!(
             crate::add_route(
                 &sync_ctx,
                 &mut non_sync_ctx,
-                AddableEntry::with_gateway(
-                    I::FAKE_CONFIG.subnet.into(),
-                    None,
-                    I::FAKE_CONFIG.remote_ip.into(),
-                )
-                .into()
+                AddableEntry::with_gateway(gateway_subnet, None, I::FAKE_CONFIG.remote_ip.into(),)
+                    .into()
             ),
             Ok(())
         );
         assert_eq!(
             take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
             [IpLayerEvent::RouteAdded(types::Entry {
-                subnet: I::FAKE_CONFIG.subnet.into(),
+                subnet: gateway_subnet,
                 device: device_id.clone(),
                 gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
             })]
         );
-        assert_eq!(
-            crate::del_route(&sync_ctx, &mut non_sync_ctx, I::FAKE_CONFIG.subnet.into()),
-            Ok(())
-        );
+        assert_eq!(crate::del_route(&sync_ctx, &mut non_sync_ctx, gateway_subnet.into()), Ok(()));
         assert_eq!(
             take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
-            [
-                IpLayerEvent::RouteRemoved(types::Entry {
-                    subnet: I::FAKE_CONFIG.subnet.into(),
-                    device: device_id.clone(),
-                    gateway: None
-                }),
-                IpLayerEvent::RouteRemoved(types::Entry {
-                    subnet: I::FAKE_CONFIG.subnet.into(),
-                    device: device_id.clone(),
-                    gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
-                })
-            ]
+            [IpLayerEvent::RouteRemoved(types::Entry {
+                subnet: gateway_subnet,
+                device: device_id.clone(),
+                gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
+            })]
+        );
+        crate::device::remove_device(&sync_ctx, &mut non_sync_ctx, device_id.clone());
+        assert_eq!(
+            take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
+            [IpLayerEvent::RouteRemoved(types::Entry {
+                subnet: I::FAKE_CONFIG.subnet.into(),
+                device: device_id,
+                gateway: None
+            }),]
         );
     }
 }

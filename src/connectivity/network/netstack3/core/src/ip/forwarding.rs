@@ -158,37 +158,53 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         self.add_entry(ip::types::Entry { subnet, device, gateway: None })
     }
 
+    // Applies the given predicate to the entries in the forwarding table,
+    // removing (and returning) those that yield `true` while retaining those
+    // that yield `false`.
+    fn del_routes<F: Fn(&ip::types::Entry<I::Addr, D>) -> bool>(
+        &mut self,
+        predicate: F,
+    ) -> Vec<ip::types::Entry<I::Addr, D>> {
+        // TODO(https://github.com/rust-lang/rust/issues/43244): Use
+        // drain_filter to avoid extra allocation.
+        let Self { table } = self;
+        let owned_table = core::mem::replace(table, Vec::new());
+        let (removed, owned_table) = owned_table.into_iter().partition(|entry| predicate(entry));
+        *table = owned_table;
+        removed
+    }
+
     /// Delete all routes to a subnet, returning `Err` if no route was found to
     /// be deleted.
     ///
     /// Returns all the deleted entries on success.
     ///
-    /// Note, `del_route` will remove *all* routes to a `subnet`, including
-    /// routes that consider `subnet` on-link for some device and routes that
-    /// require packets destined to a node within `subnet` to be routed through
-    /// some next-hop node.
-    pub(crate) fn del_route(
+    /// Note, `del_subnet_routes` will remove *all* routes to a `subnet`,
+    /// including routes that consider `subnet` on-link for some device and
+    /// routes that require packets destined to a node within `subnet` to be
+    /// routed through some next-hop node.
+    pub(crate) fn del_subnet_routes(
         &mut self,
         subnet: Subnet<I::Addr>,
     ) -> Result<Vec<ip::types::Entry<I::Addr, D>>, crate::error::NotFoundError> {
-        debug!("deleting route: {}", subnet);
-
-        // Delete all routes to a subnet.
-        //
-        // TODO(https://github.com/rust-lang/rust/issues/43244): Use
-        // drain_filter to avoid extra allocation.
-        let Self { table } = self;
-        let owned_table = core::mem::replace(table, Vec::new());
-        let (owned_table, removed) =
-            owned_table.into_iter().partition(|entry| entry.subnet != subnet);
-        *table = owned_table;
+        debug!("deleting routes to subnet: {}", subnet);
+        let removed =
+            self.del_routes(|entry: &ip::types::Entry<I::Addr, D>| entry.subnet == subnet);
         if removed.is_empty() {
             // If a path to `subnet` was not in our installed table, then it
             // definitely won't be in our active routes cache.
             return Err(crate::error::NotFoundError);
         }
-
         Ok(removed)
+    }
+
+    /// Delete all routes on a device.
+    ///
+    /// Unlike ['del_subnet_routes'], this function always succeeds, even if
+    /// there are no device routes.
+    pub(crate) fn del_device_routes(&mut self, device: D) -> Vec<ip::types::Entry<I::Addr, D>> {
+        debug!("deleting routes on device: {:?}", device);
+        self.del_routes(|entry: &ip::types::Entry<I::Addr, D>| entry.device == device)
     }
 
     /// Get an iterator over all of the forwarding entries ([`Entry`]) this
@@ -236,11 +252,6 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
                 Destination { next_hop, device: device.clone() }
             })
         })
-    }
-
-    /// Retains only the entries that pass the predicate.
-    pub(crate) fn retain<F: FnMut(&ip::types::Entry<I::Addr, D>) -> bool>(&mut self, pred: F) {
-        self.table.retain(pred)
     }
 }
 
@@ -397,7 +408,7 @@ mod tests {
 
         // Delete all routes to subnet.
         assert_eq!(
-            table.del_route(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
+            table.del_subnet_routes(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
             HashSet::from([
                 ip::types::Entry { subnet: config.subnet, device: device.clone(), gateway: None },
                 ip::types::Entry {
@@ -412,6 +423,30 @@ mod tests {
             table.iter_table().collect::<Vec<_>>(),
             &[&ip::types::Entry { subnet: next_hop_subnet, device: device.clone(), gateway: None }]
         );
+    }
+
+    #[ip_test]
+    fn test_delete_device_routes<I: Ip + TestIpExt>() {
+        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+
+        let config = I::FAKE_CONFIG;
+        let subnet = config.subnet;
+        let device_a = MultipleDevicesId::A;
+        let device_b = MultipleDevicesId::B;
+
+        // Should add the routes successfully.
+        let expected_entry_a = ip::types::Entry { subnet, device: device_a.clone(), gateway: None };
+        let expected_entry_b = ip::types::Entry { subnet, device: device_b.clone(), gateway: None };
+        assert_eq!(table.add_device_route(subnet, device_a.clone()), Ok(&expected_entry_a));
+        assert_eq!(table.add_device_route(subnet, device_b.clone()), Ok(&expected_entry_b));
+        assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&expected_entry_a, &expected_entry_b]);
+
+        assert_eq!(
+            table.del_device_routes(device_a.clone()).into_iter().collect::<Vec<_>>(),
+            &[expected_entry_a]
+        );
+
+        assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&expected_entry_b]);
     }
 
     #[ip_test]
@@ -438,7 +473,7 @@ mod tests {
         // Delete routes to the subnet and make sure that we can no longer route
         // to destinations in the subnet.
         assert_eq!(
-            table.del_route(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
+            table.del_subnet_routes(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
             HashSet::from([
                 ip::types::Entry { subnet: config.subnet, device: device.clone(), gateway: None },
                 ip::types::Entry {
