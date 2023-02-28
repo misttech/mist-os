@@ -54,7 +54,7 @@ class FakeDisplay : public DeviceType,
   // This function is called from the c-bind function upon driver matching.
   zx_status_t Bind(bool start_vsync);
 
-  // Required functions needed to implement Display Controller Protocol
+  // DisplayControllerImplProtocol implementation:
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
@@ -73,23 +73,17 @@ class FakeDisplay : public DeviceType,
                                                size_t display_count,
                                                const config_stamp_t* config_stamp);
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
-                                   size_t raw_eld_count) {}
+                                   size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   uint32_t collection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
                                                                    uint64_t collection_id);
   zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
-                                                              uint32_t* out_stride) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
+                                                              uint32_t* out_stride);
+  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
   zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
       const display_capture_interface_protocol_t* intf);
-
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection,
                                                          uint32_t index,
                                                          uint64_t* out_capture_handle)

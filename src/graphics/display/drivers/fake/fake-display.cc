@@ -91,7 +91,6 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
   return ZX_OK;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   fbl::AutoLock lock(&display_lock_);
@@ -123,7 +122,6 @@ static bool IsAcceptableImageType(uint32_t image_type) {
 
 static bool IsAcceptablePixelFormat(zx_pixel_format_t pixel_format) { return true; }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                                      zx::channel collection_token) {
   if (buffer_collections_.find(collection_id) != buffer_collections_.end()) {
@@ -153,7 +151,6 @@ zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(uint64_t co
   return ZX_OK;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(uint64_t collection_id) {
   if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
@@ -164,7 +161,6 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(uint64_t c
   return ZX_OK;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
                                                            uint32_t index) {
   const auto it = buffer_collections_.find(collection_id);
@@ -176,7 +172,6 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage2(image_t* image, uint6
                                           index);
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image,
                                                           zx_unowned_handle_t handle,
                                                           uint32_t index) {
@@ -245,14 +240,12 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image,
   return status;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void FakeDisplay::DisplayControllerImplReleaseImage(image_t* image) {
   fbl::AutoLock lock(&image_lock_);
   auto info = reinterpret_cast<ImageInfo*>(image->handle);
   imported_images_.erase(*info);
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 uint32_t FakeDisplay::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
     size_t* layer_cfg_result_count) {
@@ -291,7 +284,6 @@ uint32_t FakeDisplay::DisplayControllerImplCheckConfiguration(
   return CONFIG_DISPLAY_OK;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 void FakeDisplay::DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,
                                                           size_t display_count,
                                                           const config_stamp_t* config_stamp) {
@@ -311,7 +303,9 @@ void FakeDisplay::DisplayControllerImplApplyConfiguration(const display_config_t
   current_config_stamp_ = *config_stamp;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
+                                              size_t raw_eld_count) {}
+
 zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
   zx_status_t status = sysmem_.Connect(std::move(connection));
   if (status != ZX_OK) {
@@ -322,7 +316,6 @@ zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel co
   return ZX_OK;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
     const image_t* config, uint64_t collection_id) {
   const auto it = buffer_collections_.find(collection_id);
@@ -334,7 +327,6 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
       config, it->second.client_end().borrow().handle()->get());
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, zx_unowned_handle_t collection) {
   fuchsia_sysmem::BufferCollectionConstraints constraints;
@@ -401,6 +393,15 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
+zx_status_t FakeDisplay::DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
+                                                                         uint32_t* out_stride) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t FakeDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
   fbl::AutoLock lock(&capture_lock_);
@@ -409,7 +410,6 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
   return ZX_OK;
 }
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture2(uint64_t collection_id,
                                                                      uint32_t index,
                                                                      uint64_t* out_capture_handle) {
