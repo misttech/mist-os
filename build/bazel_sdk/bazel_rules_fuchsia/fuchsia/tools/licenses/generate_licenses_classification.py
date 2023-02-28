@@ -135,12 +135,23 @@ def _apply_policy_and_overrides(
 def _print_verification_errors(classification: LicensesClassifications):
     verification_messages = classification.verification_errors()
 
+    message_count = len(verification_messages)
+    max_verification_errors = 100
+
+    if message_count > max_verification_errors:
+        verification_messages = verification_messages[0:max_verification_errors]
+
     if verification_messages:
         for i in range(0, len(verification_messages)):
             _log(f"==========================")
-            _log(f"VERIFICATION MESSAGE {i+1}/{len(verification_messages)}:")
+            _log(f"VERIFICATION MESSAGE {i+1}/{message_count}:")
             _log(f"==========================")
             _log(verification_messages[i])
+
+    if message_count > max_verification_errors:
+        _log(
+            f"WARNING: Too many verification errors. Only showing the first {max_verification_errors} of {message_count} errors."
+        )
 
 
 def main():
