@@ -14,8 +14,5 @@ fidl("fuchsia.lowpan.thread") {
     "overview.fidl",
   ]
 
-  public_deps = [
-    "//sdk/fidl/fuchsia.lowpan",
-    "//zircon/vdso/zx",
-  ]
+  public_deps = [ "//sdk/fidl/fuchsia.lowpan" ]
 }
