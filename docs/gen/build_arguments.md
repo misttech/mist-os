@@ -2684,6 +2684,17 @@ You can still build //build/images:netboot explicitly even if enable_netboot is 
 
 From //build/images/args.gni:88
 
+### enable_netstack2_tracing
+
+TODO(https://fxbug.dev/122670): If we make tracing in netstack3
+conditionally compiled, make this flag generic over netstack and choose the
+appropriate netstack package based on the combination of netstack3
+(true/false) and tracing (true/false).
+
+**Current value (from the default):** `false`
+
+From //src/connectivity/network/BUILD.gn:18
+
 ### enable_perfetto_benchmarks
 
 **Current value (from the default):** `false`
@@ -3699,7 +3710,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7939,7 +7950,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
