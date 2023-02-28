@@ -10,6 +10,9 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <span>
+#include <vector>
+
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/nxp/platform/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
@@ -24,60 +27,50 @@ namespace imx8mm_evk {
 namespace fpbus = fuchsia_hardware_platform_bus;
 using i2c_channel_t = fidl_metadata::i2c::Channel;
 
-zx_status_t Imx8mmEvk::I2cInit() {
-  static const std::vector<fpbus::Mmio> i2c_mmios{
+struct Imx8mmEvk::I2cBus {
+  zx_paddr_t mmio;
+  uint32_t irq;
+  cpp20::span<const i2c_channel_t> channels;
+};
+
+zx_status_t Imx8mmEvk::AddI2cBus(const uint32_t bus_id, const I2cBus& bus) {
+  const std::vector<fpbus::Mmio> i2c_mmios{
       {{
-          .base = imx8mm::kI2c1Base,
+          .base = bus.mmio,
           .length = imx8mm::kI2cSize,
       }},
-      {{
-          .base = imx8mm::kI2c2Base,
-          .length = imx8mm::kI2cSize,
-      }},
   };
 
-  static const std::vector<fpbus::Irq> i2c_irqs{
+  const std::vector<fpbus::Irq> i2c_irqs{
       {{
-          .irq = imx8mm::kI2c1Irq,
-          .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
-      }},
-      {{
-          .irq = imx8mm::kI2c2Irq,
+          .irq = bus.irq,
           .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
       }},
   };
 
-  constexpr i2c_channel_t i2c_channels[] = {
-      // PMIC
-      {
-          .bus_id = 0,
-          .address = 0x25,
-          .vid = 0,
-          .pid = 0,
-          .did = 0,
-          .name = "PMIC",
-      },
-  };
-
-  auto i2c_channels_fidl = fidl_metadata::i2c::I2CChannelsToFidl(i2c_channels);
+  auto i2c_channels_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus_id, bus.channels);
   if (i2c_channels_fidl.is_error()) {
     zxlogf(ERROR, "Failed to FIDL encode I2C channel metadata: %d",
            i2c_channels_fidl.error_value());
     return i2c_channels_fidl.error_value();
   }
 
-  std::vector<fpbus::Metadata> i2c_metadata{
+  const std::vector<fpbus::Metadata> i2c_metadata{
       {{
           .type = DEVICE_METADATA_I2C_CHANNELS,
           .data = i2c_channels_fidl.value(),
       }},
   };
 
+  char name[32];
+  snprintf(name, sizeof(name), "i2c-%u", bus_id);
+
   fpbus::Node i2c_dev;
-  i2c_dev.name() = "i2c";
+  i2c_dev.name() = name;
   i2c_dev.vid() = PDEV_VID_NXP;
   i2c_dev.pid() = PDEV_PID_IMX8MMEVK;
   i2c_dev.did() = PDEV_DID_IMX_I2C;
+  i2c_dev.instance_id() = bus_id;
   i2c_dev.mmio() = i2c_mmios;
   i2c_dev.irq() = i2c_irqs;
   i2c_dev.metadata() = i2c_metadata;
@@ -98,6 +91,7 @@ zx_status_t Imx8mmEvk::I2cInit() {
                         bind_fuchsia_nxp_platform::BIND_PLATFORM_DEV_VID_NXP),
       ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
                         bind_fuchsia_nxp_platform::BIND_PLATFORM_DEV_DID_I2C),
+      ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, bus_id),
   };
 
   fidl::Arena<> fidl_arena;
@@ -115,10 +109,42 @@ zx_status_t Imx8mmEvk::I2cInit() {
 
   // TODO (fxbug.dev/121200): Add clock fragment, and replace the PlatformBus::NodeAdd() and
   // DdkAddCompositeNodeSpec() calls with PlatformBus::AddCompositeNodeSpec().
-  auto status = DdkAddCompositeNodeSpec("i2c", ddk::CompositeNodeSpec(kPdevRules, kPdevProperties));
+  auto status = DdkAddCompositeNodeSpec(name, ddk::CompositeNodeSpec(kPdevRules, kPdevProperties));
   if (status != ZX_OK) {
     zxlogf(INFO, "DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
     return status;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t Imx8mmEvk::I2cInit() {
+  static constexpr i2c_channel_t i2c_1_channels[]{
+      // PMIC
+      {
+          .address = 0x25,
+          .vid = 0,
+          .pid = 0,
+          .did = 0,
+          .name = "PMIC",
+      },
+  };
+
+  static constexpr I2cBus buses[]{
+      {
+          .mmio = imx8mm::kI2c1Base,
+          .irq = imx8mm::kI2c1Irq,
+          .channels{i2c_1_channels, std::size(i2c_1_channels)},
+      },
+      {
+          .mmio = imx8mm::kI2c2Base,
+          .irq = imx8mm::kI2c2Irq,
+          .channels{},
+      },
+  };
+
+  for (uint32_t i = 0; i < std::size(buses); i++) {
+    AddI2cBus(i, buses[i]);
   }
 
   return ZX_OK;

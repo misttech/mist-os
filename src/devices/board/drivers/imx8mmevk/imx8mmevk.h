@@ -32,6 +32,8 @@ class Imx8mmEvk : public ddk::Device<Imx8mmEvk> {
   void DdkRelease() { delete this; }
 
  private:
+  struct I2cBus;
+
   zx_status_t Start();
   int Thread();
 
@@ -39,6 +41,8 @@ class Imx8mmEvk : public ddk::Device<Imx8mmEvk> {
   zx_status_t I2cInit();
   zx_status_t EmmcInit();
   zx_status_t SdInit();
+
+  zx_status_t AddI2cBus(uint32_t bus_id, const I2cBus& bus);
 
   const fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   const fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info_;

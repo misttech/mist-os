@@ -380,7 +380,7 @@ zx_status_t Imx8mI2cBus::Init() {
 }
 
 zx_status_t Imx8mI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t count) {
-  if (bus_id >= bus_count_) {
+  if (bus_id < bus_base_ || (bus_id - bus_base_) >= bus_count_) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -400,21 +400,21 @@ zx_status_t Imx8mI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_l
     }
   }
 
-  return buses_[bus_id]->Transact(op_list, count);
+  return buses_[bus_id - bus_base_]->Transact(op_list, count);
 }
 
 zx_status_t Imx8mI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
-  if (bus_id >= bus_count_) {
+  if (bus_id < bus_base_ || (bus_id - bus_base_) >= bus_count_) {
     return ZX_ERR_INVALID_ARGS;
   }
-  return buses_[bus_id]->SetBitRate(bitrate);
+  return buses_[bus_id - bus_base_]->SetBitRate(bitrate);
 }
 
 uint32_t Imx8mI2c::I2cImplGetBusBase() { return bus_base_; }
 uint32_t Imx8mI2c::I2cImplGetBusCount() { return static_cast<uint32_t>(bus_count_); }
 
 zx_status_t Imx8mI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
-  if (bus_id >= bus_count_) {
+  if (bus_id < bus_base_ || (bus_id - bus_base_) >= bus_count_) {
     return ZX_ERR_INVALID_ARGS;
   }
   *out_size = kMaxTransferSize;
