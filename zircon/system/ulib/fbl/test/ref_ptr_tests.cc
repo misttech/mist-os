@@ -15,13 +15,17 @@ namespace {
 
 class RefCallCounter {
  public:
-  RefCallCounter();
-  ~RefCallCounter();
+  RefCallCounter() = default;
+  ~RefCallCounter() { destroy_calls_++; }
 
-  void AddRef();
-  bool Release();
-
+  void AddRef() { add_ref_calls_++; }
+  bool Release() {
+    release_calls_++;
+    return add_ref_calls_ == release_calls_;
+  }
   void Adopt() {}
+
+  static void ResetStatics() { destroy_calls_ = 0; }
 
   int add_ref_calls() const { return add_ref_calls_; }
   int release_calls() const { return release_calls_; }
@@ -30,28 +34,23 @@ class RefCallCounter {
   static void operator delete(void* ptr) {}
 
  private:
-  int add_ref_calls_;
-  int release_calls_;
+  int add_ref_calls_{0};
+  int release_calls_{0};
 
-  static int destroy_calls_;
+  static inline int destroy_calls_{0};
 };
-
-int RefCallCounter::destroy_calls_ = 0u;
-
-RefCallCounter::RefCallCounter() : add_ref_calls_(0u), release_calls_(0u) {}
-
-RefCallCounter::~RefCallCounter() { destroy_calls_++; }
-
-void RefCallCounter::AddRef() { add_ref_calls_++; }
-bool RefCallCounter::Release() {
-  release_calls_++;
-  return add_ref_calls_ == release_calls_;
-}
 
 static_assert(std::is_standard_layout_v<fbl::RefPtr<RefCallCounter>>,
               "fbl::RefPtr<T>'s should have a standard layout.");
 
-TEST(RefPtrTest, Basic) {
+class RefPtrTest : public zxtest::Test {
+ public:
+  RefPtrTest() = default;
+  virtual ~RefPtrTest() = default;
+  void SetUp() override { RefCallCounter::ResetStatics(); }
+};
+
+TEST_F(RefPtrTest, Basic) {
   using RefCallPtr = fbl::RefPtr<RefCallCounter>;
 
   RefCallCounter counter;
@@ -125,7 +124,7 @@ TEST(RefPtrTest, Basic) {
   EXPECT_FALSE(ptr.get());
 }
 
-TEST(RefPtrTest, Compare) {
+TEST_F(RefPtrTest, Compare) {
   using RefCallPtr = fbl::RefPtr<RefCallCounter>;
 
   RefCallCounter obj1, obj2;
@@ -481,7 +480,7 @@ void DoUpcastTest() {
   }
 }
 
-TEST(RefPtrTest, Upcast) {
+TEST_F(RefPtrTest, Upcast) {
   // This should work.  C derives from A, A has a virtual destructor, and
   // everything is using the default deleter.
   auto do_test = DoUpcastTest<A, C>;
@@ -531,14 +530,14 @@ TEST(RefPtrTest, Upcast) {
 
 }  // namespace upcasting
 
-TEST(RefPtrTest, AdoptNull) {
+TEST_F(RefPtrTest, AdoptNull) {
   class C : public fbl::RefCounted<C> {};
 
   fbl::RefPtr<C> ptr = fbl::AdoptRef(static_cast<C*>(nullptr));
   EXPECT_NULL(ptr);
 }
 
-TEST(RefPtrTest, PtrToConst) {
+TEST_F(RefPtrTest, PtrToConst) {
   class C : public fbl::RefCounted<C> {
    public:
     explicit C(int x) : x_(x) {}
@@ -576,7 +575,7 @@ TEST(RefPtrTest, PtrToConst) {
   ASSERT_NULL(moved_const_refptr);
 }
 
-TEST(RefPtrTest, MoveAssign) {
+TEST_F(RefPtrTest, MoveAssign) {
   using RefCallPtr = fbl::RefPtr<RefCallCounter>;
 
   RefCallCounter counter1, counter2;
