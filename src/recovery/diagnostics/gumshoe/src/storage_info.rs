@@ -13,6 +13,7 @@ type PartitionProxyProvider =
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Device {
     logical_path: String,
+    download_path: Option<String>,
     block_size: Option<u32>,
     block_count: Option<u64>,
     capacity: Option<u64>,
@@ -34,8 +35,14 @@ impl Device {
             (_, _) => None,
         };
 
+        let download_path = match logical_path.rsplit_once('/') {
+            Some((prefix, suffix)) => Some(format!("/download/{suffix}")),
+            None => None,
+        };
+
         Self {
             logical_path: logical_path.to_string(),
+            download_path: download_path,
             block_size: block_size,
             block_count: block_count,
             capacity: capacity,
