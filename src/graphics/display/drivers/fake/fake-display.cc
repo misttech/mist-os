@@ -150,17 +150,6 @@ zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(uint64_t co
   }
 
   buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
-
-  // TODO(fxbug.dev/121411): This BufferCollection is currently a placeholder so
-  // we need to set null constraints in order not to block the sysmem Allocator.
-  // Remove this once SetBufferCollectionConstraints() using `collection_id` is
-  // correctly implemented.
-  fidl::OneWayStatus status = buffer_collections_.at(collection_id)->SetConstraints(false, {});
-  if (!status.ok()) {
-    zxlogf(ERROR, "Failed to set BufferCollection constraints: %s", status.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
   return ZX_OK;
 }
 
@@ -173,6 +162,18 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(uint64_t c
   }
   buffer_collections_.erase(collection_id);
   return ZX_OK;
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t FakeDisplay::DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
+                                                           uint32_t index) {
+  const auto it = buffer_collections_.find(collection_id);
+  if (it == buffer_collections_.end()) {
+    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplImportImage(image, it->second.client_end().borrow().handle()->get(),
+                                          index);
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
@@ -322,6 +323,18 @@ zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel co
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
+    const image_t* config, uint64_t collection_id) {
+  const auto it = buffer_collections_.find(collection_id);
+  if (it == buffer_collections_.end()) {
+    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplSetBufferCollectionConstraints(
+      config, it->second.client_end().borrow().handle()->get());
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
 zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, zx_unowned_handle_t collection) {
   fuchsia_sysmem::BufferCollectionConstraints constraints;
@@ -394,6 +407,19 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
   capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   capture_active_id_ = INVALID_ID;
   return ZX_OK;
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture2(uint64_t collection_id,
+                                                                     uint32_t index,
+                                                                     uint64_t* out_capture_handle) {
+  const auto it = buffer_collections_.find(collection_id);
+  if (it == buffer_collections_.end()) {
+    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplImportImageForCapture(
+      it->second.client_end().borrow().handle()->get(), index, out_capture_handle);
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection,
