@@ -255,7 +255,7 @@ packages, the package management system only fetches BLOBs that are required for
 only those BLOBs that aren't already present. The package management system fetches entire BLOBs,
 as opposed to a diff of whatever might currently be on the system.
 
-Once all packages have been feteched, a BlobFS sync is triggered to flush the
+Once all packages have been fetched, a BlobFS sync is triggered to flush the
 BLOBs to persistent storage. This process ensures that all the necessary BLOBs
 for the system update are available in BlobFS.
 
@@ -270,7 +270,7 @@ The `system-updater` determines which images need to be written to the block
 device. There are two kinds of images, assets and firmware.
 
 Note: For more information on how this works, see the [`update.rs`][update-rs] file.
-To see the difference between assests and firmware images, see the [`paver.rs`][image-types] file.
+To see the difference between assets and firmware images, see the [`paver.rs`][image-types] file.
 
 Then, the `system-updater` instructs the paver to write the bootloader and
 firmware. The final location of these images does not depend on whether
