@@ -114,7 +114,8 @@ func NewCheckLicensesConfigJson(configJson string) (*CheckLicensesConfig, error)
 	}
 
 	d := json.NewDecoder(strings.NewReader(configJson))
-	d.DisallowUnknownFields()
+	// TODO: Readme processing updates. Soft Transition
+	//d.DisallowUnknownFields()
 	if err := d.Decode(c); err != nil {
 		return nil, err
 	}
