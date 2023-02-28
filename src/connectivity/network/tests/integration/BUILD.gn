@@ -9,11 +9,10 @@ import(
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
-tests = [ "sys" ]
-
 tests_with_expectations = [
   "device",
   "inspect",
+  "sys",
 ]
 
 tests_with_expectations_with_err_logs = [
@@ -32,7 +31,7 @@ tests_with_expectations_with_err_logs = [
 
 long_tests = [ "multicast-forwarding" ]
 
-foreach(test, tests + tests_with_expectations_with_err_logs + long_tests) {
+foreach(test, tests_with_expectations_with_err_logs + long_tests) {
   name = "netstack-${test}-integration-test"
   fuchsia_test_component(name) {
     manifest = "meta/${name}.cml"
@@ -89,15 +88,6 @@ package_deps = [
   "//src/connectivity/network/netcfg:component-advanced",
   "//src/connectivity/network/netcfg:component-basic",
 ]
-
-fuchsia_test_package("netstack-integration-tests") {
-  test_components = []
-  foreach(test, tests) {
-    test_components += [ ":netstack-${test}-integration-test" ]
-  }
-
-  deps = package_deps
-}
 
 fuchsia_test_package("netstack-integration-tests-with-expectations") {
   test_components = []
@@ -177,7 +167,6 @@ resource("sampler-config") {
 group("tests") {
   testonly = true
   deps = [
-           ":netstack-integration-tests",
            ":netstack-integration-tests-with-expectations",
            "guest:netstack-guest-integration-tests",
            "macros:netstack_testing_macros_test",

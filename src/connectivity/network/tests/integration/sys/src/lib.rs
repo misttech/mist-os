@@ -19,7 +19,7 @@ use netstack_testing_macros::netstack_test;
 
 const MOCK_SERVICES_NAME: &str = "mock";
 
-fn create_netstack_with_mock_endpoint<'s, RS: RequestStream + 'static>(
+fn create_netstack_with_mock_endpoint<'s, RS: RequestStream + 'static, N: Netstack>(
     sandbox: &'s TestSandbox,
     service_name: String,
     name: &'s str,
@@ -29,7 +29,16 @@ where
 {
     let mut netstack: fnetemul::ChildDef =
         (&netstack_testing_common::realms::KnownServiceProvider::Netstack(
-            NetstackVersion::ProdNetstack2,
+            match N::VERSION {
+                // The prod ns2 has a route for
+                // fuchsia.scheduler.ProfileProvider which is needed for tests
+                // in this suite.
+                NetstackVersion::Netstack2 => NetstackVersion::ProdNetstack2,
+                v @ NetstackVersion::Netstack3 => v,
+                v @ NetstackVersion::Netstack2WithFastUdp | v @ NetstackVersion::ProdNetstack2 => {
+                    panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
+                }
+            }
         ))
             .into();
     {
@@ -70,15 +79,17 @@ where
     (realm, fs)
 }
 
-#[fuchsia::test]
-async fn ns2_sets_thread_profiles() {
+#[netstack_test]
+async fn ns_sets_thread_profiles<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_realm, mut fs) =
-        create_netstack_with_mock_endpoint::<fidl_fuchsia_scheduler::ProfileProviderRequestStream>(
-            &sandbox,
-            fidl_fuchsia_scheduler::ProfileProviderMarker::PROTOCOL_NAME.to_string(),
-            "ns2_sets_thread_profiles",
-        );
+    let (_realm, mut fs) = create_netstack_with_mock_endpoint::<
+        fidl_fuchsia_scheduler::ProfileProviderRequestStream,
+        N,
+    >(
+        &sandbox,
+        fidl_fuchsia_scheduler::ProfileProviderMarker::PROTOCOL_NAME.to_string(),
+        name,
+    );
 
     let profile_provider_request_stream = fs.next().await.expect("fs terminated unexpectedly");
 
@@ -133,8 +144,8 @@ async fn ns2_sets_thread_profiles() {
     result.short_circuited().expect("didn't observe all profiles installed");
 }
 
-#[fuchsia::test]
-async fn ns2_requests_inspect_persistence() {
+#[netstack_test]
+async fn ns_requests_inspect_persistence<N: Netstack>(name: &str) {
     let persist_path = format!(
         "{}-netstack",
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker::PROTOCOL_NAME
@@ -143,7 +154,8 @@ async fn ns2_requests_inspect_persistence() {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (_realm, fs) = create_netstack_with_mock_endpoint::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream,
-    >(&sandbox, persist_path, "ns2_requests_persistence");
+        N,
+    >(&sandbox, persist_path, name);
 
     // And expect that we'll see a connection to profile provider.
     let (tag, responder) = fs
