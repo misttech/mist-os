@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/bind/bind.gni")
+import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/test.gni")
 
 driver_bind_rules("bootpart_bind") {
   disable_autobind = true
@@ -11,11 +13,6 @@ driver_bind_rules("bootpart_bind") {
   header_output = "bootpart_bind.h"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":bootpart_bind_test" ]
 }
 
 fuchsia_driver("bootpart-driver") {
@@ -33,8 +30,6 @@ fuchsia_driver("bootpart-driver") {
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
-    "//zircon/third_party/ulib/cksum",
   ]
 }
 
@@ -43,4 +38,35 @@ fuchsia_driver_component("bootpart") {
   deps = [ ":bootpart-driver" ]
   info = "bootpart-info.json"
   colocate = true
+}
+
+test("bootpart-test-bin") {
+  output_name = "bootpart-test"
+  sources = [
+    "bootpart-test.cc",
+    "bootpart.cc",
+  ]
+  deps = [
+    ":bootpart_bind",
+    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
+    "//src/devices/block/lib/common",
+    "//src/devices/lib/driver",
+    "//src/devices/testing/mock-ddk",
+    "//src/lib/ddk",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("bootpart-test") {
+  deps = [ ":bootpart-test-bin" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":bootpart-test",
+    ":bootpart_bind_test",
+  ]
 }
