@@ -136,10 +136,10 @@ export RBE_server_address=unix://"$reproxy_tmpdir"/reproxy.sock
 # deps cache dir should be somewhere persistent between builds,
 # and thus, not random.  /var/cache can be root-owned and not always writeable.
 if test -n "$HOME"
-then export RBE_deps_cache_dir="$HOME/.cache/reproxy/deps"
-else export RBE_deps_cache_dir="/tmp/.cache/reproxy/deps"
+then export RBE_cache_dir="$HOME/.cache/reproxy/deps"
+else export RBE_cache_dir="/tmp/.cache/reproxy/deps"
 fi
-mkdir -p "$RBE_deps_cache_dir"
+mkdir -p "$RBE_cache_dir"
 
 gcloud="$(which gcloud)" || {
   cat <<EOF
