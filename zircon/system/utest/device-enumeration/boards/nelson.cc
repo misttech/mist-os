@@ -15,6 +15,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:3/bt-uart/aml-uart/bt-transport-uart",
       "sys/platform/05:00:3/bt-uart/aml-uart/bt-transport-uart/bt-hci-broadcom",
       "sys/platform/05:00:2/aml-i2c",
+      "sys/platform/05:00:2:1/aml-i2c",
+      "sys/platform/05:00:2:2/aml-i2c",
       "sys/platform/05:05:17/mali/aml-gpu",
       "sys/platform/05:0a:21/nelson-usb-phy",
       "sys/platform/05:05:12/nelson-audio-i2s-out",
@@ -24,7 +26,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:00:8/nelson-emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot1/block",
@@ -72,8 +74,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/00:00:1e/dw-dsi",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-controller",
       "sys/platform/00:00:1e/dw-dsi/dw-dsi-base",
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-73/ti-ina231-mlb/ti-ina231",
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-64/ti-ina231-speakers/ti-ina231",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-73/ti-ina231-mlb/ti-ina231",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-64/ti-ina231-speakers/ti-ina231",
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-112/shtv3",
       "sys/platform/1c:00:1/gt6853-touch/gt6853",
 
@@ -88,7 +90,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/03:0a:27/thermistor-device/therm-thread",
       "sys/platform/03:0a:27/thermistor-device/therm-audio",
 
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-45/audio-tas58xx/TAS5805m/brownout-protection",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-45/audio-tas58xx/TAS5805m/brownout-protection",
 
       "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0",
       "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52811-radio/ot-radio",
