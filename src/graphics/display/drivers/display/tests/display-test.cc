@@ -31,7 +31,7 @@ TEST(DisplayTest, ClientVSyncOk) {
   ASSERT_OK(endpoints);
   auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
+  ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
@@ -76,7 +76,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   ASSERT_OK(endpoints);
   auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
+  ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   client_end.reset();
@@ -89,7 +89,7 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
   ASSERT_OK(endpoints);
   auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
+  ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   fbl::AutoLock lock(controller.mtx());
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(0, 0, INVALID_CONFIG_STAMP_BANJO));
   clientproxy.CloseTest();
@@ -104,7 +104,7 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   ASSERT_OK(endpoints);
   auto& [client_end, server_end] = endpoints.value();
   Controller controller(nullptr);
-  ClientProxy clientproxy(&controller, false, false, 0, std::move(server_end));
+  ClientProxy clientproxy(&controller, false, 0, std::move(server_end));
   clientproxy.EnableVsync(false);
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {

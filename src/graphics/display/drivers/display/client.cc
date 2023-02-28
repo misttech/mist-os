@@ -109,29 +109,6 @@ void Client::ImportImage2(ImportImage2RequestView request, ImportImage2Completer
       fit::defer([this, &dc_image]() { controller_->dc()->ReleaseImage(&dc_image); });
   zx::vmo vmo;
   uint32_t stride = 0;
-  if (use_kernel_framebuffer_) {
-    ZX_ASSERT(it->second.kernel.is_valid());
-    auto res = it->second.kernel->WaitForBuffersAllocated();
-    if (!res.ok() || res.value().status != ZX_OK) {
-      completer.Reply(ZX_ERR_NO_MEMORY);
-      return;
-    }
-    fuchsia_sysmem::wire::BufferCollectionInfo2& info = res.value().buffer_collection_info;
-
-    if (!info.settings.has_image_format_constraints || request->index >= info.buffer_count) {
-      completer.Reply(ZX_ERR_OUT_OF_RANGE);
-      return;
-    }
-    uint32_t minimum_row_bytes;
-    if (!ImageFormatMinimumRowBytes(info.settings.image_format_constraints, dc_image.width,
-                                    &minimum_row_bytes)) {
-      zxlogf(DEBUG, "Cannot determine minimum row bytes.\n");
-      completer.Reply(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    vmo = std::move(info.buffers[request->index].vmo);
-    stride = minimum_row_bytes / ZX_PIXEL_FORMAT_BYTES(dc_image.pixel_format);
-  }
 
   fbl::AllocChecker ac;
   auto image = fbl::AdoptRef(
@@ -185,43 +162,6 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
     return;
   }
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> vc_collection;
-
-  // Make a second handle to represent the kernel's usage of the buffer as a
-  // framebuffer, so we can set constraints and get VMOs for zx_framebuffer_set_range.
-  if (use_kernel_framebuffer_) {
-    zx::result vc_token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-    if (vc_token_endpoints.is_error()) {
-      completer.Reply(ZX_ERR_INTERNAL);
-      return;
-    }
-    auto& [vc_token_client, vc_token_server] = vc_token_endpoints.value();
-    if (!fidl::WireCall(request->collection_token)
-             ->Duplicate(UINT32_MAX, std::move(vc_token_server))
-             .ok()) {
-      completer.Reply(ZX_ERR_INTERNAL);
-      return;
-    }
-    if (!fidl::WireCall(request->collection_token)->Sync().ok()) {
-      completer.Reply(ZX_ERR_INTERNAL);
-      return;
-    }
-
-    zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-    if (collection_endpoints.is_error()) {
-      completer.Reply(ZX_ERR_INTERNAL);
-      return;
-    }
-    auto& [collection_client, collection_server] = collection_endpoints.value();
-    if (!sysmem_allocator_
-             ->BindSharedCollection(std::move(vc_token_client), std::move(collection_server))
-             .ok()) {
-      completer.Reply(ZX_ERR_INTERNAL);
-      return;
-    }
-    vc_collection.Bind(std::move(collection_client));
-  }
-
   zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   if (collection_endpoints.is_error()) {
     completer.Reply(ZX_ERR_INTERNAL);
@@ -237,7 +177,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   }
 
   collection_map_[request->collection_id] =
-      Collections{fidl::WireSyncClient(std::move(collection_client)), std::move(vc_collection)};
+      Collections{fidl::WireSyncClient(std::move(collection_client))};
   completer.Reply(ZX_OK);
 }
 
@@ -250,10 +190,6 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
 
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)it->second.driver->Close();
-  if (it->second.kernel.is_valid()) {
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)it->second.kernel->Close();
-  }
   collection_map_.erase(it);
 }
 
@@ -273,55 +209,6 @@ void Client::SetBufferCollectionConstraints(
 
   zx_status_t status = controller_->dc()->SetBufferCollectionConstraints(
       &dc_image, it->second.driver.client_end().borrow().channel()->get());
-
-  if (status == ZX_OK && use_kernel_framebuffer_) {
-    ZX_ASSERT(it->second.kernel.is_valid());
-
-    // Constraints to be used with zx_framebuffer_set_range.
-    fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
-    constraints.usage.display = fuchsia_sysmem::wire::kDisplayUsageLayer;
-    constraints.has_buffer_memory_constraints = true;
-    fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
-        constraints.buffer_memory_constraints;
-    buffer_constraints.min_size_bytes = 0;
-    buffer_constraints.max_size_bytes = 0xffffffff;
-    buffer_constraints.secure_required = false;
-    buffer_constraints.ram_domain_supported = true;
-    constraints.image_format_constraints_count = 1;
-    fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
-        constraints.image_format_constraints[0];
-    switch (request->config.pixel_format) {
-      case ZX_PIXEL_FORMAT_RGB_x888:
-      case ZX_PIXEL_FORMAT_ARGB_8888:
-        image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
-        image_constraints.pixel_format.has_format_modifier = true;
-        image_constraints.pixel_format.format_modifier.value =
-            fuchsia_sysmem::wire::kFormatModifierLinear;
-        break;
-    }
-
-    image_constraints.color_spaces_count = 1;
-    image_constraints.color_space[0].type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb;
-    image_constraints.min_coded_width = 0;
-    image_constraints.max_coded_width = 0xffffffff;
-    image_constraints.min_coded_height = 0;
-    image_constraints.max_coded_height = 0xffffffff;
-    image_constraints.min_bytes_per_row = 0;
-    image_constraints.max_bytes_per_row = 0xffffffff;
-    image_constraints.max_coded_width_times_coded_height = 0xffffffff;
-    image_constraints.layers = 1;
-    image_constraints.coded_width_divisor = 1;
-    image_constraints.coded_height_divisor = 1;
-    image_constraints.bytes_per_row_divisor = 4;
-    image_constraints.start_offset_divisor = 1;
-    image_constraints.display_width_divisor = 1;
-    image_constraints.display_height_divisor = 1;
-
-    if (image_constraints.pixel_format.type != fuchsia_sysmem::wire::PixelFormatType::kInvalid) {
-      completer.Reply(it->second.kernel->SetConstraints(true, constraints).status());
-      return;
-    }
-  }
 
   completer.Reply(status);
 }
@@ -1164,32 +1051,6 @@ void Client::ApplyConfig() {
             std::min(current_applied_config_stamp.value, layer_client_config_stamp->value);
       }
 
-      if (use_kernel_framebuffer_) {
-        auto fb = layer->current_image();
-        if (fb) {
-          // If the virtcon is displaying an image, set it as the kernel's framebuffer
-          // vmo. If the virtcon is displaying images on multiple displays, this ends
-          // executing multiple times, but the extra work is okay since the virtcon
-          // shouldn't be flipping images.
-          console_fb_display_id_ = display_config.id;
-
-          uint32_t stride = fb->stride_px();
-          uint32_t size =
-              fb->info().height * ZX_PIXEL_FORMAT_BYTES(fb->info().pixel_format) * stride;
-          // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-          zx_framebuffer_set_range(get_root_resource(), fb->vmo().get(), size,
-                                   fb->info().pixel_format, fb->info().width, fb->info().height,
-                                   stride);
-        } else if (console_fb_display_id_ == display_config.id) {
-          // If this display doesn't have an image but it was the display which had the
-          // kernel's framebuffer, make the kernel drop the reference. Note that this
-          // executes when tearing down the virtcon client.
-          // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-          zx_framebuffer_set_range(get_root_resource(), ZX_HANDLE_INVALID, 0, 0, 0, 0, 0);
-          console_fb_display_id_ = -1;
-        }
-      }
-
       display_config.current_.layer_count++;
       layers[layer_idx++] = &layer->current_layer_;
       if (layer->current_layer_.type != LAYER_TYPE_COLOR) {
@@ -1556,21 +1417,18 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end) {
   return fpromise::ok(binding);
 }
 
-Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, bool use_kernel_framebuffer,
-               uint32_t client_id)
+Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t client_id)
     : controller_(controller),
       proxy_(proxy),
       is_vc_(is_vc),
-      use_kernel_framebuffer_(use_kernel_framebuffer),
       id_(client_id),
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)) {}
 
-Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, bool use_kernel_framebuffer,
-               uint32_t client_id, fidl::ServerEnd<fhd::Controller> server_end)
+Client::Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t client_id,
+               fidl::ServerEnd<fhd::Controller> server_end)
     : controller_(controller),
       proxy_(proxy),
       is_vc_(is_vc),
-      use_kernel_framebuffer_(use_kernel_framebuffer),
       id_(client_id),
       running_(true),
       fences_(controller->loop().dispatcher(), fit::bind_member<&Client::OnFenceFired>(this)),
@@ -1841,21 +1699,20 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
   return ZX_OK;
 }
 
-ClientProxy::ClientProxy(Controller* controller, bool is_vc, bool use_kernel_framebuffer,
-                         uint32_t client_id, fit::function<void()> on_client_dead)
+ClientProxy::ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
+                         fit::function<void()> on_client_dead)
     : controller_(controller),
       is_vc_(is_vc),
-      handler_(controller_, this, is_vc_, use_kernel_framebuffer, client_id),
+      handler_(controller_, this, is_vc_, client_id),
       on_client_dead_(std::move(on_client_dead)) {
   mtx_init(&mtx_, mtx_plain);
 }
 
-ClientProxy::ClientProxy(Controller* controller, bool is_vc, bool use_kernel_framebuffer,
-                         uint32_t client_id, fidl::ServerEnd<fhd::Controller> server_end)
+ClientProxy::ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
+                         fidl::ServerEnd<fhd::Controller> server_end)
     : controller_(controller),
       is_vc_(is_vc),
-      handler_(controller_, this, is_vc_, use_kernel_framebuffer, client_id,
-               std::move(server_end)) {
+      handler_(controller_, this, is_vc_, client_id, std::move(server_end)) {
   mtx_init(&mtx_, mtx_plain);
 }
 

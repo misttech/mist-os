@@ -176,12 +176,11 @@ class DisplayControllerBindingState {
 class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
  public:
   // |controller| must outlive this and |proxy|.
-  Client(Controller* controller, ClientProxy* proxy, bool is_vc, bool use_kernel_framebuffer,
-         uint32_t id);
+  Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t id);
 
   // This is used for testing
-  Client(Controller* controller, ClientProxy* proxy, bool is_vc, bool use_kernel_framebuffer,
-         uint32_t id, fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
+  Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t id,
+         fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   ~Client() override;
 
@@ -295,7 +294,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   Controller* controller_;
   ClientProxy* proxy_;
   const bool is_vc_;
-  const bool use_kernel_framebuffer_;
   uint64_t console_fb_display_id_ = -1;
   const uint32_t id_;
   bool running_;
@@ -321,9 +319,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   struct Collections {
     // Sent to the hardware driver.
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> driver;
-    // If the VC is using this, |kernel| is the collection used for setting
-    // it as kernel framebuffer.
-    fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> kernel;
   };
   std::map<uint64_t, Collections> collection_map_;
 
@@ -361,11 +356,11 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
 class ClientProxy {
  public:
   // "client_id" is assigned by the Controller to distinguish clients.
-  ClientProxy(Controller* controller, bool is_vc, bool use_kernel_framebuffer, uint32_t client_id,
+  ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
               fit::function<void()> on_client_dead);
 
   // This is used for testing
-  ClientProxy(Controller* controller, bool is_vc, bool use_kernel_framebuffer, uint32_t client_id,
+  ClientProxy(Controller* controller, bool is_vc, uint32_t client_id,
               fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
 
   ~ClientProxy();

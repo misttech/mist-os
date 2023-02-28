@@ -11,6 +11,8 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
 #include <threads.h>
+#include <zircon/pixelformat.h>
+#include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -47,19 +49,6 @@ constexpr uint64_t kWatchdogTimeoutMs = 45000;
 // vsync was last observed.
 constexpr zx::duration kVsyncStallThreshold = zx::sec(10);
 constexpr zx::duration kVsyncMonitorInterval = kVsyncStallThreshold / 2;
-
-bool IsKernelFramebufferEnabled(zx_device_t* dev) {
-  char value[32];
-  auto status = device_get_variable(dev, "driver.display.enable-kernel-framebuffer", value,
-                                    sizeof(value), nullptr);
-  if (status != ZX_OK) {
-    return false;
-  }
-  if ((strcmp(value, "0") == 0) || (strcmp(value, "false") == 0) || (strcmp(value, "off") == 0)) {
-    return false;
-  }
-  return true;
-}
 
 }  // namespace
 
@@ -495,6 +484,16 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
   last_valid_apply_config_interval_ns_property_.Set(timestamp - last_valid_apply_config_timestamp_);
   last_valid_apply_config_timestamp_ = timestamp;
 
+  // Release the bootloader framebuffer referenced by the kernel. This only
+  // needs to be done once on the first ApplyConfig().
+  if (!kernel_framebuffer_released_) {
+    // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
+    zx_framebuffer_set_range(get_root_resource(), /*vmo=*/ZX_HANDLE_INVALID, /*len=*/0,
+                             /*format=*/ZX_PIXEL_FORMAT_NONE, /*width=*/0, /*height=*/0,
+                             /*stride=*/0);
+    kernel_framebuffer_released_ = true;
+  }
+
   fbl::Array<const display_config_t*> display_configs(new const display_config_t*[count], count);
   uint32_t display_count = 0;
 
@@ -774,14 +773,8 @@ zx_status_t Controller::CreateClient(
     return ZX_ERR_ALREADY_BOUND;
   }
 
-  // Kernel framebuffer currently prevent non-linear formats and result
-  // in a significant performance cost each time a new config is applied.
-  // We limit usage to virtcon mode until these problems have been
-  // resolved.
-  bool use_kernel_framebuffer = is_vc && kernel_framebuffer_enabled_;
-
-  auto client = std::make_unique<ClientProxy>(this, is_vc, use_kernel_framebuffer,
-                                              next_client_id_++, std::move(on_display_client_dead));
+  auto client = std::make_unique<ClientProxy>(this, is_vc, next_client_id_++,
+                                              std::move(on_display_client_dead));
 
   zx_status_t status = client->Init(&root_, std::move(controller_server_end));
   if (status != ZX_OK) {
@@ -966,7 +959,6 @@ void Controller::DdkRelease() {
 
 Controller::Controller(zx_device_t* parent)
     : ControllerParent(parent),
-      kernel_framebuffer_enabled_(IsKernelFramebufferEnabled(parent)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
                 loop_.dispatcher()) {
