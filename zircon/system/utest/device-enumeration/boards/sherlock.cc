@@ -13,6 +13,8 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:14/clocks",
       "sys/platform/05:00:1c/aml_light",
       "sys/platform/05:00:2/aml-i2c",
+      "sys/platform/05:00:2:1/aml-i2c",
+      "sys/platform/05:00:2:2/aml-i2c",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/05:04:a/aml-thermal-pll/thermal",
       "sys/platform/00:00:1e/dw-dsi",
@@ -56,12 +58,12 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:17/mali/aml-gpu",
       "sys/platform/05:04:13/sherlock-audio-pdm-in",
       "sys/platform/05:04:12:1/sherlock-i2s-audio-out",
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-1-56/focaltech_touch",
+      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch",
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0",
       "sys/platform/05:04:1/aml-gpio/gpio-4/sherlock-buttons/hid-buttons",
       "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52840-radio/ot-radio",
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:04:1a/aml-secure-mem/aml-securemem",
       "sys/platform/05:04:1d/aml-pwm-device/pwm-4/pwm-init",
@@ -90,10 +92,10 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "class/temperature/002",
 
       // LCD Bias
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-2-62",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-62",
 
       // Touchscreen
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch HidDevice/hid-device/InputReport",
+      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch HidDevice/hid-device/InputReport",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
