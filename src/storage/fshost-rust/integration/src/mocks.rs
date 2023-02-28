@@ -4,6 +4,7 @@
 
 use {
     anyhow::Error,
+    ffeedback::FileReportResults,
     fidl::prelude::*,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
     fuchsia_component_test::LocalComponentHandles,
@@ -154,6 +155,10 @@ async fn run_crash_reporter(
             ffeedback::CrashReporterRequest::File { report, responder } => {
                 crash_reports_sink.send(report).await.unwrap();
                 responder.send(&mut Ok(())).unwrap();
+            }
+            ffeedback::CrashReporterRequest::FileReport { report, responder } => {
+                crash_reports_sink.send(report).await.unwrap();
+                responder.send(&mut Ok(FileReportResults::EMPTY)).unwrap();
             }
         }
     }

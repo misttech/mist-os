@@ -5,7 +5,10 @@
 #![warn(clippy::all)]
 
 use {
-    fidl_fuchsia_feedback::{CrashReporterMarker, CrashReporterProxy, CrashReporterRequestStream},
+    fidl_fuchsia_feedback::{
+        CrashReporterMarker, CrashReporterProxy, CrashReporterRequestStream, FileReportResults,
+        FilingError,
+    },
     fuchsia_async::Task,
     fuchsia_zircon::Status,
     futures::{
@@ -65,6 +68,14 @@ impl MockCrashReporterService {
                 fidl_fuchsia_feedback::CrashReporterRequest::File { report, responder } => {
                     let mut res = self.call_hook.file(report).await.map_err(|s| s.into_raw());
                     responder.send(&mut res).unwrap();
+                }
+
+                fidl_fuchsia_feedback::CrashReporterRequest::FileReport { report, responder } => {
+                    let res = self.call_hook.file(report).await;
+                    match res {
+                        Err(_) => responder.send(&mut Err(FilingError::InvalidArgsError)).unwrap(),
+                        Ok(_) => responder.send(&mut Ok(FileReportResults::EMPTY)).unwrap(),
+                    }
                 }
             }
         }

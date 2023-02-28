@@ -128,8 +128,41 @@
         "type": "(fuchsia.feedback/CrashReport report) -> (fuchsia.feedback/CrashReporter_File_Result result)"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.feedback/CrashReporter.FileReport",
+        "ordinal": "8027120246585691604",
+        "type": "(fuchsia.feedback/CrashReport report) -> (fuchsia.feedback/CrashReporter_FileReport_Result result)"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.feedback/CrashReporter"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.feedback/CrashReporter_FileReport_Response.results",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/FileReportResults"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.feedback/CrashReporter_FileReport_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.feedback/CrashReporter_FileReport_Result.err",
+        "ordinal": "2",
+        "type": "fuchsia.feedback/FilingError"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.feedback/CrashReporter_FileReport_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/CrashReporter_FileReport_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.feedback/CrashReporter_FileReport_Result",
+        "strictness": "strict"
     },
     {
         "kind": "struct",
@@ -231,6 +264,84 @@
     {
         "kind": "protocol",
         "name": "fuchsia.feedback/DeviceIdProvider"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.feedback/FileReportResults.report_id",
+        "ordinal": "2",
+        "type": "string:64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.feedback/FileReportResults.result",
+        "ordinal": "1",
+        "type": "fuchsia.feedback/FilingSuccess"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.feedback/FileReportResults"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingError.INVALID_ARGS_ERROR",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingError.PERSISTENCE_ERROR",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingError.QUOTA_REACHED_ERROR",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingError.SERVER_ERROR",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingError.UNKNOWN",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.feedback/FilingError",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingSuccess.REPORT_IN_MEMORY",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingSuccess.REPORT_NOT_FILED_USER_OPTED_OUT",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingSuccess.REPORT_ON_DISK",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingSuccess.REPORT_UPLOADED",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/FilingSuccess.UNKNOWN",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.feedback/FilingSuccess",
+        "strictness": "flexible",
+        "type": "uint32"
     },
     {
         "kind": "table/member",
@@ -367,6 +478,12 @@
         "name": "fuchsia.feedback/MAX_PROGRAM_NAME_LENGTH",
         "type": "uint32",
         "value": "1024"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.feedback/MAX_REPORT_ID_LENGTH",
+        "type": "uint32",
+        "value": "64"
     },
     {
         "kind": "const",

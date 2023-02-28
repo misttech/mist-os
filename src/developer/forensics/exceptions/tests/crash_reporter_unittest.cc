@@ -50,10 +50,18 @@ constexpr zx::duration kDefaultTimeout{zx::duration::infinite()};
 
 class StubCrashReporter : public fuchsia::feedback::CrashReporter {
  public:
-  void File(fuchsia::feedback::CrashReport report, FileCallback callback) {
+  void File(fuchsia::feedback::CrashReport report, FileCallback callback) override {
     reports_.push_back(std::move(report));
 
     fuchsia::feedback::CrashReporter_File_Result result;
+    result.set_response({});
+    callback(std::move(result));
+  }
+
+  void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override {
+    reports_.push_back(std::move(report));
+
+    fuchsia::feedback::CrashReporter_FileReport_Result result;
     result.set_response({});
     callback(std::move(result));
   }

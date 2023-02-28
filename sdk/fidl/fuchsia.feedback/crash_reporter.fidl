@@ -13,9 +13,35 @@ protocol CrashReporter {
     ///
     /// This could mean generating a crash report in a local crash report database or uploading the
     /// crash report to a remote crash server depending on the FIDL server's configuration.
+    ///
+    /// # Deprecation
+    ///
+    /// This method returns an immediate acknowledgement that the request was
+    /// received. In practice this acknowledgement isn't used and only returns
+    /// an error if the program name is blank. By F12, FileReport should be
+    /// used instead. FileReport will provide a useful status once the report
+    /// has been successfully or unsuccessfully filed.
+    // TODO(fxbug.dev/122422): remove File once all clients are migrated to
+    // FileReport.
+    @available(deprecated=11, note="use FileReport")
     File(resource struct {
         report CrashReport;
     }) -> () error zx.status;
+
+    /// Files a crash `report` and gives the final result of the operation.
+    ///
+    /// This could mean generating a crash report in a local crash report
+    /// database or uploading the crash report to a remote crash server
+    /// depending on the FIDL server's configuration.
+    ///
+    /// Warning: this could potentially take up to several minutes. Calling
+    /// this function in a synchronous manner is not recommended.
+    @available(added=11)
+    FileReport(resource struct {
+        report CrashReport;
+    }) -> (struct {
+        results FileReportResults;
+    }) error FilingError;
 };
 
 const MAX_PROGRAM_NAME_LENGTH uint32 = 1024;
@@ -23,6 +49,8 @@ const MAX_NUM_ANNOTATIONS_PER_CRASH_REPORT uint32 = 32;
 const MAX_NUM_ATTACHMENTS_PER_CRASH_REPORT uint32 = 16;
 const MAX_EVENT_ID_LENGTH uint32 = 128;
 const MAX_CRASH_SIGNATURE_LENGTH uint32 = 128;
+@available(added=11)
+const MAX_REPORT_ID_LENGTH uint32 = 64;
 
 /// Represents a crash report.
 type CrashReport = resource table {
@@ -144,4 +172,35 @@ type RuntimeCrashReport = resource table {
 
     /// The text representation of the exception stack trace.
     3: exception_stack_trace fuchsia.mem.Buffer;
+};
+
+@available(added=11)
+type FileReportResults = table {
+    /// The success type.
+    1: result FilingSuccess;
+
+    /// A non-empty value if |result| is FilingSuccess::REPORT_UPLOADED.
+    2: report_id string:MAX_REPORT_ID_LENGTH;
+};
+
+/// "Memory" refers to a non-persistent location, e.g. a memory-backed
+/// filesystem.
+@available(added=11)
+type FilingSuccess = flexible enum {
+    @unknown
+    UNKNOWN = 0;
+    REPORT_UPLOADED = 1;
+    REPORT_ON_DISK = 2;
+    REPORT_IN_MEMORY = 3;
+    REPORT_NOT_FILED_USER_OPTED_OUT = 4;
+};
+
+@available(added=11)
+type FilingError = flexible enum {
+    @unknown
+    UNKNOWN = 0;
+    INVALID_ARGS_ERROR = 1;
+    SERVER_ERROR = 2;
+    PERSISTENCE_ERROR = 3;
+    QUOTA_REACHED_ERROR = 4;
 };

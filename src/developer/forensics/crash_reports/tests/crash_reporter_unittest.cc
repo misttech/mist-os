@@ -55,6 +55,9 @@ namespace {
 using fuchsia::feedback::Annotation;
 using fuchsia::feedback::Attachment;
 using fuchsia::feedback::CrashReport;
+using fuchsia::feedback::CrashReporter_FileReport_Result;
+using fuchsia::feedback::FilingError;
+using fuchsia::feedback::FilingSuccess;
 using fuchsia::feedback::NativeCrashReport;
 using fuchsia::feedback::RuntimeCrashReport;
 using fuchsia::feedback::SpecificCrashReport;
@@ -78,6 +81,7 @@ using testing::UnorderedElementsAreArray;
 constexpr CrashServer::UploadStatus kUploadSuccessful = CrashServer::UploadStatus::kSuccess;
 constexpr CrashServer::UploadStatus kUploadFailed = CrashServer::UploadStatus::kFailure;
 constexpr CrashServer::UploadStatus kUploadThrottled = CrashServer::UploadStatus::kThrottled;
+constexpr CrashServer::UploadStatus kUploadTimeout = CrashServer::UploadStatus::kTimedOut;
 
 constexpr char kProgramName[] = "crashing_program";
 
@@ -158,10 +162,11 @@ class CrashReporterTest : public UnitTestFixture {
 
  protected:
   // Sets up the underlying crash reporter using the given |config| and |crash_server|.
-  void SetUpCrashReporter(
-      const feedback::CrashReportUploadPolicy crash_report_upload_policy,
-      const std::optional<uint64_t> daily_per_product_quota, const bool enable_hourly_snapshots,
-      const std::vector<CrashServer::UploadStatus>& upload_attempt_results = {}) {
+  void SetUpCrashReporter(const feedback::CrashReportUploadPolicy crash_report_upload_policy,
+                          const std::optional<uint64_t> daily_per_product_quota,
+                          const bool enable_hourly_snapshots,
+                          const std::vector<CrashServer::UploadStatus>& upload_attempt_results = {},
+                          StorageSize max_reports_cache_size = StorageSize::Megabytes(1)) {
     FX_CHECK(data_provider_server_);
     annotation_manager_ = std::make_unique<feedback::AnnotationManager>(
         dispatcher(),
@@ -181,8 +186,9 @@ class CrashReporterTest : public UnitTestFixture {
             {feedback::kDeviceFeedbackIdKey, kDefaultDeviceId},
             {feedback::kSystemUpdateChannelCurrentKey, kDefaultChannel},
         });
-    report_store_ =
-        std::make_unique<ScopedTestReportStore>(annotation_manager_.get(), info_context_);
+    report_store_ = std::make_unique<ScopedTestReportStore>(
+        annotation_manager_.get(), info_context_,
+        /*max_reports_tmp_size=*/StorageSize::Megabytes(1), max_reports_cache_size);
 
     crash_server_ = std::make_unique<StubCrashServer>(
         dispatcher(), services(), annotation_manager_.get(), upload_attempt_results);
@@ -287,24 +293,23 @@ class CrashReporterTest : public UnitTestFixture {
   }
 
   // Files one crash report.
-  ::fpromise::result<void, zx_status_t> FileOneCrashReport(CrashReport report) {
+  CrashReporter_FileReport_Result FileOneCrashReport(CrashReport report) {
     // Run loop to start the clock.
     RunLoopUntilIdle();
     FX_CHECK(crash_reporter_ != nullptr)
         << "crash_reporter_ is nullptr. Call SetUpCrashReporter() or one of its variants "
            "at the beginning of a test case.";
-    std::optional<::fpromise::result<void, zx_status_t>> out_result{std::nullopt};
-    crash_reporter_->File(std::move(report),
-                          [&out_result](::fpromise::result<void, zx_status_t> result) {
-                            out_result = std::move(result);
-                          });
+    std::optional<CrashReporter_FileReport_Result> out_result{std::nullopt};
+    crash_reporter_->FileReport(
+        std::move(report),
+        [&out_result](CrashReporter_FileReport_Result result) { out_result = std::move(result); });
     RunLoopFor(kSnapshotSharedRequestWindow);
     FX_CHECK(out_result.has_value());
-    return out_result.value();
+    return std::move(*out_result);
   }
 
   // Files one crash report.
-  ::fpromise::result<void, zx_status_t> FileOneCrashReport(
+  CrashReporter_FileReport_Result FileOneCrashReport(
       const std::vector<Annotation>& annotations = {}, std::vector<Attachment> attachments = {}) {
     CrashReport report;
     report.set_program_name(kProgramName);
@@ -321,7 +326,7 @@ class CrashReporterTest : public UnitTestFixture {
   //
   // |attachment| is useful to control the lower bound of the size of the report by controlling the
   // size of some of the attachment(s).
-  ::fpromise::result<void, zx_status_t> FileOneCrashReportWithSingleAttachment(
+  CrashReporter_FileReport_Result FileOneCrashReportWithSingleAttachment(
       const std::string& attachment = kSingleAttachmentValue) {
     std::vector<Attachment> attachments;
     attachments.emplace_back(BuildAttachment(kSingleAttachmentKey, attachment));
@@ -330,7 +335,7 @@ class CrashReporterTest : public UnitTestFixture {
   }
 
   // Files one native crash report.
-  ::fpromise::result<void, zx_status_t> FileOneNativeCrashReport(
+  CrashReporter_FileReport_Result FileOneNativeCrashReport(
       std::optional<fuchsia::mem::Buffer> minidump,
       const std::optional<std::string>& crash_signature) {
     NativeCrashReport native_report;
@@ -357,7 +362,7 @@ class CrashReporterTest : public UnitTestFixture {
   }
 
   // Files one Dart crash report.
-  ::fpromise::result<void, zx_status_t> FileOneDartCrashReport(
+  CrashReporter_FileReport_Result FileOneDartCrashReport(
       const std::optional<std::string>& exception_type,
       const std::optional<std::string>& exception_message,
       std::optional<fuchsia::mem::Buffer> exception_stack_trace) {
@@ -383,14 +388,13 @@ class CrashReporterTest : public UnitTestFixture {
   }
 
   // Files one empty crash report.
-  ::fpromise::result<void, zx_status_t> FileOneEmptyCrashReport() {
+  CrashReporter_FileReport_Result FileOneEmptyCrashReport() {
     CrashReport report;
     return FileOneCrashReport(std::move(report));
   }
 
   // Files one crash report with the provided crash signature.
-  ::fpromise::result<void, zx_status_t> FileOneCrashReportWithSignature(
-      const std::string& signature) {
+  CrashReporter_FileReport_Result FileOneCrashReportWithSignature(const std::string& signature) {
     CrashReport report;
     report.set_program_name("crashing_program_generic");
     report.set_crash_signature(signature);
@@ -399,7 +403,7 @@ class CrashReporterTest : public UnitTestFixture {
   }
 
   // Files one crash report with the provided is fatal value.
-  ::fpromise::result<void, zx_status_t> FileOneCrashReportWithIsFatal(const bool is_fatal) {
+  CrashReporter_FileReport_Result FileOneCrashReportWithIsFatal(const bool is_fatal) {
     CrashReport report;
     report.set_program_name("crashing_program_generic");
     report.set_is_fatal(is_fatal);
@@ -449,7 +453,34 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReport) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneCrashReport().is_ok());
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_response());
+  EXPECT_EQ(result.response().results.result(), FilingSuccess::REPORT_UPLOADED);
+
+  CheckAnnotationsOnServer();
+  CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
+}
+
+// TODO(fxbug.dev/117123): delete when CrashReporter::File is removed.
+TEST_F(CrashReporterTest, Succeed_OnInputCrashReport_OldFile) {
+  SetUpDataProviderServer(
+      std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
+  SetUpCrashReporterDefaultConfig({kUploadSuccessful});
+
+  CrashReport report;
+  report.set_program_name(kProgramName);
+
+  // Run loop to start the clock.
+  RunLoopUntilIdle();
+  std::optional<::fpromise::result<void, zx_status_t>> out_result{std::nullopt};
+  crash_reporter_->File(std::move(report),
+                        [&out_result](::fpromise::result<void, zx_status_t> result) {
+                          out_result = std::move(result);
+                        });
+  RunLoopFor(kSnapshotSharedRequestWindow);
+  FX_CHECK(out_result.has_value());
+  ASSERT_TRUE(out_result->is_ok());
+
   CheckAnnotationsOnServer();
   CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
 }
@@ -457,29 +488,39 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReport) {
 TEST_F(CrashReporterTest, EnforcesQuota) {
   SetUpDataProviderServer(
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
-  SetUpCrashReporterDefaultConfig(
+  SetUpCrashReporter(
+      /*crash_report_upload_policy=*/feedback::CrashReportUploadPolicy::kEnabled,
+      /*daily_per_product_quota=*/kDailyPerProductQuota,
+      /*enable_hourly_snapshots=*/false,
       std::vector<CrashServer::UploadStatus>(kDailyPerProductQuota, kUploadSuccessful));
 
-  for (size_t i = 0; i < kDailyPerProductQuota + 1; ++i) {
-    ASSERT_TRUE(FileOneCrashReport().is_ok());
+  for (size_t i = 0; i < kDailyPerProductQuota; ++i) {
+    ASSERT_TRUE(FileOneCrashReport().is_response());
   }
+
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_err());
+  EXPECT_EQ(result.err(), FilingError::QUOTA_REACHED_ERROR);
 }
 
 TEST_F(CrashReporterTest, ResetsQuota) {
   SetUpDataProviderServer(
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
-  SetUpCrashReporterDefaultConfig(
+  SetUpCrashReporter(
+      /*crash_report_upload_policy=*/feedback::CrashReportUploadPolicy::kEnabled,
+      /*daily_per_product_quota=*/kDailyPerProductQuota,
+      /*enable_hourly_snapshots=*/false,
       std::vector<CrashServer::UploadStatus>(kDailyPerProductQuota * 2, kUploadSuccessful));
 
   for (size_t i = 0; i < kDailyPerProductQuota; ++i) {
-    ASSERT_TRUE(FileOneCrashReport().is_ok());
+    ASSERT_TRUE(FileOneCrashReport().is_response());
   }
 
   RunLoopFor(zx::hour(24) + kResetOffset);
   clock_.Set(clock_.Now() + zx::hour(24) + kResetOffset);
 
   for (size_t i = 0; i < kDailyPerProductQuota; ++i) {
-    ASSERT_TRUE(FileOneCrashReport().is_ok());
+    ASSERT_TRUE(FileOneCrashReport().is_response());
   }
 }
 
@@ -494,7 +535,7 @@ TEST_F(CrashReporterTest, NoQuota) {
                                              kUploadSuccessful));
 
   for (size_t i = 0; i < kDailyPerProductQuota; ++i) {
-    ASSERT_TRUE(FileOneCrashReport().is_ok());
+    ASSERT_TRUE(FileOneCrashReport().is_response());
   }
 }
 
@@ -509,7 +550,7 @@ TEST_F(CrashReporterTest, Check_RegisteredProduct) {
   product.set_channel("some channel");
   crash_register_->Upsert(kProgramName, std::move(product));
 
-  ASSERT_TRUE(FileOneCrashReport().is_ok());
+  ASSERT_TRUE(FileOneCrashReport().is_response());
 
   ASSERT_TRUE(crash_server_->latest_annotations().Contains("product"));
   EXPECT_EQ(crash_server_->latest_annotations().Get("product"), "some name");
@@ -533,7 +574,7 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithAdditionalData) {
                       {"annotation.key", "annotation.value"},
                   },
                   /*attachments=*/std::move(attachments))
-                  .is_ok());
+                  .is_response());
   CheckAnnotationsOnServer({
       {"annotation.key", "annotation.value"},
   });
@@ -549,7 +590,7 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithEventId) {
   report.set_program_name(kProgramName);
   report.set_event_id("some-event-id");
 
-  ASSERT_TRUE(FileOneCrashReport(std::move(report)).is_ok());
+  ASSERT_TRUE(FileOneCrashReport(std::move(report)).is_response());
   CheckAnnotationsOnServer({
       {"comments", "some-event-id"},
   });
@@ -567,7 +608,7 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithProgramUptime) {
       zx::hour(3) * 24 + zx::hour(15) + zx::min(33) + zx::sec(17) + zx::msec(54);
   report.set_program_uptime(uptime.get());
 
-  ASSERT_TRUE(FileOneCrashReport(std::move(report)).is_ok());
+  ASSERT_TRUE(FileOneCrashReport(std::move(report)).is_response());
   CheckAnnotationsOnServer({
       {"ptime", std::to_string(uptime.to_msecs())},
   });
@@ -582,7 +623,7 @@ TEST_F(CrashReporterTest, Succeed_OnNativeInputCrashReport) {
   fuchsia::mem::Buffer minidump;
   fsl::VmoFromString("minidump", &minidump);
 
-  ASSERT_TRUE(FileOneNativeCrashReport(std::move(minidump), std::nullopt).is_ok());
+  ASSERT_TRUE(FileOneNativeCrashReport(std::move(minidump), std::nullopt).is_response());
   CheckAnnotationsOnServer({
       {"crash.process.name", "crashing_process"},
       {"crash.process.koid", "123"},
@@ -597,7 +638,7 @@ TEST_F(CrashReporterTest, Succeed_OnNativeInputCrashReportWithoutMinidump) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneNativeCrashReport(std::nullopt, std::nullopt).is_ok());
+  ASSERT_TRUE(FileOneNativeCrashReport(std::nullopt, std::nullopt).is_response());
   CheckAnnotationsOnServer({
       {"crash.process.name", "crashing_process"},
       {"crash.process.koid", "123"},
@@ -613,7 +654,7 @@ TEST_F(CrashReporterTest, Succeed_OnNativeInputCrashReportWithoutMinidumpButCras
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneNativeCrashReport(std::nullopt, "some-signature").is_ok());
+  ASSERT_TRUE(FileOneNativeCrashReport(std::nullopt, "some-signature").is_response());
   CheckAnnotationsOnServer({
       {"crash.process.name", "crashing_process"},
       {"crash.process.koid", "123"},
@@ -634,7 +675,7 @@ TEST_F(CrashReporterTest, Succeed_OnDartInputCrashReport) {
 
   ASSERT_TRUE(
       FileOneDartCrashReport("FileSystemException", "cannot open file", std::move(stack_trace))
-          .is_ok());
+          .is_response());
   CheckAnnotationsOnServer({
       {"error_runtime_type", "FileSystemException"},
       {"error_message", "cannot open file"},
@@ -648,7 +689,7 @@ TEST_F(CrashReporterTest, Succeed_OnDartInputCrashReportWithoutExceptionData) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneDartCrashReport(std::nullopt, std::nullopt, std::nullopt).is_ok());
+  ASSERT_TRUE(FileOneDartCrashReport(std::nullopt, std::nullopt, std::nullopt).is_response());
   CheckAnnotationsOnServer({
       {"type", "DartError"},
       {"signature", "fuchsia-no-dart-stack-trace"},
@@ -661,7 +702,7 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithSignature) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneCrashReportWithSignature("some-signature").is_ok());
+  ASSERT_TRUE(FileOneCrashReportWithSignature("some-signature").is_response());
   CheckAnnotationsOnServer({
       {"signature", "some-signature"},
   });
@@ -672,7 +713,27 @@ TEST_F(CrashReporterTest, Fail_OnInvalidInputCrashReport) {
   SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
   SetUpCrashReporterDefaultConfig();
 
-  EXPECT_TRUE(FileOneEmptyCrashReport().is_error());
+  const CrashReporter_FileReport_Result result = FileOneEmptyCrashReport();
+  EXPECT_TRUE(result.is_err());
+  EXPECT_EQ(result.err(), FilingError::INVALID_ARGS_ERROR);
+}
+
+// TODO(fxbug.dev/117123): delete when CrashReporter::File is removed.
+TEST_F(CrashReporterTest, Fail_OnInvalidInputCrashReport_OldFile) {
+  SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
+  SetUpCrashReporterDefaultConfig();
+
+  // Run loop to start the clock.
+  RunLoopUntilIdle();
+  CrashReport report;
+  std::optional<::fpromise::result<void, zx_status_t>> out_result{std::nullopt};
+  crash_reporter_->File(std::move(report),
+                        [&out_result](::fpromise::result<void, zx_status_t> result) {
+                          out_result = std::move(result);
+                        });
+  RunLoopFor(kSnapshotSharedRequestWindow);
+  ASSERT_TRUE(out_result.has_value());
+  EXPECT_TRUE(out_result->is_error());
 }
 
 TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithIsFatalTrue) {
@@ -680,7 +741,7 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithIsFatalTrue) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneCrashReportWithIsFatal(true).is_ok());
+  ASSERT_TRUE(FileOneCrashReportWithIsFatal(true).is_response());
   CheckAnnotationsOnServer({
       {"isFatal", "true"},
   });
@@ -692,7 +753,7 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithIsFatalFalse) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneCrashReportWithIsFatal(false).is_ok());
+  ASSERT_TRUE(FileOneCrashReportWithIsFatal(false).is_response());
   CheckAnnotationsOnServer({
       {"isFatal", "false"},
   });
@@ -709,7 +770,7 @@ TEST_F(CrashReporterTest, Upload_OnUserAlreadyOptedInDataSharing) {
   SetUpPrivacySettingsServer(std::make_unique<fakes::PrivacySettings>());
   SetPrivacySettings(kUserOptInDataSharing);
 
-  ASSERT_TRUE(FileOneCrashReport().is_ok());
+  ASSERT_TRUE(FileOneCrashReport().is_response());
   CheckAnnotationsOnServer();
   CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
 }
@@ -724,7 +785,9 @@ TEST_F(CrashReporterTest, Archive_OnUserAlreadyOptedOutDataSharing) {
   SetPrivacySettings(kUserOptOutDataSharing);
   RunLoopUntilIdle();
 
-  ASSERT_TRUE(FileOneCrashReport().is_ok());
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_response());
+  EXPECT_EQ(result.response().results.result(), FilingSuccess::REPORT_NOT_FILED_USER_OPTED_OUT);
 }
 
 TEST_F(CrashReporterTest, Upload_OnceUserOptInDataSharing) {
@@ -736,7 +799,7 @@ TEST_F(CrashReporterTest, Upload_OnceUserOptInDataSharing) {
       /*enable_hourly_snapshots=*/true, std::vector({kUploadSuccessful}));
   SetUpPrivacySettingsServer(std::make_unique<fakes::PrivacySettings>());
 
-  ASSERT_TRUE(FileOneCrashReport().is_ok());
+  ASSERT_TRUE(FileOneCrashReport().is_response());
   CheckServerStillExpectRequests();
 
   SetPrivacySettings(kUserOptInDataSharing);
@@ -746,7 +809,7 @@ TEST_F(CrashReporterTest, Upload_OnceUserOptInDataSharing) {
   CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
 }
 
-TEST_F(CrashReporterTest, Succeed_OnFailedUpload) {
+TEST_F(CrashReporterTest, Succeed_OnFailedUploadPutIntoDisk) {
   SetUpDataProviderServer(
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kEmptyAttachmentBundleKey));
   SetUpCrashReporter(
@@ -754,10 +817,26 @@ TEST_F(CrashReporterTest, Succeed_OnFailedUpload) {
       /*daily_per_product_quota=*/kDailyPerProductQuota,
       /*enable_hourly_snapshots=*/true, std::vector({kUploadFailed}));
 
-  EXPECT_TRUE(FileOneCrashReport().is_ok());
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_response());
+  EXPECT_EQ(result.response().results.result(), FilingSuccess::REPORT_ON_DISK);
 }
 
-TEST_F(CrashReporterTest, Succeed_OnThrottledUpload) {
+TEST_F(CrashReporterTest, Succeed_OnFailedUploadPutIntoMemory) {
+  SetUpDataProviderServer(
+      std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kEmptyAttachmentBundleKey));
+  SetUpCrashReporter(
+      /*crash_report_upload_policy=*/feedback::CrashReportUploadPolicy::kEnabled,
+      /*daily_per_product_quota=*/kDailyPerProductQuota,
+      /*enable_hourly_snapshots=*/true, std::vector({kUploadFailed}),
+      /*max_reports_cache_size=*/StorageSize::Bytes(0));
+
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_response());
+  EXPECT_EQ(result.response().results.result(), FilingSuccess::REPORT_IN_MEMORY);
+}
+
+TEST_F(CrashReporterTest, Fail_OnThrottledUpload) {
   SetUpDataProviderServer(
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kEmptyAttachmentBundleKey));
   SetUpCrashReporter(
@@ -765,7 +844,22 @@ TEST_F(CrashReporterTest, Succeed_OnThrottledUpload) {
       /*daily_per_product_quota=*/kDailyPerProductQuota,
       /*enable_hourly_snapshots=*/true, std::vector({kUploadThrottled}));
 
-  EXPECT_TRUE(FileOneCrashReport().is_ok());
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_err());
+  EXPECT_EQ(result.err(), FilingError::SERVER_ERROR);
+}
+
+TEST_F(CrashReporterTest, Fail_OnUploadTimeout) {
+  SetUpDataProviderServer(
+      std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kEmptyAttachmentBundleKey));
+  SetUpCrashReporter(
+      /*crash_report_upload_policy=*/feedback::CrashReportUploadPolicy::kEnabled,
+      /*daily_per_product_quota=*/kDailyPerProductQuota,
+      /*enable_hourly_snapshots=*/true, std::vector({kUploadTimeout}));
+
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_err());
+  EXPECT_EQ(result.err(), FilingError::SERVER_ERROR);
 }
 
 TEST_F(CrashReporterTest, Succeed_OnDisabledUpload) {
@@ -776,7 +870,9 @@ TEST_F(CrashReporterTest, Succeed_OnDisabledUpload) {
       /*daily_per_product_quota=*/std::nullopt,
       /*enable_hourly_snapshots=*/true);
 
-  EXPECT_TRUE(FileOneCrashReport().is_ok());
+  const CrashReporter_FileReport_Result result = FileOneCrashReport();
+  ASSERT_TRUE(result.is_response());
+  EXPECT_EQ(result.response().results.result(), FilingSuccess::REPORT_ON_DISK);
 }
 
 TEST_F(CrashReporterTest, Succeed_OnNoFeedbackAttachments) {
@@ -784,7 +880,7 @@ TEST_F(CrashReporterTest, Succeed_OnNoFeedbackAttachments) {
       std::make_unique<stubs::DataProviderReturnsNoAttachment>(kFeedbackAnnotations));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  EXPECT_TRUE(FileOneCrashReportWithSingleAttachment().is_ok());
+  EXPECT_TRUE(FileOneCrashReportWithSingleAttachment().is_response());
   CheckAnnotationsOnServer({{feedback::kDebugSnapshotPresentKey, "false"}});
   CheckAttachmentsOnServer({kSingleAttachmentKey});
 }
@@ -854,7 +950,7 @@ TEST_F(CrashReporterTest, Check_CobaltAfterSuccessfulUpload) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kEmptyAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  EXPECT_TRUE(FileOneCrashReport().is_ok());
+  EXPECT_TRUE(FileOneCrashReport().is_response());
 
   EXPECT_THAT(ReceivedCobaltEvents(),
               UnorderedElementsAreArray({
@@ -873,7 +969,7 @@ TEST_F(CrashReporterTest, Check_CobaltAfterQuotaReached) {
       /*daily_per_product_quota=*/0u,
       /*enable_hourly_snapshots=*/true);
 
-  EXPECT_TRUE(FileOneCrashReport().is_ok());
+  EXPECT_TRUE(FileOneCrashReport().is_err());
   EXPECT_THAT(ReceivedCobaltEvents(), UnorderedElementsAreArray({
                                           cobalt::Event(cobalt::CrashState::kOnDeviceQuotaReached),
                                       }));
@@ -883,7 +979,7 @@ TEST_F(CrashReporterTest, Check_CobaltAfterInvalidInputCrashReport) {
   SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
   SetUpCrashReporterDefaultConfig();
 
-  EXPECT_TRUE(FileOneEmptyCrashReport().is_error());
+  EXPECT_TRUE(FileOneEmptyCrashReport().is_err());
   EXPECT_THAT(ReceivedCobaltEvents(), UnorderedElementsAreArray({
                                           cobalt::Event(cobalt::CrashState::kDropped),
                                       }));
@@ -942,7 +1038,7 @@ TEST_F(CrashReporterTestWithClock, Check_UtcTimeIsNotReady) {
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
   SetUpCrashReporterDefaultConfig({kUploadSuccessful});
 
-  ASSERT_TRUE(FileOneCrashReport().is_ok());
+  ASSERT_TRUE(FileOneCrashReport().is_response());
   CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
 
   EXPECT_FALSE(crash_server_->latest_annotations().Contains("reportTimeMillis"));

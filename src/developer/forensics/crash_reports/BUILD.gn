@@ -131,7 +131,15 @@ source_set("errors") {
 }
 
 source_set("filing_result") {
-  sources = [ "filing_result.h" ]
+  sources = [
+    "filing_result.cc",
+    "filing_result.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/lib/fit-promise",
+  ]
 }
 
 source_set("item_location") {

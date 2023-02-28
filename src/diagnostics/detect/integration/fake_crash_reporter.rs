@@ -5,6 +5,7 @@
 use {
     super::{DoneSignaler, TestEvent, TestEventSender},
     anyhow::{bail, Context, Error},
+    fcrash::FileReportResults,
     fidl_fuchsia_feedback as fcrash, fuchsia_async as fasync,
     futures::{SinkExt, StreamExt},
     std::sync::Arc,
@@ -59,6 +60,22 @@ impl FakeCrashReporter {
                             event_sender.send(Ok(TestEvent::CrashReport(signature))).await.unwrap();
                             responder
                                 .send(&mut Ok(()))
+                                .context("failed to send response to client")?;
+                        }
+                        Err(problem) => {
+                            error!("Problem in report: {}", problem);
+                            event_sender.send(Err(problem)).await.unwrap();
+                            self.done_signaler.signal_done().await;
+                        }
+                    }
+                }
+                Some(Ok(fcrash::CrashReporterRequest::FileReport { report, responder })) => {
+                    match evaluate_report(&report) {
+                        Ok(signature) => {
+                            info!("Received crash report: {}", signature);
+                            event_sender.send(Ok(TestEvent::CrashReport(signature))).await.unwrap();
+                            responder
+                                .send(&mut Ok(FileReportResults::EMPTY))
                                 .context("failed to send response to client")?;
                         }
                         Err(problem) => {

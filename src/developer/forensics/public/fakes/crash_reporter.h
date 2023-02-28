@@ -28,6 +28,9 @@ class CrashReporter : public fuchsia::feedback::CrashReporter {
   // |fuchsia::feedback::CrashReporter|
   void File(fuchsia::feedback::CrashReport report, FileCallback callback) override;
 
+  // |fuchsia::feedback::CrashReporter|
+  void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override;
+
  private:
   std::unique_ptr<FakeCrashReporterQuerier> querier_;
   size_t num_crash_reports_filed_{0};

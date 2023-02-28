@@ -4,6 +4,7 @@
 
 #include "src/developer/forensics/testing/stubs/crash_reporter.h"
 
+#include <fuchsia/feedback/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -54,6 +55,18 @@ CrashReporter::~CrashReporter() {
 }
 
 void CrashReporter::File(fuchsia::feedback::CrashReport report, FileCallback callback) {
+  FileReport(std::move(report),
+             [callback = std::move(callback)](
+                 const fuchsia::feedback::CrashReporter_FileReport_Result& result) {
+               if (result.is_err()) {
+                 callback(fpromise::error(ZX_ERR_INTERNAL));
+               } else {
+                 callback(fpromise::ok());
+               }
+             });
+}
+
+void CrashReporter::FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) {
   FX_CHECK(report.has_crash_signature());
   FX_CHECK(report.has_attachments());
   FX_CHECK(report.attachments().size() == 1u);
@@ -62,7 +75,7 @@ void CrashReporter::File(fuchsia::feedback::CrashReport report, FileCallback cal
 
   if (!fsl::StringFromVmo(report.attachments()[0].value, &reboot_log_)) {
     FX_LOGS(ERROR) << "error parsing feedback log VMO as string";
-    callback(::fpromise::error(ZX_ERR_INTERNAL));
+    callback(fpromise::error(fuchsia::feedback::FilingError::INVALID_ARGS_ERROR));
     return;
   }
 
@@ -78,7 +91,11 @@ void CrashReporter::File(fuchsia::feedback::CrashReport report, FileCallback cal
     is_fatal_ = std::nullopt;
   }
 
-  callback(::fpromise::ok());
+  fuchsia::feedback::FileReportResults results;
+  results.set_result(fuchsia::feedback::FilingSuccess::REPORT_UPLOADED);
+  results.set_report_id("01234567890abcdef");
+
+  callback(fpromise::ok(std::move(results)));
 }
 
 void CrashReporterAlwaysReturnsError::File(fuchsia::feedback::CrashReport report,
@@ -86,9 +103,19 @@ void CrashReporterAlwaysReturnsError::File(fuchsia::feedback::CrashReport report
   callback(::fpromise::error(ZX_ERR_INTERNAL));
 }
 
+void CrashReporterAlwaysReturnsError::FileReport(fuchsia::feedback::CrashReport report,
+                                                 FileReportCallback callback) {
+  callback(::fpromise::error(fuchsia::feedback::FilingError::INVALID_ARGS_ERROR));
+}
+
 void CrashReporterNoFileExpected::File(fuchsia::feedback::CrashReport report,
                                        FileCallback callback) {
   FX_CHECK(false) << "No call to File() expected";
+}
+
+void CrashReporterNoFileExpected::FileReport(fuchsia::feedback::CrashReport report,
+                                             FileReportCallback callback) {
+  FX_CHECK(false) << "No call to FileReport() expected";
 }
 
 }  // namespace stubs

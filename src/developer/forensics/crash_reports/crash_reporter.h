@@ -55,8 +55,12 @@ class CrashReporter : public fuchsia::feedback::CrashReporter {
   // |fuchsia::feedback::CrashReporter|
   void File(fuchsia::feedback::CrashReport report, FileCallback callback) override;
 
+  // |fuchsia::feedback::CrashReporter|
+  void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override;
+
  private:
-  void File(fuchsia::feedback::CrashReport report, bool is_hourly_snapshot);
+  void File(fuchsia::feedback::CrashReport report, bool is_hourly_snapshot,
+            FileReportCallback callback);
   void ScheduleHourlySnapshot(zx::duration delay);
 
   async_dispatcher_t* dispatcher_;

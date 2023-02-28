@@ -103,6 +103,9 @@ inline void PrintTo(const FilingResult& result, std::ostream* os) {
     case FilingResult::kPersistenceError:
       result_str = "PERSISTENCE_ERROR";
       break;
+    case FilingResult::kQuotaReachedError:
+      result_str = "QUOTA_REACHED_ERROR";
+      break;
   }
   *os << result_str;
 }

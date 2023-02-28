@@ -5,6 +5,7 @@
 #include "src/developer/forensics/public/fakes/crash_reporter.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
+#include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -21,6 +22,23 @@ void CrashReporter::File(CrashReport report, FileCallback callback) {
     callback(CrashReporter_File_Result::WithErr(ZX_ERR_INVALID_ARGS));
   } else {
     callback(CrashReporter_File_Result::WithResponse(CrashReporter_File_Response()));
+  }
+
+  ++num_crash_reports_filed_;
+  if (querier_) {
+    querier_->UpdateAndNotify(num_crash_reports_filed_);
+  }
+}
+
+void CrashReporter::FileReport(CrashReport report, FileReportCallback callback) {
+  if (!report.has_program_name()) {
+    callback(fpromise::error(FilingError::INVALID_ARGS_ERROR));
+  } else {
+    FileReportResults results;
+    results.set_result(FilingSuccess::REPORT_UPLOADED);
+    results.set_report_id("01234567890abcdef");
+
+    callback(fpromise::ok(std::move(results)));
   }
 
   ++num_crash_reports_filed_;

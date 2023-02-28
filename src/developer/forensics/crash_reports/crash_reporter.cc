@@ -26,6 +26,7 @@
 
 #include "src/developer/forensics/crash_reports/constants.h"
 #include "src/developer/forensics/crash_reports/crash_server.h"
+#include "src/developer/forensics/crash_reports/filing_result.h"
 #include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/crash_reports/report.h"
 #include "src/developer/forensics/crash_reports/report_util.h"
@@ -39,6 +40,10 @@ namespace {
 
 using FidlSnapshot = fuchsia::feedback::Snapshot;
 using fuchsia::feedback::CrashReport;
+using fuchsia::feedback::CrashReporter_FileReport_Result;
+using fuchsia::feedback::FileReportResults;
+using fuchsia::feedback::FilingError;
+using fuchsia::feedback::FilingSuccess;
 
 constexpr zx::duration kSnapshotTimeout = zx::min(1);
 
@@ -72,6 +77,20 @@ std::unique_ptr<ReportingPolicyWatcher> MakeReportingPolicyWatcher(
     case feedback::CrashReportUploadPolicy::kReadFromPrivacySettings:
       return std::make_unique<UserReportingPolicyWatcher>(dispatcher, std::move(services));
   }
+}
+
+CrashReporter_FileReport_Result InternalResultsToFidl(const FilingResult result,
+                                                      const std::string& report_id = "") {
+  const fpromise::result<FilingSuccess, FilingError> fidl_result = ToFidlFilingResult(result);
+  if (fidl_result.is_error()) {
+    return fpromise::error(fidl_result.error());
+  }
+
+  FileReportResults results;
+  results.set_result(ToFidlFilingResult(result).value());
+  results.set_report_id(report_id);
+
+  return fpromise::ok(std::move(results));
 }
 
 }  // namespace
@@ -146,11 +165,25 @@ void CrashReporter::File(fuchsia::feedback::CrashReport report, FileCallback cal
   // can take quite some time and blocking clients would defeat the purpose of sharing the snapshot.
   callback(::fpromise::ok());
 
-  File(std::move(report), /*is_hourly_snapshot=*/false);
+  File(std::move(report), /*is_hourly_snapshot=*/false,
+       [](const CrashReporter_FileReport_Result& result) {});
 }
 
-void CrashReporter::File(fuchsia::feedback::CrashReport report, const bool is_hourly_snapshot) {
+void CrashReporter::FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) {
+  if (!report.has_program_name()) {
+    FX_LOGS(ERROR) << "Input report missing required program name. Won't file.";
+    callback(InternalResultsToFidl(FilingResult::kInvalidArgsError));
+    info_.LogCrashState(cobalt::CrashState::kDropped);
+    return;
+  }
+
+  File(std::move(report), /*is_hourly_snapshot=*/false, std::move(callback));
+}
+
+void CrashReporter::File(fuchsia::feedback::CrashReport report, const bool is_hourly_snapshot,
+                         FileReportCallback callback) {
   if (reporting_policy_watcher_->CurrentPolicy() == ReportingPolicy::kDoNotFileAndDelete) {
+    callback(InternalResultsToFidl(FilingResult::kReportNotFiledUserOptedOut));
     info_.LogCrashState(cobalt::CrashState::kDeleted);
     return;
   }
@@ -168,6 +201,7 @@ void CrashReporter::File(fuchsia::feedback::CrashReport report, const bool is_ho
 
   if (!product_quotas_.HasQuotaRemaining(product)) {
     FX_LOGST(INFO, tags_->Get(report_id)) << "Daily report quota reached. Won't retry";
+    callback(InternalResultsToFidl(FilingResult::kQuotaReachedError));
     info_.LogCrashState(cobalt::CrashState::kOnDeviceQuotaReached);
     tags_->Unregister(report_id);
     return;
@@ -186,7 +220,8 @@ void CrashReporter::File(fuchsia::feedback::CrashReport report, const bool is_ho
   auto p = snapshot_collector_
                .GetReport(kSnapshotTimeout, std::move(report), report_id, current_time, product,
                           is_hourly_snapshot, reporting_policy_watcher_->CurrentPolicy())
-               .then([this, report_id, is_hourly_snapshot](fpromise::result<Report>& result) {
+               .then([this, report_id, is_hourly_snapshot,
+                      callback = std::move(callback)](fpromise::result<Report>& result) mutable {
                  if (is_hourly_snapshot) {
                    FX_LOGST(INFO, tags_->Get(report_id)) << "Generated hourly snapshot";
                  } else {
@@ -206,7 +241,10 @@ void CrashReporter::File(fuchsia::feedback::CrashReport report, const bool is_ho
                  }
 
                  if (!queue_.Add(std::move(result.value()),
-                                 [](const FilingResult& result, const std::string& report_id) {})) {
+                                 [callback = std::move(callback)](const FilingResult& result,
+                                                                  const std::string& report_id) {
+                                   callback(InternalResultsToFidl(result, report_id));
+                                 })) {
                    return record_failure(cobalt::CrashState::kDropped,
                                          "Failed to file report: Queue::Add failed. Won't retry");
                  }
@@ -235,7 +273,8 @@ void CrashReporter::ScheduleHourlySnapshot(const zx::duration delay) {
             .set_is_fatal(false)
             .set_crash_signature(kHourlySnapshotSignature);
 
-        File(std::move(report), /*is_hourly_snapshot=*/true);
+        File(std::move(report), /*is_hourly_snapshot=*/true,
+             [](const CrashReporter_FileReport_Result& result) {});
       },
       delay);
 }
