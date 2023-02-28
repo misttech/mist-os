@@ -10,16 +10,15 @@ use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Task;
 use futures::TryStreamExt;
-use mdns_discovery::{discovery_loop, DiscoveryConfig, MdnsEnabledChecker, MdnsProtocol};
+use mdns_discovery::{
+    discovery_loop, DiscoveryConfig, MdnsEnabledChecker, MdnsProtocol, MDNS_BROADCAST_INTERVAL,
+    MDNS_INTERFACE_DISCOVERY_INTERVAL, MDNS_TTL,
+};
 use protocols::prelude::*;
-use std::{rc::Rc, time::Duration};
+use std::rc::Rc;
 
 // Default port to listen on for MDNS queries
 const MDNS_PORT: u16 = 5353;
-
-pub(crate) const MDNS_BROADCAST_INTERVAL_SECS: u64 = 10;
-pub(crate) const MDNS_INTERFACE_DISCOVERY_INTERVAL_SECS: u64 = 1;
-pub(crate) const MDNS_TTL: u32 = 255;
 
 #[ffx_protocol]
 #[derive(Default)]
@@ -85,8 +84,8 @@ impl FidlProtocol for Mdns {
             DiscoveryConfig {
                 socket_tasks: Default::default(),
                 mdns_protocol: inner,
-                discovery_interval: Duration::from_secs(MDNS_INTERFACE_DISCOVERY_INTERVAL_SECS),
-                query_interval: Duration::from_secs(MDNS_BROADCAST_INTERVAL_SECS),
+                discovery_interval: MDNS_INTERFACE_DISCOVERY_INTERVAL,
+                query_interval: MDNS_BROADCAST_INTERVAL,
                 ttl: MDNS_TTL,
                 mdns_port,
             },

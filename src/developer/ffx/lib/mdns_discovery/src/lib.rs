@@ -28,6 +28,10 @@ use std::{
 };
 use zerocopy::ByteSlice;
 
+pub const MDNS_BROADCAST_INTERVAL: Duration = Duration::from_secs(10);
+pub const MDNS_INTERFACE_DISCOVERY_INTERVAL: Duration = Duration::from_secs(1);
+pub const MDNS_TTL: u32 = 255;
+
 const MDNS_MCAST_V4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
 const MDNS_MCAST_V6: Ipv6Addr = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 0x00fb);
 
@@ -134,6 +138,51 @@ async fn propagate_bind_event(sock: &UdpSocket, svc: &Weak<MdnsProtocol>) -> u16
 #[async_trait(?Send)]
 pub trait MdnsEnabledChecker {
     async fn enabled(&self) -> bool;
+}
+
+struct MdnsEnabled;
+
+#[async_trait(?Send)]
+impl MdnsEnabledChecker for MdnsEnabled {
+    async fn enabled(&self) -> bool {
+        true
+    }
+}
+
+/// Returns a Vec<TargetInfo> of Fuchsia targets discovered via mDNS during the given `duration`
+pub async fn discover_targets(
+    listen_duration: Duration,
+    mdns_port: u16,
+) -> Result<Vec<ffx::TargetInfo>> {
+    let (sender, receiver) = async_channel::bounded::<ffx::MdnsEventType>(1);
+    let inner = Rc::new(MdnsProtocol {
+        events_in: receiver,
+        events_out: sender,
+        target_cache: Default::default(),
+    });
+
+    let inner_mv = Rc::downgrade(&inner);
+
+    let discover_task = discovery_loop(
+        DiscoveryConfig {
+            socket_tasks: Default::default(),
+            mdns_protocol: inner_mv,
+            discovery_interval: MDNS_INTERFACE_DISCOVERY_INTERVAL,
+            query_interval: MDNS_BROADCAST_INTERVAL,
+            ttl: MDNS_TTL,
+            mdns_port,
+        },
+        MdnsEnabled {},
+    )
+    .fuse();
+    let discover_task = Box::pin(discover_task);
+
+    let timeout = fuchsia_async::Timer::new(listen_duration).fuse();
+
+    // Wait on either the discovery or the timeout
+    futures::future::select(discover_task, timeout).await;
+
+    Ok(inner.as_ref().target_cache())
 }
 
 // discovery_loop iterates over all multicast interfaces and adds them to
