@@ -22,12 +22,20 @@ impl Delegate {
     }
 
     /// Returns a builder for constructing a new messenger.
-    pub(crate) fn messenger_builder(&self, messenger_type: MessengerType) -> Builder {
+    fn messenger_builder(&self, messenger_type: MessengerType) -> Builder {
         Builder::new(self.messenger_action_tx.clone(), messenger_type)
     }
 
     pub(crate) async fn create(&self, messenger_type: MessengerType) -> CreateMessengerResult {
         self.messenger_builder(messenger_type).build().await
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn create_sink(&self) -> CreateMessengerResult {
+        self.messenger_builder(MessengerType::Unbound)
+            .add_role(crate::Role::Event(crate::event::Role::Sink))
+            .build()
+            .await
     }
 
     /// Checks whether a messenger is present at the given [`Signature`]. Note

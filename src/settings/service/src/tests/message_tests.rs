@@ -43,7 +43,7 @@ static MODIFIED_2: &crate::Payload = &test_message::THUD;
 static BROADCAST: &crate::Payload = &test_message::BAZ;
 static REPLY: &crate::Payload = &test_message::BAR;
 
-const ROLE_1: crate::Role = crate::Role::Event(event::Role::Sink);
+const EVENT_SINK: crate::Role = crate::Role::Event(event::Role::Sink);
 
 mod test {
     pub(crate) type MessageHub = crate::message::message_hub::MessageHub;
@@ -774,25 +774,17 @@ async fn test_roles_membership() {
     let delegate = test::MessageHub::create();
 
     // Create messengers who participate in roles
-    let (_, mut foo_role_receptor) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .add_role(ROLE_1)
-        .build()
-        .await
-        .expect("recipient messenger should be created");
-    let (_, mut foo_role_receptor_2) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .add_role(ROLE_1)
-        .build()
-        .await
-        .expect("recipient messenger should be created");
+    let (_, mut foo_role_receptor) =
+        delegate.create_sink().await.expect("recipient messenger should be created");
+    let (_, mut foo_role_receptor_2) =
+        delegate.create_sink().await.expect("recipient messenger should be created");
 
     // Create messenger to send a message to the given participant.
     let (sender, _) =
         delegate.create(MessengerType::Unbound).await.expect("sending messenger should be created");
 
     let message = test_message::FOO.clone();
-    let audience = Audience::Role(ROLE_1);
+    let audience = Audience::Role(EVENT_SINK);
     let _ = sender.message(message.clone(), audience);
 
     // Verify payload received by role members.
@@ -807,12 +799,8 @@ async fn test_roles_audience() {
     let delegate = test::MessageHub::create();
 
     // Create messenger who participate in a role
-    let (_, mut foo_role_receptor) = delegate
-        .messenger_builder(MessengerType::Unbound)
-        .add_role(ROLE_1)
-        .build()
-        .await
-        .expect("recipient messenger should be created");
+    let (_, mut foo_role_receptor) =
+        delegate.create_sink().await.expect("recipient messenger should be created");
 
     // Create another messenger with no role to ensure messages are not routed
     // improperly to other messengers.
@@ -827,7 +815,7 @@ async fn test_roles_audience() {
     // Send message to role.
     {
         let message = test_message::FOO.clone();
-        let audience = Audience::Role(ROLE_1);
+        let audience = Audience::Role(EVENT_SINK);
         let _ = sender.message(message.clone(), audience);
 
         // Verify payload received by role members.
