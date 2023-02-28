@@ -9,30 +9,86 @@ use {argh::FromArgs, ffx_core::ffx_command, std::time::Duration};
 #[argh(
     subcommand,
     name = "load",
-    description = "Measure CPU load over the specified duration",
-    example = "To measure the CPU load over a two second duration
+    description = "\
+Collect and print CPU usage data for the specified time frame, or instruct the metrics-logger \
+component to record the CPU usage data to Inspect, Trace, and/or syslog.
+",
+    example = "\
+1) To measure the CPU load over a two second duration:
 
-    $ ffx profile cpu load --duration 2
-    ",
-    note = "This command uses the GetCpuLoad method of the fuchsia.kernel.Stats service to query the
-the load from each active CPU core in the system. The measured CPU load from each core is
-printed in the following format:
+    $ ffx profile cpu load --duration 2s
 
-    CPU 0: 0.66%
-    CPU 1: 1.56%
-    CPU 2: 0.83%
-    CPU 3: 0.71%
-    Total: 3.76%
+    The measured CPU load from each core is printed in the following format:
 
-The valid range for each CPU load is [0-100]%. The \"Total\" value represents the summation
-of the load percentages of all CPU cores and is valid in the range [0-100*[NUM_CPU]]%
-"
+        CPU 0: 0.66%
+        CPU 1: 1.56%
+        CPU 2: 0.83%
+        CPU 3: 0.71%
+        Total: 3.76%
+
+    The valid range for each CPU load is [0-100]%. The \"Total\" value represents the summation of \
+    the load percentages of all CPU cores and is valid in the range [0-100*[NUM_CPU]]%.
+
+2) To log CPU load every 500 ms indefinitely:
+
+    $ ffx profile cpu load start --interval 500ms
+
+    Logged samples will be available via iquery under core/metrics-logger and via tracing in the \
+    `cpu_usage` category.
+
+3) To log CPU load every 1 second for 30 seconds with output-to-syslog enabled:
+
+    $ ffx profile cpu load start --interval 1s -d 30s --output-to-syslog
+
+    Logged samples will be available in syslog, via iquery under core/metrics-logger and via \
+    tracing in the `cpu_usage` category.
+",
+    note = "\
+Please specify a duration for immediate load display, or alternatively, utilize the start/stop \
+subcommand to instruct the metrics-logger component to record the CPU usage data to Inspect, Trace,\
+and/or syslog.
+If the metrics-logger component is not available to the target, add \
+`--with //src/testing/metrics-logger` to fx set."
 )]
+
 pub struct CpuLoadCommand {
     #[argh(option, long = "duration", short = 'd', from_str_fn(parse_duration))]
-    /// duration over which to measure the CPU load
-    pub duration: Duration,
+    /// duration over which to measure and print the CPU load
+    pub duration: Option<Duration>,
+
+    #[argh(subcommand)]
+    /// top-level command to instruct the metrics-logger component to record the CPU usage data
+    pub subcommand: Option<SubCommand>,
 }
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+pub enum SubCommand {
+    Start(StartCommand),
+    Stop(StopCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Start logging on the target
+#[argh(subcommand, name = "start")]
+pub struct StartCommand {
+    #[argh(option, long = "interval", short = 's', from_str_fn(parse_duration))]
+    /// interval for logging the CPU load
+    pub interval: Duration,
+
+    #[argh(switch)]
+    /// toggle for logging CPU loads to syslog
+    pub output_to_syslog: bool,
+
+    #[argh(option, long = "duration", short = 'd', from_str_fn(parse_duration))]
+    /// duration for which to log; if omitted, logging will continue indefinitely
+    pub duration: Option<Duration>,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Stop logging on the target
+#[argh(subcommand, name = "stop")]
+pub struct StopCommand {}
 
 const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
 
