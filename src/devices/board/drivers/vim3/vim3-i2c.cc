@@ -25,11 +25,11 @@ using i2c_channel_t = fidl_metadata::i2c::Channel;
 static const std::vector<fpbus::Mmio> i2c_mmios{
     {{
         .base = A311D_I2C_AOBUS_BASE,
-        .length = A311D_I2C_AOBUS_LENGTH,
+        .length = A311D_I2C_LENGTH,
     }},
     {{
         .base = A311D_EE_I2C_M3_BASE,
-        .length = A311D_I2C_AOBUS_LENGTH,
+        .length = A311D_I2C_LENGTH,
     }},
 };
 
