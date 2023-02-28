@@ -43,7 +43,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/phys/BUILD.gn:30
+From //zircon/kernel/phys/BUILD.gn:31
 
 ### all_font_file_paths
 
@@ -2597,7 +2597,7 @@ From //src/ui/tests/integration_flutter_tests/embedder/flutter_build_config.gni:
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:53
+From //build/product.gni:49
 
 ### emu_window_size_width
 
@@ -2605,7 +2605,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:52
+From //build/product.gni:48
 
 ### enable_api_diff
 
@@ -2868,7 +2868,7 @@ From //third_party/perfetto/gn/perfetto.gni:302
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:148
+From //src/power/power-manager/BUILD.gn:147
 
 ### enable_recovery_ui_v2
 
@@ -3367,22 +3367,13 @@ TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to bui
 
 From //build/product.gni:36
 
-### fuchsia_product_assembly_config_file
+### fuchsia_product_assembly_config_label
 
-TODO(https://fxbug.dev/122450): Remove once usage OOT usage is removed.
+The product assembly config used to configure the main Fuchsia image.
 
 **Current value (from the default):** `false`
 
 From //build/product.gni:39
-
-### fuchsia_product_assembly_config_label
-
-If the above file is created by a target in GN, then the label that creates
-it needs to be specified as well.
-
-**Current value (from the default):** `false`
-
-From //build/product.gni:43
 
 ### fuchsia_route_sources_config
 
@@ -3708,7 +3699,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -5816,7 +5807,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:295
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:296
 
 ### pw_arduino_build_BOARD
 
@@ -7153,6 +7144,15 @@ Supported modes are:
 
 From //src/sys/pkg/bin/package-tool/package-tool.gni:184
 
+### repository_publish_delivery_blob_type
+
+Controls what type of delivery blob to generate in the repository.
+Supported types can be found in //src/storage/blobfs/delivery_blob.h
+
+**Current value (from the default):** `-1`
+
+From //src/sys/pkg/bin/package-tool/package-tool.gni:188
+
 ### restat_cc
 
 Set to true to make C++ compiles preserve timestamps of unchanged outputs.
@@ -7939,7 +7939,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8190,7 +8190,7 @@ physboot will be the only build.
 
 **Current value (from the default):** `true`
 
-From //zircon/kernel/phys/BUILD.gn:24
+From //zircon/kernel/phys/BUILD.gn:25
 
 ### use_flatland_by_default
 
@@ -8508,7 +8508,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:49
+From //build/product.gni:45
 
 ### vm_tracing_level
 
