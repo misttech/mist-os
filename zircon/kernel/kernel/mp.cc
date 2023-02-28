@@ -14,6 +14,7 @@
 #include <lib/console.h>
 #include <lib/fit/defer.h>
 #include <lib/lockup_detector.h>
+#include <lib/system-topology.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <stdlib.h>
@@ -456,6 +457,46 @@ zx_status_t mp_wait_for_all_cpus_started(Deadline deadline) {
   return mp_all_cpu_startup_event.Wait(deadline);
 }
 
+static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
+  // Before proceeding any further, wait for a _really_ long time to make sure
+  // that all of the CPUs have started.  We really don't want to start user-mode
+  // until we have seen all of our CPUs start up.  In addition, there are
+  // decisions to be made while setting up the VDSO which can only be made once
+  // we have seen all CPUs start up and check-in.  Specifically, on ARM, we may
+  // need to install a version of `zx_get_ticks` which is slower, but may be
+  // needed to work around certain errata presented in only some revisions of
+  // the CPU silicon (something which can only be determined by the core itself
+  // as it comes up).
+  //
+  // If something goes wrong, do not panic.  Instead, just log a kernel OOPS and
+  // keep going.  Things are bad, and we want to take notice in CI/CQ
+  // environments, but not bad enough to panic the system and send it into a
+  // boot-loop.
+  constexpr zx_duration_t kCpuStartupTimeout = ZX_SEC(30);
+  zx_status_t status = mp_wait_for_all_cpus_started(Deadline::after(kCpuStartupTimeout));
+  if (status != ZX_OK) {
+    const auto online_mask = mp_get_online_mask();
+    KERNEL_OOPS(
+        "At least one CPU has not declared itself to be started after %ld ms.  "
+        "(online mask = %08x)\n",
+        kCpuStartupTimeout / ZX_MSEC(1), online_mask);
+
+    // Also report a separate OOPS for any processor which is not yet in the
+    // online mask.  Depending on where the core got wedged, it may be "online"
+    // but has not managed to declare itself as started, or it might not have
+    // even made it to the point where it declared itself to be online.
+    for (auto* node : system_topology::GetSystemTopology().processors()) {
+      const auto& processor = node->entity.processor;
+      for (int i = 0; i < processor.logical_id_count; i++) {
+        const cpu_num_t logical_id = node->entity.processor.logical_ids[i];
+        if ((cpu_num_to_mask(logical_id) & online_mask) == 0) {
+          KERNEL_OOPS("CPU %u is not online\n", logical_id);
+        }
+      }
+    }
+  }
+}
+
 // Notes about the startup check-in.
 //
 // In order to know when all of the all CPUs have started, we must first
@@ -474,6 +515,11 @@ zx_status_t mp_wait_for_all_cpus_started(Deadline deadline) {
 // initialization level.
 LK_INIT_HOOK_FLAGS(mp_all_cpu_startup_checkin, mp_all_cpu_startup_checkin_hook,
                    LK_INIT_LEVEL_PLATFORM, LK_INIT_FLAG_ALL_CPUS)
+
+// Before allowing the system to proceed to the USER init level, wait to be sure
+// that all of the CPUs have started and made it to the check-in point (see
+// above).
+LK_INIT_HOOK(mp_all_cpu_startup_sync, mp_all_cpu_startup_sync_hook, LK_INIT_LEVEL_USER - 1)
 
 static int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {

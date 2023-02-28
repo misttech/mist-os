@@ -192,32 +192,6 @@ static void topology_cpu_init(void) {
       }
     }
   }
-
-  // Create a thread that checks that the secondary processors actually
-  // started. Since the secondary cpus are defined in the bootloader by humans
-  // it is possible they don't match the hardware.
-  constexpr auto check_cpus_booted = [](void*) -> int {
-    constexpr zx_duration_t kDuration = ZX_SEC(5);
-    // We wait for secondary cpus to start up.
-    Thread::Current::SleepRelative(kDuration);
-
-    // Check that all cpus in the topology are now online.
-    const auto online_mask = mp_get_online_mask();
-    for (auto* node : system_topology::GetSystemTopology().processors()) {
-      const auto& processor = node->entity.processor;
-      for (int i = 0; i < processor.logical_id_count; i++) {
-        const cpu_num_t logical_id = node->entity.processor.logical_ids[i];
-        if ((cpu_num_to_mask(logical_id) & online_mask) == 0) {
-          KERNEL_OOPS("CPU %u did not start after %ld ms\n", logical_id, kDuration / ZX_MSEC(1));
-        }
-      }
-    }
-    return 0;
-  };
-
-  auto* warning_thread = Thread::Create("platform-cpu-boot-check-thread", check_cpus_booted,
-                                        nullptr, DEFAULT_PRIORITY);
-  warning_thread->DetachAndResume();
 }
 
 static void process_mem_ranges(ktl::span<const zbi_mem_range_t> ranges) {

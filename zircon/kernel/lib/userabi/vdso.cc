@@ -268,19 +268,24 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
   }
 #if ARCH_ARM64
   else {
-    // Wait for a _really_ long time for all of the CPUs to have started up, so
-    // we know whether or not to deploy the ARM A73 timer read mitigation or
-    // not.  If we timeout from this, then something is extremely wrong.  In
-    // that situation, go ahead and install the mitigation anyway. It is slower,
-    // but at least it will read correctly on all cores.
+    // Before we got here (during an INIT_HOOK run at LK_INIT_LEVEL_USER - 1),
+    // we should have already waited for all of the CPUs in the system to have
+    // started up and checked in.
+    //
+    // Now that all CPUs have started, it should be safe to check whether or not
+    // we need to deploy the ARM A73 timer read mitigation. In the case that the
+    // CPUs did not all manage to start, go ahead and install the mitigation
+    // anyway. This would be a bad situation, and the mitigation is slower then
+    // the alternative if it is not needed, but at least it will read correctly
+    // on all cores.
     //
     // see arch/quirks.h for details about the quirk itself.
-    zx_status_t status = mp_wait_for_all_cpus_started(Deadline::after(ZX_SEC(30)));
+    const zx_status_t status = mp_wait_for_all_cpus_started(Deadline::no_slack(0));
     if ((status != ZX_OK) || arch_quirks_needs_arm_erratum_858921_mitigation()) {
       if (status != ZX_OK) {
-        KERNEL_OOPS(
-            "WARNING: Timed out waiting for all CPUs to start.  Installing A73 quirks for "
-            "zx_ticks_get in VDSO as a defensive measure.\n");
+        dprintf(ALWAYS,
+                "WARNING: Timed out waiting for all CPUs to start.  "
+                "Installing A73 quirks for zx_ticks_get in VDSO as a defensive measure.\n");
       } else {
         dprintf(INFO, "Installing A73 quirks for zx_ticks_get in VDSO\n");
       }
