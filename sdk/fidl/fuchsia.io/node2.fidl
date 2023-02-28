@@ -85,33 +85,30 @@ protocol Node2 {
     /// inherent `Describe` methods on the specific protocols. It exists as
     /// an optimization to avoid an additional round trip.
     @selector("fuchsia.io/Node.OnRepresentation")
-    -> OnRepresentation(resource struct {
-        // TODO(https://fxbug.dev/105837): Remove the outer struct when fidlgen_go is fixed.
-        payload @generated_name("Representation") flexible resource union {
-            /// Auxiliary data for the connector representation of a node, used
-            /// for protocol discovery and connection.
-            ///
-            /// It supports connecting to arbitrary protocols exported by the
-            /// filesystem server at a path, including ones that do not compose
-            /// [`Node2`].
-            ///
-            /// See [`NodeProtocolKinds.CONNECTOR`].
-            1: connector @generated_name("ConnectorInfo") table {};
+    -> OnRepresentation(@generated_name("Representation") flexible resource union {
+        /// Auxiliary data for the connector representation of a node, used
+        /// for protocol discovery and connection.
+        ///
+        /// It supports connecting to arbitrary protocols exported by the
+        /// filesystem server at a path, including ones that do not compose
+        /// [`Node2`].
+        ///
+        /// See [`NodeProtocolKinds.CONNECTOR`].
+        1: connector @generated_name("ConnectorInfo") table {};
 
-            /// Auxiliary data for the directory representation of a node. The
-            /// selection of this variant in [`Representation`] implies that the
-            /// connection speaks the [`Directory`] protocol.
-            ///
-            /// See [`NodeProtocolKinds.DIRECTORY`].
-            2: directory @generated_name("DirectoryInfo") table {};
+        /// Auxiliary data for the directory representation of a node. The
+        /// selection of this variant in [`Representation`] implies that the
+        /// connection speaks the [`Directory`] protocol.
+        ///
+        /// See [`NodeProtocolKinds.DIRECTORY`].
+        2: directory @generated_name("DirectoryInfo") table {};
 
-            /// Auxiliary data for the file representation of a node. The
-            /// selection of this variant in [`Representation`] implies that the
-            /// connection speaks the [`File`] protocol.
-            ///
-            /// See [`NodeProtocolKinds.FILE`].
-            3: file FileInfo;
-        };
+        /// Auxiliary data for the file representation of a node. The
+        /// selection of this variant in [`Representation`] implies that the
+        /// connection speaks the [`File`] protocol.
+        ///
+        /// See [`NodeProtocolKinds.FILE`].
+        3: file FileInfo;
     });
 
     // TODO(https://fxbug.dev/77623): uncomment and implement.
