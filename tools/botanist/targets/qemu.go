@@ -147,6 +147,7 @@ type EMUCommandBuilder interface {
 	SetMemory(int)
 	SetCPUCount(int)
 	AddVirtioBlkPciDrive(qemu.Drive)
+	AddRNG(qemu.RNGdev)
 	AddSerial(qemu.Chardev)
 	AddNetwork(qemu.Netdev)
 	AddKernelArg(string)
@@ -400,6 +401,16 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 	}
 
 	qemuCmd.AddNetwork(netdev)
+
+	// If we're running on RISC-V, we need to add an RNG device.
+	if t.config.Target == "riscv64" {
+		rngdev := qemu.RNGdev{
+			ID:       "rng0",
+			Device:   qemu.Device{Model: qemu.DeviceModelRNG},
+			Filename: "/dev/urandom",
+		}
+		qemuCmd.AddRNG(rngdev)
+	}
 
 	chardev := qemu.Chardev{
 		ID:     "char0",

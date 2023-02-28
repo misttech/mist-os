@@ -57,6 +57,7 @@ message Static {
     ARCH_UNSPECIFIED = 0;  // See OPTIMIZE_UNSPECIFIED for rationale.
     ARM64 = 1;
     X64 = 2;
+    RISCV64 = 3;
   }
 
   // The target CPU architecture.

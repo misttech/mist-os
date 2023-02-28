@@ -282,4 +282,36 @@ func TestQEMUCommandBuilder(t *testing.T) {
 			"-device", "qemu-xhci,id=xhci",
 			"-append", "kernel.serial=legacy infra.foo=bar"},
 	}, cmd, err)
+
+	b.AddRNG(RNGdev{
+		ID:       "rng0",
+		Device:   Device{Model: DeviceModelRNG},
+		Filename: "/dev/urandom",
+	})
+	cmd, err = b.Build()
+	check(t, expected{
+		cmd: []string{
+			"./bin/qemu",
+			"-kernel", "./data/qemu-kernel",
+			"-initrd", "./data/zircon-a",
+			"-machine", "virt-2.12,gic-version=host",
+			"-cpu", "host",
+			"-enable-kvm",
+			"-m", "4096",
+			"-smp", "4",
+			"-object", "iothread,id=iothread-otherdisk",
+			"-drive", "id=otherdisk,file=./data/otherdisk,format=raw,if=none,cache=unsafe,aio=threads",
+			"-device", "virtio-blk-pci,drive=otherdisk,iothread=iothread-otherdisk,addr=04.2",
+			"-chardev", "stdio,id=char0,logfile=logfile.txt,signal=off",
+			"-serial", "chardev:char0",
+			"-netdev", "user,id=net0",
+			"-device", "virtio-net-pci,mac=52:54:00:63:5e:7a,vectors=8,netdev=net0",
+			"-drive", "if=none,id=usb,file=/usbdrive,format=raw",
+			"-device", "usb-storage,drive=usb,removable=on",
+			"-device", "qemu-xhci,id=xhci",
+			"-object", "rng-random,filename=/dev/urandom,id=rng0",
+			"-device", "virtio-rng-device,rng=rng0",
+			"-append", "kernel.serial=legacy infra.foo=bar",
+		},
+	}, cmd, err)
 }

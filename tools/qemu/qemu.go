@@ -72,6 +72,16 @@ type Netdev struct {
 	ID string
 }
 
+type RNGdev struct {
+	Device
+
+	// ID is the RNG device identifier.
+	ID string
+
+	// Filename is the file name of the RNG.
+	Filename string
+}
+
 type Device struct {
 	Model   string
 	options []string
@@ -83,6 +93,7 @@ type DeviceModel string
 const (
 	DeviceModelVirtioBlkPCI = "virtio-blk-pci"
 	DeviceModelVirtioNetPCI = "virtio-net-pci"
+	DeviceModelRNG          = "virtio-rng-device"
 )
 
 func (d *Device) AddOption(key, val string) {
@@ -140,7 +151,7 @@ type targetList struct {
 var TargetEnum = &targetList{
 	AArch64: "aarch64",
 	X86_64:  "x86_64",
-	RiscV64: "rv64",
+	RiscV64: "riscv64",
 }
 
 type uefiVolumes struct {
@@ -304,6 +315,12 @@ func (q *QEMUCommandBuilder) AddNetwork(n Netdev) {
 	q.SetFlag("-device", n.Device.String())
 
 	q.hasNetwork = true
+}
+
+func (q *QEMUCommandBuilder) AddRNG(r RNGdev) {
+	q.SetFlag("-object", fmt.Sprintf("rng-random,filename=%s,id=%s", r.Filename, r.ID))
+	r.AddOption("rng", r.ID)
+	q.SetFlag("-device", r.String())
 }
 
 func (q *QEMUCommandBuilder) AddKernelArg(kernelArg string) {
