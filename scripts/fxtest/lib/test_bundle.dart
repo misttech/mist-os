@@ -120,6 +120,38 @@ class TestBundle {
     return targets;
   }
 
+  /// Calculate the package manifests from all the tests in the [testBuilds]
+  /// when we are incrementally publishing.
+  /// Returns null for non-incremental builds, or the full build.
+  static Set<String> calculateIncementalPublishingPackageManifests(
+      TestsConfig testsConfig, List<TestBundle> testBundles) {
+    if (!(testsConfig.fxEnv.isFeatureEnabled('incremental') ||
+        testsConfig.fxEnv.isFeatureEnabled('incremental_new') ||
+        testsConfig.fxEnv.isFeatureEnabled('incremental_legacy'))) {
+      return {};
+    }
+
+    Set<String> packageManifests = {};
+    for (var e in testBundles) {
+      switch (e.testDefinition.testType) {
+        case TestType.suite:
+          if (e.testDefinition.packageManifests?.isNotEmpty ?? false) {
+            packageManifests.addAll(e.testDefinition.packageManifests ?? []);
+          }
+          break;
+        case TestType.command:
+        case TestType.host:
+          break;
+        case TestType.e2e:
+          // The presence of an e2e test requires a full build
+          return <String>{};
+        default:
+          break;
+      }
+    }
+    return packageManifests;
+  }
+
   TestBundle(
     this.testDefinition, {
     required this.testRunner,

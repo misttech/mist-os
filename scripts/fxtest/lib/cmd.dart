@@ -194,6 +194,77 @@ class FuchsiaTestCommand {
         _exitCodeSetter(failureExitCode);
         return;
       }
+
+      // FIXME(http://fxbug.dev/107343): When running `fx test` with incremental
+      // publishing, it's possible we could trigger a test to run before the
+      // incremental publisher has published all the test packages we just
+      // built. When this happens, the test could end up running the old tests.
+      //
+      // Ideally the incremental publisher would have a way to block until the
+      // publishing happened. As a stopgap, this section will explicitly publish
+      // all the test package manifests. This shouldn't corrupt the repository
+      // because `package-tool` grabs the repository lock before we make any
+      // changes to it.
+      //
+      // However, while this protects us from starting a test before the test
+      // packages are published, we still could run into some races. It's
+      // possible components in the test package could depend on other packages,
+      // which is not visible in the `tests.json`. If those packages also were
+      // dirtied, then we could start the test before those packages were
+      // published.
+      //
+      // So long term we still need a way to block until the incremental
+      // publisher finishes publishing those packages before we start start the
+      // tests.
+      if (testsConfig.fxEnv.outputDir != null) {
+        String outputDir = testsConfig.fxEnv.outputDir!;
+
+        Set<String> packageManifests =
+            TestBundle.calculateIncementalPublishingPackageManifests(
+                testsConfig, parsedManifest.testBundles);
+
+        if (!packageManifests.isEmpty) {
+          String amberFilesDir = outputDir + "/amber-files";
+
+          List<String> args = [
+            "host-tool",
+            "package-tool",
+            "repository",
+            "publish",
+            "--trusted-root",
+            amberFilesDir + "/repository/root.json"
+          ];
+
+          for (String packageManifest in packageManifests) {
+            args.add("--package");
+            args.add(outputDir + "/" + packageManifest);
+          }
+
+          args.add(amberFilesDir);
+
+          emitEvent(TestInfo(testsConfig
+              .wrapWith('> fx ${args.join(' ')}', [green, styleBold])));
+
+          try {
+            await Process.start(testsConfig.fxEnv.fx, args,
+                    mode: ProcessStartMode.inheritStdio,
+                    workingDirectory: outputDir)
+                .then((Process process) async {
+              final _exitCode = await process.exitCode;
+              if (_exitCode != 0) {
+                throw FxRunException(
+                    'Failed to run fx ${args.join(' ')}', _exitCode);
+              }
+            });
+          } on FxRunException {
+            emitEvent(FatalError(
+                '\'fx test\' could not perform a successful publish. Try to run \'fx build\' manually or use the \'--no-build\' flag'));
+            _exitCodeSetter(failureExitCode);
+            return;
+          }
+        }
+      }
+
       // Re-parse the manifest in case it has changed as a side effect of building
       parsedManifest = await readManifest(manifestReader);
     }
