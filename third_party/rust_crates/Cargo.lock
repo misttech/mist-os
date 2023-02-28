@@ -1328,6 +1328,7 @@ dependencies = [
  "percent-encoding 2.2.0",
  "pest",
  "pest_derive",
+ "petgraph",
  "pin-project",
  "pin-utils",
  "pkcs8",
