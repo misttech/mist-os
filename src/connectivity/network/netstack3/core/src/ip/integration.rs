@@ -15,6 +15,8 @@ use crate::{
     context::NonTestCtxMarker,
     ip::{
         self,
+        device::{IpDeviceContext, IpDeviceIpExt, IpDeviceNonSyncContext},
+        gmp::GmpHandler,
         path_mtu::{PmtuCache, PmtuStateContext},
         reassembly::FragmentStateContext,
         send_ipv4_packet_from_device, send_ipv6_packet_from_device,
@@ -178,5 +180,32 @@ impl<I: Ip, C: NonSyncContext> MulticastMembershipHandler<I, C> for &'_ SyncCtx<
                 crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(sync_ctx, ctx, device, addr)
             },
         )
+    }
+}
+
+impl<
+        I: Ip + IpDeviceIpExt,
+        C: NonSyncContext + IpDeviceNonSyncContext<I, Self::DeviceId>,
+        L: LockBefore<crate::lock_ordering::IpState<I>>,
+    > MulticastMembershipHandler<I, C> for Locked<'_, SyncCtx<C>, L>
+where
+    Self: IpDeviceContext<I, C> + GmpHandler<I, C>,
+{
+    fn join_multicast_group(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        addr: MulticastAddr<I::Addr>,
+    ) {
+        crate::ip::device::join_ip_multicast::<I, _, _>(self, ctx, device, addr)
+    }
+
+    fn leave_multicast_group(
+        &mut self,
+        ctx: &mut C,
+        device: &Self::DeviceId,
+        addr: MulticastAddr<I::Addr>,
+    ) {
+        crate::ip::device::leave_ip_multicast::<I, _, _>(self, ctx, device, addr)
     }
 }

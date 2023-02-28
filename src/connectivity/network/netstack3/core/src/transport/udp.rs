@@ -14,6 +14,7 @@ use core::{
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
+use lock_order::Locked;
 
 use derivative::Derivative;
 use either::Either;
@@ -827,11 +828,14 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
-    type IpSocketsCtx: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+    type IpSocketsCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + MulticastMembershipHandler<I, C>;
 
     /// Calls the function with an immutable reference to UDP sockets.
-    fn with_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx, &Sockets<I, Self::WeakDeviceId>) -> O>(
+    fn with_sockets<
+        O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &Sockets<I, Self::WeakDeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O;
@@ -839,14 +843,14 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
     /// Calls the function with a mutable reference to UDP sockets.
     fn with_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut Sockets<I, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O;
 
     /// Returns true if UDP may send a port unreachable ICMP error message.
-    fn should_send_port_unreachable(&self) -> bool;
+    fn should_send_port_unreachable(&mut self) -> bool;
 }
 
 /// An execution context for the UDP protocol when a buffer is provided.
@@ -895,24 +899,17 @@ impl<I: IpExt, B: BufferMut, C: StateNonSyncContext<I> + BufferNonSyncContext<I,
 /// An execution context for the UDP protocol when a buffer is provided which
 /// also provides access to state.
 pub(crate) trait BufferStateContext<I: IpExt, C: BufferStateNonSyncContext<I, B>, B: BufferMut>:
-    StateContext<I, C, IpSocketsCtx = Self::BufferIpSocketsCtx>
+    StateContext<I, C>
+where
+    for<'a> Self: StateContext<I, C, IpSocketsCtx<'a> = Self::BufferIpSocketsCtx<'a>>,
 {
-    type BufferIpSocketsCtx: BufferTransportIpContext<
+    type BufferIpSocketsCtx<'a>: BufferTransportIpContext<
         I,
         C,
         B,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
-}
-
-impl<I: IpExt, B: BufferMut, C: BufferStateNonSyncContext<I, B>, SC: StateContext<I, C>>
-    BufferStateContext<I, C, B> for SC
-where
-    SC::IpSocketsCtx:
-        BufferTransportIpContext<I, C, B, DeviceId = SC::DeviceId, WeakDeviceId = SC::WeakDeviceId>,
-{
-    type BufferIpSocketsCtx = SC::IpSocketsCtx;
 }
 
 /// An implementation of [`IpTransportContext`] for UDP.
@@ -1527,11 +1524,12 @@ impl<
 ///
 /// Panics if `conn` is not a valid UDP connection identifier.
 pub fn send_udp_conn<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     conn: ConnId<I>,
     body: B,
 ) -> Result<(), (B, IpSockSendError)> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, body)), conn),
         |(IpInvariant((sync_ctx, ctx, body)), conn)| {
@@ -1549,13 +1547,14 @@ pub fn send_udp_conn<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
 /// Sends a UDP packet using an existing connected socket but overriding the
 /// destination address.
 pub fn send_udp_conn_to<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     conn: ConnId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
     remote_port: NonZeroU16,
     body: B,
 ) -> Result<(), (B, SendToError)> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), conn, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port, body)), conn, remote_ip)| {
@@ -1593,13 +1592,14 @@ pub fn send_udp_conn_to<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B
 /// `send_udp_listener` panics if `listener` is not associated with a listener
 /// for this IP version.
 pub fn send_udp_listener<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     listener: ListenerId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
     remote_port: NonZeroU16,
     body: B,
 ) -> Result<(), (B, SendToError)> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), listener, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port, body)), listener, remote_ip)| {
@@ -1631,13 +1631,13 @@ pub fn send_udp_listener<I: IpExt, B: BufferMut, C: crate::BufferNonSyncContext<
 impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
     DatagramStateContext<IpPortSpec<I, SC::WeakDeviceId>, C, Udp<I, SC::WeakDeviceId>> for SC
 {
-    type IpSocketsCtx = SC::IpSocketsCtx;
+    type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
     type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, SC::WeakDeviceId>>>;
 
     fn with_sockets<
         O,
         F: FnOnce(
-            &mut Self::IpSocketsCtx,
+            &mut Self::IpSocketsCtx<'_>,
             &DatagramSockets<IpPortSpec<I, SC::WeakDeviceId>, Udp<I, SC::WeakDeviceId>>,
         ) -> O,
     >(
@@ -1652,7 +1652,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>>
     fn with_sockets_mut<
         O,
         F: FnOnce(
-            &mut Self::IpSocketsCtx,
+            &mut Self::IpSocketsCtx<'_>,
             &mut DatagramSockets<IpPortSpec<I, SC::WeakDeviceId>, Udp<I, SC::WeakDeviceId>>,
             &mut Self::LocalIdAllocator,
         ) -> O,
@@ -1702,8 +1702,9 @@ impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakIpDeviceId>
 /// identifier for it. The ID can be used to connect the socket to a remote
 /// address or to listen for incoming packets.
 pub fn create_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
 ) -> UnboundId<I> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         IpInvariant(&mut sync_ctx),
         |IpInvariant(sync_ctx)| SocketHandler::<Ipv4, _>::create_udp_unbound(sync_ctx),
@@ -1718,10 +1719,11 @@ pub fn create_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// # Panics if `id` is not a valid [`UnboundId`].
 pub fn remove_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -1755,12 +1757,13 @@ pub fn remove_udp_unbound<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `connect_udp` panics if `id` is not a valid [`UnboundId`].
 pub fn connect_udp<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
     remote_port: NonZeroU16,
 ) -> Result<ConnId<I>, SockCreationError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
@@ -1781,11 +1784,12 @@ pub fn connect_udp<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `set_unbound_udp_device` panics if `id` is not a valid [`UnboundId`].
 pub fn set_unbound_udp_device<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
     device_id: Option<&DeviceId<C::Instant>>,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
         |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
@@ -1806,11 +1810,12 @@ pub fn set_unbound_udp_device<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `set_listener_udp_device` panics if `id` is not a valid [`ListenerId`].
 pub fn set_listener_udp_device<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
     device_id: Option<&DeviceId<C::Instant>>,
 ) -> Result<(), LocalAddressError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
         |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
@@ -1831,11 +1836,12 @@ pub fn set_listener_udp_device<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `set_conn_udp_device` panics if `id` is not a valid [`ConnId`].
 pub fn set_conn_udp_device<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnId<I>,
     device_id: Option<&DeviceId<C::Instant>>,
 ) -> Result<(), SocketError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, device_id)), id),
         |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
@@ -1878,11 +1884,12 @@ pub fn get_udp_bound_device<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `set_udp_posix_reuse_port` panics if `id` is not a valid `UnboundId`.
 pub fn set_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
     reuse_port: bool,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, reuse_port)), id),
         |(IpInvariant((sync_ctx, ctx, reuse_port)), id)| {
@@ -1900,10 +1907,11 @@ pub fn set_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// Panics if `id` is not a valid `UdpSocketId`.
 pub fn get_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: SocketId<I>,
 ) -> bool {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(reuse_port) = I::map_ip::<_, IpInvariant<bool>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -1924,13 +1932,14 @@ pub fn get_udp_posix_reuse_port<I: IpExt, C: crate::NonSyncContext>(
 /// if the device to use to join is unspecified or conflicts with the existing
 /// socket state.
 pub fn set_udp_multicast_membership<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: SocketId<I>,
     multicast_group: MulticastAddr<I::Addr>,
     interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C::Instant>>,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, want_membership)), id, multicast_group, interface),
         |(IpInvariant((sync_ctx, ctx, want_membership)), id, multicast_group, interface)| {
@@ -1964,11 +1973,12 @@ pub fn set_udp_multicast_membership<I: IpExt, C: crate::NonSyncContext>(
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
 pub fn set_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: SocketId<I>,
     unicast_hop_limit: Option<NonZeroU8>,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, unicast_hop_limit)), id),
         |(IpInvariant((sync_ctx, ctx, unicast_hop_limit)), id)| {
@@ -1995,11 +2005,12 @@ pub fn set_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
 pub fn set_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: SocketId<I>,
     multicast_hop_limit: Option<NonZeroU8>,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, multicast_hop_limit)), id),
         |(IpInvariant((sync_ctx, ctx, multicast_hop_limit)), id)| {
@@ -2023,10 +2034,11 @@ pub fn set_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 
 /// Gets the hop limit for packets sent by the socket to a unicast destination.
 pub fn get_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: SocketId<I>,
 ) -> NonZeroU8 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(hop_limit) = I::map_ip::<_, IpInvariant<NonZeroU8>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2044,10 +2056,11 @@ pub fn get_udp_unicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 /// Sets the hop limit (IPv6) or TTL (IPv4) for outbound packets going to a
 /// unicast address.
 pub fn get_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: SocketId<I>,
 ) -> NonZeroU8 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(hop_limit) = I::map_ip::<_, IpInvariant<NonZeroU8>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2071,12 +2084,13 @@ pub fn get_udp_multicast_hop_limit<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `connect_udp_listener` panics if `id` is not a valid `ListenerId`.
 pub fn connect_udp_listener<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
     remote_port: NonZeroU16,
 ) -> Result<ConnId<I>, (ConnectListenerError, ListenerId<I>)> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
@@ -2112,10 +2126,11 @@ pub fn connect_udp_listener<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// Panics if `id` is not a valid `ConnId`.
 pub fn disconnect_udp_connected<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnId<I>,
 ) -> ListenerId<I> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2134,12 +2149,13 @@ pub fn disconnect_udp_connected<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `reconnect_udp` panics if `id` is not a valid `ConnId`.
 pub fn reconnect_udp<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
     remote_port: NonZeroU16,
 ) -> Result<ConnId<I>, (ConnectListenerError, ConnId<I>)> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
@@ -2164,10 +2180,11 @@ pub fn reconnect_udp<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `remove_udp_conn` panics if `id` is not a valid `ConnId`.
 pub fn remove_udp_conn<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnId<I>,
 ) -> ConnInfo<I::Addr, WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2185,10 +2202,11 @@ pub fn remove_udp_conn<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `get_udp_conn_info` panics if `id` is not a valid `ConnId`.
 pub fn get_udp_conn_info<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnId<I>,
 ) -> ConnInfo<I::Addr, WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2217,12 +2235,13 @@ pub fn get_udp_conn_info<I: IpExt, C: crate::NonSyncContext>(
 /// `listen_udp` panics if `listener` is already in use, or if `id` is not a
 /// valid [`UnboundId`].
 pub fn listen_udp<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
     addr: Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>,
     port: Option<NonZeroU16>,
 ) -> Result<ListenerId<I>, LocalAddressError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, port)), id, addr),
         |(IpInvariant((sync_ctx, ctx, port)), id, addr)| {
@@ -2244,10 +2263,11 @@ pub fn listen_udp<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `remove_listener` panics if `id` is not a valid `ListenerId`.
 pub fn remove_udp_listener<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
 ) -> ListenerInfo<I::Addr, WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2266,10 +2286,11 @@ pub fn remove_udp_listener<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// `get_udp_conn_info` panics if `id` is not a valid `ListenerId`.
 pub fn get_udp_listener_info<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
 ) -> ListenerInfo<I::Addr, WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2439,11 +2460,11 @@ mod tests {
     impl<I: TestIpExt, D: FakeStrongIpDeviceId + 'static> StateContext<I, FakeUdpNonSyncCtx<I>>
         for FakeUdpSyncCtx<I, D>
     {
-        type IpSocketsCtx = FakeBufferSyncCtx<I, D>;
+        type IpSocketsCtx<'a> = FakeBufferSyncCtx<I, D>;
 
         fn with_sockets<
             O,
-            F: FnOnce(&mut Self::IpSocketsCtx, &Sockets<I, Self::WeakDeviceId>) -> O,
+            F: FnOnce(&mut Self::IpSocketsCtx<'_>, &Sockets<I, Self::WeakDeviceId>) -> O,
         >(
             &mut self,
             cb: F,
@@ -2455,7 +2476,7 @@ mod tests {
 
         fn with_sockets_mut<
             O,
-            F: FnOnce(&mut Self::IpSocketsCtx, &mut Sockets<I, Self::WeakDeviceId>) -> O,
+            F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut Sockets<I, Self::WeakDeviceId>) -> O,
         >(
             &mut self,
             cb: F,
@@ -2465,9 +2486,15 @@ mod tests {
             cb(inner, sockets)
         }
 
-        fn should_send_port_unreachable(&self) -> bool {
+        fn should_send_port_unreachable(&mut self) -> bool {
             false
         }
+    }
+
+    impl<I: TestIpExt, D: FakeStrongIpDeviceId + 'static, B: BufferMut>
+        BufferStateContext<I, FakeUdpNonSyncCtx<I>, B> for FakeUdpSyncCtx<I, D>
+    {
+        type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
     }
 
     impl<I: TestIpExt, B: BufferMut> BufferNonSyncContext<I, B> for FakeUdpNonSyncCtx<I> {

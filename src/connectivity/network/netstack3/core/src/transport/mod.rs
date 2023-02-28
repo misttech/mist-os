@@ -59,6 +59,7 @@ mod integration;
 pub mod tcp;
 pub mod udp;
 
+use lock_order::lock::RwLockFor;
 use net_types::{
     ip::{IpAddress, Ipv4, Ipv6},
     SpecifiedAddr, ZonedAddr,
@@ -69,6 +70,7 @@ use crate::{
     device::WeakDeviceId,
     error::ZonedAddressError,
     ip::EitherDeviceId,
+    sync::{RwLockReadGuard, RwLockWriteGuard},
     transport::{
         tcp::TcpState,
         udp::{UdpState, UdpStateBuilder},
@@ -108,6 +110,34 @@ pub(crate) struct TransportLayerState<C: tcp::socket::NonSyncContext> {
     udpv6: UdpState<Ipv6, WeakDeviceId<C::Instant>>,
     tcpv4: TcpState<Ipv4, WeakDeviceId<C::Instant>, C>,
     tcpv6: TcpState<Ipv6, WeakDeviceId<C::Instant>, C>,
+}
+
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSockets<Ipv4>> for SyncCtx<C> {
+    type ReadData<'l> = RwLockReadGuard<'l,
+        udp::Sockets<Ipv4, WeakDeviceId<C::Instant>>> where Self: 'l;
+    type WriteData<'l> = RwLockWriteGuard<'l,
+        udp::Sockets<Ipv4, WeakDeviceId<C::Instant>>> where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.state.transport.udpv4.sockets.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.state.transport.udpv4.sockets.write()
+    }
+}
+
+impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSockets<Ipv6>> for SyncCtx<C> {
+    type ReadData<'l> = RwLockReadGuard<'l,
+        udp::Sockets<Ipv6, WeakDeviceId<C::Instant>>> where Self: 'l;
+    type WriteData<'l> = RwLockWriteGuard<'l,
+        udp::Sockets<Ipv6, WeakDeviceId<C::Instant>>> where Self: 'l;
+
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.state.transport.udpv6.sockets.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.state.transport.udpv6.sockets.write()
+    }
 }
 
 /// The identifier for timer events in the transport layer.

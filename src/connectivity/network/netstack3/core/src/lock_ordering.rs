@@ -9,6 +9,8 @@ use core::{convert::Infallible as Never, marker::PhantomData};
 use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
+pub(crate) struct UdpSockets<I>(PhantomData<I>, Never);
+
 pub(crate) enum Ipv4StateNextPacketId {}
 
 // This is not a real lock level, but it is useful for writing bounds that
@@ -32,7 +34,13 @@ pub(crate) enum LoopbackRxDequeue {}
 
 impl LockAfter<Unlocked> for LoopbackRxDequeue {}
 
-impl_lock_after!(LoopbackRxDequeue => IpState<Ipv4>);
+impl_lock_after!(LoopbackRxDequeue => UdpSockets<Ipv4>);
+
+// Ideally we'd have separate impls `LoopbackRxDequeue => UdpSockets<Ipv4>` and
+// for `Ipv6`, but that doesn't play well with the blanket impls. Linearize IPv4
+// and IPv6 like for `IpState` below.
+impl_lock_after!(UdpSockets<Ipv4> => UdpSockets<Ipv6>);
+impl_lock_after!(UdpSockets<Ipv6> => IpState<Ipv4>);
 
 impl_lock_after!(IpState<Ipv4> => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpState<Ipv6> => IpStateRoutingTable<Ipv6>);
