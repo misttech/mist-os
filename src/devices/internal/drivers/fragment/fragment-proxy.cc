@@ -59,9 +59,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_GPIO:
       proto->ops = &gpio_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_HDMI:
-      proto->ops = &hdmi_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_PDEV:
       proto->ops = &pdev_protocol_ops_;
       return ZX_OK;
@@ -440,16 +437,6 @@ zx_status_t FragmentProxy::GpioWrite(uint8_t value) {
   req.value = value;
 
   return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-void FragmentProxy::HdmiConnect(zx::channel chan) {
-  HdmiProxyRequest req = {};
-  HdmiProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_HDMI;
-  req.op = HdmiOp::CONNECT;
-
-  zx_handle_t handle = chan.release();
-  Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), &handle, 1, nullptr, 0, nullptr);
 }
 
 zx_status_t FragmentProxy::PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {

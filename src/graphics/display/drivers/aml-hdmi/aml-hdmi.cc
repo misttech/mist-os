@@ -26,25 +26,6 @@
 
 namespace aml_hdmi {
 
-void AmlHdmiDevice::HdmiConnect(zx::channel chan) {
-  zx_status_t status;
-  if (!loop_started_ && (status = loop_.StartThread("aml-hdmi-thread")) != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to start registers thread: %d", __func__, status);
-    fidl_epitaph_write(chan.get(), status);
-  }
-
-  loop_started_ = true;
-  fidl::OnChannelClosedFn<AmlHdmiDevice> cb = [&chan](AmlHdmiDevice* server) {
-    fidl_epitaph_write(chan.get(), ZX_ERR_INTERNAL);
-  };
-  status = fidl::BindSingleInFlightOnly(
-      loop_.dispatcher(), fidl::ServerEnd<fuchsia_hardware_hdmi::Hdmi>(std::move(chan)), this,
-      std::move(cb));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to bind channel: %d", __func__, status);
-  }
-}
-
 void AmlHdmiDevice::WriteReg(uint32_t reg, uint32_t val) {
   // determine if we are writing to HDMI TOP (AMLOGIC Wrapper) or HDMI IP
   uint32_t offset = (reg & DWC_OFFSET_MASK) >> 24;
@@ -88,7 +69,37 @@ zx_status_t AmlHdmiDevice::Bind() {
     return status;
   }
 
-  status = DdkAdd(ddk::DeviceAddArgs("aml-hdmi"));
+  async_dispatcher_t* dispatcher =
+      fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
+  outgoing_ = component::OutgoingDirectory(dispatcher);
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  fuchsia_hardware_hdmi::Service::InstanceHandler handler({
+      .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_->AddService<fuchsia_hardware_hdmi::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  result = outgoing_->Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_hdmi::Service::Name,
+  };
+
+  status = DdkAdd(ddk::DeviceAddArgs("aml-hdmi")
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     DISP_ERROR("Could not add device\n");
     return status;

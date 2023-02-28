@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
+#include <ddktl/device.h>
+#include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
 namespace amlogic_display {
@@ -107,32 +109,20 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   return ZX_OK;
 }
 
-zx_status_t Vout::InitHdmi(zx_device_t* parent) {
+zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi) {
   type_ = VoutType::kHdmi;
 
   supports_afbc_ = kHdmiSupportedFeatures.afbc;
   supports_capture_ = kHdmiSupportedFeatures.capture;
   supports_hpd_ = kHdmiSupportedFeatures.hpd;
 
-  ddk::HdmiProtocolClient hdmi(parent, "hdmi");
-  if (!hdmi.is_valid()) {
-    zxlogf(ERROR, "Could not get hdmi fragment");
-    return ZX_ERR_INTERNAL;
-  }
-
-  zx::result hdmi_endpoints = fidl::CreateEndpoints<fuchsia_hardware_hdmi::Hdmi>();
-  if (hdmi_endpoints.is_error()) {
-    zxlogf(ERROR, "Could not create channel %s\n", hdmi_endpoints.status_string());
-    return hdmi_endpoints.error_value();
-  }
-  hdmi.Connect(hdmi_endpoints->server.TakeChannel());
-
   fbl::AllocChecker ac;
-  hdmi_.hdmi_host = fbl::make_unique_checked<amlogic_display::HdmiHost>(
-      &ac, parent, std::move(hdmi_endpoints->client));
+  hdmi_.hdmi_host =
+      fbl::make_unique_checked<amlogic_display::HdmiHost>(&ac, parent, std::move(hdmi));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
+
   if (zx_status_t status = hdmi_.hdmi_host->Init(); status != ZX_OK) {
     zxlogf(ERROR, "Could not initialize HDMI host %s\n", zx_status_get_string(status));
     return status;

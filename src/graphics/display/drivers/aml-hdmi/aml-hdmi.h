@@ -7,9 +7,9 @@
 
 #include <fidl/fuchsia.hardware.hdmi/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/hdmi/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/hdmi-dw/hdmi-dw.h>
 #include <lib/hdmi/base.h>
@@ -53,10 +53,7 @@ class AmlHdmiDevice;
 using DeviceType = ddk::Device<AmlHdmiDevice, ddk::Messageable<fuchsia_hardware_hdmi::Hdmi>::Mixin,
                                ddk::Unbindable>;
 
-class AmlHdmiDevice : public DeviceType,
-                      public ddk::HdmiProtocol<AmlHdmiDevice, ddk::base_protocol>,
-                      public HdmiIpBase,
-                      public fbl::RefCounted<AmlHdmiDevice> {
+class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCounted<AmlHdmiDevice> {
  public:
   explicit AmlHdmiDevice(zx_device_t* parent)
       : DeviceType(parent),
@@ -72,38 +69,37 @@ class AmlHdmiDevice : public DeviceType,
   }
   void DdkRelease() { delete this; }
 
-  void HdmiConnect(zx::channel chan);
-
-  void PowerUp(PowerUpRequestView request, PowerUpCompleter::Sync& completer) {
+  void PowerUp(PowerUpRequestView request, PowerUpCompleter::Sync& completer) override {
     ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
     // no-op. initialization handled in modeset
     completer.ReplySuccess();
   }
-  void PowerDown(PowerDownRequestView request, PowerDownCompleter::Sync& completer) {
+  void PowerDown(PowerDownRequestView request, PowerDownCompleter::Sync& completer) override {
     // no-op. handled by phy
     ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
     completer.Reply();
   }
-  void IsPoweredUp(IsPoweredUpRequestView request, IsPoweredUpCompleter::Sync& completer) {
+  void IsPoweredUp(IsPoweredUpRequestView request, IsPoweredUpCompleter::Sync& completer) override {
     ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
     completer.Reply(is_powered_up_);
   }
-  void Reset(ResetRequestView request, ResetCompleter::Sync& completer);
-  void ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& completer);
-  void EdidTransfer(EdidTransferRequestView request, EdidTransferCompleter::Sync& completer);
-  void WriteReg(WriteRegRequestView request, WriteRegCompleter::Sync& completer) {
+  void Reset(ResetRequestView request, ResetCompleter::Sync& completer) override;
+  void ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& completer) override;
+  void EdidTransfer(EdidTransferRequestView request,
+                    EdidTransferCompleter::Sync& completer) override;
+  void WriteReg(WriteRegRequestView request, WriteRegCompleter::Sync& completer) override {
     WriteReg(request->reg, request->val);
     completer.Reply();
   }
-  void ReadReg(ReadRegRequestView request, ReadRegCompleter::Sync& completer) {
+  void ReadReg(ReadRegRequestView request, ReadRegCompleter::Sync& completer) override {
     auto val = ReadReg(request->reg);
     completer.Reply(val);
   }
-  void EnableBist(EnableBistRequestView request, EnableBistCompleter::Sync& completer) {
+  void EnableBist(EnableBistRequestView request, EnableBistCompleter::Sync& completer) override {
     ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
     completer.ReplySuccess();
   }
-  void PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer);
+  void PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer) override;
 
  private:
   friend class FakeAmlHdmiDevice;
@@ -119,11 +115,11 @@ class AmlHdmiDevice : public DeviceType,
         hdmitx_mmio_(std::move(mmio)),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
-  void WriteIpReg(uint32_t addr, uint32_t data) {
+  void WriteIpReg(uint32_t addr, uint32_t data) override {
     fbl::AutoLock lock(&register_lock_);
     hdmitx_mmio_->Write8(data, addr);
   }
-  uint32_t ReadIpReg(uint32_t addr) {
+  uint32_t ReadIpReg(uint32_t addr) override {
     fbl::AutoLock lock(&register_lock_);
     return hdmitx_mmio_->Read8(addr);
   }
@@ -141,6 +137,10 @@ class AmlHdmiDevice : public DeviceType,
 
   bool is_powered_up_ = false;
   bool loop_started_ = false;
+
+  std::optional<component::OutgoingDirectory> outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_hdmi::Hdmi> bindings_;
+
   async::Loop loop_;
 };
 

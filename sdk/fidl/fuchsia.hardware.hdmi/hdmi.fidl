@@ -62,6 +62,7 @@ type EdidOp = struct {
     is_write bool;
 };
 
+@discoverable
 protocol Hdmi {
     /// This function is called to power up the HDMI interface
     /// Should be called once on boot. Any future calls should do nothing.
@@ -139,4 +140,8 @@ protocol Hdmi {
 
     /// This function prints the value of all HDMI registers
     PrintHdmiRegisters() -> ();
+};
+
+service Service {
+    device client_end:Hdmi;
 };

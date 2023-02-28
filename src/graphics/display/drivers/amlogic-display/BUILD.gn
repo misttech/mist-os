@@ -72,7 +72,6 @@ source_set("common_srcs") {
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
@@ -159,8 +158,7 @@ fuchsia_driver_component("amlogic-display-vim3") {
   component_name = "amlogic-display-vim3"
   deps = [ ":amlogic-display-driver-vim3" ]
   info = "amlogic-display-info.json"
-  uses_profiles = true
-  colocate = false
+  manifest = "meta/amlogic-display-vim3.cml"
 }
 
 test("amlogic-display-test") {

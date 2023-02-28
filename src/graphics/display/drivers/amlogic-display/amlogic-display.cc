@@ -936,13 +936,22 @@ zx_status_t AmlogicDisplay::Bind() {
     switch (zx_status_t status = device_get_metadata(parent_, DEVICE_METADATA_DISPLAY_CONFIG,
                                                      &display_info, sizeof(display_info), &actual);
             status) {
-      case ZX_ERR_NOT_FOUND:
+      case ZX_ERR_NOT_FOUND: {
+        auto hdmi_client =
+            DdkConnectFragmentFidlProtocol<fuchsia_hardware_hdmi::Service::Device>("hdmi");
+        if (hdmi_client.is_error()) {
+          zxlogf(ERROR, "fuchsia.hardware.hdmi/Device not found");
+          return hdmi_client.status_value();
+        }
+
         // If configuration is missing, init HDMI.
-        if (zx_status_t status = vout_->InitHdmi(parent_); status != ZX_OK) {
+        if (zx_status_t status = vout_->InitHdmi(parent_, std::move(*hdmi_client));
+            status != ZX_OK) {
           DISP_ERROR("Could not initialize HDMI Vout device! %d\n", status);
           return status;
         }
         break;
+      }
       case ZX_OK:
         if (actual != sizeof(display_info)) {
           DISP_ERROR("Could not get display panel metadata %zu/%zu\n", actual,

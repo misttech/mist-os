@@ -9,6 +9,6 @@ extend uint fuchsia.BIND_PROTOCOL {
 };
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 15,
+  SERVICE = 15,
 };
 

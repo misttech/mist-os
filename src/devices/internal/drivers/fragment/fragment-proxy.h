@@ -10,7 +10,6 @@
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/ethernet/board/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
-#include <fuchsia/hardware/hdmi/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/power/sensor/cpp/banjo.h>
@@ -41,7 +40,6 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::ClockProtocol<FragmentProxy>,
                       public ddk::EthBoardProtocol<FragmentProxy>,
                       public ddk::GpioProtocol<FragmentProxy>,
-                      public ddk::HdmiProtocol<FragmentProxy>,
                       public ddk::CodecProtocol<FragmentProxy>,
                       public ddk::DaiProtocol<FragmentProxy>,
                       public ddk::PDevProtocol<FragmentProxy>,
@@ -101,7 +99,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t GpioSetPolarity(gpio_polarity_t polarity);
   zx_status_t GpioSetDriveStrength(uint64_t ds_ua, uint64_t* out_actual_ds_ua);
   zx_status_t GpioGetDriveStrength(uint64_t* ds_ua);
-  void HdmiConnect(zx::channel chan);
   zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio);
   zx_status_t PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq);
   zx_status_t PDevGetBti(uint32_t index, zx::bti* out_bti);

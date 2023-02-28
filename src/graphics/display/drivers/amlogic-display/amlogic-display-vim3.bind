@@ -31,6 +31,5 @@ node "canvas" {
 }
 
 node "hdmi" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.hdmi.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.hdmi.BIND_FIDL_PROTOCOL.SERVICE;
 }
-

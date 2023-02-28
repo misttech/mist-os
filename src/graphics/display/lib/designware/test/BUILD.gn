@@ -8,7 +8,6 @@ import("//build/test.gni")
 test("hdmi-dw") {
   sources = [ "hdmi-dw-test.cc" ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp_wire",
     "//src/devices/lib/mmio",

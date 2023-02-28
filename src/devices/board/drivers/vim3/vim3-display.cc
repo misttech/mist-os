@@ -83,12 +83,13 @@ static const fpbus::Node display_dev = []() {
 
 zx_status_t Vim3::DisplayInit() {
   auto hdmi_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                              bind_fuchsia_hardware_hdmi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
   auto hdmi_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_hdmi::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
   auto gpio_bind_rules = std::vector{
