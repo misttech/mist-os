@@ -8,7 +8,9 @@ use {
     tracing::warn,
 };
 
-use crate::packets::{CharsetId, Error, PacketResult, StatusCode};
+use crate::packets::{
+    adjust_byte_size, AdvancedDecodable, CharsetId, Error, PacketResult, StatusCode,
+};
 
 /// AVRCP 1.6.2 section 6.9.3.1 SetBrowsedPlayer.
 #[derive(Debug)]
@@ -65,40 +67,17 @@ pub enum SetBrowsedPlayerResponse {
     Failure(StatusCode),
 }
 
-#[derive(Debug)]
-pub struct SetBrowsedPlayerResponseParams {
-    uid_counter: u16,
-    num_items: u32,
-    folder_names: Vec<String>,
-}
-
-impl SetBrowsedPlayerResponseParams {
-    pub fn uid_counter(&self) -> u16 {
-        self.uid_counter
-    }
-
-    pub fn num_items(&self) -> u32 {
-        self.num_items
-    }
-
-    pub fn folder_names(self) -> Vec<String> {
-        self.folder_names
-    }
-}
-
 impl SetBrowsedPlayerResponse {
-    /// Minimum encoded length that includes length of all required parameters
-    /// for a failure response message.
-    /// The fields are: Status (1 byte).
-    /// Defined in AVRCP 1.6.2, Section 6.9.3.2.
-    const MIN_FAILURE_PACKET_SIZE: usize = 1;
+    /// The packet size of a SetBrowsedPlayerResponse Status field (1 byte).
+    const STATUS_FIELD_SIZE: usize = 1;
 
-    /// Minimum encoded length that includes length of all required parameters
-    /// for a success response message. Excludes folder name length/folder name pair.
-    /// The fields are: Status (1 byte), UID Counter (2 bytes), Number
-    /// of Items (4 bytes), Char Set ID (2 bytes), Folder Depth (1 byte).
-    /// Defined in AVRCP 1.6.2, Section 6.9.3.2.
-    const MIN_SUCCESS_PACKET_SIZE: usize = 10;
+    /// The packet size of a SetBrowsedPlayerResponse that indicates failure.
+    const FAILURE_RESPONSE_SIZE: usize = Self::STATUS_FIELD_SIZE;
+
+    /// The minimum packet size of a SetBrowsedPlayerResponse for success status.
+    /// The fields are: Status (1 byte) and all the fields represented in
+    /// `SetBrowsedPlayerResponseParams::MIN_PACKET_SIZE`.
+    const MIN_SUCCESS_RESPONSE_SIZE: usize = 10;
 
     #[cfg(test)]
     pub fn new_success(
@@ -125,54 +104,126 @@ impl Decodable for SetBrowsedPlayerResponse {
     type Error = Error;
 
     fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < SetBrowsedPlayerResponse::MIN_FAILURE_PACKET_SIZE {
+        if buf.len() < Self::FAILURE_RESPONSE_SIZE {
             return Err(Error::InvalidMessage);
         }
 
         let status = StatusCode::try_from(buf[0])?;
-        match status {
-            StatusCode::Success => {
-                let success_resp = SetBrowsedPlayerResponseParams::decode(buf)?;
-                Ok(Self::Success(success_resp))
-            }
-            code => Ok(Self::Failure(code)),
+        if status != StatusCode::Success {
+            return Ok(Self::Failure(status));
         }
+        if buf.len() < Self::MIN_SUCCESS_RESPONSE_SIZE {
+            return Err(Error::InvalidMessageLength);
+        }
+        Ok(Self::Success(SetBrowsedPlayerResponseParams::decode(&buf[1..])?))
+    }
+}
+
+impl Encodable for SetBrowsedPlayerResponse {
+    type Error = Error;
+
+    fn encoded_len(&self) -> usize {
+        match &self {
+            Self::Failure(_) => Self::FAILURE_RESPONSE_SIZE,
+            Self::Success(params) => Self::STATUS_FIELD_SIZE + params.encoded_len(),
+        }
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
+        if buf.len() < self.encoded_len() {
+            return Err(Error::BufferLengthOutOfRange);
+        }
+
+        buf[0] = match self {
+            Self::Failure(status) => u8::from(status),
+            Self::Success(_) => u8::from(&StatusCode::Success),
+        };
+        if let Self::Success(params) = self {
+            params.encode(&mut buf[1..])?;
+        }
+        Ok(())
+    }
+}
+
+/// AVRCP 1.6.2 section 6.9.3.2 SetBrowsedPlayer.
+/// Struct that contains all the parameters from a successful SetBrowsedPlayerResponse.
+/// Excludes the Status field since the struct itself indicates a Status of success.
+#[derive(Debug)]
+pub struct SetBrowsedPlayerResponseParams {
+    uid_counter: u16,
+    num_items: u32,
+    folder_names: Vec<String>,
+}
+
+impl SetBrowsedPlayerResponseParams {
+    /// Minimum encoded length that includes byte size of essential parameters for a
+    /// successful response. Excludes the Status field since it is processed at
+    /// `SetBrowsedPlayerResponse` and Folder name length/folder name pair since
+    /// they are variable.
+    /// The fields are: UID Counter (2 bytes), Number of Items (4 bytes), CharSet ID
+    /// (2 bytes), Folder Depth (1 byte).
+    const MIN_PACKET_SIZE: usize = 9;
+
+    pub fn uid_counter(&self) -> u16 {
+        self.uid_counter
+    }
+
+    pub fn num_items(&self) -> u32 {
+        self.num_items
+    }
+
+    pub fn folder_names(self) -> Vec<String> {
+        self.folder_names
     }
 }
 
 impl Decodable for SetBrowsedPlayerResponseParams {
     type Error = Error;
 
+    /// First tries to decode the packet using no adjustments
+    /// then if it fails tries to decode the packet using adjustments.
+    fn decode(buf: &[u8]) -> core::result::Result<Self, Self::Error> {
+        let res = Self::try_decode(buf, false);
+        if let Ok(decoded) = res {
+            return Ok(decoded.0);
+        }
+        Self::try_decode(buf, true).map(|decoded| decoded.0)
+    }
+}
+
+impl AdvancedDecodable for SetBrowsedPlayerResponseParams {
+    type Error = Error;
+
     // Given a SetBrowsedPlayerResponse message buf with supposed Success status,
     // it will try to decode the remaining response parameters.
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < SetBrowsedPlayerResponse::MIN_SUCCESS_PACKET_SIZE {
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
+        if buf.len() < Self::MIN_PACKET_SIZE {
             return Err(Error::InvalidMessage);
         }
 
-        // No need to process status since it would have processed as part
-        // of SetBrowsedPlayerResponse.
-
-        let uid_counter = u16::from_be_bytes(buf[1..3].try_into().unwrap());
-        let num_items = u32::from_be_bytes(buf[3..7].try_into().unwrap());
-        let is_utf8 = match CharsetId::try_from(u16::from_be_bytes(buf[7..9].try_into().unwrap())) {
+        let uid_counter = u16::from_be_bytes(buf[0..2].try_into().unwrap());
+        let num_items = u32::from_be_bytes(buf[2..6].try_into().unwrap());
+        let is_utf8 = match CharsetId::try_from(u16::from_be_bytes(buf[6..8].try_into().unwrap())) {
             Ok(CharsetId::Utf8) => true,
             res => {
                 warn!("Unsupported charset ID {:?}", res);
                 false
             }
         };
-        let folder_depth = buf[9];
+        let folder_depth = buf[8];
 
-        let mut next_idx = 10;
+        let mut next_idx = Self::MIN_PACKET_SIZE;
         let mut folder_names = Vec::with_capacity(folder_depth.into());
 
         for processed in 0..folder_depth {
             if buf.len() < next_idx + 2 {
                 return Err(Error::InvalidMessage);
             }
-            let name_len: usize =
-                u16::from_be_bytes(buf[next_idx..next_idx + 2].try_into().unwrap()).into();
+            let mut name_len: usize =
+                u16::from_be_bytes(buf[next_idx..next_idx + 2].try_into().unwrap()) as usize;
+            if should_adjust {
+                name_len = adjust_byte_size(name_len)?;
+            }
             if buf.len() < next_idx + 2 + name_len {
                 return Err(Error::InvalidMessage);
             }
@@ -192,35 +243,7 @@ impl Decodable for SetBrowsedPlayerResponseParams {
         if next_idx != buf.len() {
             return Err(Error::InvalidMessage);
         }
-
-        Ok(Self { uid_counter, num_items, folder_names })
-    }
-}
-
-impl Encodable for SetBrowsedPlayerResponse {
-    type Error = Error;
-
-    fn encoded_len(&self) -> usize {
-        match &self {
-            SetBrowsedPlayerResponse::Failure(_) => {
-                SetBrowsedPlayerResponse::MIN_FAILURE_PACKET_SIZE
-            }
-            SetBrowsedPlayerResponse::Success(resp) => resp.encoded_len(),
-        }
-    }
-
-    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
-        if buf.len() < self.encoded_len() {
-            return Err(Error::BufferLengthOutOfRange);
-        }
-
-        match &self {
-            SetBrowsedPlayerResponse::Failure(r) => {
-                buf[0] = u8::from(r);
-                Ok(())
-            }
-            SetBrowsedPlayerResponse::Success(r) => r.encode(&mut buf[..]),
-        }
+        Ok((Self { uid_counter, num_items, folder_names }, buf.len()))
     }
 }
 
@@ -228,8 +251,7 @@ impl Encodable for SetBrowsedPlayerResponseParams {
     type Error = Error;
 
     fn encoded_len(&self) -> usize {
-        SetBrowsedPlayerResponse::MIN_SUCCESS_PACKET_SIZE
-            + self.folder_names.iter().map(|name| 2 + name.len()).sum::<usize>()
+        Self::MIN_PACKET_SIZE + self.folder_names.iter().map(|name| 2 + name.len()).sum::<usize>()
     }
 
     fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
@@ -237,12 +259,11 @@ impl Encodable for SetBrowsedPlayerResponseParams {
             return Err(Error::BufferLengthOutOfRange);
         }
 
-        buf[0] = u8::from(&StatusCode::Success);
-        buf[1..3].copy_from_slice(&self.uid_counter.to_be_bytes());
-        buf[3..7].copy_from_slice(&self.num_items.to_be_bytes());
-        buf[7..9].copy_from_slice(&u16::from(&CharsetId::Utf8).to_be_bytes());
-        buf[9] = u8::try_from(self.folder_names.len()).map_err(|_| Error::OutOfRange)?;
-        let mut next_idx = 10;
+        buf[0..2].copy_from_slice(&self.uid_counter.to_be_bytes());
+        buf[2..6].copy_from_slice(&self.num_items.to_be_bytes());
+        buf[6..8].copy_from_slice(&u16::from(&CharsetId::Utf8).to_be_bytes());
+        buf[8] = u8::try_from(self.folder_names.len()).map_err(|_| Error::OutOfRange)?;
+        let mut next_idx = Self::MIN_PACKET_SIZE;
         for name in &self.folder_names {
             buf[next_idx..next_idx + 2]
                 .copy_from_slice(&(u16::try_from(name.len()).unwrap().to_be_bytes()));
@@ -381,6 +402,26 @@ mod tests {
                 assert_eq!(r.uid_counter, 1);
                 assert_eq!(r.num_items, 10);
                 assert_eq!(r.folder_names, vec!["Folder 1".to_string()]);
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_malformed_set_browsed_player_response_decode_success() {
+        let buf = [
+            4, 0, 1, 0, 0, 0, 10, 0, 106, 2,
+            // Should be 2 bytes, but 4 bytes is defined as displayable name.
+            0, 4, 0x41, 0x42,
+            // Should be 2 bytes, but 4 bytes is defined as displayable name.
+            0, 4, 0x43, 0x44,
+        ];
+        let resp = SetBrowsedPlayerResponse::decode(&buf[..]).expect("should have decoded");
+        assert_matches!(
+            resp,
+            SetBrowsedPlayerResponse::Success(r) => {
+                assert_eq!(r.uid_counter, 1);
+                assert_eq!(r.num_items, 10);
+                assert_eq!(r.folder_names, vec!["AB".to_string(), "CD".to_string()]);
             }
         );
     }

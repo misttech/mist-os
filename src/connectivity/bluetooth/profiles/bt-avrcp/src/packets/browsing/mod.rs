@@ -17,7 +17,7 @@ pub use self::{
     change_path::*, get_folder_items::*, get_total_items::*, set_addressed_player::*,
     set_browsed_player::*,
 };
-use crate::packets::{Error, PacketResult, PduId, StatusCode};
+use crate::packets::{adjust_byte_size, AdvancedDecodable, Error, PacketResult, PduId, StatusCode};
 
 decodable_enum! {
     pub enum Scope <u8, Error, OutOfRange> {
@@ -53,20 +53,37 @@ impl BrowsePreamble {
 impl Decodable for BrowsePreamble {
     type Error = Error;
 
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
+    /// First tries to decode the packet using no adjustments
+    /// then if it fails tries to decode the packet using adjustments.
+    fn decode(buf: &[u8]) -> core::result::Result<Self, Self::Error> {
+        let res = Self::try_decode(buf, false);
+        if let Ok(decoded) = res {
+            return Ok(decoded.0);
+        }
+        Self::try_decode(buf, true).map(|decoded| decoded.0)
+    }
+}
+
+impl AdvancedDecodable for BrowsePreamble {
+    type Error = Error;
+
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
         if buf.len() < 3 {
             return Err(Error::InvalidMessage);
         }
 
         let pdu_id = buf[0];
-        let parameter_length = u16::from_be_bytes(buf[1..3].try_into().unwrap());
+        let mut parameter_length = u16::from_be_bytes(buf[1..3].try_into().unwrap());
         let body = buf[3..].to_vec();
+        if should_adjust {
+            parameter_length = adjust_byte_size(parameter_length as usize).map(|v| v as u16)?;
+        }
 
         if parameter_length as usize != body.len() {
             return Err(Error::InvalidMessage);
         }
 
-        Ok(Self { pdu_id, parameter_length, body })
+        Ok((Self { pdu_id, parameter_length, body }, buf.len()))
     }
 }
 
@@ -118,6 +135,18 @@ mod tests {
         assert!(avctp.is_ok());
         let avctp = avctp.expect("Just checked");
 
+        assert_eq!(avctp.pdu_id, 0x74);
+        assert_eq!(avctp.parameter_length, 5);
+        assert_eq!(avctp.body, vec![0x01, 0x02, 0x03, 0x04, 0x05]);
+    }
+
+    #[test]
+    fn test_malformed_avctp_packet_decode_success() {
+        let packet = [
+            0x74, 0x00, /* parameter length overcalculated by 2 bytes */ 0x07, 0x01, 0x02,
+            0x03, 0x04, 0x05,
+        ];
+        let avctp = BrowsePreamble::decode(&packet[..]).expect("should have expected");
         assert_eq!(avctp.pdu_id, 0x74);
         assert_eq!(avctp.parameter_length, 5);
         assert_eq!(avctp.body, vec![0x01, 0x02, 0x03, 0x04, 0x05]);

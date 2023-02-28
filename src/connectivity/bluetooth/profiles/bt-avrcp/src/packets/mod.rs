@@ -574,6 +574,32 @@ impl VendorCommand for RawVendorDependentPacket {
     }
 }
 
+/// A decodable type that tries best effort to decode a packet to a desirable type.
+/// Might contain logic that assumes/expects some trivial mistakes in the raw packet.
+/// Therefore, after decoding, it would return the actual number of bytes that were used to
+/// decode the raw data into the desired struct.
+pub trait AdvancedDecodable: ::core::marker::Sized {
+    type Error;
+
+    // Attempts to decode a byte buffer into a well known packet type.
+    // The decoding logic can attempt to correct malformed packets in the process
+    // based on the `should_adjust` flag.
+    // Callers of this method should always attempt to decode with `should_adjust = false` first.
+    fn try_decode(
+        buf: &[u8],
+        should_adjust: bool,
+    ) -> ::core::result::Result<(Self, usize), Self::Error>;
+}
+
+/// Some browse command's response messages have fields such as Item Size where the
+/// byte size of an item is defined. Item Size field size does not include the size of the
+/// Item Size field itself (2 bytes).
+/// Some peers include the Item Size field's size as part of the size value.
+/// We should subtract it so that the correct Item Size value is used for decoding.
+fn adjust_byte_size(val: usize) -> Result<usize, Error> {
+    val.checked_sub(2).ok_or(Error::InvalidMessageLength)
+}
+
 #[cfg(test)]
 #[track_caller]
 pub fn decode_avc_vendor_command(command: &bt_avctp::AvcCommand) -> Result<(PduId, &[u8]), Error> {

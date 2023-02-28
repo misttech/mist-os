@@ -11,8 +11,8 @@ use {
 };
 
 use crate::packets::{
-    CharsetId, Error, FolderType, ItemType, MediaAttributeId, MediaType, PacketResult,
-    PlaybackStatus, Scope, StatusCode, ATTRIBUTE_ID_LEN,
+    adjust_byte_size, AdvancedDecodable, CharsetId, Error, FolderType, ItemType, MediaAttributeId,
+    MediaType, PacketResult, PlaybackStatus, Scope, StatusCode, ATTRIBUTE_ID_LEN,
 };
 
 const DEFAULT_PLAYER_FEATURE_BITS: fidl_avrcp::PlayerFeatureBits =
@@ -260,428 +260,40 @@ impl Encodable for BrowseableItem {
     }
 }
 
-impl Decodable for BrowseableItem {
+impl AdvancedDecodable for BrowseableItem {
     type Error = Error;
 
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
         if buf.len() < Self::HEADER_SIZE {
             return Err(Error::InvalidMessageLength);
         }
 
         let item_type = ItemType::try_from(buf[0])?;
-        let item_size = u16::from_be_bytes(buf[1..3].try_into().unwrap());
+        let mut item_size = u16::from_be_bytes(buf[1..3].try_into().unwrap()) as usize;
+        if should_adjust {
+            item_size = adjust_byte_size(item_size)?;
+        }
 
         if buf.len() < Self::HEADER_SIZE + (item_size as usize) {
             return Err(Error::InvalidMessageLength);
         }
 
-        let item = match item_type {
-            ItemType::MediaPlayer => Self::MediaPlayer(MediaPlayerItem::decode(&buf[3..])?),
-            ItemType::Folder => Self::Folder(FolderItem::decode(&buf[3..])?),
-            ItemType::MediaElement => Self::MediaElement(MediaElementItem::decode(&buf[3..])?),
-        };
-        Ok(item)
-    }
-}
-
-/// AVRCP 1.6.2 section 6.10.2.3.1 Attribute Value entry
-#[derive(Clone, Debug, PartialEq)]
-struct AttributeValueEntry {
-    attribute_id: MediaAttributeId,
-    value: String,
-}
-
-impl AttributeValueEntry {
-    /// The smallest AttributeValueEntry size. Calculated by taking the number of bytes needed
-    /// to represent the mandatory (fixed sized) fields.
-    /// Attribute ID (4 bytes), char set ID (2 bytes), attr value len (2 bytes).
-    /// Defined in AVRCP 1.6.2, Section 6.10.2.3.1.
-    const MIN_PACKET_SIZE: usize = 8;
-}
-
-impl Encodable for AttributeValueEntry {
-    type Error = Error;
-
-    fn encoded_len(&self) -> usize {
-        // Only variable length field is `name`, which can be calculated by taking
-        // the length of the array.
-        Self::MIN_PACKET_SIZE + self.value.len()
-    }
-
-    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
-        if buf.len() < self.encoded_len() {
-            return Err(Error::OutOfRange);
-        }
-
-        let attr_id = u8::from(&self.attribute_id) as u32;
-        buf[0..4].copy_from_slice(&attr_id.to_be_bytes());
-
-        let charset_id = u16::from(&CharsetId::Utf8);
-        buf[4..6].copy_from_slice(&charset_id.to_be_bytes());
-        let val_len = self.value.len();
-        if val_len > std::u16::MAX.into() {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        buf[6..8].copy_from_slice(&(val_len as u16).to_be_bytes());
-        buf[8..8 + val_len].copy_from_slice(self.value.as_bytes());
-
-        Ok(())
-    }
-}
-
-impl Decodable for AttributeValueEntry {
-    type Error = Error;
-
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < Self::MIN_PACKET_SIZE {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        let attr_id = u32::from_be_bytes(buf[0..4].try_into().unwrap());
-        if attr_id > 0x8 {
-            // AVRCP spec 1.6.2 Appendix E
-            // Values 0x9-0xFFFFFFFF are reserved.
-            return Err(Error::InvalidMessage);
-        }
-        // Since media attribute ID is u8, we only extract the lowest octet.
-        let attribute_id = MediaAttributeId::try_from(buf[3])?;
-        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
-        // charset ID value to utf8.
-        let is_utf8 = is_utf8_charset_id(&buf[4..6].try_into().unwrap());
-
-        let val_len = u16::from_be_bytes(buf[6..8].try_into().unwrap()) as usize;
-        if buf.len() < Self::MIN_PACKET_SIZE + val_len {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
-        // charset ID folder names to utf8 names.
-        let value = if is_utf8 {
-            String::from_utf8(buf[Self::MIN_PACKET_SIZE..Self::MIN_PACKET_SIZE + val_len].to_vec())
-                .or(Err(Error::ParameterEncodingError))?
-        } else {
-            "Unknown Value".to_string()
-        };
-
-        Ok(AttributeValueEntry { attribute_id, value })
-    }
-}
-
-/// The response parameters for a Media Player Item.
-/// Defined in AVRCP 1.6.2, Section 6.10.2.1.
-// TODO(fxbug.dev/45904): Maybe wrap major_player_type, player_sub_type,
-// and feature_bit_mask into strongly typed variables.
-#[derive(Clone, Debug, PartialEq)]
-pub struct MediaPlayerItem {
-    player_id: u16,
-    major_player_type: u8,
-    player_sub_type: u32,
-    play_status: PlaybackStatus,
-    feature_bit_mask: [u64; 2],
-    name: String,
-}
-
-impl MediaPlayerItem {
-    /// The smallest MediaPlayerItem size. Calculated by taking the number of bytes needed
-    /// to represent the mandatory (fixed sized) fields. This does not include the header fields,
-    /// ItemType and ItemLength. The fields are:
-    /// Player ID (2 bytes), Media Player Type (1 byte), Player Sub Type (4 bytes),
-    /// Play Status (1 byte), Feature Bit Mask (16 bytes), Character Set ID (2 bytes),
-    /// Displayable Name Length (2 bytes).
-    /// Defined in AVRCP 1.6.2, Section 6.10.2.1.
-    const MIN_PAYLOAD_SIZE: usize = 28;
-}
-
-impl Encodable for MediaPlayerItem {
-    type Error = Error;
-
-    fn encoded_len(&self) -> usize {
-        // Only variable length field is `name`, which can be calculated by
-        // taking the length of the array.
-        Self::MIN_PAYLOAD_SIZE + self.name.len()
-    }
-
-    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
-        if buf.len() < self.encoded_len() {
-            return Err(Error::OutOfRange);
-        }
-
-        buf[0..2].copy_from_slice(&self.player_id.to_be_bytes());
-
-        buf[2] = self.major_player_type;
-        buf[3..7].copy_from_slice(&self.player_sub_type.to_be_bytes());
-        buf[7] = u8::from(&self.play_status);
-
-        buf[8..16].copy_from_slice(&self.feature_bit_mask[0].to_be_bytes());
-        buf[16..24].copy_from_slice(&self.feature_bit_mask[1].to_be_bytes());
-
-        let charset_id = u16::from(&CharsetId::Utf8);
-        buf[24..26].copy_from_slice(&charset_id.to_be_bytes());
-
-        let name_len = self.name.len();
-        let name_length = u16::try_from(name_len).map_err(|_| Error::ParameterEncodingError)?;
-        buf[26..28].copy_from_slice(&name_length.to_be_bytes());
-
-        // Copy the name at the end.
-        buf[28..28 + name_len].copy_from_slice(self.name.as_bytes());
-
-        Ok(())
-    }
-}
-
-/// TODO(fxb/102060): once we change CharsetId to be infalliable we can
-/// change or remove this method.
-fn is_utf8_charset_id(id_buf: &[u8; 2]) -> bool {
-    let raw_val = u16::from_be_bytes(*id_buf);
-    match CharsetId::try_from(raw_val) {
-        Ok(id) => id.is_utf8(),
-        Err(_) => {
-            warn!("Unsupported charset ID {:?}", raw_val,);
-            false
-        }
-    }
-}
-
-impl Decodable for MediaPlayerItem {
-    type Error = Error;
-
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < Self::MIN_PAYLOAD_SIZE {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        let player_id = u16::from_be_bytes(buf[0..2].try_into().unwrap());
-        let major_player_type = buf[2];
-        let player_sub_type = u32::from_be_bytes(buf[3..7].try_into().unwrap());
-        let play_status = PlaybackStatus::try_from(buf[7])?;
-
-        // These aren't actually numbers but a giant 128-bit bitfield that we interpret
-        // as two 64-bit big-endian numbers.
-        // Bits 69-127 are reserved (values valid up to Octet 8 Bit 4 see AVRCP v1.6.2 section 6.10.2.1 for details).
-        let feature_bit_mask = [
-            u64::from_be_bytes(buf[8..16].try_into().unwrap()),
-            u64::from_be_bytes(buf[16..24].try_into().unwrap()),
-        ];
-        let is_utf8 = is_utf8_charset_id(&buf[24..26].try_into().unwrap());
-
-        let name_len = u16::from_be_bytes(buf[26..28].try_into().unwrap()) as usize;
-        if buf.len() < Self::MIN_PAYLOAD_SIZE + name_len {
-            return Err(Error::InvalidMessageLength);
-        }
-        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
-        // charset ID media player name to utf8 name.
-        let name = if is_utf8 {
-            String::from_utf8(
-                buf[Self::MIN_PAYLOAD_SIZE..Self::MIN_PAYLOAD_SIZE + name_len].to_vec(),
-            )
-            .or(Err(Error::ParameterEncodingError))?
-        } else {
-            "Media Player".to_string()
-        };
-
-        Ok(MediaPlayerItem {
-            player_id,
-            major_player_type,
-            player_sub_type,
-            play_status,
-            feature_bit_mask,
-            name,
-        })
-    }
-}
-
-/// The response parameters for a Folder Item.
-/// Defined in AVRCP 1.6.2, Section 6.10.2.2.
-#[derive(Clone, Debug, PartialEq)]
-pub struct FolderItem {
-    folder_uid: u64,
-    folder_type: FolderType,
-    is_playable: bool,
-    name: String,
-}
-
-impl FolderItem {
-    /// The smallest FolderItem size. Calculated by taking the number of bytes needed
-    /// to represent the mandatory (fixed sized) fields. This does not include the header fields,
-    /// ItemType and ItemLength.
-    /// Folder UID (8 bytes), Folder Type (1 byte), Is Playable (1 byte),
-    /// Character Set ID (2 bytes), Displayable Name Length (2 bytes).
-    /// Defined in AVRCP 1.6.2, Section 6.10.2.2.
-    const MIN_PAYLOAD_SIZE: usize = 14;
-}
-
-impl Encodable for FolderItem {
-    type Error = Error;
-
-    fn encoded_len(&self) -> usize {
-        // Only variable length field is `name`, which can be calculated by
-        // taking the length of the array.
-        Self::MIN_PAYLOAD_SIZE + self.name.len()
-    }
-
-    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
-        if buf.len() < self.encoded_len() {
-            return Err(Error::OutOfRange);
-        }
-
-        buf[0..8].copy_from_slice(&self.folder_uid.to_be_bytes());
-        buf[8] = u8::from(&self.folder_type);
-        buf[9] = u8::from(self.is_playable);
-
-        let charset_id = u16::from(&CharsetId::Utf8);
-        buf[10..12].copy_from_slice(&charset_id.to_be_bytes());
-
-        let name_len = self.name.len();
-        let name_length = u16::try_from(name_len).map_err(|_| Error::ParameterEncodingError)?;
-        buf[12..14].copy_from_slice(&name_length.to_be_bytes());
-
-        // Copy the name at the end.
-        buf[14..14 + name_len].copy_from_slice(self.name.as_bytes());
-
-        Ok(())
-    }
-}
-
-impl Decodable for FolderItem {
-    type Error = Error;
-
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < Self::MIN_PAYLOAD_SIZE {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        let folder_uid = u64::from_be_bytes(buf[0..8].try_into().unwrap());
-        let folder_type = FolderType::try_from(buf[8])?;
-        if buf[9] > 1 {
-            return Err(Error::OutOfRange);
-        }
-        let is_playable = buf[9] == 1;
-        let is_utf8 = is_utf8_charset_id(&buf[10..12].try_into().unwrap());
-
-        let name_len = u16::from_be_bytes(buf[12..14].try_into().unwrap()) as usize;
-        if buf.len() < Self::MIN_PAYLOAD_SIZE + name_len {
-            return Err(Error::InvalidMessageLength);
-        }
-        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
-        // charset ID folder name to utf8 name.
-        let name = if is_utf8 {
-            String::from_utf8(
-                buf[Self::MIN_PAYLOAD_SIZE..Self::MIN_PAYLOAD_SIZE + name_len].to_vec(),
-            )
-            .or(Err(Error::ParameterEncodingError))?
-        } else {
-            "Folder".to_string()
-        };
-
-        Ok(FolderItem { folder_uid, folder_type, is_playable, name })
-    }
-}
-
-/// The response parameters for a Folder Item.
-/// Defined in AVRCP 1.6.2, Section 6.10.2.3.
-#[derive(Clone, Debug, PartialEq)]
-pub struct MediaElementItem {
-    element_uid: u64,
-    media_type: MediaType,
-    name: String,
-    attributes: Vec<AttributeValueEntry>,
-}
-
-impl MediaElementItem {
-    /// The smallest MediaElementItem size. Calculated by taking the number of bytes needed
-    /// to represent the mandatory (fixed sized) fields. This does not include the header fields,
-    /// ItemType and ItemLength.
-    /// Media Element UID (8 bytes), Media Type (1 byte), Character Set ID (2 bytes),
-    /// Displayable Name Length (2 bytes), Number of Attributes (1 byte).
-    /// Defined in AVRCP 1.6.2, Section 6.10.2.3.
-    const MIN_PAYLOAD_SIZE: usize = 14;
-}
-
-impl Encodable for MediaElementItem {
-    type Error = Error;
-
-    fn encoded_len(&self) -> usize {
-        // Name and attributes are variable length.
-        Self::MIN_PAYLOAD_SIZE
-            + self.name.len()
-            + self.attributes.iter().map(|attr| attr.encoded_len()).sum::<usize>()
-    }
-
-    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
-        if buf.len() < self.encoded_len() {
-            return Err(Error::OutOfRange);
-        }
-
-        buf[0..8].copy_from_slice(&self.element_uid.to_be_bytes());
-        buf[8] = u8::from(&self.media_type);
-
-        let charset_id = u16::from(&CharsetId::Utf8);
-        buf[9..11].copy_from_slice(&charset_id.to_be_bytes());
-
-        let name_len = self.name.len();
-        let len = u16::try_from(name_len).map_err(|_| Error::ParameterEncodingError)?;
-        buf[11..13].copy_from_slice(&len.to_be_bytes());
-        buf[13..13 + name_len].copy_from_slice(self.name.as_bytes());
-
-        buf[13 + name_len] = self.attributes.len() as u8;
-
-        let mut next_idx = Self::MIN_PAYLOAD_SIZE + name_len; // after attribute length.
-        for a in &self.attributes {
-            a.encode(&mut buf[next_idx..next_idx + a.encoded_len()])?;
-            next_idx += a.encoded_len();
-        }
-
-        Ok(())
-    }
-}
-
-impl Decodable for MediaElementItem {
-    type Error = Error;
-
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < Self::MIN_PAYLOAD_SIZE {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        let element_uid = u64::from_be_bytes(buf[0..8].try_into().unwrap());
-        let media_type = MediaType::try_from(buf[8])?;
-
-        let is_utf8 = is_utf8_charset_id(&buf[9..11].try_into().unwrap());
-
-        let name_len = u16::from_be_bytes(buf[11..13].try_into().unwrap()) as usize;
-        if buf.len() < 13 + name_len {
-            return Err(Error::InvalidMessageLength);
-        }
-
-        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
-        // charset ID folder names to utf8 names.
-        let name = if is_utf8 {
-            String::from_utf8(buf[13..13 + name_len].to_vec())
-                .or(Err(Error::ParameterEncodingError))?
-        } else {
-            "Media Element".to_string()
-        };
-
-        let mut next_idx = 13 + name_len;
-        if buf.len() <= next_idx {
-            return Err(Error::InvalidMessageLength);
-        }
-        let num_attrs = buf[next_idx];
-
-        // Process all the attributes.
-        next_idx += 1;
-        let mut attributes = Vec::with_capacity(num_attrs.into());
-        for _processed in 0..num_attrs {
-            if buf.len() <= next_idx {
-                return Err(Error::InvalidMessageLength);
+        let item_buf = &buf[Self::HEADER_SIZE..Self::HEADER_SIZE + item_size];
+        let (item, decoded_len) = match item_type {
+            ItemType::MediaPlayer => {
+                let res = MediaPlayerItem::try_decode(item_buf, should_adjust)?;
+                (Self::MediaPlayer(res.0), res.1)
             }
-            let a = AttributeValueEntry::decode(&buf[next_idx..])?;
-            next_idx += a.encoded_len();
-            attributes.push(a);
-        }
-
-        Ok(MediaElementItem { element_uid, media_type, name, attributes })
+            ItemType::Folder => {
+                let res = FolderItem::try_decode(item_buf, should_adjust)?;
+                (Self::Folder(res.0), res.1)
+            }
+            ItemType::MediaElement => {
+                let res = MediaElementItem::try_decode(item_buf, should_adjust)?;
+                (Self::MediaElement(res.0), res.1)
+            }
+        };
+        Ok((item, Self::HEADER_SIZE + decoded_len))
     }
 }
 
@@ -787,29 +399,449 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::FileSystemItem {
     }
 }
 
-/// AVRCP 1.6.2 section 6.9.3.2 SetBrowsedPlayer.
-#[derive(Debug)]
+/// AVRCP 1.6.2 section 6.10.2.3.1 Attribute Value entry
+#[derive(Clone, Debug, PartialEq)]
+struct AttributeValueEntry {
+    attribute_id: MediaAttributeId,
+    value: String,
+}
+
+impl AttributeValueEntry {
+    /// The smallest AttributeValueEntry size. Calculated by taking the number of bytes needed
+    /// to represent the mandatory (fixed sized) fields.
+    /// Attribute ID (4 bytes), char set ID (2 bytes), attr value len (2 bytes).
+    /// Defined in AVRCP 1.6.2, Section 6.10.2.3.1.
+    const MIN_PACKET_SIZE: usize = 8;
+}
+
+impl Encodable for AttributeValueEntry {
+    type Error = Error;
+
+    fn encoded_len(&self) -> usize {
+        // Only variable length field is `name`, which can be calculated by taking
+        // the length of the array.
+        Self::MIN_PACKET_SIZE + self.value.len()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
+        if buf.len() < self.encoded_len() {
+            return Err(Error::OutOfRange);
+        }
+
+        let attr_id = u8::from(&self.attribute_id) as u32;
+        buf[0..4].copy_from_slice(&attr_id.to_be_bytes());
+
+        let charset_id = u16::from(&CharsetId::Utf8);
+        buf[4..6].copy_from_slice(&charset_id.to_be_bytes());
+        let val_len = self.value.len();
+        if val_len > std::u16::MAX.into() {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        buf[6..8].copy_from_slice(&(val_len as u16).to_be_bytes());
+        buf[8..8 + val_len].copy_from_slice(self.value.as_bytes());
+
+        Ok(())
+    }
+}
+
+impl AdvancedDecodable for AttributeValueEntry {
+    type Error = Error;
+
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
+        if buf.len() < Self::MIN_PACKET_SIZE {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        let attr_id = u32::from_be_bytes(buf[0..4].try_into().unwrap());
+        if attr_id > 0x8 {
+            // AVRCP spec 1.6.2 Appendix E
+            // Values 0x9-0xFFFFFFFF are reserved.
+            return Err(Error::InvalidMessage);
+        }
+        // Since media attribute ID is u8, we only extract the lowest octet.
+        let attribute_id = MediaAttributeId::try_from(buf[3])?;
+        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
+        // charset ID value to utf8.
+        let is_utf8 = is_utf8_charset_id(&buf[4..6].try_into().unwrap());
+
+        let mut val_len = u16::from_be_bytes(buf[6..8].try_into().unwrap()) as usize;
+        if should_adjust {
+            val_len = adjust_byte_size(val_len)?;
+        }
+        if buf.len() < Self::MIN_PACKET_SIZE + val_len {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
+        // charset ID folder names to utf8 names.
+        let value = if is_utf8 {
+            String::from_utf8(buf[Self::MIN_PACKET_SIZE..Self::MIN_PACKET_SIZE + val_len].to_vec())
+                .or(Err(Error::ParameterEncodingError))?
+        } else {
+            "Unknown Value".to_string()
+        };
+
+        Ok((AttributeValueEntry { attribute_id, value }, Self::MIN_PACKET_SIZE + val_len))
+    }
+}
+
+/// The response parameters for a Media Player Item.
+/// Defined in AVRCP 1.6.2, Section 6.10.2.1.
+// TODO(fxbug.dev/45904): Maybe wrap major_player_type, player_sub_type,
+// and feature_bit_mask into strongly typed variables.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MediaPlayerItem {
+    player_id: u16,
+    major_player_type: u8,
+    player_sub_type: u32,
+    play_status: PlaybackStatus,
+    feature_bit_mask: [u64; 2],
+    name: String,
+}
+
+impl MediaPlayerItem {
+    /// The smallest MediaPlayerItem size. Calculated by taking the number of bytes needed
+    /// to represent the mandatory (fixed sized) fields. This does not include the header fields,
+    /// ItemType and ItemLength. The fields are:
+    /// Player ID (2 bytes), Media Player Type (1 byte), Player Sub Type (4 bytes),
+    /// Play Status (1 byte), Feature Bit Mask (16 bytes), Character Set ID (2 bytes),
+    /// Displayable Name Length (2 bytes).
+    /// Defined in AVRCP 1.6.2, Section 6.10.2.1.
+    const MIN_PACKET_SIZE: usize = 28;
+}
+
+impl Encodable for MediaPlayerItem {
+    type Error = Error;
+
+    fn encoded_len(&self) -> usize {
+        // Only variable length field is `name`, which can be calculated by
+        // taking the length of the array.
+        Self::MIN_PACKET_SIZE + self.name.len()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
+        if buf.len() < self.encoded_len() {
+            return Err(Error::OutOfRange);
+        }
+
+        buf[0..2].copy_from_slice(&self.player_id.to_be_bytes());
+
+        buf[2] = self.major_player_type;
+        buf[3..7].copy_from_slice(&self.player_sub_type.to_be_bytes());
+        buf[7] = u8::from(&self.play_status);
+
+        buf[8..16].copy_from_slice(&self.feature_bit_mask[0].to_be_bytes());
+        buf[16..24].copy_from_slice(&self.feature_bit_mask[1].to_be_bytes());
+
+        let charset_id = u16::from(&CharsetId::Utf8);
+        buf[24..26].copy_from_slice(&charset_id.to_be_bytes());
+
+        let name_len = self.name.len();
+        let name_length = u16::try_from(name_len).map_err(|_| Error::ParameterEncodingError)?;
+        buf[26..28].copy_from_slice(&name_length.to_be_bytes());
+
+        // Copy the name at the end.
+        buf[28..28 + name_len].copy_from_slice(self.name.as_bytes());
+
+        Ok(())
+    }
+}
+
+/// TODO(fxb/102060): once we change CharsetId to be infalliable we can
+/// change or remove this method.
+fn is_utf8_charset_id(id_buf: &[u8; 2]) -> bool {
+    let raw_val = u16::from_be_bytes(*id_buf);
+    match CharsetId::try_from(raw_val) {
+        Ok(id) => id.is_utf8(),
+        Err(_) => {
+            warn!("Unsupported charset ID {:?}", raw_val,);
+            false
+        }
+    }
+}
+
+impl AdvancedDecodable for MediaPlayerItem {
+    type Error = Error;
+
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
+        if buf.len() < Self::MIN_PACKET_SIZE {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        let player_id = u16::from_be_bytes(buf[0..2].try_into().unwrap());
+        let major_player_type = buf[2];
+        let player_sub_type = u32::from_be_bytes(buf[3..7].try_into().unwrap());
+        let play_status = PlaybackStatus::try_from(buf[7])?;
+
+        // These aren't actually numbers but a giant 128-bit bitfield that we interpret
+        // as two 64-bit big-endian numbers.
+        // Bits 69-127 are reserved (values valid up to Octet 8 Bit 4 see AVRCP v1.6.2 section 6.10.2.1 for details).
+        let feature_bit_mask = [
+            u64::from_be_bytes(buf[8..16].try_into().unwrap()),
+            u64::from_be_bytes(buf[16..24].try_into().unwrap()),
+        ];
+        let is_utf8 = is_utf8_charset_id(&buf[24..26].try_into().unwrap());
+
+        let mut name_len = u16::from_be_bytes(buf[26..28].try_into().unwrap()) as usize;
+        if should_adjust {
+            name_len = adjust_byte_size(name_len)?;
+        }
+
+        if buf.len() < Self::MIN_PACKET_SIZE + name_len {
+            return Err(Error::InvalidMessageLength);
+        }
+        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
+        // charset ID media player name to utf8 name.
+        let name = if is_utf8 {
+            String::from_utf8(buf[Self::MIN_PACKET_SIZE..Self::MIN_PACKET_SIZE + name_len].to_vec())
+                .or(Err(Error::ParameterEncodingError))?
+        } else {
+            "Media Player".to_string()
+        };
+        let decoded_len = Self::MIN_PACKET_SIZE + name_len;
+        if decoded_len != buf.len() {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        Ok((
+            MediaPlayerItem {
+                player_id,
+                major_player_type,
+                player_sub_type,
+                play_status,
+                feature_bit_mask,
+                name,
+            },
+            decoded_len,
+        ))
+    }
+}
+
+/// The response parameters for a Folder Item.
+/// Defined in AVRCP 1.6.2, Section 6.10.2.2.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FolderItem {
+    folder_uid: u64,
+    folder_type: FolderType,
+    is_playable: bool,
+    name: String,
+}
+
+impl FolderItem {
+    /// The smallest FolderItem size. Calculated by taking the number of bytes needed
+    /// to represent the mandatory (fixed sized) fields. This does not include the header fields,
+    /// ItemType and ItemLength.
+    /// Folder UID (8 bytes), Folder Type (1 byte), Is Playable (1 byte),
+    /// Character Set ID (2 bytes), Displayable Name Length (2 bytes).
+    /// Defined in AVRCP 1.6.2, Section 6.10.2.2.
+    const MIN_PACKET_SIZE: usize = 14;
+}
+
+impl Encodable for FolderItem {
+    type Error = Error;
+
+    fn encoded_len(&self) -> usize {
+        // Only variable length field is `name`, which can be calculated by
+        // taking the length of the array.
+        Self::MIN_PACKET_SIZE + self.name.len()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
+        if buf.len() < self.encoded_len() {
+            return Err(Error::OutOfRange);
+        }
+
+        buf[0..8].copy_from_slice(&self.folder_uid.to_be_bytes());
+        buf[8] = u8::from(&self.folder_type);
+        buf[9] = u8::from(self.is_playable);
+
+        let charset_id = u16::from(&CharsetId::Utf8);
+        buf[10..12].copy_from_slice(&charset_id.to_be_bytes());
+
+        let name_len = self.name.len();
+        let name_length = u16::try_from(name_len).map_err(|_| Error::ParameterEncodingError)?;
+        buf[12..14].copy_from_slice(&name_length.to_be_bytes());
+
+        // Copy the name at the end.
+        buf[14..14 + name_len].copy_from_slice(self.name.as_bytes());
+
+        Ok(())
+    }
+}
+
+impl AdvancedDecodable for FolderItem {
+    type Error = Error;
+
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
+        if buf.len() < Self::MIN_PACKET_SIZE {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        let folder_uid = u64::from_be_bytes(buf[0..8].try_into().unwrap());
+        let folder_type = FolderType::try_from(buf[8])?;
+        if buf[9] > 1 {
+            return Err(Error::OutOfRange);
+        }
+        let is_playable = buf[9] == 1;
+        let is_utf8 = is_utf8_charset_id(&buf[10..12].try_into().unwrap());
+
+        let mut name_len = u16::from_be_bytes(buf[12..14].try_into().unwrap()) as usize;
+        if should_adjust {
+            name_len = adjust_byte_size(name_len)?;
+        }
+        if buf.len() < Self::MIN_PACKET_SIZE + name_len {
+            return Err(Error::InvalidMessageLength);
+        }
+        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
+        // charset ID folder name to utf8 name.
+        let name = if is_utf8 {
+            String::from_utf8(buf[Self::MIN_PACKET_SIZE..Self::MIN_PACKET_SIZE + name_len].to_vec())
+                .or(Err(Error::ParameterEncodingError))?
+        } else {
+            "Folder".to_string()
+        };
+        let decoded_len = Self::MIN_PACKET_SIZE + name_len;
+        if decoded_len != buf.len() {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        Ok((FolderItem { folder_uid, folder_type, is_playable, name }, buf.len()))
+    }
+}
+
+/// The response parameters for a Folder Item.
+/// Defined in AVRCP 1.6.2, Section 6.10.2.3.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MediaElementItem {
+    element_uid: u64,
+    media_type: MediaType,
+    name: String,
+    attributes: Vec<AttributeValueEntry>,
+}
+
+impl MediaElementItem {
+    /// The smallest MediaElementItem size. Calculated by taking the number of bytes needed
+    /// to represent the mandatory (fixed sized) fields. This does not include the header fields,
+    /// ItemType and ItemLength.
+    /// Media Element UID (8 bytes), Media Type (1 byte), Character Set ID (2 bytes),
+    /// Displayable Name Length (2 bytes), Number of Attributes (1 byte).
+    /// Defined in AVRCP 1.6.2, Section 6.10.2.3.
+    const MIN_PACKET_SIZE: usize = 14;
+}
+
+impl Encodable for MediaElementItem {
+    type Error = Error;
+
+    fn encoded_len(&self) -> usize {
+        // Name and attributes are variable length.
+        Self::MIN_PACKET_SIZE
+            + self.name.len()
+            + self.attributes.iter().map(|attr| attr.encoded_len()).sum::<usize>()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
+        if buf.len() < self.encoded_len() {
+            return Err(Error::OutOfRange);
+        }
+
+        buf[0..8].copy_from_slice(&self.element_uid.to_be_bytes());
+        buf[8] = u8::from(&self.media_type);
+
+        let charset_id = u16::from(&CharsetId::Utf8);
+        buf[9..11].copy_from_slice(&charset_id.to_be_bytes());
+
+        let name_len = self.name.len();
+        let len = u16::try_from(name_len).map_err(|_| Error::ParameterEncodingError)?;
+        buf[11..13].copy_from_slice(&len.to_be_bytes());
+        buf[13..13 + name_len].copy_from_slice(self.name.as_bytes());
+
+        buf[13 + name_len] = self.attributes.len() as u8;
+
+        let mut next_idx = Self::MIN_PACKET_SIZE + name_len; // after attribute length.
+        for a in &self.attributes {
+            a.encode(&mut buf[next_idx..next_idx + a.encoded_len()])?;
+            next_idx += a.encoded_len();
+        }
+
+        Ok(())
+    }
+}
+
+impl AdvancedDecodable for MediaElementItem {
+    type Error = Error;
+
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
+        if buf.len() < Self::MIN_PACKET_SIZE {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        let element_uid = u64::from_be_bytes(buf[0..8].try_into().unwrap());
+        let media_type = MediaType::try_from(buf[8])?;
+
+        let is_utf8 = is_utf8_charset_id(&buf[9..11].try_into().unwrap());
+
+        let mut name_len = u16::from_be_bytes(buf[11..13].try_into().unwrap()) as usize;
+        if should_adjust {
+            name_len = adjust_byte_size(name_len)?;
+        }
+        if buf.len() < 13 + name_len {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
+        // charset ID folder names to utf8 names.
+        let name = if is_utf8 {
+            String::from_utf8(buf[13..13 + name_len].to_vec())
+                .or(Err(Error::ParameterEncodingError))?
+        } else {
+            "Media Element".to_string()
+        };
+
+        let mut next_idx = 13 + name_len;
+        if buf.len() <= next_idx {
+            return Err(Error::InvalidMessageLength);
+        }
+        let num_attrs = buf[next_idx];
+
+        // Process all the attributes.
+        next_idx += 1;
+        let mut attributes = Vec::with_capacity(num_attrs.into());
+        for _processed in 0..num_attrs {
+            if buf.len() <= next_idx {
+                return Err(Error::InvalidMessageLength);
+            }
+            let (entry, decoded_len) =
+                AttributeValueEntry::try_decode(&buf[next_idx..], should_adjust)?;
+            next_idx += decoded_len;
+            attributes.push(entry);
+        }
+        if next_idx != buf.len() {
+            return Err(Error::InvalidMessageLength);
+        }
+
+        Ok((MediaElementItem { element_uid, media_type, name, attributes }, buf.len()))
+    }
+}
+
+/// AVRCP 1.6.2 section 6.10.4.2 GetFolderItems
+#[derive(Debug, PartialEq)]
 pub enum GetFolderItemsResponse {
     Success(GetFolderItemsResponseParams),
     Failure(StatusCode),
 }
 
-/// AVRCP 1.6.2 section 6.10.4.2 GetFolderItems
-/// Currently, we only support Scope = MediaPlayerList. Therefore, the response packet
-/// is formatted according to Section 6.10.2.1 from AVRCP 1.6.2.
-#[derive(Debug)]
-pub struct GetFolderItemsResponseParams {
-    uid_counter: u16,
-    item_list: Vec<BrowseableItem>,
-}
-
 impl GetFolderItemsResponse {
+    /// The packet size of a GetFolderItemsResponse Status field (1 byte).
+    const STATUS_FIELD_SIZE: usize = 1;
+
     /// The packet size of a GetFolderItemsResponse that indicates failure.
-    /// 1 byte for status
-    const FAILURE_RESPONSE_SIZE: usize = 1;
+    /// If an error happened, Status is the only field present.
+    const FAILURE_RESPONSE_SIZE: usize = Self::STATUS_FIELD_SIZE;
 
     /// The smallest packet size of a GetFolderItemsResponse for success status.
-    /// 1 byte for status, 2 for uid counter, 2 for number of items.
+    /// The fields are: Status (1 byte) and and all the fields represented in
+    /// `GetFolderItemsResponseParams::MIN_PACKET_SIZE`.
     const MIN_SUCCESS_RESPONSE_SIZE: usize = 5;
 
     pub fn new_success(uid_counter: u16, item_list: Vec<BrowseableItem>) -> Self {
@@ -831,7 +863,7 @@ impl Encodable for GetFolderItemsResponse {
     fn encoded_len(&self) -> usize {
         match self {
             Self::Failure(_) => Self::FAILURE_RESPONSE_SIZE,
-            Self::Success(r) => r.encoded_len(),
+            Self::Success(r) => Self::STATUS_FIELD_SIZE + r.encoded_len(),
         }
     }
 
@@ -840,10 +872,13 @@ impl Encodable for GetFolderItemsResponse {
             return Err(Error::BufferLengthOutOfRange);
         }
 
-        match self {
-            Self::Failure(status) => buf[0] = u8::from(status),
-            Self::Success(r) => r.encode(&mut buf[..])?,
+        buf[0] = match self {
+            Self::Failure(status) => u8::from(status),
+            Self::Success(_) => u8::from(&StatusCode::Success),
         };
+        if let Self::Success(params) = self {
+            params.encode(&mut buf[1..])?;
+        }
         Ok(())
     }
 }
@@ -861,12 +896,28 @@ impl Decodable for GetFolderItemsResponse {
         if status != StatusCode::Success {
             return Ok(Self::Failure(status));
         }
-        Ok(Self::Success(GetFolderItemsResponseParams::decode(buf)?))
+        if buf.len() < Self::MIN_SUCCESS_RESPONSE_SIZE {
+            return Err(Error::InvalidMessageLength);
+        }
+        Ok(Self::Success(GetFolderItemsResponseParams::decode(&buf[1..])?))
     }
+}
+/// AVRCP 1.6.2 section 6.10.4.2 GetFolderItems
+/// Struct that contains all the parameters from a successful GetFolderItemsResponse.
+/// Excludes the Status field since the struct itself indicates a Status of success.
+#[derive(Debug, PartialEq)]
+pub struct GetFolderItemsResponseParams {
+    uid_counter: u16,
+    item_list: Vec<BrowseableItem>,
 }
 
 impl GetFolderItemsResponseParams {
-    // Returns a list of browseable items from a successful GetFolderItem response.
+    /// The smallest packet size containing params from a successful GetFolderItemsResponse.
+    /// Excludes the Status field since it is processed at `GetFolderItemsResponse`.
+    /// The fields are: UID Counter (2 bytes) and Number of Items (2 bytes).
+    const MIN_PACKET_SIZE: usize = 4;
+
+    // Returns a list of browsable items from a successful GetFolderItem response.
     pub fn item_list(self) -> Vec<BrowseableItem> {
         self.item_list
     }
@@ -879,8 +930,7 @@ impl Encodable for GetFolderItemsResponseParams {
     /// Each item in `item_list` has variable size, so iterate and update total size.
     /// Each item in `item_list` also contains a header, which is not part of the object.
     fn encoded_len(&self) -> usize {
-        GetFolderItemsResponse::MIN_SUCCESS_RESPONSE_SIZE
-            + self.item_list.iter().map(|item| item.encoded_len()).sum::<usize>()
+        Self::MIN_PACKET_SIZE + self.item_list.iter().map(|item| item.encoded_len()).sum::<usize>()
     }
 
     fn encode(&self, buf: &mut [u8]) -> PacketResult<()> {
@@ -888,15 +938,14 @@ impl Encodable for GetFolderItemsResponseParams {
             return Err(Error::BufferLengthOutOfRange);
         }
 
-        buf[0] = u8::from(&StatusCode::Success);
-        buf[1..3].copy_from_slice(&self.uid_counter.to_be_bytes());
+        buf[0..2].copy_from_slice(&self.uid_counter.to_be_bytes());
 
         let num_items =
             u16::try_from(self.item_list.len()).map_err(|_| Error::ParameterEncodingError)?;
 
-        buf[3..5].copy_from_slice(&num_items.to_be_bytes());
+        buf[2..4].copy_from_slice(&num_items.to_be_bytes());
 
-        let mut idx = 5;
+        let mut idx = Self::MIN_PACKET_SIZE;
         for item in self.item_list.iter() {
             item.encode(&mut buf[idx..])?;
             idx += item.encoded_len();
@@ -909,20 +958,31 @@ impl Encodable for GetFolderItemsResponseParams {
 impl Decodable for GetFolderItemsResponseParams {
     type Error = Error;
 
+    /// First tries to decode the packet using no adjustments
+    /// then if it fails tries to decode the packet using adjustments.
+    fn decode(buf: &[u8]) -> core::result::Result<Self, Self::Error> {
+        let res = Self::try_decode(buf, false);
+        if let Ok(decoded) = res {
+            return Ok(decoded.0);
+        }
+        Self::try_decode(buf, true).map(|decoded| decoded.0)
+    }
+}
+
+impl AdvancedDecodable for GetFolderItemsResponseParams {
+    type Error = Error;
+
     // Given a GetFolderItemsResponse message buf with supposed Success status,
     // it will try to decode the remaining response parameters.
-    fn decode(buf: &[u8]) -> PacketResult<Self> {
-        if buf.len() < GetFolderItemsResponse::MIN_SUCCESS_RESPONSE_SIZE {
+    fn try_decode(buf: &[u8], should_adjust: bool) -> Result<(Self, usize), Error> {
+        if buf.len() < Self::MIN_PACKET_SIZE {
             return Err(Error::InvalidMessageLength);
         }
 
-        // Skip first byte since no need to process status as it would have
-        // processed as part of SetBrowsedPlayerResponse.
+        let uid_counter = u16::from_be_bytes(buf[0..2].try_into().unwrap());
+        let num_items = u16::from_be_bytes(buf[2..4].try_into().unwrap());
 
-        let uid_counter = u16::from_be_bytes(buf[1..3].try_into().unwrap());
-        let num_items = u16::from_be_bytes(buf[3..5].try_into().unwrap());
-
-        let mut next_idx = GetFolderItemsResponse::MIN_SUCCESS_RESPONSE_SIZE;
+        let mut next_idx = Self::MIN_PACKET_SIZE;
         let mut item_list = Vec::with_capacity(num_items.into());
 
         let mut seen_item_types = HashSet::new();
@@ -931,24 +991,23 @@ impl Decodable for GetFolderItemsResponseParams {
             if buf.len() <= next_idx {
                 return Err(Error::InvalidMessageLength);
             }
-            let a = BrowseableItem::decode(&buf[next_idx..])?;
+            let (item, decoded_len) = BrowseableItem::try_decode(&buf[next_idx..], should_adjust)?;
 
             // According to AVRCP 1.6.2 section 6.10.1,
             // Media player item cannot exist with other items.
-            let _ = seen_item_types.insert(a.get_item_type());
+            let _ = seen_item_types.insert(item.get_item_type());
             if seen_item_types.contains(&ItemType::MediaPlayer) && seen_item_types.len() != 1 {
                 return Err(Error::InvalidMessage);
             }
 
-            next_idx += a.encoded_len();
-            item_list.push(a);
+            next_idx += decoded_len;
+            item_list.push(item);
         }
 
         if next_idx != buf.len() {
             return Err(Error::InvalidMessageLength);
         }
-
-        Ok(GetFolderItemsResponseParams { uid_counter, item_list })
+        Ok((GetFolderItemsResponseParams { uid_counter, item_list }, buf.len()))
     }
 }
 
@@ -956,8 +1015,8 @@ impl Decodable for GetFolderItemsResponseParams {
 mod tests {
     use super::*;
 
-    #[test]
     /// Encoding a GetFolderItemsCommand successfully produces a byte buffer.
+    #[fuchsia::test]
     fn test_get_folder_items_command_encode() {
         let cmd = GetFolderItemsCommand::new_media_player_list(1, 4);
 
@@ -997,14 +1056,14 @@ mod tests {
         assert_eq!(buf, &[0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x04, 0xFF,]);
     }
 
-    #[test]
     /// Sending expected buffer decodes successfully.
+    #[fuchsia::test]
     fn test_get_folder_items_command_decode_success() {
         // `self.attribute_count` is zero, so all attributes are requested.
         let buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00];
         let cmd = GetFolderItemsCommand::decode(&buf[..]);
         assert!(cmd.is_ok());
-        let cmd = cmd.expect("Just checked");
+        let cmd = cmd.expect("should have succeeded");
         assert_eq!(cmd.scope, Scope::MediaPlayerList);
         assert_eq!(cmd.start_item, 0);
         assert_eq!(cmd.end_item, 4);
@@ -1014,7 +1073,7 @@ mod tests {
         let buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0xff];
         let cmd = GetFolderItemsCommand::decode(&buf[..]);
         assert!(cmd.is_ok());
-        let cmd = cmd.expect("Just checked");
+        let cmd = cmd.expect("should have succeeded");
         assert_eq!(cmd.scope, Scope::MediaPlayerList);
         assert_eq!(cmd.start_item, 0);
         assert_eq!(cmd.end_item, 4);
@@ -1025,16 +1084,16 @@ mod tests {
             [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x01];
         let cmd = GetFolderItemsCommand::decode(&buf[..]);
         assert!(cmd.is_ok());
-        let cmd = cmd.expect("Just checked");
+        let cmd = cmd.expect("should have succeeded");
         assert_eq!(cmd.scope, Scope::MediaPlayerList);
         assert_eq!(cmd.start_item, 0);
         assert_eq!(cmd.end_item, 4);
         assert_eq!(cmd.attribute_list, Some(vec![MediaAttributeId::Title]));
     }
 
-    #[test]
     /// Sending payloads that are malformed and/or contain invalid parameters should be
     /// gracefully handled.
+    #[fuchsia::test]
     fn test_get_folder_items_command_decode_invalid_buf() {
         // Incomplete buffer.
         let invalid_format_buf = [0x00, 0x00, 0x00, 0x01];
@@ -1058,8 +1117,8 @@ mod tests {
         assert!(cmd.is_err());
     }
 
-    #[test]
     /// Tests encoding a response buffer for GetFolderItemsResponse works as intended.
+    #[fuchsia::test]
     fn test_get_folder_items_response_empty_encode() {
         let response = GetFolderItemsResponse::new_failure(StatusCode::InvalidParameter)
             .expect("should have initialized");
@@ -1079,8 +1138,8 @@ mod tests {
             .expect_err("should have failed to initialize");
     }
 
-    #[test]
     /// Tests encoding a response buffer for GetFolderItemsResponse works as intended.
+    #[fuchsia::test]
     fn test_get_folder_items_response_media_player_list_encode() {
         let feature_bit_mask = [0; 2];
         let player_name = "Foobar".to_string();
@@ -1112,8 +1171,8 @@ mod tests {
         let _ = response.encode(&mut buf[..]).expect_err("should have failed");
     }
 
-    #[test]
     /// Tests encoding a response buffer for GetFolderItemsResponse works as intended.
+    #[fuchsia::test]
     fn test_get_folder_items_response_file_system_encode() {
         let item_list = vec![
             BrowseableItem::Folder(FolderItem {
@@ -1169,16 +1228,16 @@ mod tests {
         let _ = response.encode(&mut buf[..]).expect_err("should have failed");
     }
 
-    #[fuchsia::test]
     /// Sending expected buffer decodes successfully.
+    #[fuchsia::test]
     fn test_get_folder_items_response_decode_success() {
-        // With 1 media item.
+        // With 1 media player.
         let buf = [
-            4, 0, 1, 0, 1, // media player item begin
+            4, 0, 1, 0, 1, // Media player item.
             1, 0, 32, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 0,
             106, 0, 4, 0x74, 0x65, 0x73, 0x74,
         ];
-        let response = GetFolderItemsResponse::decode(&buf).expect("Just checked");
+        let response = GetFolderItemsResponse::decode(&buf).expect("should have succeeded");
 
         match response {
             GetFolderItemsResponse::Success(resp) => {
@@ -1221,16 +1280,16 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
     /// Sending expected buffer decodes successfully.
+    #[fuchsia::test]
     fn test_get_folder_items_response_mixed_decode_success() {
-        // With 1 folder item and 1 media element item.
+        // With 1 folder and 1 media element.
         let buf = [
-            4, 0, 1, 0, 2, // folder item begin
+            4, 0, 1, 0, 2, // Folder item.
             2, 0, 18, 0, 0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 106, 0, 4, 0x74, 0x65, 0x73, 0x74,
-            // media element item begin
+            // Media element item.
             3, 0, 29, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 106, 0, 3, 0x61, 0x62, 0x63, 1,
-            // - media element attribute
+            // Media element's attribute.
             0, 0, 0, 1, 0, 106, 0, 4, 0x74, 0x65, 0x73, 0x74,
         ];
         let response = GetFolderItemsResponse::decode(&buf[..]).expect("should have decoded");
@@ -1263,6 +1322,78 @@ mod tests {
             }
             _ => panic!("should have been success response"),
         }
+    }
+
+    /// Sending payloads that are malformed and/or contain invalid parameters should be
+    /// gracefully handled.
+    #[fuchsia::test]
+    fn test_malformed_get_folder_items_response_decode_success() {
+        // With 1 media player.
+        let player_buf = [
+            4, 0, 1, 0, 1,
+            // Media player item.
+            // Should be 32 bytes, but 34 bytes is defined as item size.
+            1, 0, 34, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 0,
+            106, // Should be 4 bytes, but 6 bytes is defined as displayable name length.
+            0, 6, 0x74, 0x65, 0x73, 0x74,
+        ];
+        let response = GetFolderItemsResponse::decode(&player_buf).expect("should have succeeded");
+        assert_eq!(
+            response,
+            GetFolderItemsResponse::Success(GetFolderItemsResponseParams {
+                uid_counter: 1,
+                item_list: vec![BrowseableItem::MediaPlayer(MediaPlayerItem {
+                    player_id: 1,
+                    major_player_type: 0,
+                    player_sub_type: 1,
+                    play_status: PlaybackStatus::Playing,
+                    feature_bit_mask: [0, 8193],
+                    name: "test".to_string(),
+                }),],
+            })
+        );
+
+        // With 1 folder item and 1 media element item.
+        let mixed_items_buf = [
+            4, 0, 1, 0, 2,
+            // Folder item.
+            // Should be 18 bytes, but 20 bytes is defined as item size.
+            // Should be 4 bytes but 6 bytes is defined as displayable name length.
+            2, 0, 20, 0, 0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 106, 0, 6, 0x74, 0x65, 0x73, 0x74,
+            // Media element item.
+            // Should be 29 bytes, but 31 bytes is defined as item size.
+            // Should be 3 bytes, but 5 bytes is defined as displayable length.
+            3, 0, 31, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 106, 0, 5, 0x61, 0x62, 0x63, 1,
+            // Media element item's attribute.
+            // Should be 4 bytes, but 6 bytes is defined as displayable length.
+            0, 0, 0, 1, 0, 106, 0, 6, 0x74, 0x65, 0x73, 0x74,
+        ];
+        let response =
+            GetFolderItemsResponse::decode(&mixed_items_buf[..]).expect("should have decoded");
+        assert_eq!(
+            response,
+            GetFolderItemsResponse::Success(GetFolderItemsResponseParams {
+                uid_counter: 1,
+                item_list: vec![
+                    BrowseableItem::Folder(FolderItem {
+                        folder_uid: 1,
+                        folder_type: FolderType::Artists,
+                        is_playable: true,
+                        name: "test".to_string(),
+                    }),
+                    BrowseableItem::MediaElement(MediaElementItem {
+                        element_uid: 1,
+                        media_type: MediaType::Video,
+                        name: "abc".to_string(),
+                        attributes: vec![AttributeValueEntry {
+                            attribute_id: MediaAttributeId::try_from(1)
+                                .expect("should be attribute id"),
+                            value: "test".to_string(),
+                        },],
+                    })
+                ],
+            })
+        );
     }
 
     #[fuchsia::test]
@@ -1302,7 +1433,7 @@ mod tests {
             GetFolderItemsResponse::decode(&invalid_items_buf[..]).expect_err("should have failed");
     }
 
-    #[test]
+    #[fuchsia::test]
     /// Tests encoding a MediaPlayerItem succeeds.
     fn test_media_player_item_encode() {
         let player_id = 10;
@@ -1364,16 +1495,23 @@ mod tests {
         assert_eq!(TEST_PLAYER_FEATURE_BITS.bits().to_be_bytes(), &buf[8..16]);
         assert_eq!(TEST_PLAYER_FEATURE_BITS_EXT.bits().to_be_bytes(), &buf[16..24]);
 
-        let item = MediaPlayerItem::decode(&buf[..]).expect("Just checked");
-        assert_eq!(item.player_id, 127);
-        assert_eq!(item.major_player_type, 1);
-        assert_eq!(item.player_sub_type, 1);
-        assert_eq!(item.play_status, PlaybackStatus::Paused);
+        let (item, decoded_len) =
+            MediaPlayerItem::try_decode(&buf[..], false).expect("should have succeeded");
+        assert_eq!(decoded_len, buf.len());
         assert_eq!(
-            item.feature_bit_mask,
-            [TEST_PLAYER_FEATURE_BITS.bits(), TEST_PLAYER_FEATURE_BITS_EXT.bits()]
+            item,
+            MediaPlayerItem {
+                player_id: 127,
+                major_player_type: 1,
+                player_sub_type: 1,
+                play_status: PlaybackStatus::Paused,
+                feature_bit_mask: [
+                    TEST_PLAYER_FEATURE_BITS.bits(),
+                    TEST_PLAYER_FEATURE_BITS_EXT.bits()
+                ],
+                name: "MediaPlayer".to_string(),
+            }
         );
-        assert_eq!(item.name, "MediaPlayer".to_string());
 
         // Without utf8 name.
         let buf = [
@@ -1381,13 +1519,53 @@ mod tests {
             0x74, 0x65, 0x73, 0x74,
         ];
 
-        let item = MediaPlayerItem::decode(&buf[..]).expect("Just checked");
-        assert_eq!(item.player_id, 1);
-        assert_eq!(item.major_player_type, 0);
-        assert_eq!(item.player_sub_type, 1);
-        assert_eq!(item.play_status, PlaybackStatus::Playing);
-        assert_eq!(item.feature_bit_mask, [0, 8193]);
-        assert_eq!(item.name, "Media Player".to_string());
+        let (item, decoded_len) =
+            MediaPlayerItem::try_decode(&buf[..], false).expect("should have succeeded");
+        assert_eq!(decoded_len, buf.len());
+        assert_eq!(
+            item,
+            MediaPlayerItem {
+                player_id: 1,
+                major_player_type: 0,
+                player_sub_type: 1,
+                play_status: PlaybackStatus::Playing,
+                feature_bit_mask: [0, 8193],
+                name: "Media Player".to_string(),
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    /// Tests decoding a MediaPlayerItem succeeds.
+    fn test_malformed_media_player_item_decode_success() {
+        let buf = [
+            0, 127, 1, 0, 0, 0, 1, 2, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB7, 0x01, 0xEF, 0x02, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0, 106,
+            // Should be 11 bytes, but 13 bytes is defined as displayable name length.
+            0, 13, 77, 101, 100, 105, 97, 80, 108, 97, 121, 101, 114,
+        ];
+        assert_eq!(TEST_PLAYER_FEATURE_BITS.bits().to_be_bytes(), &buf[8..16]);
+        assert_eq!(TEST_PLAYER_FEATURE_BITS_EXT.bits().to_be_bytes(), &buf[16..24]);
+
+        let _ = MediaPlayerItem::try_decode(&buf[..], false)
+            .expect_err("should have failed without adjustments");
+        let (item, decoded_len) =
+            MediaPlayerItem::try_decode(&buf[..], true).expect("should have succeeded");
+        assert_eq!(decoded_len, buf.len());
+        assert_eq!(
+            item,
+            MediaPlayerItem {
+                player_id: 127,
+                major_player_type: 1,
+                player_sub_type: 1,
+                play_status: PlaybackStatus::Paused,
+                feature_bit_mask: [
+                    TEST_PLAYER_FEATURE_BITS.bits(),
+                    TEST_PLAYER_FEATURE_BITS_EXT.bits()
+                ],
+                name: "MediaPlayer".to_string(),
+            }
+        );
     }
 
     #[fuchsia::test]
@@ -1395,17 +1573,23 @@ mod tests {
     fn test_media_player_item_decode_invalid_buf() {
         // Invalid buf that's too short.
         let invalid_buf = [0, 1, 0, 0];
-        let _ = MediaPlayerItem::decode(&invalid_buf[..]).expect_err("should fail");
+        let _ =
+            MediaPlayerItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ =
+            MediaPlayerItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
 
         // Invalid buf with mismatching name length field and actual name length.
         let invalid_buf = [
             0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 0, 106, 0, 4,
             0x74, 0x65, 0x73,
         ];
-        let _ = MediaPlayerItem::decode(&invalid_buf[..]).expect_err("should fail");
+        let _ =
+            MediaPlayerItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ =
+            MediaPlayerItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
     }
 
-    #[test]
+    #[fuchsia::test]
     /// Tests encoding a FolderItem succeeds.
     fn test_folder_item_encode() {
         let folder_uid = 1;
@@ -1430,20 +1614,59 @@ mod tests {
         // With utf8 name.
         let buf = [0, 0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 106, 0, 4, 0x74, 0x65, 0x73, 0x74];
 
-        let item = FolderItem::decode(&buf[..]).expect("Just checked");
-        assert_eq!(item.folder_uid, 1);
-        assert_eq!(item.folder_type, FolderType::Artists);
-        assert_eq!(item.is_playable, true);
-        assert_eq!(item.name, "test".to_string());
+        let (item, decoded_len) =
+            FolderItem::try_decode(&buf[..], false).expect("should have succeeded");
+        assert_eq!(decoded_len, buf.len());
+        assert_eq!(
+            item,
+            FolderItem {
+                folder_uid: 1,
+                folder_type: FolderType::Artists,
+                is_playable: true,
+                name: "test".to_string(),
+            }
+        );
 
         // Without utf8 name.
         let buf = [0, 0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 5, 0, 4, 0x74, 0x65, 0x73, 0x74];
 
-        let item = FolderItem::decode(&buf[..]).expect("Just checked");
-        assert_eq!(item.folder_uid, 1);
-        assert_eq!(item.folder_type, FolderType::Artists);
-        assert_eq!(item.is_playable, true);
-        assert_eq!(item.name, "Folder".to_string());
+        let (item, decoded_len) =
+            FolderItem::try_decode(&buf[..], false).expect("should have succeeded");
+        assert_eq!(decoded_len, buf.len());
+        assert_eq!(
+            item,
+            FolderItem {
+                folder_uid: 1,
+                folder_type: FolderType::Artists,
+                is_playable: true,
+                name: "Folder".to_string(),
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    /// Tests decoding a FolderItem succeeds.
+    fn test_malformed_folder_item_decode_success() {
+        let buf = [
+            0, 0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 106,
+            // Should be 4 bytes, but 6 bytes is defined as displayable name.
+            0, 6, 0x74, 0x65, 0x73, 0x74,
+        ];
+
+        let _ = FolderItem::try_decode(&buf[..], false)
+            .expect_err("should have failed without adjustments");
+        let (item, decoded_len) =
+            FolderItem::try_decode(&buf[..], true).expect("should have succeeded");
+        assert_eq!(decoded_len, buf.len());
+        assert_eq!(
+            item,
+            FolderItem {
+                folder_uid: 1,
+                folder_type: FolderType::Artists,
+                is_playable: true,
+                name: "test".to_string(),
+            }
+        );
     }
 
     #[fuchsia::test]
@@ -1451,14 +1674,16 @@ mod tests {
     fn test_folder_item_decode_invalid_buf() {
         // Invalid buf that's too short.
         let invalid_buf = [0, 1, 0, 0];
-        let _ = FolderItem::decode(&invalid_buf[..]).expect_err("should fail");
+        let _ = FolderItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ = FolderItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
 
         // Invalid buf with mismatching name length field and actual name length.
         let invalid_buf = [0, 0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 106, 0, 2, 0x74];
-        let _ = FolderItem::decode(&invalid_buf[..]).expect_err("should fail");
+        let _ = FolderItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ = FolderItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
     }
 
-    #[test]
+    #[fuchsia::test]
     /// Tests encoding a MediaElementItem succeeds.
     fn test_media_element_item_encode() {
         let element_uid = 1;
@@ -1493,39 +1718,111 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
     /// Tests decoding a MediaElementItem succeeds.
+    #[fuchsia::test]
     fn test_media_element_item_decode_success() {
         let no_attrs_buf = [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 3, 0, 3, 0x61, 0x62, 0x63, 0];
 
-        let item = MediaElementItem::decode(&no_attrs_buf[..]).expect("Just checked");
-        assert_eq!(item.element_uid, 1);
-        assert_eq!(item.media_type, MediaType::Video);
-        assert_eq!(item.name, "abc".to_string());
-        assert_eq!(item.attributes.len(), 0);
+        let (item, decoded_len) =
+            MediaElementItem::try_decode(&no_attrs_buf[..], false).expect("should have succeeded");
+        assert_eq!(decoded_len, no_attrs_buf.len());
+        assert_eq!(
+            item,
+            MediaElementItem {
+                element_uid: 1,
+                media_type: MediaType::Video,
+                name: "abc".to_string(),
+                attributes: vec![],
+            }
+        );
 
         let attrs_buf = [
             0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 3, 0, 3, 0x61, 0x62, 0x63, 2, 0, 0, 0, 1, 0, 106, 0, 1,
             0x61, 0, 0, 0, 2, 0, 106, 0, 2, 0x62, 0x63,
         ];
 
-        let item = MediaElementItem::decode(&attrs_buf[..]).expect("Just checked");
-        assert_eq!(item.element_uid, 2);
-        assert_eq!(item.media_type, MediaType::Audio);
-        assert_eq!(item.name, "abc".to_string());
-        assert_eq!(item.attributes.len(), 2);
+        let (item, decoded_len) =
+            MediaElementItem::try_decode(&attrs_buf[..], false).expect("should have succeeded");
+        assert_eq!(decoded_len, attrs_buf.len());
         assert_eq!(
-            item.attributes[0],
-            AttributeValueEntry {
-                attribute_id: MediaAttributeId::try_from(1).expect("should be attribute id"),
-                value: "a".to_string(),
+            item,
+            MediaElementItem {
+                element_uid: 2,
+                media_type: MediaType::Audio,
+                name: "abc".to_string(),
+                attributes: vec![
+                    AttributeValueEntry {
+                        attribute_id: MediaAttributeId::try_from(1)
+                            .expect("should be attribute id"),
+                        value: "a".to_string(),
+                    },
+                    AttributeValueEntry {
+                        attribute_id: MediaAttributeId::try_from(2)
+                            .expect("should be attribute id"),
+                        value: "bc".to_string(),
+                    },
+                ],
             }
         );
+    }
+
+    /// Tests decoding a MediaElementItem succeeds.
+    #[fuchsia::test]
+    fn test_malformed_media_element_item_decode_success() {
+        let no_attrs_buf = [
+            0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 3,
+            // Should be 3 bytes, but 5 bytes is defined as displayable name length.
+            0, 5, 0x61, 0x62, 0x63, 0,
+        ];
+
+        let _ = MediaElementItem::try_decode(&no_attrs_buf[..], false)
+            .expect_err("should have failed without adjustments");
+        let (item, decoded_len) =
+            MediaElementItem::try_decode(&no_attrs_buf[..], true).expect("should have succeeded");
+        assert_eq!(decoded_len, no_attrs_buf.len());
         assert_eq!(
-            item.attributes[1],
-            AttributeValueEntry {
-                attribute_id: MediaAttributeId::try_from(2).expect("should be attribute id"),
-                value: "bc".to_string(),
+            item,
+            MediaElementItem {
+                element_uid: 1,
+                media_type: MediaType::Video,
+                name: "abc".to_string(),
+                attributes: vec![],
+            }
+        );
+
+        let attrs_buf = [
+            0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 3,
+            // Should be 3 bytes, but 5 bytes is defined as displayable name length.
+            0, 5, 0x61, 0x62, 0x63, 2,
+            // Should be 1 byte, but 3 bytes is defined as attribute value length.
+            0, 0, 0, 1, 0, 106, 0, 3, 0x61,
+            // Should be 2 byte, but 4 bytes is defined as attribute value length.
+            0, 0, 0, 2, 0, 106, 0, 4, 0x62, 0x63,
+        ];
+
+        let _ = MediaElementItem::try_decode(&no_attrs_buf[..], false)
+            .expect_err("should have failed without adjustments");
+        let (item, decoded_len) =
+            MediaElementItem::try_decode(&attrs_buf[..], true).expect("should have succeeded");
+        assert_eq!(decoded_len, attrs_buf.len());
+        assert_eq!(
+            item,
+            MediaElementItem {
+                element_uid: 2,
+                media_type: MediaType::Audio,
+                name: "abc".to_string(),
+                attributes: vec![
+                    AttributeValueEntry {
+                        attribute_id: MediaAttributeId::try_from(1)
+                            .expect("should be attribute id"),
+                        value: "a".to_string(),
+                    },
+                    AttributeValueEntry {
+                        attribute_id: MediaAttributeId::try_from(2)
+                            .expect("should be attribute id"),
+                        value: "bc".to_string(),
+                    },
+                ],
             }
         );
     }
@@ -1535,30 +1832,42 @@ mod tests {
     fn test_media_element_item_decode_invalid_buf() {
         // Invalid buf that's too short.
         let invalid_buf = [0, 0, 0, 0, 0, 0, 0, 1];
-        let _ = MediaElementItem::decode(&invalid_buf[..]).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
 
         // Invalid buf with mismatching name length field and actual name length.
         let invalid_buf = [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 106, 0, 2, 0x61, 0x62, 0x63, 0];
-        let _ = MediaElementItem::decode(&invalid_buf[..]).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
 
         // Invalid attribute ID was provided.
         let invalid_buf = [
             0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 106, 0, 3, 0x61, 0x62, 0x63, 1, 0, 0, 0, 9, 0, 106, 0, 4,
             0x74, 0x65, 0x73, 0x74,
         ];
-        let _ = MediaElementItem::decode(&invalid_buf[..]).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
 
         // Invalid number of attribute values were provided.
         let invalid_buf = [
             0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 106, 0, 3, 0x61, 0x62, 0x63, 2, 0, 0, 0, 1, 0, 106, 0, 4,
             0x74, 0x65, 0x73, 0x74,
         ];
-        let _ = MediaElementItem::decode(&invalid_buf[..]).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], false).expect_err("should have failed");
+        let _ =
+            MediaElementItem::try_decode(&invalid_buf[..], true).expect_err("should have failed");
     }
 
-    #[test]
     /// Tests converting from a FIDL MediaPlayerItem to a local MediaPlayerItem
     /// works as intended.
+    #[fuchsia::test]
     fn test_fidl_to_media_player_item() {
         let player_id = 1;
         let item_fidl = fidl_avrcp::MediaPlayerItem {
