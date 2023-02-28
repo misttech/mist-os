@@ -353,7 +353,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
   EXPECT_OK(op3->private_storage()->status);
   EXPECT_NOT_OK(op4->private_storage()->status);
   EXPECT_NOT_OK(op5->private_storage()->status);
-  EXPECT_OK(op6->private_storage()->status);
+  EXPECT_NOT_OK(op6->private_storage()->status);
   EXPECT_OK(op7->private_storage()->status);
 }
 
@@ -1041,7 +1041,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
   EXPECT_OK(op2->private_storage()->status);
   EXPECT_NOT_OK(op3->private_storage()->status);
   EXPECT_NOT_OK(op4->private_storage()->status);
-  EXPECT_OK(op5->private_storage()->status);
+  EXPECT_NOT_OK(op5->private_storage()->status);
   EXPECT_OK(op6->private_storage()->status);
 }
 

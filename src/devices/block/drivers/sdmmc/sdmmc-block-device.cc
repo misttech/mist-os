@@ -19,6 +19,7 @@
 
 #include "sdmmc-partition-device.h"
 #include "sdmmc-rpmb-device.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace {
 
@@ -460,22 +461,14 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
   switch (kBlockOp(btxn->command)) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE:
-      if ((btxn->rw.offset_dev >= max) || ((max - btxn->rw.offset_dev) < btxn->rw.length)) {
-        BlockComplete(txn, ZX_ERR_OUT_OF_RANGE);
-        return;
-      }
-      if (btxn->rw.length == 0) {
-        BlockComplete(txn, ZX_OK);
+      if (zx_status_t status = block::CheckIoRange(btxn->rw, max); status != ZX_OK) {
+        BlockComplete(txn, status);
         return;
       }
       break;
     case BLOCK_OP_TRIM:
-      if ((btxn->trim.offset_dev >= max) || ((max - btxn->trim.offset_dev) < btxn->trim.length)) {
-        BlockComplete(txn, ZX_ERR_OUT_OF_RANGE);
-        return;
-      }
-      if (btxn->trim.length == 0) {
-        BlockComplete(txn, ZX_OK);
+      if (zx_status_t status = block::CheckIoRange(btxn->trim, max); status != ZX_OK) {
+        BlockComplete(txn, status);
         return;
       }
       break;
