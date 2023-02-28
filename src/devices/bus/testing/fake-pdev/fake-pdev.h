@@ -109,11 +109,19 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
 
   FakePDevFidl() = default;
 
+  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_platform_device::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(this, async_get_default_dispatcher(),
+                                               fidl::kIgnoreBindingClosure),
+    });
+  }
+
   zx_status_t Connect(fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
     binding_group_.AddBinding(async_get_default_dispatcher(), std::move(request), this,
                               fidl::kIgnoreBindingClosure);
     return ZX_OK;
   }
+
   zx_status_t SetConfig(Config config) {
     config_ = std::move(config);
     return ZX_OK;

@@ -6,47 +6,14 @@
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 
+#include <ddktl/device.h>
+
 namespace ddk {
 
-namespace {
-
-zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> GetClient(
-    zx_device_t* parent) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  zx_status_t status = device_connect_fidl_protocol(
-      parent, fidl::DiscoverableProtocolName<fuchsia_hardware_platform_device::Device>,
-      endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  return zx::ok(std::move(endpoints->client));
-}
-
-zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> GetClient(
-    zx_device_t* parent, const char* fragment_name) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent, fragment_name,
-      fidl::DiscoverableProtocolName<fuchsia_hardware_platform_device::Device>,
-      endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  return zx::ok(std::move(endpoints->client));
-}
-
-}  // namespace
-
 PDevFidl::PDevFidl(zx_device_t* parent) {
-  zx::result client = GetClient(parent);
+  zx::result client =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
+          parent);
   if (client.is_error()) {
     return;
   }
@@ -54,7 +21,8 @@ PDevFidl::PDevFidl(zx_device_t* parent) {
 }
 
 PDevFidl::PDevFidl(zx_device_t* parent, const char* fragment_name) {
-  zx::result client = GetClient(parent, fragment_name);
+  zx::result client = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent, fragment_name);
   if (client.is_error()) {
     return;
   }
@@ -65,7 +33,9 @@ PDevFidl::PDevFidl(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> cli
     : pdev_(std::move(client)) {}
 
 zx::result<PDevFidl> PDevFidl::Create(zx_device_t* parent) {
-  zx::result client = GetClient(parent);
+  zx::result client =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
+          parent);
   if (client.is_error()) {
     return client.take_error();
   }
@@ -73,7 +43,8 @@ zx::result<PDevFidl> PDevFidl::Create(zx_device_t* parent) {
 }
 
 zx::result<PDevFidl> PDevFidl::Create(zx_device_t* parent, const char* fragment_name) {
-  zx::result client = GetClient(parent, fragment_name);
+  zx::result client = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_platform_device::Service::Device>(parent, fragment_name);
   if (client.is_error()) {
     return client.take_error();
   }

@@ -93,14 +93,16 @@ void FakePDevFidl::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& c
     completer.ReplyError(ZX_ERR_NOT_FOUND);
     return;
   }
-  zx::vmo dup;
-  mmio->second.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
   fidl::Arena arena;
-  completer.ReplySuccess(fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
-                             .offset(mmio->second.offset)
-                             .size(mmio->second.size)
-                             .vmo(std::move(dup))
-                             .Build());
+  auto builder = fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
+                     .offset(mmio->second.offset)
+                     .size(mmio->second.size);
+  if (mmio->second.vmo.is_valid()) {
+    zx::vmo dup;
+    mmio->second.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+    builder.vmo(std::move(dup));
+  }
+  completer.ReplySuccess(builder.Build());
 }
 void FakePDevFidl::GetInterrupt(GetInterruptRequestView request,
                                 GetInterruptCompleter::Sync& completer) {

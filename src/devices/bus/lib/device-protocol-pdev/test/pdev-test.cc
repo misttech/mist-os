@@ -124,6 +124,30 @@ TEST(PDevFidlTest, GetMmios) {
   ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio(4, &mmio));
 }
 
+TEST(PDevFidlTest, InvalidMmioHandle) {
+  constexpr uint32_t kMmioId = 5;
+  constexpr zx_off_t kMmioOffset = 10;
+  constexpr size_t kMmioSize = 11;
+  std::map<uint32_t, fake_pdev::MmioInfo> mmios;
+  mmios[kMmioId] = fake_pdev::MmioInfo{
+      .offset = kMmioOffset,
+      .size = kMmioSize,
+  };
+
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .mmios = std::move(mmios),
+  });
+  ASSERT_OK(client_channel);
+
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
+  pdev_mmio_t mmio = {};
+  ASSERT_OK(pdev.GetMmio(kMmioId, &mmio));
+  ASSERT_EQ(kMmioOffset, mmio.offset);
+  ASSERT_EQ(kMmioSize, mmio.size);
+  ASSERT_EQ(ZX_HANDLE_INVALID, mmio.vmo);
+}
+
 TEST(PDevFidlTest, GetIrqs) {
   constexpr uint32_t kIrqId = 5;
   std::map<uint32_t, zx::interrupt> irqs;
