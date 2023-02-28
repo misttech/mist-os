@@ -929,6 +929,12 @@ before they impact the system.
 Temporary flag to assist on serial driver migration from kernel's implementation to
 ulib/uart implementation.
 
+### kernel.select=\<string>
+
+**Default:** `zircon`
+
+The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
+
 
 ## Options available only on arm64 machines
 

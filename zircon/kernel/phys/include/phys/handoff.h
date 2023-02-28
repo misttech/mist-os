@@ -150,6 +150,9 @@ static_assert(ktl::is_default_constructible_v<PhysHandoff>);
 
 extern PhysHandoff* gPhysHandoff;
 
+// This is the entry point function for the ELF kernel.
+extern "C" [[noreturn]] void PhysbootHandoff(PhysHandoff* handoff);
+
 #ifdef _KERNEL
 
 // These functions relate to PhysHandoff but exist only in the kernel proper.

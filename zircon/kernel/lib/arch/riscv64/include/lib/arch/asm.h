@@ -25,6 +25,10 @@
 /// #if __has_feature(shadow_call_stack) it's used for the SCSP.
 #define shadow_call_sp s2
 
+.macro assert.fail
+  unimp
+.endm
+
 // Standard prologue sequence for FP setup, with CFI.
 .macro .prologue.fp frame_extra_size=0
   sub sp, sp, 16 + \frame_extra_size

@@ -476,12 +476,57 @@ if (current_toolchain != default_toolchain) {
     ]
   }
 
+  kernel_elf_binary("physboot-elf-kernel-hello-world-test") {
+    testonly = true
+    output_name = "physzircon"
+    sources = [ "physboot-elf-kernel-hello-world-test.cc" ]
+    defines = [
+      "HANDOFF_PTR_DEREF=1",
+      "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"",
+    ]
+    deps = [
+      "..:physboot.kernel",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/code-patching:self-test",
+      "//zircon/system/ulib/uart",
+    ]
+  }
+
+  kernel_package("physboot-elf-kernel-test-data") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    deps = [
+      ":physboot-elf-kernel-hello-world-test($phys_toolchain)",
+      ":physboot-elf-kernel-test-data.cmdline",
+    ]
+  }
+
+  kernel_cmdline("physboot-elf-kernel-test-data.cmdline") {
+    args = [ "kernel.select=physboot-elf-kernel-test-data" ]
+  }
+
+  zbi("physboot-elf-kernel-test-data.zbi") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    deps = [
+      ":physboot-elf-kernel-test-data($phys_toolchain)",
+      "..:physboot-elf-kernel.package",
+    ]
+  }
+
+  zbi_test("physboot-elf-kernel-test") {
+    deps = [ ":physboot-elf-kernel-test-data.zbi" ]
+  }
+
   group("test") {
     testonly = true
     deps = [
       ":backtrace-test",
       ":hello-world-test",
       ":phys-unittests",
+      ":physboot-elf-kernel-test",
       ":trampoline-boot-zbi-test",
       ":turducken-boot-next-zbi-test",
       ":turducken-zbi-test",

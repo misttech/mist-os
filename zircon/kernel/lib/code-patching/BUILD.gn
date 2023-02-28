@@ -17,6 +17,16 @@ source_set("code-patching") {
   }
 }
 
+source_set("self-test") {
+  public = [ "include/lib/code-patching/self-test.h" ]
+  public_configs = [ ":headers.config" ]
+  sources = [ "self-test.S" ]
+  deps = [
+    ":case-id-asm",
+    "//zircon/kernel/lib/arch",
+  ]
+}
+
 library_headers("headers") {
   headers = [
     "lib/code-patching/asm.h",

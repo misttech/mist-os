@@ -17,12 +17,6 @@
 #include <phys/allocation.h>
 #include <phys/handoff.h>
 
-// The default kernel package (i.e., STORAGE_KERNEL BOOTFS namespace) in which
-// we will pick a kernel ZBI to boot.
-//
-// TODO(fxbug.dev/68585): Support kernel page selection via a boot option.
-constexpr ktl::string_view kDefaultKernelPackage = "zircon";
-
 // The name of the kernel ZBI within a kernel package.
 constexpr ktl::string_view kKernelZbiName = "kernel.zbi";
 

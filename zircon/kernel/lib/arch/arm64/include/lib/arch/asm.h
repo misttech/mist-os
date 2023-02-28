@@ -24,6 +24,10 @@ percpu_ptr .req x20
 /// #if __has_feature(shadow_call_stack) it's used for the SCSP.
 shadow_call_sp .req x18
 
+.macro assert.fail
+  brk #23
+.endm
+
 // Standard prologue sequence for FP setup, with CFI.
 .macro .prologue.fp frame_extra_size=0
   stp x29, x30, [sp, #-(16 + \frame_extra_size)]!

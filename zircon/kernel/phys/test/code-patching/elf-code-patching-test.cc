@@ -95,17 +95,17 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     enum class ExpectedCase : uint32_t { kAddOne = kAddOneCaseId };
 
     auto patch = [](code_patching::Patcher& patcher, ExpectedCase case_id,
-                    ktl::span<ktl::byte> code) -> fit::result<ElfImage::Error> {
+                    ktl::span<ktl::byte> code, auto&& print) -> fit::result<ElfImage::Error> {
       ZX_ASSERT_MSG(case_id == ExpectedCase::kAddOne,
                     "code-patching case ID %" PRIu32 " != expected %" PRIu32,
                     static_cast<uint32_t>(case_id), static_cast<uint32_t>(ExpectedCase::kAddOne));
       ZX_ASSERT_MSG(code.size_bytes() == PATCH_SIZE_ADD_ONE, "code patch %zu bytes != expected %d",
                     code.size_bytes(), PATCH_SIZE_ADD_ONE);
-      printf("Patching [%p, %p)...", code.data(), code.data() + code.size());
+      print({"patched nop-fill"});
       patcher.NopFill(code);
       return fit::ok();
     };
-    auto result = add_one.ForEachPatch<ExpectedCase>(patch, patched);
+    auto result = add_one.ForEachPatch<ExpectedCase>(patch);
     ZX_ASSERT(result.is_ok());
 
     printf("Calling %#" PRIx64 "...", add_one.entry());
@@ -132,17 +132,17 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     enum class ExpectedCase : uint32_t { kMultiply = kMultiplyByFactorCaseId };
 
     auto patch = [](code_patching::Patcher& patcher, ExpectedCase case_id,
-                    ktl::span<ktl::byte> code) -> fit::result<ElfImage::Error> {
+                    ktl::span<ktl::byte> code, auto&& print) -> fit::result<ElfImage::Error> {
       ZX_ASSERT_MSG(case_id == ExpectedCase::kMultiply,
                     "code-patching case ID %" PRIu32 " != expected %" PRIu32,
                     static_cast<uint32_t>(case_id), static_cast<uint32_t>(ExpectedCase::kMultiply));
       ZX_ASSERT_MSG(code.size_bytes() == PATCH_SIZE_MULTIPLY_BY_FACTOR,
                     "code patch %zu bytes != expected %d", code.size_bytes(),
                     PATCH_SIZE_MULTIPLY_BY_FACTOR);
-      printf("Patching [%p, %p)...", code.data(), code.data() + code.size());
+      print({"patch in multiply_by_two"});
       return patcher.PatchWithAlternative(code, "multiply_by_two");
     };
-    auto result = multiply.ForEachPatch<ExpectedCase>(patch, patched_stub2);
+    auto result = multiply.ForEachPatch<ExpectedCase>(patch);
     ZX_ASSERT_MSG(result.is_ok(), "%.*s", static_cast<int>(result.error_value().reason.size()),
                   result.error_value().reason.data());
 
@@ -170,17 +170,17 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     enum class ExpectedCase : uint32_t { kMultiply = kMultiplyByFactorCaseId };
 
     auto patch = [](code_patching::Patcher& patcher, ExpectedCase case_id,
-                    ktl::span<ktl::byte> code) -> fit::result<ElfImage::Error> {
+                    ktl::span<ktl::byte> code, auto&& print) -> fit::result<ElfImage::Error> {
       ZX_ASSERT_MSG(case_id == ExpectedCase::kMultiply,
                     "code-patching case ID %" PRIu32 " != expected %" PRIu32,
                     static_cast<uint32_t>(case_id), static_cast<uint32_t>(ExpectedCase::kMultiply));
       ZX_ASSERT_MSG(code.size_bytes() == PATCH_SIZE_MULTIPLY_BY_FACTOR,
                     "code patch %zu bytes != expected %d", code.size_bytes(),
                     PATCH_SIZE_MULTIPLY_BY_FACTOR);
-      printf("Patching [%p, %p)...", code.data(), code.data() + code.size());
+      print({"patch in multiply_by_ten"});
       return patcher.PatchWithAlternative(code, "multiply_by_ten");
     };
-    auto result = multiply.ForEachPatch<ExpectedCase>(patch, patched_stub10);
+    auto result = multiply.ForEachPatch<ExpectedCase>(patch);
     ZX_ASSERT_MSG(result.is_ok(), "%.*s", static_cast<int>(result.error_value().reason.size()),
                   result.error_value().reason.data());
 

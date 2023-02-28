@@ -134,9 +134,8 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
   return fit::ok();
 }
 
-ktl::span<ktl::byte> ElfImage::GetBytesToPatch(const code_patching::Directive& patch,
-                                               const Allocation& loaded) {
-  ktl::span<ktl::byte> file = loaded ? loaded.data() : image_.image();
+ktl::span<ktl::byte> ElfImage::GetBytesToPatch(const code_patching::Directive& patch) {
+  ktl::span<ktl::byte> file = image_.image();
   ZX_ASSERT_MSG(patch.range_start >= image_.base() && file.size() >= patch.range_size &&
                     file.size() - patch.range_size >= patch.range_start - image_.base(),
                 "Patch ID %#" PRIx32 " range [%#" PRIx64 ", %#" PRIx64
@@ -146,7 +145,8 @@ ktl::span<ktl::byte> ElfImage::GetBytesToPatch(const code_patching::Directive& p
   return file.subspan(static_cast<size_t>(patch.range_start - image_.base()), patch.range_size);
 }
 
-Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_place_ok) {
+Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_place_ok,
+                          size_t extra_vaddr_size) {
   auto endof = [](const auto& last) { return last.offset() + last.filesz(); };
   const uint64_t load_size = ktl::visit(endof, load_info_.segments().back());
 
@@ -157,7 +157,7 @@ Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_pl
     gSymbolize->OnLoad(*this);
   });
 
-  if (in_place_ok && CanLoadInPlace()) {
+  if (in_place_ok && CanLoadInPlace() && extra_vaddr_size == 0) {
     // TODO(fxbug.dev/113938): Could have a memalloc::Pool feature to
     // reclassify the memory range to the new type.
 
@@ -171,8 +171,8 @@ Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_pl
   }
 
   fbl::AllocChecker ac;
-  Allocation image =
-      Allocation::New(ac, memalloc::Type::kPhysElf, load_info_.vaddr_size(), ZX_PAGE_SIZE);
+  Allocation image = Allocation::New(ac, memalloc::Type::kPhysElf,
+                                     load_info_.vaddr_size() + extra_vaddr_size, ZX_PAGE_SIZE);
   if (!ac.check()) {
     ZX_PANIC("cannot allocate phys ELF load image of %#zx bytes",
              static_cast<size_t>(load_info_.vaddr_size()));
@@ -257,4 +257,15 @@ void ElfImage::InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, u
   name_ = name;
 
   OnHandoff();
+}
+
+void ElfImage::PrintPatch(const code_patching::Directive& patch,
+                          ktl::initializer_list<ktl::string_view> strings) const {
+  printf("%s: code-patching on %.*s: ", gSymbolize->name(), static_cast<int>(name_.size()),
+         name_.data());
+  for (ktl::string_view str : strings) {
+    stdout->Write(str);
+  }
+  printf(": [%#" PRIx64 ", %#" PRIx64 ")\n", patch.range_start,
+         patch.range_start + patch.range_size);
 }

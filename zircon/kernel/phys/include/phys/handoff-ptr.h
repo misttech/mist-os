@@ -70,7 +70,15 @@ struct PhysHandoffPtrTraits<T, PhysHandoffPtrEncoding::PhysAddr> {
   }
 };
 
+#ifndef HANDOFF_PTR_DEREF
 #ifdef _KERNEL
+#define HANDOFF_PTR_DEREF 1
+#else
+#define HANDOFF_PTR_DEREF 0
+#endif
+#endif
+
+#if HANDOFF_PTR_DEREF
 template <typename T>
 struct PhysHandoffPtrTraits<T, PhysHandoffPtrEncoding::KernelVirtualPtr> {
   using ExportType = T*;
@@ -96,7 +104,7 @@ class PhysHandoffPtr {
     return *this;
   }
 
-#ifdef _KERNEL
+#if HANDOFF_PTR_DEREF
   // Handoff pointers can only be dereferenced in the kernel proper.
 
   T* get() const { return Traits::Import(ptr_); }
@@ -106,7 +114,7 @@ class PhysHandoffPtr {
   T& operator*() const { return *get(); }
 
   T* operator->() const { return get(); }
-#endif  // _KERNEL
+#endif  // HANDOFF_PTR_DEREF
 
  private:
   using Traits = PhysHandoffPtrTraits<T, Encoding>;
@@ -131,7 +139,7 @@ class PhysHandoffSpan {
 
   PhysHandoffSpan& operator=(PhysHandoffSpan&&) noexcept = default;
 
-#ifdef _KERNEL
+#if HANDOFF_PTR_DEREF
   ktl::span<T> get() const { return {ptr_.get(), size_}; }
 
   ktl::span<T> release() { return {ptr_.release(), size_}; }
@@ -154,7 +162,7 @@ class PhysHandoffString : public PhysHandoffSpan<const char, Encoding, Lifetime>
   PhysHandoffString() = default;
   PhysHandoffString(const PhysHandoffString&) = default;
 
-#ifdef _KERNEL
+#ifdef HANDOFF_PTR_DEREF
   ktl::string_view get() const {
     ktl::span str = Base::get();
     return {str.data(), str.size()};

@@ -8,6 +8,7 @@ import("//build/config/zircon/standard.gni")
 import("//build/info/info.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
+import("//build/zbi/kernel_cmdline.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/params.gni")
@@ -543,6 +544,7 @@ if (toolchain_environment == "kernel.phys" ||
       ":handoff-entropy",
       ":log",
       ":new",
+      ":physboot.h",
       ":symbolize",
       ":zbitl-allocation",
       "$arch_phys:arch-handoff-prep",
@@ -668,56 +670,17 @@ kernel_package("physboot.package") {
   deps = [ ":elf-physboot(:kernel.phys_$current_cpu)" ]
 }
 
-if (toolchain_environment == "kernel.phys") {
-  kernel_elf_binary("elf-physboot") {
-    output_name = "physboot"
+kernel_package("physboot-elf-kernel.package") {
+  prefix = ""
+  deps = [
+    ":physboot-elf-kernel(:kernel.phys_$current_cpu)",
+    ":physboot-elf-kernel.cmdline",
+  ]
+}
 
-    target_type = "loadable_module"
-    has_patches = false
-
-    sources = [ "physboot-elf-main.cc" ]
-    deps = [
-      ":elf-image",
-      ":log",
-      ":physboot-main",
-      ":physload.module",
-      ":stdio",
-      ":symbolize",
-      "//zircon/kernel/lib/boot-options",
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
-    ]
-  }
-
-  source_set("physboot-main") {
-    public = [ "physboot.h" ]
-    allow_circular_includes_from = [ ":handoff-prep" ]
-
-    sources = [ "physboot.cc" ]
-    deps = [
-      ":allocation",
-      ":boot-zbi",
-      ":handoff",
-      ":handoff-prep",
-      ":kernel-package",
-      ":log",
-      ":main",
-      ":stdio",
-      ":symbolize",
-      ":trampoline-boot",
-      ":uart",
-      "//src/lib/zbitl",
-      "//zircon/kernel/arch/$zircon_cpu/code-patches",
-      "//zircon/kernel/lib/arch",
-      "//zircon/kernel/lib/boot-options",
-      "//zircon/kernel/lib/code-patching",
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
-    ]
-
-    # Used as a bias when patching kernel code.
-    defines = [ "KERNEL_LINK_ADDRESS=${kernel_base}" ]
-  }
+kernel_cmdline("physboot-elf-kernel.cmdline") {
+  visibility = [ ":*" ]
+  args = [ "kernel.phys.next=physboot-elf-kernel" ]
 }
 
 zbi_executable("physload") {
@@ -780,12 +743,16 @@ if (is_kernel) {
   config("physload.module.config") {
     visibility = [ ":*" ]
     ldflags = [ "-Wl,-e,PhysLoadHandoff" ]
+    configs = [ ":phys-elf-module.config" ]
+  }
 
-    # The GNU linkers don't do page-aligned segments by default like LLD,
-    # so a linker script is required.
+  # The GNU linkers don't do page-aligned segments by default like LLD,
+  # so a linker script is required.
+  config("phys-elf-module.config") {
+    visibility = [ ":*" ]
     if (is_gcc) {
       inputs = [ "phys-elf-module.ld" ]
-      ldflags += [
+      ldflags = [
         "-Wl,-z,relro",
         "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
       ]
@@ -810,4 +777,101 @@ if (is_kernel) {
     ]
     public_configs = [ ":includes" ]
   }
+
+  kernel_elf_binary("elf-physboot") {
+    output_name = "physboot"
+
+    target_type = "loadable_module"
+    has_patches = false
+
+    sources = [ "physboot-elf-main.cc" ]
+    deps = [
+      ":elf-image",
+      ":log",
+      ":physboot-main",
+      ":physload.module",
+      ":stdio",
+      ":symbolize",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
+  }
+
+  source_set("physboot.h") {
+    visibility = [ ":*" ]
+    public = [ "physboot.h" ]
+  }
+
+  source_set("physboot-main") {
+    public_deps = [ ":physboot.h" ]
+    sources = [ "physboot.cc" ]
+    deps = [
+      ":allocation",
+      ":boot-zbi",
+      ":handoff",
+      ":handoff-prep",
+      ":kernel-package",
+      ":log",
+      ":main",
+      ":stdio",
+      ":symbolize",
+      ":trampoline-boot",
+      ":uart",
+      "//src/lib/zbitl",
+      "//zircon/kernel/arch/$zircon_cpu/code-patches",
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/code-patching",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
+
+    # Used as a bias when patching kernel code.
+    defines = [ "KERNEL_LINK_ADDRESS=${kernel_base}" ]
+  }
+
+  kernel_elf_binary("physboot-elf-kernel") {
+    target_type = "loadable_module"
+    has_patches = false
+
+    sources = [ "physboot-elf-kernel.cc" ]
+    include_dirs = [ "//zircon/kernel/arch/$zircon_cpu/include" ]
+    deps = [
+      ":allocation",
+      ":boot-zbi",
+      ":elf-image",
+      ":handoff",
+      ":handoff-prep",
+      ":kernel-package",
+      ":log",
+      ":physboot.h",
+      ":physload.module",
+      ":stdio",
+      ":symbolize",
+      "//sdk/lib/fit",
+      "//zircon/kernel/arch/$zircon_cpu/code-patches",
+      "//zircon/kernel/lib/boot-options",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
+  }
+
+  # A physboot-compatible ELF kernel depends on this.
+  source_set("physboot.kernel") {
+    public_deps = [ ":handoff" ]
+    public_configs = [ ":physboot.kernel.config" ]
+    deps = [ ":physboot.interp" ]
+  }
+
+  config("physboot.kernel.config") {
+    visibility = [ ":*" ]
+    ldflags = [ "-Wl,-e,PhysbootHandoff" ]
+    configs = [ ":phys-elf-module.config" ]
+  }
+}
+
+kernel_elf_interp("physboot.interp") {
+  visibility = [ ":*" ]
+  deps = [ ":physboot-elf-kernel($phys_toolchain)" ]
 }

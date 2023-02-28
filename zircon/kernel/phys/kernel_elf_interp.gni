@@ -30,7 +30,7 @@ import("//build/zircon/c_utils.gni")
 template("kernel_elf_interp") {
   main_target = target_name
   inc_target = "$target_name.incbin.inc"
-  inc_label = ":$inc_target($default_toolchain)"
+  inc_label = ":$inc_target"
   gen_dir = get_label_info(inc_label, "target_gen_dir")
   elf_interp_inc_file = "$target_name.elf-interp.inc"
   elf_interp_inc = "$gen_dir/$elf_interp_inc_file"
@@ -51,61 +51,63 @@ template("kernel_elf_interp") {
     deps = [ inc_label ]
   }
 
-  if (current_toolchain == default_toolchain) {
-    # Generate a file containing `.incbin "FILENAME"` to be used in the
-    # assembly.  The source_set() depends on this so that elf-interp.S can
-    # #include the file in a fresh build, though since it's an #include the
-    # depfiles from the doing the assembly will track that (redundantly).
-    # However, those depfiles are only from the compiler driver doing the
-    # preprocessing; the assembler itself doesn't emit any depfile information
-    # about the `.incbin` use of the input file.  So to ensure that the
-    # assembler step is repeated when *that* file changes, we unconditionally
-    # update this generated one-liner file whenever the file `.incbin` will
-    # make the assembler read was touched.  This happens only implicitly via
-    # the depfile that the script writes, since we don't know what that actual
-    # file name is until we derive it from the rspfile below.  What we use is
-    # the .stamp file that buildidtool writes.  This has a name that's the same
-    # as the link_ouptut_path plus ".build-id.stamp" and is an implicit output
-    # of the linking step.  GN doesn't really care that this output file
-    # exists, but GN tells Ninja about it being an output of the link step.
-    # That's enough for Ninja to ingest a depfile that refers to it and ensure
-    # that the next incremental build will regenerate $elf_interp_inc when and
-    # only when the $deps linking target was actually relinked.
+  # Generate a file containing `.incbin "FILENAME"` to be used in the assembly.
+  # The source_set() depends on this so that elf-interp.S can #include the file
+  # in a fresh build, though since it's an #include the depfiles from the doing
+  # the assembly will track that (redundantly).  However, those depfiles are
+  # only from the compiler driver doing the preprocessing; the assembler itself
+  # doesn't emit any depfile information about the `.incbin` use of the input
+  # file.  So to ensure that the assembler step is repeated when *that* file
+  # changes, we unconditionally update this generated one-liner file whenever
+  # the file `.incbin` will make the assembler read was touched.  This happens
+  # only implicitly via the depfile that the script writes, since we don't know
+  # what that actual file name is until we derive it from the rspfile below.
+  # What we use is the .stamp file that buildidtool writes.  This has a name
+  # that's the same as the link_ouptut_path plus ".build-id.stamp" and is an
+  # implicit output of the linking step.  GN doesn't really care that this
+  # output file exists, but GN tells Ninja about it being an output of the link
+  # step.  That's enough for Ninja to ingest a depfile that refers to it and
+  # ensure that the next incremental build will regenerate $elf_interp_inc when
+  # and only when the $deps linking target was actually relinked.
+  #
+  # **NOTE:** This generation has to be evaluated separately in each toolchain
+  # because there's no other way to be sure that the `deps` list is resolved to
+  # the intended toolchain.  Even if it used explicit toolchain labels, then
+  # those would be generated using `$current_cpu` and the like, which gets
+  # re-evaluated in a toolchain redirect and e.g. in $default_toolchain might
+  # not be the same CPU that a particular kernel or phys toolchain is using.
 
-    rspfile_target = "$target_name.interp.rspfile"
-    interp_rspfile = "$target_gen_dir/$target_name.elf-interp.rspfile"
+  rspfile_target = "$target_name.interp.rspfile"
+  interp_rspfile = "$target_gen_dir/$target_name.elf-interp.rspfile"
 
-    action(inc_target) {
-      visibility = [ ":$main_target" ]
-      forward_variables_from(invoker, [ "testonly" ])
+  action(inc_target) {
+    visibility = [ ":$main_target" ]
+    forward_variables_from(invoker, [ "testonly" ])
 
-      script = "//zircon/kernel/phys/kernel-elf-interp.sh"
-      sources = [ interp_rspfile ]
-      deps = [ ":$rspfile_target" ]
-      outputs = [ elf_interp_inc ]
-      depfile = "$elf_interp_inc.d"
-      args = rebase_path(sources + outputs + [ depfile ], root_build_dir)
+    script = "//zircon/kernel/phys/kernel-elf-interp.sh"
+    sources = [ interp_rspfile ]
+    deps = [ ":$rspfile_target" ]
+    outputs = [ elf_interp_inc ]
+    depfile = "$elf_interp_inc.d"
+    args = rebase_path(sources + outputs + [ depfile ], root_build_dir)
 
-      metadata = {
-        # Don't propagate from zbi_input()-compatible targets.
-        zbi_input_barrier = []
-      }
+    metadata = {
+      # Don't propagate from zbi_input()-compatible targets.
+      zbi_input_barrier = []
     }
+  }
 
-    # Before all else, we need an rspfile that shows the file name that the
-    # link step wrote.  The handy template generates an rspfile that contains
-    # the name of the main output file.  The buildidtool file we need has a
-    # name that can be derived from this file name.
-    link_output_rspfile(rspfile_target) {
-      visibility = [ ":$inc_target" ]
-      forward_variables_from(invoker,
-                             [
-                               "deps",
-                               "testonly",
-                             ])
-      outputs = [ interp_rspfile ]
-    }
-  } else {
-    not_needed(invoker, [ "deps" ])
+  # Before all else, we need an rspfile that shows the file name that the
+  # link step wrote.  The handy template generates an rspfile that contains
+  # the name of the main output file.  The buildidtool file we need has a
+  # name that can be derived from this file name.
+  link_output_rspfile(rspfile_target) {
+    visibility = [ ":$inc_target" ]
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+    outputs = [ interp_rspfile ]
   }
 }

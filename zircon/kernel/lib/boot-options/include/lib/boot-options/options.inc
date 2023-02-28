@@ -791,6 +791,10 @@ Temporary flag to assist on serial driver migration from kernel's implementation
 ulib/uart implementation.
 )""")
 
+DEFINE_OPTION("kernel.select", SmallString, select, {"zircon"}, R"""(
+The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
+)""")
+
 // Machine-specific options are included here for all the kernel places.
 // In the generator program, they're included separately.
 

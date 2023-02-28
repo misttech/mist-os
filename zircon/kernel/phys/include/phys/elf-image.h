@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_
 
+#include <inttypes.h>
 #include <lib/code-patching/code-patching.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
@@ -21,6 +22,7 @@
 
 #include <ktl/array.h>
 #include <ktl/byte.h>
+#include <ktl/initializer_list.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
@@ -46,6 +48,8 @@ class ElfImage {
   using PublishDebugdataFunction = fit::inline_function<ktl::span<ktl::byte>(
       ktl::string_view sink_name, ktl::string_view vmo_name, ktl::string_view suffix,
       size_t content_size)>;
+
+  using PrintPatchFunction = fit::inline_function<void(ktl::initializer_list<ktl::string_view>)>;
 
   // An ELF image is found at "dir/name". That can be an ELF file or a subtree.
   // The subtree should contain "image.elf", "code-patches.bin", etc.  A
@@ -76,24 +80,29 @@ class ElfImage {
 
   // The template parameter must be an `enum class Id : uint32_t` type.  Calls
   // the callback as fit::result<Error>(code_patching::Patcher&, Id,
-  // ktl::span<ktl::byte>) for each patch in the file.  The Allocation can be
-  // one returned by Load() to patch that copy of the file instead of patching
-  // the BOOTFS file image in place.  (Note Load() returns an empty Allocation
-  // if loading in place.)
+  // ktl::span<ktl::byte>, PrintPatchFunction) for each patch in the file
+  // (Print is as for ArchCodePatch in <lib/code-patching/code-patches.h>).
+  // Before Load() this patches the BOOTFS file image in place.  After Load()
+  // this patches the load image (which could sometimes still be using the file
+  // image in place).
   template <typename Id, typename Callback>
-  fit::result<Error> ForEachPatch(Callback&& callback, const Allocation& loaded = {}) {
+  fit::result<Error> ForEachPatch(Callback&& callback) {
     static_assert(ktl::is_enum_v<Id>);
     static_assert(ktl::is_same_v<uint32_t, ktl::underlying_type_t<Id>>);
     static_assert(ktl::is_invocable_r_v<fit::result<Error>, Callback, code_patching::Patcher&, Id,
-                                        ktl::span<ktl::byte>>);
+                                        ktl::span<ktl::byte>, PrintPatchFunction>);
+    fit::result<Error> result = fit::ok();
     for (const code_patching::Directive& patch : patches()) {
-      ktl::span<ktl::byte> bytes = GetBytesToPatch(patch, loaded);
-      auto result = callback(patcher_, static_cast<Id>(patch.id), bytes);
+      ktl::span<ktl::byte> bytes = GetBytesToPatch(patch);
+      auto print = [this, &patch](ktl::initializer_list<ktl::string_view> strings) {
+        PrintPatch(patch, strings);
+      };
+      result = callback(patcher_, static_cast<Id>(patch.id), bytes, print);
       if (result.is_error()) {
-        return result.take_error();
+        break;
       }
     }
-    return fit::ok();
+    return result;
   }
 
   // Return true if the memory within the BOOTFS image for this file is
@@ -111,13 +120,24 @@ class ElfImage {
   // the lifetime of the ElfImage. In general, the returned allocation should
   // not be consulted for addresses within the load image; that is what
   // memory_image() is for.
-  Allocation Load(ktl::optional<uint64_t> relocation_address = {}, bool in_place_ok = true);
+  Allocation Load(ktl::optional<uint64_t> relocation_address = {}, bool in_place_ok = true,
+                  // TODO(fxbug.dev/84107): This won't be needed once kernels
+                  // in use no longer use the old boot_alloc code that blindly
+                  // uses memory off the end of the kernel image.
+                  size_t extra_vaddr_size = 0);
 
   // Returns the virtual address where the image will be loaded. Must be called
   // after Load().
   uintptr_t load_address() const {
     ZX_DEBUG_ASSERT(load_bias_);
     return static_cast<uintptr_t>(load_info_.vaddr_start() + *load_bias_);
+  }
+
+  // Set the virtual address where the image will be loaded.
+  // This is the address Relocate() adjusts things for.
+  void set_load_address(uint64_t address) {
+    ZX_ASSERT(address % ZX_PAGE_SIZE == 0);
+    load_bias_ = address - load_info_.vaddr_start();
   }
 
   // Returns the physical address where the image will be loaded. Must be
@@ -198,17 +218,12 @@ class ElfImage {
   // instantiation inside this module.
   void PublishSelfLlvmProfdata(PublishSelfCallback publish) const;
 
-  // Set the virtual address where the image will be loaded.
-  void set_load_address(uint64_t address) {
-    ZX_DEBUG_ASSERT(!load_bias_);
-    ZX_ASSERT(address % ZX_PAGE_SIZE == 0);
-    load_bias_ = address - load_info_.vaddr_start();
-  }
-
   ktl::span<const code_patching::Directive> patches() const { return patcher_.patches(); }
 
-  ktl::span<ktl::byte> GetBytesToPatch(const code_patching::Directive& patch,
-                                       const Allocation& loaded);
+  ktl::span<ktl::byte> GetBytesToPatch(const code_patching::Directive& patch);
+
+  void PrintPatch(const code_patching::Directive& patch,
+                  ktl::initializer_list<ktl::string_view> strings) const;
 
   ktl::string_view name_;
   elfldltl::DirectMemory image_{{}};

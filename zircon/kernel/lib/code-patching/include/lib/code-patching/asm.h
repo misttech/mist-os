@@ -29,11 +29,13 @@
   // The `M` means to set the SHF_MERGE flag, which tells the linker it can
   // merge identical entries. While there will not be any identical entries in
   // this section in practice, the use of `M` allows us to specify the entry
-  // size (16), which makes for nicer `readelf` output. `?` tells the assembler
-  // to use the current section's section group (if any). Inside `.function`,
-  // that ensures that the .code-patches data is attached to the function and
-  // gets GC'd if and only if the function itself gets GC'd.
-  .pushsection .code-patches, "M?", %progbits, 16
+  // size (16), which makes for nicer `readelf` output. `R` sets SHF_GNU_RETAIN
+  // to tell the linker that this non-allocated section should not be discarded
+  // even if there are no references to it.  `?` tells the assembler to use the
+  // current section's section group (if any). Inside `.function`, that ensures
+  // that the .code-patches data is attached to the function and gets GC'd if
+  // and only if the function itself gets GC'd.
+  .pushsection .code-patches, "MR?", %progbits, 16
   .quad \begin
   .int \end - \begin
   .int \ident
