@@ -650,6 +650,32 @@ type EncoderSettings = flexible union {
     5: cvsd CvsdEncoderSettings;
 };
 
+/// A list of permitted codec profiles. This list should be flexible since codecs can and will be added
+/// in the future. This can contain both video and audio profiles if needed.
+@available(added=11)
+type CodecProfile = flexible enum : uint32 {
+    H264PROFILE_BASELINE = 0;
+    H264PROFILE_MAIN = 1;
+    H264PROFILE_EXTENDED = 2;
+    H264PROFILE_HIGH = 3;
+    H264PROFILE_HIGH10PROFILE = 4;
+    H264PROFILE_HIGH422PROFILE = 5;
+    H264PROFILE_HIGH444PREDICTIVEPROFILE = 6;
+    H264PROFILE_SCALABLEBASELINE = 7;
+    H264PROFILE_SCALABLEHIGH = 8;
+    H264PROFILE_STEREOHIGH = 9;
+    H264PROFILE_MULTIVIEWHIGH = 10;
+    VP8PROFILE_ANY = 11;
+    VP9PROFILE_PROFILE0 = 12;
+    VP9PROFILE_PROFILE1 = 13;
+    VP9PROFILE_PROFILE2 = 14;
+    VP9PROFILE_PROFILE3 = 15;
+    HEVCPROFILE_MAIN = 16;
+    HEVCPROFILE_MAIN10 = 17;
+    HEVCPROFILE_MAIN_STILL_PICTURE = 18;
+    MJPEG_BASELINE = 19;
+};
+
 /// FormatDetails
 ///
 /// This describes/details the format on input or output of a StreamProcessor
@@ -788,4 +814,19 @@ type FormatDetails = table {
     /// independently by the client).  Set if timestamp extrapolation is known to be
     /// needed or known to be acceptable to the client.
     7: timebase uint64;
+
+    /// The codec profile for the given encoder or decoder.
+    ///
+    /// For encoders: This value is completely optional. A client may want to specify the codec
+    /// profile used for protocol compatibility reasons (i.e. WebRTC). However if the value is not
+    /// set then the the encoder is free to choose any supported codec profile.
+    ///
+    /// For decoders: This value is optional but providing it is best practice (at least of
+    /// unencrypted streams). Container formats include the encoded profile and this should be
+    /// provided to the decoder. Certain formats like VP9 and AV1 include the encoded profile in
+    /// their elementary bitstream so it is possible for those decoders to figure out the profile
+    /// the stream is encoded in. Regardless, clients should provide the encoded profile if
+    /// possible.
+    @available(added=11)
+    8: profile CodecProfile;
 };

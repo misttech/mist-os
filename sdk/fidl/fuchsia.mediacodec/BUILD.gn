@@ -13,6 +13,7 @@ fidl("fuchsia.mediacodec") {
   sources = [ "codec_factory.fidl" ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.math",
     "//sdk/fidl/fuchsia.media",
     "//zircon/vdso/zx",
   ]

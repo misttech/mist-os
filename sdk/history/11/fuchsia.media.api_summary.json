@@ -1218,6 +1218,112 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_BASELINE",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_EXTENDED",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_HIGH",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_HIGH10PROFILE",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_HIGH422PROFILE",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_HIGH444PREDICTIVEPROFILE",
+        "value": "6"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_MAIN",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_MULTIVIEWHIGH",
+        "value": "10"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_SCALABLEBASELINE",
+        "value": "7"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_SCALABLEHIGH",
+        "value": "8"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.H264PROFILE_STEREOHIGH",
+        "value": "9"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.HEVCPROFILE_MAIN",
+        "value": "16"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.HEVCPROFILE_MAIN10",
+        "value": "17"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.HEVCPROFILE_MAIN_STILL_PICTURE",
+        "value": "18"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.MJPEG_BASELINE",
+        "value": "19"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.VP8PROFILE_ANY",
+        "value": "11"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.VP9PROFILE_PROFILE0",
+        "value": "12"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.VP9PROFILE_PROFILE1",
+        "value": "13"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.VP9PROFILE_PROFILE2",
+        "value": "14"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/CodecProfile.VP9PROFILE_PROFILE3",
+        "value": "15"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.media/CodecProfile",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.media/ColorSpace.HD_REC709",
         "value": "3"
     },
@@ -1457,6 +1563,12 @@
         "name": "fuchsia.media/FormatDetails.pass_through_parameters",
         "ordinal": "5",
         "type": "vector<fuchsia.media/Parameter>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.media/FormatDetails.profile",
+        "ordinal": "8",
+        "type": "fuchsia.media/CodecProfile"
     },
     {
         "kind": "table/member",
