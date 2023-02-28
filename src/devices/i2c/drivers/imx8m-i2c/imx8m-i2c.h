@@ -30,8 +30,12 @@ using DeviceType = ddk::Device<Imx8mI2c, ddk::Unbindable>;
 
 class Imx8mI2c : public DeviceType, public ddk::I2cImplProtocol<Imx8mI2c, ddk::base_protocol> {
  public:
-  explicit Imx8mI2c(zx_device_t* parent, fbl::Vector<std::unique_ptr<Imx8mI2cBus>>&& bus_list)
-      : DeviceType(parent), buses_(std::move(bus_list)), bus_count_(buses_.size()) {}
+  explicit Imx8mI2c(zx_device_t* parent, fbl::Vector<std::unique_ptr<Imx8mI2cBus>>&& bus_list,
+                    uint32_t bus_base)
+      : DeviceType(parent),
+        buses_(std::move(bus_list)),
+        bus_count_(buses_.size()),
+        bus_base_(bus_base) {}
   ~Imx8mI2c() = default;
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
@@ -58,6 +62,7 @@ class Imx8mI2c : public DeviceType, public ddk::I2cImplProtocol<Imx8mI2c, ddk::b
   zx_status_t Bind();
   fbl::Vector<std::unique_ptr<Imx8mI2cBus>> buses_;
   size_t bus_count_ = 0;
+  const uint32_t bus_base_;
 };
 
 class Imx8mI2cBus {
@@ -80,6 +85,8 @@ class Imx8mI2cBus {
   void SetTimeout(zx::duration timeout);
 
  private:
+  static uint32_t GetBusBase(zx_device_t* parent, uint32_t controller_count);
+
   zx_status_t HostInit();
   zx_status_t WaitForBusState(bool busy);
   zx_status_t PreStart();

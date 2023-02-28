@@ -4,6 +4,7 @@
 
 #include "imx8m-i2c.h"
 
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
@@ -409,7 +410,7 @@ zx_status_t Imx8mI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
   return buses_[bus_id]->SetBitRate(bitrate);
 }
 
-uint32_t Imx8mI2c::I2cImplGetBusBase() { return 0; }
+uint32_t Imx8mI2c::I2cImplGetBusBase() { return bus_base_; }
 uint32_t Imx8mI2c::I2cImplGetBusCount() { return static_cast<uint32_t>(bus_count_); }
 
 zx_status_t Imx8mI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
@@ -437,6 +438,41 @@ void Imx8mI2c::SetTimeout(zx::duration timeout) {
   for (uint32_t id = 0; id < bus_count_; id++) {
     buses_[id]->SetTimeout(timeout);
   }
+}
+
+uint32_t GetBusBase(zx_device_t* parent, const uint32_t controller_count) {
+  if (controller_count != 1) {
+    return 0;
+  }
+
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
+      parent, DEVICE_METADATA_I2C_CHANNELS);
+  if (!decoded.is_ok()) {
+    if (decoded.status_value() != ZX_ERR_NOT_FOUND) {
+      zxlogf(WARNING, "Bus metadata could not be decoded: %s", decoded.status_string());
+    }
+    return 0;
+  }
+
+  // Prefer the top-level bus ID if present.
+  if (decoded->has_bus_id()) {
+    return decoded->bus_id();
+  }
+
+  if (!decoded->has_channels() || decoded->channels().empty()) {
+    zxlogf(WARNING, "No channels specified in bus metadata");
+    return 0;
+  }
+
+  const uint32_t bus_id = decoded->channels()[0].has_bus_id() ? decoded->channels()[0].bus_id() : 0;
+  for (const auto& channel : decoded->channels()) {
+    const uint32_t this_bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
+    if (this_bus_id != bus_id) {
+      return 0;
+    }
+  }
+
+  return bus_id;
 }
 
 zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
@@ -491,7 +527,9 @@ zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
     }
   }
 
-  auto dev = fbl::make_unique_checked<Imx8mI2c>(&ac, parent, std::move(bus_list));
+  const uint32_t bus_base = GetBusBase(parent, info.mmio_count);
+
+  auto dev = fbl::make_unique_checked<Imx8mI2c>(&ac, parent, std::move(bus_list), bus_base);
   if (!ac.check()) {
     zxlogf(ERROR, "ZX_ERR_NO_MEMORY");
     return ZX_ERR_NO_MEMORY;
