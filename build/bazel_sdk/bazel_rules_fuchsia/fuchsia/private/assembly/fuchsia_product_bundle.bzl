@@ -460,7 +460,6 @@ def _fuchsia_product_bundle_impl(ctx):
     ]
     if ctx.attr.repository_keys != None:
         script_lines.append("cp -r $ORIG_DIR/$REPOKEYS $ORIG_DIR/$OUTDIR")
-        script_lines.append("cp -r $ORIG_DIR/$OUTDIR/blobs $ORIG_DIR/$OUTDIR/repository/blobs")
 
     script_lines.append("cp $ORIG_DIR/$BOOTSERVER $ORIG_DIR/$OUTDIR")
     env["BOOTSERVER"] = fuchsia_toolchain.bootserver.path
