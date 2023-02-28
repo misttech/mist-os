@@ -775,6 +775,23 @@ impl<'a> ReachabilityTestHelper<'a> {
         }
     }
 
+    // Within the internet to gateway test, there may be an additional
+    // Snapshot that has a value of internet and gateway state as
+    // false. This is an intermediary state due to the separate probes
+    // and is expected to resolve on the next update to a Some(true)
+    // gateway state.
+    async fn next_snapshot_with_gateway(
+        &mut self,
+        is_reachable: bool,
+    ) -> fnet_reachability::Snapshot {
+        loop {
+            let snapshot = self.next_snapshot().await;
+            if snapshot.gateway_reachable == Some(is_reachable) {
+                break snapshot;
+            }
+        }
+    }
+
     fn set_iface_states(&mut self, states: Vec<State>) {
         assert!(states.len() == self.iface_states.len());
         self.iface_states
@@ -904,7 +921,7 @@ async fn test_internet_to_gateway_state(name: &str) {
     assert_eq!(snapshot.internet_available, Some(true));
 
     helper.set_iface_states(vec![State::Gateway, State::Gateway]);
-    let snapshot = helper.next_snapshot_with_internet(false).await;
+    let snapshot = helper.next_snapshot_with_gateway(true).await;
     assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(false));
 }
