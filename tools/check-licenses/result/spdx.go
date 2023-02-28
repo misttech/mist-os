@@ -12,7 +12,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/check-licenses/project"
 
-	spdx_builder "github.com/spdx/tools-golang/builder"
 	spdx_common "github.com/spdx/tools-golang/spdx/common"
 	spdx "github.com/spdx/tools-golang/spdx/v2_2"
 )
@@ -23,6 +22,8 @@ const (
 )
 
 func generateSPDXDoc(name string, projects []*project.Project, root *project.Project) (string, error) {
+	seenOtherLicenses := make(map[string]*spdx.OtherLicense, 0)
+
 	if root == nil {
 		return "", fmt.Errorf("root project must not be nil")
 	}
@@ -30,30 +31,28 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 	var b strings.Builder
 	b.WriteString("\n")
 
-	spdxConfig := &spdx_builder.Config2_2{
-		NamespacePrefix: "fuchsia-",
-		CreatorType:     "Tool",
-		Creator:         "fuchsia.googlesource.com/fuchsia/+/refs/head/main/tools/check-licenses",
-		PathsIgnored: []string{
-			"**",  // Skip all files for now.
-			"**/", // Skip all folders for now.
+	doc := &spdx.Document{
+		SPDXVersion:       "SPDX-2.2",
+		DataLicense:       "CC0-1.0",
+		SPDXIdentifier:    "SPDXRef-DOCUMENT",
+		DocumentName:      Config.SPDXDocName,
+		DocumentNamespace: "fuchsia--{da39a3ee5e6b4b0d3255bfef95601890afd80709 []}",
+		Files:             make([]*spdx.File, 0),
+		Annotations:       make([]*spdx.Annotation, 0),
+		Snippets:          make([]spdx.Snippet, 0),
+		Reviews:           nil,
+		Packages:          make([]*spdx.Package, 0),
+		Relationships:     make([]*spdx.Relationship, 0),
+		OtherLicenses:     make([]*spdx.OtherLicense, 0),
+		CreationInfo: &spdx.CreationInfo{
+			Creators: []spdx_common.Creator{
+				spdx_common.Creator{
+					Creator:     "fuchsia.googlesource.com/fuchsia/+/refs/head/main/tools/check-licenses",
+					CreatorType: "Tool",
+				},
+			},
 		},
 	}
-	doc, err := spdx_builder.Build2_2(Config.SPDXDocName, Config.FuchsiaDir, spdxConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate SPDX document for path %s: %w", Config.FuchsiaDir, err)
-	}
-
-	// Initialize these fields to make the online validator happy.
-	// https://tools.spdx.org/app/validate/
-	doc.Files = make([]*spdx.File, 0)
-	doc.Annotations = make([]*spdx.Annotation, 0)
-	doc.Snippets = make([]spdx.Snippet, 0)
-	doc.Reviews = nil
-
-	doc.Packages = make([]*spdx.Package, 0)
-	doc.Relationships = make([]*spdx.Relationship, 0)
-	doc.OtherLicenses = make([]*spdx.OtherLicense, 0)
 
 	// Every SPDX doc must have one "DESCRIBES" relationship.
 	r := &spdx.Relationship{
@@ -86,7 +85,10 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 						l.URL,
 					},
 				}
-				doc.OtherLicenses = append(doc.OtherLicenses, ol)
+				if _, ok := seenOtherLicenses[ol.LicenseIdentifier]; !ok {
+					seenOtherLicenses[ol.LicenseIdentifier] = ol
+					doc.OtherLicenses = append(doc.OtherLicenses, ol)
+				}
 				continue
 			}
 
@@ -99,7 +101,10 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 						d.URL,
 					},
 				}
-				doc.OtherLicenses = append(doc.OtherLicenses, ol)
+				if _, ok := seenOtherLicenses[ol.LicenseIdentifier]; !ok {
+					seenOtherLicenses[ol.LicenseIdentifier] = ol
+					doc.OtherLicenses = append(doc.OtherLicenses, ol)
+				}
 			}
 		}
 	}

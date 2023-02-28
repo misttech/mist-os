@@ -104,7 +104,7 @@ func SaveResults(cmdConfig interface{}, cmdMetrics MetricsInterface) (string, er
 			// TODO(fxbug.dev/116788): Return ("", err) instead once SPDX generation
 			// stops flaking. For now, do not treat a failure from generateSPDXDoc
 			// as fatal.
-			b.WriteString("SPDX doc generation failed.\n")
+			b.WriteString(fmt.Sprintf("SPDX doc generation failed: %v\n", err))
 		} else {
 			b.WriteString(s)
 		}

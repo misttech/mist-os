@@ -6,7 +6,6 @@
   "DocumentComment": "",
   "creationInfo": {
     "creators": [
-      "Tool: github.com/spdx/tools-golang/builder",
       "Tool: fuchsia.googlesource.com/fuchsia/+/refs/head/main/tools/check-licenses"
     ],
     "created": "SKIP ME"
