@@ -62,7 +62,7 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
     return AE_OK;
   }
 
-  ZX_DEBUG_ASSERT(InterruptLevel == 0x9);  // SCI
+  ZX_DEBUG_ASSERT_MSG(InterruptLevel == 0x9, "%d", InterruptLevel);  // SCI
 
   fbl::AllocChecker ac;
   std::unique_ptr<AcpiIrqThread> arg(new (&ac) AcpiIrqThread());
@@ -103,8 +103,8 @@ ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLE
  * @return AE_NOT_EXIST There is no handler installed for this interrupt level.
  */
 ACPI_STATUS AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, ACPI_OSD_HANDLER Handler) {
-  ZX_DEBUG_ASSERT(InterruptNumber == 0x9);  // SCI
-  ZX_DEBUG_ASSERT(sci_irq);
+  ZX_DEBUG_ASSERT_MSG(InterruptNumber == 0x9, "%d", InterruptNumber);  // SCI
+  ZX_DEBUG_ASSERT(sci_irq != nullptr);
   zx_interrupt_destroy(sci_irq->irq_handle);
   thrd_join(sci_irq->thread, nullptr);
   sci_irq.reset();
