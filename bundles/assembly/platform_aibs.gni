@@ -36,6 +36,9 @@ platform_aib_names = [
   "kernel_args_user",
   "kernel_args_userdebug",
 
+  # Netstack
+  "netstack",
+
   # WLAN
   "wlan_base",
   "wlan_legacy_privacy_support",

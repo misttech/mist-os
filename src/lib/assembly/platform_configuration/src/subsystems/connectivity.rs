@@ -34,6 +34,8 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     }
                 }
             }
+
+            builder.platform_bundle("netstack");
         }
 
         Ok(())

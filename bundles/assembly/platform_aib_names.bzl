@@ -16,6 +16,7 @@ PLATFORM_AIB_NAMES = [
     "kernel_args_user",
     "kernel_args_userdebug",
     "live_usb",
+    "netstack",
     "omaha_client",
     "starnix_support",
     "wlan_base",

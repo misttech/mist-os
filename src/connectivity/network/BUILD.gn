@@ -3,14 +3,10 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//src/connectivity/network/use_netstack3.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 declare_args() {
-  # DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR NETSTACK DEVELOPER USE ONLY
-  # TODO(https://fxbug.dev/85450) - Convert this to a platform configuration
-  # option in Product Assembly
-  use_netstack3 = false
-
   # TODO(https://fxbug.dev/122670): If we make tracing in netstack3
   # conditionally compiled, make this flag generic over netstack and choose the
   # appropriate netstack package based on the combination of netstack3
@@ -89,7 +85,10 @@ network_package("network-basic") {
 fuchsia_package("netstack2") {
   package_name = "netstack"
   deps = [ "netstack:component" ]
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//bundles/assembly:*",
+  ]
 }
 
 fuchsia_package("netstack2-with-tracing") {
@@ -101,7 +100,10 @@ fuchsia_package("netstack2-with-tracing") {
 fuchsia_package("netstack3") {
   package_name = "netstack"
   deps = [ "netstack3:component-dropin" ]
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//bundles/assembly:*",
+  ]
 }
 
 group("netstack") {
