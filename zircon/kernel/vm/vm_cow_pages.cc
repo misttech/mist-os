@@ -122,6 +122,12 @@ class BatchPQRemove {
   void Push(vm_page_t* page) {
     DEBUG_ASSERT(page);
     DEBUG_ASSERT(count_ < kMaxPages);
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+    VmCowPages* owner = reinterpret_cast<VmCowPages*>(page->object.get_object());
+    DEBUG_ASSERT(owner != nullptr);
+    AssertHeld(owner->lock_ref());
+    owner->DecrementResidentPagesLocked();
+#endif
     pages_[count_] = page;
     count_++;
     if (count_ == kMaxPages) {
@@ -475,7 +481,8 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 
     // Free the old page.
     vm_page_t* released_page = old_page.ReleasePage();
-    pmm_page_queues()->Remove(released_page);
+    PQRemoveLocked(released_page);
+
     DEBUG_ASSERT(!list_in_list(&released_page->queue_node));
     FreePageLocked(released_page, /*freeing_owned_page=*/true);
 
@@ -1068,6 +1075,13 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
           AssertHeld<Lock<SpinLock>, IrqSave>(*pq->get_lock());
 
           vm_page_t* page = p->Page();
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+          DEBUG_ASSERT(page->object.get_object() == this);
+          AssertHeld(lock_ref());
+          AssertHeld(child.lock_ref());
+          DecrementResidentPagesLocked();
+          child.IncrementResidentPagesLocked();
+#endif
           pq->ChangeObjectOffsetLocked(page, &child, off);
         }
 
@@ -1145,6 +1159,14 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
             // Not an else-if to intentionally perform this if the previous block turned a reference
             // into a page.
             if (page_or_marker->IsPage()) {
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+              DEBUG_ASSERT(page_or_marker->Page()->object.get_object() == this);
+              // Because the child exists in the same hierarchy, the lock will be the same.
+              AssertHeld(lock_ref());
+              AssertHeld(state.child->lock_ref());
+              DecrementResidentPagesLocked();
+              state.child->IncrementResidentPagesLocked();
+#endif
               state.pq->ChangeObjectOffset(page_or_marker->Page(), state.child,
                                            offset - state.merge_start_offset);
             }
@@ -1737,7 +1759,7 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       VmPageOrMarker removed = target_page_owner->page_list_.RemoveContent(target_page_offset);
       // We know this is a true page since it is just our |target_page|, which is a true page.
       vm_page* removed_page = removed.ReleasePage();
-      pmm_page_queues()->Remove(removed_page);
+      target_page_owner->PQRemoveLocked(removed_page);
       DEBUG_ASSERT(removed_page == target_page);
     } else {
       // Otherwise we need to fork the page.  The page has no writable mappings so we don't need to
@@ -1844,7 +1866,7 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
     // We know this is a true page since it is just our target |page|.
     vm_page* removed = parent_->page_list_.RemoveContent(offset + parent_offset_).ReleasePage();
     DEBUG_ASSERT(removed == page);
-    pmm_page_queues()->Remove(removed);
+    parent_->PQRemoveLocked(removed);
     DEBUG_ASSERT(!list_in_list(&removed->queue_node));
     list_add_tail(freed_list, &removed->queue_node);
   } else {
@@ -3446,7 +3468,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     if (released_page.IsPage()) {
       vm_page_t* page = released_page.ReleasePage();
       DEBUG_ASSERT(page->object.pin_count == 0);
-      pmm_page_queues()->Remove(page);
+      PQRemoveLocked(page);
       DEBUG_ASSERT(!list_in_list(&page->queue_node));
       list_add_tail(&freed_list, &page->queue_node);
     } else if (released_page.IsReference()) {
@@ -3478,7 +3500,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
              (parent_immutable(offset) && !parent_has_content(offset)))) {
           if (slot->IsPage()) {
             vm_page_t* page = slot->ReleasePage();
-            pmm_page_queues()->Remove(page);
+            PQRemoveLocked(page);
             DEBUG_ASSERT(!list_in_list(&page->queue_node));
             list_add_tail(&freed_list, &page->queue_node);
           } else if (slot->IsReference()) {
@@ -3598,6 +3620,10 @@ void VmCowPages::MoveToNotPinnedLocked(vm_page_t* page, uint64_t offset) {
 }
 
 void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  DEBUG_ASSERT(reinterpret_cast<VmCowPages*>(page->object.get_object()) == nullptr);
+  IncrementResidentPagesLocked();
+#endif
   if (is_source_preserving_page_content()) {
     DEBUG_ASSERT(is_page_dirty_tracked(page));
     // We can only move Clean pages to the pager backed queues as they track age information for
@@ -4505,7 +4531,8 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
       [&compression, this](VmPageOrMarkerRef p, uint64_t off) {
         if (p->IsPage()) {
           DEBUG_ASSERT(p->Page()->object.pin_count == 0);
-          pmm_page_queues()->Remove(p->Page());
+          AssertHeld(lock_ref());
+          PQRemoveLocked(p->Page());
         } else if (p->IsReference()) {
           // A regular reference we can move are permitted in the VmPageSpliceList, it is up to the
           // receiver of the pages to reject or otherwise deal with them. A temporary reference we
@@ -4929,7 +4956,8 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
         list_initialize(&freed_list);
 
         page_list_.RemovePages(
-            [&freed_list](VmPageOrMarker* p, uint64_t off) {
+            [&freed_list, this](VmPageOrMarker* p, uint64_t off) {
+              AssertHeld(lock_ref());
               DEBUG_ASSERT(p->IsPage());
               vm_page_t* page = p->Page();
               DEBUG_ASSERT(is_page_dirty_tracked(page));
@@ -4939,7 +4967,7 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
                 vm_page_t* released_page = p->ReleasePage();
                 DEBUG_ASSERT(released_page == page);
                 DEBUG_ASSERT(page->object.pin_count == 0);
-                pmm_page_queues()->Remove(page);
+                PQRemoveLocked(page);
                 DEBUG_ASSERT(!list_in_list(&page->queue_node));
                 list_add_tail(&freed_list, &page->queue_node);
               }
@@ -5629,7 +5657,7 @@ bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
   // to release any now empty intermediate nodes.
   vm_page_t* p = page_list_.RemoveContent(offset).ReleasePage();
   DEBUG_ASSERT(p == page);
-  pmm_page_queues()->Remove(page);
+  PQRemoveLocked(page);
 
   eviction_event_count_++;
   IncrementHierarchyGenerationCountLocked();
@@ -5673,7 +5701,7 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
         page_or_marker.SwapPageForReference(compressor->Start(page));
     DEBUG_ASSERT(compress_page == page);
   }
-  pmm_page_queues()->Remove(page);
+  PQRemoveLocked(page);
   // Going to drop the lock so need to indicate that we've modified the hierarchy by putting in the
   // temporary reference.
   IncrementHierarchyGenerationCountLocked();
@@ -5924,7 +5952,7 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     return status;
   }
   SwapPageLocked(offset, old_page, new_page);
-  pmm_page_queues()->Remove(old_page);
+  PQRemoveLocked(old_page);
   FreePageLocked(old_page, /*freeing_owned_page=*/true);
   if (after_page) {
     *after_page = new_page;

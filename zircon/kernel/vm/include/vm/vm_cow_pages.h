@@ -22,6 +22,7 @@
 #include <fbl/macros.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <kernel/attribution.h>
 #include <kernel/mutex.h>
 #include <vm/compressor.h>
 #include <vm/page_source.h>
@@ -635,6 +636,23 @@ class VmCowPages final : public VmHierarchyBase,
   // Initializes the PageCache instance for COW page allocations.
   static void InitializePageCache(uint32_t level);
 
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  void IncrementResidentPagesLocked() TA_REQ(lock()) {
+    ++resident_pages_;
+    if (attribution_obj_) {
+      attribution_obj_->AddPages(1, shared_);
+    }
+  }
+
+  void DecrementResidentPagesLocked() TA_REQ(lock()) {
+    DEBUG_ASSERT(resident_pages_ > 0);
+    --resident_pages_;
+    if (attribution_obj_) {
+      attribution_obj_->RemovePages(1, shared_);
+    }
+  }
+#endif
+
  private:
   // private constructor (use Create...())
   VmCowPages(ktl::unique_ptr<VmCowPagesContainer> cow_container,
@@ -1024,6 +1042,17 @@ class VmCowPages final : public VmHierarchyBase,
     return page_source_ && page_source_->properties().is_handling_free;
   }
 
+  // Wrapper around PageQueues::Remove calls. Must be used instead of calling
+  // Remove directly.
+  // Note: The caller must own the page being removed.
+  void PQRemoveLocked(vm_page_t* page) TA_REQ(lock()) {
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+    DEBUG_ASSERT(this == reinterpret_cast<VmCowPages*>(page->object.get_object()));
+    DecrementResidentPagesLocked();
+#endif
+    pmm_page_queues()->Remove(page);
+  }
+
   // Helper to free |pages| to the PMM. |freeing_owned_pages| is set to true to indicate that this
   // object had ownership of |pages|. This could either be true ownership, where the |pages| have
   // been removed from this object's page list, or logical ownership, e.g. when a source page list
@@ -1265,6 +1294,20 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Count eviction events so that we can report them to the user.
   uint64_t eviction_event_count_ TA_GUARDED(lock()) = 0;
+
+#if KERNEL_BASED_MEMORY_ATTRIBUTION
+  // Cached count of number of pages in the page_list_, used to efficiently
+  // update ownership to new attribution objects.
+  size_t resident_pages_ TA_GUARDED(lock()) = 0;
+
+  // Required reference back to a AttributionObject associated with the process that last uniquely
+  // owned these pages.
+  fbl::RefPtr<AttributionObject> attribution_obj_ TA_GUARDED(lock());
+
+  // Whether resident_pages_ are charged on the attribution_obj_'s private count or not (meaningless
+  // if attribution_obj_ == nullptr).
+  bool shared_ TA_GUARDED(lock()) = false;
+#endif
 
   // a tree of pages
   VmPageList page_list_ TA_GUARDED(lock());
