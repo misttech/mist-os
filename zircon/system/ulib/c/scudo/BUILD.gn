@@ -303,6 +303,14 @@ libc_test("gwp_asan-unittests") {
     "tests/thread_contention.cpp",
   ]
 
+  # TODO(fxbug.dev/122829): Add tests/never_allocated.cpp to sources after gwp_asan
+  # successfully rolls.
+  gwp_asan_git_revision =
+      read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
+  if (gwp_asan_git_revision != [ "f36df953a3bab8b8e54e1ce7214cb710a5605a1a" ]) {
+    sources += [ "tests/never_allocated.cpp" ]
+  }
+
   deps += [ ":gwp_asan.testonly" ]
 
   # Suppress warnings from third party code
