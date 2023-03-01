@@ -20,9 +20,6 @@
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
 
-#include "src/devices/usb/drivers/aml-usb-crg-phy-v2/udc-device.h"
-#include "src/devices/usb/drivers/aml-usb-crg-phy-v2/xhci-device.h"
-
 namespace aml_usb_crg_phy {
 
 class AmlUsbCrgPhy;
@@ -98,8 +95,8 @@ class AmlUsbCrgPhy : public AmlUsbCrgPhyType,
   uint32_t pll_settings_[8];
 
   // Device nodes for child devices. The resources pointed at are managed by the DDK.
-  XhciDevice* xhci_device_ __TA_GUARDED(lock_) = nullptr;
-  UdcDevice* udc_device_ __TA_GUARDED(lock_) = nullptr;
+  zx_device_t* xhci_device_ __TA_GUARDED(lock_) = nullptr;
+  zx_device_t* udc_device_ __TA_GUARDED(lock_) = nullptr;
 
   UsbMode phy_mode_ __TA_GUARDED(lock_) = UsbMode::UNKNOWN;  // Physical USB mode.
   usb_mode_t dr_mode_ = USB_MODE_OTG;  // USB Controller Mode. Internal to Driver.
