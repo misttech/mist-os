@@ -12,37 +12,23 @@
 #include "src/lib/chunked-compression/status.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
+#include "src/storage/blobfs/delivery_blob.h"
+#include "src/storage/blobfs/delivery_blob_private.h"
 #include "src/storage/blobfs/format.h"
 
 namespace blobfs_compress {
 namespace {
 using blobfs::DeliveryBlobHeader;
 using blobfs::DeliveryBlobType;
-using blobfs::UncompressedMetadata;
-using blobfs::ZstdChunkedMetadata;
+using blobfs::MetadataType1;
 using chunked_compression::ChunkedCompressor;
 using chunked_compression::CompressionParams;
 
-zx::result<std::vector<uint8_t>> GenerateUncompressedDeliveryBlob(cpp20::span<const uint8_t> data) {
-  const DeliveryBlobHeader header =
-      DeliveryBlobHeader::Create(DeliveryBlobType::kUncompressed, sizeof(UncompressedMetadata));
-  const UncompressedMetadata metadata = UncompressedMetadata::Create(header, data.size_bytes());
-  // Reserve buffer and write header + metadata + blob data.
-  std::vector<uint8_t> delivery_blob(sizeof metadata + sizeof header + data.size_bytes());
-  uint8_t* buff = delivery_blob.data();
-  std::memcpy(buff, &header, sizeof header);
-  buff += sizeof header;
-  std::memcpy(buff, &metadata, sizeof metadata);
-  buff += sizeof metadata;
-  std::memcpy(buff, data.data(), data.size_bytes());
-  return zx::ok(delivery_blob);
-}
-
-zx::result<std::vector<uint8_t>> GenerateZstdChunkedDeliveryBlob(cpp20::span<const uint8_t> data) {
+zx::result<std::vector<uint8_t>> GenerateBlobType1(cpp20::span<const uint8_t> data) {
   const CompressionParams params = blobfs::GetDefaultChunkedCompressionParams(data.size_bytes());
   ChunkedCompressor compressor(params);
 
-  constexpr size_t kPayloadOffset = sizeof(DeliveryBlobHeader) + sizeof(ZstdChunkedMetadata);
+  constexpr size_t kPayloadOffset = sizeof(DeliveryBlobHeader) + sizeof(MetadataType1);
   const size_t output_limit = params.ComputeOutputSizeLimit(data.size_bytes());
   std::vector<uint8_t> delivery_blob(kPayloadOffset + output_limit);
 
@@ -60,10 +46,10 @@ zx::result<std::vector<uint8_t>> GenerateZstdChunkedDeliveryBlob(cpp20::span<con
   delivery_blob.resize(kPayloadOffset + payload_length);
   // Write delivery blob header and metadata.
   const DeliveryBlobHeader header =
-      DeliveryBlobHeader::Create(DeliveryBlobType::kZstdChunked, sizeof(ZstdChunkedMetadata));
+      DeliveryBlobHeader::Create(DeliveryBlobType::kType1, sizeof(MetadataType1));
   std::memcpy(delivery_blob.data(), &header, sizeof header);
-  const ZstdChunkedMetadata metadata =
-      ZstdChunkedMetadata::Create(header, payload_length, use_compressed_result);
+  const MetadataType1 metadata =
+      MetadataType1::Create(header, payload_length, use_compressed_result);
   std::memcpy(delivery_blob.data() + sizeof header, &metadata, sizeof metadata);
   // Overwrite the payload with original data if we aren't compressing the blob.
   if (!use_compressed_result) {
@@ -167,13 +153,11 @@ zx_status_t BlobfsCompress(const uint8_t* src, const size_t src_sz, uint8_t* des
 zx::result<std::vector<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
                                                       DeliveryBlobType type) {
   switch (type) {
-    case DeliveryBlobType::kUncompressed:
-      return GenerateUncompressedDeliveryBlob(data);
-    case DeliveryBlobType::kZstdChunked:
-      return GenerateZstdChunkedDeliveryBlob(data);
+    case DeliveryBlobType::kType1:
+      return GenerateBlobType1(data);
+    default:
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace blobfs_compress

@@ -16,8 +16,6 @@
 #include <safemath/safe_math.h>
 #include <src/lib/digest/merkle-tree.h>
 
-#include "src/lib/chunked-compression/chunked-compressor.h"
-#include "src/lib/chunked-compression/status.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
@@ -25,24 +23,24 @@
 
 namespace {
 
+using blobfs::DeliveryBlobType;
 using ::chunked_compression::CompressionParams;
 
 const std::set<std::string_view> kCliOptions = {
     "source_file", "compressed_file", "type", "disable_size_alignment", "help", "verbose",
 };
 
-zx::result<blobfs::DeliveryBlobType> DeliveryTypeFromString(const std::string& delivery_type_str) {
-  using DeliveryBlobTypeRaw = std::underlying_type_t<blobfs::DeliveryBlobType>;
+zx::result<DeliveryBlobType> DeliveryTypeFromString(const std::string& delivery_type_str) {
+  using DeliveryBlobTypeRaw = std::underlying_type_t<DeliveryBlobType>;
   const std::set<DeliveryBlobTypeRaw> kSupportedBlobTypes = {
-      static_cast<DeliveryBlobTypeRaw>(blobfs::DeliveryBlobType::kUncompressed),
-      static_cast<DeliveryBlobTypeRaw>(blobfs::DeliveryBlobType::kZstdChunked),
+      static_cast<DeliveryBlobTypeRaw>(DeliveryBlobType::kType1),
   };
-  const DeliveryBlobTypeRaw delivery_blob_type_raw =
+  const DeliveryBlobTypeRaw type_raw =
       safemath::checked_cast<DeliveryBlobTypeRaw>(std::stoul(delivery_type_str));
-  if (kSupportedBlobTypes.find(delivery_blob_type_raw) == kSupportedBlobTypes.cend()) {
+  if (kSupportedBlobTypes.find(type_raw) == kSupportedBlobTypes.cend()) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  return zx::ok(static_cast<blobfs::DeliveryBlobType>(delivery_blob_type_raw));
+  return zx::ok(DeliveryBlobType{type_raw});
 }
 
 void usage(const char* fname) {
@@ -62,8 +60,7 @@ void usage(const char* fname) {
   fprintf(stderr, "--%s=TYPE\n    %s\n", "type",
           "(optional) If specified, uses specified type for size calculation, and will output "
           "blob in delivery format. Output is only compressed if space is saved. Supported types:"
-          "\n\t0 - uncompressed"
-          "\n\t1 - zstd-chunked, default compression level");
+          "\n\t1 - Type A: zstd-chunked, default compression level");
   fprintf(stderr, "--%s\n    %s\n", "disable_size_alignment",
           "Do not align compressed output with block size. Incompatible with --type.");
   fprintf(stderr, "--%s\n    %s\n", "help", "print this usage message.");
@@ -108,7 +105,7 @@ zx_status_t MapFileForReading(const fbl::unique_fd& fd, const uint8_t** out_buf,
 
   void* data = nullptr;
   if (size > 0) {
-    data = mmap(NULL, size, PROT_READ, MAP_SHARED, fd.get(), 0);
+    data = mmap(nullptr, size, PROT_READ, MAP_SHARED, fd.get(), 0);
     if (data == MAP_FAILED) {
       fprintf(stderr, "mmap failed: %s\n", strerror(errno));
       return ZX_ERR_NO_MEMORY;
