@@ -33,7 +33,7 @@ use {
 // TODO(fxbug.dev/91061): Make this larger when we have a protocol to
 // determine the hotspot and the cursor component knows how to produce
 // output that doesn't occupy the full viewport.
-const CURSOR_SIZE: (u32, u32) = (18, 29);
+const _CURSOR_SIZE: (u32, u32) = (18, 29);
 const CURSOR_HOTSPOT: (u32, u32) = (2, 4);
 
 // TODO(fxbug.dev/78201): Remove hardcoded scale when Flatland provides
@@ -370,7 +370,6 @@ impl FlatlandSceneManager {
         root_flatland: ui_comp::FlatlandProxy,
         pointerinjector_flatland: ui_comp::FlatlandProxy,
         scene_flatland: ui_comp::FlatlandProxy,
-        cursor_view_provider: ui_app::ViewProviderProxy,
         a11y_view_provider: a11y_scene::ProviderProxy,
         display_rotation: i32,
         display_pixel_density: Option<f32>,
@@ -525,62 +524,6 @@ impl FlatlandSceneManager {
             )?;
         }
 
-        // If the cursor exists, create the cursor view and embed it as a child of the root view.
-        let mut maybe_cursor_transform_id = None;
-        let mut cursor_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
-        match cursor_view_provider.create_view2(ui_app::CreateView2Args {
-            view_creation_token: Some(cursor_view_creation_pair.view_creation_token),
-            ..ui_app::CreateView2Args::EMPTY
-        }) {
-            Ok(_) => {
-                let flatland = root_flatland.flatland.lock();
-
-                let cursor_transform_id = id_generator.next_transform_id();
-                let cursor_viewport_content_id = id_generator.next_content_id();
-
-                // We create/add the cursor transform second, so that it is above everything else in
-                // the scene graph.
-                flatland.create_transform(&mut cursor_transform_id.clone())?;
-                flatland.add_child(
-                    &mut root_flatland.root_transform_id.clone(),
-                    &mut cursor_transform_id.clone(),
-                )?;
-                // Visible but offscreen until we get a first position event.
-                flatland.set_translation(
-                    &mut cursor_transform_id.clone(),
-                    &mut fmath::Vec_ { x: -100, y: -100 },
-                )?;
-
-                let cursor_size = fmath::SizeU {
-                    width: physical_cursor_size(CURSOR_SIZE.0),
-                    height: physical_cursor_size(CURSOR_SIZE.1),
-                };
-                let link_properties = ui_comp::ViewportProperties {
-                    logical_size: Some(cursor_size),
-                    ..ui_comp::ViewportProperties::EMPTY
-                };
-
-                let (_, child_view_watcher_request) =
-                    create_proxy::<ui_comp::ChildViewWatcherMarker>()?;
-
-                flatland.create_viewport(
-                    &mut cursor_viewport_content_id.clone(),
-                    &mut cursor_view_creation_pair.viewport_creation_token,
-                    link_properties,
-                    child_view_watcher_request,
-                )?;
-                flatland.set_content(
-                    &mut cursor_transform_id.clone(),
-                    &mut cursor_viewport_content_id.clone(),
-                )?;
-
-                maybe_cursor_transform_id = Some(cursor_transform_id);
-            }
-            Err(e) => {
-                warn!("Failed to create cursor View: {:?}. Cursor disabled.", e);
-            }
-        };
-
         let mut a11y_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
 
         // Bridge the pointerinjector and a11y Flatland instances.
@@ -687,7 +630,7 @@ impl FlatlandSceneManager {
             id_generator,
             viewport_hanging_get,
             _viewport_publisher: viewport_publisher,
-            cursor_transform_id: maybe_cursor_transform_id,
+            cursor_transform_id: None,
             cursor_visibility: true,
             display_metrics,
             device_pixel_ratio,

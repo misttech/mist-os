@@ -33,7 +33,6 @@ use {
         RegistryRequest as A11yViewRegistryRequest,
         RegistryRequestStream as A11yViewRegistryRequestStream,
     },
-    fidl_fuchsia_ui_app as ui_app,
     fidl_fuchsia_ui_brightness::ColorAdjustmentHandlerRequestStream,
     fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_display_color as color,
     fidl_fuchsia_ui_display_singleton as singleton_display,
@@ -248,7 +247,6 @@ async fn inner_main() -> Result<(), Error> {
         let root_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
         let pointerinjector_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
         let scene_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
-        let cursor_view_provider = connect_to_protocol::<ui_app::ViewProviderMarker>()?;
         let a11y_view_provider = connect_to_protocol::<a11y_view::ProviderMarker>()?;
         Arc::new(Mutex::new(
             scene_management::FlatlandSceneManager::new(
@@ -257,7 +255,6 @@ async fn inner_main() -> Result<(), Error> {
                 root_flatland,
                 pointerinjector_flatland,
                 scene_flatland,
-                cursor_view_provider,
                 a11y_view_provider,
                 display_rotation,
                 display_pixel_density,
