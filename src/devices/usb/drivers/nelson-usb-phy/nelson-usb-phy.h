@@ -15,9 +15,6 @@
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 
-#include "src/devices/usb/drivers/nelson-usb-phy/dwc2-device.h"
-#include "src/devices/usb/drivers/nelson-usb-phy/xhci-device.h"
-
 namespace nelson_usb_phy {
 
 class NelsonUsbPhy;
@@ -82,8 +79,8 @@ class NelsonUsbPhy : public NelsonUsbPhyType,
   uint32_t pll_settings_[8];
 
   // Device node for binding XHCI driver.
-  std::unique_ptr<XhciDevice> xhci_device_;
-  std::unique_ptr<Dwc2Device> dwc2_device_;
+  zx_device_t* xhci_device_ = nullptr;
+  zx_device_t* dwc2_device_ = nullptr;
   sync_completion_t remove_event_;
 
   UsbMode mode_ = UsbMode::UNKNOWN;

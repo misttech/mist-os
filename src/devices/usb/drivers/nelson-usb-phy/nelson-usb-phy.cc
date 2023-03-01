@@ -256,12 +256,19 @@ void NelsonUsbPhy::SetMode(UsbMode mode) {
     PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(phy_mmio);
   }
 
+  zx_status_t status;
   if (mode == UsbMode::HOST) {
     RemoveDwc2Device(true);
-    AddXhciDevice();
+    status = AddXhciDevice();
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "AddXhciDevice() error %s", zx_status_get_string(status));
+    }
   } else {
     RemoveXhciDevice(true);
-    AddDwc2Device();
+    status = AddDwc2Device();
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "AddDwc2Device() error %s", zx_status_get_string(status));
+    }
   }
 }
 
@@ -322,24 +329,43 @@ zx_status_t NelsonUsbPhy::AddXhciDevice() {
     return ZX_ERR_BAD_STATE;
   }
 
-  xhci_device_ = std::make_unique<XhciDevice>(zxdev());
+  static zx_protocol_device_t ops = {
+      .version = DEVICE_OPS_VERSION,
+      // Defer get_protocol() to parent.
+      .get_protocol =
+          [](void* ctx, uint32_t id, void* proto) {
+            return device_get_protocol(reinterpret_cast<NelsonUsbPhy*>(ctx)->zxdev(), id, proto);
+          },
+      .release = [](void*) {},
+  };
 
   zx_device_prop_t props[] = {
       {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
       {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
       {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_USB_XHCI_COMPOSITE},
   };
-  xhci_device_->DdkAdd(
-      ddk::DeviceAddArgs("xhci").set_props(props).set_proto_id(ZX_PROTOCOL_USB_PHY));
-  return ZX_OK;
+
+  // clang-format off
+  device_add_args_t args = (ddk::DeviceAddArgs("xhci")
+                            .set_context(this)
+                            .set_props(props)
+                            .set_proto_id(ZX_PROTOCOL_USB_PHY)
+                            .set_ops(&ops)).get();
+  // clang-format on
+
+  auto status = device_add(zxdev(), &args, &xhci_device_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "device_add() error %s", zx_status_get_string(status));
+  }
+  return status;
 }
 
 void NelsonUsbPhy::RemoveXhciDevice(bool wait) {
   if (xhci_device_) {
     // devmgr will own the device until it is destroyed.
-    auto* dev = xhci_device_.release();
     sync_completion_reset(&remove_event_);
-    dev->DdkAsyncRemove();
+    device_async_remove(xhci_device_);
+    xhci_device_ = nullptr;
     if (wait) {
       sync_completion_wait(&remove_event_, ZX_TIME_INFINITE);
     }
@@ -349,11 +375,7 @@ void NelsonUsbPhy::RemoveXhciDevice(bool wait) {
 // Support for USB OTG
 // We need this to ensure that our children have
 // unbound before we mode switch.
-void NelsonUsbPhy::DdkChildPreRelease(void* ctx) {
-  if ((ctx == xhci_device_.get()) || (ctx == dwc2_device_.get())) {
-    UsbPhyNotifyDeviceRemoved();
-  }
-}
+void NelsonUsbPhy::DdkChildPreRelease(void* ctx) { UsbPhyNotifyDeviceRemoved(); }
 
 zx_status_t NelsonUsbPhy::UsbPhyNotifyDeviceRemoved() {
   sync_completion_signal(&remove_event_);
@@ -365,7 +387,15 @@ zx_status_t NelsonUsbPhy::AddDwc2Device() {
     return ZX_ERR_BAD_STATE;
   }
 
-  dwc2_device_ = std::make_unique<Dwc2Device>(zxdev());
+  static zx_protocol_device_t ops = {
+      .version = DEVICE_OPS_VERSION,
+      // Defer get_protocol() to parent.
+      .get_protocol =
+          [](void* ctx, uint32_t id, void* proto) {
+            return device_get_protocol(reinterpret_cast<NelsonUsbPhy*>(ctx)->zxdev(), id, proto);
+          },
+      .release = [](void*) {},
+  };
 
   zx_device_prop_t props[] = {
       {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
@@ -373,16 +403,27 @@ zx_status_t NelsonUsbPhy::AddDwc2Device() {
       {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_USB_DWC2},
   };
 
-  return dwc2_device_->DdkAdd(
-      ddk::DeviceAddArgs("dwc2").set_props(props).set_proto_id(ZX_PROTOCOL_USB_PHY));
+  // clang-format off
+  device_add_args_t args = (ddk::DeviceAddArgs("dwc2")
+                            .set_context(this)
+                            .set_props(props)
+                            .set_proto_id(ZX_PROTOCOL_USB_PHY)
+                            .set_ops(&ops)).get();
+  // clang-format on
+
+  auto status = device_add(zxdev(), &args, &dwc2_device_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "device_add() error %s", zx_status_get_string(status));
+  }
+  return status;
 }
 
 void NelsonUsbPhy::RemoveDwc2Device(bool wait) {
   if (dwc2_device_) {
     // devmgr will own the device until it is destroyed.
-    auto* dev = dwc2_device_.release();
     sync_completion_reset(&remove_event_);
-    dev->DdkAsyncRemove();
+    device_async_remove(dwc2_device_);
+    dwc2_device_ = nullptr;
     if (wait) {
       sync_completion_wait(&remove_event_, ZX_TIME_INFINITE);
     }
