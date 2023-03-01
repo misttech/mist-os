@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import sys
+import textwrap
 
 ROOT_PATH = os.path.abspath(__file__ + "/../..")
 sys.path += [os.path.join(ROOT_PATH, "third_party", "pytoml")]
@@ -221,11 +222,16 @@ def write_toml_file(
         is_proc_macro = ""
 
     features = []
+    extra_configs = []
     feature_pat = re.compile(r"--cfg=feature=\"(.*)\"$")
+    cfg_pat = re.compile(r"--cfg=([^=]*)=\"(.*)\"$")
     for flag in metadata["rustflags"]:
         match = feature_pat.match(flag)
         if match:
             features.append(match.group(1))
+        elif match := cfg_pat.match(flag):
+            if match.group(1) != "__rust_toolchain":
+                extra_configs.append((match.group(1), match.group(2)))
 
     crate_type = "rlib"
     package_name = lookup_gn_pkg_name(project, target, for_workspace=for_workspace)
@@ -250,6 +256,23 @@ def write_toml_file(
             "rust_crates_path": rust_crates_path,
             "default_target": default_target,
         })
+
+    if extra_configs:
+        with open(os.path.join(gn_cargo_dir, str(lookup[target]), "build.rs"), "w") as buildfile:
+            template = textwrap.dedent("""\
+                //! build script for {target}
+                fn main() {{
+                // build script does not read any files
+                println!("cargo:rerun-if-changed=build.rs");
+
+                {body}
+                }}
+            """)
+            body="\n".join(
+                'println!("cargo:rustc-cfg={key}=\\"{value}\\"");'.format(key=key, value=value)
+                for key, value in extra_configs
+            )
+            buildfile.write(template.format(target=target, body=body))
 
     extra_test_deps = set()
     if target_type in {"[lib]", "[[bin]]"}:
