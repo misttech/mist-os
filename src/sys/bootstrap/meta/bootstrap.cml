@@ -112,7 +112,7 @@
         },
         {
             name: "virtual_console",
-            url: "fuchsia-boot:///#meta/virtual-console.cm",
+            url: "fuchsia-boot:///virtual-console#meta/virtual-console.cm",
         },
 
         // TODO(fxb/98535): Remove need for separate full_resolver component here.
@@ -313,6 +313,14 @@
             to: "#svchost",
             rights: [ "r*" ],
             subdir: "config/profiles",
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "boot-data",
+            to: [ "#virtual_console" ],
+            rights: [ "r*" ],
+            subdir: "data",
         },
         {
             protocol: [

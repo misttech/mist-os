@@ -127,11 +127,15 @@ pub struct VirtualConsoleViewAssistant {
     is_primary: bool,
 }
 
-const BOOT_ANIMATION: &'static str = "/pkg/data/boot-animation.riv";
+const BOOT_ANIMATION_PATH_1: &'static str = "/pkg/data/boot-animation.riv";
+const BOOT_ANIMATION_PATH_2: &'static str = "/boot/data/boot-animation.riv";
 const FONT: &'static str = "/pkg/data/font.ttf";
-const BOLD_FONT: &'static str = "/pkg/data/bold-font.ttf";
-const ITALIC_FONT: &'static str = "/pkg/data/italic-font.ttf";
-const BOLD_ITALIC_FONT: &'static str = "/pkg/data/bold-italic-font.ttf";
+const BOLD_FONT_PATH_1: &'static str = "/pkg/data/bold-font.ttf";
+const BOLD_FONT_PATH_2: &'static str = "/boot/data/bold-font.ttf";
+const ITALIC_FONT_PATH_1: &'static str = "/pkg/data/italic-font.ttf";
+const ITALIC_FONT_PATH_2: &'static str = "/boot/data/italic-font.ttf";
+const BOLD_ITALIC_FONT_PATH_1: &'static str = "/pkg/data/bold-italic-font.ttf";
+const BOLD_ITALIC_FONT_PATH_2: &'static str = "/boot/data/bold-italic-font.ttf";
 const FALLBACK_FONT_PREFIX: &'static str = "/pkg/data/fallback-font";
 
 impl VirtualConsoleViewAssistant {
@@ -151,9 +155,15 @@ impl VirtualConsoleViewAssistant {
         let terminals = BTreeMap::new();
         let active_terminal_id = 0;
         let font = load_font(PathBuf::from(FONT))?;
-        let bold_font = load_font(PathBuf::from(BOLD_FONT)).ok();
-        let italic_font = load_font(PathBuf::from(ITALIC_FONT)).ok();
-        let bold_italic_font = load_font(PathBuf::from(BOLD_ITALIC_FONT)).ok();
+        let bold_font = load_font(PathBuf::from(BOLD_FONT_PATH_1))
+            .or_else(|_| load_font(PathBuf::from(BOLD_FONT_PATH_2)))
+            .ok();
+        let italic_font = load_font(PathBuf::from(ITALIC_FONT_PATH_1))
+            .or_else(|_| load_font(PathBuf::from(ITALIC_FONT_PATH_2)))
+            .ok();
+        let bold_italic_font = load_font(PathBuf::from(BOLD_ITALIC_FONT_PATH_1))
+            .or_else(|_| load_font(PathBuf::from(BOLD_ITALIC_FONT_PATH_2)))
+            .ok();
         let mut fallback_fonts = vec![];
         while let Ok(font) = load_font(PathBuf::from(format!(
             "{}-{}.ttf",
@@ -165,7 +175,8 @@ impl VirtualConsoleViewAssistant {
         let font_set = FontSet::new(font, bold_font, italic_font, bold_italic_font, fallback_fonts);
         let virtcon_mode = VirtconMode::Forced; // We always start out in forced mode.
         let (animation, desired_virtcon_mode) = if boot_animation {
-            let file = load_rive(BOOT_ANIMATION)?;
+            let file =
+                load_rive(BOOT_ANIMATION_PATH_1).or_else(|_| load_rive(BOOT_ANIMATION_PATH_2))?;
             let artboard = file.artboard().ok_or_else(|| anyhow!("missing artboard"))?;
             let artboard_ref = artboard.as_ref();
             let color_scheme_name = match color_scheme {

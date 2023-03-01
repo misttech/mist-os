@@ -4,18 +4,25 @@
 
 import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
-import("//build/dist/component_manifest_resources.gni")
-import("//build/drivers.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/bringup/bin/virtcon/virtcon_args.gni")
 
 # Mandatory portion of virtcon that's included in all products.
-bootfs_files_for_assembly("bootfs") {
+fuchsia_component("component") {
+  component_name = "virtual-console"
+  manifest = "meta/virtual-console.cml"
+  deps = [ ":bin" ]
+
+  # The includes checker wants the inspect shard but it doesn't use insepct.
+  check_includes = false
+}
+
+fuchsia_package("package") {
+  package_name = "virtual-console"
   deps = [
-    ":bin",
+    ":component",
     ":font",
-    ":meta",
   ]
 }
 
@@ -53,10 +60,6 @@ group("extra_fonts") {
 #
 # Set all targets below here to only be visible within this file.
 visibility = [ ":*" ]
-
-component_manifest_resources("meta") {
-  sources = [ "meta/virtual-console.cml" ]
-}
 
 rustc_library("lib") {
   name = "virtual_console_lib"
