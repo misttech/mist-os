@@ -13,7 +13,6 @@ use crate::message::receptor::Receptor;
 
 use fuchsia_syslog::fx_log_warn;
 use fuchsia_zircon::Duration;
-use std::collections::HashSet;
 use std::convert::identity;
 
 /// `Builder` is the default way for creating a new messenger. Beyond the base
@@ -25,8 +24,8 @@ pub struct Builder {
     /// The type of messenger to be created. Along with roles, the messenger
     /// type determines what audiences the messenger is included in.
     messenger_type: MessengerType,
-    /// The roles to associate with this messenger.
-    roles: HashSet<crate::Role>,
+    /// The optional role to associate with this messenger.
+    role: Option<crate::Role>,
 }
 
 impl Builder {
@@ -36,14 +35,14 @@ impl Builder {
         messenger_action_tx: MessengerActionSender,
         messenger_type: MessengerType,
     ) -> Self {
-        Self { messenger_action_tx, messenger_type, roles: HashSet::new() }
+        Self { messenger_action_tx, messenger_type, role: None }
     }
 
     /// Includes the specified role in the list of roles to be associated with
     /// the new messenger.
     #[cfg(test)]
     pub(crate) fn add_role(mut self, role: crate::Role) -> Self {
-        let _ = self.roles.insert(role);
+        self.role = Some(role);
         self
     }
 
@@ -54,7 +53,7 @@ impl Builder {
         // Panic if send failed since a messenger cannot be created.
         self.messenger_action_tx
             .unbounded_send(MessengerAction::Create(
-                messenger::Descriptor { messenger_type: self.messenger_type, roles: self.roles },
+                messenger::Descriptor { messenger_type: self.messenger_type, role: self.role },
                 tx,
                 self.messenger_action_tx.clone(),
             ))

@@ -482,12 +482,14 @@ impl MessageHub {
                 }
 
                 // Track roles
-                for role in &messenger_descriptor.roles {
+                let mut roles = HashSet::new();
+                if let Some(role) = &messenger_descriptor.role {
                     let _ = self.roles.entry(*role).or_insert_with(HashSet::new).insert(id);
+                    let _ = roles.insert(*role);
                 }
 
                 // Update descriptor mapping and role records
-                let _ = self.messengers.insert(id, messenger_descriptor.roles);
+                let _ = self.messengers.insert(id, roles);
 
                 let response_result =
                     responder.send(Ok((MessengerClient::new(messenger, fuse), receptor)));
