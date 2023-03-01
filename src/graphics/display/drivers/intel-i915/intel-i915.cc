@@ -1982,7 +1982,7 @@ zx_status_t Controller::IntelGpuCoreReadPciConfig16(uint16_t addr, uint16_t* val
 
 zx_status_t Controller::IntelGpuCoreMapPciMmio(uint32_t pci_bar, uint8_t** addr_out,
                                                uint64_t* size_out) {
-  if (pci_bar > PCI_MAX_BAR_COUNT) {
+  if (pci_bar > fuchsia_hardware_pci::wire::kMaxBarCount) {
     return ZX_ERR_INVALID_ARGS;
   }
   fbl::AutoLock lock(&bar_lock_);
@@ -2002,7 +2002,7 @@ zx_status_t Controller::IntelGpuCoreMapPciMmio(uint32_t pci_bar, uint8_t** addr_
 }
 
 zx_status_t Controller::IntelGpuCoreUnmapPciMmio(uint32_t pci_bar) {
-  if (pci_bar > PCI_MAX_BAR_COUNT) {
+  if (pci_bar > fuchsia_hardware_pci::wire::kMaxBarCount) {
     return ZX_ERR_INVALID_ARGS;
   }
   fbl::AutoLock lock(&bar_lock_);
@@ -2354,7 +2354,7 @@ zx_status_t Controller::Init() {
     return ZX_ERR_INTERNAL;
   }
 
-  pci_.ReadConfig16(PCI_CONFIG_DEVICE_ID, &device_id_);
+  pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
   zxlogf(TRACE, "Device id %x", device_id_);
 
   status = igd_opregion_.Init(pci_);
@@ -2531,7 +2531,7 @@ Controller::~Controller() {
   // Release anything leaked by the gpu-core client.
   fbl::AutoLock lock(&bar_lock_);
   // Start at 1, because we treat bar 0 specially.
-  for (unsigned i = 1; i < PCI_MAX_BAR_COUNT; i++) {
+  for (unsigned i = 1; i < fuchsia_hardware_pci::wire::kMaxBarCount; i++) {
     if (mapped_bars_[i].count) {
       zxlogf(WARNING, "Leaked bar %d", i);
       mapped_bars_[i].count = 1;

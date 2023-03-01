@@ -317,7 +317,7 @@ class Controller : public DeviceType,
   struct {
     mmio_buffer_t mmio;
     int32_t count = 0;
-  } mapped_bars_[PCI_MAX_BAR_COUNT] __TA_GUARDED(bar_lock_);
+  } mapped_bars_[fuchsia_hardware_pci::wire::kMaxBarCount] __TA_GUARDED(bar_lock_);
   mtx_t bar_lock_;
   // The mmio_space_ is read only. The internal registers are guarded by various locks where
   // appropriate.
