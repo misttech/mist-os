@@ -16,22 +16,24 @@
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
-#include <fbl/vector.h>
 
 #include "dw-i2c-regs.h"
 
 namespace dw_i2c {
 
 class DwI2c;
-class DwI2cBus;
 
 using DeviceType = ddk::Device<DwI2c, ddk::Unbindable>;
 
 class DwI2c : public DeviceType, public ddk::I2cImplProtocol<DwI2c, ddk::base_protocol> {
  public:
-  explicit DwI2c(zx_device_t* parent, fbl::Vector<std::unique_ptr<DwI2cBus>>&& bus_list)
-      : DeviceType(parent), buses_(std::move(bus_list)), bus_count_(buses_.size()) {}
-  ~DwI2c() = default;
+  static constexpr uint32_t kDwCompTypeNum = 0x44570140;
+
+  explicit DwI2c(zx_device_t* parent, ddk::MmioBuffer mmio, zx::interrupt& irq)
+      : DeviceType(parent), mmio_(std::move(mmio)), irq_(std::move(irq)) {}
+
+  DwI2c() = delete;
+  ~DwI2c() { ShutDown(); }
 
   zx_status_t Bind();
   zx_status_t Init();
@@ -47,29 +49,6 @@ class DwI2c : public DeviceType, public ddk::I2cImplProtocol<DwI2c, ddk::base_pr
   zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size);
   zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
   zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count);
-
- private:
-  int TestThread();
-
-  fbl::Vector<std::unique_ptr<DwI2cBus>> buses_;
-  size_t bus_count_ = 0;
-};
-
-class DwI2cBus {
- public:
-  static constexpr uint32_t kDwCompTypeNum = 0x44570140;
-  // Local buffer for transfer and receive. Matches FIFO size.
-  uint32_t kMaxTransfer = 0;
-
-  explicit DwI2cBus(ddk::MmioBuffer mmio, zx::interrupt& irq)
-      : mmio_(std::move(mmio)), irq_(std::move(irq)) {}
-
-  DwI2cBus() = delete;
-  ~DwI2cBus() { ShutDown(); }
-
-  zx_status_t Init();
-  void ShutDown();
-  zx_status_t Transact(const i2c_impl_op_t* rws, size_t count);
 
  private:
   static constexpr uint32_t kErrorSignal = ZX_USER_SIGNAL_0;
@@ -126,6 +105,11 @@ class DwI2cBus {
 
   // IC_SDA_HOLD = (IC_CLK * tSDA;Hold + 500000 / 1000000)
   static constexpr uint32_t kSdaHoldValue = ((kClkRateKHz * kSdaTHold) + 500000) / 1000000;
+
+  // Local buffer for transfer and receive. Matches FIFO size.
+  uint32_t kMaxTransfer = 0;
+
+  int TestThread();
 
   zx_status_t HostInit();
   zx_status_t Receive() __TA_REQUIRES(ops_lock_);

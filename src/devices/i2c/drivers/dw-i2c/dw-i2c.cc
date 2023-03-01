@@ -23,13 +23,14 @@
 
 #include <memory>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/i2c/drivers/dw-i2c/dw_i2c-bind.h"
 
 namespace dw_i2c {
 
-zx_status_t DwI2cBus::Dumpstate() {
+zx_status_t DwI2c::Dumpstate() {
   zxlogf(INFO, "DW_kI2cEnable_STATUS = \t0x%x",
          EnableStatusReg::Get().ReadFrom(&mmio_).reg_value());
   zxlogf(INFO, "DW_kI2cEnable = \t0x%x", EnableReg::Get().ReadFrom(&mmio_).reg_value());
@@ -58,7 +59,7 @@ zx_status_t DwI2cBus::Dumpstate() {
   return ZX_OK;
 }
 
-zx_status_t DwI2cBus::EnableAndWait(bool enable) {
+zx_status_t DwI2c::EnableAndWait(bool enable) {
   uint32_t poll = 0;
 
   // Set enable bit.
@@ -81,22 +82,22 @@ zx_status_t DwI2cBus::EnableAndWait(bool enable) {
   return ZX_ERR_TIMED_OUT;
 }
 
-zx_status_t DwI2cBus::Enable() { return EnableAndWait(kI2cEnable); }
+zx_status_t DwI2c::Enable() { return EnableAndWait(kI2cEnable); }
 
-void DwI2cBus::ClearInterrupts() {
+void DwI2c::ClearInterrupts() {
   // Reading this register will clear all the interrupts.
   ClearInterruptReg::Get().ReadFrom(&mmio_);
 }
 
-void DwI2cBus::DisableInterrupts() { InterruptMaskReg::Get().FromValue(0).WriteTo(&mmio_); }
+void DwI2c::DisableInterrupts() { InterruptMaskReg::Get().FromValue(0).WriteTo(&mmio_); }
 
-void DwI2cBus::EnableInterrupts(uint32_t flag) {
+void DwI2c::EnableInterrupts(uint32_t flag) {
   InterruptMaskReg::Get().FromValue(flag).WriteTo(&mmio_);
 }
 
-zx_status_t DwI2cBus::Disable() { return EnableAndWait(kI2cDisable); }
+zx_status_t DwI2c::Disable() { return EnableAndWait(kI2cDisable); }
 
-zx_status_t DwI2cBus::WaitEvent(uint32_t sig_mask) {
+zx_status_t DwI2c::WaitEvent(uint32_t sig_mask) {
   uint32_t observed = 0;
   auto deadline = zx::deadline_after(timeout_);
   sig_mask |= kErrorSignal;
@@ -114,7 +115,7 @@ zx_status_t DwI2cBus::WaitEvent(uint32_t sig_mask) {
   return ZX_OK;
 }
 
-InterruptStatusReg DwI2cBus::ReadAndClearIrq() {
+InterruptStatusReg DwI2c::ReadAndClearIrq() {
   auto irq = InterruptStatusReg::Get().ReadFrom(&mmio_);
 
   if (irq.tx_abrt()) {
@@ -138,7 +139,7 @@ InterruptStatusReg DwI2cBus::ReadAndClearIrq() {
 }
 
 // Thread to handle interrupts.
-int DwI2cBus::IrqThread() {
+int DwI2c::IrqThread() {
   zx_status_t status;
 
   while (1) {
@@ -195,7 +196,7 @@ int DwI2cBus::IrqThread() {
   return ZX_OK;
 }
 
-zx_status_t DwI2cBus::WaitBusBusy() {
+zx_status_t DwI2c::WaitBusBusy() {
   uint32_t timeout = 0;
   auto status = StatusReg::Get();
   while (status.ReadFrom(&mmio_).activity()) {
@@ -208,7 +209,7 @@ zx_status_t DwI2cBus::WaitBusBusy() {
   return ZX_OK;
 }
 
-void DwI2cBus::SetOpsHelper(const i2c_impl_op_t* ops, size_t count) {
+void DwI2c::SetOpsHelper(const i2c_impl_op_t* ops, size_t count) {
   fbl::AutoLock lock(&ops_lock_);
   ops_ = ops;
   ops_count_ = count;
@@ -220,7 +221,23 @@ void DwI2cBus::SetOpsHelper(const i2c_impl_op_t* ops, size_t count) {
   rx_pending_ = 0;
 }
 
-zx_status_t DwI2cBus::Transact(const i2c_impl_op_t* rws, size_t count) {
+zx_status_t DwI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, size_t count) {
+  for (uint32_t i = 0; i < count; ++i) {
+    if (rws[i].data_size > kMaxTransfer) {
+      return ZX_ERR_OUT_OF_RANGE;
+    }
+  }
+
+  if (count == 0) {
+    return ZX_OK;
+  }
+
+  for (uint32_t i = 1; i < count; ++i) {
+    if (rws[i].address != rws[0].address) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+  }
+
   fbl::AutoLock lock(&transact_lock_);
 
   auto status = WaitBusBusy();
@@ -254,7 +271,7 @@ zx_status_t DwI2cBus::Transact(const i2c_impl_op_t* rws, size_t count) {
   return status;
 }
 
-zx_status_t DwI2cBus::SetSlaveAddress(uint16_t addr) {
+zx_status_t DwI2c::SetSlaveAddress(uint16_t addr) {
   if (addr & (~k7BitAddrMask)) {
     // support 7bit for now
     return ZX_ERR_NOT_SUPPORTED;
@@ -266,7 +283,7 @@ zx_status_t DwI2cBus::SetSlaveAddress(uint16_t addr) {
   return ZX_OK;
 }
 
-zx_status_t DwI2cBus::Receive() {
+zx_status_t DwI2c::Receive() {
   if (rx_pending_ == 0) {
     zxlogf(ERROR, "dw-i2c: Bytes received without being requested");
     return ZX_ERR_IO_OVERRUN;
@@ -299,7 +316,7 @@ zx_status_t DwI2cBus::Receive() {
   return ZX_OK;
 }
 
-zx_status_t DwI2cBus::Transmit() {
+zx_status_t DwI2c::Transmit() {
   uint32_t tx_limit;
 
   tx_limit = tx_fifo_depth_ - TxFifoLevelReg::Get().ReadFrom(&mmio_).tx_fifo_level();
@@ -363,14 +380,14 @@ zx_status_t DwI2cBus::Transmit() {
   return ZX_OK;
 }
 
-void DwI2cBus::ShutDown() {
+void DwI2c::ShutDown() {
   irq_.destroy();
   if (irq_thread_.joinable()) {
     irq_thread_.join();
   }
 }
 
-zx_status_t DwI2cBus::HostInit() {
+zx_status_t DwI2c::HostInit() {
   // Make sure we are truly running on a DesignWire IP.
   auto dw_comp_type = CompTypeReg::Get().ReadFrom(&mmio_).reg_value();
 
@@ -455,7 +472,7 @@ zx_status_t DwI2cBus::HostInit() {
   return ZX_OK;
 }
 
-zx_status_t DwI2cBus::Init() {
+zx_status_t DwI2c::Init() {
   zx_status_t status;
 
   timeout_ = zx::duration(kDefaultTimeout);
@@ -472,8 +489,20 @@ zx_status_t DwI2cBus::Init() {
     return status;
   }
 
-  irq_thread_ = std::thread(&DwI2cBus::IrqThread, this);
+  irq_thread_ = std::thread(&DwI2c::IrqThread, this);
 
+#if I2C_AS370_DW_TEST
+  auto cleanup = fit::defer([&]() { ShutDown(); });
+
+  thrd_t test_thread;
+  auto thunk = [](void* arg) -> int { return reinterpret_cast<DwI2c*>(arg)->TestThread(); };
+  int rc = thrd_create_with_name(&test_thread, thunk, this, "dw-i2c-test");
+  if (rc != thrd_success) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  cleanup.cancel();
+#endif
   return ZX_OK;
 }
 
@@ -545,50 +574,20 @@ int DwI2c::TestThread() {
 }
 #endif
 
-zx_status_t DwI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, size_t count) {
-  if (bus_id >= bus_count_) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  for (uint32_t i = 0; i < count; ++i) {
-    if (rws[i].data_size > buses_[bus_id]->kMaxTransfer) {
-      return ZX_ERR_OUT_OF_RANGE;
-    }
-  }
-
-  if (count == 0) {
-    return ZX_OK;
-  }
-
-  for (uint32_t i = 1; i < count; ++i) {
-    if (rws[i].address != rws[0].address) {
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-  }
-
-  return buses_[bus_id]->Transact(rws, count);
-}
-
 zx_status_t DwI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
   // TODO: currently supports FAST_MODE - 400kHz
   return ZX_ERR_NOT_SUPPORTED;
 }
 
 uint32_t DwI2c::I2cImplGetBusBase() { return static_cast<uint32_t>(0); }
-uint32_t DwI2c::I2cImplGetBusCount() { return static_cast<uint32_t>(bus_count_); }
+// TODO(fxbug.dev/120971): This hack satisfies checks made by the I2C core driver, but it doesn't
+// matter here because bus ID values are ignored. Remove this when the core driver no longer checks
+// bus IDs.
+uint32_t DwI2c::I2cImplGetBusCount() { return 2; }
 
 zx_status_t DwI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
-  if (bus_id >= bus_count_) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  *out_size = buses_[bus_id]->kMaxTransfer;
+  *out_size = kMaxTransfer;
   return ZX_OK;
-}
-
-void DwI2c::ShutDown() {
-  for (uint32_t id = 0; id < bus_count_; id++) {
-    buses_[id]->ShutDown();
-  }
 }
 
 void DwI2c::DdkUnbind(ddk::UnbindTxn txn) {
@@ -597,22 +596,6 @@ void DwI2c::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void DwI2c::DdkRelease() { delete this; }
-
-zx_status_t DwI2c::Init() {
-  auto cleanup = fit::defer([&]() { ShutDown(); });
-
-#if I2C_AS370_DW_TEST
-  thrd_t test_thread;
-  auto thunk = [](void* arg) -> int { return reinterpret_cast<DwI2c*>(arg)->TestThread(); };
-  int rc = thrd_create_with_name(&test_thread, thunk, this, "dw-i2c-test");
-  if (rc != thrd_success) {
-    return ZX_ERR_INTERNAL;
-  }
-#endif
-
-  cleanup.cancel();
-  return ZX_OK;
-}
 
 zx_status_t DwI2c::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
@@ -630,46 +613,32 @@ zx_status_t DwI2c::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (info.mmio_count != info.irq_count) {
-    zxlogf(ERROR, "dw_i2c: mmio_count %u does not matchirq_count %u", info.mmio_count,
+  if (info.mmio_count != 1 || info.irq_count != 1) {
+    zxlogf(ERROR, "dw_i2c: Invalid mmio_count (%u) or irq_count (%u)", info.mmio_count,
            info.irq_count);
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::Vector<std::unique_ptr<DwI2cBus>> bus_list;
-
-  for (uint32_t i = 0; i < info.mmio_count; i++) {
-    std::optional<ddk::MmioBuffer> mmio;
-    if ((status = pdev.MapMmio(i, &mmio)) != ZX_OK) {
-      zxlogf(ERROR, "%s: pdev_map_mmio_buffer failed %d", __FUNCTION__, status);
-      return status;
-    }
-
-    zx::interrupt irq;
-    if ((status = pdev.GetInterrupt(i, &irq)) != ZX_OK) {
-      return status;
-    }
-
-    auto i2c_bus = fbl::make_unique_checked<DwI2cBus>(&ac, *std::move(mmio), irq);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    if ((status = i2c_bus->Init()) != ZX_OK) {
-      zxlogf(ERROR, "dw_i2c: dw_i2c bus init failed: %d", status);
-      return ZX_ERR_INTERNAL;
-    }
-
-    bus_list.push_back(std::move(i2c_bus), &ac);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
+  std::optional<ddk::MmioBuffer> mmio;
+  if ((status = pdev.MapMmio(0, &mmio)) != ZX_OK) {
+    zxlogf(ERROR, "%s: pdev_map_mmio_buffer failed %d", __FUNCTION__, status);
+    return status;
   }
 
-  auto dev = fbl::make_unique_checked<DwI2c>(&ac, parent, std::move(bus_list));
+  zx::interrupt irq;
+  if ((status = pdev.GetInterrupt(0, &irq)) != ZX_OK) {
+    return status;
+  }
+
+  auto dev = fbl::make_unique_checked<DwI2c>(&ac, parent, *std::move(mmio), irq);
   if (!ac.check()) {
     zxlogf(ERROR, "%s ZX_ERR_NO_MEMORY", __FUNCTION__);
     return ZX_ERR_NO_MEMORY;
+  }
+
+  if ((status = dev->Init()) != ZX_OK) {
+    zxlogf(ERROR, "dw_i2c: dw_i2c bus init failed: %d", status);
+    return ZX_ERR_INTERNAL;
   }
 
   if ((status = dev->DdkAdd("dw-i2c")) != ZX_OK) {
@@ -679,8 +648,8 @@ zx_status_t DwI2c::Create(void* ctx, zx_device_t* parent) {
   }
 
   // Devmgr is now in charge of the memory for dev.
-  auto ptr = dev.release();
-  return ptr->Init();
+  [[maybe_unused]] auto ptr = dev.release();
+  return ZX_OK;
 }
 
 static zx_driver_ops_t dw_i2c_driver_ops = {

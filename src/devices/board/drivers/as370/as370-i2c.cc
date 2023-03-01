@@ -72,7 +72,6 @@ zx_status_t As370::I2cInit() {
   constexpr i2c_channel_t visalia_i2c_channels[] = {
       // For audio out
       {
-          .bus_id = 0,
           .address = 0x31,
           .vid = 0,
           .pid = 0,
@@ -80,7 +79,6 @@ zx_status_t As370::I2cInit() {
       },
       // TI LP5018 LED driver
       {
-          .bus_id = 0,
           .address = 0x29,
           .vid = 0,
           .pid = 0,
@@ -88,7 +86,6 @@ zx_status_t As370::I2cInit() {
       },
       // For power regulator
       {
-          .bus_id = 0,
           .address = 0x66,
           .vid = 0,
           .pid = 0,
@@ -96,7 +93,6 @@ zx_status_t As370::I2cInit() {
       },
       // Cypress touch sensor
       {
-          .bus_id = 0,
           .address = 0x37,
           .vid = 0,
           .pid = 0,
@@ -104,7 +100,7 @@ zx_status_t As370::I2cInit() {
       },
   };
 
-  auto visalia_i2c_channels_fidl = fidl_metadata::i2c::I2CChannelsToFidl(visalia_i2c_channels);
+  auto visalia_i2c_channels_fidl = fidl_metadata::i2c::I2CChannelsToFidl(0, visalia_i2c_channels);
   if (visalia_i2c_channels_fidl.is_error()) {
     zxlogf(ERROR, "Failed to FIDL encode I2C channel metadata: %d",
            visalia_i2c_channels_fidl.error_value());

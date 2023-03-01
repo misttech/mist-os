@@ -41,22 +41,14 @@ class DwI2cTester {
     SetupRegisters();
 
     fbl::AllocChecker ac;
-    /* Create DwI2cBus instance */
-    auto dw_i2c_bus = fbl::make_unique_checked<DwI2cBus>(&ac, std::move(mmio_buffer_), irq_);
-    ASSERT_TRUE(ac.check());
-    ASSERT_OK(dw_i2c_bus->Init());
-
-    fbl::Vector<std::unique_ptr<DwI2cBus>> bus_list;
-    bus_list.push_back(std::move(dw_i2c_bus), &ac);
-    ASSERT_TRUE(ac.check());
-
     /* Create DwI2c instance */
-    dw_i2c_ = fbl::make_unique_checked<DwI2c>(&ac, fake_parent_.get(), std::move(bus_list));
+    dw_i2c_ =
+        fbl::make_unique_checked<DwI2c>(&ac, fake_parent_.get(), std::move(mmio_buffer_), irq_);
     ASSERT_TRUE(ac.check());
   }
 
   void SetupRegisters() {
-    mock_i2c_regs_[CompTypeReg::Get().addr()].ReadReturns(DwI2cBus::kDwCompTypeNum);
+    mock_i2c_regs_[CompTypeReg::Get().addr()].ReadReturns(DwI2c::kDwCompTypeNum);
     auto comp_param = CompParam1Reg::Get().FromValue(0);
     comp_param.set_rx_buffer_depth(kBufferDepth);
     comp_param.set_tx_buffer_depth(kBufferDepth);
@@ -82,10 +74,10 @@ class DwI2cTester {
 TEST(DwI2cTest, DdkLifecyle) {
   DwI2cTester tester;
   auto dut = tester.GetDUT();
+  ASSERT_OK(dut->Init());
   ASSERT_OK(dut->DdkAdd("dw-i2c"));
   // Release the device ptr, now owned by the device host
   auto dut_ptr = dut.release();
-  ASSERT_OK(dut_ptr->Init());
 
   dut_ptr->DdkAsyncRemove();
   EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(dut_ptr->zxdev()));
@@ -95,7 +87,7 @@ TEST(DwI2cTest, I2cImplGetBusCount) {
   DwI2cTester tester;
   auto dut = tester.GetDUT();
   ASSERT_OK(dut->Init());
-  EXPECT_EQ(dut->I2cImplGetBusCount(), 1, "");
+  EXPECT_EQ(dut->I2cImplGetBusCount(), 2, "");
   tester.VerifyAll();
 }
 
