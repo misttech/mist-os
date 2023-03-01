@@ -44,6 +44,14 @@ Screenshot::Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t h
   FX_CHECK(status == ZX_OK);
 }
 
+std::ostream& operator<<(std::ostream& stream, const Pixel& pixel) {
+  return stream << "{Pixel:"
+                << " r:" << static_cast<unsigned int>(pixel.red)
+                << " g:" << static_cast<unsigned int>(pixel.green)
+                << " b:" << static_cast<unsigned int>(pixel.blue)
+                << " a:" << static_cast<unsigned int>(pixel.alpha) << "}";
+}
+
 Pixel Screenshot::GetPixelAt(uint64_t x, uint64_t y) const {
   FX_CHECK(x >= 0 && x < width_ && y >= 0 && y < height_) << "Index out of bounds";
   return screenshot_[y][x];

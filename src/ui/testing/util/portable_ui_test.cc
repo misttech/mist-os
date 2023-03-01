@@ -128,9 +128,11 @@ bool PortableUITest::HasViewConnected(zx_koid_t view_ref_koid) {
 }
 
 void PortableUITest::LaunchClient() {
+  ASSERT_TRUE(realm_.has_value());
   scene_provider_ = realm_->component().Connect<fuchsia::ui::test::scene::Controller>();
-  scene_provider_.set_error_handler(
-      [](auto) { FX_LOGS(ERROR) << "Error from test scene provider"; });
+  scene_provider_.set_error_handler([](zx_status_t status) {
+    FX_LOGS(ERROR) << "Error from test scene provider: " << zx_status_get_string(status);
+  });
   fuchsia::ui::test::scene::ControllerAttachClientViewRequest request;
   request.set_view_provider(realm_->component().Connect<fuchsia::ui::app::ViewProvider>());
   scene_provider_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});

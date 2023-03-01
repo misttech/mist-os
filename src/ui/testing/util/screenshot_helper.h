@@ -52,6 +52,8 @@ struct Pixel {
   }
 };
 
+std::ostream& operator<<(std::ostream& stream, const Pixel& pixel);
+
 // Helper class to get information about a screenshot returned by
 // |fuchsia.ui.composition.Screenshot| protocol.
 class Screenshot {

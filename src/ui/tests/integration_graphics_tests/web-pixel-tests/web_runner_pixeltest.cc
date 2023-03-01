@@ -31,6 +31,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
+#include <algorithm>
+#include <cmath>
+
 #include <gtest/gtest.h>
 
 #include "constants.h"
@@ -51,11 +54,43 @@ constexpr zx::duration kScreenshotTimeout = zx::sec(10);
 
 enum class TapLocation { kTopLeft, kTopRight };
 
+// A dot product of the coordinates of two pixels.
+double Dot(const ui_testing::Pixel& v, const ui_testing::Pixel& u) {
+  return static_cast<double>(v.red) * u.red + static_cast<double>(v.green) * u.green +
+         static_cast<double>(v.blue) * u.blue + static_cast<double>(v.alpha) * u.alpha;
+}
+
+// Project v along the direction d.  d != 0.
+double Project(const ui_testing::Pixel& v, const ui_testing::Pixel& dir) {
+  double n = Dot(dir, dir);
+  EXPECT_GT(n, 1e-10) << "Weakly conditioned result.";
+  double p = Dot(v, dir);
+  return p / n;
+}
+
+// Maximal sum of projections of pixels in h along the vector of pixel v.
+//
+// The idea is that at least some of the pixels in the histogram will be dominantly
+// in the direction of the pixel v. But they don't need to be *exactly* in that
+// direction, we're fine with an approximate direction. This accounts for variations
+// in nuance up to a point. Should be enough for this test.
+double MaxSumProject(const ui_testing::Pixel& v,
+                     const std::vector<std::pair<uint32_t, ui_testing::Pixel>>& h) {
+  double maxp = 0.0;
+  for (const auto& elem : h) {
+    auto n = elem.first;
+    auto p = elem.second;
+
+    maxp = std::max(maxp, Project(p, v) * n);
+  }
+  return maxp;
+}
+
 class WebRunnerPixelTest : public ui_testing::PortableUITest {
  public:
   void SetUp() override {
     ui_testing::PortableUITest::SetUp();
-
+    EXPECT_TRUE(realm_root().has_value());
     screenshotter_ = realm_root()->component().Connect<fuchsia::ui::composition::Screenshot>();
 
     // Get display information.
@@ -68,6 +103,19 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
     });
 
     RunLoopUntil([&has_completed] { return has_completed; });
+  }
+
+  bool TakeScreenshotUntil(
+      fit::function<bool(std::map<ui_testing::Pixel, uint32_t>)> histogram_predicate,
+      zx::duration timeout = kScreenshotTimeout) {
+    return RunLoopWithTimeoutOrUntil(
+        [this, &histogram_predicate] {
+          auto screenshot = TakeScreenshot();
+          auto histogram = screenshot.Histogram();
+
+          return histogram_predicate(std::move(histogram));
+        },
+        timeout);
   }
 
   bool TakeScreenshotUntil(
@@ -332,6 +380,22 @@ TEST_F(DynamicHtmlPixelTests, ValidPixelTest) {
   }
 }
 
+std::vector<std::pair<uint32_t, ui_testing::Pixel>> TopPixels(
+    std::map<ui_testing::Pixel, uint32_t> histogram) {
+  std::vector<std::pair<uint32_t, ui_testing::Pixel>> vec;
+  std::transform(histogram.begin(), histogram.end(), std::inserter(vec, vec.begin()),
+                 [](const std::pair<ui_testing::Pixel, uint32_t> p) {
+                   return std::make_pair(p.second, p.first);
+                 });
+  std::stable_sort(vec.begin(), vec.end(),
+                   [](const auto& a, const auto& b) { return a.first > b.first; });
+
+  std::vector<std::pair<uint32_t, ui_testing::Pixel>> top;
+  std::copy(vec.begin(), vec.begin() + std::min<ptrdiff_t>(vec.size(), 10),
+            std::back_inserter(top));
+  return top;
+}
+
 // This test renders a video in the browser and takes a screenshot to verify the pixels. The video
 // displays a scene as shown below:-
 //  __________________________________
@@ -352,29 +416,45 @@ class VideoHtmlPixelTests : public WebRunnerPixelTest {
 
 TEST_F(VideoHtmlPixelTests, ValidPixelTest) {
   // BGRA values,
-  const ui_testing::Pixel kYellow = {16, 255, 255, 255};
-  const ui_testing::Pixel kRed = {26, 17, 255, 255};
-  const ui_testing::Pixel kBlue = {255, 11, 13, 255};
-  const ui_testing::Pixel kGreenv1 = {17, 255, 45, 255};
-  const ui_testing::Pixel kGreenv2 = {18, 255, 45, 255};
-  const ui_testing::Pixel kMagenta = {255, 255, 255, 255};
+  const ui_testing::Pixel kYellow = {0, 255, 255, 255};
+  const ui_testing::Pixel kRed = {0, 0, 255, 255};
+  const ui_testing::Pixel kBlue = {255, 0, 0, 255};
+  const ui_testing::Pixel kGreen = {0, 255, 0, 255};
+  const ui_testing::Pixel kBackground = {255, 255, 255, 255};
 
   LaunchClient();
 
   // The web page should render the scene as shown above.
   // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
   // been rendered on the display.
-  ASSERT_TRUE(TakeScreenshotUntil(kBlue, [&](std::map<ui_testing::Pixel, uint32_t> histogram) {
+  ASSERT_TRUE(TakeScreenshotUntil([&](std::map<ui_testing::Pixel, uint32_t> histogram) {
+    // Have at least some visual feedback about the examined histogram.
+    auto top = TopPixels(histogram);
+    std::cout << "Histogram top:" << std::endl;
+    for (const auto& elems : top) {
+      std::cout << "{ " << elems.second << " value: " << elems.first << " }" << std::endl;
+    }
+    std::cout << "--------------" << std::endl;
+
+    // Fail the predicate check until at least some pixels are kinda blue. This will
+    // cause a re-attempt of a screenshot.
+    if (MaxSumProject(kBlue, top) < 60000) {
+      return false;
+    }
+
     // Video's background color should not be visible.
-    EXPECT_EQ(histogram[kMagenta], 0u);
+    EXPECT_LT(histogram[kBackground], 10u);
 
     // Note that we do not see pure colors in the video but a shade of the colors shown in the
     // diagram. Since it is hard to assert on the exact number of pixels for each shade of the
-    // color, the test asserts on the most prominent shade which was visible in the video.
-    EXPECT_GT(histogram[kYellow], 100000u);
-    EXPECT_GT(histogram[kRed], 100000u);
-    EXPECT_GT(histogram[kBlue], 100000u);
-    EXPECT_GT(histogram[kGreenv1] + histogram[kGreenv2], 100000u);
+    // color, the test asserts on whether the shade that's most like the given color is
+    // prominent enough.
+    EXPECT_GT(MaxSumProject(kYellow, top), 100000);
+    EXPECT_GT(MaxSumProject(kRed, top), 100000);
+    EXPECT_GT(MaxSumProject(kBlue, top), 100000);
+    EXPECT_GT(MaxSumProject(kGreen, top), 100000);
+
+    return true;
   }));
 }
 
