@@ -11,6 +11,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/zx/object.h>
+#include <zircon/errors.h>
+#include <zircon/pixelformat.h>
+#include <zircon/rights.h>
 
 #include <list>
 #include <memory>
@@ -26,12 +29,56 @@ namespace {
 // testing doubles instead of writing mocks for each display driver test.
 class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
  public:
+  explicit FakeBufferCollection(zx::unowned_vmo framebuffer_vmo)
+      : framebuffer_vmo_(std::move(framebuffer_vmo)) {}
+
+  void SetConstraints(::fuchsia_sysmem::wire::BufferCollectionSetConstraintsRequest* request,
+                      SetConstraintsCompleter::Sync& completer) override {}
+  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override {
+    completer.Reply(ZX_OK);
+  }
+  void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override {
+    zx::vmo vmo;
+    EXPECT_OK(framebuffer_vmo_->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
+
+    completer.Reply(ZX_OK,
+                    {
+                        .buffer_count = 1,
+                        .settings =
+                            {
+                                .buffer_settings =
+                                    {
+                                        .heap = fuchsia_sysmem::HeapType::kFramebuffer,
+                                    },
+                                .has_image_format_constraints = true,
+                                .image_format_constraints =
+                                    {
+                                        .pixel_format =
+                                            {
+                                                .type = fuchsia_sysmem::PixelFormatType::kBgra32,
+                                                .has_format_modifier = true,
+                                                .format_modifier =
+                                                    {fuchsia_sysmem::wire::kFormatModifierLinear},
+                                            },
+                                    },
+                            },
+                        .buffers =
+                            {
+                                fuchsia_sysmem::wire::VmoBuffer{std::move(vmo), 0},
+                            },
+                    });
+  }
+
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
+
+ private:
+  zx::unowned_vmo framebuffer_vmo_;
 };
 
 class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
  public:
-  explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+  explicit MockAllocator(async_dispatcher_t* dispatcher, zx::unowned_vmo framebuffer_vmo)
+      : dispatcher_(dispatcher), framebuffer_vmo_(std::move(framebuffer_vmo)) {
     ASSERT_TRUE(dispatcher_);
   }
 
@@ -40,9 +87,10 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     auto buffer_collection_id = next_buffer_collection_id_++;
     active_buffer_collections_.emplace(
         buffer_collection_id,
-        BufferCollection{.token_client = std::move(request->token),
-                         .unowned_collection_server = request->buffer_collection_request,
-                         .fake_buffer_collection = FakeBufferCollection()});
+        BufferCollection{
+            .token_client = std::move(request->token),
+            .unowned_collection_server = request->buffer_collection_request,
+            .fake_buffer_collection = FakeBufferCollection(framebuffer_vmo_->borrow())});
     fidl::BindServer(
         dispatcher_, std::move(request->buffer_collection_request),
         &active_buffer_collections_.at(buffer_collection_id).fake_buffer_collection,
@@ -95,17 +143,19 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   BufferCollectionId next_buffer_collection_id_ = 0;
   async_dispatcher_t* dispatcher_ = nullptr;
+  zx::unowned_vmo framebuffer_vmo_;
 };
 
 class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  explicit FakeSysmem(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+  explicit FakeSysmem(async_dispatcher_t* dispatcher, zx::unowned_vmo framebuffer_vmo)
+      : dispatcher_(dispatcher), framebuffer_vmo_(std::move(framebuffer_vmo)) {
     EXPECT_TRUE(dispatcher_);
   }
 
   void ConnectServer(ConnectServerRequestView request,
                      ConnectServerCompleter::Sync& completer) override {
-    mock_allocators_.emplace_front(dispatcher_);
+    mock_allocators_.emplace_front(dispatcher_, framebuffer_vmo_->borrow());
     auto it = mock_allocators_.begin();
     fidl::BindServer(dispatcher_, std::move(request->allocator_request), &*it);
   }
@@ -120,6 +170,7 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
  private:
   std::list<MockAllocator> mock_allocators_;
   async_dispatcher_t* dispatcher_ = nullptr;
+  zx::unowned_vmo framebuffer_vmo_ = {};
 };
 
 class FakeMmio {
@@ -161,7 +212,7 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
 
 TEST(SimpleDisplay, ImportBufferCollection) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  FakeSysmem fake_sysmem(loop.dispatcher());
+  FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{});
   FakeMmio fake_mmio;
 
   auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
@@ -226,6 +277,108 @@ TEST(SimpleDisplay, ImportBufferCollection) {
     const std::vector buffer_collection_connections = allocator.GetBufferCollectionConnections();
     ASSERT_EQ(buffer_collection_connections.size(), 0u);
   }
+
+  // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
+  // may still have pending callbacks.
+  loop.Shutdown();
+}
+
+TEST(SimpleDisplay, ImportKernelFramebufferImage) {
+  constexpr uint32_t kWidth = 800;
+  constexpr uint32_t kHeight = 600;
+  constexpr uint32_t kStride = 800;
+  constexpr zx_pixel_format_t kPixelFormat = ZX_PIXEL_FORMAT_RGB_x888;
+
+  // `framebuffer_vmo` must outlive `fake_sysmem`.
+  zx::vmo framebuffer_vmo;
+  size_t kImageBytes = kStride * kHeight * ZX_PIXEL_FORMAT_BYTES(kPixelFormat);
+  EXPECT_OK(zx::vmo::create(/*size=*/kImageBytes, /*options=*/0, &framebuffer_vmo));
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  FakeSysmem fake_sysmem(loop.dispatcher(), framebuffer_vmo.borrow());
+  FakeMmio fake_mmio;
+
+  loop.StartThread("sysmem loop");
+
+  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+  ASSERT_TRUE(sysmem_endpoints.is_ok());
+  auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
+  fidl::BindServer(loop.dispatcher(), std::move(sysmem_server), &fake_sysmem);
+
+  SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(sysmem_client)),
+                        fake_mmio.MmioBuffer(), kWidth, kHeight, kStride, kPixelFormat);
+
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
+
+  // Import BufferCollection.
+  const uint64_t kCollectionId = 1u;
+  EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
+      kCollectionId, token_endpoints->client.TakeChannel()));
+
+  // Import kernel framebuffer.
+  zx::vmo heap_vmo;
+  ASSERT_OK(framebuffer_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &heap_vmo));
+
+  zx::result heap_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Heap>();
+  ASSERT_TRUE(heap_endpoints.is_ok());
+  auto& [heap_client, heap_server] = heap_endpoints.value();
+  auto bind_ref = fidl::BindServer(loop.dispatcher(), std::move(heap_server), &display);
+  fidl::WireSyncClient heap{std::move(heap_client)};
+  EXPECT_OK(heap->CreateResource(std::move(heap_vmo), {}));
+  bind_ref.Unbind();
+
+  // Set Buffer collection constraints.
+  const image_t kDefaultImage = {
+      .width = kWidth,
+      .height = kHeight,
+      .pixel_format = kPixelFormat,
+      .type = IMAGE_TYPE_SIMPLE,
+      .handle = 0,
+  };
+  EXPECT_OK(
+      display.DisplayControllerImplSetBufferCollectionConstraints2(&kDefaultImage, kCollectionId));
+
+  // Invalid import: bad collection id
+  image_t invalid_image = kDefaultImage;
+  uint64_t kInvalidCollectionId = 100;
+  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kInvalidCollectionId, 0),
+            ZX_ERR_NOT_FOUND);
+
+  // Invalid import: bad index
+  invalid_image = kDefaultImage;
+  uint32_t kInvalidIndex = 100;
+  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, kInvalidIndex),
+            ZX_ERR_OUT_OF_RANGE);
+
+  // Invalid import: bad width
+  invalid_image = kDefaultImage;
+  invalid_image.width = invalid_image.width * 2;
+  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, /*index=*/0),
+            ZX_ERR_INVALID_ARGS);
+
+  // Invalid import: bad height
+  invalid_image = kDefaultImage;
+  invalid_image.height = invalid_image.height * 2;
+  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, /*index=*/0),
+            ZX_ERR_INVALID_ARGS);
+
+  // Invalid import: bad format
+  invalid_image = kDefaultImage;
+  invalid_image.pixel_format = ZX_PIXEL_FORMAT_NV12;
+  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, /*index=*/0),
+            ZX_ERR_INVALID_ARGS);
+
+  // Valid import
+  image_t valid_image = kDefaultImage;
+  EXPECT_EQ(valid_image.handle, 0u);
+  EXPECT_OK(display.DisplayControllerImplImportImage2(&valid_image, kCollectionId, /*index=*/0));
+  EXPECT_NE(valid_image.handle, 0u);
+
+  // Release buffer collection.
+  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kCollectionId));
+
+  loop.RunUntilIdle();
 
   // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
   // may still have pending callbacks.
