@@ -379,6 +379,10 @@ class DeviceAddArgs {
     args_.flags = flags;
     return *this;
   }
+  DeviceAddArgs& set_context(void* ctx) {
+    args_.ctx = ctx;
+    return *this;
+  }
   DeviceAddArgs& set_props(cpp20::span<const zx_device_prop_t> props) {
     args_.props = props.data();
     args_.prop_count = static_cast<uint32_t>(props.size());
@@ -391,6 +395,10 @@ class DeviceAddArgs {
   }
   DeviceAddArgs& set_proto_id(uint32_t proto_id) {
     args_.proto_id = proto_id;
+    return *this;
+  }
+  DeviceAddArgs& set_ops(zx_protocol_device_t* ops) {
+    args_.ops = ops;
     return *this;
   }
   DeviceAddArgs& set_inspect_vmo(zx::vmo inspect_vmo) {
