@@ -63,7 +63,7 @@ fuchsia_driver_component("usb-hid") {
   component_name = "usb-hid"
   deps = [ ":usb-hid-driver" ]
   info = "usb-hid-info.json"
-  colocate = true
+  manifest = "meta/usb-hid.cml"
 }
 
 fuchsia_driver("usb-one-endpoint-hid-fake-usb-driver") {
@@ -97,7 +97,7 @@ fuchsia_driver_component("usb-one-endpoint-hid-fake-usb") {
   component_name = "usb-one-endpoint-hid-fake-usb"
   deps = [ ":usb-one-endpoint-hid-fake-usb-driver" ]
   info = "usb-one-endpoint-hid-fake-usb-info.json"
-  colocate = true
+  manifest = "meta/usb-one-endpoint-hid-fake-usb.cml"
 }
 
 fuchsia_driver("usb-two-endpoint-hid-fake-usb-driver") {
@@ -131,7 +131,7 @@ fuchsia_driver_component("usb-two-endpoint-hid-fake-usb") {
   component_name = "usb-two-endpoint-hid-fake-usb"
   deps = [ ":usb-two-endpoint-hid-fake-usb-driver" ]
   info = "usb-two-endpoint-hid-fake-usb-info.json"
-  colocate = true
+  manifest = "meta/usb-two-endpoint-hid-fake-usb.cml"
 }
 
 group("fake") {

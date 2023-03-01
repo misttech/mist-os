@@ -51,7 +51,7 @@ fuchsia_driver_component("ctaphid") {
   component_name = "ctaphid"
   deps = [ ":ctaphid-driver" ]
   info = "ctaphid-info.json"
-  colocate = true
+  manifest = "meta/ctaphid.cml"
 }
 
 test("ctaphid-test-bin") {

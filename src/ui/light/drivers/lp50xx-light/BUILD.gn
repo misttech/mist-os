@@ -43,7 +43,7 @@ fuchsia_driver_component("lp50xx-light") {
   component_name = "lp50xx-light"
   deps = [ ":lp50xx-light-driver" ]
   info = "lp50xx-light-info.json"
-  colocate = true
+  manifest = "meta/lp50xx-light.cml"
 }
 
 test("lp50xx-light-test") {

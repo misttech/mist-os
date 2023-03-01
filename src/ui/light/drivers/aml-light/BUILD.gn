@@ -53,7 +53,7 @@ fuchsia_driver_component("aml-light") {
   component_name = "aml-light"
   deps = [ ":aml-light-driver" ]
   info = "aml-light-info.json"
-  colocate = true
+  manifest = "meta/aml-light.cml"
 }
 
 test("aml-light-test") {

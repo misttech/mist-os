@@ -46,7 +46,7 @@ fuchsia_driver_component("fake-ot-radio-driver") {
   testonly = true
   component_name = "fake-ot-radio"
   deps = [ ":fake-ot-radio-driver-driver" ]
-  colocate = true
+  manifest = "meta/fake-ot-radio-driver.cml"
 }
 
 group("tests") {

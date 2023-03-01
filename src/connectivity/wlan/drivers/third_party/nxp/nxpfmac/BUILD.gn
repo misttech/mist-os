@@ -122,7 +122,7 @@ fuchsia_driver_component("nxpfmac_sdio") {
   deps = [ ":nxpfmac_sdio-driver" ]
   visibility += [ "//src/connectivity/wlan:drivers" ]
   info = "nxpfmac_driver-info.json"
-  colocate = true
+  manifest = "meta/nxpfmac_sdio.cml"
 }
 
 all_fw_files = [

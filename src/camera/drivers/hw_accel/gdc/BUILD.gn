@@ -77,7 +77,7 @@ fuchsia_driver_component("driver") {
   component_name = "gdc"
   deps = [ ":fuchsia_driver" ]
   info = "driver-info.json"
-  colocate = true
+  manifest = "meta/driver.cml"
 }
 
 fuchsia_driver_package("gdc") {

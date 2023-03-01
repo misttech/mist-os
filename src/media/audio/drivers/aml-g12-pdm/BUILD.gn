@@ -56,7 +56,7 @@ fuchsia_driver_component("aml-g12-pdm") {
   component_name = "aml-g12-pdm"
   deps = [ ":aml-g12-pdm-driver" ]
   info = "aml-g12-pdm-info.json"
-  colocate = true
+  manifest = "meta/aml-g12-pdm.cml"
 }
 
 group("tests") {

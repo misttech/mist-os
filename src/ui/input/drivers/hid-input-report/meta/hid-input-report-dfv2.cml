@@ -1,0 +1,19 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        binary: "driver/hid-input-report-v2.so",
+        bind: "meta/bind/hid-input-report.bindbc",
+        colocate: "true",
+    },
+    use: [
+        { protocol: "fuchsia.device.fs.Exporter" },
+        { service: "fuchsia.driver.compat.Service" },
+    ],
+}

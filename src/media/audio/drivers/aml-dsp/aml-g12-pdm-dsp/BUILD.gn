@@ -54,5 +54,5 @@ fuchsia_driver_component("aml-g12-pdm-dsp") {
   component_name = "aml-g12-pdm-dsp"
   deps = [ ":aml-g12-pdm-dsp-driver" ]
   info = "aml-g12-pdm-info.json"
-  colocate = true
+  manifest = "meta/aml-g12-pdm-dsp.cml"
 }

@@ -36,8 +36,7 @@ fuchsia_driver_component("driver") {
   component_name = "bt-hci-passthrough"
   deps = [ ":fuchsia_driver" ]
   info = "driver-info.json"
-  colocate = true
-  fallback = true
+  manifest = "meta/driver.cml"
 }
 
 fuchsia_driver_package("passthrough") {

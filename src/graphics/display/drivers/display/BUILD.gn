@@ -30,10 +30,7 @@ fuchsia_driver_component("display") {
   component_name = "display"
   deps = [ ":display-driver" ]
   info = "display-info.json"
-  colocate = true
-  uses_profiles = true
-  root_resource = true
-  uses_boot_args = true
+  manifest = "meta/display.cml"
 }
 
 # Also used by test/.

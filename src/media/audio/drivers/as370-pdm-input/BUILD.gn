@@ -54,7 +54,7 @@ fuchsia_driver_component("as370-pdm-input") {
   component_name = "as370-pdm-input"
   deps = [ ":as370-pdm-input-driver" ]
   info = "as370-pdm-input-info.json"
-  colocate = true
+  manifest = "meta/as370-pdm-input.cml"
 }
 
 test("as370-pdm-input-unit-tests") {

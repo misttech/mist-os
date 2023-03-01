@@ -52,7 +52,7 @@ fuchsia_driver_component("as370-tdm-output") {
   component_name = "as370-tdm-output"
   deps = [ ":as370-tdm-output-driver" ]
   info = "as370-tdm-output-info.json"
-  colocate = true
+  manifest = "meta/as370-tdm-output.cml"
 }
 
 test("as370-tdm-output-unit-tests") {

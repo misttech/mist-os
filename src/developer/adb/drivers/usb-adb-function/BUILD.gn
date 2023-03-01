@@ -50,7 +50,7 @@ fuchsia_driver_component("usb-adb-function") {
   component_name = "usb-adb-function"
   deps = [ ":usb-adb-function-driver" ]
   info = "usb-adb-function-info.json"
-  colocate = true
+  manifest = "meta/usb-adb-function.cml"
 }
 
 test("usb-adb-test") {

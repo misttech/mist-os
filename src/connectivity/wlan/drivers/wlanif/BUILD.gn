@@ -67,7 +67,7 @@ fuchsia_driver_component("wlanif_driver") {
   component_name = "wlanif"
   deps = [ ":wlanif_driver-driver" ]
   info = "wlanif_driver-info.json"
-  colocate = true
+  manifest = "meta/wlanif_driver.cml"
 }
 
 fuchsia_driver_package("wlanif") {

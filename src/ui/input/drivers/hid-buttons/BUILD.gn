@@ -29,7 +29,7 @@ fuchsia_driver_component("hid-buttons") {
   component_name = "hid-buttons"
   deps = [ ":hid-buttons-driver" ]
   info = "hid-buttons-info.json"
-  colocate = true
+  manifest = "meta/hid-buttons.cml"
 }
 
 source_set("common") {

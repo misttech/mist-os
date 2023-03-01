@@ -49,7 +49,7 @@ fuchsia_driver_component("aml-canvas") {
   component_name = "aml-canvas"
   deps = [ ":aml-canvas-driver" ]
   info = "aml-canvas-info.json"
-  colocate = true
+  manifest = "meta/aml-canvas.cml"
 }
 
 test("aml-canvas-test") {

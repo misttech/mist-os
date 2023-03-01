@@ -64,7 +64,7 @@ fuchsia_driver_component("driver") {
   component_name = "bt-hci-intel"
   deps = [ ":fuchsia_driver" ]
   info = "driver-info.json"
-  colocate = true
+  manifest = "meta/driver.cml"
 }
 
 if (internal_access) {

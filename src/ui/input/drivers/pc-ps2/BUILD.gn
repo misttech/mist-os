@@ -64,8 +64,7 @@ fuchsia_driver_component("pc-ps2") {
     ":pc-ps2-driver",
   ]
   info = "pc-ps2-info.json"
-  root_resource = true
-  colocate = true
+  manifest = "meta/pc-ps2.cml"
 }
 
 test("pc-ps2-tests-bin") {

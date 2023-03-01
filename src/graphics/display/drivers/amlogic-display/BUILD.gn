@@ -141,8 +141,7 @@ fuchsia_driver_component("amlogic-display") {
   component_name = "amlogic-display"
   deps = [ ":amlogic-display-driver" ]
   info = "amlogic-display-info.json"
-  uses_profiles = true
-  colocate = true
+  manifest = "meta/amlogic-display.cml"
 }
 
 fuchsia_driver("amlogic-display-driver-vim3") {

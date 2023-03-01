@@ -74,7 +74,7 @@ fuchsia_driver_component("wlanphy_driver") {
   component_name = "wlanphy"
   deps = [ ":wlanphy_driver-driver" ]
   info = "wlanphy_driver-info.json"
-  colocate = true
+  manifest = "meta/wlanphy_driver.cml"
 }
 
 # TODO(https://fxbug.dev/100036): Remove it when all the drivers that wlanphy driver binds to gets
@@ -83,7 +83,7 @@ fuchsia_driver_component("wlanphy_driver_dfv2") {
   component_name = "wlanphy_dfv2"
   deps = [ ":wlanphy_driver_dfv2-driver" ]
   info = "wlanphy_driver-info.json"
-  colocate = true
+  manifest = "meta/wlanphy_driver_dfv2.cml"
 }
 
 fuchsia_driver_package("wlanphy") {
