@@ -12,7 +12,6 @@
 #include <wlan/common/band.h>
 #include <wlan/common/channel.h>
 #include <wlan/common/element.h>
-#include <wlan/common/parse_element.h>
 #include <wlan/common/phy.h>
 
 #include "fidl/fuchsia.wlan.common/cpp/common_types.h"

@@ -23,7 +23,6 @@ source_set("mlme") {
 
   public = [
     "include/wlan/mlme/ap/tim.h",
-    "include/wlan/mlme/debug.h",
     "include/wlan/mlme/eapol.h",
     "include/wlan/mlme/frame_validation.h",
     "include/wlan/mlme/mac_frame.h",
@@ -35,13 +34,10 @@ source_set("mlme") {
 
   sources = [
     "ap/tim.cc",
-    "beacon.cc",
-    "debug.cc",
     "ht.cc",
     "mac_frame.cc",
     "packet.cc",
     "rate_limiter.cc",
-    "rates_elements.cc",
     "validate_frame.cc",
   ]
 

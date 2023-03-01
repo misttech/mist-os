@@ -14,7 +14,6 @@
 
 #include <ddktl/device.h>
 #include <wlan/common/channel.h>
-#include <wlan/common/features.h>
 #include <wlan/common/phy.h>
 
 #include "utils.h"

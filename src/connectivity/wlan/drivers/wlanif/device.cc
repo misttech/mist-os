@@ -18,7 +18,6 @@
 
 #include <memory>
 
-#include <wlan/common/features.h>
 #include <wlan/common/ieee80211_codes.h>
 #include <wlan/drivers/log.h>
 

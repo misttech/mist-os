@@ -200,17 +200,4 @@ VhtCapabilities IntersectVhtCap(const VhtCapabilities& lhs, const VhtCapabilitie
 #undef SET_BITFIELD_AND
 #undef SET_BITFIELD_MIN
 #undef SET_BITFIELD_MAX
-
-std::vector<SupportedRate> IntersectRatesAp(const std::vector<SupportedRate>& ap_rates,
-                                            const std::vector<SupportedRate>& client_rates) {
-  std::set<SupportedRate> ap(ap_rates.cbegin(), ap_rates.cend());
-  std::set<SupportedRate> client(client_rates.cbegin(), client_rates.cend());
-
-  std::vector<SupportedRate> result;
-  // C++11 Standard 25.4.5.3 - set_intersection ALWAYS takes elements from the
-  // first input.
-  std::set_intersection(ap.cbegin(), ap.cend(), client.cbegin(), client.cend(),
-                        std::back_inserter(result));
-  return result;
-}
 }  // namespace wlan

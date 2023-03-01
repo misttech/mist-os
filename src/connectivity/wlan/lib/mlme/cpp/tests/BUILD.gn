@@ -47,7 +47,6 @@ test("mac_tests") {
 
   sources = [
     "channel_unittest.cc",
-    "element_splitter_unittest.cc",
     "element_unittest.cc",
     "energy_unittest.cc",
     "frame_validation_unittest.cc",
@@ -55,14 +54,8 @@ test("mac_tests") {
     "macaddr_unittest.cc",
     "mcs_unittest.cc",
     "packet_unittest.cc",
-    "parse_element_unittest.cc",
-    "parse_mac_header_unittest.cc",
-    "perr_destination_parser_unittest.cc",
     "rate_limiter_unittest.cc",
-    "tim_element_unittest.cc",
     "tim_unittest.cc",
-    "tx_vector_unittest.cc",
-    "write_element_unittest.cc",
   ]
 
   deps = [
@@ -96,33 +89,8 @@ test("buffer_utils_tests") {
   configs += [ "//src/connectivity/wlan/lib/mlme/cpp:wlan_mlme_config" ]
 }
 
-test("common_tests") {
-  output_name = "wlan_common_unittest"
-
-  sources = [
-    "features_unittest.cc",
-    "moving_average_unittest.cc",
-    "rates_elements_unittest.cc",
-  ]
-
-  deps = [
-    ":test_main",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats_hlcpp",
-    "//src/connectivity/wlan/lib/common/cpp:common",
-    "//third_party/googletest:gtest",
-  ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-
-  configs += [ "//src/connectivity/wlan/lib/mlme/cpp:wlan_mlme_config" ]
-}
-
 tests = [
   "buffer_utils",
-  "common",
   "mac",
 ]
 

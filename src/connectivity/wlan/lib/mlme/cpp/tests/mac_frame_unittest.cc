@@ -5,7 +5,6 @@
 #include <memory>
 
 #include <gtest/gtest.h>
-#include <wlan/common/write_element.h>
 #include <wlan/mlme/mac_frame.h>
 #include <wlan/mlme/wlan.h>
 

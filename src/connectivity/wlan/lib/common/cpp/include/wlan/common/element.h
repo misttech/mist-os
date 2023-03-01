@@ -31,31 +31,6 @@ struct ElementHeader {
   uint8_t len;
 } __PACKED;
 
-// IEEE 802.11-2016 9.4.2.3.
-// The MSB in a rate indicates "basic rate" and is ignored during comparison.
-// Rates are in 0.5Mbps increment: 12 -> 6 Mbps, 11 -> 5.5 Mbps, etc.
-struct SupportedRate : public common::BitField<uint8_t> {
-  constexpr SupportedRate() = default;
-  constexpr explicit SupportedRate(uint8_t val) : common::BitField<uint8_t>(val) {}
-  constexpr explicit SupportedRate(uint8_t val, bool is_basic) : common::BitField<uint8_t>(val) {
-    set_is_basic(static_cast<uint8_t>(is_basic));
-  }
-
-  static SupportedRate basic(uint8_t rate) { return SupportedRate(rate, true); }
-  static SupportedRate raw(uint8_t rate) { return SupportedRate(rate); }
-
-  WLAN_BIT_FIELD(rate, 0, 7)
-  WLAN_BIT_FIELD(is_basic, 7, 1)
-
-  operator uint8_t() const { return val(); }
-  bool operator==(const SupportedRate& other) const { return rate() == other.rate(); }
-  bool operator!=(const SupportedRate& other) const { return !this->operator==(other); }
-  bool operator<(const SupportedRate& other) const { return rate() < other.rate(); }
-  bool operator>(const SupportedRate& other) const { return rate() > other.rate(); }
-} __PACKED;
-
-static constexpr size_t kMaxSupportedRatesLen = 8;
-
 // IEEE Std 802.11-2016, 9.4.2.4
 struct DsssParamSet {
   uint8_t current_channel;
@@ -77,13 +52,6 @@ class BitmapControl : public common::BitField<uint8_t> {
   WLAN_BIT_FIELD(group_traffic_ind, 0, 1)
   WLAN_BIT_FIELD(offset, 1, 7)
 };
-
-// IEEE Std 802.11-2016, 9.4.2.6
-struct TimHeader {
-  uint8_t dtim_count;
-  uint8_t dtim_period;
-  BitmapControl bmp_ctrl;
-} __PACKED;
 
 constexpr size_t kMaxTimBitmapLen = 251;
 
@@ -184,134 +152,6 @@ struct MeshConfiguration {
   MeshCapability mesh_capability;
 } __PACKED;
 
-// IEEE Std 802.11-2016, 9.4.2.113, Figure 9-478
-struct PreqFlags : public common::BitField<uint8_t> {
-  WLAN_BIT_FIELD(gate_announcement, 0, 1)
-  WLAN_BIT_FIELD(addressing_mode, 1, 1)
-  WLAN_BIT_FIELD(proactive, 2, 1)
-  // bits 3-5 reserved
-  WLAN_BIT_FIELD(addr_ext, 6, 1)
-  // bit 7 reserved
-};
-
-// Fixed-length fields of the PREQ element that precede
-// the optional Originator External Address field.
-// IEEE Std 802.11-2016, 9.4.2.113, Figure 9-477
-struct PreqHeader {
-  PreqFlags flags;
-  uint8_t hop_count;
-  uint8_t element_ttl;
-  uint32_t path_discovery_id;
-  common::MacAddr originator_addr;
-  uint32_t originator_hwmp_seqno;
-} __PACKED;
-
-static_assert(sizeof(PreqHeader) == 17);
-
-// Fixed-length fields of the PREQ elements that follow the optional Originator
-// External Address field and precede the variable length per-target fields.
-// IEEE Std 802.11-2016, 9.4.2.113, Figure 9-477
-struct PreqMiddle {
-  uint32_t lifetime;
-  uint32_t metric;
-  uint8_t target_count;
-} __PACKED;
-
-static_assert(sizeof(PreqMiddle) == 9);
-
-// IEEE Std 802.11-2016, 9.4.2.113
-constexpr size_t kPreqMaxTargets = 20;
-
-// IEEE Std 802.11-2016, 9.4.2.113, Figure 9-479
-struct PreqPerTargetFlags : public common::BitField<uint8_t> {
-  WLAN_BIT_FIELD(target_only, 0, 1)
-  // bit 1 reserved
-  WLAN_BIT_FIELD(usn, 2, 1)
-  // bits 3-7 reserved
-};
-
-// An entry of the variable-length part of PREQ
-// IEEE Std 802.11-2016, 9.4.2.113, Figure 9-477
-struct PreqPerTarget {
-  PreqPerTargetFlags flags;
-  common::MacAddr target_addr;
-  uint32_t target_hwmp_seqno;
-} __PACKED;
-
-static_assert(sizeof(PreqPerTarget) == 11);
-
-// IEEE Std 802.11-2016, 9.4.2.114, Figure 9-481
-struct PrepFlags : public common::BitField<uint8_t> {
-  PrepFlags() = default;
-  explicit PrepFlags(uint8_t raw_value) : common::BitField<uint8_t>(raw_value) {}
-
-  // bits 0-5 reserved
-  WLAN_BIT_FIELD(addr_ext, 6, 1)
-  // bit 7 reserved
-};
-
-// Fixed-length fields of the PREP element that precede
-// the optional Target External Address field.
-// IEEE Std 802.11-2016, 9.4.2.114, Figure 9-480
-struct PrepHeader {
-  PrepFlags flags;
-  uint8_t hop_count;
-  uint8_t element_ttl;
-  common::MacAddr target_addr;
-  uint32_t target_hwmp_seqno;
-} __PACKED;
-
-static_assert(sizeof(PrepHeader) == 13);
-
-// Fixed-length fields of the PREP element that follow
-// the optional Target External Address field.
-// IEEE Std 802.11-2016, 9.4.2.114, Figure 9-480
-struct PrepTail {
-  uint32_t lifetime;
-  uint32_t metric;
-  common::MacAddr originator_addr;
-  uint32_t originator_hwmp_seqno;
-} __PACKED;
-
-static_assert(sizeof(PrepTail) == 18);
-
-// Fixed-length fields of the PERR element that precede the variable-length
-// per-destination fields.
-// IEEE Std 802.11-2016, 9.4.2.115
-struct PerrHeader {
-  uint8_t element_ttl;
-  uint8_t num_destinations;
-} __PACKED;
-
-// IEEE Std 802.11-2016, 9.4.2.115, Figure 9-483
-struct PerrPerDestinationFlags : public common::BitField<uint8_t> {
-  // bits 0-5 reserved
-  WLAN_BIT_FIELD(addr_ext, 6, 1)
-  // bit 7 reserved
-};
-
-// Fixed-length fields of the per-destination chunk of the PERR element
-// that precede the optional "Destination External Address" field.
-// IEEE Std 802.11-2016, 9.4.2.115
-struct PerrPerDestinationHeader {
-  PerrPerDestinationFlags flags;
-  common::MacAddr dest_addr;
-  uint32_t hwmp_seqno;
-} __PACKED;
-
-// The fixed-length field of the per-destination chunk of the PERR element
-// that follows the optional "Destination External Address" field.
-// IEEE Std 802.11-2016, 9.4.2.115
-struct PerrPerDestinationTail {
-  uint16_t reason_code;
-} __PACKED;
-
-// IEEE Std 802.11-2016, 9.4.2.115
-constexpr size_t kPerrMaxDestinations = 19;
-
-constexpr size_t kPerrMaxDestinationSize =
-    sizeof(PerrPerDestinationHeader) + sizeof(common::MacAddr) + sizeof(PerrPerDestinationTail);
-
 // IEEE Std 802.11-2016, 9.4.1.17
 class QosInfo : public common::BitField<uint8_t> {
  public:
@@ -373,88 +213,12 @@ enum TsScheduleSetting : uint8_t {
   kScheduledApsd = 3,
 };
 
-// IEEE Std 802.11-2016, 9.4.2.30, Figure 9-266
-class TsInfoPart1 : public common::BitField<uint16_t> {
- public:
-  constexpr explicit TsInfoPart1(uint16_t params) : common::BitField<uint16_t>(params) {}
-  constexpr TsInfoPart1() = default;
-
-  WLAN_BIT_FIELD(traffic_type, 0, 1)
-  WLAN_BIT_FIELD(tsid, 1, 4)
-  WLAN_BIT_FIELD(direction, 5, 2)
-  WLAN_BIT_FIELD(access_policy, 7, 2)
-  WLAN_BIT_FIELD(aggregation, 9, 1)
-  WLAN_BIT_FIELD(apsd, 10, 1)
-  WLAN_BIT_FIELD(user_priority, 11, 3)
-  WLAN_BIT_FIELD(ack_policy, 14, 2)
-} __PACKED;
-
-// IEEE Std 802.11-2016, 9.4.2.30, Figure 9-266
-class TsInfoPart2 : public common::BitField<uint8_t> {
- public:
-  constexpr explicit TsInfoPart2(uint8_t params) : common::BitField<uint8_t>(params) {}
-  constexpr TsInfoPart2() = default;
-
-  WLAN_BIT_FIELD(schedule, 0, 1)
-  // Bit 17-23 reserved.
-} __PACKED;
-
-// IEEE Std 802.11-2016, 9.4.2.30, Figure 9-266
-// Note: In order to use a 3 byte packed struct, the TsInfo was split into two
-// parts.
-struct TsInfo {
-  TsInfoPart1 p1;
-  TsInfoPart2 p2;
-
-  bool IsValidAggregation() const {
-    if (p1.access_policy() == TsAccessPolicy::kHccaSpca) {
-      return true;
-    }
-    return p1.access_policy() == TsAccessPolicy::kEdca && p2.schedule();
-  }
-
-  bool IsScheduleReserved() const { return p1.access_policy() != TsAccessPolicy::kEdca; }
-
-  TsScheduleSetting GetScheduleSetting() const {
-    return static_cast<TsScheduleSetting>(p1.apsd() | (p2.schedule() << 1));
-  }
-} __PACKED;
-
 // IEEE Std 802.11-2016, 9.4.2.30, Figure 9-267
 struct NominalMsduSize : public common::BitField<uint16_t> {
   constexpr explicit NominalMsduSize(uint16_t params) : common::BitField<uint16_t>(params) {}
   constexpr NominalMsduSize() = default;
 
   WLAN_BIT_FIELD(size, 0, 15) WLAN_BIT_FIELD(fixed, 15, 1)
-} __PACKED;
-
-// IEEE Std 802.11-2016, 9.4.2.30
-struct Tspec {
-  // TODO(hahnr): The element will for now only be read by the AP when received
-  // from an associated client and there is no need for providing a custom
-  // constructor yet.
-
-  TsInfo ts_info;
-  NominalMsduSize nominal_msdu_size;
-  uint16_t max_msdu_size;
-  uint32_t min_service_interval;
-  uint32_t max_service_interval;
-  uint32_t inactivity_interval;
-  uint32_t suspension_interval;
-  uint32_t service_start_time;
-  uint32_t min_data_rate;
-  uint32_t mean_data_rate;
-  uint32_t peak_data_rate;
-  uint32_t burst_size;
-  uint32_t delay_bound;
-  uint32_t min_phy_rate;
-  uint16_t surplus_bw_allowance;
-  uint16_t medium_time;
-
-  // TODO(hahnr): Add min/mean/peak data rate support based on the provided
-  // fields.
-  // TODO(hahnr): Add min PHY rate support based on the provided field.
-  // TODO(hahnr): Add DMG support.
 } __PACKED;
 
 // IEEE Std 802.11-2016, 9.4.2.56.2
@@ -1091,10 +855,6 @@ SupportedMcsSet IntersectMcs(const SupportedMcsSet& lhs, const SupportedMcsSet& 
 HtCapabilities IntersectHtCap(const HtCapabilities& lhs, const HtCapabilities& rhs);
 VhtCapabilities IntersectVhtCap(const VhtCapabilities& lhs, const VhtCapabilities& rhs);
 
-// Find common legacy rates between AP and client.
-// The outcoming "Basic rates" follows those specified in AP
-std::vector<SupportedRate> IntersectRatesAp(const std::vector<SupportedRate>& ap_rates,
-                                            const std::vector<SupportedRate>& client_rates);
 }  // namespace wlan
 
 #endif  // SRC_CONNECTIVITY_WLAN_LIB_COMMON_CPP_INCLUDE_WLAN_COMMON_ELEMENT_H_

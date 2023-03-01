@@ -34,7 +34,6 @@
 
 #include "convert.h"
 #include "fidl/fuchsia.wlan.common/cpp/wire_types.h"
-#include "probe_sequence.h"
 
 namespace wlan {
 

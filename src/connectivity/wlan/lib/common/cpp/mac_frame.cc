@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fbl/algorithm.h>
-#include <wlan/common/element_splitter.h>
 #include <wlan/common/mac_frame.h>
 
 namespace wlan {

@@ -48,8 +48,6 @@ fuchsia_driver("wlansoftmac_driver-driver") {
     "device_interface.cc",
     "device_interface.h",
     "driver.cc",
-    "probe_sequence.cc",
-    "probe_sequence.h",
   ]
   deps = [
     ":wlansoftmac_bind",
