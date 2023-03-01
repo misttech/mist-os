@@ -216,13 +216,13 @@ void Allocator::RegisterBufferCollection(
   // Use a self-referencing async::WaitOnce to deregister buffer collections when all
   // BufferCollectionImportTokens are used, i.e. peers of eventpair are closed. Note that the
   // ownership of |export_token| is also passed, so that GetRelatedKoid() calls return valid koid.
-  auto wait =
-      std::make_shared<async::WaitOnce>(export_token.value.release(), ZX_EVENTPAIR_PEER_CLOSED);
+  auto wait = std::make_shared<async::WaitOnce>(export_token.value.get(), ZX_EVENTPAIR_PEER_CLOSED);
   const zx_status_t status =
       wait->Begin(async_get_default_dispatcher(),
-                  [copy_ref = wait, weak_ptr = weak_factory_.GetWeakPtr(), koid = koid](
-                      async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
-                      const zx_packet_signal_t* /*signal*/) mutable {
+                  [keepalive_wait = wait, keepalive_export_token = std::move(export_token.value),
+                   weak_ptr = weak_factory_.GetWeakPtr(),
+                   koid = koid](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                const zx_packet_signal_t* /*signal*/) mutable {
                     FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
                     if (!weak_ptr)
                       return;

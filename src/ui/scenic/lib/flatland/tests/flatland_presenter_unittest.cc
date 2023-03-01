@@ -121,7 +121,7 @@ TEST_F(FlatlandPresenterTest, RemoveSessionForwardsToFrameScheduler) {
   auto presenter = CreateFlatlandPresenterImpl(frame_scheduler);
 
   const scheduling::SessionId kSessionId = 1;
-  presenter->RemoveSession(kSessionId);
+  presenter->RemoveSession(kSessionId, std::nullopt);
 
   RunLoopUntilIdle();
 

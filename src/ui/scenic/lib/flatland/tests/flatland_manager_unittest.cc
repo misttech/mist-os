@@ -17,6 +17,7 @@
 #include "src/ui/scenic/lib/scheduling/id.h"
 
 using ::testing::_;
+using ::testing::AtLeast;
 using ::testing::Return;
 
 using flatland::FlatlandManager;
@@ -104,9 +105,12 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
           return presentation_infos;
         }));
 
-    ON_CALL(*mock_flatland_presenter_, RemoveSession(_))
+    ON_CALL(*mock_flatland_presenter_, RemoveSession(_, _))
         .WillByDefault(::testing::Invoke(
-            [&](scheduling::SessionId session_id) { removed_sessions_.insert(session_id); }));
+            [&](scheduling::SessionId session_id, std::optional<zx::event> release_fence) {
+              async::PostTask(this->dispatcher(),
+                              [&, session_id]() { removed_sessions_.insert(session_id); });
+            }));
 
     uint64_t kDisplayId = 1;
     uint32_t kDisplayWidth = 640;
@@ -129,7 +133,7 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
     removed_sessions_.clear();
     if (manager_) {
       const size_t session_count = manager_->GetSessionCount();
-      EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_)).Times(session_count);
+      EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_, _)).Times(AtLeast(session_count));
       RunLoopUntil([this] { return manager_->GetSessionCount() == 0; });
       RunLoopUntil([this, session_count] { return removed_sessions_.size() == session_count; });
     }
@@ -183,6 +187,7 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
   std::set<scheduling::SchedulingIdPair> pending_presents_;
   std::unordered_map<scheduling::SessionId, std::queue<scheduling::PresentId>>
       pending_session_updates_;
+
   std::unordered_set<scheduling::SessionId> removed_sessions_;
 
   const std::shared_ptr<LinkSystem> link_system_;
@@ -230,7 +235,7 @@ TEST_F(FlatlandManagerTest, CreateViewportedFlatlands) {
     EXPECT_EQ(manager_->GetSessionCount(), 2ul);
     RunLoopUntil([this] { return !link_system_->GetResolvedTopologyLinks().empty(); });
 
-    EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_));
+    EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_, _));
   }
 
   RunLoopUntil([this] { return link_system_->GetResolvedTopologyLinks().empty(); });
@@ -247,7 +252,7 @@ TEST_F(FlatlandManagerTest, ClientDiesBeforeManager) {
     EXPECT_TRUE(flatland.is_bound());
 
     // |flatland| falls out of scope, killing the session.
-    EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id));
+    EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id, _));
 
     // FlatlandManager::RemoveFlatlandInstance() will be posted on main thread and may not be run
     // yet.
@@ -271,7 +276,7 @@ TEST_F(FlatlandManagerTest, ManagerDiesBeforeClients) {
   EXPECT_EQ(manager_->GetSessionCount(), 1ul);
 
   // Explicitly kill the server.
-  EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id));
+  EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id, _));
   manager_.reset();
 
   EXPECT_EQ(uber_struct_system_->GetSessionCount(), 0ul);
@@ -485,7 +490,7 @@ TEST_F(FlatlandManagerTest, PresentWithoutTokensClosesSession) {
   EXPECT_TRUE(flatland.is_bound());
 
   // Present one more time and ensure the session is closed.
-  EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id));
+  EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id, _));
   PRESENT(flatland, id, false);
 
   // The instance will eventually be unbound, but it takes a pair of thread hops to complete since
@@ -511,7 +516,7 @@ TEST_F(FlatlandManagerTest, ErrorClosesSession) {
   EXPECT_TRUE(flatland.is_bound());
 
   // Queue a bad SetRootTransform call ensure the session is closed.
-  EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id));
+  EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(id, _));
   flatland->SetRootTransform({2});
   PRESENT(flatland, id, false);
 

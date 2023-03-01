@@ -39,7 +39,8 @@ class FlatlandPresenterImpl final : public FlatlandPresenter,
   std::vector<scheduling::FuturePresentationInfo> GetFuturePresentationInfos() override;
 
   // |FlatlandPresenter|
-  void RemoveSession(scheduling::SessionId session_id) override;
+  void RemoveSession(scheduling::SessionId session_id,
+                     std::optional<zx::event> release_fence) override;
 
   // Called at FrameScheduler's UpdateSessions() time.
   // Takes the release fences up to the corresponding PresentId for each SessionId in

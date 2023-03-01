@@ -351,17 +351,14 @@ void FlatlandManager::RemoveFlatlandInstance(scheduling::SessionId session_id) {
       // Note: Capturing "this" is safe as a flatland manager is guaranteed to outlive any flatland
       // instance.
       async::PostTask(instance_kv->second->loop->dispatcher(),
-                      [instance = std::move(instance_kv->second), session_id, this]() mutable {
+                      [instance = std::move(instance_kv->second), this]() mutable {
+                        TRACE_DURATION("gfx", "FlatlandManager::RemoveFlatlandInstance[task]");
+
                         // A flatland instance must release all its resources before
                         // |alive_sessions_| is decremented. This ensures that flatland manager is
                         // not destroyed before the flatland instance.
                         instance->impl.reset();
                         alive_sessions_--;
-
-                        // Call FlatlandPresenter::RemoveSession() here, so that we're guaranteed
-                        // that no further calls can be made to FlatlandPresenter from this Flatland
-                        // instance after removal.
-                        flatland_presenter_->RemoveSession(session_id);
                       });
       flatland_instances_.erase(session_id);
     }
@@ -381,19 +378,15 @@ void FlatlandManager::RemoveFlatlandInstance(scheduling::SessionId session_id) {
       // Note: Capturing "this" is safe as a flatland manager is guaranteed to outlive any flatland
       // display instance.
       async::PostTask(instance_kv->second->loop->dispatcher(),
-                      [instance = std::move(instance_kv->second), session_id, this]() mutable {
-                        TRACE_DURATION("gfx", "FlatlandManager::RemoveFlatlandInstance[task]");
+                      [instance = std::move(instance_kv->second), this]() mutable {
+                        TRACE_DURATION("gfx",
+                                       "FlatlandManager::RemoveFlatlandInstance[display/task]");
 
                         // A flatland display instance must release all its resources before
                         // |alive_sessions_| is decremented. This ensures that flatland manager is
                         // not destroyed before the flatland display instance.
                         instance->impl.reset();
                         alive_sessions_--;
-
-                        // Call FlatlandPresenter::RemoveSession() here, so that we're guaranteed
-                        // that no further calls can be made to FlatlandPresenter from this Flatland
-                        // instance after removal.
-                        flatland_presenter_->RemoveSession(session_id);
                       });
       flatland_display_instances_.erase(session_id);
     }

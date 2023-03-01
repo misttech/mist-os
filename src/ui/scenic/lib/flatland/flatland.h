@@ -73,7 +73,6 @@ class Flatland : public fuchsia::ui::composition::Flatland,
           register_touch_source,
       fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
           register_mouse_source);
-  ~Flatland();
 
   // Because this object captures its "this" pointer in internal closures, it is unsafe to copy or
   // move it. Disable all copy and move operations.
@@ -81,6 +80,8 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   Flatland& operator=(const Flatland&) = delete;
   Flatland(Flatland&&) = delete;
   Flatland& operator=(Flatland&&) = delete;
+
+  ~Flatland() override;
 
   // |fuchsia::ui::composition::Flatland|
   void Present(fuchsia::ui::composition::PresentArgs args) override;
@@ -236,6 +237,17 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   // TransformID as a parameter so that it can be applied to content transforms that do
   // not have an external ID that they are mapped to.
   void SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Rect bounds);
+
+  // For each dead transform:
+  //   1) remove the corresponding matrix
+  //   2) record any corresponding image which needs to be released
+  // The images found by 2) are handled in two ways:
+  //   - by adding them to `images_to_release_` (to ensure that they're properly released even if
+  //     the Flatland session is destroyed before releasing the images)
+  //   - returned from this function, so that they can be released as soon as the corresponding
+  //     release fence is signaled.
+  std::vector<allocation::ImageMetadata> ProcessDeadTransforms(
+      const TransformGraph::TopologyData& data);
 
   // The dispatcher this Flatland instance is running on.
   async_dispatcher_t* dispatcher() const { return dispatcher_holder_->dispatcher(); }
@@ -403,6 +415,15 @@ class Flatland : public fuchsia::ui::composition::Flatland,
 
   // Error reporter used for printing debug logs.
   std::unique_ptr<scenic_impl::ErrorReporter> error_reporter_;
+
+  // These images no longer exist in the Flatland session.  They will be released as soon as the
+  // corresponding (internally generated) release fence is signaled, indicating that they are no
+  // longer in use by the compositor/display-controller.  Additionally, if the session is destroyed,
+  // this allows the images to be released without waiting for a release fence; see ~Flatland().
+  // The indirection through a shared_ptr is so this can be captured and used in a closure after
+  // this Flatland session is destroyed (this happens only in tests, at least when this code was
+  // written).
+  std::shared_ptr<std::unordered_set<allocation::GlobalImageId>> images_to_release_;
 
   // Callbacks for registering View-bound protocols.
   fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::Focuser>, zx_koid_t)>

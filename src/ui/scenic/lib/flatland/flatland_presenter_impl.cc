@@ -9,6 +9,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
+#include "src/ui/scenic/lib/scheduling/id.h"
+
 namespace flatland {
 
 FlatlandPresenterImpl::FlatlandPresenterImpl(async_dispatcher_t* main_dispatcher,
@@ -67,14 +69,27 @@ FlatlandPresenterImpl::GetFuturePresentationInfos() {
   return frame_scheduler_.GetFuturePresentationInfos(kDefaultPredictionSpan);
 }
 
-void FlatlandPresenterImpl::RemoveSession(scheduling::SessionId session_id) {
-  async::PostTask(main_dispatcher_, [thiz = shared_from_this(), session_id] {
-    TRACE_DURATION("gfx", "FlatlandPresenterImpl::ScheduleUpdateForSession[task]");
+void FlatlandPresenterImpl::RemoveSession(scheduling::SessionId session_id,
+                                          std::optional<zx::event> release_fence) {
+  async::PostTask(main_dispatcher_, [thiz = shared_from_this(), session_id,
+                                     release_fence = std::move(release_fence)]() mutable {
+    TRACE_DURATION("gfx", "FlatlandPresenterImpl::RemoveSession[task]");
     // Remove any registered release fences for the removed session.
     {
       auto start = thiz->release_fences_.lower_bound({session_id, 0});
       auto end = thiz->release_fences_.lower_bound({session_id + 1, 0});
       thiz->release_fences_.erase(start, end);
+    }
+
+    const auto present_id = scheduling::GetNextPresentId();
+
+    // If provided, add one final release fence for cleanup.
+    if (release_fence.has_value()) {
+      FX_DCHECK(release_fence.value());
+      std::vector<zx::event> release_fences;
+      release_fences.emplace_back(std::move(*release_fence));
+      thiz->release_fences_.emplace(scheduling::SchedulingIdPair{session_id, present_id},
+                                    std::move(release_fences));
     }
 
     // Ensure that in case no client is currently rendering we'll still produce a new frame to clean
@@ -83,7 +98,7 @@ void FlatlandPresenterImpl::RemoveSession(scheduling::SessionId session_id) {
     // ensures both that there will be no collisions for the |session_id| used and that we'll
     // schedule exactly one frame for the shortest possible timeframe.
     thiz->frame_scheduler_.RemoveSession(session_id);
-    const auto present_id = thiz->frame_scheduler_.RegisterPresent(session_id, {});
+    thiz->frame_scheduler_.RegisterPresent(session_id, {});
     thiz->frame_scheduler_.ScheduleUpdateForSession(zx::time(0), {session_id, present_id},
                                                     /*squashable*/ true);
   });

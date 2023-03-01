@@ -72,6 +72,12 @@ FlatlandDisplay::FlatlandDisplay(
   FLATLAND_VERBOSE_LOG << "FlatlandDisplay new with ID: " << session_id_;
 }
 
+FlatlandDisplay::~FlatlandDisplay() {
+  // Unlike Flatland, FlatlandDisplay doesn't manage any client images, therefore doesn't need to
+  // pass a release fence to RemoveSession().
+  flatland_presenter_->RemoveSession(session_id_, std::nullopt);
+}
+
 void FlatlandDisplay::SetContent(ViewportCreationToken token,
                                  fidl::InterfaceRequest<ChildViewWatcher> child_view_watcher) {
   // Attempting to link with an invalid token will never succeed, so its better to fail early and

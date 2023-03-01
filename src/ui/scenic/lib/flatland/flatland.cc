@@ -16,12 +16,15 @@
 #include <memory>
 #include <sstream>
 #include <utility>
+#include <vector>
 
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/gfx/util/validate_eventpair.h"
+#include "src/ui/scenic/lib/scheduling/id.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/logging.h"
+#include "zircon/errors.h"
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_access.hpp>
@@ -149,6 +152,7 @@ Flatland::Flatland(
       transform_graph_(session_id_),
       local_root_(transform_graph_.CreateTransform()),
       error_reporter_(scenic_impl::ErrorReporter::DefaultUnique()),
+      images_to_release_(std::make_shared<std::unordered_set<allocation::GlobalImageId>>()),
       register_view_focuser_(std::move(register_view_focuser)),
       register_view_ref_focused_(std::move(register_view_ref_focused)),
       register_touch_source_(std::move(register_touch_source)),
@@ -169,6 +173,58 @@ Flatland::Flatland(
 
 Flatland::~Flatland() {
   // TODO(fxbug.dev/55374): consider if Link tokens should be returned or not.
+
+  // Clear the scene graph, then collect the images to release.
+  Clear();
+  auto data = transform_graph_.ComputeAndCleanup(GetRoot(), std::numeric_limits<uint64_t>::max());
+
+  // We don't care about the images returned by `ProcessDeadTransforms()` because we want to release
+  // all the images in `images_to_release_`, which potentially includes some added by
+  // `ProcessDeadTransforms()`.
+  ProcessDeadTransforms(data);
+  FX_DCHECK(image_metadatas_.empty());
+
+  // If there are any images to release, set up a waiter, and pass the event-to-be-signaled to
+  // `FlatlandPresenter::RemoveSession`.  This will schedule another frame and signal the event
+  // just like any other release fence.
+  std::optional<zx::event> image_release_fence;
+  if (!images_to_release_->empty()) {
+    zx::event evt = utils::CreateEvent();
+    image_release_fence = utils::CopyEvent(evt);
+
+    auto wait = std::make_shared<async::WaitOnce>(evt.get(), ZX_EVENT_SIGNALED);
+    zx_status_t status = wait->Begin(
+        dispatcher(),
+        [importer_refs = buffer_collection_importers_, images_to_release = images_to_release_,
+         // We keep several objects alive in the closure:
+         //   - the dispatcher, which is about to be released by the Flatland and FlatlandManager.
+         //   - the wait object keeps itself alive via the ref in this closure
+         //   - the waited-upon fence event: we retain a copy of the handle to avoid reasoning about
+         //     whether the FlatlandPresenter implementation will safely keep it alive.
+         keepalive_dispatcher = dispatcher_holder_, keepalive_wait = wait,
+         keepalive_evt = std::move(evt)](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                         const zx_packet_signal_t* /*signal*/) mutable {
+          for (auto& image_id : *images_to_release) {
+            for (auto& importer : importer_refs) {
+              importer->ReleaseBufferImage(image_id);
+            }
+          }
+          images_to_release->clear();
+
+          // This is bullet-proofing against a subtle issue.  When we capture the "keepalive"
+          // dispatcher/wait/event, we intentionally capture the dispatcher first, so that it is
+          // destroyed last.  Otherwise, if it is destroyed before the wait and/or event, we cannot
+          // rely on RAII to clean them up (for some reason).  Instead of relying on that subtle
+          // detail, we explicitly release the wait/event.
+          keepalive_evt.reset();
+          keepalive_wait.reset();
+        });
+    FX_DCHECK(status == ZX_OK);
+  }
+
+  // This will signal the release fence (if any) that we pass to it, and therefore enable the wait
+  // above to succeed.
+  flatland_presenter_->RemoveSession(session_id_, std::move(image_release_fence));
 }
 
 void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
@@ -225,16 +281,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
   // Cleanup released resources. Here we also collect the list of unused images so they can be
   // released by the buffer collection importers.
-  std::vector<allocation::ImageMetadata> images_to_release;
-  for (const auto& dead_handle : data.dead_transforms) {
-    matrices_.erase(dead_handle);
-
-    auto image_kv = image_metadatas_.find(dead_handle);
-    if (image_kv != image_metadatas_.end()) {
-      images_to_release.push_back(image_kv->second);
-      image_metadatas_.erase(image_kv);
-    }
-  }
+  auto images_to_release = ProcessDeadTransforms(data);
 
   // If there are images ready for release, create a release fence for the current Present() and
   // delay release until that fence is reached to ensure that the images are no longer referenced
@@ -253,18 +300,36 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
     // ensure that the wait object lives. The callback will not trigger without this.
     auto wait = std::make_shared<async::WaitOnce>(image_release_fence.get(), ZX_EVENT_SIGNALED);
     status = wait->Begin(
-        dispatcher(), [copy_ref = wait, importer_ref = buffer_collection_importers_,
-                       images_to_release](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
-                                          const zx_packet_signal_t* /*signal*/) mutable {
-          FX_DCHECK(status == ZX_OK);
+        dispatcher(),
+        [copy_ref = wait, importer_refs = buffer_collection_importers_, images_to_release,
+         all_images_to_release = images_to_release_,
+         session_id = session_id_](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                   const zx_packet_signal_t* /*signal*/) mutable {
+          // The wait is canceled if the dispatcher is destroyed before the event is signaled.
+          // In this case, we expect the images to have already been released by the wait in the
+          // ~Flatland() destructor.
+          FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED)
+              << "status is: " << zx_status_get_string(status) << " (" << status << ")";
+          if (status == ZX_ERR_CANCELED) {
+            FX_DCHECK(all_images_to_release->empty());
+            return;
+          }
 
           for (auto& image_id : images_to_release) {
-            for (auto& importer : importer_ref) {
+            if (!all_images_to_release->erase(image_id.identifier)) {
+              // This is harmless, but is not expected to happen.
+              FX_LOGS(WARNING) << "Flatland session << " << session_id
+                               << " did not find expected image " << image_id.identifier
+                               << " in images_to_release_";
+              continue;
+            }
+
+            for (auto& importer : importer_refs) {
               importer->ReleaseBufferImage(image_id.identifier);
             }
           }
         });
-    FX_DCHECK(status == ZX_OK);
+    FX_DCHECK(status == ZX_OK) << "status is: " << status;
 
     // Push the new release fence into the user-provided list.
     args.mutable_release_fences()->push_back(std::move(image_release_fence));
@@ -726,6 +791,28 @@ void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Re
   }
 
   clip_regions_[handle] = bounds;
+}
+
+std::vector<allocation::ImageMetadata> Flatland::ProcessDeadTransforms(
+    const TransformGraph::TopologyData& data) {
+  std::vector<allocation::ImageMetadata> images_to_release;
+  for (const auto& dead_handle : data.dead_transforms) {
+    matrices_.erase(dead_handle);
+
+    // Gather all images corresponding to dead transforms.
+    auto image_kv = image_metadatas_.find(dead_handle);
+    if (image_kv != image_metadatas_.end()) {
+      // Remember all dead images so that we can release them in the destructor if necessary.
+      // Typically this won't be necessary: we'll release them as soon as it is safe (roughly, when
+      // the next present takes effect).
+      images_to_release_->insert(image_kv->second.identifier);
+
+      images_to_release.push_back(image_kv->second);
+      image_metadatas_.erase(image_kv);
+    }
+  }
+
+  return images_to_release;
 }
 
 void Flatland::AddChild(TransformId parent_transform_id, TransformId child_transform_id) {
