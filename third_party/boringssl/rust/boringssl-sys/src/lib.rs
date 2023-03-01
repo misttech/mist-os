@@ -460,7 +460,6 @@ pub const ASN1_TFLG_PRIVATE: u32 = 192;
 pub const ASN1_TFLG_TAG_CLASS: u32 = 192;
 pub const ASN1_TFLG_ADB_MASK: u32 = 768;
 pub const ASN1_TFLG_ADB_OID: u32 = 256;
-pub const ASN1_TFLG_COMBINE: u32 = 1024;
 pub const ASN1_ITYPE_PRIMITIVE: u32 = 0;
 pub const ASN1_ITYPE_SEQUENCE: u32 = 1;
 pub const ASN1_ITYPE_CHOICE: u32 = 2;
@@ -522,6 +521,9 @@ pub const EVP_CIPH_OFB_MODE: u32 = 4;
 pub const EVP_CIPH_CTR_MODE: u32 = 5;
 pub const EVP_CIPH_GCM_MODE: u32 = 6;
 pub const EVP_CIPH_XTS_MODE: u32 = 7;
+pub const EVP_CIPH_CCM_MODE: u32 = 8;
+pub const EVP_CIPH_OCB_MODE: u32 = 9;
+pub const EVP_CIPH_WRAP_MODE: u32 = 10;
 pub const EVP_CIPH_VARIABLE_LENGTH: u32 = 64;
 pub const EVP_CIPH_ALWAYS_CALL_INIT: u32 = 128;
 pub const EVP_CIPH_CUSTOM_IV: u32 = 256;
@@ -530,9 +532,6 @@ pub const EVP_CIPH_FLAG_CUSTOM_CIPHER: u32 = 1024;
 pub const EVP_CIPH_FLAG_AEAD_CIPHER: u32 = 2048;
 pub const EVP_CIPH_CUSTOM_COPY: u32 = 4096;
 pub const EVP_CIPH_FLAG_NON_FIPS_ALLOW: u32 = 0;
-pub const EVP_CIPH_CCM_MODE: i32 = -1;
-pub const EVP_CIPH_OCB_MODE: i32 = -2;
-pub const EVP_CIPH_WRAP_MODE: i32 = -3;
 pub const EVP_CIPHER_CTX_FLAG_WRAP_ALLOW: u32 = 0;
 pub const EVP_CIPH_NO_PADDING: u32 = 2048;
 pub const EVP_CTRL_INIT: u32 = 0;
@@ -664,6 +663,7 @@ pub const DSA_R_BAD_VERSION: u32 = 104;
 pub const DSA_R_DECODE_ERROR: u32 = 105;
 pub const DSA_R_ENCODE_ERROR: u32 = 106;
 pub const DSA_R_INVALID_PARAMETERS: u32 = 107;
+pub const DSA_R_TOO_MANY_ITERATIONS: u32 = 108;
 pub const OPENSSL_EC_EXPLICIT_CURVE: u32 = 0;
 pub const OPENSSL_EC_NAMED_CURVE: u32 = 1;
 pub const EC_R_BUFFER_TOO_SMALL: u32 = 100;
@@ -713,6 +713,7 @@ pub const ECDSA_R_NEED_NEW_SETUP_VALUES: u32 = 102;
 pub const ECDSA_R_NOT_IMPLEMENTED: u32 = 103;
 pub const ECDSA_R_RANDOM_NUMBER_GENERATION_FAILED: u32 = 104;
 pub const ECDSA_R_ENCODE_ERROR: u32 = 105;
+pub const ECDSA_R_TOO_MANY_ITERATIONS: u32 = 106;
 pub const EVP_R_BUFFER_TOO_SMALL: u32 = 100;
 pub const EVP_R_COMMAND_NOT_SUPPORTED: u32 = 101;
 pub const EVP_R_DECODE_ERROR: u32 = 102;
@@ -1991,6 +1992,11 @@ pub struct evp_pkey_method_st {
     _unused: [u8; 0],
 }
 pub type EVP_PKEY_METHOD = evp_pkey_method_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct evp_pkey_st {
+    _unused: [u8; 0],
+}
 pub type EVP_PKEY = evp_pkey_st;
 pub type HMAC_CTX = hmac_ctx_st;
 pub type MD5_CTX = md5_state_st;
@@ -4866,12 +4872,12 @@ extern "C" {
     pub fn ASN1_UTCTIME_check(a: *const ASN1_UTCTIME) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn ASN1_UTCTIME_set(s: *mut ASN1_UTCTIME, t: time_t) -> *mut ASN1_UTCTIME;
+    pub fn ASN1_UTCTIME_set(s: *mut ASN1_UTCTIME, posix_time: i64) -> *mut ASN1_UTCTIME;
 }
 extern "C" {
     pub fn ASN1_UTCTIME_adj(
         s: *mut ASN1_UTCTIME,
-        t: time_t,
+        posix_time: i64,
         offset_day: ::std::os::raw::c_int,
         offset_sec: ::std::os::raw::c_long,
     ) -> *mut ASN1_UTCTIME;
@@ -4900,13 +4906,13 @@ extern "C" {
 extern "C" {
     pub fn ASN1_GENERALIZEDTIME_set(
         s: *mut ASN1_GENERALIZEDTIME,
-        t: time_t,
+        posix_time: i64,
     ) -> *mut ASN1_GENERALIZEDTIME;
 }
 extern "C" {
     pub fn ASN1_GENERALIZEDTIME_adj(
         s: *mut ASN1_GENERALIZEDTIME,
-        t: time_t,
+        posix_time: i64,
         offset_day: ::std::os::raw::c_int,
         offset_sec: ::std::os::raw::c_long,
     ) -> *mut ASN1_GENERALIZEDTIME;
@@ -4935,12 +4941,15 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn ASN1_TIME_set(s: *mut ASN1_TIME, t: time_t) -> *mut ASN1_TIME;
+    pub fn ASN1_TIME_set_posix(s: *mut ASN1_TIME, posix_time: i64) -> *mut ASN1_TIME;
+}
+extern "C" {
+    pub fn ASN1_TIME_set(s: *mut ASN1_TIME, time: time_t) -> *mut ASN1_TIME;
 }
 extern "C" {
     pub fn ASN1_TIME_adj(
         s: *mut ASN1_TIME,
-        t: time_t,
+        posix_time: i64,
         offset_day: ::std::os::raw::c_int,
         offset_sec: ::std::os::raw::c_long,
     ) -> *mut ASN1_TIME;
@@ -5612,148 +5621,6 @@ fn bindgen_test_layout_ASN1_ITEM_st() {
         concat!("Offset of field: ", stringify!(ASN1_ITEM_st), "::", stringify!(sname))
     );
 }
-pub type ASN1_new_func = ::std::option::Option<unsafe extern "C" fn() -> *mut ASN1_VALUE>;
-pub type ASN1_free_func = ::std::option::Option<unsafe extern "C" fn(a: *mut ASN1_VALUE)>;
-pub type ASN1_d2i_func = ::std::option::Option<
-    unsafe extern "C" fn(
-        a: *mut *mut ASN1_VALUE,
-        in_: *mut *const ::std::os::raw::c_uchar,
-        length: ::std::os::raw::c_long,
-    ) -> *mut ASN1_VALUE,
->;
-pub type ASN1_i2d_func = ::std::option::Option<
-    unsafe extern "C" fn(
-        a: *mut ASN1_VALUE,
-        in_: *mut *mut ::std::os::raw::c_uchar,
-    ) -> ::std::os::raw::c_int,
->;
-pub type ASN1_ex_d2i = ::std::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *mut ASN1_VALUE,
-        in_: *mut *const ::std::os::raw::c_uchar,
-        len: ::std::os::raw::c_long,
-        it: *const ASN1_ITEM,
-        tag: ::std::os::raw::c_int,
-        aclass: ::std::os::raw::c_int,
-        opt: ::std::os::raw::c_char,
-        ctx: *mut ASN1_TLC,
-    ) -> ::std::os::raw::c_int,
->;
-pub type ASN1_ex_i2d = ::std::option::Option<
-    unsafe extern "C" fn(
-        pval: *mut *mut ASN1_VALUE,
-        out: *mut *mut ::std::os::raw::c_uchar,
-        it: *const ASN1_ITEM,
-        tag: ::std::os::raw::c_int,
-        aclass: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int,
->;
-pub type ASN1_ex_new_func = ::std::option::Option<
-    unsafe extern "C" fn(pval: *mut *mut ASN1_VALUE, it: *const ASN1_ITEM) -> ::std::os::raw::c_int,
->;
-pub type ASN1_ex_free_func =
-    ::std::option::Option<unsafe extern "C" fn(pval: *mut *mut ASN1_VALUE, it: *const ASN1_ITEM)>;
-pub type ASN1_ex_print_func = ::std::option::Option<
-    unsafe extern "C" fn(
-        out: *mut BIO,
-        pval: *mut *mut ASN1_VALUE,
-        indent: ::std::os::raw::c_int,
-        fname: *const ::std::os::raw::c_char,
-        pctx: *const ASN1_PCTX,
-    ) -> ::std::os::raw::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ASN1_EXTERN_FUNCS_st {
-    pub app_data: *mut ::std::os::raw::c_void,
-    pub asn1_ex_new: ASN1_ex_new_func,
-    pub asn1_ex_free: ASN1_ex_free_func,
-    pub asn1_ex_clear: ASN1_ex_free_func,
-    pub asn1_ex_d2i: ASN1_ex_d2i,
-    pub asn1_ex_i2d: ASN1_ex_i2d,
-    pub asn1_ex_print: ASN1_ex_print_func,
-}
-#[test]
-fn bindgen_test_layout_ASN1_EXTERN_FUNCS_st() {
-    const UNINIT: ::std::mem::MaybeUninit<ASN1_EXTERN_FUNCS_st> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<ASN1_EXTERN_FUNCS_st>(),
-        56usize,
-        concat!("Size of: ", stringify!(ASN1_EXTERN_FUNCS_st))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<ASN1_EXTERN_FUNCS_st>(),
-        8usize,
-        concat!("Alignment of ", stringify!(ASN1_EXTERN_FUNCS_st))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).app_data) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(ASN1_EXTERN_FUNCS_st), "::", stringify!(app_data))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).asn1_ex_new) as usize - ptr as usize },
-        8usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ASN1_EXTERN_FUNCS_st),
-            "::",
-            stringify!(asn1_ex_new)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).asn1_ex_free) as usize - ptr as usize },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ASN1_EXTERN_FUNCS_st),
-            "::",
-            stringify!(asn1_ex_free)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).asn1_ex_clear) as usize - ptr as usize },
-        24usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ASN1_EXTERN_FUNCS_st),
-            "::",
-            stringify!(asn1_ex_clear)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).asn1_ex_d2i) as usize - ptr as usize },
-        32usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ASN1_EXTERN_FUNCS_st),
-            "::",
-            stringify!(asn1_ex_d2i)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).asn1_ex_i2d) as usize - ptr as usize },
-        40usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ASN1_EXTERN_FUNCS_st),
-            "::",
-            stringify!(asn1_ex_i2d)
-        )
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).asn1_ex_print) as usize - ptr as usize },
-        48usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(ASN1_EXTERN_FUNCS_st),
-            "::",
-            stringify!(asn1_ex_print)
-        )
-    );
-}
-pub type ASN1_EXTERN_FUNCS = ASN1_EXTERN_FUNCS_st;
 pub type ASN1_aux_cb = ::std::option::Option<
     unsafe extern "C" fn(
         operation: ::std::os::raw::c_int,
@@ -7476,7 +7343,19 @@ extern "C" {
     pub fn OPENSSL_strnlen(s: *const ::std::os::raw::c_char, len: usize) -> usize;
 }
 extern "C" {
+    pub fn OPENSSL_isalpha(c: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn OPENSSL_isdigit(c: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn OPENSSL_isxdigit(c: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn OPENSSL_fromxdigit(out: *mut u8, c: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn OPENSSL_isalnum(c: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn OPENSSL_tolower(c: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
@@ -7511,6 +7390,20 @@ extern "C" {
         n: usize,
         format: *const ::std::os::raw::c_char,
         args: *mut __va_list_tag,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn OPENSSL_vasprintf(
+        str_: *mut *mut ::std::os::raw::c_char,
+        format: *const ::std::os::raw::c_char,
+        args: *mut __va_list_tag,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn OPENSSL_asprintf(
+        str_: *mut *mut ::std::os::raw::c_char,
+        format: *const ::std::os::raw::c_char,
+        ...
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
@@ -8736,6 +8629,26 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
+    pub fn EC_hash_to_curve_p256_xmd_sha256_sswu(
+        group: *const EC_GROUP,
+        out: *mut EC_POINT,
+        dst: *const u8,
+        dst_len: usize,
+        msg: *const u8,
+        msg_len: usize,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
+    pub fn EC_hash_to_curve_p384_xmd_sha384_sswu(
+        group: *const EC_GROUP,
+        out: *mut EC_POINT,
+        dst: *const u8,
+        dst_len: usize,
+        msg: *const u8,
+        msg_len: usize,
+    ) -> ::std::os::raw::c_int;
+}
+extern "C" {
     pub fn EC_GROUP_new_curve_GFp(
         p: *const BIGNUM,
         a: *const BIGNUM,
@@ -9797,99 +9710,6 @@ extern "C" {
         ctx: *mut EVP_PKEY_CTX,
         qbits: ::std::os::raw::c_int,
     ) -> ::std::os::raw::c_int;
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct evp_pkey_st {
-    pub references: CRYPTO_refcount_t,
-    pub type_: ::std::os::raw::c_int,
-    pub pkey: evp_pkey_st__bindgen_ty_1,
-    pub ameth: *const EVP_PKEY_ASN1_METHOD,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union evp_pkey_st__bindgen_ty_1 {
-    pub ptr: *mut ::std::os::raw::c_void,
-    pub rsa: *mut RSA,
-    pub dsa: *mut DSA,
-    pub dh: *mut DH,
-    pub ec: *mut EC_KEY,
-}
-#[test]
-fn bindgen_test_layout_evp_pkey_st__bindgen_ty_1() {
-    const UNINIT: ::std::mem::MaybeUninit<evp_pkey_st__bindgen_ty_1> =
-        ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<evp_pkey_st__bindgen_ty_1>(),
-        8usize,
-        concat!("Size of: ", stringify!(evp_pkey_st__bindgen_ty_1))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<evp_pkey_st__bindgen_ty_1>(),
-        8usize,
-        concat!("Alignment of ", stringify!(evp_pkey_st__bindgen_ty_1))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ptr) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st__bindgen_ty_1), "::", stringify!(ptr))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).rsa) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st__bindgen_ty_1), "::", stringify!(rsa))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dsa) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st__bindgen_ty_1), "::", stringify!(dsa))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).dh) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st__bindgen_ty_1), "::", stringify!(dh))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ec) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st__bindgen_ty_1), "::", stringify!(ec))
-    );
-}
-#[test]
-fn bindgen_test_layout_evp_pkey_st() {
-    const UNINIT: ::std::mem::MaybeUninit<evp_pkey_st> = ::std::mem::MaybeUninit::uninit();
-    let ptr = UNINIT.as_ptr();
-    assert_eq!(
-        ::std::mem::size_of::<evp_pkey_st>(),
-        24usize,
-        concat!("Size of: ", stringify!(evp_pkey_st))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<evp_pkey_st>(),
-        8usize,
-        concat!("Alignment of ", stringify!(evp_pkey_st))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).references) as usize - ptr as usize },
-        0usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st), "::", stringify!(references))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).type_) as usize - ptr as usize },
-        4usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st), "::", stringify!(type_))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).pkey) as usize - ptr as usize },
-        8usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st), "::", stringify!(pkey))
-    );
-    assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ameth) as usize - ptr as usize },
-        16usize,
-        concat!("Offset of field: ", stringify!(evp_pkey_st), "::", stringify!(ameth))
-    );
 }
 extern "C" {
     pub fn HMAC_CTX_init(ctx: *mut HMAC_CTX);
