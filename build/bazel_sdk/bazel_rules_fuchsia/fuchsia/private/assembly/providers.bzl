@@ -68,6 +68,14 @@ FuchsiaStorageConfigInfo = provider(
     },
 )
 
+FuchsiaVirtualizationConfigInfo = provider(
+    doc = "Platform virtualization options for the virtualization area.",
+    fields = {
+        "enabled": "Whether virtualization support should be included",
+    },
+)
+
+
 FuchsiaConnectivityConfigInfo = provider(
     doc = "Platform configuration options for the connectivity area.",
     fields = {

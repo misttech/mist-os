@@ -16,6 +16,7 @@ load(
     "FuchsiaProductConfigInfo",
     "FuchsiaStarnixConfigInfo",
     "FuchsiaStorageConfigInfo",
+    "FuchsiaVirtualizationConfigInfo",
 )
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
@@ -73,6 +74,8 @@ def _create_platform_config(ctx):
     if ctx.attr.diagnostics != None:
         diagnostics_config = ctx.attr.diagnostics[FuchsiaDiagnosticsConfigInfo]
         platform["diagnostics"] = diagnostics_config
+    if ctx.attr.virtualization != None:
+        platform["virtualization"] = ctx.attr.virtualization[FuchsiaVirtualizationConfigInfo]
 
     return platform
 
@@ -249,6 +252,11 @@ fuchsia_product_configuration = rule(
         "storage": attr.label(
             doc = "Storage Configuration.",
             providers = [FuchsiaStorageConfigInfo],
+            default = None,
+        ),
+        "virtualization": attr.label(
+            doc = "Virtualization Configuration.",
+            providers = [FuchsiaVirtualizationConfigInfo],
             default = None,
         ),
         "base_packages": attr.label_list(

@@ -26,6 +26,9 @@ workstation_platform_config = {
     live_usb_enabled = true
     configure_fshost = false
   }
+  virtualization = {
+    enabled = true
+  }
 }
 
 workstation_product_config = {

@@ -55,6 +55,10 @@ load(
     _fuchsia_platform_identity_configuration = "fuchsia_platform_identity_configuration",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_platform_virtualization_configuration.bzl",
+    _fuchsia_platform_virtualization_configuration = "fuchsia_platform_virtualization_configuration",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_product_configuration.bzl",
     _BUILD_TYPES = "BUILD_TYPES",
     _fuchsia_product_configuration = "fuchsia_product_configuration",
@@ -175,6 +179,7 @@ fuchsia_platform_development_support_configuration = _fuchsia_platform_developme
 fuchsia_platform_driver_framework_configuration = _fuchsia_platform_driver_framework_configuration
 fuchsia_platform_starnix_configuration = _fuchsia_platform_starnix_configuration
 fuchsia_platform_storage_configuration = _fuchsia_platform_storage_configuration
+fuchsia_platform_virtualization_configuration = _fuchsia_platform_virtualization_configuration
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
