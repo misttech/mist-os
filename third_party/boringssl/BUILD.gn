@@ -382,13 +382,6 @@ config("test_config") {
     "src/ssl/test",
   ]
   configs = [ ":internal_config" ]
-
-  # TODO(fxbug.dev/11049): Newer googletest's are spamming about an API rename, but
-  # BoringSSL hasn't updated yet.
-  cflags = [
-    "-Wno-deprecated-declarations",
-    "-Wno-ignored-qualifiers",  # trust_token_test.cc has an extra const
-  ]
 }
 
 config("fuzz_config") {
