@@ -19,9 +19,6 @@
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
 
-#include "src/devices/usb/drivers/vim3-usb-phy/dwc2-device.h"
-#include "src/devices/usb/drivers/vim3-usb-phy/xhci-device.h"
-
 namespace vim3_usb_phy {
 
 class Vim3UsbPhy;
@@ -93,8 +90,8 @@ class Vim3UsbPhy : public Vim3UsbPhyType,
   uint32_t pll_settings_[8];
 
   // Device node for binding XHCI driver.
-  std::unique_ptr<XhciDevice> xhci_device_ __TA_GUARDED(lock_);
-  std::unique_ptr<Dwc2Device> dwc2_device_ __TA_GUARDED(lock_);
+  zx_device_t* xhci_device_ __TA_GUARDED(lock_) = nullptr;
+  zx_device_t* dwc2_device_ __TA_GUARDED(lock_) = nullptr;
 
   UsbMode phy_mode_ __TA_GUARDED(lock_) = UsbMode::UNKNOWN;  // Physical USB mode.
   usb_mode_t dr_mode_ = USB_MODE_OTG;  // USB Controller Mode. Internal to Driver.
