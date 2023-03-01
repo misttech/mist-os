@@ -25,12 +25,12 @@ syscall_entry_begin zx_futex_wake_handle_close_thread_exit
   mv s1, a3
 
   zircon_syscall ZX_SYS_futex_wake, zx_futex_wake, zx_futex_wake_handle_close_thread_exit
-  bnz a0, .Lfutex_wake_fail
+  bnez a0, .Lfutex_wake_fail
 
-  bnz s1, .Lthread_exit
-  mov a0, s1
+  bnez s1, .Lthread_exit
+  mv a0, s1
   zircon_syscall ZX_SYS_handle_close, zx_handle_close, zx_futex_wake_handle_close_thread_exit
-  cbnz x0, .Lhandle_close_fail
+  bnez a0, .Lhandle_close_fail
 
 .Lthread_exit:
   zircon_syscall ZX_SYS_thread_exit, zx_thread_exit, zx_futex_wake_handle_close_thread_exit

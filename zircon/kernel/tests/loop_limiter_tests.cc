@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/intrin.h>
 #include <lib/unittest/unittest.h>
 
 #include <kernel/loop_limiter.h>

@@ -13,6 +13,8 @@
 
 // Provide the machine-independent <lib/arch/intrin.h> API.
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 
 namespace arch {
@@ -27,6 +29,13 @@ inline void DeviceMemoryBarrier() { __asm__("fence iorw, iorw" ::: "memory"); }
 
 /// Synchronize the ordering of all memory accesses wrt other CPUs.
 inline void ThreadMemoryBarrier() { __asm__("fence iorw, iorw" ::: "memory"); }
+
+/// Return the current CPU cycle count.
+inline uint64_t Cycles() {
+  uint64_t time;
+  __asm__ volatile("rdtime %0" : "=r"(time));
+  return time;
+}
 
 }  // namespace arch
 

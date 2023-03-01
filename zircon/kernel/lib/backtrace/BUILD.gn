@@ -16,6 +16,7 @@ zx_library("backtrace") {
   ]
 
   public_deps = [
+    "//zircon/kernel/lib/arch:headers",
     "//zircon/kernel/lib/ktl:headers",
     "//zircon/system/ulib/affine",
   ]

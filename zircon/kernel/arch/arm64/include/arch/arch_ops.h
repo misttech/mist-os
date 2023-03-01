@@ -11,7 +11,7 @@
 #ifndef __ASSEMBLER__
 
 #include <stdbool.h>
-#include <zircon/compiler.h>
+#include <stdint.h>
 
 #include <arch/arm64.h>
 #include <arch/arm64/feature.h>
@@ -20,13 +20,13 @@
 
 #define ENABLE_CYCLE_COUNTER 1
 
-static inline uint32_t arch_cpu_features() { return arm64_isa_features; }
+inline uint32_t arch_cpu_features() { return arm64_isa_features; }
 
-static inline uint32_t arch_dcache_line_size() { return arm64_dcache_size; }
+inline uint32_t arch_dcache_line_size() { return arm64_dcache_size; }
 
-static inline uint32_t arch_icache_line_size() { return arm64_icache_size; }
+inline uint32_t arch_icache_line_size() { return arm64_icache_size; }
 
-static inline uint32_t arch_vm_features() { return 0; }
+constexpr uint32_t arch_vm_features() { return 0; }
 
 // Implemented in assembly.
 extern "C" void arm64_clean_cache_range_pou(vaddr_t start, size_t len);

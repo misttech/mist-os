@@ -272,8 +272,13 @@ constexpr void String::WriteHex(Fixed<Integer, FractionalBits> value) {
   using Format = typename Fixed<Integer, FractionalBits>::Format;
 
   // Cast the raw_value to a uint64_t without sign extension.
-  const uint64_t raw_value_mask =
-      (Format::Bits == 64) ? uint64_t(-1) : (uint64_t(1) << Format::Bits) - 1;
+  const uint64_t raw_value_mask = []() {
+    if constexpr (Format::Bits == 64) {
+      return ~uint64_t{};
+    } else {
+      return (uint64_t{1} << Format::Bits) - 1;
+    }
+  }();
   const uint64_t raw_value = static_cast<uint64_t>(value.raw_value()) & raw_value_mask;
 
   // Integral portion.

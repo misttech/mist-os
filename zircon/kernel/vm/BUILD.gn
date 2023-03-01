@@ -50,6 +50,7 @@ zx_library("vm") {
     "vmm.cc",
   ]
   deps = [
+    "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",
@@ -61,6 +62,7 @@ zx_library("vm") {
     "//zircon/kernel/lib/page_cache",
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/lib/userabi",
+    "//zircon/system/ulib/affine",
     "//zircon/system/ulib/pretty",
 
     # TODO: testonly
@@ -95,6 +97,11 @@ zx_library("vm") {
 
     # "pmm_arena.h" has #include <lib/zx/result.h>.
     "//zircon/system/ulib/zx:headers",
+  ]
+  public_configs = [
+    # <vm/physical_page_provider.h> has #include <object/port_dispatcher.h>.
+    # But this is a circular dependency, so we can't use its :headers in deps.
+    "//zircon/kernel/object:headers.config",
   ]
 
   # GCC figures out some cases where we have a global variable that's used as a

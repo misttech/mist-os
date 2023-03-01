@@ -71,17 +71,17 @@ extern uint arm64_cpu_cpu_ids[SMP_MAX_CPUS];
 // x20 is the first available callee-saved register that clang will allow to be marked
 // as fixed (via -ffixed-x20 command line). Since it's callee saved when making firmware
 // calls to PSCI or SMCC the register will be naturally saved and restored.
-static inline void arm64_write_percpu_ptr(struct arm64_percpu* percpu) {
+inline void arm64_write_percpu_ptr(struct arm64_percpu* percpu) {
   __asm__ volatile("mov x20, %0" ::"r"(percpu));
 }
 
-static inline struct arm64_percpu* arm64_read_percpu_ptr() {
+inline struct arm64_percpu* arm64_read_percpu_ptr() {
   struct arm64_percpu* p;
   __asm__("mov %0, x20" : "=r"(p));
   return p;
 }
 
-static inline uint32_t arm64_read_percpu_u32(size_t offset) {
+inline uint32_t arm64_read_percpu_u32(size_t offset) {
   uint32_t val;
 
   // mark as volatile to force a read of the field to make sure
@@ -91,34 +91,32 @@ static inline uint32_t arm64_read_percpu_u32(size_t offset) {
   return val;
 }
 
-static inline void arm64_write_percpu_u32(size_t offset, uint32_t val) {
+inline void arm64_write_percpu_u32(size_t offset, uint32_t val) {
   __asm__("str %w[val], [x20, %[offset]]" ::[val] "r"(val), [offset] "Ir"(offset) : "memory");
 }
 
 // Return a pointer to the high-level percpu struct for the calling CPU.
-static inline struct percpu* arch_get_curr_percpu() {
-  return arm64_read_percpu_ptr()->high_level_percpu;
-}
+inline struct percpu* arch_get_curr_percpu() { return arm64_read_percpu_ptr()->high_level_percpu; }
 
-static inline cpu_num_t arch_curr_cpu_num() {
+inline cpu_num_t arch_curr_cpu_num() {
   return arm64_read_percpu_u32(offsetof(struct arm64_percpu, cpu_num));
 }
 
 // TODO(fxbug.dev/32903) get num_cpus from topology.
 // This needs to be set very early (before arch_init).
-static inline void arch_set_num_cpus(uint cpu_count) { arm_num_cpus = cpu_count; }
+inline void arch_set_num_cpus(uint cpu_count) { arm_num_cpus = cpu_count; }
 
-static inline uint arch_max_num_cpus() { return arm_num_cpus; }
+inline uint arch_max_num_cpus() { return arm_num_cpus; }
 
 // translate a cpu number back to the cluster ID (AFF1)
-static inline uint arch_cpu_num_to_cluster_id(cpu_num_t cpu) {
+inline uint arch_cpu_num_to_cluster_id(cpu_num_t cpu) {
   DEBUG_ASSERT(cpu < SMP_MAX_CPUS);
 
   return arm64_cpu_cluster_ids[cpu];
 }
 
 // translate a cpu number back to the MP cpu number within a cluster (AFF0)
-static inline uint arch_cpu_num_to_cpu_id(cpu_num_t cpu) {
+inline uint arch_cpu_num_to_cpu_id(cpu_num_t cpu) {
   DEBUG_ASSERT(cpu < SMP_MAX_CPUS);
 
   return arm64_cpu_cpu_ids[cpu];
@@ -136,6 +134,6 @@ cpu_num_t arm64_mpidr_to_cpu_num(uint64_t mpidr);
 void arch_setup_percpu(cpu_num_t cpu_num, struct percpu* percpu);
 
 // TODO: implement
-static inline void arch_set_restricted_flag(bool restricted) {}
+inline void arch_set_restricted_flag(bool restricted) {}
 
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARM64_MP_H_

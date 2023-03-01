@@ -138,19 +138,19 @@ int x86_apic_id_to_cpu_num(uint32_t apic_id);
 // Allocate all of the necessary structures for all of the APs to run.
 zx_status_t x86_allocate_ap_structures(uint32_t *apic_ids, uint8_t cpu_count);
 
-static inline struct x86_percpu *x86_get_percpu() {
+inline struct x86_percpu *x86_get_percpu() {
   return (struct x86_percpu *)x86_read_gs_offset64(PERCPU_DIRECT_OFFSET);
 }
 
 // Return a pointer to the high-level percpu struct for the calling CPU.
-static inline struct percpu *arch_get_curr_percpu() {
+inline struct percpu *arch_get_curr_percpu() {
   return ((struct percpu *)x86_read_gs_offset64(PERCPU_HIGH_LEVEL_PERCPU_OFFSET));
 }
 
-static inline cpu_num_t arch_curr_cpu_num() { return x86_read_gs_offset32(PERCPU_CPU_NUM_OFFSET); }
+inline cpu_num_t arch_curr_cpu_num() { return x86_read_gs_offset32(PERCPU_CPU_NUM_OFFSET); }
 
 extern uint8_t x86_num_cpus;
-static inline uint arch_max_num_cpus() { return x86_num_cpus; }
+inline uint arch_max_num_cpus() { return x86_num_cpus; }
 
 #define READ_PERCPU_FIELD32(field) x86_read_gs_offset32(offsetof(struct x86_percpu, field))
 
@@ -167,7 +167,7 @@ void x86_force_halt_all_but_local_and_bsp();
 // Setup the high-level percpu struct pointer for |cpu_num|.
 void arch_setup_percpu(cpu_num_t cpu_num, struct percpu *percpu);
 
-static inline void arch_set_restricted_flag(bool set) {
+inline void arch_set_restricted_flag(bool set) {
   WRITE_PERCPU_FIELD32(in_restricted_mode, set ? 1 : 0);
 }
 

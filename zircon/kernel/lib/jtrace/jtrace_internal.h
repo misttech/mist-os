@@ -6,6 +6,7 @@
 #define ZIRCON_KERNEL_LIB_JTRACE_JTRACE_INTERNAL_H_
 
 #include <lib/affine/ratio.h>
+#include <lib/arch/intrin.h>
 #include <lib/fit/defer.h>
 #include <lib/jtrace/jtrace.h>
 #include <platform.h>

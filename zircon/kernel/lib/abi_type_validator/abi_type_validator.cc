@@ -20,6 +20,8 @@
 #include <lib/zircon-internal/device/cpu-trace/arm64-pm.h>
 #elif defined(__x86_64__)
 #include <lib/zircon-internal/device/cpu-trace/intel-pm.h>
+#else
+#include <lib/zircon-internal/device/cpu-trace/common-pm.h>
 #endif
 
 #include <zircon/boot/driver-config.h>

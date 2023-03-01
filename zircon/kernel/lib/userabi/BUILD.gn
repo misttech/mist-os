@@ -6,6 +6,7 @@
 
 import("//build/zircon/c_utils.gni")
 import("//build/zircon/migrated_targets.gni")
+import("//zircon/kernel/params.gni")
 
 zx_library("userabi") {
   sources = []
@@ -14,24 +15,27 @@ zx_library("userabi") {
     "//zircon/kernel/lib/instrumentation:headers",
   ]
   if (is_kernel) {
-    deps = [
-      ":userboot",
-      ":vdso",
-      "//zircon/kernel/lib/instrumentation",
-    ]
-    public_configs = [
-      ":sysret-offsets",
-      ":vdso-valid-sysret",
-    ]
     public_deps += [
-      # Dependents can use the generated header via $public_configs
-      # (above), and so need to depend on the generation action.
-      ":gen-sysret-offsets",
-      ":gen-vdso-valid-sysret",
-
       # <lib/userabi/rodso.h> has #include <object/handle.h>.
       "//zircon/kernel/object",
     ]
+    if (!kernel_no_userabi) {
+      deps = [
+        ":userboot",
+        ":vdso",
+        "//zircon/kernel/lib/instrumentation",
+      ]
+      public_configs = [
+        ":sysret-offsets",
+        ":vdso-valid-sysret",
+      ]
+      public_deps += [
+        # Dependents can use the generated header via $public_configs
+        # (above), and so need to depend on the generation action.
+        ":gen-sysret-offsets",
+        ":gen-vdso-valid-sysret",
+      ]
+    }
   } else {
     # Our own embedded "user" code needs some shared headers.
     visibility = [ "./*" ]
@@ -168,7 +172,7 @@ rodso("vdso") {
   deps = [ "vdso" ]
 }
 
-if (is_kernel) {
+if (is_kernel && !kernel_no_userabi) {
   # Support for loading embedded ELF files, used for both vdso and userboot.
   source_set("rodso") {
     visibility = [ ":*" ]

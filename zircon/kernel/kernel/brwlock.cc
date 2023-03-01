@@ -8,6 +8,7 @@
 
 #include <lib/affine/ratio.h>
 #include <lib/affine/utils.h>
+#include <lib/arch/intrin.h>
 #include <lib/zircon-internal/macros.h>
 
 #include <kernel/auto_preempt_disabler.h>

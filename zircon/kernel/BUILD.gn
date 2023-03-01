@@ -42,6 +42,12 @@ if (current_toolchain == default_toolchain) {
       os = "fuchsia"
       environment = "kernel"
 
+      if (cpu == "x64") {
+        kernel_cpu = "x86"
+      } else {
+        kernel_cpu = cpu
+      }
+
       toolchain_tags = [
         "kernel",
         "standalone",
@@ -101,6 +107,10 @@ if (current_toolchain == default_toolchain) {
         "//zircon/kernel/lib/backtrace:headers.config",
 
         "//zircon/kernel/lib/version:headers.config",
+
+        # <platform.h> has #include <lib/arch/ticks.h>.
+        "//zircon/kernel/lib/arch/$kernel_cpu:headers.config",
+        "//zircon/kernel/lib/arch:common-headers.config",
       ]
 
       configs = [ "//zircon/kernel:kernel_config" ]

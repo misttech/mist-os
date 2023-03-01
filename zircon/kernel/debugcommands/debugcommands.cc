@@ -392,7 +392,7 @@ extern "C" const uint8_t begin_func[], end_func[];
 __asm__(
     ".pushsection .rodata.func\n"
     "begin_func:"
-#if defined(__x86_64__) || defined(__aarch64__)
+#if defined(__x86_64__) || defined(__aarch64__) || defined(__riscv)
     "ret\n"
 #else
 #error "what machine?"
@@ -405,6 +405,9 @@ static bool has_user_code_execution_protection() {
   return x86_feature_test(X86_FEATURE_SMEP) || g_x86_feature_has_smap;
 #elif defined(__aarch64__)
   // Privilege Execute Never (PXN) is available on all aarch64 machines.
+  return true;
+#elif defined(__riscv)
+  // Supervisor User Memory access control is always available on RISC-V.
   return true;
 #else
 #error "what machine?"

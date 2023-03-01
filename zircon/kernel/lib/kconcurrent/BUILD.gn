@@ -22,6 +22,7 @@ source_set("kconcurrent") {
   sources = [ "seqlock.cc" ]
   public_deps = [ ":headers" ]
   deps = [
+    "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/concurrent",
     "//zircon/system/ulib/lockdep",
   ]

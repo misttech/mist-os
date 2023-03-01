@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/arch/intrin.h>
 #include <lib/kconcurrent/seqlock.h>
 #include <lib/unittest/unittest.h>
 

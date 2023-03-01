@@ -8,6 +8,7 @@
 #define ZIRCON_KERNEL_LIB_BACKTRACE_INCLUDE_LIB_BACKTRACE_CPU_CONTEXT_EXCHANGE_H_
 
 #include <lib/affine/ratio.h>
+#include <lib/arch/intrin.h>
 #include <lib/backtrace.h>
 #include <zircon/types.h>
 

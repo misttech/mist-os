@@ -6,6 +6,7 @@
 
 import("//build/zircon/zircon_cpu.gni")
 import("//build/zircon/zx_library.gni")
+import("//zircon/kernel/params.gni")
 
 assert(is_kernel, current_toolchain)
 
@@ -19,7 +20,9 @@ zx_library("syscalls") {
   # Depend on the files generated from the syscall IDL.
   public_deps = [ "//zircon/vdso:private" ]
 
-  deps = [ ":impl" ]
+  if (!kernel_no_userabi) {
+    deps = [ ":impl" ]
+  }
 }
 
 source_set("impl") {

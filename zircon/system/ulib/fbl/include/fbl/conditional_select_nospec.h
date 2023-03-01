@@ -42,7 +42,7 @@ namespace fbl {
 // To avoid Spectre V1-style attacks, a caller must also avoid branching on the return value of
 // conditional_select_nospec(); it may do so by using a safe object for |b|; it may also be able
 // to use nullptr if AARCH64 PAN / x86-64 SMAP are available.
-#if __aarch64__
+#if defined(__aarch64__)
 // (x == y) ? a : b
 static inline size_t conditional_select_nospec_eq(size_t x, size_t y, size_t a, size_t b) {
   size_t select;
@@ -75,7 +75,7 @@ static inline size_t conditional_select_nospec_lt(size_t x, size_t y, size_t a, 
   return select;
 }
 
-#elif __x86_64__
+#elif defined(__x86_64__)
 
 // (x == y) ? a : b
 static inline size_t conditional_select_nospec_eq(size_t x, size_t y, size_t a, size_t b) {
@@ -109,6 +109,18 @@ static inline size_t conditional_select_nospec_lt(size_t x, size_t y, size_t a, 
       : "cc");
 
   return select;
+}
+
+#elif defined(__riscv)
+
+// No mitigations defined for RISC-V.
+
+static inline size_t conditional_select_nospec_eq(size_t x, size_t y, size_t a, size_t b) {
+  return x == y ? a : b;
+}
+
+static inline size_t conditional_select_nospec_lt(size_t x, size_t y, size_t a, size_t b) {
+  return x < y ? a : b;
 }
 
 #else

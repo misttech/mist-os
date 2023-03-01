@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/userabi/vdso-riscv64.h>
-
 .macro zircon_syscall num, name, caller
     li t0, \num
     ecall

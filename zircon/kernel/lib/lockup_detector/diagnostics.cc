@@ -6,6 +6,7 @@
 
 #include "lib/lockup_detector/diagnostics.h"
 
+#include <debug.h>
 #include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 
@@ -151,6 +152,11 @@ void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
     }
   } while ((target_cpu = remove_cpu_from_mask(remaining_cpus)) != INVALID_CPU);
 }
+
+#elif defined(__riscv)
+
+// TODO(eieio): implement me
+void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) { PANIC_UNIMPLEMENTED; }
 
 #else
 #error "Unknown architecture! Neither __aarch64__ nor __x86_64__ are defined"

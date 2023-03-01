@@ -6,6 +6,7 @@
 
 #include "vm/vm_cow_pages.h"
 
+#include <lib/arch/intrin.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
 #include <trace.h>

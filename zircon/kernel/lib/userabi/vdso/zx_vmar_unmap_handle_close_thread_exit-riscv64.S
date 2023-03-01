@@ -17,19 +17,19 @@ syscall_entry_begin zx_vmar_unmap_handle_close_thread_exit
   // Callee-save that register so we can unwind in the error case.
   // We only need to save s1, but we have to keep SP aligned to 16
   // bytes, so we always push and pop registers in pairs.
-  sub sp, sp, 16
+  add sp, sp, -16
   .cfi_adjust_cfa_offset 16
   sd s1, (sp)
   .cfi_offset s1, -16
 
   zircon_syscall ZX_SYS_vmar_unmap, zx_vmar_unmap, zx_vmar_unmap_handle_close_thread_exit
-  bnz a0, .Lvmar_unmap_fail
+  bnez a0, .Lvmar_unmap_fail
 
   // Now the stack is gone and we can never return!
 
   mv a0, s1
   zircon_syscall ZX_SYS_handle_close, zx_handle_close, zx_vmar_unmap_handle_close_thread_exit
-  cbnz x0, .Lhandle_close_fail
+  bnez a0, .Lhandle_close_fail
 
   zircon_syscall ZX_SYS_thread_exit, zx_thread_exit, zx_vmar_unmap_handle_close_thread_exit
 

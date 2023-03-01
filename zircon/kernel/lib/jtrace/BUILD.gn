@@ -7,9 +7,13 @@
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("jtrace") {
-  sources = [ "jtrace.cc" ]
+  sources = [
+    "jtrace.cc",
+    "jtrace_internal.h",
+  ]
   deps = [
     "//sdk/lib/fit:headers",
+    "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/debuglog",
     "//zircon/kernel/lib/io",

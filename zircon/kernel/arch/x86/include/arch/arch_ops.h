@@ -18,17 +18,17 @@
 #include <ktl/atomic.h>
 
 /* override of some routines */
-static inline void arch_enable_ints() {
+inline void arch_enable_ints() {
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
   __asm__ volatile("sti");
 }
 
-static inline void arch_disable_ints() {
+inline void arch_disable_ints() {
   __asm__ volatile("cli");
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
 }
 
-static inline bool arch_ints_disabled() {
+inline bool arch_ints_disabled() {
   x86_flags_t state;
 
   __asm__ volatile(
@@ -39,14 +39,14 @@ static inline bool arch_ints_disabled() {
   return !(state & (1 << 9));
 }
 
-static inline uint32_t arch_cpu_features() {
+inline uint32_t arch_cpu_features() {
   return 0;  // Use cpuid instead.
 }
 
 uint32_t arch_dcache_line_size();
 uint32_t arch_icache_line_size();
 
-static inline uint32_t arch_vm_features() { return 0; }
+constexpr uint32_t arch_vm_features() { return 0; }
 
 // Log architecture-specific data for process creation.
 // This can only be called after the process has been created and before

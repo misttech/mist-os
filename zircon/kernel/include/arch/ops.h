@@ -20,13 +20,13 @@
 #include <kernel/cpu.h>
 
 // Fast routines that most arches will implement inline.
-static void arch_enable_ints();
-static void arch_disable_ints();
-static bool arch_ints_disabled();
+void arch_enable_ints();
+void arch_disable_ints();
+bool arch_ints_disabled();
 
-static cpu_num_t arch_curr_cpu_num();
-static uint arch_max_num_cpus();
-static uint arch_cpu_features();
+cpu_num_t arch_curr_cpu_num();
+uint arch_max_num_cpus();
+uint arch_cpu_features();
 
 uint8_t arch_get_hw_breakpoint_count();
 uint8_t arch_get_hw_watchpoint_count();
@@ -39,7 +39,7 @@ void arch_clean_cache_range(vaddr_t start, size_t len);
 void arch_clean_invalidate_cache_range(vaddr_t start, size_t len);
 void arch_invalidate_cache_range(vaddr_t start, size_t len);
 void arch_sync_cache_range(vaddr_t start, size_t len);
-} // extern C
+}  // extern C
 
 // Used to suspend work on a CPU until it is further shutdown.
 // This will only be invoked with interrupts disabled.  This function
@@ -64,15 +64,13 @@ extern "C" void arch_zero_page(void *);
 //
 // arch_blocking_disallowed() should only be true when interrupts are
 // disabled.
-static inline bool arch_blocking_disallowed() {
-  return READ_PERCPU_FIELD32(blocking_disallowed);
-}
+inline bool arch_blocking_disallowed() { return READ_PERCPU_FIELD32(blocking_disallowed); }
 
-static inline void arch_set_blocking_disallowed(bool value) {
+inline void arch_set_blocking_disallowed(bool value) {
   WRITE_PERCPU_FIELD32(blocking_disallowed, value);
 }
 
-static inline uint32_t arch_num_spinlocks_held() { return READ_PERCPU_FIELD32(num_spinlocks); }
+inline uint32_t arch_num_spinlocks_held() { return READ_PERCPU_FIELD32(num_spinlocks); }
 
 #endif  // !__ASSEMBLER__
 

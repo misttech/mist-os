@@ -24,9 +24,13 @@
 #include <arch/x86/mmu.h>
 #define PGTABLE_L1_SHIFT PDP_SHIFT
 #define PGTABLE_L2_SHIFT PD_SHIFT
-#else
+#elif defined(__aarch64__)
 #define PGTABLE_L1_SHIFT MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 1)
 #define PGTABLE_L2_SHIFT MMU_LX_X(MMU_KERNEL_PAGE_SIZE_SHIFT, 2)
+#elif defined(__riscv)
+// sv39
+#define PGTABLE_L1_SHIFT 30
+#define PGTABLE_L2_SHIFT 21
 #endif
 
 // Most mmu tests want a 'sufficiently large' aspace to play in, these constants define an aspace

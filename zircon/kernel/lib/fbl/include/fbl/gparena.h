@@ -302,7 +302,9 @@ class __OWNER(void) GPArena {
     HeadNode(FreeNode* h, uint64_t g) : head(h), gen(g) {}
   };
   ktl::atomic<HeadNode> head_node_{};
-#ifdef __clang__
+#if defined(__riscv)
+  // TODO(mcgrathr): doesn't actually work on riscv yet
+#elif defined(__clang__)
   static_assert(ktl::atomic<HeadNode>::is_always_lock_free, "atomic<HeadNode> not lock free");
 #else
   // For gcc we have a custom libatomic implementation that *is* lock free, but the compiler doesn't

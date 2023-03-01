@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <debug.h>
+#include <lib/arch/intrin.h>
 #include <lib/backtrace.h>
 #include <lib/fit/defer.h>
 #include <lib/unittest/unittest.h>

@@ -48,13 +48,12 @@ static inline size_t confine_array_index(size_t index, size_t size) {
   // See "Cache Speculation Side-channels" whitepaper, section "Software Mitigation".
   // "" The combination of both a conditional select/conditional move and the new barrier are
   // sufficient to address this problem on ALL Arm implementations... ""
-  asm(
-    "cmp %1, %2\n"  // %1 holds the unsanitized index
-    "csel %0, %1, xzr, lo\n"  // Select index or zero based on carry (%1 within range)
-    "csdb\n"
-  : "=r"(safe_index)
-  : "r"(index), "r"(size)
-  : "cc");
+  asm("cmp %1, %2\n"            // %1 holds the unsanitized index
+      "csel %0, %1, xzr, lo\n"  // Select index or zero based on carry (%1 within range)
+      "csdb\n"
+      : "=r"(safe_index)
+      : "r"(index), "r"(size)
+      : "cc");
 
   return safe_index;
 }
@@ -71,13 +70,19 @@ static inline size_t confine_array_index(size_t index, size_t size) {
   // See "Analyzing potential bounds check bypass vulnerabilities", Revision 002,
   //   Section 5.2 Bounds clipping
   __asm__(
-    "cmp %1, %2\n"
-    "cmova %1, %0\n"  // Select between $0 and |index|
-  : "+r"(safe_index)
-  : "r"(index), "r"(size)
-  : "cc");
+      "cmp %1, %2\n"
+      "cmova %1, %0\n"  // Select between $0 and |index|
+      : "+r"(safe_index)
+      : "r"(index), "r"(size)
+      : "cc");
 
   return safe_index;
+}
+#endif
+
+#ifdef __riscv
+static inline size_t confine_array_index(size_t index, size_t size) {
+  return index < size ? index : 0;
 }
 #endif
 

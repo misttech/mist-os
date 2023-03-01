@@ -75,6 +75,7 @@ source_set("tests") {
     "thread_test.cc",
   ]
   deps = [
+    "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/unittest",
   ]

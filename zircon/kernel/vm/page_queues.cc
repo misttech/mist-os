@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/intrin.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
 #include <lib/zircon-internal/macros.h>

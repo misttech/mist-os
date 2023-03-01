@@ -54,11 +54,13 @@ class InterruptBitmap {
   }
 
   bool Scan(uint32_t* vector) {
-    size_t bitoff;
+    size_t bitoff = 0;
 #if ARCH_ARM64
     bool is_empty = bitmap_.Scan(0, N, false, &bitoff);
 #elif ARCH_X86
     bool is_empty = bitmap_.ReverseScan(0, N, false, &bitoff);
+#else
+    bool is_empty = true;
 #endif
     if (is_empty) {
       return false;

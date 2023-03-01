@@ -14,16 +14,17 @@
 // override of some routines
 
 // Clear/set both I and A bits to prevent arbitrary nesting of IRQ and SError.
-static inline void arch_enable_ints() {
+inline void arch_enable_ints() {
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
   __asm__ volatile("msr daifclr, #6" ::: "memory");
 }
-static inline void arch_disable_ints() {
+
+inline void arch_disable_ints() {
   __asm__ volatile("msr daifset, #6" ::: "memory");
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
 }
 
-static inline bool arch_ints_disabled() {
+inline bool arch_ints_disabled() {
   unsigned long state;
 
   __asm__ volatile("mrs %0, daif" : "=r"(state));
@@ -32,18 +33,18 @@ static inline bool arch_ints_disabled() {
   return !!state;
 }
 
-static inline void arch_enable_fiqs() {
+inline void arch_enable_fiqs() {
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
   __asm__ volatile("msr daifclr, #1" ::: "memory");
 }
 
-static inline void arch_disable_fiqs() {
+inline void arch_disable_fiqs() {
   __asm__ volatile("msr daifset, #1" ::: "memory");
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
 }
 
 // XXX
-static inline bool arch_fiqs_disabled() {
+inline bool arch_fiqs_disabled() {
   unsigned long state;
 
   __asm__ volatile("mrs %0, daif" : "=r"(state));
