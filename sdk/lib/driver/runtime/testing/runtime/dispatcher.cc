@@ -5,6 +5,7 @@
 #include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/driver/runtime/testing/runtime/internal/wait_for.h>
 #include <lib/fdf/cpp/env.h>
 #include <lib/fdf/testing.h>
 
@@ -17,21 +18,14 @@ zx::result<> RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure ta
     task_completion.Signal();
   });
 
-  return WaitForCompletion(task_completion);
+  return WaitFor(task_completion);
 }
 
-zx::result<> WaitForCompletion(libsync::Completion& completion) {
-  while (!completion.signaled()) {
-    auto status = fdf_testing_run_until_idle();
-    if (status == ZX_OK) {
-      continue;
-    }
-
-    if (status == ZX_ERR_BAD_STATE) {
-      break;
-    }
-
-    return zx::error(status);
+zx::result<> WaitFor(libsync::Completion& completion) {
+  zx::result wait_result =
+      internal::CheckManagedThreadOrWaitUntil([&] { return completion.signaled(); });
+  if (wait_result.is_error()) {
+    return wait_result.take_error();
   }
 
   completion.Wait();
@@ -72,7 +66,7 @@ zx::result<> TestSynchronizedDispatcher::StartAsDefault(
 
 zx::result<> TestSynchronizedDispatcher::Stop() {
   dispatcher_.ShutdownAsync();
-  return WaitForCompletion(dispatcher_shutdown_);
+  return WaitFor(dispatcher_shutdown_);
 }
 
 }  // namespace fdf

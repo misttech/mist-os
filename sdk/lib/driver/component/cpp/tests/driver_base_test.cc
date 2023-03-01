@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/component/cpp/tests/test_driver.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
@@ -85,14 +86,12 @@ class TestDefaultDispatcherSeparateEnv : public ::testing::Test {
     EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment
-    result = fdf::RunOnDispatcherSync(
-        env_dispatcher(),
-        [this, server = std::move(start_args->incoming_directory_server)]() mutable {
-          test_environment_.emplace(env_dispatcher());
-          zx::result result = test_environment_->Initialize(std::move(server));
-          EXPECT_EQ(ZX_OK, result.status_value());
-        });
-    EXPECT_EQ(ZX_OK, result.status_value());
+    test_environment_.emplace(env_dispatcher(), std::in_place);
+    std::future init_fut = test_environment_
+                               ->AsyncCall(&fdf_testing::TestEnvironment::Initialize,
+                                           std::move(start_args->incoming_directory_server))
+                               .ToFuture();
+    EXPECT_EQ(ZX_OK, fdf::WaitFor(std::move(init_fut)).status_value());
 
     // Start driver
     zx::result driver = fdf_testing::StartDriver<TestDriver>(std::move(start_args->start_args),
@@ -105,8 +104,7 @@ class TestDefaultDispatcherSeparateEnv : public ::testing::Test {
     zx::result result = fdf_testing::TeardownDriver(driver_, test_driver_dispatcher_);
     EXPECT_EQ(ZX_OK, result.status_value());
 
-    result = fdf::RunOnDispatcherSync(env_dispatcher(), [this]() { test_environment_.reset(); });
-    EXPECT_EQ(ZX_OK, result.status_value());
+    test_environment_.reset();
 
     result = test_env_dispatcher_.Stop();
     EXPECT_EQ(ZX_OK, result.status_value());
@@ -121,7 +119,8 @@ class TestDefaultDispatcherSeparateEnv : public ::testing::Test {
   fdf::TestSynchronizedDispatcher test_driver_dispatcher_;
   fdf::TestSynchronizedDispatcher test_env_dispatcher_;
   std::optional<fdf_testing::TestNode> node_server_;
-  std::optional<fdf_testing::TestEnvironment> test_environment_;
+  std::optional<async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment>>
+      test_environment_;
   TestDriver* driver_;
 };
 

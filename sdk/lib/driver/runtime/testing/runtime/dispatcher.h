@@ -5,8 +5,11 @@
 #ifndef LIB_DRIVER_RUNTIME_TESTING_RUNTIME_DISPATCHER_H_
 #define LIB_DRIVER_RUNTIME_TESTING_RUNTIME_DISPATCHER_H_
 
+#include <lib/driver/runtime/testing/runtime/internal/wait_for.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
+
+#include <future>
 
 namespace fdf {
 
@@ -18,7 +21,22 @@ zx::result<> RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure ta
 // Wait until the completion is signaled. When this function returns, the completion is signaled.
 //
 // This MUST be called from the main test thread.
-zx::result<> WaitForCompletion(libsync::Completion& completion);
+zx::result<> WaitFor(libsync::Completion& completion);
+
+// Wait until the future is resolved, then returns the resolved value of the future.
+//
+// This MUST be called from the main test thread.
+template <typename T>
+zx::result<T> WaitFor(std::future<T> future) {
+  using namespace std::chrono_literals;
+  zx::result wait_result = internal::CheckManagedThreadOrWaitUntil(
+      [&] { return future.wait_for(1ms) != std::future_status::timeout; });
+  if (wait_result.is_error()) {
+    return wait_result.take_error();
+  }
+
+  return zx::ok(future.get());
+}
 
 // A wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
 class TestSynchronizedDispatcher {

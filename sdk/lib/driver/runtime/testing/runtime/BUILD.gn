@@ -8,6 +8,8 @@ source_set("runtime") {
   sources = [
     "dispatcher.cc",
     "dispatcher.h",
+    "internal/wait_for.cc",
+    "internal/wait_for.h",
   ]
 
   public_deps = [

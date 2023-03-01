@@ -38,7 +38,7 @@ zx::result<> PrepareStopSync(OpaqueDriverPtr driver, const DriverLifecycle& driv
     return result.take_error();
   }
 
-  return fdf::WaitForCompletion(prepare_stop_completion);
+  return fdf::WaitFor(prepare_stop_completion);
 }
 
 }  // namespace internal

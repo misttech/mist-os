@@ -21,8 +21,8 @@ namespace fdf_testing {
 //
 class TestEnvironment {
  public:
-  explicit TestEnvironment(async_dispatcher_t* dispatcher)
-      : dispatcher_(dispatcher),
+  explicit TestEnvironment(async_dispatcher_t* dispatcher = nullptr)
+      : dispatcher_(dispatcher ? dispatcher : fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         incoming_directory_server_(dispatcher_),
         checker_(dispatcher_, kTestEnvironmentThreadSafetyDescription) {}
 
