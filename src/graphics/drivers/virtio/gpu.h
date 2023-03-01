@@ -69,9 +69,7 @@ class GpuDevice : public Device,
                                                uint32_t index);
 
   zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                uint32_t index) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+                                                uint32_t index);
 
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
                                                          uint32_t index,
@@ -102,9 +100,7 @@ class GpuDevice : public Device,
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   zx_unowned_handle_t collection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
-                                                                   uint64_t collection_id) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+                                                                   uint64_t collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
 
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {

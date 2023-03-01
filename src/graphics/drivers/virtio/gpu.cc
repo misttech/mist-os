@@ -175,18 +175,6 @@ zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(uint64_t coll
   }
 
   buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
-
-  // TODO(fxbug.dev/121411): This BufferCollection is currently a placeholder so
-  // we need to set null constraints in order not to block the sysmem Allocator.
-  // Remove this once SetBufferCollectionConstraints() using `collection_id` is
-  // correctly implemented.
-  fidl::OneWayStatus status =
-      buffer_collections_.at(collection_id)->SetConstraints(/*has_constraints=*/false, {});
-  if (!status.ok()) {
-    zxlogf(ERROR, "Failed to set BufferCollection constraints: %s", status.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
   return ZX_OK;
 }
 
@@ -198,6 +186,17 @@ zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(uint64_t col
   }
   buffer_collections_.erase(collection_id);
   return ZX_OK;
+}
+
+zx_status_t GpuDevice::DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
+                                                         uint32_t index) {
+  const auto it = buffer_collections_.find(collection_id);
+  if (it == buffer_collections_.end()) {
+    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplImportImage(image, it->second.client_end().borrow().handle()->get(),
+                                          index);
 }
 
 zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
@@ -317,6 +316,18 @@ zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysm
   }
 
   return ZX_OK;
+}
+
+zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints2(
+    const image_t* config, uint64_t collection_id) {
+  const auto it = buffer_collections_.find(collection_id);
+  if (it == buffer_collections_.end()) {
+    zxlogf(ERROR, "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplSetBufferCollectionConstraints(
+      config, it->second.client_end().borrow().handle()->get());
 }
 
 zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(

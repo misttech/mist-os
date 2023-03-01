@@ -13,6 +13,7 @@
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/virtio/backends/fake.h>
 #include <zircon/compiler.h>
+#include <zircon/pixelformat.h>
 
 #include <list>
 
@@ -355,6 +356,65 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
     ExpectObjectsArePaired(inactive_buffer_token_clients[0].channel(),
                            token1_endpoints->server.channel().borrow());
   }
+}
+
+TEST_F(VirtioGpuTest, ImportImage) {
+  EXPECT_TRUE(PollUntil([&]() { return fake_sysmem_.GetLatestMockAllocator() != nullptr; },
+                        zx::msec(5), 1000));
+
+  // This allocator is expected to be alive as long as the `device_` is
+  // available, so it should outlive the test body.
+  const MockAllocator* allocator = fake_sysmem_.GetLatestMockAllocator();
+
+  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token1_endpoints.is_ok());
+
+  display_controller_impl_protocol_t proto;
+  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
+                                    reinterpret_cast<void*>(&proto)));
+
+  // Import buffer collection.
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBufferCollectionId,
+                                                token1_endpoints->client.handle()->get()));
+  EXPECT_TRUE(
+      PollUntil([&]() { return !allocator->GetActiveBufferCollectionTokenClients().empty(); },
+                zx::msec(5), 1000));
+
+  // Set buffer collection constraints.
+  const image_t kDefaultImage = {
+      .width = 800,
+      .height = 600,
+      .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
+      .type = IMAGE_TYPE_SIMPLE,
+      .handle = 0,
+  };
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints2(device_.get(), &kDefaultImage,
+                                                          kBufferCollectionId));
+
+  // Invalid import: bad collection id
+  image_t invalid_image = kDefaultImage;
+  uint64_t kInvalidCollectionId = 100;
+  EXPECT_EQ(
+      proto.ops->import_image2(device_.get(), &invalid_image, kInvalidCollectionId, /*index=*/0),
+      ZX_ERR_NOT_FOUND);
+
+  // Invalid import: bad index
+  invalid_image = kDefaultImage;
+  uint32_t kInvalidIndex = 100;
+  EXPECT_EQ(
+      proto.ops->import_image2(device_.get(), &invalid_image, kBufferCollectionId, kInvalidIndex),
+      ZX_ERR_OUT_OF_RANGE);
+
+  // TODO(fxbug.dev/122727): Implement fake ring-buffer based tests so that we
+  // can test the valid import case.
+
+  // Release buffer collection.
+  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBufferCollectionId));
+
+  EXPECT_TRUE(
+      PollUntil([&]() { return allocator->GetActiveBufferCollectionTokenClients().empty(); },
+                zx::msec(5), 1000));
 }
 
 }  // namespace
