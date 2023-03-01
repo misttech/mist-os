@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use chrono::NaiveDateTime;
 use fuchsia_bluetooth::types::Uuid;
 use packet_encoding::{decodable_enum, Decodable};
 use tracing::trace;
@@ -207,9 +208,12 @@ pub enum Header {
     Type(String),
     /// Number of bytes.
     Length(u32),
-    /// Time represented as a String "YYYYMMDDTHHMMSSZ".
-    TimeIso8601(String),
-    Time4Byte(u32),
+    /// Time represented as a well-formed NaiveDateTime (no timezone). This is typically UTC.
+    /// See OBEX 1.5 Section 2.2.5.
+    TimeIso8601(NaiveDateTime),
+    /// Time represented as the number of seconds elapsed since midnight UTC on January 1, 1970.
+    /// This is saved as a well-formed NaiveDateTime (no timezone).
+    Time4Byte(NaiveDateTime),
     Description(String),
     Target(Vec<u8>),
     Http(Vec<u8>),
@@ -243,6 +247,12 @@ impl Header {
     /// A Unicode or Byte Sequence Header must be at least 3 bytes - 1 byte for the HI and 2 bytes
     /// for the encoded data length.
     const MIN_UNICODE_OR_BYTE_SEQ_LENGTH_BYTES: usize = 3;
+
+    /// The ISO 8601 time format used in the Time Header packet.
+    /// The format is YYYYMMDDTHHMMSS where "T" delimits the date from the time. It is assumed that
+    /// the time is the local time, but per OBEX 2.2.5, a suffix of "Z" can be included to indicate
+    /// UTC time.
+    const ISO_8601_TIME_FORMAT: &str = "%Y%m%dT%H%M%S";
 
     pub fn identifier(&self) -> HeaderIdentifier {
         match &self {
@@ -326,9 +336,26 @@ impl Decodable for Header {
             HeaderIdentifier::Length => {
                 Ok(Header::Length(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
-            HeaderIdentifier::TimeIso8601 => Ok(Header::TimeIso8601(be_bytes_to_string(data)?)),
+            HeaderIdentifier::TimeIso8601 => {
+                let mut time_str = be_bytes_to_string(data)?;
+                // TODO(fxbug.dev/120012): In some cases, the peer can send a local time instead of
+                // UTC. The timezone is not specified. Figure out how to represent this using
+                // DateTime/NaiveDateTime.
+                if time_str.ends_with("Z") {
+                    let _ = time_str.pop();
+                }
+                let parsed = NaiveDateTime::parse_from_str(&time_str, Self::ISO_8601_TIME_FORMAT)
+                    .map_err(PacketError::external)?;
+                Ok(Header::TimeIso8601(parsed))
+            }
             HeaderIdentifier::Time4Byte => {
-                Ok(Header::Time4Byte(u32::from_be_bytes(data[..].try_into().unwrap())))
+                let elapsed_time_seconds = u32::from_be_bytes(data[..].try_into().unwrap());
+                let parsed = NaiveDateTime::from_timestamp_opt(
+                    elapsed_time_seconds.into(),
+                    /*nsecs= */ 0,
+                )
+                .ok_or(PacketError::external(anyhow::format_err!("invalid timestamp")))?;
+                Ok(Header::Time4Byte(parsed))
             }
             HeaderIdentifier::Description => Ok(Header::Description(be_bytes_to_string(data)?)),
             HeaderIdentifier::Target => {
@@ -426,7 +453,9 @@ fn be_bytes_to_string(buf: &[u8]) -> Result<String, PacketError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use assert_matches::assert_matches;
+    use chrono::NaiveDate;
 
     #[fuchsia::test]
     fn is_user_id() {
@@ -638,5 +667,52 @@ mod tests {
         ];
         let result = Header::decode(&user_buf).expect("can decode user header");
         assert_eq!(result, Header::User(UserDefinedHeader { identifier: 0xb3, value: vec![0x05] }));
+    }
+
+    #[fuchsia::test]
+    fn decode_time_header_success() {
+        let utc_time_buf = [
+            0x44, // HI = Time ISO 8601
+            0x00, 0x25, // Total length = 37 bytes
+            0x00, 0x32, 0x00, 0x30, 0x00, 0x32, 0x00, 0x33, 0x00, 0x30, 0x00, 0x32, 0x00, 0x32,
+            0x00, 0x34, 0x00, 0x54, 0x00, 0x31, 0x00, 0x32, 0x00, 0x34, 0x00, 0x31, 0x00, 0x33,
+            0x00, 0x30, 0x00, 0x5a, 0x00, 0x00, // Time = "20230224T124130Z" (UTC), 34 bytes
+        ];
+        let result = Header::decode(&utc_time_buf).expect("can decode a utc time header");
+        assert_matches!(result, Header::TimeIso8601(t) if t == NaiveDate::from_ymd(2023, 2, 24).and_hms(12, 41, 30));
+
+        let local_time_buf = [
+            0x44, // HI = Time ISO 8601
+            0x00, 0x23, // Total length = 35 bytes
+            0x00, 0x32, 0x00, 0x30, 0x00, 0x32, 0x00, 0x33, 0x00, 0x30, 0x00, 0x32, 0x00, 0x32,
+            0x00, 0x34, 0x00, 0x54, 0x00, 0x31, 0x00, 0x32, 0x00, 0x34, 0x00, 0x31, 0x00, 0x33,
+            0x00, 0x30, 0x00, 0x00, // Time = "20230224T124130" (UTC), 32 bytes
+        ];
+        let result = Header::decode(&local_time_buf).expect("can decode a local time header");
+        assert_matches!(result, Header::TimeIso8601(t) if t == NaiveDate::from_ymd(2023, 2, 24).and_hms(12, 41, 30));
+
+        // The timestamp corresponds to September 9, 2001 at 01:46:40.
+        let timestamp_buf = [
+            0xc4, // HI = Time 4-byte timestamp
+            0x3b, 0x9a, 0xca, 0x00, // Timestamp = 1e9 seconds after Jan 1, 1970.
+        ];
+        let result = Header::decode(&timestamp_buf).expect("can decode a timestamp header");
+        assert_matches!(result, Header::Time4Byte(t) if t == NaiveDate::from_ymd(2001, 9, 9).and_hms(1, 46, 40));
+    }
+
+    #[fuchsia::test]
+    fn decode_invalid_time_header_is_error() {
+        let invalid_utc_time_buf = [
+            0x44, // HI = Time ISO 8601
+            0x00, 0x23, // Total length = 35 bytes
+            0x00, 0x32, 0x00, 0x30, 0x00, 0x32, 0x00, 0x33, 0x00, 0x30, 0x00, 0x32, 0x00, 0x32,
+            0x00, 0x34, 0x00, 0x31, 0x00, 0x32, 0x00, 0x34, 0x00, 0x31, 0x00, 0x33, 0x00, 0x30,
+            0x00, 0x5a, 0x00,
+            0x00, // Time = "20230224124130Z" (UTC, missing the "T" delineator)
+        ];
+        assert_matches!(Header::decode(&invalid_utc_time_buf), Err(PacketError::Other(_)));
+
+        // The timestamp Header should never produce an Error since the timestamp is bounded by
+        // u32::MAX, whereas the only potential failure case in NaiveDateTime is i64::MAX.
     }
 }
