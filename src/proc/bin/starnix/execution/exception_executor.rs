@@ -139,16 +139,19 @@ fn run_exception_loop(
                     if info.type_ == ZX_EXCP_FATAL_PAGE_FAULT {
                         #[cfg(target_arch = "x86_64")]
                         let fault_addr = unsafe { report.context.arch.x86_64.cr2 };
+                        #[cfg(target_arch = "x86_64")]
+                        let (pc, sp) = (current_task.registers.rip, current_task.registers.rsp);
 
                         #[cfg(target_arch = "aarch64")]
                         let fault_addr = unsafe { report.context.arch.arm_64.far };
+                        #[cfg(target_arch = "aarch64")]
+                        let (pc, sp) = (current_task.registers.pc, current_task.registers.sp);
 
-                        // Both ARM and x64 register sets have "rip" and "rsp" members.
                         log_trace!(
                             current_task,
                             "page fault, ip={:#x}, sp={:#x}, fault={:#x}",
-                            current_task.registers.rip,
-                            current_task.registers.rsp,
+                            pc,
+                            sp,
                             fault_addr
                         );
                     }

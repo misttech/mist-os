@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::convert::TryFrom;
+use static_assertions::assert_eq_size;
+use std::convert::{From, TryFrom};
 use std::fmt;
 
 use crate::types::*;
+use zerocopy::{AsBytes, FromBytes};
 
 pub const UNBLOCKABLE_SIGNALS: sigset_t = SIGKILL.mask() | SIGSTOP.mask();
 
@@ -164,5 +166,85 @@ impl fmt::Display for Signal {
         } else {
             write!(f, "signal {}: SIGRTMIN+{}", self.number, self.number - uapi::SIGRTMIN)
         }
+    }
+}
+
+/// POSIX defines sigset_t as either a numeric or structure type (so the number of signals can
+/// exceed the bits in a machine word). The programmer is supposed to modify this bitfield using
+/// sigaddset(), etc. rather than setting bits directly so client code can be agnostic to the
+/// definition.
+///
+///  * On x64, sigset_t is a typedef for "unsigned long".
+///  * On ARM64, sigset_t is a structure containing one "unsigned long" member.
+///
+/// To keep the Starnix code agnostic to the definition, this SigSet type provides a wrapper
+/// with a uniform interface for the things we need.
+///
+/// The layout of this object is designed to be identical to the layout of the current
+/// architecture's sigset_t type so UserRef<SigSet> can be used for system calls.
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Default, AsBytes, FromBytes, PartialEq)]
+pub struct SigSet(std::os::raw::c_ulong);
+assert_eq_size!(SigSet, sigset_t);
+
+impl SigSet {
+    /// Returns whether this signal set contains the given signal.
+    pub fn has_signal(&self, signal: Signal) -> bool {
+        (self.0 & (signal.mask() as std::os::raw::c_ulong)) != 0
+    }
+
+    pub fn to_inverted(self) -> SigSet {
+        SigSet(!self.0)
+    }
+
+    /// Returns a new SigSet with the given signal added.
+    pub fn with_signal_added(&self, to_add: Signal) -> SigSet {
+        SigSet(self.0 | (to_add.mask() as std::os::raw::c_ulong))
+    }
+
+    /// Returns a new SigSet with the given signals added.
+    pub fn with_sigset_added(&self, to_add: SigSet) -> SigSet {
+        SigSet(self.0 | to_add.0)
+    }
+
+    /// Returns a new SigSet with the given signal removed.
+    pub fn with_signal_removed(&self, to_remove: Signal) -> SigSet {
+        SigSet(self.0 & !(to_remove.mask() as std::os::raw::c_ulong))
+    }
+
+    /// Returns a new SigSet with the given signals removed.
+    pub fn with_sigset_removed(&self, to_remove: SigSet) -> SigSet {
+        SigSet(self.0 & !to_remove.0)
+    }
+}
+
+impl From<Signal> for SigSet {
+    /// Constructs a sigset consisting of one signal value.
+    fn from(value: Signal) -> Self {
+        SigSet(value.mask() as std::os::raw::c_ulong)
+    }
+}
+
+impl From<sigset_t> for SigSet {
+    #[cfg(target_arch = "x86_64")]
+    fn from(value: sigset_t) -> Self {
+        SigSet(value)
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn from(value: sigset_t) -> Self {
+        SigSet(value.sig[0])
+    }
+}
+
+impl From<SigSet> for sigset_t {
+    #[cfg(target_arch = "x86_64")]
+    fn from(val: SigSet) -> Self {
+        val.0
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn from(val: SigSet) -> Self {
+        sigset_t { sig: [val.0] }
     }
 }

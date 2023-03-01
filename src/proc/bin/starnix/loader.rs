@@ -185,10 +185,20 @@ pub struct ThreadStartInfo {
 }
 
 impl ThreadStartInfo {
+    #[cfg(target_arch = "x86_64")]
     pub fn to_registers(&self) -> zx_thread_state_general_regs_t {
         zx_thread_state_general_regs_t {
             rip: self.entry.ptr() as u64,
             rsp: self.stack.ptr() as u64,
+            ..Default::default()
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn to_registers(&self) -> zx_thread_state_general_regs_t {
+        zx_thread_state_general_regs_t {
+            pc: self.entry.ptr() as u64,
+            sp: self.stack.ptr() as u64,
             ..Default::default()
         }
     }
