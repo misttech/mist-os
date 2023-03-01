@@ -11,7 +11,6 @@
 
 #include <array>
 #include <iostream>
-#include <string_view>
 
 #include <fbl/unique_fd.h>
 #include <perftest/perftest.h>
@@ -269,7 +268,7 @@ constexpr char kFakeNetstackEnvVar[] = "FAKE_NETSTACK";
 constexpr char kNetstack3EnvVar[] = "NETSTACK3";
 
 void RegisterTests() {
-  constexpr std::string_view kSingleReadTestNameFmt = "WriteRead/%s/%s/%ld%s";
+  constexpr const char* kSingleReadTestNameFmt = "WriteRead/%s/%s/%ld%s";
   enum class Network { kIpv4, kIpv6 };
 
   auto network_to_string = [](Network network) {
@@ -281,7 +280,7 @@ void RegisterTests() {
     }
   };
 
-  auto bytes_with_unit = [](size_t bytes) -> std::pair<size_t, std::string_view> {
+  auto bytes_with_unit = [](size_t bytes) -> std::pair<size_t, const char*> {
     if (bytes >= 1024) {
       bytes /= 1024;
       // Keep "kB" instead of "KiB" to avoid losing benchmarking history.
@@ -290,27 +289,25 @@ void RegisterTests() {
     return {bytes, "B"};
   };
 
-  auto get_tcp_test_name = [&bytes_with_unit, &network_to_string, &kSingleReadTestNameFmt](
-                               Network network, size_t raw_bytes) -> std::string {
-    std::string_view network_name = network_to_string(network);
+  auto get_tcp_test_name = [&bytes_with_unit, &network_to_string](Network network,
+                                                                  size_t raw_bytes) -> std::string {
+    const char* network_name = network_to_string(network);
     auto [bytes, bytes_unit] = bytes_with_unit(raw_bytes);
 
-    return fxl::StringPrintf(kSingleReadTestNameFmt.data(), "TCP", network_name.data(), bytes,
-                             bytes_unit.data());
+    return fxl::StringPrintf(kSingleReadTestNameFmt, "TCP", network_name, bytes, bytes_unit);
   };
 
-  auto get_udp_test_name = [&bytes_with_unit, &network_to_string, &kSingleReadTestNameFmt](
+  auto get_udp_test_name = [&bytes_with_unit, &network_to_string](
                                Network network, size_t raw_bytes,
                                size_t message_count) -> std::string {
-    std::string_view network_name = network_to_string(network);
+    const char* network_name = network_to_string(network);
     auto [bytes, bytes_unit] = bytes_with_unit(raw_bytes);
-    constexpr std::string_view kUDP = "UDP";
+    constexpr const char* kUDP = "UDP";
     if (message_count > 1) {
-      return fxl::StringPrintf("MultiWriteRead/%s/%s/%ld%s/%ldMessages", kUDP.data(),
-                               network_name.data(), bytes, bytes_unit.data(), message_count);
+      return fxl::StringPrintf("MultiWriteRead/%s/%s/%ld%s/%ldMessages", kUDP, network_name, bytes,
+                               bytes_unit, message_count);
     } else {
-      return fxl::StringPrintf(kSingleReadTestNameFmt.data(), kUDP.data(), network_name.data(),
-                               bytes, bytes_unit.data());
+      return fxl::StringPrintf(kSingleReadTestNameFmt, kUDP, network_name, bytes, bytes_unit);
     }
   };
 
