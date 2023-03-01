@@ -45,10 +45,10 @@ class Nvme;
 using DeviceType = ddk::Device<Nvme, ddk::Initializable>;
 class Nvme : public DeviceType {
  public:
-  explicit Nvme(zx_device_t* parent, pci_protocol_t pci, fdf::MmioBuffer mmio,
-                pci_interrupt_mode_t irq_mode, zx::interrupt irq, zx::bti bti)
+  explicit Nvme(zx_device_t* parent, ddk::Pci pci, fdf::MmioBuffer mmio,
+                fuchsia_hardware_pci::InterruptMode irq_mode, zx::interrupt irq, zx::bti bti)
       : DeviceType(parent),
-        pci_(pci),
+        pci_(std::move(pci)),
         mmio_(std::move(mmio)),
         irq_mode_(irq_mode),
         irq_(std::move(irq)),
@@ -93,9 +93,9 @@ class Nvme : public DeviceType {
   // Process pending IO completions. Called in the IoLoop().
   void ProcessIoCompletions();
 
-  pci_protocol_t pci_;
+  ddk::Pci pci_;
   fdf::MmioBuffer mmio_;
-  pci_interrupt_mode_t irq_mode_;
+  fuchsia_hardware_pci::InterruptMode irq_mode_;
   zx::interrupt irq_;
   zx::bti bti_;
   inspect::Inspector inspector_;

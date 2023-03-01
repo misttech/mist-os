@@ -55,7 +55,7 @@ int Nvme::IrqLoop() {
     }
 
     // The interrupt mask register should only be used when not using MSI-X.
-    if (irq_mode_ != PCI_INTERRUPT_MODE_MSI_X) {
+    if (irq_mode_ != fuchsia_hardware_pci::InterruptMode::kMsiX) {
       InterruptReg::MaskSet().FromValue(1).WriteTo(&mmio_);
     }
 
@@ -68,13 +68,13 @@ int Nvme::IrqLoop() {
 
     sync_completion_signal(&io_signal_);
 
-    if (irq_mode_ != PCI_INTERRUPT_MODE_MSI_X) {
+    if (irq_mode_ != fuchsia_hardware_pci::InterruptMode::kMsiX) {
       // Unmask the interrupt.
       InterruptReg::MaskClear().FromValue(1).WriteTo(&mmio_);
     }
 
-    if (irq_mode_ == PCI_INTERRUPT_MODE_LEGACY) {
-      status = pci_ack_interrupt(&pci_);
+    if (irq_mode_ == fuchsia_hardware_pci::InterruptMode::kLegacy) {
+      status = pci_.AckInterrupt();
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to ack interrupt: %s", zx_status_get_string(status));
         break;
@@ -238,7 +238,7 @@ void Nvme::DdkRelease() {
   zxlogf(DEBUG, "Releasing driver.");
   driver_shutdown_ = true;
   if (mmio_.get_vmo() != ZX_HANDLE_INVALID) {
-    pci_set_bus_mastering(&pci_, false);
+    pci_.SetBusMastering(false);
   }
   irq_.destroy();  // Make irq_.wait() in IrqLoop() return ZX_ERR_CANCELED.
   if (irq_thread_started_) {
@@ -664,54 +664,50 @@ zx_status_t Nvme::AddDevice() {
 }
 
 zx_status_t Nvme::Bind(void* ctx, zx_device_t* dev) {
-  pci_protocol_t pci;
-  zx_status_t status = device_get_fragment_protocol(dev, "pci", ZX_PROTOCOL_PCI, &pci);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to find PCI fragment: %s", zx_status_get_string(status));
-    return status;
+  ddk::Pci pci(dev, "pci");
+  if (!pci.is_valid()) {
+    zxlogf(ERROR, "Failed to find PCI fragment");
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
-  mmio_buffer_t mmio_buffer;
-  status = pci_map_bar_buffer(&pci, 0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_buffer);
+  std::optional<fdf::MmioBuffer> mmio;
+  zx_status_t status = pci.MapMmio(0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map registers: %s", zx_status_get_string(status));
     return status;
   }
-  auto mmio = fdf::MmioBuffer(mmio_buffer);
 
-  pci_interrupt_mode_t irq_mode;
-  status = pci_configure_interrupt_mode(&pci, 1, &irq_mode);
+  fuchsia_hardware_pci::InterruptMode irq_mode;
+  status = pci.ConfigureInterruptMode(1, &irq_mode);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to configure interrupt: %s", zx_status_get_string(status));
     return status;
   }
-  zxlogf(DEBUG, "Interrupt mode: %u", irq_mode);
+  zxlogf(DEBUG, "Interrupt mode: %u", static_cast<uint8_t>(irq_mode));
 
-  zx_handle_t irq_handle;
-  status = pci_map_interrupt(&pci, 0, &irq_handle);
+  zx::interrupt irq;
+  status = pci.MapInterrupt(0, &irq);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map interrupt: %s", zx_status_get_string(status));
     return status;
   }
-  auto irq = zx::interrupt(irq_handle);
 
-  status = pci_set_bus_mastering(&pci, true);
+  status = pci.SetBusMastering(true);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to enable bus mastering: %s", zx_status_get_string(status));
     return status;
   }
 
-  zx_handle_t bti_handle;
-  status = pci_get_bti(&pci, 0, &bti_handle);
+  zx::bti bti;
+  status = pci.GetBti(0, &bti);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get BTI handle: %s", zx_status_get_string(status));
     return status;
   }
-  auto bti = zx::bti(bti_handle);
 
   fbl::AllocChecker ac;
-  auto driver = fbl::make_unique_checked<nvme::Nvme>(&ac, dev, pci, std::move(mmio), irq_mode,
-                                                     std::move(irq), std::move(bti));
+  auto driver = fbl::make_unique_checked<nvme::Nvme>(&ac, dev, std::move(pci), std::move(*mmio),
+                                                     irq_mode, std::move(irq), std::move(bti));
   if (!ac.check()) {
     zxlogf(ERROR, "Failed to allocate memory for nvme driver.");
     return ZX_ERR_NO_MEMORY;

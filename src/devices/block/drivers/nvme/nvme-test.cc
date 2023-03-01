@@ -11,7 +11,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "fuchsia/hardware/block/cpp/banjo.h"
 #include "src/devices/block/drivers/nvme/commands/nvme-io.h"
 #include "src/devices/block/drivers/nvme/fake/fake-admin-commands.h"
 #include "src/devices/block/drivers/nvme/fake/fake-controller.h"
@@ -58,8 +57,8 @@ class NvmeTest : public inspect::InspectTestHelper, public zxtest::Test {
 
     // Set up the driver.
     auto driver = std::make_unique<Nvme>(
-        fake_root_.get(), pci_protocol_t{}, controller_.registers().GetBuffer(),
-        PCI_INTERRUPT_MODE_MSI_X, std::move(*irq), std::move(fake_bti));
+        fake_root_.get(), ddk::Pci{}, controller_.registers().GetBuffer(),
+        fuchsia_hardware_pci::InterruptMode::kMsiX, std::move(*irq), std::move(fake_bti));
     ASSERT_OK(driver->AddDevice());
     [[maybe_unused]] auto unused = driver.release();
 

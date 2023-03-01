@@ -10,10 +10,12 @@
     program: {
         runner: "driver",
         bind: "meta/bind/nvme_bind.bindbc",
-        colocate: "true",
+        colocate: "false",
         compat: "driver/nvme.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.pci.Service" },
+    ],
 }
