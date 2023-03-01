@@ -616,32 +616,56 @@ impl<'a> Transaction<'a> {
             ..
         } = mutation
         {
-            // Insert implies the caller expects no object with which to race
-            match op {
-                Operation::Insert => {
-                    self.new_objects.insert((*store_object_id, key.object_id));
-                }
-                Operation::Merge | Operation::ReplaceOrInsert => {
-                    let id = key.object_id;
-                    match &key.data {
-                        ObjectKeyData::Object => {
-                            if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))
-                                && !self.new_objects.contains(&(*store_object_id, id))
-                            {
-                                debug_assert!(
-                                    false,
-                                    "Not holding required lock for object {id} \
+            match &key.data {
+                ObjectKeyData::Object => match op {
+                    // Insert implies the caller expects no object with which to race
+                    Operation::Insert => {
+                        self.new_objects.insert((*store_object_id, key.object_id));
+                    }
+                    Operation::Merge | Operation::ReplaceOrInsert => {
+                        let id = key.object_id;
+                        if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))
+                            && !self.new_objects.contains(&(*store_object_id, id))
+                        {
+                            debug_assert!(
+                                false,
+                                "Not holding required lock for object {id} \
                                     in store {store_object_id}"
-                                );
-                                error!(
-                                    "Not holding required lock for object {id} in store \
+                            );
+                            error!(
+                                "Not holding required lock for object {id} in store \
                                     {store_object_id}"
-                                )
-                            }
+                            )
                         }
-                        _ => {}
+                    }
+                },
+                ObjectKeyData::ProjectUsage { .. } => match op {
+                    Operation::Insert | Operation::ReplaceOrInsert => {
+                        panic!(
+                            "Project usage is all handled by merging deltas, no inserts or \
+                            replacements should be used"
+                        );
+                    }
+                    // Merges are all handled like atomic +/- and serialized by the tree locks.
+                    Operation::Merge => {}
+                },
+                ObjectKeyData::ProjectLimit { project_id } => {
+                    if !self.txn_locks.contains(&LockKey::ProjectId {
+                        store_object_id: *store_object_id,
+                        project_id: *project_id,
+                    }) {
+                        debug_assert!(
+                            false,
+                            "Not holding required lock for project limit id {project_id} \
+                                in store {store_object_id}"
+                        );
+                        error!(
+                            "Not holding required lock for project limit id {project_id} in \
+                                store {store_object_id}"
+                        )
                     }
                 }
+                _ => {}
             }
         }
     }

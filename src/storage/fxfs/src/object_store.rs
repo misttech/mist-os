@@ -1023,7 +1023,8 @@ impl ObjectStore {
     }
 
     /// Deletes extents for attribute `attribute_id` in object `object_id`.  Also see the comments
-    /// for TrimMode and TrimResult.
+    /// for TrimMode and TrimResult. Should hold a lock on the attribute, and the object as it
+    /// performs a read-modify-write on the sizes.
     pub async fn trim_some(
         &self,
         transaction: &mut Transaction<'_>,
@@ -1135,7 +1136,28 @@ impl ObjectStore {
             iter.advance().await?;
         }
 
-        if matches!(mode, TrimMode::Tombstone) && matches!(result, TrimResult::Done(None)) {
+        let finished_tombstone =
+            matches!(mode, TrimMode::Tombstone) && matches!(result, TrimResult::Done(None));
+        let mut mutation = self.txn_get_object_mutation(transaction, object_id).await?;
+        if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
+            mutation.item.value
+        {
+            let nodes = if finished_tombstone { -1 } else { 0 };
+            if project_id != 0 && (deallocated != 0 || nodes != 0) {
+                transaction.add(
+                    self.store_object_id,
+                    Mutation::merge_object(
+                        ObjectKey::project_usage(self.root_directory_object_id(), project_id),
+                        ObjectValue::BytesAndNodes {
+                            bytes: -i64::try_from(deallocated).unwrap(),
+                            nodes,
+                        },
+                    ),
+                );
+            }
+        }
+
+        if finished_tombstone {
             // Tombstone records *must* be merged so as to consume all other records for the
             // object.
             transaction.add(
@@ -1152,7 +1174,6 @@ impl ObjectStore {
             );
 
             // Update allocated size.
-            let mut mutation = self.txn_get_object_mutation(transaction, object_id).await?;
             if let ObjectValue::Object { kind: ObjectKind::File { allocated_size, .. }, .. } =
                 &mut mutation.item.value
             {
@@ -1259,7 +1280,7 @@ impl ObjectStore {
             } else {
                 *store_info = StoreOrReplayInfo::Info(info);
             }
-        }
+        };
 
         if encrypted.is_some() {
             *self.lock_state.lock().unwrap() = LockState::Locked;
@@ -1834,7 +1855,7 @@ impl JournalingObject for ObjectStore {
 
     fn write_mutation(&self, mutation: &Mutation, mut writer: journal::Writer<'_>) {
         match mutation {
-            // Encrypt all object store mutations.
+            // Encrypt all mutations that could be related to a volume object store.
             Mutation::ObjectStore(_) => {
                 let mut cipher = self.mutations_cipher.lock().unwrap();
                 if let Some(cipher) = cipher.as_mut() {

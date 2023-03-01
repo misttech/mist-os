@@ -209,6 +209,34 @@ pub fn merge(
                 right_extent,
             );
         }
+        (
+            ObjectKey {
+                object_id: _,
+                data: ObjectKeyData::ProjectUsage { project_id: left_project_id },
+            },
+            ObjectKey {
+                object_id: _,
+                data: ObjectKeyData::ProjectUsage { project_id: right_project_id },
+            },
+            ObjectValue::BytesAndNodes { bytes: left_bytes, nodes: left_nodes },
+            ObjectValue::BytesAndNodes { bytes: right_bytes, nodes: right_nodes },
+        ) if left_project_id == right_project_id => {
+            let bytes = left_bytes + right_bytes;
+            let nodes = left_nodes + right_nodes;
+            // Tombstone the tracking when it goes to zero.
+            match (bytes, nodes) {
+                (0, 0) => MergeResult::Other { emit: None, left: Discard, right: Discard },
+                _ => MergeResult::Other {
+                    emit: None,
+                    left: Discard,
+                    right: Replace(Item {
+                        key: right.key().clone(),
+                        value: ObjectValue::BytesAndNodes { bytes, nodes },
+                        sequence: right.sequence(),
+                    }),
+                },
+            }
+        }
         // Tombstones (ObjectKeyData::Object) compare before others, so always appear on left.
         (ObjectKey { data: ObjectKeyData::Object, .. }, _, ObjectValue::None, _) => {
             debug_assert!(left.layer_index < right.layer_index);
@@ -1078,5 +1106,136 @@ mod tests {
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_project_usage() {
+        let tree = LSMTree::new(merge);
+        let key = ObjectKey::project_usage(5, 6);
+
+        tree.insert(Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 100, nodes: 1000 }))
+            .await
+            .expect("insert error");
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 4, nodes: 8 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: -1, nodes: -2 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 16, nodes: 32 }),
+            &key,
+        )
+        .await;
+
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        assert_eq!(iter.get().unwrap().key, &key);
+        assert_eq!(
+            iter.get().unwrap().value,
+            &ObjectValue::BytesAndNodes { bytes: 119, nodes: 1038 }
+        );
+        iter.advance().await.unwrap();
+        assert!(iter.get().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_project_usage_to_zero() {
+        let tree = LSMTree::new(merge);
+        let key = ObjectKey::project_usage(5, 6);
+
+        tree.insert(Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 4, nodes: 8 }))
+            .await
+            .expect("insert error");
+        tree.seal().await;
+
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: -4, nodes: -8 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        assert!(iter.get().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_project_usage_recover_from_zero() {
+        let tree = LSMTree::new(merge);
+        let key = ObjectKey::project_usage(5, 6);
+
+        tree.insert(Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 4, nodes: 8 }))
+            .await
+            .expect("insert error");
+        tree.seal().await;
+
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: -4, nodes: -8 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 20, nodes: 40 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        assert_eq!(iter.get().unwrap().key, &key);
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::BytesAndNodes { bytes: 20, nodes: 40 });
+        iter.advance().await.unwrap();
+        assert!(iter.get().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_project_usage_layer_merge_to_negative() {
+        let tree = LSMTree::new(merge);
+        let key = ObjectKey::project_usage(5, 6);
+
+        tree.insert(Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 4, nodes: 8 }))
+            .await
+            .expect("insert error");
+        tree.seal().await;
+
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: 16, nodes: 32 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        // As we merge from the newest layer down this will drop bytes below zero and nodes to
+        // exactly zero during the merge process.
+        tree.merge_into(
+            Item::new(key.clone(), ObjectValue::BytesAndNodes { bytes: -18, nodes: -32 }),
+            &key,
+        )
+        .await;
+        tree.seal().await;
+
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        assert_eq!(iter.get().unwrap().key, &key);
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::BytesAndNodes { bytes: 2, nodes: 8 });
+        iter.advance().await.unwrap();
+        assert!(iter.get().is_none());
     }
 }

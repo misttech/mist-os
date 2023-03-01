@@ -795,8 +795,10 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
             return Ok(());
         }
         let mut mutation = self.txn_get_object_mutation(transaction).await?;
-        if let ObjectValue::Object { kind: ObjectKind::File { allocated_size, .. }, .. } =
-            &mut mutation.item.value
+        if let ObjectValue::Object {
+            kind: ObjectKind::File { allocated_size, .. },
+            attributes: ObjectAttributes { project_id, .. },
+        } = &mut mutation.item.value
         {
             // The only way for these to fail are if the volume is inconsistent.
             *allocated_size = allocated_size
@@ -806,6 +808,22 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
                 .ok_or_else(|| {
                     anyhow!(FxfsError::Inconsistent).context("Allocated size underflow")
                 })?;
+
+            if *project_id != 0 {
+                // The allocated and deallocated shouldn't exceed the max size of the file which is
+                // bound within i64.
+                let diff = i64::try_from(allocated).unwrap() - i64::try_from(deallocated).unwrap();
+                transaction.add(
+                    self.store().store_object_id(),
+                    Mutation::merge_object(
+                        ObjectKey::project_usage(
+                            self.store().root_directory_object_id(),
+                            *project_id,
+                        ),
+                        ObjectValue::BytesAndNodes { bytes: diff, nodes: 0 },
+                    ),
+                );
+            }
         } else {
             panic!("Unexpected object value");
         }

@@ -14,7 +14,7 @@ use {
     std::ops::Range,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FsckIssue {
     /// Warnings don't prevent the filesystem from mounting and don't fail fsck, but they indicate a
     /// consistency issue.
@@ -53,7 +53,7 @@ impl FsckIssue {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 pub struct Allocation {
     range: Range<u64>,
@@ -66,7 +66,7 @@ impl From<ItemRef<'_, AllocatorKey, AllocatorValue>> for Allocation {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 pub struct Key(String);
 
@@ -82,7 +82,7 @@ impl<K: std::fmt::Debug> From<&K> for Key {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 pub struct Value(String);
 
@@ -106,7 +106,7 @@ impl<V: std::fmt::Debug> From<&V> for Value {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FsckWarning {
     ExtentForMissingAttribute(u64, u64, u64),
     ExtentForDirectory(u64, u64),
@@ -117,6 +117,7 @@ pub enum FsckWarning {
     OrphanedAttribute(u64, u64, u64),
     OrphanedObject(u64, u64),
     OrphanedKeys(u64, u64),
+    ProjectUsageInconsistent(u64, u64, (i64, i64), (i64, i64)),
 }
 
 impl FsckWarning {
@@ -165,6 +166,12 @@ impl FsckWarning {
             FsckWarning::OrphanedKeys(store_id, object_id) => {
                 format!("Orphaned keys for object {} were found in store {}", object_id, store_id)
             }
+            FsckWarning::ProjectUsageInconsistent(store_id, project_id, stored, used) => {
+                format!(
+                    "Project id {} in store {} expected usage ({}, {}) found ({}, {})",
+                    project_id, store_id, stored.0, stored.1, used.0, used.1
+                )
+            }
         }
     }
 
@@ -197,11 +204,14 @@ impl FsckWarning {
             FsckWarning::OrphanedKeys(store_id, oid) => {
                 warn!(oid, store_id, "Orphaned keys");
             }
+            FsckWarning::ProjectUsageInconsistent(store_id, project_id, stored, used) => {
+                warn!(project_id, store_id, ?stored, ?used, "Project Inconsistent");
+            }
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FsckError {
     AllocatedBytesMismatch(Vec<(u64, i64)>, Vec<(u64, i64)>),
     AllocatedSizeMismatch(u64, u64, u64, u64),
@@ -227,8 +237,6 @@ pub enum FsckError {
     ObjectCountMismatch(u64, u64, u64),
     ProjectOnGraveyard(u64, u64, u64),
     ProjectUsedWithNoUsageTracking(u64, u64, u64),
-    ProjectWithLimitNoUsage(u64, Vec<u64>),
-    ProjectWithUsageNoLimit(u64, Vec<u64>),
     RefCountMismatch(u64, u64, u64),
     RootObjectHasParent(u64, u64, u64),
     SubDirCountMismatch(u64, u64, u64, u64),
@@ -348,18 +356,6 @@ impl FsckError {
                 format!(
                     "Store {} had node {} with project ids {} but no usage tracking metadata",
                     store_id, node_id, project_id
-                )
-            }
-            FsckError::ProjectWithLimitNoUsage(store_id, missing) => {
-                format!(
-                    "Project metadata in store {} had limits but no tracked usage for {:?}",
-                    store_id, missing
-                )
-            }
-            FsckError::ProjectWithUsageNoLimit(store_id, missing) => {
-                format!(
-                    "Project metadata in store {} had tracked usaged but no limits for {:?}",
-                    store_id, missing
                 )
             }
             FsckError::RefCountMismatch(oid, expected, actual) => {
@@ -490,12 +486,6 @@ impl FsckError {
             FsckError::ProjectUsedWithNoUsageTracking(store_id, project_id, node_id) => {
                 error!(store_id, project_id, node_id, "Project used without tracking metadata");
             }
-            FsckError::ProjectWithLimitNoUsage(store_id, missing) => {
-                error!(store_id, ?missing, "Project id with metadata for limits but no usage");
-            }
-            FsckError::ProjectWithUsageNoLimit(store_id, missing) => {
-                error!(store_id, ?missing, "Project id with metadata for usage but no limits");
-            }
             FsckError::RefCountMismatch(oid, expected, actual) => {
                 error!(oid, expected, actual, "Reference count mismatch");
             }
@@ -533,7 +523,7 @@ impl FsckError {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FsckFatal {
     MalformedGraveyard,
     MalformedLayerFile(u64, u64),

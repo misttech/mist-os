@@ -382,7 +382,7 @@ pub enum ObjectValue {
     /// the bounds of a single transaction.
     Trim,
     /// Tracking a bytes and nodes pair. Added to support tracking Project ID usage and limits.
-    BytesAndNodes { bytes: u64, nodes: u64 },
+    BytesAndNodes { bytes: i64, nodes: i64 },
     /// A symlink of an object. |object_id| is the ID of the target, |object_descriptor| describes
     /// the target and |link| is the link path.
     Symlink { link: String },
@@ -398,7 +398,7 @@ pub enum ObjectValueV5 {
     Extent(ExtentValue),
     Child { object_id: u64, object_descriptor: ObjectDescriptor },
     Trim,
-    BytesAndNodes { bytes: u64, nodes: u64 },
+    BytesAndNodes { bytes: i64, nodes: i64 },
 }
 
 impl ObjectValue {

@@ -86,8 +86,8 @@ struct ScannedStore<'a> {
     is_encrypted: bool,
     current_file: Option<CurrentFile>,
     root_dir_id: u64,
-    seen_project_limits: HashSet<u64>,
-    seen_project_usages: HashSet<u64>,
+    stored_project_usages: BTreeMap<u64, (i64, i64)>,
+    total_project_usages: BTreeMap<u64, (i64, i64)>,
     /// Tracks project ids used and an example node to examine if it should not have been included.
     used_project_ids: BTreeMap<u64, u64>,
 }
@@ -115,8 +115,8 @@ impl<'a> ScannedStore<'a> {
             is_encrypted,
             current_file: None,
             root_dir_id,
-            seen_project_limits: HashSet::new(),
-            seen_project_usages: HashSet::new(),
+            stored_project_usages: BTreeMap::new(),
+            total_project_usages: BTreeMap::new(),
             used_project_ids: BTreeMap::new(),
         }
     }
@@ -147,6 +147,9 @@ impl<'a> ScannedStore<'a> {
                     } => {
                         if project_id > &0 {
                             self.used_project_ids.insert(*project_id, key.object_id);
+                            let entry = self.total_project_usages.entry(*project_id).or_default();
+                            entry.0 += i64::try_from(*allocated_size).unwrap();
+                            entry.1 += 1;
                         }
                         self.current_file =
                             Some(CurrentFile { object_id: key.object_id, key_ids: HashSet::new() });
@@ -200,6 +203,9 @@ impl<'a> ScannedStore<'a> {
                     } => {
                         if project_id > &0 {
                             self.used_project_ids.insert(*project_id, key.object_id);
+                            let entry = self.total_project_usages.entry(*project_id).or_default();
+                            // Increment only nodes.
+                            entry.1 += 1;
                         }
                         let kind = ObjectKind::Directory { sub_dirs: *sub_dirs };
                         match self.objects.get_mut(&key.object_id) {
@@ -535,12 +541,7 @@ impl<'a> ScannedStore<'a> {
                     ))?;
                 }
                 match value {
-                    ObjectValue::None => {
-                        self.seen_project_limits.remove(&project_id);
-                    }
-                    ObjectValue::BytesAndNodes { .. } => {
-                        self.seen_project_limits.insert(project_id);
-                    }
+                    ObjectValue::None | ObjectValue::BytesAndNodes { .. } => {}
                     _ => {
                         self.fsck.error(FsckError::MalformedObjectRecord(
                             self.store_id,
@@ -561,10 +562,10 @@ impl<'a> ScannedStore<'a> {
                 }
                 match value {
                     ObjectValue::None => {
-                        self.seen_project_usages.remove(&project_id);
+                        self.stored_project_usages.remove(&project_id);
                     }
-                    ObjectValue::BytesAndNodes { .. } => {
-                        self.seen_project_usages.insert(project_id);
+                    ObjectValue::BytesAndNodes { bytes, nodes } => {
+                        self.stored_project_usages.insert(project_id, (*bytes, *nodes));
                     }
                     _ => {
                         self.fsck.error(FsckError::MalformedObjectRecord(
@@ -823,23 +824,30 @@ pub(super) async fn scan_store(
     }
     scanned.finish_file()?;
 
-    {
-        let diff: Vec<u64> =
-            scanned.seen_project_limits.difference(&scanned.seen_project_usages).cloned().collect();
-        if !diff.is_empty() {
-            fsck.error(FsckError::ProjectWithLimitNoUsage(store_id, diff))?;
-        }
-    }
-    {
-        let diff: Vec<u64> =
-            scanned.seen_project_usages.difference(&scanned.seen_project_limits).cloned().collect();
-        if !diff.is_empty() {
-            fsck.error(FsckError::ProjectWithUsageNoLimit(store_id, diff))?;
-        }
-    }
     for (project_id, node_id) in scanned.used_project_ids.iter() {
-        if !scanned.seen_project_usages.contains(project_id) {
+        if !scanned.stored_project_usages.contains_key(project_id) {
             fsck.error(FsckError::ProjectUsedWithNoUsageTracking(store_id, *project_id, *node_id))?;
+        }
+    }
+    for (project_id, (bytes_stored, nodes_stored)) in scanned.stored_project_usages.iter() {
+        if let Some((bytes_used, nodes_used)) = scanned.total_project_usages.get(&project_id) {
+            if *bytes_stored != *bytes_used || *nodes_stored != *nodes_used {
+                fsck.warning(FsckWarning::ProjectUsageInconsistent(
+                    store_id,
+                    *project_id,
+                    (*bytes_stored, *nodes_stored),
+                    (*bytes_used, *nodes_used),
+                ))?;
+            }
+        } else {
+            if *bytes_stored > 0 || *nodes_stored > 0 {
+                fsck.warning(FsckWarning::ProjectUsageInconsistent(
+                    store_id,
+                    *project_id,
+                    (*bytes_stored, *nodes_stored),
+                    (0, 0),
+                ))?;
+            }
         }
     }
 

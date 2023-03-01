@@ -1673,3 +1673,155 @@ async fn test_duplicate_key() {
 
     assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::DuplicateKey(sid, oid, kid)) ] if *sid == store_id && *oid == object_id && *kid == key_id);
 }
+
+#[fuchsia::test]
+async fn test_project_accounting() {
+    let mut test = FsckTest::new().await;
+
+    let store_id;
+    let orphaned_object_id;
+    {
+        let fs = test.filesystem();
+        let store = fs.root_store();
+        store_id = store.store_object_id();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        // Project 3 in use on file, no info on it.
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                &[LockKey::object(store_id, root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let object_id = root_directory
+            .create_child_file(&mut transaction, "a")
+            .await
+            .expect("Create child failed")
+            .object_id();
+        let mut mutation = transaction
+            .get_object_mutation(store_id, ObjectKey::object(object_id))
+            .unwrap()
+            .clone();
+        if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
+            &mut mutation.item.value
+        {
+            *project_id = 3;
+        } else {
+            panic!("Unexpected object type");
+        }
+        orphaned_object_id = object_id;
+        transaction.add(store_id, Mutation::ObjectStore(mutation));
+        transaction.commit().await.expect("commit failed");
+
+        // Project 4 with mismatched actual and usage.
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                &[
+                    LockKey::object(store_id, root_directory.object_id()),
+                    LockKey::ProjectId { store_object_id: store_id, project_id: 4 },
+                ],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        transaction.add(
+            store_id,
+            Mutation::merge_object(
+                ObjectKey::project_usage(root_directory.object_id(), 4),
+                ObjectValue::BytesAndNodes { bytes: 0, nodes: 2 },
+            ),
+        );
+        transaction.add(
+            store_id,
+            Mutation::insert_object(
+                ObjectKey::project_limit(root_directory.object_id(), 4),
+                ObjectValue::BytesAndNodes { bytes: 0, nodes: 0 },
+            ),
+        );
+        let object_id = root_directory
+            .create_child_file(&mut transaction, "b")
+            .await
+            .expect("Create child failed")
+            .object_id();
+        let mut mutation = transaction
+            .get_object_mutation(store_id, ObjectKey::object(object_id))
+            .unwrap()
+            .clone();
+        if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
+            &mut mutation.item.value
+        {
+            *project_id = 4;
+        } else {
+            panic!("Unexpected object type");
+        }
+        transaction.add(store_id, Mutation::ObjectStore(mutation));
+        transaction.commit().await.expect("commit failed");
+
+        // Project 5 just fine.
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                &[
+                    LockKey::object(store_id, root_directory.object_id()),
+                    LockKey::ProjectId { store_object_id: store_id, project_id: 5 },
+                ],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        transaction.add(
+            store_id,
+            Mutation::merge_object(
+                ObjectKey::project_usage(root_directory.object_id(), 5),
+                ObjectValue::BytesAndNodes { bytes: 0, nodes: 1 },
+            ),
+        );
+        transaction.add(
+            store_id,
+            Mutation::insert_object(
+                ObjectKey::project_limit(root_directory.object_id(), 5),
+                ObjectValue::BytesAndNodes { bytes: 0, nodes: 0 },
+            ),
+        );
+        let object_id = root_directory
+            .create_child_file(&mut transaction, "c")
+            .await
+            .expect("Create child failed")
+            .object_id();
+        let mut mutation = transaction
+            .get_object_mutation(store_id, ObjectKey::object(object_id))
+            .unwrap()
+            .clone();
+        if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
+            &mut mutation.item.value
+        {
+            *project_id = 5;
+        } else {
+            panic!("Unexpected object type");
+        }
+        transaction.add(store_id, Mutation::ObjectStore(mutation));
+        transaction.commit().await.expect("commit failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert!(test.errors().contains(&FsckIssue::Error(FsckError::ProjectUsedWithNoUsageTracking(
+        store_id,
+        3,
+        orphaned_object_id
+    ))));
+    assert!(test.errors().contains(&FsckIssue::Warning(FsckWarning::ProjectUsageInconsistent(
+        store_id,
+        4,
+        (0, 2),
+        (0, 1)
+    ))));
+    assert_eq!(test.errors().len(), 2);
+}

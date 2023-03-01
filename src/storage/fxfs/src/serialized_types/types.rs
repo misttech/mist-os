@@ -99,13 +99,13 @@ fn type_hashes() {
     success &= assert_type_hash::<AllocatorKey>(0xe1f0c79ca78a2314);
     success &= assert_type_hash::<AllocatorValue>(0x3c75b908c6b1d289);
     success &= assert_type_hash::<EncryptedMutations>(0x960347c6c0713e58);
-    success &= assert_type_hash::<JournalRecord>(0x1da9fb318cb32211);
+    success &= assert_type_hash::<JournalRecord>(0x6ff6648d9da9c081);
     success &= assert_type_hash::<LayerInfo>(0x265c7729385ff919);
-    success &= assert_type_hash::<Mutation>(0xaaae07ec844f6ada);
+    success &= assert_type_hash::<Mutation>(0xee55103e4dfb8fba);
     success &= assert_type_hash::<ObjectKey>(0x9be699d968209448);
-    success &= assert_type_hash::<ObjectValue>(0x6a974e3703d57af2);
+    success &= assert_type_hash::<ObjectValue>(0xf45ea5f9e0f70762);
     success &= assert_type_hash::<StoreInfo>(0xa6fecf8e27518741);
     success &= assert_type_hash::<SuperBlockHeader>(0x5eb9b7ec2c8201e1);
-    success &= assert_type_hash::<SuperBlockRecord>(0x0d7457153fb02594);
+    success &= assert_type_hash::<SuperBlockRecord>(0xe37586ec8a9ae664);
     assert!(success, "One or more versioned types have different TypeHash signatures.");
 }
