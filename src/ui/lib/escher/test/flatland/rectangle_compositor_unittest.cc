@@ -39,6 +39,26 @@ TexturePtr CreateFourColorTexture(EscherWeakPtr escher, BatchGpuUploader* gpu_up
   return escher->NewTexture(std::move(image), vk::Filter::eNearest);
 }
 
+// WxH texture with red(top) and green(bottom) pixels.
+TexturePtr CreateTwoColorTexture(EscherWeakPtr escher, BatchGpuUploader* gpu_uploader,
+                                 uint32_t width, uint32_t height) {
+  FX_DCHECK(escher);
+  std::vector<uint8_t> channels;
+  uint8_t red[4] = {255, 0, 0, 255};
+  uint8_t green[4] = {0, 255, 0, 255};
+  for (size_t y = 0; y < height; ++y) {
+    for (size_t x = 0; x < width; ++x) {
+      if (y < height / 2) {
+        channels.insert(channels.end(), red, red + 4);
+      } else {
+        channels.insert(channels.end(), green, green + 4);
+      }
+    }
+  }
+  auto image = escher->NewRgbaImage(gpu_uploader, width, height, channels.data());
+  return escher->NewTexture(std::move(image), vk::Filter::eLinear);
+}
+
 TexturePtr CreateDepthBuffer(Escher* escher, const ImagePtr& output_image) {
   TexturePtr depth_buffer;
   RenderFuncs::ObtainDepthTexture(
@@ -162,6 +182,39 @@ VK_TEST_F(RectangleCompositorTest, SimpleTextureTest) {
   EXPECT_EQ(histogram[kRed], num_pixels);
   EXPECT_EQ(histogram[kGreen], num_pixels);
   EXPECT_EQ(histogram[kBlue], num_pixels);
+}
+
+// Render a single full-screen renderable with a texture that has 2 colors.
+VK_TEST_F(RectangleCompositorTest, TwoColorTextureTest) {
+  frame_setup();
+
+  auto gpu_uploader =
+      std::make_shared<escher::BatchGpuUploader>(escher(), frame_data_.frame->frame_number());
+  EXPECT_TRUE(gpu_uploader);
+  EXPECT_TRUE(ren_);
+
+  auto texture =
+      CreateTwoColorTexture(escher(), gpu_uploader.get(), kFramebufferWidth, kFramebufferHeight);
+  gpu_uploader->Submit();
+
+  Rectangle2D rectangle(vec2(0, 0), vec2(kFramebufferWidth, kFramebufferHeight));
+  RectangleCompositor::ColorData color_data(vec4(1), /*is_opaque*/ true);
+
+  auto cmd_buf = frame_data_.frame->cmds();
+  auto depth_texture = CreateDepthBuffer(escher().get(), frame_data_.color_attachment);
+  ren_->DrawBatch(cmd_buf, {rectangle}, {texture}, {color_data}, frame_data_.color_attachment,
+                  depth_texture);
+
+  auto bytes = ReadbackFromColorAttachment(frame_data_.frame,
+                                           frame_data_.color_attachment->swapchain_layout(),
+                                           vk::ImageLayout::eColorAttachmentOptimal);
+
+  const ColorHistogram<ColorBgra> histogram(bytes.data(), kFramebufferWidth * kFramebufferHeight);
+
+  constexpr uint32_t num_pixels = kFramebufferWidth * kFramebufferHeight / 2;
+  EXPECT_EQ(histogram[kRed], num_pixels);
+  EXPECT_EQ(histogram[kGreen], num_pixels);
+  EXPECT_EQ(2U, histogram.size());
 }
 
 // Render with color conversion applied.
