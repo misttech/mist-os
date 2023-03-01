@@ -393,7 +393,7 @@ const char* VmoRightsToString(uint32_t rights, char str[kRightsStrLen]) {
 // Prints a header for the columns printed by DumpVmObject.
 // If |handles| is true, the dumped objects are expected to have handle info.
 void PrintVmoDumpHeader(bool handles) {
-  printf("%s koid obj                parent #depth #chld #map #shr    size   alloc name\n",
+  printf("%s koid obj                parent #depth #chld #map #shr    size   uncomp   comp name\n",
          handles ? "      handle rights " : "           -      - ");
 }
 
@@ -417,14 +417,16 @@ void DumpVmObject(const VmObject& vmo, pretty::SizeUnit format_unit, zx_handle_t
 
   FormattedBytes size_str(vmo.size(), format_unit);
 
-  FormattedBytes alloc_size;
-  const char* alloc_str = "phys";
+  FormattedBytes uncomp_size;
+  FormattedBytes comp_size;
+  const char* uncomp_str = "phys";
+  const char* comp_str = "phys";
   if (vmo.is_paged()) {
-    // TODO(fxb/60238): Handle compressed page counting.
     VmObject::AttributionCounts page_counts = vmo.AttributedPages();
-    ASSERT(page_counts.compressed == 0);
-    alloc_size.SetSize(page_counts.uncompressed * PAGE_SIZE, format_unit);
-    alloc_str = alloc_size.c_str();
+    uncomp_size.SetSize(page_counts.uncompressed * PAGE_SIZE, format_unit);
+    comp_size.SetSize(page_counts.compressed * PAGE_SIZE, format_unit);
+    uncomp_str = uncomp_size.c_str();
+    comp_str = comp_size.c_str();
   }
 
   char child_str[21];
@@ -458,10 +460,11 @@ void DumpVmObject(const VmObject& vmo, pretty::SizeUnit format_unit, zx_handle_t
       "%4" PRIu32
       " "      // share count
       "%7s "   // size in bytes
-      "%7s "   // allocated bytes
+      "%7s "   // uncompressed bytes
+      "%7s "   // compressed bytes
       "%s\n",  // name
       handle_str, rights_str, koid, &vmo, child_str, vmo.DebugLookupDepth(), vmo.num_children(),
-      vmo.num_mappings(), vmo.share_count(), size_str.c_str(), alloc_str, name);
+      vmo.num_mappings(), vmo.share_count(), size_str.c_str(), uncomp_str, comp_str, name);
 }
 
 // If |hidden_only| is set, will only dump VMOs that are not mapped
@@ -578,8 +581,6 @@ class VmCounter final : public VmEnumerator {
     auto vmo = map->vmo_locked();
     const VmObject::AttributionCounts page_counts =
         vmo->AttributedPagesInRange(map->object_offset_locked(), map->size());
-    // TODO(fxb/60238): Handle compressed page counting.
-    DEBUG_ASSERT(page_counts.compressed == 0);
     const size_t committed_pages = page_counts.uncompressed;
     uint32_t share_count = vmo->share_count();
     if (share_count == 1) {
@@ -1048,9 +1049,7 @@ int hwd_thread(void* arg) {
 
 void DumpProcessMemoryUsage(const char* prefix, size_t min_pages) {
   auto walker = MakeProcessWalker([&](ProcessDispatcher* process) {
-    // TODO(fxb/60238): Report compressed content as well?
     VmObject::AttributionCounts page_counts = process->PageCount();
-    ASSERT(page_counts.compressed == 0);
     if (page_counts.uncompressed >= min_pages) {
       char pname[ZX_MAX_NAME_LEN];
       process->get_name(pname);
