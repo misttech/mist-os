@@ -112,10 +112,7 @@ bool ClockSynchronizer::NeedsSynchronization() const {
     // with the old code from audio_core. Some unit tests require this check because they
     // setup the clocks inconsistently relative to internal Mix parameters (e.g. some
     // MixStagePositionTests).
-    if (!follower_->IdenticalToMonotonicClock() || !leader_->IdenticalToMonotonicClock()) {
-      return true;
-    }
-    return false;
+    return (!follower_->IdenticalToMonotonicClock() || !leader_->IdenticalToMonotonicClock());
   }
 
   // Synchronization may be needed.

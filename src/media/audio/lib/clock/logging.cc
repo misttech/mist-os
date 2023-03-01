@@ -18,8 +18,9 @@ constexpr bool kLogClockAdjustment = true;
 constexpr bool kLogClockAdjustmentWithPidCoefficients = false;
 // Within LogCLockAdjustment, log every kLogClockAdjustmentStride or if the position error
 // exceeds kLogClockAdjustmentPositionErrorThreshold.
-constexpr int64_t kLogClockAdjustmentStride = 97;  // make strides prime, to avoid periodicity
+constexpr int64_t kLogClockAdjustmentStride = 197;  // prime, to avoid periodicity
 constexpr zx::duration kLogClockAdjustmentPositionErrorThreshold = zx::nsec(500);
+constexpr int64_t kLogClockAdjustmentRateChangeThresholdPpm = 500;
 }  // namespace
 
 void LogClockAdjustment(const Clock& clock, std::optional<int32_t> last_rate_ppm,
@@ -31,9 +32,11 @@ void LogClockAdjustment(const Clock& clock, std::optional<int32_t> last_rate_ppm
 
   static std::atomic<int64_t> log_count(0);
 
-  // If absolute error is large enough, then log now but reset our stride.
+  // If absolute error or rate change is large enough, then log now but reset our stride.
   bool always_log = false;
-  if (std::abs(pos_error.to_nsecs()) >= kLogClockAdjustmentPositionErrorThreshold.to_nsecs()) {
+  if (std::abs(pos_error.to_nsecs()) >= kLogClockAdjustmentPositionErrorThreshold.to_nsecs() ||
+      (last_rate_ppm &&
+       std::abs(*last_rate_ppm - next_rate_ppm) >= kLogClockAdjustmentRateChangeThresholdPpm)) {
     log_count.store(1);
     always_log = true;
   }
@@ -42,15 +45,15 @@ void LogClockAdjustment(const Clock& clock, std::optional<int32_t> last_rate_ppm
     std::stringstream os;
     os << (&clock) << " " << clock.name();
     if (!last_rate_ppm) {
-      os << " set to (ppm)              " << std::setw(4) << next_rate_ppm;
+      os << " set to (ppm)               " << std::setw(5) << next_rate_ppm;
     } else if (next_rate_ppm != *last_rate_ppm) {
-      os << " change from (ppm) " << std::setw(4) << *last_rate_ppm << " to " << std::setw(4)
+      os << " change from (ppm) " << std::setw(5) << *last_rate_ppm << " to " << std::setw(5)
          << next_rate_ppm;
     } else {
-      os << " adjust_ppm remains  (ppm) " << std::setw(4) << *last_rate_ppm;
-      if constexpr (kLogClockAdjustmentWithPidCoefficients) {
-        os << "; PID " << pid;
-      }
+      os << " adjust_ppm remains (ppm)   " << std::setw(5) << *last_rate_ppm;
+    }
+    if constexpr (kLogClockAdjustmentWithPidCoefficients) {
+      os << "; PID " << pid;
     }
     os << "; src_pos_err " << pos_error.to_nsecs() << " ns";
     FX_LOGS(INFO) << os.str();

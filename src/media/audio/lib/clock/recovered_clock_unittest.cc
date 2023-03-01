@@ -55,6 +55,7 @@ TEST(RecoveredClockTest, Tune) {
   recovered->Update(realm->now(), 1);
   EXPECT_EQ(recovered->to_clock_mono(), TimelineFunction(20, 20, 1'000'000, 999'990));
   EXPECT_EQ(recovered->to_clock_mono(), backing->to_clock_mono());
+  EXPECT_EQ(recovered->rate_adjustment_ppm(), -10);
 }
 
 }  // namespace media_audio

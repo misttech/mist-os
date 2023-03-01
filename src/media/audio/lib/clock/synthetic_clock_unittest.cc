@@ -89,6 +89,7 @@ TEST(SyntheticClockTest, SetTimeAndRate) {
   clock->SetRate(1000);
   EXPECT_EQ(clock->to_clock_mono_snapshot().generation, 1);
   EXPECT_EQ(clock->to_clock_mono(), TimelineFunction(m1.get(), m1.get(), 1000, 1001));
+  EXPECT_EQ(clock->rate_adjustment_ppm(), 1000);
   EXPECT_FALSE(clock->IdenticalToMonotonicClock());
 
   // Reference clock advances by 1.001 seconds over the next second.
@@ -102,6 +103,7 @@ TEST(SyntheticClockTest, SetTimeAndRate) {
   clock->SetRate(-1000);
   EXPECT_EQ(clock->to_clock_mono_snapshot().generation, 2);
   EXPECT_EQ(clock->to_clock_mono(), TimelineFunction(m2.get(), r2.get(), 1000, 999));
+  EXPECT_EQ(clock->rate_adjustment_ppm(), -1000);
   EXPECT_FALSE(clock->IdenticalToMonotonicClock());
 
   // Reference clock advances by 0.999 seconds over the next second.

@@ -88,10 +88,12 @@ TEST(RealClockTest, SetRate) {
 
   // Initially should be identical to system monotonic.
   EXPECT_TRUE(clock->IdenticalToMonotonicClock());
+  EXPECT_EQ(clock->rate_adjustment_ppm(), 0);
   EXPECT_EQ(clock->ReferenceTimeFromMonotonicTime(r1), r1);
 
   // Set the rate slower.
   clock->SetRate(-1000);
+  EXPECT_EQ(clock->rate_adjustment_ppm(), -1000);
   {
     auto snapshot = clock->to_clock_mono_snapshot();
     EXPECT_EQ(initial_snapshot.generation + 1, snapshot.generation);
@@ -111,6 +113,7 @@ TEST(RealClockTest, SetRate) {
 
   // Set the rate faster.
   clock->SetRate(1000);
+  EXPECT_EQ(clock->rate_adjustment_ppm(), 1000);
   {
     auto snapshot = clock->to_clock_mono_snapshot();
     EXPECT_EQ(initial_snapshot.generation + 2, snapshot.generation);

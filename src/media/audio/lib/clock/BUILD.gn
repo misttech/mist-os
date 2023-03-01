@@ -60,6 +60,7 @@ executable("unittest_bin") {
   sources = [
     "clock_snapshot_unittest.cc",
     "clock_synchronizer_unittest.cc",
+    "clock_unittest.cc",
     "clone_mono_unittest.cc",
     "pid_control_unittest.cc",
     "real_clock_unittest.cc",
@@ -68,6 +69,7 @@ executable("unittest_bin") {
     "synthetic_clock_realm_unittest.cc",
     "synthetic_clock_unittest.cc",
     "synthetic_timer_unittest.cc",
+    "unadjustable_clock_wrapper_unittest.cc",
     "utils_unittest.cc",
   ]
 

@@ -88,6 +88,13 @@ class Clock {
   // Shorthand for to_clock_mono_snapshot().timeline_function.
   media::TimelineFunction to_clock_mono() const { return to_clock_mono_snapshot().to_clock_mono; }
 
+  // Returns the current clock rate adjustment as integral parts-per-million, rounded. A zx::clock
+  // specifies rate adjustment as parts-per-million, but our Clock object's underlying TimelineRate
+  // is capable of higher precision, so we use a utility function that rounds to nearest integer.
+  int32_t rate_adjustment_ppm() const {
+    return TimelineRateToRateAdjustmentPpm(to_clock_mono().rate().Inverse());
+  }
+
   // Returns the reference time equivalent to the given system monotonic time.
   zx::time ReferenceTimeFromMonotonicTime(zx::time mono_time) const {
     return zx::time(to_clock_mono().ApplyInverse(mono_time.get()));
@@ -103,6 +110,18 @@ class Clock {
     auto to_mono = to_clock_mono();
     return to_mono.subject_time() == to_mono.reference_time() &&
            to_mono.subject_delta() == to_mono.reference_delta();
+  }
+
+  // Converts a TimelineRate to parts-per-million, rounded.
+  static int32_t TimelineRateToRateAdjustmentPpm(const media::TimelineRate& rate) {
+    media::TimelineRate abs_rate_adjustment{
+        std::max(rate.subject_delta(), rate.reference_delta()) -
+            std::min(rate.subject_delta(), rate.reference_delta()),
+        rate.reference_delta()};
+
+    int32_t absolute_rate_ppm =
+        (static_cast<int32_t>(abs_rate_adjustment.Scale(2'000'000)) + 1) / 2;
+    return rate.subject_delta() >= rate.reference_delta() ? absolute_rate_ppm : -absolute_rate_ppm;
   }
 
   // Clamps an integer rate, expressed in parts-per-million, to the range allowed by
