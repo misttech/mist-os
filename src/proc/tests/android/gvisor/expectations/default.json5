@@ -336,7 +336,6 @@
                 "MadviseDontforkTest.DontforkAnonPrivate",
 
                 // memfd_test
-                "MemfdTest.Name",
                 "MemfdTest.SealingDisabledByDefault",
                 "MemfdTest.SealsGetSet",
                 "MemfdTest.SealGrowWithTruncate",

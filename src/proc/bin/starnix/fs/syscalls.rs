@@ -20,6 +20,12 @@ use crate::task::*;
 use crate::types::*;
 use fuchsia_zircon as zx;
 
+/// A memfd file descriptor cannot have a name longer than 250 bytes, including
+/// the null terminator.
+///
+/// See Errors section of https://man7.org/linux/man-pages/man2/memfd_create.2.html
+const MEMFD_NAME_MAX_LEN: usize = 250;
+
 pub fn sys_read(
     current_task: &CurrentTask,
     fd: FdNumber,
@@ -1172,13 +1178,17 @@ pub fn sys_dup3(
 
 pub fn sys_memfd_create(
     current_task: &CurrentTask,
-    _user_name: UserCString,
+    user_name: UserCString,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
     if flags & !MFD_CLOEXEC != 0 {
         not_implemented!(current_task, "memfd_create: flags: {}", flags);
     }
-    let file = new_memfd(current_task, OpenFlags::RDWR)?;
+
+    let mut name = [0u8; MEMFD_NAME_MAX_LEN];
+    let name = current_task.mm.read_c_string(user_name, &mut name)?.to_owned();
+
+    let file = new_memfd(current_task, name, OpenFlags::RDWR)?;
     let mut fd_flags = FdFlags::empty();
     if flags & MFD_CLOEXEC != 0 {
         fd_flags |= FdFlags::CLOEXEC;

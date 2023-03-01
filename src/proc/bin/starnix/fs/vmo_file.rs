@@ -208,8 +208,21 @@ impl FileOps for VmoFileObject {
     }
 }
 
-pub fn new_memfd(current_task: &CurrentTask, flags: OpenFlags) -> Result<FileHandle, Errno> {
+pub fn new_memfd(
+    current_task: &CurrentTask,
+    mut name: FsString,
+    flags: OpenFlags,
+) -> Result<FileHandle, Errno> {
     let fs = anon_fs(current_task.kernel());
     let node = fs.create_node(VmoFileNode::new()?, mode!(IFREG, 0o600), current_task.as_fscred());
-    Ok(FileObject::new_anonymous(node.open(current_task, flags, false)?, node, flags))
+
+    let ops = node.open(current_task, flags, false)?;
+
+    // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
+    let mut local_name = b"/memfd:".to_vec();
+    local_name.append(&mut name);
+
+    let name = NamespaceNode::new_anonymous(DirEntry::new(node, None, local_name));
+
+    Ok(FileObject::new(ops, name, flags))
 }
