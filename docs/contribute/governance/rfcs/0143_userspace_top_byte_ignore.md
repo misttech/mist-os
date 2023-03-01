@@ -144,7 +144,7 @@ significant VA bit before setting debug registers.
 ## Implementation
 
 A boot-option will control whether user address spaces have ARM TBI enabled.
-ARM TBI can be enabled by adding setting the `TBI0` and `TBI1` bits in the
+ARM TBI can be enabled by setting the `TBI0` and `TBI1` bits in the
 translation control register (EL1).
 
 In addition to enabling/disabling TBI, we'll need to make sure existing
