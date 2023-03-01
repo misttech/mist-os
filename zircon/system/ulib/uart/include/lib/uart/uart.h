@@ -295,8 +295,6 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
       // This is normal MMIO.
       io_.emplace<hwreg::RegisterMmio>(ptr);
     }
-    // This is normal MMIO.
-    io_.emplace<hwreg::RegisterMmio>(ptr);
   }
 
   BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size)
