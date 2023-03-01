@@ -320,13 +320,10 @@ static void motmot_uart_dputs(const char* str, size_t len, bool block) {
   }
 }
 
-static void motmot_uart_start_panic() { uart_tx_irq_enabled = false; }
-
 static const struct pdev_uart_ops uart_ops = {
     .getc = motmot_uart_getc,
     .pputc = motmot_uart_pputc,
     .pgetc = motmot_uart_pgetc,
-    .start_panic = motmot_uart_start_panic,
     .dputs = motmot_uart_dputs,
 };
 

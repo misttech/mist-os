@@ -289,13 +289,10 @@ static void pl011_dputs(const char* str, size_t len, bool block) {
   }
 }
 
-static void pl011_start_panic() { uart_tx_irq_enabled = false; }
-
 static const struct pdev_uart_ops uart_ops = {
     .getc = pl011_uart_getc,
     .pputc = pl011_uart_pputc,
     .pgetc = pl011_uart_pgetc,
-    .start_panic = pl011_start_panic,
     .dputs = pl011_dputs,
 };
 

@@ -15,15 +15,12 @@ static void default_pputc(char c) {}
 
 static int default_pgetc() { return ZX_ERR_NOT_SUPPORTED; }
 
-static void default_start_panic() {}
-
 static void default_dputs(const char* str, size_t len, bool block) {}
 
 static const struct pdev_uart_ops default_ops = {
     .getc = default_getc,
     .pputc = default_pputc,
     .pgetc = default_pgetc,
-    .start_panic = default_start_panic,
     .dputs = default_dputs,
 };
 

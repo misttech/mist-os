@@ -21,7 +21,6 @@ struct pdev_uart_ops {
   void (*pputc)(char c);
   int (*pgetc)(void);
 
-  void (*start_panic)(void);
   void (*dputs)(const char* str, size_t len, bool block);
 };
 

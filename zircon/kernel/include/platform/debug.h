@@ -15,7 +15,6 @@
 
 __BEGIN_CDECLS
 
-void platform_debug_panic_start(void);
 void platform_dputs_thread(const char* str, size_t len);
 void platform_dputs_irq(const char* str, size_t len);
 

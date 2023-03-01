@@ -548,13 +548,10 @@ static void imx_uart_dputs(const char* str, size_t len, bool block) {
   }
 }
 
-static void imx_uart_start_panic() { uart_tx_irq_enabled = false; }
-
 static const struct pdev_uart_ops imx_uart_ops = {
     .getc = imx_uart_getc,
     .pputc = imx_uart_pputc,
     .pgetc = imx_uart_pgetc,
-    .start_panic = imx_uart_start_panic,
     .dputs = imx_uart_dputs,
 };
 

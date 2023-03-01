@@ -278,13 +278,10 @@ static void s905_dputs(const char* str, size_t len, bool block) {
   }
 }
 
-static void s905_uart_start_panic() { uart_tx_irq_enabled = false; }
-
 static const struct pdev_uart_ops s905_uart_ops = {
     .getc = s905_uart_getc,
     .pputc = s905_uart_pputc,
     .pgetc = s905_uart_pgetc,
-    .start_panic = s905_uart_start_panic,
     .dputs = s905_dputs,
 };
 

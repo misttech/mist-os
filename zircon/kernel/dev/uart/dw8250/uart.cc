@@ -241,13 +241,10 @@ void Dw8250UartInitLate() {
   uart_tx_irq_enabled = true;
 }
 
-static void dw8250_start_panic() { uart_tx_irq_enabled = false; }
-
 static const struct pdev_uart_ops uart_ops = {
     .getc = dw8250_uart_getc,
     .pputc = dw8250_uart_pputc,
     .pgetc = dw8250_uart_pgetc,
-    .start_panic = dw8250_start_panic,
     .dputs = dw8250_dputs,
 };
 

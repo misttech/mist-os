@@ -460,9 +460,3 @@ int platform_pgetc(char* c) {
   }
   return ZX_ERR_NOT_SUPPORTED;
 }
-
-// Called on start of a panic.
-//
-// When we do Tx buffering, drain the Tx buffer here in polling mode.
-// Turn off Tx interrupts, so force Tx be polling from this point
-void platform_debug_panic_start() { uart_tx_irq_enabled = false; }

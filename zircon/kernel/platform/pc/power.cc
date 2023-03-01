@@ -102,7 +102,6 @@ void platform_halt_cpu(void) {
 
 // TODO(fxbug.dev/98351): Refactor platform_panic_start.
 void platform_panic_start(PanicStartHaltOtherCpus option) {
-  platform_debug_panic_start();
   arch_disable_ints();
   dlog_panic_start();
 
