@@ -1116,7 +1116,7 @@ zx_status_t Imx8mSdmmc::Init(const fuchsia_nxp_sdmmc::wire::SdmmcMetadata& metad
 }
 
 zx_status_t Imx8mSdmmc::Create(void* ctx, zx_device_t* parent) {
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Could not get pdev.");
     return ZX_ERR_NO_RESOURCES;
@@ -1148,7 +1148,7 @@ zx_status_t Imx8mSdmmc::Create(void* ctx, zx_device_t* parent) {
   }
 
   zx::interrupt irq;
-  if ((status = pdev.GetInterrupt(0, &irq)) != ZX_OK) {
+  if ((status = pdev.GetInterrupt(0, 0, &irq)) != ZX_OK) {
     zxlogf(ERROR, "Failed to get interrupt: %s", zx_status_get_string(status));
     return status;
   }
