@@ -33,9 +33,6 @@ pub type Filter = Arc<dyn Fn(&Message) -> bool + Send + Sync>;
 /// messages.
 pub(super) mod messenger {
     use super::MessengerType;
-    use std::collections::HashSet;
-
-    pub type Roles = HashSet<crate::Role>;
 
     /// `Descriptor` is a blueprint for creating a messenger. It is sent to the
     /// MessageHub by clients, which interprets the information to build the

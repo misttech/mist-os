@@ -4,7 +4,7 @@
 
 use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{
-    messenger, ActionSender, Attribution, Audience, Filter, Fingerprint, Message, MessageAction,
+    ActionSender, Attribution, Audience, Filter, Fingerprint, Message, MessageAction,
     MessageClientId, MessageError, MessageType, MessengerAction, MessengerId, MessengerType,
     Signature, Status,
 };
@@ -61,12 +61,8 @@ pub struct MessageHub {
     /// Address mapping for looking up messengers. Used for sending messages
     /// to an addressable recipient.
     addresses: HashMap<crate::Address, MessengerId>,
-    /// MessengerId mapping to roles. This mapping allows the `MessageHub`
-    /// to remove a messenger from role memberships upon removal.
-    messengers: HashMap<MessengerId, messenger::Roles>,
-    /// Role mapping for looking up which messengers belong to a particular
-    /// role.
-    roles: HashMap<crate::Role, HashSet<MessengerId>>,
+    /// Set of messengers acting as event sinks.
+    sinks: HashSet<MessengerId>,
     /// Mapping of registered messengers (including brokers) to beacons. Used for
     /// delivering messages from a resolved address or a list of participants.
     beacons: HashMap<MessengerId, Beacon>,
@@ -98,8 +94,7 @@ impl MessageHub {
             action_tx,
             beacons: HashMap::new(),
             addresses: HashMap::new(),
-            messengers: HashMap::new(),
-            roles: HashMap::new(),
+            sinks: HashSet::new(),
             brokers: Vec::new(),
             messenger_channel_closed: false,
             exit_tx,
@@ -382,10 +377,9 @@ impl MessageHub {
                     return Err(format_err!("could not resolve address"));
                 }
             }
-            Audience::Role(role) => {
-                if let Some(messengers) = self.roles.get(role) {
-                    return_set.extend(messengers);
-                }
+            Audience::Role(_) => {
+                // NB: The only supporte role is the event sink role.
+                return_set.extend(self.sinks.iter());
             }
             Audience::Messenger(signature) => {
                 delivery_required = true;
@@ -482,14 +476,10 @@ impl MessageHub {
                 }
 
                 // Track roles
-                let mut roles = HashSet::new();
-                if let Some(role) = &messenger_descriptor.role {
-                    let _ = self.roles.entry(*role).or_insert_with(HashSet::new).insert(id);
-                    let _ = roles.insert(*role);
+                if messenger_descriptor.role.is_some() {
+                    // NB: The only role is the event sink type.
+                    let _ = self.sinks.insert(id);
                 }
-
-                // Update descriptor mapping and role records
-                let _ = self.messengers.insert(id, roles);
 
                 let response_result =
                     responder.send(Ok((MessengerClient::new(messenger, fuse), receptor)));
@@ -520,19 +510,7 @@ impl MessageHub {
         let id = self.resolve_messenger_id(&signature).expect("messenger should be present");
 
         // Clean up roles
-        if let Some(roles) = self.messengers.remove(&id) {
-            for role in roles {
-                // Remove messenger from each role it belongs to. Remove the
-                // role as well if it no longer has any members.
-                if let Some(messengers) = self.roles.get_mut(&role) {
-                    let _ = messengers.remove(&id);
-
-                    if messengers.is_empty() {
-                        let _ = self.roles.remove(&role);
-                    }
-                }
-            }
-        }
+        let _ = self.sinks.remove(&id);
 
         // These are all safe if the containers don't contain any items matching `id`.
         let _ = self.beacons.remove(&id);
