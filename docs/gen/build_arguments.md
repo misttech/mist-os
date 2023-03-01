@@ -2663,7 +2663,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:145
+From //zircon/kernel/params.gni:148
 
 ### enable_mdns_trace
 
@@ -2693,7 +2693,7 @@ appropriate netstack package based on the combination of netstack3
 
 **Current value (from the default):** `false`
 
-From //src/connectivity/network/BUILD.gn:18
+From //src/connectivity/network/BUILD.gn:14
 
 ### enable_perfetto_benchmarks
 
@@ -3105,7 +3105,7 @@ From //build/images/args.gni:118
 
 **Current value (from the default):** `"max"`
 
-From //src/media/lib/ffmpeg/BUILD.gn:55
+From //src/media/lib/ffmpeg/BUILD.gn:57
 
 ### ffx_build_dual_mode_plugins_as_subtools
 
@@ -3710,7 +3710,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -4287,6 +4287,14 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 **Current value (from the default):** `[]`
 
 From //zircon/kernel/params.gni:83
+
+### kernel_no_userabi
+
+Build a kernel with no user-space support, for development only.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:130
 
 ### kernel_version_string
 
@@ -5528,7 +5536,7 @@ in testing but disable for production.
 
 **Current value (from the default):** `true`
 
-From //zircon/kernel/params.gni:137
+From //zircon/kernel/params.gni:140
 
 ### partitions_config_contents
 
@@ -7950,7 +7958,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8285,7 +8293,7 @@ option in Product Assembly
 
 **Current value (from the default):** `false`
 
-From //src/connectivity/network/BUILD.gn:12
+From //src/connectivity/network/use_netstack3.gni:11
 
 ### use_new_account_manager
 
@@ -8350,13 +8358,15 @@ won't manage third_party/ffmpeg in this case):
 ```
 mkdir build/secondary/third_party/ffmpeg
 git clone https://fuchsia.googlesource.com/third_party/ffmpeg build/secondary/third_party/ffmpeg
+mkdir third_party/yasm
+git clone https://fuchsia.googlesource.com/third_party/yasm third_party/yasm
 mkdir third_party/ffmpeg/src
 git clone https://chromium.googlesource.com/chromium/third_party/ffmpeg third_party/ffmpeg/src
 ```
 
 **Current value (from the default):** `true`
 
-From //src/media/lib/ffmpeg/BUILD.gn:31
+From //src/media/lib/ffmpeg/BUILD.gn:33
 
 ### use_scene_manager_as_scene_owner
 
