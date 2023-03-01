@@ -193,27 +193,82 @@ class DispatcherBound {
   bool has_value() const { return storage_.has_value(); }
 
  protected:
+  template <typename Task>
+  class [[nodiscard]] AsyncCallBuilder;
+
   // Calls an arbitrary |callable| asynchronously on the |dispatcher_|.
-  template <typename Callable, typename... Args>
+  template <template <typename> typename Builder = AsyncCallBuilder, typename Callable,
+            typename... Args>
   auto UnsafeAsyncCallImpl(Callable&& callable, Args&&... args) {
     using Result = std::invoke_result_t<Callable, T*, Args...>;
     if constexpr (std::is_void_v<Result>) {
       return storage_.AsyncCall<T>(dispatcher_, std::forward<Callable>(callable),
                                    std::forward<Args>(args)...);
     } else {
-      return storage_.AsyncCallWithReply<T>(dispatcher_, std::forward<Callable>(callable),
-                                            std::forward<Args>(args)...);
+      return storage_.AsyncCallWithReply<Builder, T>(dispatcher_, std::forward<Callable>(callable),
+                                                     std::forward<Args>(args)...);
     }
   }
 
- private:
   template <typename... Args>
   constexpr void CheckArgs(fit::parameter_pack<Args...>) {
     internal::CheckArguments<Args...>::Check();
   }
 
+ private:
   async_dispatcher_t* dispatcher_;
   internal::DispatcherBoundStorage storage_;
+};
+
+// The return type of |DispatcherBound<T>::AsyncCall| when the method has a
+// return value. Supports chaining a callback via |Then|.
+template <typename T>
+template <typename Task>
+class [[nodiscard]] DispatcherBound<T>::AsyncCallBuilder {
+ protected:
+  using TaskResult = std::invoke_result_t<Task>;
+
+ public:
+  // Arranges the |on_result| callback to be called with the result of the async
+  // call. See |DispatcherBound<T>::AsyncCall| for documentation.
+  template <typename R>
+  void Then(async_patterns::Callback<R> on_result) && {
+    constexpr bool kReceiverMatchesReturnValue =
+        std::is_invocable_v<decltype(on_result), TaskResult>;
+    static_assert(kReceiverMatchesReturnValue,
+                  "The |async_patterns::Callback<R>| must accept the return value "
+                  "of the |Member| being called.");
+    if constexpr (kReceiverMatchesReturnValue) {
+      Call(std::move(on_result));
+    }
+  }
+
+  AsyncCallBuilder(internal::DispatcherBoundStorage* storage, async_dispatcher_t* dispatcher,
+                   Task task)
+      : storage_(storage), dispatcher_(dispatcher), task_(std::move(task)) {}
+
+  ~AsyncCallBuilder() { ZX_DEBUG_ASSERT(!storage_); }
+
+ protected:
+  template <typename Continuation>
+  void Call(Continuation&& continuation) {
+    ZX_DEBUG_ASSERT(storage_);
+    storage_->CallInternal(dispatcher_, [task = std::move(task_),
+                                         continuation = std::forward<Continuation>(
+                                             continuation)]() mutable { continuation(task()); });
+    storage_ = nullptr;
+  }
+
+ private:
+  AsyncCallBuilder(const AsyncCallBuilder&) = delete;
+  AsyncCallBuilder& operator=(const AsyncCallBuilder&) = delete;
+
+  AsyncCallBuilder(AsyncCallBuilder&&) = delete;
+  AsyncCallBuilder& operator=(AsyncCallBuilder&&) = delete;
+
+  internal::DispatcherBoundStorage* storage_;
+  async_dispatcher_t* dispatcher_;
+  Task task_;
 };
 
 // Constructs a |DispatcherBound<T>| that holds an instance of |T| by sending

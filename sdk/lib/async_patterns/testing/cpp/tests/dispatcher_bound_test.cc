@@ -9,6 +9,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/testing/predicates/status.h"
+
 namespace {
 
 TEST(TestDispatcherBound, SyncCallReturnInt) {
@@ -73,6 +75,31 @@ TEST(TestDispatcherBound, SyncCallWithGeneralLambda) {
   async_patterns::TestDispatcherBound<Object> object{remote_loop.dispatcher(), std::in_place};
   int result = object.SyncCall([num = 2](Object* object) { return object->Get() + num; });
   EXPECT_EQ(result, 3);
+}
+
+TEST(TestDispatcherBound, AsyncCallWithReplyUsingFuture) {
+  class Background {
+   public:
+    explicit Background(std::string base) : base_(std::move(base)) {}
+
+    std::string Concat(const std::string& arg) { return base_ + arg; }
+
+   private:
+    std::string base_;
+  };
+
+  async::Loop background_loop{&kAsyncLoopConfigNeverAttachToThread};
+  async_patterns::TestDispatcherBound<Background> background{background_loop.dispatcher(),
+                                                             std::in_place, std::string("abc")};
+
+  std::future fut = background.AsyncCall(&Background::Concat, std::string("def")).ToFuture();
+  std::chrono::time_point infinite_past = std::chrono::system_clock::time_point::min();
+
+  EXPECT_EQ(std::future_status::timeout, fut.wait_until(infinite_past));
+  // Background loop should process |Concat| and post back the result.
+  ASSERT_OK(background_loop.RunUntilIdle());
+  EXPECT_EQ(std::future_status::ready, fut.wait_until(infinite_past));
+  EXPECT_EQ("abcdef", fut.get());
 }
 
 TEST(TestDispatcherBound, MakeTestDispatcherBound) {

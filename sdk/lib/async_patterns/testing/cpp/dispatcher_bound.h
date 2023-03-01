@@ -9,6 +9,8 @@
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/async_patterns/cpp/receiver.h>
 
+#include <future>
+
 namespace async_patterns {
 
 // |TestDispatcherBound| adds the ability to issue synchronous calls on top of
@@ -20,6 +22,30 @@ template <typename T>
 class TestDispatcherBound final : public DispatcherBound<T> {
  public:
   using DispatcherBound<T>::DispatcherBound;
+
+  // Refer to |DispatcherBound<T>::AsyncCall| for documentation.
+  //
+  // This test version of |AsyncCall| adds the ability to encapsulate the result
+  // of the call into a |std::future<R>|. This way, tests can synchronously block
+  // on that future, leading to more direct code:
+  //
+  //     std::future<std::string> fut = some_dispatcher_bound
+  //         .AsyncCall(&Object::GetSomeString)
+  //         .ToFuture();
+  //
+  template <typename Member, typename... Args>
+  auto AsyncCall(Member T::*member, Args&&... args) {
+    ZX_ASSERT(DispatcherBound<T>::has_value());
+    constexpr bool kIsInvocable = std::is_invocable_v<Member, Args...>;
+    static_assert(kIsInvocable,
+                  "|Member| must be callable with the provided |Args|. "
+                  "Check that you specified each argument correctly to the |member| function.");
+    if constexpr (kIsInvocable) {
+      DispatcherBound<T>::CheckArgs(typename fit::callable_traits<Member>::args{});
+      return DispatcherBound<T>::template UnsafeAsyncCallImpl<TestAsyncCallBuilder>(
+          member, std::forward<Args>(args)...);
+    }
+  }
 
   // Schedules an asynchronous |callable| on |dispatcher| with |args| and then
   // block the caller until the asynchronous call is processed, returning the
@@ -76,8 +102,11 @@ class TestDispatcherBound final : public DispatcherBound<T> {
 
  private:
   template <typename Task>
+  class [[nodiscard]] TestAsyncCallBuilder;
+
+  template <typename Task>
   std::invoke_result_t<Task> BlockOn(
-      async_patterns::internal::DispatcherBoundStorage::AsyncCallBuilder<Task>&& builder) {
+      typename async_patterns::DispatcherBound<T>::template AsyncCallBuilder<Task>&& builder) {
     using R = std::invoke_result_t<Task>;
     struct Slot {
       async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
@@ -91,6 +120,37 @@ class TestDispatcherBound final : public DispatcherBound<T> {
     ZX_ASSERT(slot.loop.Run() == ZX_ERR_CANCELED);
     return std::move(slot.result.value());
   }
+};
+
+// The return type of |TestDispatcherBound<T>::AsyncCall| when the method has a
+// return value. Supports chaining a callback via |Then|, or transforming to a
+// |std::future|.
+template <typename T>
+template <typename Task>
+class [[nodiscard]] TestDispatcherBound<T>::TestAsyncCallBuilder
+    : public DispatcherBound<T>::template AsyncCallBuilder<Task> {
+ private:
+  using Base = typename DispatcherBound<T>::template AsyncCallBuilder<Task>;
+  using TaskResult = typename Base::TaskResult;
+
+ public:
+  // Arranges the |on_result| callback to be called with the result of the async
+  // call. See |DispatcherBound<T>::AsyncCall| for documentation.
+  using Base::Then;
+
+  // Gets a |std::future| that will resolve with the return value of the
+  // async call. Because one needs to block on an |std::future| to obtain its
+  // value, this function is only for use in tests. Use |Then| and attach a
+  // |Callback| in production code instead.
+  std::future<TaskResult> ToFuture() && {
+    std::promise<TaskResult> promise;
+    std::future<TaskResult> fut = promise.get_future();
+    Base::Call(
+        [promise = std::move(promise)](TaskResult r) mutable { promise.set_value(std::move(r)); });
+    return fut;
+  }
+
+  using Base::Base;
 };
 
 // Constructs a |TestDispatcherBound<T>| that holds an instance of |T| by sending

@@ -71,44 +71,7 @@ class DispatcherBoundStorage final {
                                 std::forward<Args>(args)...));
   }
 
-  template <typename Task>
-  class [[nodiscard]] AsyncCallBuilder {
-   public:
-    template <typename R>
-    void Then(async_patterns::Callback<R> on_result) && {
-      ZX_DEBUG_ASSERT(storage_);
-      constexpr bool kReceiverMatchesReturnValue =
-          std::is_invocable_v<decltype(on_result), std::invoke_result_t<Task>>;
-      static_assert(kReceiverMatchesReturnValue,
-                    "The |async_patterns::Callback<R>| must accept the return value "
-                    "of the |Member| being called.");
-      if constexpr (kReceiverMatchesReturnValue) {
-        storage_->CallInternal(
-            dispatcher_, [task = std::move(task_), on_result = std::move(on_result)]() mutable {
-              on_result(task());
-            });
-        storage_ = nullptr;
-      }
-    }
-
-    AsyncCallBuilder(DispatcherBoundStorage* storage, async_dispatcher_t* dispatcher, Task task)
-        : storage_(storage), dispatcher_(dispatcher), task_(std::move(task)) {}
-
-    ~AsyncCallBuilder() { ZX_DEBUG_ASSERT(!storage_); }
-
-    AsyncCallBuilder(const AsyncCallBuilder&) = delete;
-    AsyncCallBuilder& operator=(const AsyncCallBuilder&) = delete;
-
-    AsyncCallBuilder(AsyncCallBuilder&&) = delete;
-    AsyncCallBuilder& operator=(AsyncCallBuilder&&) = delete;
-
-   private:
-    DispatcherBoundStorage* storage_;
-    async_dispatcher_t* dispatcher_;
-    Task task_;
-  };
-
-  template <typename T, typename Callable, typename... Args>
+  template <template <typename> typename Builder, typename T, typename Callable, typename... Args>
   auto AsyncCallWithReply(async_dispatcher_t* dispatcher, Callable&& callable, Args&&... args) {
     void* raw_ptr = op_fn_(Operation::kGetPointer);
     T* ptr = static_cast<T*>(raw_ptr);
@@ -116,14 +79,13 @@ class DispatcherBoundStorage final {
       return BindForSending(cpp20::bind_front(std::forward<Callable>(callable), ptr),
                             std::forward<Args>(args)...);
     };
-    return AsyncCallBuilder<decltype(make_task())>(this, dispatcher, make_task());
+    return Builder<decltype(make_task())>(this, dispatcher, make_task());
   }
 
   // Asynchronously destructs the object that was constructed earlier in
   // |Construct|.
   void Destruct(async_dispatcher_t* dispatcher);
 
- private:
   enum class Operation {
     kDestruct,
     kGetPointer,
@@ -132,6 +94,7 @@ class DispatcherBoundStorage final {
   static void ConstructInternal(async_dispatcher_t* dispatcher, fit::callback<void()> task);
   void CallInternal(async_dispatcher_t* dispatcher, fit::callback<void()> member);
 
+ private:
   // |op_fn_| type-erases the managed object so |DispatcherBoundStorage| avoids
   // template bloat. See |DispatcherBoundStorage::Construct|.
   //
