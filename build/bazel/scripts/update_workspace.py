@@ -278,6 +278,16 @@ def md5_all_files(paths):
 
 
 def all_sdk_metas(sdk_root):
+    """Collect all SDK metadata files from a given exported SDK.
+
+    Args:
+        sdk_root: Path to an exported SDK directory, e.g.
+            $NINJA_OUTPUT_DIR/sdk/exported/core.
+
+    Returns:
+        A list of file paths for all metadata files that belong
+        to this SDK instance.
+    """
     sdk_manifest_path = os.path.join(sdk_root, 'meta', 'manifest.json')
     if not os.path.exists(sdk_manifest_path):
         # The manifest does not exist yet, which happens when this script
@@ -289,6 +299,20 @@ def all_sdk_metas(sdk_root):
         os.path.join(sdk_root, part["meta"]) for part in sdk_manifest["parts"]
     ]
     return [sdk_manifest_path] + part_metas
+
+
+def find_clang_content_files(clang_install_dir):
+    """Return a list of content hashing input files for Clang."""
+    version_file = os.path.join(
+        clang_install_dir, '.versions', 'clang.cipd_version')
+    if os.path.exists(version_file):
+        return [version_file]
+
+    # This directory does not come from CIPD, this can happen when
+    # experimenting with local Clang installation. Return the path of the
+    # main Clang binary, hoping its unique hash will differ between different
+    # releases of the whole toolchain.
+    return [os.path.join(clang_install_bin, 'bin', 'clang')]
 
 
 class GeneratedFiles(object):
@@ -345,6 +369,7 @@ class GeneratedFiles(object):
                 force_symlink(target_path, link_path)
             elif type == "file":
                 file_path = os.path.join(out_dir, path)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 with open(file_path, 'w') as f:
                     f.write(entry["content"])
                 if entry.get("executable", False):
@@ -543,10 +568,10 @@ def main():
             return f.read().format(**kwargs)
 
     def write_workspace_file(path, content):
-        generated.add_file('workspace/' + path, content)
+        generated.add_file(os.path.join('workspace', path), content)
 
     def create_workspace_symlink(path, target_path):
-        generated.add_symlink('workspace/' + path, target_path)
+        generated.add_symlink(os.path.join('workspace', path), target_path)
 
     script_path = os.path.relpath(__file__, fuchsia_dir)
 
@@ -554,16 +579,16 @@ def main():
 
     if args.use_bzlmod:
         generated.add_file(
-            'workspace/WORKSPACE.bazel',
+            os.path.join('workspace', 'WORKSPACE.bazel'),
             '# Empty on purpose, see MODULE.bazel\n')
 
         generated.add_symlink(
-            'workspace/WORKSPACE.bzlmod',
+            os.path, join('workspace', 'WORKSPACE.bzlmod'),
             os.path.join(
                 fuchsia_dir, 'build', 'bazel', 'toplevel.WORKSPACE.bzlmod'))
 
         generated.add_symlink(
-            'workspace/MODULE.bazel',
+            os.path.join('workspace', 'MODULE.bazel'),
             os.path.join(
                 fuchsia_dir, 'build', 'bazel', 'toplevel.MODULE.bazel'))
     else:
@@ -575,7 +600,7 @@ def main():
             ninja_output_dir=os.path.relpath(gn_output_dir, workspace_dir),
         )
         generated.add_file(
-            'workspace/WORKSPACE.bazel',
+            os.path.join('workspace', 'WORKSPACE.bazel'),
             workspace_content,
         )
 
@@ -596,7 +621,7 @@ def main():
     generated.add_top_entries(fuchsia_dir, 'workspace', excluded_file)
 
     generated.add_symlink(
-        'workspace/BUILD.bazel',
+        os.path.join('workspace', 'BUILD.bazel'),
         os.path.join(fuchsia_dir, 'build', 'bazel', 'toplevel.BUILD.bazel'))
 
     # The top-level .git directory must be symlinked because some actions actually
@@ -636,7 +661,8 @@ block *
     fuchsia_build_config_content = expand_template_file(
         'template.fuchsia_build_config.bzl', **build_config)
     generated.add_file(
-        'workspace/fuchsia_build_config.bzl', fuchsia_build_config_content)
+        os.path.join('workspace', 'fuchsia_build_config.bzl'),
+        fuchsia_build_config_content)
 
     # Generate a platform mapping file to ensure that using --platforms=<value>
     # also sets --cpu properly, as required by the Bazel SDK rules. See comments
@@ -650,7 +676,9 @@ block *
         host_cpu=host_cpu,
         bazel_host_cpu=_BAZEL_CPU_MAP[host_cpu],
     )
-    generated.add_file('workspace/platform_mappings', platform_mappings_content)
+    generated.add_file(
+        os.path.join('workspace', 'platform_mappings'),
+        platform_mappings_content)
 
     # Generate the content of .bazelrc
     bazelrc_content = expand_template_file(
@@ -667,13 +695,13 @@ block *
 # Enable BlzMod, i.e. support for MODULE.bazel files.
 common --experimental_enable_bzlmod
 '''
-    generated.add_file('workspace/.bazelrc', bazelrc_content)
+    generated.add_file(os.path.join('workspace', '.bazelrc'), bazelrc_content)
 
     # Create a symlink to the GN-generated file that will contain the list
     # of @legacy_ninja_build_outputs entries. This file is generated by the
     # GN target //build/bazel:legacy_ninja_build_outputs.
     generated.add_symlink(
-        'workspace/bazel_inputs_manifest.json',
+        os.path.join('workspace', 'bazel_inputs_manifest.json'),
         os.path.join(
             workspace_dir, '..',
             'legacy_ninja_build_outputs.inputs_manifest.json'))
@@ -696,29 +724,74 @@ common --experimental_enable_bzlmod
     # Ensure regeneration when this script's content changes!
     generated.add_file_hash(os.path.abspath(__file__))
 
-    # Create hash files to capture current state of locally generated SDKs.
+    # Create hash files to capture current state of locally generated repositories.
+    # This is important for bazel_action.py which will also use these to
+    # fix implicit dependency paths (see comments in this script for details).
+    #
+    # In this case $BAZEL_TOPDIR/workspace/generated_repository_hashes/<repo_name>
+    # is a file that contains a single hexadecimal content hash corresponding to
+    # the input files that were used to generate its content (except for symlinks
+    # to input files outside of the Bazel topdir).
+    #
+    generated_repositories_inputs = {}
+
+    # Content hash file for @fuchsia_sdk.
     sdk_root = os.path.join(gn_output_dir, 'sdk', 'exported')
-
     all_core_sdk_metas = all_sdk_metas(os.path.join(sdk_root, 'core'))
-    fuchsia_sdk_hash = os.path.join('workspace', 'fuchsia_sdk_hash')
-    generated.add_file(fuchsia_sdk_hash, md5_all_files(all_core_sdk_metas))
-    if args.depfile:
-        out = os.path.relpath(
-            os.path.join(topdir, fuchsia_sdk_hash), gn_output_dir)
-        ins = ' '.join(
-            os.path.relpath(p, gn_output_dir) for p in all_core_sdk_metas)
-        args.depfile.write(f'{out}: {ins}\n')
 
+    # Content hash file for @internal_sdk
     all_internal_part_metas = all_sdk_metas(os.path.join(sdk_root, 'platform'))
-    internal_sdk_hash = os.path.join('workspace', 'internal_sdk_hash')
-    generated.add_file(
-        internal_sdk_hash, md5_all_files(all_internal_part_metas))
-    if args.depfile:
-        out = os.path.relpath(
-            os.path.join(topdir, internal_sdk_hash), gn_output_dir)
-        ins = ' '.join(
-            os.path.relpath(p, gn_output_dir) for p in all_internal_part_metas)
-        args.depfile.write(f'{out}: {ins}\n')
+
+    # Content hash file for @prebuilt_clang, fuchsia_clang, keep in sync with
+    # generate_prebuilt_clang_toolchain_repository() in
+    # //build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/fuchsia_clang_repository.bzl
+    clang_content_files = find_clang_content_files(
+        os.path.join(fuchsia_dir, 'prebuilt', 'third_party', 'clang', host_tag))
+
+    rules_fuchsia_dir = os.path.join(
+        fuchsia_dir, 'build', 'bazel_sdk', 'bazel_rules_fuchsia')
+
+    fuchsia_clang_content_files = clang_content_files + [
+        os.path.join(
+            rules_fuchsia_dir, 'fuchsia', 'workspace', 'clang_templates',
+            'defs.bzl'),
+        os.path.join(
+            rules_fuchsia_dir, 'fuchsia', 'workspace', 'clang_templates',
+            'cc_toolchain_config_template.bzl'),
+        os.path.join(
+            rules_fuchsia_dir, 'fuchsia', 'workspace', 'clang_templates',
+            'crosstool_template.BUILD'),
+    ]
+
+    googletest_content_files = [
+        os.path.join(
+            fuchsia_dir, 'third_party', 'googletest', 'src', '.git', 'HEAD'),
+        os.path.join(
+            fuchsia_dir, 'build', 'bazel', 'patches', 'googletest',
+            'fuchsia-support.bundle'),
+    ]
+
+    # LINT.IfChange
+    generated_repositories_inputs['fuchsia_sdk'] = all_core_sdk_metas
+    generated_repositories_inputs['internal_sdk'] = all_internal_part_metas
+    generated_repositories_inputs['fuchsia_clang'] = fuchsia_clang_content_files
+    generated_repositories_inputs['prebuilt_clang'] = clang_content_files
+    generated_repositories_inputs[
+        'com_google_googletest'] = googletest_content_files
+    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+    # LINT.ThenChange(../BUILD.gn)
+
+    for repo_name in sorted(generated_repositories_inputs.keys()):
+        repo_inputs = generated_repositories_inputs[repo_name]
+        repo_hash_file = os.path.join(
+            'workspace', 'generated_repository_hashes', repo_name + '.hash')
+        generated.add_file(repo_hash_file, md5_all_files(repo_inputs))
+        if args.depfile:
+            out = os.path.relpath(
+                os.path.join(topdir, repo_hash_file), gn_output_dir)
+            ins = ' '.join(
+                os.path.relpath(p, gn_output_dir) for p in repo_inputs)
+            args.depfile.write(f'{out}: {ins}\n')
 
     force = args.force
     generated_json = generated.to_json()

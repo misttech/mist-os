@@ -169,6 +169,8 @@ template("bazel_action") {
       "//.git/index",
     ]
 
+    depfile = "$target_gen_dir/$target_name.d"
+
     outputs = _outputs
     args = [
              "--bazel-launcher",
@@ -182,7 +184,15 @@ template("bazel_action") {
              "--bazel-inputs",
            ] + _inputs + [ "--bazel-outputs" ] + invoker.bazel_outputs +
            [ "--bazel-targets" ] + invoker.bazel_targets +
-           [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir)
+           [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
+           [
+             "--fuchsia-dir",
+             rebase_path("//", root_build_dir),
+             "--depfile",
+             rebase_path(depfile, root_build_dir),
+           ]
+
+    args += [ "--" ]
 
     # Ensure that the default platform is set correctly when this build action
     # is invoked from a Fuchsia or host toolchain. For other ones. Other toolchains
@@ -190,13 +200,10 @@ template("bazel_action") {
     # //build/bazel/platforms:common in the future, and does not target any
     # specific system intentionally.
     if (is_host || is_fuchsia) {
-      args += [
-        "--bazel-platform",
-        "//build/bazel/platforms:${current_os}_${current_cpu}",
-      ]
+      args +=
+          [ "--platforms=//build/bazel/platforms:${current_os}_${current_cpu}" ]
     }
 
-    args += [ "--" ]
     if (bazel_quiet) {
       args += [ "--config=quiet" ]
     }

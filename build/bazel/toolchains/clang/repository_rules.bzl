@@ -28,18 +28,19 @@ def _generate_prebuilt_clang_toolchain_impl(repo_ctx):
     # Symlink the content of the clang installation directory into
     # the repository directory.
 
-    # Resolve full path of script before executing it, this ensures that the repository
-    # rule will be re-run everytime the invoked script is modified.
-    script_path = str(repo_ctx.path(Label("@//:build/bazel/scripts/symlink-directory.py")))
+    # Symlink top-level items from Clang prebuilt install to repository directory
+    # Note that this is possible because our C++ toolchain configuration redefine
+    # the "dependency_file" feature to use relative file paths.
+    clang_install_path = repo_ctx.path(workspace_dir + "/" + repo_ctx.attr.clang_install_dir)
+    for f in clang_install_path.readdir():
+        repo_ctx.symlink(f, f.basename)
 
-    repo_ctx.execute(
-        [
-            script_path,
-            repo_ctx.attr.clang_install_dir,
-            ".",
-        ],
-        quiet = False,  # False for debugging!
-    )
+    if hasattr(repo_ctx.attr, "repository_version_file"):
+        # Force Bazel to record an association with this file, if it is provided.
+        # If its content changes (for example after a `jiri update` that modifies
+        # the toolchain directory), this Bazel repository will be automatically
+        # re-generated.
+        repo_ctx.path(workspace_dir + "/" + repo_ctx.attr.repository_version_file)
 
     # Extract the builtin include paths by running the executable once.
     # Only care about C++ include paths. The list for compiling C is actually
@@ -89,7 +90,14 @@ constants = struct(
 generate_prebuilt_clang_toolchain_repository = repository_rule(
     implementation = _generate_prebuilt_clang_toolchain_impl,
     attrs = {
-        "clang_install_dir": attr.string(mandatory = True),
+        "clang_install_dir": attr.string(
+            doc = "Clang installation directory, relative to workspace root.",
+            mandatory = True,
+        ),
+        "repository_version_file": attr.string(
+            doc = "Clang toolchain content identification file, relative to workspace root.",
+            mandatory = False,
+        ),
     },
 )
 
