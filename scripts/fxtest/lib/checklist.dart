@@ -49,6 +49,18 @@ class PreChecker implements Checklist {
     if (!isPackageServerRunning) {
       return false;
     }
+
+    // check for a running incremental publisher
+    bool isIncrementalPublisherRunning = await fxCommandRunWithIO(
+      eventSink,
+      testsConfig.wrapWith,
+      testsConfig.fxEnv.fx,
+      'is-incremental-publisher-running',
+    ).then((process) => process.exitCode).then((exitCode) => exitCode == 0);
+    if (!isIncrementalPublisherRunning) {
+      return false;
+    }
+
     if (testsConfig.flags.shouldUpdateIfInBase) {
       // if any test is on base, perform an OTA first
       Iterable<String> allTestNames = testBundles

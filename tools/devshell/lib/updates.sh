@@ -212,6 +212,24 @@ function check-for-package-server {
   return 0
 }
 
+function check-for-incremental-publisher {
+  if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
+    if [[ -z $(pgrep -f "package-tool repository publish $(fx get-build-dir)/amber-files --watch") ]]; then
+      fx-error "It looks like the incremental publisher is not running."
+      fx-error "You probably need to start \"fx --enable=incremental serve\""
+      return 1
+    fi
+  elif is_feature_enabled "incremental_legacy"; then
+    if [[ -z $(pgrep -f "pm serve .* -p all_package_manifests.list") ]]; then
+      fx-error "It looks like the incremental publisher is not running."
+      fx-error "You probably need to start \"fx --enable=incremental_legacy serve\""
+      return 1
+    fi
+  else
+    return 0
+  fi
+}
+
 function is-listening-on-port {
   local port=$1
 
