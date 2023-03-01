@@ -15,35 +15,30 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if let FeatureSupportLevel::Minimal = context.feature_set_level {
-            let mut requires_netstack3 = false;
-            if let Some(board_info) = context.board_info {
-                let has_fullmac = board_info.provides_feature("fuchsia::wlan_fullmac");
-                let has_softmac = board_info.provides_feature("fuchsia::wlan_softmac");
-                if has_fullmac || has_softmac {
-                    builder.platform_bundle("wlan_base");
-                    // Some products require legacy security types to be supported.
-                    // Otherwise, they are disabled by default.
-                    if connectivity_config.wlan.legacy_privacy_support {
-                        builder.platform_bundle("wlan_legacy_privacy_support");
-                    } else {
-                        builder.platform_bundle("wlan_contemporary_privacy_only_support");
-                    }
-
-                    if has_fullmac {
-                        builder.platform_bundle("wlan_fullmac_support");
-                    }
-                    if has_softmac {
-                        builder.platform_bundle("wlan_softmac_support");
-                    }
+            let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
+            let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
+            if has_fullmac || has_softmac {
+                builder.platform_bundle("wlan_base");
+                // Some products require legacy security types to be supported.
+                // Otherwise, they are disabled by default.
+                if connectivity_config.wlan.legacy_privacy_support {
+                    builder.platform_bundle("wlan_legacy_privacy_support");
+                } else {
+                    builder.platform_bundle("wlan_contemporary_privacy_only_support");
                 }
 
-                if board_info.provides_feature("fuchsia::network_require_netstack3") {
-                    requires_netstack3 = true;
+                if has_fullmac {
+                    builder.platform_bundle("wlan_fullmac_support");
+                }
+                if has_softmac {
+                    builder.platform_bundle("wlan_softmac_support");
                 }
             }
 
             let PlatformNetworkConfig { force_netstack3 } = connectivity_config.network;
-            if requires_netstack3 || force_netstack3 {
+            if context.board_info.provides_feature("fuchsia::network_require_netstack3")
+                || force_netstack3
+            {
                 builder.platform_bundle("netstack3");
             } else {
                 builder.platform_bundle("netstack2");
