@@ -150,7 +150,7 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
   // Look up the CPU version.
   uint32_t cpu_version_packed = 0;
   {
-    ddk::PDev pdev_client = ddk::PDev::FromFragment(parent);
+    ddk::PDevFidl pdev_client = ddk::PDevFidl::FromFragment(parent);
     if (!pdev_client.is_valid()) {
       return ZX_ERR_INTERNAL;
     }
