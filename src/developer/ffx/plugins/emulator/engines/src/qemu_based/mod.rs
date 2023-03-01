@@ -24,7 +24,7 @@ use ffx_emulator_common::{
     config,
     config::EMU_START_TIMEOUT,
     dump_log_to_out, host_is_mac, process,
-    target::{add_target, is_active, remove_target, TargetAddress},
+    target::is_active,
     tuntap::{tap_ready, TAP_INTERFACE_NAME},
 };
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
@@ -433,21 +433,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             .await
             .context("Failed to write the emulation configuration file to disk.")?;
 
-        let ssh = self.emu_config().host.port_map.get("ssh");
-        let ssh_port = if let Some(ssh) = ssh { ssh.host } else { None };
-        if self.emu_config().host.networking == NetworkingMode::User {
-            // We only need to do this if we're running in user net mode.
-            let timeout = self.emu_config().runtime.startup_timeout;
-            if let Some(ssh_port) = ssh_port {
-                let local_ip = TargetAddress::Loopback;
-
-                // TODO(fxbug.dev/114597): Remove manually added target when obsolete.
-                add_target(proxy, local_ip, ssh_port, timeout)
-                    .await
-                    .context("Failed to add the emulator to the ffx target collection.")?;
-            }
-        }
-
         if self.emu_config().runtime.debugger {
             println!("The emulator will wait for a debugger to attach before starting up.");
             println!("Attach to process {} to continue launching the emulator.", self.get_pid());
@@ -465,11 +450,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     return Ok(0);
                 }
                 Err(e) => {
-                    let name = &self.emu_config().runtime.name;
-                    if let Err(e) = remove_target(proxy, name).await {
-                        // Even if we can't remove it, still continue shutting down.
-                        tracing::warn!("Couldn't remove target from ffx during shutdown: {:?}", e);
-                    }
                     if let Some(stop_error) = self.stop_emulator().await.err() {
                         tracing::debug!(
                             "Error encountered in stop when handling failed launch: {:?}",
@@ -515,22 +495,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                             Ok(_) => (),
                             Err(e) => eprintln!("Couldn't print the log: {:?}", e),
                         };
-                        if self.emu_config().host.networking == NetworkingMode::User {
-                            // We only need to do this if we're running in user net mode.
-                            if let Some(ssh_port) = ssh_port {
-                                // TODO(fxbug.dev/114597): Remove manually added target when obsolete.
-                                if let Err(e) =
-                                    remove_target(proxy, &format!("127.0.0.1:{}", ssh_port)).await
-                                {
-                                    // A failure here probably means it was never added.
-                                    // Just log the error and quit.
-                                    tracing::warn!(
-                                        "Couldn't remove target from ffx during shutdown: {:?}",
-                                        e
-                                    );
-                                }
-                            }
-                        }
 
                         self.set_engine_state(EngineState::Staged);
                         self.save_to_disk()

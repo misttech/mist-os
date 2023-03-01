@@ -60,7 +60,7 @@ pub trait EmulatorEngine: Send + Sync {
     /// will terminate a running emulator instance, which will be specified on the command line. It
     /// may return an error if the instance doesn't exist or the shut down fails, but should succeed
     /// if it's no longer running or gets successfully shut down.
-    async fn stop(&mut self, _proxy: &ffx::TargetCollectionProxy) -> Result<()> {
+    async fn stop(&mut self) -> Result<()> {
         let bt = Backtrace::force_capture();
         unimplemented!(
             "These default trait implementations are to allow for easier testing and \

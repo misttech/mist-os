@@ -8,10 +8,9 @@ use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_emulator_commands::{get_engine_by_name, EngineOption};
 use ffx_emulator_stop_args::StopCommand;
-use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 
-#[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
-pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> {
+#[ffx_plugin()]
+pub async fn stop(cmd: StopCommand) -> Result<()> {
     let mut names = vec![cmd.name];
     if cmd.all {
         names = match get_all_instances().await {
@@ -43,7 +42,7 @@ pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> 
             }
             Ok(EngineOption::DoesExist(mut engine)) => {
                 println!("Stopping emulator '{}'...", name);
-                if let Err(e) = engine.stop(&proxy).await {
+                if let Err(e) = engine.stop().await {
                     eprintln!("Failed with the following error: {:?}", e);
                 }
             }
