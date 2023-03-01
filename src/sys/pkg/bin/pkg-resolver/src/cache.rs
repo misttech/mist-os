@@ -113,39 +113,52 @@ pub async fn cache_package<'a>(
             .map_err(|e| CacheError::FetchMetaFar(e, merkle))?;
 
         let mut fetches = FuturesUnordered::new();
-        let mut missing_blobs = get.get_missing_blobs();
-        while let Some(chunk) = missing_blobs.try_next().await? {
-            #[allow(clippy::needless_collect)]
-            // Not sure if this collect is significant -- without it, the
-            // compiler believes we are double-borrowing |get|.
-            let chunk = chunk
-                .into_iter()
-                .map(|need| {
-                    (
-                        need.blob_id,
-                        FetchBlobContext {
-                            opener: get.make_open_blob(need.blob_id),
-                            mirrors: Arc::clone(&mirrors),
-                            expected_len: None,
-                            use_local_mirror: config.use_local_mirror(),
-                            parent_trace_id: trace_id,
-                        },
-                    )
-                })
-                .collect::<Vec<_>>();
-            let () = fetches.extend(blob_fetcher.push_all(chunk.into_iter()));
+        let mut missing_blobs = get.get_missing_blobs().fuse();
+        let mut first_closed_error: Option<Arc<FetchError>> = None;
+
+        loop {
+            futures::select! {
+                fetch_res = fetches.select_next_some() => {
+                    match Result::<Result<_, Arc<FetchError>>, _>::expect(
+                        fetch_res,
+                        "processor exists"
+                    ) {
+                        Ok(()) => {}
+                        Err(e) if e.is_unexpected_pkg_cache_closed() => {
+                            first_closed_error.get_or_insert(e);
+                        }
+                        Err(e) => return Err(CacheError::FetchContentBlob(e, merkle)),
+                    }
+                }
+                chunk = missing_blobs.select_next_some() => {
+                    #[allow(clippy::needless_collect)]
+                    // Not sure if this collect is significant -- without it, the
+                    // compiler believes we are double-borrowing |get|.
+                    let chunk = chunk?
+                        .into_iter()
+                        .map(|need| {
+                            (
+                                need.blob_id,
+                                FetchBlobContext {
+                                    opener: get.make_open_blob(need.blob_id),
+                                    mirrors: Arc::clone(&mirrors),
+                                    expected_len: None,
+                                    use_local_mirror: config.use_local_mirror(),
+                                    parent_trace_id: trace_id,
+                                },
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let () = fetches.extend(blob_fetcher.push_all(chunk.into_iter()));
+                }
+                complete => {
+                    match first_closed_error {
+                        None =>  return Ok(()),
+                        Some(e) => return Err(CacheError::FetchContentBlob(e, merkle)),
+                    }
+                }
+            }
         }
-
-        let fetches = fetches.map(|res| res.expect("processor exists"));
-
-        // When a blob write fails and tears down the entire Get() operation, the other pending blob
-        // writes will fail with an unexpected close of the NeededBlobs/blob write channel.
-        //
-        // Wait for:
-        // * any blob fetch to fail with a non-cancelled error
-        // * every blob fetch to either succeed/fail with a cancelled error
-        // returning the more interesting error encountered, if any.
-        try_collect_useful_error(fetches).await.map_err(|e| CacheError::FetchContentBlob(e, merkle))
     }
     .await;
 
@@ -155,40 +168,6 @@ pub async fn cache_package<'a>(
             get.abort().await;
             Err(e)
         }
-    }
-}
-
-async fn try_collect_useful_error(
-    mut fetches: impl Stream<Item = Result<(), Arc<FetchError>>> + Unpin,
-) -> Result<(), Arc<FetchError>> {
-    let mut first_closed_error: Option<Arc<FetchError>> = None;
-
-    while let Some(res) = fetches.next().await {
-        match res {
-            Ok(()) => {}
-            Err(e) if e.is_unexpected_pkg_cache_closed() => {
-                first_closed_error.get_or_insert(e);
-            }
-            Err(e) => return Err(e),
-        }
-    }
-
-    match first_closed_error {
-        Some(e) => Err(e),
-        None => Ok(()),
-    }
-}
-
-/// Provides a Debug impl for an Iterator that produces a list of all elements in the iterator.
-struct DebugIter<I>(I);
-
-impl<I> std::fmt::Debug for DebugIter<I>
-where
-    I: Iterator + Clone,
-    I::Item: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_list().entries(self.0.clone()).finish()
     }
 }
 

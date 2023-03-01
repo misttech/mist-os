@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    cobalt_sw_delivery_registry as metrics,
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_pkg as fpkg,
     fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
     fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
     lib::{TestEnvBuilder, EMPTY_REPO_PATH},
@@ -36,7 +36,7 @@ async fn resolve_disallow_local_mirror_fails() {
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
     let result = env.resolve_package(&pkg_url).await;
 
-    assert_eq!(result.unwrap_err(), fidl_fuchsia_pkg::ResolveError::UnavailableRepoMetadata);
+    assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableRepoMetadata);
 
     env.stop().await;
 }
@@ -70,7 +70,7 @@ async fn resolve_local_and_remote_mirrors_fails() {
     let pkg_url = format!("fuchsia-pkg://test/{}", pkg.name());
     let result = env.resolve_package(&pkg_url).await;
 
-    assert_eq!(result.unwrap_err(), fidl_fuchsia_pkg::ResolveError::UnavailableRepoMetadata);
+    assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableRepoMetadata);
 
     env.stop().await;
 }
@@ -93,7 +93,7 @@ async fn create_tuf_client_timeout() {
     // it obtains metadata.
     let result = env.resolve_package("fuchsia-pkg://test/missing-package").await;
 
-    assert_eq!(result.unwrap_err(), fidl_fuchsia_pkg::ResolveError::UnavailableRepoMetadata);
+    assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableRepoMetadata);
 
     env.assert_count_events(
         metrics::CREATE_TUF_CLIENT_MIGRATED_METRIC_ID,
@@ -134,7 +134,7 @@ async fn update_tuf_client_timeout() {
     // The resolve will still fail, even though pkg-resolver normally ignores failed tuf updates,
     // see fxbug.dev/43646, because the tuf client actually downloads most of the metadata during
     // the first update, not during creation.
-    assert_eq!(result.unwrap_err(), fidl_fuchsia_pkg::ResolveError::Internal);
+    assert_eq!(result.unwrap_err(), fpkg::ResolveError::Internal);
 
     env.assert_count_events(
         metrics::UPDATE_TUF_CLIENT_MIGRATED_METRIC_ID,
@@ -167,7 +167,7 @@ async fn download_blob_header_timeout() {
     env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
 
     let result = env.resolve_package("fuchsia-pkg://test/test").await;
-    assert_eq!(result.unwrap_err(), fidl_fuchsia_pkg::ResolveError::UnavailableBlob);
+    assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableBlob);
 
     env.assert_count_events(
         metrics::FETCH_BLOB_MIGRATED_METRIC_ID,
@@ -205,7 +205,7 @@ async fn download_blob_body_timeout() {
     env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
 
     let result = env.resolve_package("fuchsia-pkg://test/test").await;
-    assert_eq!(result.unwrap_err(), fidl_fuchsia_pkg::ResolveError::UnavailableBlob);
+    assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableBlob);
 }
 
 // Verify that the pkg-resolver stops downloading content blobs when a package fails to resolve.
@@ -306,7 +306,7 @@ async fn failed_resolve_stops_fetching_blobs() {
 
     let result = env.resolve_package("fuchsia-pkg://test/many-blobs").await;
     history.take();
-    assert_eq!(result.unwrap_err(), fidl_fuchsia_pkg::ResolveError::UnavailableBlob);
+    assert_eq!(result.unwrap_err(), fpkg::ResolveError::UnavailableBlob);
     unblock.send(()).unwrap();
 
     let _ = env.resolve_package("fuchsia-pkg://test/different-hash").await.unwrap();
@@ -317,4 +317,35 @@ async fn failed_resolve_stops_fetching_blobs() {
         "fetch_count should be <= MAX_CONCURRENT_BLOB_FETCHES+1, was {}",
         fetch_count
     );
+}
+
+#[fuchsia::test]
+async fn missing_subpackage_meta_far_does_not_hang() {
+    let env = TestEnvBuilder::new().build().await;
+    let startup_blobs = env.blobfs.list_blobs().unwrap();
+
+    let subpackage = PackageBuilder::new("subpackage").build().await.unwrap();
+    assert_eq!(startup_blobs.intersection(&subpackage.list_blobs().unwrap()).count(), 0);
+    let superpackage = PackageBuilder::new("superpackage")
+        .add_subpackage("my-subpackage", &subpackage)
+        .build()
+        .await
+        .unwrap();
+    let repo = Arc::new(
+        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .add_package(&superpackage)
+            .build()
+            .await
+            .unwrap(),
+    );
+    let served_repository = Arc::clone(&repo).server().start().unwrap();
+    let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
+    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+
+    assert_eq!(
+        env.resolve_package("fuchsia-pkg://test/superpackage").await.unwrap_err(),
+        fpkg::ResolveError::UnavailableBlob
+    );
+
+    env.stop().await;
 }
