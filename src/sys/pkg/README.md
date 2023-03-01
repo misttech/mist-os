@@ -9,8 +9,8 @@ updates.
 This document serves as a jumping-off point for the SWD codebase, and a
 contribution guide.
 
-Before starting, you may wish to read some [documentation](/docs/concepts/packages/package) on
-Fuchsia software packaging, or the [long term SWD goals](/docs/contribute/governance/rfcs/0133_swd_goals).
+Before starting, you may wish to read some [documentation](https://fuchsia.dev/fuchsia-src/concepts/packages/package) on
+Fuchsia software packaging, or the [long term SWD goals](https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0133_swd_goals).
 
 ### Software Delivery (SWD) Subsystems
 
@@ -26,11 +26,11 @@ Updated: February 2023
 |-----------------------    |----------------------------------------------------------------------------------------------------|----------------------------------------------|
 | pkg-cache                 | Caches downloaded packages in case they are needed again, interacting as necessary with blobfs.    | `//src/sys/pkg/bin/pkg-cache`                |
 | pkg-resolver              | Main entry point for software delivery stack. Coordinates retrieval and  installation of packages. | `//src/sys/pkg/bin/pkg-resolver`             |
-| omaha-client              | Checks for [system updates using the Omaha server infrastructure](/docs/concepts/packages/ota#update-omaha)                                    | `//src/sys/pkg/bin/omaha-client`             |
+| omaha-client              | Checks for [system updates using the Omaha server infrastructure](https://fuchsia.dev/fuchsia-src/concepts/packages/ota#update-omaha)                                    | `//src/sys/pkg/bin/omaha-client`             |
 | pkgctl                    | CLI for pkg-resolver                                                                               | `//src/sys/pkg/bin/pkgctl`                   |
-| system-update-checker     | Does what it says on the tin, [checks for system updates!](/docs/concepts/packages/ota#update-system)                                           | `//src/sys/pkg/bin/system-update-checker`    |
-| system-updater-committer  | Component responsible for [committing the update.](/docs/concepts/packages/ota#committing-update)                                                   | `//src/sys/pkg/bin/system-update-committer`  |
-| system-updater            | Actually [performs system updates.](/docs/concepts/packages/ota#staging-update)                                                                  | `//src/sys/pkg/bin/system-updater`           |
+| system-update-checker     | Does what it says on the tin, [checks for system updates!](https://fuchsia.dev/fuchsia-src/concepts/packages/ota#update-system)                                           | `//src/sys/pkg/bin/system-update-checker`    |
+| system-updater-committer  | Component responsible for [committing the update.](https://fuchsia.dev/fuchsia-src/concepts/packages/ota#committing-update)                                                   | `//src/sys/pkg/bin/system-update-committer`  |
+| system-updater            | Actually [performs system updates.](https://fuchsia.dev/fuchsia-src/concepts/packages/ota#staging-update)                                                                  | `//src/sys/pkg/bin/system-updater`           |
 | update                    | Developer CLI for interacting and configuring system updates.                                      | `//src/sys/pkg/bin/update`     |
 | far                       | Creates Fuchsia archive files.                                                                     | `//src/sys/pkg/bin/far`                      |
 
@@ -61,7 +61,7 @@ For wider system tests, including end-to-end tests of system OTA updates, see `/
 ##### IDEs
 
 VS Code seems to work pretty well. Follow the instructions
-[here](/docs/reference/tools/editors/README.md#vs-code), including
+[here](https://fuchsia.dev/fuchsia-src/reference/tools/editors#vs-code), including
 any language-specific instructions you find relevant; the Rust instructions are
 a good place to start.
 
@@ -78,7 +78,7 @@ a file. Do so!
 #### Fuchsia Setup
 
 Read the Fuchsia Getting Started guide
-[first](/docs/get-started/learn-fuchsia.md)
+[first](https://fuchsia.dev/fuchsia-src/get-started/learn-fuchsia).
 
 Most of the SWD stack is in the `base` image of fuchsia, so to get a swd stack
 working with tests, your build configuration is quite simple:
@@ -118,7 +118,7 @@ it’s fast.
 
 You’ll need to update that dependency’s vendored repository in //third_party.
 See the
-[Rust documentation](/docs/development/languages/rust/external_crates.md)
+[Rust documentation](https://fuchsia.dev/fuchsia-src/development/languages/rust/external_crates)
 for examples.
 
 ##### Resolve a package and run a contained component
@@ -133,13 +133,13 @@ fuchsia-pkg://fuchsia.com/<package_name>#meta/<component_name>.cmx`
 #### How do I run a hosted package server?
 
 See the instructions on
-[running a package repository with pm](/docs/development/idk/documentation/packages.md)
+[running a package repository with pm](https://fuchsia.dev/fuchsia-src/development/idk/documentation/packages).
 
 ### More information:
 
-*   [OTA Flow](/docs/concepts/packages/ota.md)
-*   [Package overview](/docs/concepts/packages/package.md)
-*   [Package updates](/docs/concepts/packages/update_pkg.md)
-*   [Package metadata](/docs/concepts/packages/package.md#meta-far)
-*   [Package URLs](/docs/concepts/packages/package_url.md)
-*   [Software updates](/docs/concepts/packages/software_update_system.md)
+*   [OTA Flow](https://fuchsia.dev/fuchsia-src/concepts/packages/ota)
+*   [Package overview](https://fuchsia.dev/fuchsia-src/concepts/packages/package)
+*   [Package updates](https://fuchsia.dev/fuchsia-src/concepts/packages/update_pkg)
+*   [Package metadata](https://fuchsia.dev/fuchsia-src/concepts/packages/package#meta-far)
+*   [Package URLs](https://fuchsia.dev/fuchsia-src/concepts/packages/package_url)
+*   [Software updates](https://fuchsia.dev/fuchsia-src/concepts/packages/software_update_system)
