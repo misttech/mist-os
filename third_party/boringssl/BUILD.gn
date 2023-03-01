@@ -74,10 +74,6 @@ foreach(lib_type, lib_types) {
     configs += [ ":internal_config" ]
 
     if (is_fuchsia) {
-      # TODO(46910): UBSan has found an instance of undefined behavior in this target.
-      # Disable UBSan for this target temporarily until it is migrated into CI/CQ.
-      configs += [ "//build/config:temporarily_disable_ubsan_do_not_use" ]
-
       # TODO(https://fxbug.dev/60545): profile instrumentation significantly affects performance.
       configs += [ "//build/config:no_profile" ]
 
@@ -139,10 +135,6 @@ if (!is_kernel) {
     configs += [ ":fuzz_config" ]
 
     if (is_fuchsia) {
-      # TODO(46910): UBSan has found an instance of undefined behavior in this target.
-      # Disable UBSan for this target temporarily until it is migrated into CI/CQ.
-      configs += [ "//build/config:temporarily_disable_ubsan_do_not_use" ]
-
       # sysrand() uses Zircon system call.
       deps = [ "//src/zircon/lib/zircon" ]
     }
