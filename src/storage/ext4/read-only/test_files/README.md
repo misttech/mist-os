@@ -28,8 +28,8 @@ The most basic, just has one file in the root directory.
 
 ## extents.img
 
-Contains large files with extent depth > 0 and sparse files and multiple
-nested directories.
+Contains large files with extent depth > 0, trailing zero pages, sparse files
+and multiple nested directories.
 
 ### Properties
 
@@ -37,6 +37,8 @@ nested directories.
 * 2 block groups
 * largefile (inode 14) has extent tree with depth 2
 * sparsefile (inode 12) has extent tree with depth 2, logical blocks are not contiguous
+* trailingzeropages has a small amount of data at the head, but is truncated to
+  100000 bytes.
 
 #### Flags
 
@@ -59,6 +61,7 @@ nested directories.
 │                               └── test/
 │                                   └── img/
 │                                       └── empty
+├── trailingzeropages
 ├── largefile
 ├── lost+found/
 ├── smallfile

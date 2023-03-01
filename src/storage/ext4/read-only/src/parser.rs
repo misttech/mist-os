@@ -695,7 +695,7 @@ mod tests {
         "fs with a single directory")]
     #[test_case(
         "/pkg/data/extents.img",
-        vec!["a", "smallfile", "largefile", "sparsefile", "lost+found", "..", "."];
+        vec!["trailingzeropages", "a", "smallfile", "largefile", "sparsefile", "lost+found", "..", "."];
         "fs with multiple files with multiple extents")]
     fn list_root(ext4_path: &str, mut expected_entries: Vec<&str>) {
         let data = fs::read(ext4_path).expect("Unable to read file");
@@ -836,6 +836,7 @@ mod tests {
             "largefile".to_string() => "de2cf635ae4e0e727f1e412f978001d6a70d2386dc798d4327ec8c77a8e4895d".to_string(),
             "smallfile".to_string() => "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03".to_string(),
             "sparsefile".to_string() => "3f411e42c1417cd8845d7144679812be3e120318d843c8c6e66d8b2c47a700e9".to_string(),
+            "trailingzeropages".to_string() => "afc5cc689fd3cb8d00c147d60dc911a70d36b7afb03cc7f15de9c78a52be978d".to_string(),
             "a/multi/dir/path/within/this/crowded/extents/test/img/empty".to_string() => "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
         },
         vec!["a/multi/dir/path/within/this/crowded/extents/test/img", "lost+found"];
