@@ -17,9 +17,6 @@
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
 
-#include "src/devices/usb/drivers/a1-usb-phy/dwc2-device.h"
-#include "src/devices/usb/drivers/a1-usb-phy/xhci-device.h"
-
 namespace a1_usb_phy {
 
 class A1UsbPhy;
