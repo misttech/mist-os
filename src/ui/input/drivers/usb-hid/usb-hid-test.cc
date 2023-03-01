@@ -101,9 +101,11 @@ class UsbHidTest : public zxtest::Test {
     const std::string_view hid_device_relpath = hid_device_abspath.substr(kDev.size());
     const std::string_view usb_hid_relpath =
         hid_device_relpath.substr(0, hid_device_relpath.find_last_of('/'));
+    const std::string usb_hid_controller_relpath =
+        std::string(usb_hid_relpath).append("/device_controller");
 
-    zx::result usb_hid_controller =
-        component::ConnectAt<fuchsia_device::Controller>(caller.directory(), usb_hid_relpath);
+    zx::result usb_hid_controller = component::ConnectAt<fuchsia_device::Controller>(
+        caller.directory(), usb_hid_controller_relpath);
     ASSERT_OK(usb_hid_controller);
     const size_t last_slash = usb_hid_relpath.find_last_of('/');
     const std::string_view suffix = usb_hid_relpath.substr(last_slash + 1);
