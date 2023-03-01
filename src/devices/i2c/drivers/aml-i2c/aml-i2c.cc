@@ -218,7 +218,7 @@ void AmlI2cDev::StartIrqThread() {
 /* create instance of AmlI2cDev and do basic initialization.  There will
 be one of these instances for each of the soc i2c ports.
 */
-zx_status_t AmlI2c::InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDev pdev) {
+zx_status_t AmlI2c::InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDevFidl& pdev) {
   std::optional<fdf::MmioBuffer> regs_iobuff;
   zx_status_t status = pdev.MapMmio(index, &regs_iobuff);
   if (status != ZX_OK) {
@@ -352,9 +352,9 @@ uint32_t AmlI2c::GetBusBase(zx_device_t* parent, const uint32_t controller_count
 }
 
 zx_status_t AmlI2c::Bind(void* ctx, zx_device_t* parent) {
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
-    pdev = ddk::PDev(parent, "pdev");
+    pdev = ddk::PDevFidl(parent, "pdev");
   }
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");

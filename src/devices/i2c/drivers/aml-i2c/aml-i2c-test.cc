@@ -6,6 +6,9 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/zx/clock.h>
 
@@ -160,6 +163,11 @@ class FakeAmlI2cController {
   cpp20::span<const uint8_t> read_data_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 class AmlI2cTest : public zxtest::Test {
  public:
   AmlI2cTest() {
@@ -194,15 +202,34 @@ class AmlI2cTest : public zxtest::Test {
   cpp20::span<uint32_t> mmio(size_t index) { return controllers_[index].mmio(); }
 
   void InitResources(uint32_t bus_count) {
-    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
-
     controllers_.reserve(bus_count);
-    for (uint32_t i = 0; i < bus_count; i++) {
-      pdev_.set_mmio(i, {.offset = i, .size = kMmioSize});
-      controllers_.emplace_back(pdev_.CreateVirtualInterrupt(i));
-    }
 
-    pdev_.set_device_info({{.mmio_count = bus_count, .irq_count = bus_count}});
+    fake_pdev::FakePDevFidl::Config config;
+    for (uint32_t i = 0; i < bus_count; i++) {
+      config.mmios[i] = {.offset = i, .size = kMmioSize};
+      config.irqs[i] = {};
+      ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[i]));
+      controllers_.emplace_back(config.irqs[i].borrow());
+    }
+    config.device_info = {
+        .mmio_count = bus_count,
+        .irq_count = bus_count,
+    };
+
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                          std::move(outgoing_endpoints->client), "pdev");
   }
 
   void Init(uint32_t bus_count) {
@@ -218,7 +245,9 @@ class AmlI2cTest : public zxtest::Test {
     }
   }
 
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   std::vector<FakeAmlI2cController> controllers_;
 
@@ -758,22 +787,57 @@ TEST_F(AmlI2cTest, MetadataTooSmall) {
 }
 
 TEST_F(AmlI2cTest, CanUsePDevFragment) {
-  root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+  fake_pdev::FakePDevFidl::Config config;
+  config.mmios[0] = {.offset = 0, .size = kMmioSize};
+  config.irqs[0] = {};
+  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+  controllers_.emplace_back(config.irqs[0].borrow());
+  config.device_info = {
+      .mmio_count = 1,
+      .irq_count = 1,
+  };
 
-  pdev_.set_mmio(0, {.offset = 0, .size = kMmioSize});
-  controllers_.emplace_back(pdev_.CreateVirtualInterrupt(0));
+  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(outgoing_endpoints);
+  ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+  incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                         IncomingNamespace* infra) mutable {
+    infra->pdev_server.SetConfig(std::move(config));
+    ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+        infra->pdev_server.GetInstanceHandler()));
 
-  pdev_.set_device_info({{.mmio_count = 1, .irq_count = 1}});
+    ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+  });
+  ASSERT_NO_FATAL_FAILURE();
+  root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                        std::move(outgoing_endpoints->client), "pdev");
 
   EXPECT_OK(AmlI2c::Bind(nullptr, root_.get()));
   ASSERT_EQ(root_->child_count(), 1);
 }
 
 TEST_F(AmlI2cTest, MmioIrqMismatch) {
-  root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(outgoing_endpoints);
+  ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+  incoming_.SyncCall(
+      [server = std::move(outgoing_endpoints->server)](IncomingNamespace* infra) mutable {
+        infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
+            .device_info =
+                pdev_device_info_t{
+                    .mmio_count = 2,
+                    .irq_count = 1,
+                },
+        });
 
-  pdev_.set_device_info({{.mmio_count = 2, .irq_count = 1}});
+        ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+            infra->pdev_server.GetInstanceHandler()));
 
+        ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+      });
+  ASSERT_NO_FATAL_FAILURE();
+  root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                        std::move(outgoing_endpoints->client), "pdev");
   EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
 }
 

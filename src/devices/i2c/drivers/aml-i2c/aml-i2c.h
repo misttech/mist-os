@@ -90,7 +90,7 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
   // This way board drivers can be migrated to the single-bus model individually.
   static uint32_t GetBusBase(zx_device_t* parent, uint32_t controller_count);
 
-  zx_status_t InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDev pdev);
+  zx_status_t InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDevFidl& pdev);
 
   std::vector<AmlI2cDev> i2c_devs_;
   const uint32_t bus_base_;
