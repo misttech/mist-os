@@ -175,8 +175,7 @@ class IntelHDAController : public fbl::RefCounted<IntelHDAController>,
   // Upstream PCI device, protocol interface, and device info.
   zx_device_t* pci_dev_ = nullptr;
   ddk::Pci pci_;
-  fuchsia_hardware_pci::wire::InterruptMode irq_mode_ =
-      fuchsia_hardware_pci::wire::InterruptMode::kDisabled;
+  fuchsia_hardware_pci::InterruptMode irq_mode_ = fuchsia_hardware_pci::InterruptMode::kDisabled;
   fuchsia_hardware_pci::wire::DeviceInfo pci_dev_info_;
   static zx_protocol_device_t ROOT_DEVICE_THUNKS;
 
