@@ -276,10 +276,12 @@ class WaitQueueCollection {
   };
 
   constexpr WaitQueueCollection() {}
-  ~WaitQueueCollection() { Validate(); }
+  ~WaitQueueCollection() {
+    Validate();
+    DEBUG_ASSERT(threads_.is_empty());
+  }
 
   void Validate() const TA_REQ(thread_lock) {
-    DEBUG_ASSERT(threads_.is_empty());
     // TODO(johngro): We could perform a more rigorous check of the two maintained
     // invariants of the threads_ collection, however we probably only want to do
     // so if kSchedulerExtraInvariantValidation is true.
