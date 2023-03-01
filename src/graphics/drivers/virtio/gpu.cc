@@ -13,6 +13,8 @@
 #include <string.h>
 #include <sys/param.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/pixelformat.h>
 #include <zircon/time.h>
 
 #include <memory>
@@ -69,15 +71,21 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
     dc_intf_ = *intf;
   }
 
-  added_display_args_t args = {};
-  args.display_id = kDisplayId, args.edid_present = false,
-  args.panel.params =
-      {
-          .width = pmode_.r.width,
-          .height = pmode_.r.height,
-          .refresh_rate_e2 = kRefreshRateHz * 100,
-      },
-  args.pixel_format_list = &supported_formats_, args.pixel_format_count = 1,
+  added_display_args_t args = {
+      .display_id = kDisplayId,
+      .edid_present = false,
+      .panel =
+          {
+              .params =
+                  {
+                      .width = pmode_.r.width,
+                      .height = pmode_.r.height,
+                      .refresh_rate_e2 = kRefreshRateHz * 100,
+                  },
+          },
+      .pixel_format_list = kSupportedFormats.data(),
+      .pixel_format_count = kSupportedFormats.size(),
+  };
   display_controller_interface_on_displays_changed(intf, &args, 1, nullptr, 0, nullptr, 0, nullptr);
 }
 
@@ -234,7 +242,8 @@ zx_status_t GpuDevice::Import(zx::vmo vmo, image_t* image, size_t offset, uint32
     return status;
   }
 
-  status = allocate_2d_resource(&import_data->resource_id, row_bytes / pixel_size, image->height);
+  status = allocate_2d_resource(&import_data->resource_id, row_bytes / pixel_size, image->height,
+                                image->pixel_format);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to allocate 2d resource", tag());
     return status;
@@ -474,8 +483,8 @@ zx_status_t GpuDevice::get_display_info() {
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t width,
-                                            uint32_t height) {
+zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
+                                            zx_pixel_format_t pixel_format) {
   LTRACEF("dev %p\n", this);
 
   ZX_ASSERT(resource_id);
@@ -487,7 +496,19 @@ zx_status_t GpuDevice::allocate_2d_resource(uint32_t* resource_id, uint32_t widt
   req.hdr.type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
   req.resource_id = next_resource_id_++;
   *resource_id = req.resource_id;
-  req.format = VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM;
+
+  // TODO(fxbug.dev/122802): Support more formats.
+  switch (pixel_format) {
+    case ZX_PIXEL_FORMAT_RGB_x888:
+      req.format = VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM;
+      break;
+    case ZX_PIXEL_FORMAT_ARGB_8888:
+      req.format = VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM;
+      break;
+    default:
+      return ZX_ERR_NOT_SUPPORTED;
+  }
+
   req.width = width;
   req.height = height;
 

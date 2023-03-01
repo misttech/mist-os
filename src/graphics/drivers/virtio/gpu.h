@@ -127,7 +127,8 @@ class GpuDevice : public Device,
                      uint32_t row_bytes);
 
   zx_status_t get_display_info();
-  zx_status_t allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height);
+  zx_status_t allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
+                                   zx_pixel_format_t pixel_format);
   zx_status_t attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len);
   zx_status_t set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
                           uint32_t height);
@@ -183,7 +184,11 @@ class GpuDevice : public Device,
   config_stamp_t latest_config_stamp_ = {.value = INVALID_CONFIG_STAMP_VALUE};
   config_stamp_t displayed_config_stamp_ = {.value = INVALID_CONFIG_STAMP_VALUE};
 
-  zx_pixel_format_t supported_formats_ = ZX_PIXEL_FORMAT_RGB_x888;
+  // TODO(fxbug.dev/122802): Support more formats.
+  static constexpr std::array<zx_pixel_format_t, 2> kSupportedFormats = {
+      ZX_PIXEL_FORMAT_RGB_x888,
+      ZX_PIXEL_FORMAT_ARGB_8888,
+  };
 };
 
 }  // namespace virtio
