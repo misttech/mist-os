@@ -1980,7 +1980,8 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   bcme_status_t fw_err;
   uint32_t is_up = 0;
-  float tx_err_rate = 0.0, rx_err_rate = 0.0;
+  float periodic_err_rate_tx = 0.0, periodic_err_rate_rx = 0.0;
+  float lifetime_err_rate_tx = 0.0, lifetime_err_rate_rx = 0.0;
 
   // First check if the IF is up.
   zx_status_t err =
@@ -2024,29 +2025,41 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     BRCMF_INFO("Unable to get FW packet counts err: %s fw err %s", zx_status_get_string(err),
                brcmf_fil_get_errstr(fw_err));
   } else {
-    zxlogf(INFO, "FW Stats: Rx - Good: %d Bad: %d Ocast: %d; Tx - Good: %d Bad: %d",
-           fw_pktcnt.rx_good_pkt, fw_pktcnt.rx_bad_pkt, fw_pktcnt.rx_ocast_good_pkt,
-           fw_pktcnt.tx_good_pkt, fw_pktcnt.tx_bad_pkt);
+    int32_t total_rx_pkts = fw_pktcnt.rx_good_pkt + fw_pktcnt.rx_bad_pkt;
+    int32_t total_tx_pkts = fw_pktcnt.tx_good_pkt + fw_pktcnt.tx_bad_pkt;
 
-    float total_rx_pkts = fw_pktcnt.rx_good_pkt + fw_pktcnt.rx_bad_pkt;
-    float total_tx_pkts = fw_pktcnt.tx_good_pkt + fw_pktcnt.tx_bad_pkt;
-    rx_err_rate = tx_err_rate = 0;
-    if (total_rx_pkts > 0) {
-      rx_err_rate = (float)(fw_pktcnt.rx_bad_pkt) / total_rx_pkts;
+    lifetime_err_rate_rx = (float)(fw_pktcnt.rx_bad_pkt) / total_rx_pkts;
+    lifetime_err_rate_tx = (float)(fw_pktcnt.tx_bad_pkt) / total_tx_pkts;
+    if (total_rx_pkts > ndev->stats.total_rx_pkts_prev) {
+      periodic_err_rate_rx = (float)(fw_pktcnt.rx_bad_pkt - ndev->stats.rx_bad_pkts_prev) /
+                             (total_rx_pkts - ndev->stats.total_rx_pkts_prev);
+      ndev->stats.total_rx_pkts_prev = total_rx_pkts;
+      ndev->stats.rx_bad_pkts_prev = fw_pktcnt.rx_bad_pkt;
     }
-    if (total_tx_pkts > 0) {
-      tx_err_rate = (float)(fw_pktcnt.tx_bad_pkt) / total_tx_pkts;
+    if (total_tx_pkts > ndev->stats.total_tx_pkts_prev) {
+      periodic_err_rate_tx = (float)(fw_pktcnt.tx_bad_pkt - ndev->stats.tx_bad_pkts_prev) /
+                             (total_tx_pkts - ndev->stats.total_tx_pkts_prev);
+      ndev->stats.total_tx_pkts_prev = total_tx_pkts;
+      ndev->stats.tx_bad_pkts_prev = fw_pktcnt.tx_bad_pkt;
     }
+
+    const uint32_t period = BRCMF_CONNECT_LOG_DUR / ZX_SEC(1);
+    zxlogf(
+        INFO,
+        "FW Stats: Rx - Good: %d Bad: %d Ocast: %d Err Rate %.2f%% (last %us %.2f%%); Tx - Good: %d Bad: %d Err Rate %.2f%% (last %us %.2f%%)",
+        fw_pktcnt.rx_good_pkt, fw_pktcnt.rx_bad_pkt, fw_pktcnt.rx_ocast_good_pkt,
+        lifetime_err_rate_rx * 100, period, periodic_err_rate_rx * 100, fw_pktcnt.tx_good_pkt,
+        fw_pktcnt.tx_bad_pkt, lifetime_err_rate_tx * 100, period, periodic_err_rate_tx * 100);
   }
 
-  if (ndev->stats.rx_packets != ndev->stats.rx_last_log) {
-    if (ndev->stats.rx_packets < ndev->stats.rx_last_log) {
+  if (ndev->stats.rx_packets != ndev->stats.rx_pkts_prev) {
+    if (ndev->stats.rx_packets < ndev->stats.rx_pkts_prev) {
       BRCMF_INFO(
           "Current value for rx_packets is smaller than the last one, an overflow might happened.");
     }
     // Clear the freeze count once the device gets out of the bad state.
     ndev->stats.rx_freeze_count = 0;
-  } else if (ndev->stats.tx_packets > ndev->stats.tx_last_log) {
+  } else if (ndev->stats.tx_packets > ndev->stats.tx_pkts_prev) {
     // Increase the rx freeze count only when tx_packets is still increasing while rx_packets
     // is unchanged. This pattern is expected if a scan happens when the device is not connected to
     // an AP, but this function will not be called in this case, so no false positive will occur.
@@ -2054,8 +2067,8 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
   }
 
   // Update driver rx and tx count cached from last log.
-  ndev->stats.rx_last_log = ndev->stats.rx_packets;
-  ndev->stats.tx_last_log = ndev->stats.tx_packets;
+  ndev->stats.rx_pkts_prev = ndev->stats.rx_packets;
+  ndev->stats.tx_pkts_prev = ndev->stats.tx_packets;
 
   // Increase inspect counter when the rx freeze counter first reaches threshold.
   if (ndev->stats.rx_freeze_count == BRCMF_RX_FREEZE_THRESHOLD / BRCMF_CONNECT_LOG_DUR) {
@@ -2138,8 +2151,10 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
   // If the rate is 6 Mbps or less OR Rx error rate >= 15% OR Tx error rate is >= 15%
   // log some of the Tx and Rx error counts retrieved from FW.
   if ((real_rate != 0.0 && (real_rate <= BRCMF_LOW_DATA_RATE_THRESHOLD)) ||
-      rx_err_rate >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
-      tx_err_rate >= BRCMF_HIGH_ERR_RATE_THRESHOLD) {
+      periodic_err_rate_rx >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
+      periodic_err_rate_tx >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
+      lifetime_err_rate_rx >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
+      lifetime_err_rate_tx >= BRCMF_HIGH_ERR_RATE_THRESHOLD) {
     uint8_t cnt_buf[BRCMF_DCMD_MAXLEN] = {0};
     // If data rate is at or below threshold, increment the counter.
     if (real_rate != 0.0 && (real_rate <= BRCMF_LOW_DATA_RATE_THRESHOLD)) {
@@ -2169,20 +2184,18 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     } else {
       wl_cnt_ver_6_t* counters = reinterpret_cast<wl_cnt_ver_6_t*>(cnt_buf);
 
-      zxlogf(
-          INFO,
-          "FW Err Counts: Tx: Err Rate: %.2f retrans: %u err %u serr %u nobuf %u runt %u uflo %u "
-          "phyerr %u fail %u noassoc %u noack %u",
-          tx_err_rate * 100.0, counters->txretrans, counters->txerror, counters->txserr,
-          counters->txnobuf, counters->txrunt, counters->txuflo, counters->txphyerr,
-          counters->txfail, counters->txnoassoc, counters->txnoack);
-      zxlogf(
-          INFO,
-          "FW Err Counts: Rx: Err Rate: %.2f err %u oflo %u nobuf %u runt %u fragerr %u badplcp %u "
-          "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u",
-          rx_err_rate * 100.0, counters->rxerror, counters->rxoflo, counters->rxnobuf,
-          counters->rxrunt, counters->rxfragerr, counters->rxbadplcp, counters->rxcrsglitch,
-          counters->rxbadfcs, counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac);
+      zxlogf(INFO,
+             "FW Err Counts: Tx: retrans: %u err %u serr %u nobuf %u runt %u uflo %u "
+             "phyerr %u fail %u noassoc %u noack %u",
+             counters->txretrans, counters->txerror, counters->txserr, counters->txnobuf,
+             counters->txrunt, counters->txuflo, counters->txphyerr, counters->txfail,
+             counters->txnoassoc, counters->txnoack);
+      zxlogf(INFO,
+             "FW Err Counts: Rx: err %u oflo %u nobuf %u runt %u fragerr %u badplcp %u "
+             "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u",
+             counters->rxerror, counters->rxoflo, counters->rxnobuf, counters->rxrunt,
+             counters->rxfragerr, counters->rxbadplcp, counters->rxcrsglitch, counters->rxbadfcs,
+             counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac);
     }
   }
   ndev->client_stats_log_count++;

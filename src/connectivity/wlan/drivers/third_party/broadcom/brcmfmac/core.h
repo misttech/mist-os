@@ -326,10 +326,15 @@ struct net_device {
     int rx_errors;
     int tx_errors;
     int tx_confirmed;
-    int rx_last_log;      // The value of rx_packets which was last printed out by
-                          // brcmf_log_client_stats().
-    int tx_last_log;      // The value of tx_packets which was last printed out by
-                          // brcmf_log_client_stats().
+
+    // Values last logged by the periodic stats logger
+    int rx_pkts_prev;
+    int rx_bad_pkts_prev;
+    int tx_pkts_prev;
+    int tx_bad_pkts_prev;
+    int total_rx_pkts_prev;
+    int total_tx_pkts_prev;
+
     int rx_freeze_count;  // The number of brcmf_log_client_stats called in which rx_packet number
                           // freeze happens.
     // The number of brcmf_log_client_stats() called in which data rate is low (gets reset any time

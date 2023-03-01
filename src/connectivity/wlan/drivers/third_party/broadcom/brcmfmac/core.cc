@@ -929,6 +929,8 @@ struct net_device* brcmf_allocate_net_device(size_t priv_size, const char* name)
     return NULL;
   }
   brcmf_write_net_device_name(dev, name);
+  dev->stats = {};  // initialize stats counters to 0
+
   return dev;
 }
 
