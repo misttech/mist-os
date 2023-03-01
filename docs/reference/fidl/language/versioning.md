@@ -1,7 +1,8 @@
 # FIDL versioning
 
-This document describes how to use FIDL's API versioning features. For a more
-technical specification, see [RFC-0083: FIDL versioning][rfc-0083].
+This document describes FIDL's API versioning features. For a more technical
+specification, see [RFC-0083: FIDL versioning][rfc-0083]. For guidance on how to
+evolve Fuchsia APIs, see [Fuchsia API evolution guidelines][api-evolution].
 
 ## Motivation
 
@@ -222,3 +223,4 @@ We can decompose it by swapping the protocol at every version:
 [element]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md#terminology
 [overview]: /docs/development/languages/fidl/guides/style.md#library-overview
 [deprecation-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=7692
+[api-evolution]: /docs/development/api/evolution.md
