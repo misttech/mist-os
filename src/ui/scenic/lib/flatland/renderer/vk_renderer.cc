@@ -60,7 +60,7 @@ const std::vector<vk::Format>& GetSupportedImageFormatsForBufferCollectionUsage(
   }
 }
 
-const vk::Filter kDefaultFilter = vk::Filter::eLinear;
+const vk::Filter kDefaultFilter = vk::Filter::eNearest;
 
 // Black color to replace protected content when we aren't in protected mode, i.e. Screenshots.
 const glm::vec4 kProtectedReplacementColorInRGBA = glm::vec4(0, 0, 0, 1);

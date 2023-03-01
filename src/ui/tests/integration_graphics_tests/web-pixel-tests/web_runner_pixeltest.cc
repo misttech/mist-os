@@ -354,8 +354,7 @@ TEST_F(VideoHtmlPixelTests, ValidPixelTest) {
   // BGRA values,
   const ui_testing::Pixel kYellow = {16, 255, 255, 255};
   const ui_testing::Pixel kRed = {26, 17, 255, 255};
-  const ui_testing::Pixel kBluev1 = {255, 10, 13, 255};
-  const ui_testing::Pixel kBluev2 = {255, 11, 13, 255};
+  const ui_testing::Pixel kBlue = {255, 11, 13, 255};
   const ui_testing::Pixel kGreenv1 = {17, 255, 45, 255};
   const ui_testing::Pixel kGreenv2 = {18, 255, 45, 255};
   const ui_testing::Pixel kMagenta = {255, 255, 255, 255};
@@ -365,18 +364,16 @@ TEST_F(VideoHtmlPixelTests, ValidPixelTest) {
   // The web page should render the scene as shown above.
   // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
   // been rendered on the display.
-  ASSERT_TRUE(TakeScreenshotUntil(kYellow, [&](std::map<ui_testing::Pixel, uint32_t> histogram) {
+  ASSERT_TRUE(TakeScreenshotUntil(kBlue, [&](std::map<ui_testing::Pixel, uint32_t> histogram) {
     // Video's background color should not be visible.
     EXPECT_EQ(histogram[kMagenta], 0u);
 
     // Note that we do not see pure colors in the video but a shade of the colors shown in the
     // diagram. Since it is hard to assert on the exact number of pixels for each shade of the
-    // color, the test asserts on the most prominent shade which was visible in the video. We also
-    // cannot go for the exact number of pixels because there is linear filtering applied by Scenic
-    // when magnifying that blends colors, so we check these pixels exist.
+    // color, the test asserts on the most prominent shade which was visible in the video.
     EXPECT_GT(histogram[kYellow], 100000u);
     EXPECT_GT(histogram[kRed], 100000u);
-    EXPECT_GT(histogram[kBluev1] + histogram[kBluev2], 100000u);
+    EXPECT_GT(histogram[kBlue], 100000u);
     EXPECT_GT(histogram[kGreenv1] + histogram[kGreenv2], 100000u);
   }));
 }

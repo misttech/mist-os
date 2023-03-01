@@ -369,8 +369,7 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor180DegreeRotationScreenshot) {
   }
 
   EXPECT_EQ(num_green, pixel_color_count);
-  // TODO(fxb/116631): Switch to exact comparisons after Astro precision issues are resolved.
-  EXPECT_NEAR(num_red, pixel_color_count, display_width_);
+  EXPECT_EQ(num_red, pixel_color_count);
 }
 
 // Creates this image:
@@ -525,11 +524,10 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor90DegreeRotationScreenshot) {
     }
   }
 
-  // TODO(fxb/116631): Switch to exact comparisons after Astro precision issues are resolved.
-  EXPECT_NEAR(top_left_correct, pixel_color_count, display_width_);
-  EXPECT_NEAR(top_right_correct, pixel_color_count, display_width_);
-  EXPECT_NEAR(bottom_left_correct, pixel_color_count, display_width_);
-  EXPECT_NEAR(bottom_right_correct, pixel_color_count, display_width_);
+  EXPECT_EQ(top_left_correct, pixel_color_count);
+  EXPECT_EQ(top_right_correct, pixel_color_count);
+  EXPECT_EQ(bottom_right_correct, pixel_color_count);
+  EXPECT_EQ(bottom_left_correct, pixel_color_count);
 }
 
 // Creates this image:
@@ -684,11 +682,10 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor270DegreeRotationScreenshot) {
     }
   }
 
-  // TODO(fxb/116631): Switch to exact comparisons after Astro precision issues are resolved.
-  EXPECT_NEAR(top_left_correct, pixel_color_count, display_width_);
-  EXPECT_NEAR(top_right_correct, pixel_color_count, display_width_);
-  EXPECT_NEAR(bottom_left_correct, pixel_color_count, display_width_);
-  EXPECT_NEAR(bottom_right_correct, pixel_color_count, display_width_);
+  EXPECT_EQ(top_left_correct, pixel_color_count);
+  EXPECT_EQ(top_right_correct, pixel_color_count);
+  EXPECT_EQ(bottom_right_correct, pixel_color_count);
+  EXPECT_EQ(bottom_left_correct, pixel_color_count);
 }
 
 TEST_F(ScreenCaptureIntegrationTest, FilledRectScreenshot) {

@@ -10,8 +10,6 @@
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
-#include <cstdint>
-
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -648,12 +646,10 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
 
   // Verify that the number of pixels is the same (i.e. the image hasn't changed).
   auto histogram = screenshot.Histogram();
-  const uint32_t pixel_color_count = num_pixels / 4;
-  // TODO(fxb/116631): Switch to exact comparisons after Astro precision issues are resolved.
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kBlue], pixel_color_count, display_width_);
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kGreen], pixel_color_count, display_width_);
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kBlack], pixel_color_count, display_width_);
-  EXPECT_NEAR(histogram[ui_testing::Screenshot::kRed], pixel_color_count, display_width_);
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], num_pixels / 4);
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kGreen], num_pixels / 4);
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kBlack], num_pixels / 4);
+  EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], num_pixels / 4);
 
   // Verify that the screenshot corners are the expected color.
   const auto expected_colors = expected_colors_map.find(std::make_pair(image_flip, orientation));
