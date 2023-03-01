@@ -38,7 +38,6 @@ struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> 
 };
 
 class FakeDisplay;
-class ClampRgb;
 
 using DeviceType = ddk::Device<FakeDisplay, ddk::GetProtocolable, ddk::ChildPreReleaseable>;
 

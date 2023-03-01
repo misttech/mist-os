@@ -13,11 +13,13 @@
 #include <lib/zx/time.h>
 #include <sys/types.h>
 #include <threads.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
 #include <zircon/threads.h>
 
 #include <algorithm>
+#include <cinttypes>
 #include <iterator>
 #include <memory>
 
@@ -32,8 +34,6 @@
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace fake_display {
-#define DISP_ERROR(fmt, ...) zxlogf(ERROR, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
-#define DISP_INFO(fmt, ...) zxlogf(INFO, "[%s %d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 namespace {
 // List of supported pixel formats
@@ -126,11 +126,15 @@ zx_status_t FakeDisplay::ImportVmoImage(image_t* image, zx::vmo vmo, size_t offs
   return status;
 }
 
-static bool IsAcceptableImageType(uint32_t image_type) {
+namespace {
+
+bool IsAcceptableImageType(uint32_t image_type) {
   return image_type == IMAGE_TYPE_PREFERRED_SCANOUT || image_type == IMAGE_TYPE_SIMPLE;
 }
 
-static bool IsAcceptablePixelFormat(zx_pixel_format_t pixel_format) { return true; }
+bool IsAcceptablePixelFormat(zx_pixel_format_t pixel_format) { return true; }
+
+}  // namespace
 
 zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                                      zx::channel collection_token) {
@@ -193,12 +197,13 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image,
 
   fbl::AutoLock lock(&image_lock_);
   if (!IsAcceptableImageType(image->type)) {
-    DISP_INFO("Image type is invalid (%u).\n", image->type);
+    zxlogf(INFO, "ImportImage() will fail due to invalid Image type %" PRIu32, image->type);
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (!IsAcceptablePixelFormat(image->pixel_format)) {
-    DISP_INFO("Pixel format is unsupported (%u).\n", image->pixel_format);
+    zxlogf(INFO, "ImportImage() will fail due to unsupported pixel format %" PRIu32,
+           image->pixel_format);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -319,7 +324,8 @@ void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t
 zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
   zx_status_t status = sysmem_.Connect(std::move(connection));
   if (status != ZX_OK) {
-    DISP_ERROR("Could not connect to sysmem\n");
+    zxlogf(ERROR, "Failed connecting to sysmem: %s", zx_status_get_string(status));
+    ;
     return status;
   }
 
@@ -396,7 +402,8 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   auto set_result = fidl::Call(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>(collection))
                         ->SetConstraints({true, std::move(constraints)});
   if (set_result.is_error()) {
-    DISP_ERROR("Failed to set constraints");
+    zxlogf(ERROR, "Failed to set constraints on a sysmem BufferCollection: %s",
+           set_result.error_value().status_string());
     return set_result.error_value().status();
   }
 
@@ -588,45 +595,51 @@ int FakeDisplay::CaptureThread() {
             auto dst = reinterpret_cast<ImageInfo*>(capture_active_id_);
 
             if (src->pixel_format != dst->pixel_format) {
-              DISP_ERROR("Trying to capture format=%d as format=%d\n", src->pixel_format,
-                         dst->pixel_format);
+              zxlogf(ERROR, "Trying to capture format=%d as format=%d\n", src->pixel_format,
+                     dst->pixel_format);
               continue;
             }
             size_t src_vmo_size;
             auto status = src->vmo.get_size(&src_vmo_size);
             if (status != ZX_OK) {
-              DISP_ERROR("Could not get vmo size of displayed image\n");
+              zxlogf(ERROR, "Failed to get the size of the displayed image VMO: %s",
+                     zx_status_get_string(status));
               continue;
             }
             size_t dst_vmo_size;
             status = dst->vmo.get_size(&dst_vmo_size);
             if (status != ZX_OK) {
-              DISP_ERROR("Could not get vmo size of captured image\n");
+              zxlogf(ERROR, "Failed to get the size of the VMO for the captured image: %s",
+                     zx_status_get_string(status));
               continue;
             }
             if (dst_vmo_size != src_vmo_size) {
-              DISP_ERROR("Size mismatch between src (%zu) and dst (%zu)\n", src_vmo_size,
-                         dst_vmo_size);
+              zxlogf(ERROR,
+                     "Capture will fail; the displayed image VMO size %zu does not match the "
+                     "captured image VMO size %zu",
+                     src_vmo_size, dst_vmo_size);
               continue;
             }
             fzl::VmoMapper mapped_src;
             status = mapped_src.Map(src->vmo, 0, src_vmo_size, ZX_VM_PERM_READ);
             if (status != ZX_OK) {
-              DISP_ERROR("Could not map source %d\n", status);
+              zxlogf(ERROR, "Capture thread will exit; failed to map displayed image VMO: %s",
+                     zx_status_get_string(status));
               return status;
             }
 
             fzl::VmoMapper mapped_dst;
             status = mapped_dst.Map(dst->vmo, 0, dst_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
             if (status != ZX_OK) {
-              DISP_ERROR("Could not map destination %d\n", status);
+              zxlogf(ERROR, "Capture thread will exit; failed to map capture image VMO: %s",
+                     zx_status_get_string(status));
               return status;
             }
             if (src->ram_domain) {
               zx_cache_flush(mapped_src.start(), src_vmo_size,
                              ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
             }
-            memcpy(mapped_dst.start(), mapped_src.start(), dst_vmo_size);
+            std::memcpy(mapped_dst.start(), mapped_src.start(), dst_vmo_size);
             if (dst->ram_domain) {
               zx_cache_flush(mapped_dst.start(), dst_vmo_size,
                              ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
@@ -663,26 +676,26 @@ void FakeDisplay::SendVsync() {
 zx_status_t FakeDisplay::Bind(bool start_vsync_thread) {
   zx_status_t status = ddk::PDev::FromFragment(parent(), &pdev_);
   if (status != ZX_OK) {
-    DISP_ERROR("Could not get PDEV protocol\n");
+    zxlogf(ERROR, "Failed to get PDev protocol: %s", zx_status_get_string(status));
     return status;
   }
 
   status = ddk::SysmemProtocolClient::CreateFromDevice(parent(), "sysmem", &sysmem_);
   if (status != ZX_OK) {
-    DISP_ERROR("Could not get Display SYSMEM protocol\n");
+    zxlogf(ERROR, "Failed to get Display Sysmem protocol: %s", zx_status_get_string(status));
     return status;
   }
 
   status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
-    DISP_ERROR("Could not initialize sysmem Allocator client\n");
+    zxlogf(ERROR, "Failed to initialize sysmem Allocator client: %s", zx_status_get_string(status));
     return status;
   }
 
   // Setup Display Interface
   status = SetupDisplayInterface();
   if (status != ZX_OK) {
-    DISP_ERROR("Fake display setup failed! %d\n", status);
+    zxlogf(ERROR, "SetupDisplayInterface() failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -692,7 +705,7 @@ zx_status_t FakeDisplay::Bind(bool start_vsync_thread) {
         [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this,
         "vsync_thread"));
     if (status != ZX_OK) {
-      DISP_ERROR("Could not create vsync_thread\n");
+      zxlogf(ERROR, "Failed to create VSync thread: %s", zx_status_get_string(status));
       return status;
     }
     vsync_thread_running_ = true;
@@ -703,13 +716,13 @@ zx_status_t FakeDisplay::Bind(bool start_vsync_thread) {
       [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,
       "capture_thread"));
   if (status != ZX_OK) {
-    DISP_ERROR("Could not create capture_thread\n");
+    zxlogf(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
     return status;
   }
 
   status = DdkAdd("fake-display");
   if (status != ZX_OK) {
-    DISP_ERROR("Could not add device\n");
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
     return status;
   }
 
