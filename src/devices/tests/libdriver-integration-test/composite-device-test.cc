@@ -128,11 +128,26 @@ TEST_F(CompositeDeviceTest, UnbindFragment) {
             return DoOpen(child_device1->path(), &client);
           })
           .and_then([&]() -> Promise<void> {
-            // Send the unbind request to child1
             zx_status_t status =
                 child1_controller.Bind(client.Unbind().TakeChannel(), loop_.dispatcher());
             PROMISE_ASSERT(ASSERT_EQ(status, ZX_OK));
 
+            // Setup our expectations for unbinding. The child device will be unbound,
+            // then the composite will be unbound and released, then the child device will be
+            // released.
+            auto unbind_promise =
+                ExpectUnbind(child_device1,
+                             [](HookInvocation record, Completer<void> completer) {
+                               ActionList actions;
+                               Promise<void> unbind_reply_done;
+                               actions.AppendUnbindReply(&unbind_reply_done);
+                               completer.complete_ok();
+                               return actions;
+                             })
+                    .and_then(ExpectUnbindThenRelease(composite_child_device))
+                    .and_then(ExpectRelease(child_device1));
+
+            // Send the unbind request to child1
             fpromise::bridge<void, Error> bridge;
             child1_controller->ScheduleUnbind(
                 [completer = std::move(bridge.completer)](
@@ -144,28 +159,8 @@ TEST_F(CompositeDeviceTest, UnbindFragment) {
                   }
                 });
 
-            // We should receive the unbind for child1, and then soon after for
-            // the composite.
-            auto unbind_promise =
-                ExpectUnbind(child_device1, [](HookInvocation record, Completer<void> completer) {
-                  ActionList actions;
-                  // We don't care about when the unbind reply actually finishes.
-                  // The ExpectRelease below will serialize against it anyway.
-                  Promise<void> unbind_reply_done;
-                  actions.AppendUnbindReply(&unbind_reply_done);
-                  // Complete here instead of in remove device, since the remove
-                  // device completion doesn't fire until after we're notified,
-                  // which might be after the unbind of the composite begins
-                  completer.complete_ok();
-                  return actions;
-                }).and_then(ExpectUnbindThenRelease(composite_child_device));
-
             return unbind_promise.and_then(
                 bridge.consumer.promise_or(fpromise::error("Unbind abandoned")));
-          })
-          .and_then([&]() -> Promise<void> {
-            child1_controller.Unbind();
-            return ExpectRelease(child_device1);
           })
           .and_then([&]() -> Promise<void> {
             // Destroy the test device.  This should cause an unbind of the last child
