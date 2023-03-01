@@ -1,4 +1,3 @@
-
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -17,7 +16,7 @@
 namespace gigaboot {
 namespace {
 // Reasonable guess for the size of additional zbi items on this platform.
-constexpr size_t kKernelBufferZbiSizeEstimate = 0x1000;
+constexpr size_t kKernelBufferZbiSizeEstimate = 0x8000;
 
 bool ReadFromPartition(ZirconBootOps* ops, const char* part, size_t offset, size_t size, void* dst,
                        size_t* read_size) {

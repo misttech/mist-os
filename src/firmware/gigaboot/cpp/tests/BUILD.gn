@@ -7,6 +7,7 @@ import("//build/test.gni")
 test("gigaboot_unittests") {
   sources = [
     "boot_zbi_items_tests.cc",
+    "cmdline_tests.cc",
     "efi_variables_test.cc",
     "fastboot_test.cc",
     "gpt_tests.cc",
