@@ -525,7 +525,7 @@ struct Send<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 struct RetransTimer<I: Instant> {
-    start: I,
+    user_timeout_until: I,
     remaining_retries: Option<NonZeroU8>,
     at: I,
     rto: Duration,
@@ -536,22 +536,30 @@ impl<I: Instant> RetransTimer<I> {
         let at = now.checked_add(rto).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", rto, now);
         });
-        Self { at, rto, start: now, remaining_retries: Some(DEFAULT_MAX_RETRIES) }
+        let user_timeout_until = now.checked_add(DEFAULT_USER_TIMEOUT).unwrap_or_else(|| {
+            panic!("clock wraps around when adding {:?} to {:?}", DEFAULT_USER_TIMEOUT, now);
+        });
+        Self { at, rto, user_timeout_until, remaining_retries: Some(DEFAULT_MAX_RETRIES) }
     }
 
     fn backoff(&mut self, now: I) {
-        let Self { at, rto, start, remaining_retries } = self;
+        let Self { at, rto, user_timeout_until, remaining_retries } = self;
         *remaining_retries = remaining_retries.and_then(|r| NonZeroU8::new(r.get() - 1));
         *rto = rto.saturating_mul(2);
-        let elapsed = now.duration_since(*start);
-        let remaining = DEFAULT_USER_TIMEOUT.saturating_sub(elapsed);
+        let remaining = if now < *user_timeout_until {
+            user_timeout_until.duration_since(now)
+        } else {
+            // `now` has already passed  `user_timeout_until`, just update the
+            // timer to expire as soon as possible.
+            Duration::ZERO
+        };
         *at = now.checked_add(core::cmp::min(*rto, remaining)).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", rto, now);
         });
     }
 
     fn rearm(&mut self, now: I) {
-        let Self { at, rto, start: _, remaining_retries: _ } = self;
+        let Self { at, rto, user_timeout_until: _, remaining_retries: _ } = self;
         *at = now.checked_add(*rto).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", rto, now);
         });
@@ -597,12 +605,17 @@ impl<I: Instant> KeepAliveTimer<I> {
 impl<I: Instant> SendTimer<I> {
     fn expiry(&self) -> I {
         match self {
-            SendTimer::Retrans(RetransTimer { at, rto: _, start: _, remaining_retries: _ })
+            SendTimer::Retrans(RetransTimer {
+                at,
+                rto: _,
+                user_timeout_until: _,
+                remaining_retries: _,
+            })
             | SendTimer::KeepAlive(KeepAliveTimer { at, already_sent: _ })
             | SendTimer::ZeroWindowProbe(RetransTimer {
                 at,
                 rto: _,
-                start: _,
+                user_timeout_until: _,
                 remaining_retries: _,
             }) => *at,
         }
@@ -664,9 +677,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 !keep_alive.enabled || keep_alive_timer.already_sent < keep_alive.count.get()
             }
             Some(SendTimer::Retrans(timer)) | Some(SendTimer::ZeroWindowProbe(timer)) => {
-                let RetransTimer { start, remaining_retries: remaining_retires, at: _, rto: _ } =
-                    timer;
-                remaining_retires.is_some() && now.duration_since(start) < DEFAULT_USER_TIMEOUT
+                let RetransTimer { user_timeout_until, remaining_retries, at: _, rto: _ } = timer;
+                remaining_retries.is_some() && now < user_timeout_until
             }
             None => true,
         }
@@ -3391,7 +3403,7 @@ mod test {
             retrans_timer: RetransTimer {
                 at: FakeInstant::default(),
                 rto: Duration::new(0, 0),
-                start: FakeInstant::default(),
+                user_timeout_until: FakeInstant::from(DEFAULT_USER_TIMEOUT),
                 remaining_retries: Some(DEFAULT_MAX_RETRIES),
             },
             simultaneous_open: Some(()),
@@ -3757,7 +3769,7 @@ mod test {
             retrans_timer: RetransTimer {
                 at: FakeInstant::default(),
                 rto: Duration::new(0, 0),
-                start: FakeInstant::default(),
+                user_timeout_until: FakeInstant::from(DEFAULT_USER_TIMEOUT),
                 remaining_retries: Some(DEFAULT_MAX_RETRIES),
             },
             simultaneous_open: None,
@@ -4346,5 +4358,20 @@ mod test {
             assert!(times < DEFAULT_MAX_RETRIES.get());
         }
         assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }))
+    }
+
+    #[test]
+    fn retrans_timer_backoff() {
+        let mut clock = FakeInstantCtx::default();
+        let mut timer = RetransTimer::new(clock.now(), Duration::from_secs(1));
+        clock.sleep(DEFAULT_USER_TIMEOUT);
+        timer.backoff(clock.now());
+        assert_eq!(timer.at, FakeInstant::from(DEFAULT_USER_TIMEOUT));
+        clock.sleep(Duration::from_secs(1));
+        // The current time is now later than the timeout deadline,
+        timer.backoff(clock.now());
+        // The timer should adjust its expiration time to be the current time
+        // instead of panicking.
+        assert_eq!(timer.at, clock.now());
     }
 }
