@@ -135,46 +135,47 @@ class AmlUsbPhyTest : public zxtest::Test {
 
 TEST_F(AmlUsbPhyTest, SetMode) {
   // The aml-usb-phy device should be added.
-  auto* phy = root_->GetLatestChild();
-  ASSERT_NOT_NULL(phy);
-  auto* root_ctx = phy->GetDeviceContext<AmlUsbPhy>();
+  auto* mock_phy = root_->GetLatestChild();
+  ASSERT_NOT_NULL(mock_phy);
+  auto* phy = mock_phy->GetDeviceContext<AmlUsbPhy>();
 
   // Call DdkInit
-  phy->InitOp();
-  phy->WaitUntilInitReplyCalled();
-  EXPECT_TRUE(phy->InitReplyCalled());
-  auto* xhci = phy->GetLatestChild();
-  ASSERT_NOT_NULL(xhci);
-  auto* xhci_ctx = xhci->GetDeviceContext<void>();
-  ASSERT_NE(xhci_ctx, root_ctx);
+  mock_phy->InitOp();
+  mock_phy->WaitUntilInitReplyCalled();
+  EXPECT_TRUE(mock_phy->InitReplyCalled());
+  auto* mock_xhci = mock_phy->GetLatestChild();
+  ASSERT_NOT_NULL(mock_xhci);
+  auto* xhci = mock_xhci->GetDeviceContext<void>();
+  ASSERT_EQ(xhci, phy);
 
-  ASSERT_EQ(root_ctx->mode(), AmlUsbPhy::UsbMode::HOST);
+  ASSERT_EQ(phy->mode(), AmlUsbPhy::UsbMode::HOST);
 
   // Trigger interrupt, and switch to Peripheral mode.
   TriggerInterrupt(AmlUsbPhy::UsbMode::PERIPHERAL);
-  xhci->WaitUntilAsyncRemoveCalled();
-  EXPECT_TRUE(xhci->AsyncRemoveCalled());
+  mock_xhci->WaitUntilAsyncRemoveCalled();
+  EXPECT_TRUE(mock_xhci->AsyncRemoveCalled());
   mock_ddk::ReleaseFlaggedDevices(root_.get());
-  ASSERT_EQ(phy->child_count(), 1);
-  auto* dwc2 = phy->GetLatestChild();
-  ASSERT_NOT_NULL(dwc2);
-  auto* dwc2_ctx = dwc2->GetDeviceContext<void>();
-  ASSERT_NE(dwc2_ctx, root_ctx);
+  ASSERT_EQ(mock_phy->child_count(), 1);
+  auto* mock_dwc2 = mock_phy->GetLatestChild();
+  ASSERT_NOT_NULL(mock_dwc2);
+  auto* dwc2 = mock_dwc2->GetDeviceContext<void>();
+  ASSERT_EQ(dwc2, phy);
 
-  ASSERT_EQ(root_ctx->mode(), AmlUsbPhy::UsbMode::PERIPHERAL);
+  ASSERT_EQ(phy->mode(), AmlUsbPhy::UsbMode::PERIPHERAL);
 
   // Trigger interrupt, and switch (back) to Host mode.
   TriggerInterrupt(AmlUsbPhy::UsbMode::HOST);
-  dwc2->WaitUntilAsyncRemoveCalled();
-  EXPECT_TRUE(dwc2->AsyncRemoveCalled());
+  mock_dwc2->WaitUntilAsyncRemoveCalled();
+  EXPECT_TRUE(mock_dwc2->AsyncRemoveCalled());
   mock_ddk::ReleaseFlaggedDevices(root_.get());
-  ASSERT_EQ(phy->child_count(), 1);
-  xhci = phy->GetLatestChild();
-  ASSERT_NOT_NULL(xhci);
-  xhci_ctx = xhci->GetDeviceContext<void>();
-  ASSERT_NE(xhci_ctx, root_ctx);
+  ASSERT_EQ(mock_phy->child_count(), 1);
+  mock_xhci = mock_phy->GetLatestChild();
+  ASSERT_NOT_NULL(mock_xhci);
+  xhci = mock_xhci->GetDeviceContext<void>();
+  ASSERT_EQ(xhci, phy);
 
-  ASSERT_EQ(root_ctx->mode(), AmlUsbPhy::UsbMode::HOST);
+  ASSERT_EQ(phy->mode(), AmlUsbPhy::UsbMode::HOST);
+  ASSERT_EQ(mock_phy->child_count(), 1);
 }
 
 }  // namespace aml_usb_phy

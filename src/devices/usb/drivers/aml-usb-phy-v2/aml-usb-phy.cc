@@ -217,11 +217,18 @@ void AmlUsbPhy::SetMode(UsbMode mode, SetModeCompletion completion) {
     PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(phy_mmio);
   }
 
+  zx_status_t status;
   if (mode == UsbMode::HOST) {
-    AddXhciDevice();
+    status = AddXhciDevice();
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "AddXhciDevice() error %s", zx_status_get_string(status));
+    }
     RemoveDwc2Device(std::move(completion));
   } else {
-    AddDwc2Device();
+    status = AddDwc2Device();
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "AddDwc2Device() error %s", zx_status_get_string(status));
+    }
     RemoveXhciDevice(std::move(completion));
   }
 }
@@ -288,7 +295,15 @@ zx_status_t AmlUsbPhy::AddXhciDevice() {
     return ZX_ERR_BAD_STATE;
   }
 
-  xhci_device_ = new XhciDevice(zxdev());
+  static zx_protocol_device_t ops = {
+      .version = DEVICE_OPS_VERSION,
+      // Defer get_protocol() to parent.
+      .get_protocol =
+          [](void* ctx, uint32_t id, void* proto) {
+            return device_get_protocol(reinterpret_cast<AmlUsbPhy*>(ctx)->zxdev(), id, proto);
+          },
+      .release = [](void*) {},
+  };
 
   zx_device_prop_t props[] = {
       {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
@@ -296,8 +311,19 @@ zx_status_t AmlUsbPhy::AddXhciDevice() {
       {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_USB_XHCI_COMPOSITE},
   };
 
-  return xhci_device_->DdkAdd(
-      ddk::DeviceAddArgs("xhci").set_props(props).set_proto_id(ZX_PROTOCOL_USB_PHY));
+  // clang-format off
+  device_add_args_t args = (ddk::DeviceAddArgs("xhci")
+                            .set_context(this)
+                            .set_props(props)
+                            .set_proto_id(ZX_PROTOCOL_USB_PHY)
+                            .set_ops(&ops)).get();
+  // clang-format on
+
+  auto status = device_add(zxdev(), &args, &xhci_device_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "device_add() error %s", zx_status_get_string(status));
+  }
+  return status;
 }
 
 void AmlUsbPhy::RemoveXhciDevice(SetModeCompletion completion) {
@@ -308,7 +334,8 @@ void AmlUsbPhy::RemoveXhciDevice(SetModeCompletion completion) {
   if (xhci_device_) {
     // The callback will be run by the ChildPreRelease hook once the xhci device has been removed.
     set_mode_completion_ = std::move(completion);
-    xhci_device_->DdkAsyncRemove();
+    device_async_remove(xhci_device_);
+    xhci_device_ = nullptr;
   }
 }
 
@@ -317,7 +344,15 @@ zx_status_t AmlUsbPhy::AddDwc2Device() {
     return ZX_ERR_BAD_STATE;
   }
 
-  dwc2_device_ = new Dwc2Device(zxdev());
+  static zx_protocol_device_t ops = {
+      .version = DEVICE_OPS_VERSION,
+      // Defer get_protocol() to parent.
+      .get_protocol =
+          [](void* ctx, uint32_t id, void* proto) {
+            return device_get_protocol(reinterpret_cast<AmlUsbPhy*>(ctx)->zxdev(), id, proto);
+          },
+      .release = [](void*) {},
+  };
 
   zx_device_prop_t props[] = {
       {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
@@ -325,8 +360,19 @@ zx_status_t AmlUsbPhy::AddDwc2Device() {
       {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_USB_DWC2},
   };
 
-  return dwc2_device_->DdkAdd(
-      ddk::DeviceAddArgs("dwc2").set_props(props).set_proto_id(ZX_PROTOCOL_USB_PHY));
+  // clang-format off
+  device_add_args_t args = (ddk::DeviceAddArgs("dwc2")
+                            .set_context(this)
+                            .set_props(props)
+                            .set_proto_id(ZX_PROTOCOL_USB_PHY)
+                            .set_ops(&ops)).get();
+  // clang-format on
+
+  auto status = device_add(zxdev(), &args, &dwc2_device_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "device_add() error %s", zx_status_get_string(status));
+  }
+  return status;
 }
 
 void AmlUsbPhy::RemoveDwc2Device(SetModeCompletion completion) {
@@ -337,7 +383,8 @@ void AmlUsbPhy::RemoveDwc2Device(SetModeCompletion completion) {
   if (dwc2_device_) {
     // The callback will be run by the ChildPreRelease hook once the dwc2 device has been removed.
     set_mode_completion_ = std::move(completion);
-    dwc2_device_->DdkAsyncRemove();
+    device_async_remove(dwc2_device_);
+    dwc2_device_ = nullptr;
   }
 }
 
@@ -471,14 +518,6 @@ void AmlUsbPhy::DdkUnbind(ddk::UnbindTxn txn) {
 
 void AmlUsbPhy::DdkChildPreRelease(void* child_ctx) {
   fbl::AutoLock lock(&lock_);
-  // devmgr will own the device until it is destroyed.
-  if (xhci_device_ && (child_ctx == xhci_device_)) {
-    xhci_device_ = nullptr;
-  } else if (dwc2_device_ && (child_ctx == dwc2_device_)) {
-    dwc2_device_ = nullptr;
-  } else {
-    zxlogf(ERROR, "AmlUsbPhy::DdkChildPreRelease unexpected child ctx %p", child_ctx);
-  }
   if (set_mode_completion_) {
     // If the mode is currently being set, the irq thread will be blocked
     // until we call this completion.
