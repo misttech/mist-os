@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::platform_config::connectivity_config::PlatformConnectivityConfig;
+use assembly_config_schema::platform_config::connectivity_config::{
+    PlatformConnectivityConfig, PlatformNetworkConfig,
+};
 
 pub(crate) struct ConnectivitySubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySubsystemConfig {
@@ -13,6 +15,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if let FeatureSupportLevel::Minimal = context.feature_set_level {
+            let mut requires_netstack3 = false;
             if let Some(board_info) = context.board_info {
                 let has_fullmac = board_info.provides_feature("fuchsia::wlan_fullmac");
                 let has_softmac = board_info.provides_feature("fuchsia::wlan_softmac");
@@ -33,9 +36,18 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                         builder.platform_bundle("wlan_softmac_support");
                     }
                 }
+
+                if board_info.provides_feature("fuchsia::network_require_netstack3") {
+                    requires_netstack3 = true;
+                }
             }
 
-            builder.platform_bundle("netstack");
+            let PlatformNetworkConfig { force_netstack3 } = connectivity_config.network;
+            if requires_netstack3 || force_netstack3 {
+                builder.platform_bundle("netstack3");
+            } else {
+                builder.platform_bundle("netstack2");
+            }
         }
 
         Ok(())

@@ -9,7 +9,17 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct PlatformConnectivityConfig {
     #[serde(default)]
+    pub network: PlatformNetworkConfig,
+    #[serde(default)]
     pub wlan: PlatformWlanConfig,
+}
+
+/// Platform configuration options for the network area.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PlatformNetworkConfig {
+    #[serde(default)]
+    pub force_netstack3: bool,
 }
 
 /// Platform configuration options for the wlan area.

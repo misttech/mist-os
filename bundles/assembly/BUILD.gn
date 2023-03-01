@@ -6,7 +6,6 @@
 # other files are to be imported.
 import("//build/assembly/assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
-import("//src/connectivity/network/use_netstack3.gni")
 
 ########
 # Guaranteed Invariants
@@ -525,17 +524,22 @@ assembly_input_bundle("virtualization_support") {
   ]
 }
 
-# AIB for the netstack package independent of the rest of base networking.
+# AIB to include Netstack2 as the netstack for use by base networking.
 #
 # feature_set_levels: minimal
 # build-types: all
 #
-assembly_input_bundle("netstack") {
-  if (use_netstack3) {
-    base_packages = [ "//src/connectivity/network:netstack3" ]
-  } else {
-    base_packages = [ "//src/connectivity/network:netstack2" ]
-  }
+assembly_input_bundle("netstack2") {
+  base_packages = [ "//src/connectivity/network:netstack2" ]
+}
+
+# AIB to include Netstack3 as the netstack for use by base networking.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("netstack3") {
+  base_packages = [ "//src/connectivity/network:netstack3" ]
 }
 
 # WLAN base support

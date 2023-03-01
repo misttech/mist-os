@@ -3,10 +3,26 @@
 # found in the LICENSE file.
 
 import("//build/assembly/product_assembly_configuration.gni")
+import("//src/connectivity/network/use_netstack3.gni")
 
 assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
+
+_base_driver_packages = [
+  {
+    package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-test"
+    driver_components = [ "meta/libmsd_arm_test.cm" ]
+  },
+  {
+    package_target = "//src/graphics/drivers/msd-intel-gen:msd-intel-gen-test"
+    driver_components = [ "meta/libmsd_intel_test.cm" ]
+  },
+  {
+    package_target = "//src/graphics/drivers/msd-vsi-vip:msd-vsi-vip-test"
+    driver_components = [ "meta/libmsd_vsi_test.cm" ]
+  },
+]
 
 product_assembly_configuration("core") {
   testonly = true
@@ -18,21 +34,40 @@ product_assembly_configuration("core") {
         "touchscreen",
       ]
     }
+
+    # TODO(https://fxbug.dev/121811): Remove this as soon as the existing
+    # Netstack3 CI builders have been transitioned to use the
+    # core-with-netstack3 target below.
+    connectivity = {
+      network = {
+        force_netstack3 = use_netstack3
+      }
+    }
   }
   product = {
   }
-  base_driver_packages = [
-    {
-      package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-test"
-      driver_components = [ "meta/libmsd_arm_test.cm" ]
-    },
-    {
-      package_target = "//src/graphics/drivers/msd-intel-gen:msd-intel-gen-test"
-      driver_components = [ "meta/libmsd_intel_test.cm" ]
-    },
-    {
-      package_target = "//src/graphics/drivers/msd-vsi-vip:msd-vsi-vip-test"
-      driver_components = [ "meta/libmsd_vsi_test.cm" ]
-    },
-  ]
+
+  base_driver_packages = _base_driver_packages
+}
+
+product_assembly_configuration("core-with-netstack3") {
+  testonly = true
+  platform = {
+    build_type = "eng"
+    input = {
+      supported_input_devices = [
+        "button",
+        "touchscreen",
+      ]
+    }
+    connectivity = {
+      network = {
+        force_netstack3 = true
+      }
+    }
+  }
+  product = {
+  }
+
+  base_driver_packages = _base_driver_packages
 }

@@ -1,0 +1,38 @@
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//products/common/core.gni")
+
+# TODO(fxbug.dev/102390): deprecate appmgr from core.
+
+# TODO(fxbug.dev/108016): Use appmgr_base_packages once no more chromium cmx
+# components are running.
+import("//src/sys/appmgr/appmgr.gni")
+legacy_base_package_labels += appmgr_with_sysmgr_base_packages
+core_realm_shards += appmgr_core_shards
+
+product_bootfs_labels += [
+  "//bundles/drivers:usb-peripheral-stack",
+  "//src/sys/component_manager:component_manager_bootfs_config",
+]
+
+core_realm_shards += [
+  "//src/intl/intl_services:intl_services_small_shard",
+  "//src/sys/pkg/bin/system-update-checker:system-update-checker-core-shard",
+]
+
+legacy_base_package_labels += [
+  "//src/connectivity/network/netcfg:config-default",
+  "//src/sys/pkg:system-update-checker",
+]
+
+# Use the product assembly config target to specify the product configuration.
+#
+# NOTE: This should be overridden by products which inherit from core.
+fuchsia_product_assembly_config_label = "//products/core:core-with-netstack3"
+
+# Set to empty so that products which inherit from core don't automatically get minimal's no-op
+# policy. Necessary to ensure that the check for policy on non-eng builds will actually discover
+# missing policies.
+fuchsia_structured_config_policy = ""
