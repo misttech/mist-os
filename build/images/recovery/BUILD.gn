@@ -248,7 +248,7 @@ if (is_fuchsia) {
 
   product_assembly_configuration("for-fastboot") {
     platform = {
-      build_type = "user"
+      build_type = "eng"
       feature_set_level = "utility"
     }
     product = {
@@ -258,6 +258,7 @@ if (is_fuchsia) {
   # A minimal recovery image that runs userspace fastboot on tcp.
   assembled_system("recovery-fastboot") {
     forward_variables_from(recovery_base, "*")
+    allow_eng_platform_bundle_use = true
     base_packages = []
     core_realm_definition = ":core-eng"
 
@@ -377,6 +378,7 @@ if (is_fuchsia) {
 
   assembled_system("recovery-installer") {
     forward_variables_from(recovery_base, "*")
+    allow_eng_platform_bundle_use = true
     base_packages = recovery_installer_packages
 
     product_assembly_config_label = ":for-installer"
