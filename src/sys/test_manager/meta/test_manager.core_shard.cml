@@ -116,12 +116,7 @@
             to: "#test_manager",
         },
         {
-            protocol: "fuchsia.tracing.provider.Registry",
-            protocol: [
-                "fuchsia.tracing.controller.Controller",
-                "fuchsia.tracing.perfetto.ProducerConnector",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.tracing.controller.Controller" ],
             from: "#trace_manager",
             to: "#test_manager",
             source_availability: "unknown",

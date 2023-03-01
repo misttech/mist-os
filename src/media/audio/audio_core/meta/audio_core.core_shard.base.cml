@@ -39,12 +39,6 @@
             to: "#audio_core",
         },
         {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#audio_core",
-            source_availability: "unknown",
-        },
-        {
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.ProfileProvider",

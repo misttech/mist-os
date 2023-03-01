@@ -52,11 +52,6 @@
             to: [ "#mediaplayer" ],
         },
         {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: [ "#mediaplayer" ],
-        },
-        {
             protocol: "fuchsia.ui.scenic.Scenic",
             from: "#ui",
             to: [ "#mediaplayer" ],

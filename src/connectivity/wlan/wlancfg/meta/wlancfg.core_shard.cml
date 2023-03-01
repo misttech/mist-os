@@ -77,16 +77,6 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#wlancfg",
-
-            // Trace manager may be excluded from builds where tracing is not
-            // expected to be used for observability, such as in the bringup
-            // product and non-eng builds of any product.
-            source_availability: "unknown",
-        },
-        {
             protocol: "fuchsia.diagnostics.persist.DataPersistence-wlan",
             from: "#diagnostics",
             to: "#wlancfg",

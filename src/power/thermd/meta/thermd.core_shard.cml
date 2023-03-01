@@ -19,12 +19,6 @@
             to: [ "#thermd" ],
         },
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "#trace_manager",
-            to: "#thermd",
-            source_availability: "unknown",
-        },
-        {
             directory: "dev-class",
             from: "parent",
             as: "dev-thermal",

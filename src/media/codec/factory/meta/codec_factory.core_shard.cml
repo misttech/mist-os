@@ -48,12 +48,6 @@
             from: "parent",
             to: "#codec_factory",
         },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#codec_factory",
-            source_availability: "unknown",
-        },
 
         // needed for certain non-hermetic tests.
         {

@@ -30,12 +30,6 @@
             subdir: "bt-hci",
         },
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "#trace_manager",
-            to: [ "#bt-snoop" ],
-            source_availability: "unknown",
-        },
-        {
             protocol: [ "fuchsia.bluetooth.snoop.Snoop" ],
             from: "#bt-snoop",
             to: [ "#bluetooth-core" ],

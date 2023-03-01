@@ -664,32 +664,17 @@
             to: [ "#timekeeper" ],
         },
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "#trace_manager",
-            to: [
-                "#agis",
-                "#cobalt_system_metrics",
-                "#font_provider",
-                "#starnix_manager",
-                "#sysmem_connector",
+            protocol: [
+                "fuchsia.tracing.perfetto.ProducerConnector",
+                "fuchsia.tracing.provider.Registry",
             ],
-
-            // Trace manager may be excluded from builds where tracing is not
-            // expected to be used for observability, such as in the bringup
-            // product and non-eng builds of any product.
-            source_availability: "unknown",
-        },
-        {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "#trace_manager",
-            to: [
-                "#cobalt",
-                "#network",
-                "#pkg-resolver",
-            ],
+            to: "all",
 
             // Weak offers to resolve dependency cycles that would be caused by
-            // using #core-env.
+            // using #core-env. Regardless of cycles, tracing is an optional
+            // feature and a client should be able to handle trace_manager
+            // being unavailable.
             dependency: "weak",
 
             // Trace manager may be excluded from builds where tracing is not

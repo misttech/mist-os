@@ -55,12 +55,6 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#setui_service",
-            source_availability: "unknown",
-        },
-        {
             protocol: [
                 "fuchsia.recovery.policy.Device",
                 "fuchsia.ui.policy.DeviceListenerRegistry",

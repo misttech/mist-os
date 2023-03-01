@@ -19,12 +19,6 @@
             to: "#escher-examples",
         },
         {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#escher-examples",
-            source_availability: "unknown",
-        },
-        {
             protocol: "fuchsia.sysmem.Allocator",
             from: "#sysmem_connector",
             to: "#escher-examples",

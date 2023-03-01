@@ -15,11 +15,6 @@
             to: "#dart_aot_product_runner",
         },
         {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#dart_aot_product_runner",
-        },
-        {
             protocol: [
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",

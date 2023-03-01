@@ -179,19 +179,6 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.tracing.perfetto.ProducerConnector",
-                "fuchsia.tracing.provider.Registry",
-            ],
-            from: "#trace_manager",
-            to: "#session-manager",
-
-            // Trace manager may be excluded from builds where tracing is not
-            // expected to be used for observability, such as the non-eng
-            // builds of any product.
-            source_availability: "unknown",
-        },
-        {
             directory: "tzdata-icu-44-le",
             from: "#tzdata-provider",
             to: "#session-manager",

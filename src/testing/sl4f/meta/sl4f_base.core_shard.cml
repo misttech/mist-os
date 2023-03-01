@@ -188,10 +188,7 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.tracing.controller.Controller",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.tracing.controller.Controller" ],
             from: "#trace_manager",
             to: [ "#sl4f" ],
             source_availability: "unknown",

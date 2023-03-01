@@ -143,11 +143,5 @@
             to: "#ui",
             source_availability: "unknown",
         },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#ui",
-            source_availability: "unknown",
-        },
     ],
 }

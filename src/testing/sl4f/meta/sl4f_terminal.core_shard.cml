@@ -74,14 +74,6 @@
             to: "#flatland_view_provider_example",
         },
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "#trace_manager",
-            to: [
-                "#flatland_view_provider_example",
-                "#tiles_flatland",
-            ],
-        },
-        {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: [
