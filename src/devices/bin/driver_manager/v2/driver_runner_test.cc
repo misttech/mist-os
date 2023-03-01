@@ -78,6 +78,10 @@ zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderFactory() {
   return zx::ok(std::move(endpoints->client));
 }
 
+fdecl::ChildRef CreateChildRef(std::string name, std::string collection) {
+  return fdecl::ChildRef{.name = std::move(name), .collection = std::move(collection)};
+}
+
 class FakeContext : public fpromise::context {
  public:
   fpromise::executor* executor() const override {
@@ -114,6 +118,20 @@ class TestRealm : public fcomponent::testing::Realm_TestBase {
     return fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(handles_);
   }
 
+  void AssertDestroyedChildren(std::vector<fdecl::ChildRef> expected) {
+    auto destroyed_children = destroyed_children_;
+    for (const auto& child : expected) {
+      auto it =
+          std::find_if(destroyed_children.begin(), destroyed_children.end(),
+                       [&child](const fdecl::ChildRef& other) {
+                         return child.name == other.name && *child.collection == *other.collection;
+                       });
+      ASSERT_NE(it, destroyed_children.end());
+      destroyed_children.erase(it);
+    }
+    ASSERT_EQ(destroyed_children.size(), 0ul);
+  }
+
  private:
   void CreateChild(fdecl::CollectionRef collection, fdecl::Child decl,
                    fcomponent::CreateChildArgs args, CreateChildCallback callback) override {
@@ -129,6 +147,11 @@ class TestRealm : public fcomponent::testing::Realm_TestBase {
     callback(fcomponent::Realm_CreateChild_Result(fpromise::ok()));
   }
 
+  void DestroyChild(fdecl::ChildRef child, DestroyChildCallback callback) override {
+    destroyed_children_.push_back(std::move(child));
+    callback(fcomponent::Realm_DestroyChild_Result(fpromise::ok()));
+  }
+
   void OpenExposedDir(fdecl::ChildRef child, fidl::InterfaceRequest<fio::Directory> exposed_dir,
                       OpenExposedDirCallback callback) override {
     open_exposed_dir_handler_(std::move(child), std::move(exposed_dir));
@@ -142,6 +165,7 @@ class TestRealm : public fcomponent::testing::Realm_TestBase {
   CreateChildHandler create_child_handler_;
   OpenExposedDirHandler open_exposed_dir_handler_;
   std::vector<fprocess::wire::HandleInfo> handles_;
+  std::vector<fdecl::ChildRef> destroyed_children_;
 };
 
 class TestDirectory : public fio::testing::Directory_TestBase {
@@ -466,6 +490,7 @@ TEST_F(DriverRunnerTest, StartRootDriver) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver. Make sure that the driver is stopped before the Component is exited.
@@ -543,6 +568,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, add a child node, then remove it.
@@ -587,6 +613,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_RemoveOwnedChild) {
   EXPECT_TRUE(root_test_driver->node().is_bound());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and add two child nodes with duplicate names.
@@ -626,6 +653,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild_DuplicateNames) {
   EXPECT_TRUE(root_test_driver->node().is_bound());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and add a child node with an offer that is missing a
@@ -658,6 +686,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferMissingSource) {
   ASSERT_FALSE(node_controller.is_bound());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and add a child node with one offer that has a source
@@ -696,6 +725,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferHasRef) {
   ASSERT_FALSE(node_controller.is_bound());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and add a child node with duplicate symbols. The child
@@ -735,6 +765,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_DuplicateSymbols) {
   ASSERT_FALSE(node_controller.is_bound());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and add a child node that has a symbol without an
@@ -766,6 +797,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingAddress) {
   ASSERT_FALSE(node_controller.is_bound());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and add a child node that has a symbol without a name.
@@ -796,6 +828,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingName) {
   ASSERT_FALSE(node_controller.is_bound());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and then start a second driver in a new driver host.
@@ -883,6 +916,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
                                  });
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
 
 // Start the root driver, and then start a second driver in the same driver
@@ -957,6 +992,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
                                  });
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
 
 // Start the root driver, and then start a second driver that we match based on
@@ -1039,6 +1076,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
                              });
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
 
 // Start the root driver, and then add a child node that does not bind to a
@@ -1076,6 +1115,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
   ASSERT_EQ(1u, driver_runner.NumOrphanedNodes());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the root driver, and then add a child node that only binds to a base driver.
@@ -1147,6 +1187,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
   ASSERT_EQ(0u, driver_runner.NumOrphanedNodes());
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 // Start the second driver, and then unbind its associated node.
@@ -1202,6 +1243,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnbindSecondNode) {
   ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
 
 // Start the second driver, and then close the associated Driver protocol
@@ -1259,6 +1302,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_CloseSecondDriver) {
   ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
 
 // Start a chain of drivers, and then unbind the second driver's node.
@@ -1344,6 +1389,20 @@ TEST_F(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
   EXPECT_THAT(indices, ElementsAre(10, 9, 8, 7, 6, 5, 4, 3, 2, 1));
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.node-0", "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1", "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2", "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2.node-3", "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2.node-3.node-4", "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2.node-3.node-4.node-5", "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2.node-3.node-4.node-5.node-6", "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2.node-3.node-4.node-5.node-6.node-7",
+                      "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2.node-3.node-4.node-5.node-6.node-7.node-8",
+                      "boot-drivers"),
+       CreateChildRef("dev.node-0.node-1.node-2.node-3.node-4.node-5.node-6.node-7.node-8.node-9",
+                      "boot-drivers")});
 }
 
 // Start the second driver, and then unbind the root node.
@@ -1726,6 +1785,9 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
                             }}));
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"),
+       CreateChildRef("dev.dev-group-1.test-composite", "boot-drivers")});
 }
 
 // Start a driver and inspect the driver runner.
@@ -1802,6 +1864,7 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
                                                }));
 
   StopDriverComponent(std::move(root_driver.value()));
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
 TEST_F(DriverRunnerTest, TestTearDownNodeTreeWithManyChildren) {

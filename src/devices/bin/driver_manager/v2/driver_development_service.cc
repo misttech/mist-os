@@ -258,14 +258,20 @@ void DriverDevelopmentService::AddTestNode(AddTestNodeRequestView request,
   if (request->args.has_properties()) {
     builder.properties(request->args.properties());
   }
-  auto node =
-      driver_runner_.root_node()->AddChild(builder.Build(), /* controller */ {}, /* node */ {});
-  if (node.is_error()) {
-    completer.Reply(node.take_error());
-    return;
-  }
-  test_nodes_[node.value()->name()] = node.value();
-  completer.ReplySuccess();
+
+  driver_runner_.root_node()->AddChild(
+      builder.Build(), /* controller */ {}, /* node */ {},
+      [this, completer = completer.ToAsync()](
+          fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<dfv2::Node>>
+              result) mutable {
+        if (result.is_error()) {
+          completer.Reply(result.take_error());
+        } else {
+          auto node = result.value();
+          test_nodes_[node->name()] = node;
+          completer.ReplySuccess();
+        }
+      });
 }
 
 void DriverDevelopmentService::RemoveTestNode(RemoveTestNodeRequestView request,
