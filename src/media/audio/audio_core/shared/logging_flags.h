@@ -105,6 +105,10 @@ inline constexpr bool kLogTrims = true;
 #endif
 
 // Effects-related logging
+//
+inline constexpr bool kLogEffectsV1CtorValues = false;
+inline constexpr bool kLogEffectsV2CtorValues = false;
+inline constexpr bool kLogEffectsUpdates = false;
 inline constexpr bool kLogThermalEffectEnumeration = false;
 
 // Policy-related logging

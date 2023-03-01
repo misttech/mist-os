@@ -150,6 +150,23 @@ EffectsStageV1::EffectsStageV1(std::shared_ptr<ReadableStream> source,
   // Initialize our lead time. Passing 0 here will resolve to our effect's lead time
   // in our |SetPresentationDelay| override.
   SetPresentationDelay(zx::duration(0));
+
+  if constexpr (kLogEffectsV1CtorValues) {
+    FX_LOGS(INFO) << "Creating EffectsStageV1 0x" << this;
+    FX_LOGS(INFO) << "    ReadableStream 0x" << &(*source_)  //
+                  << ": sample_format " << static_cast<size_t>(source_->format().sample_format())
+                  << ", bytes_per_sample " << source_->format().bytes_per_sample()  //
+                  << ", channels " << source_->format().channels()                  //
+                  << ", frames_per_second " << source_->format().frames_per_second();
+    FX_LOGS(INFO) << "    EffectsProcessorV1 0x" << &(*effects_processor_)          //
+                  << ": block_size " << effects_processor_->block_size()            //
+                  << ", channels_in " << effects_processor_->channels_in()          //
+                  << ", channels_out " << effects_processor_->channels_out()        //
+                  << ", delay_frames " << effects_processor_->delay_frames()        //
+                  << ", max_batch_size " << effects_processor_->max_batch_size()    //
+                  << ", ring_out_frames " << effects_processor_->ring_out_frames()  //
+                  << ", size " << effects_processor_->size();
+  }
 }
 
 std::optional<ReadableStream::Buffer> EffectsStageV1::ReadLockImpl(ReadLockContext& ctx,
@@ -322,11 +339,17 @@ fpromise::result<void, fuchsia::media::audio::UpdateEffectError> EffectsStageV1:
     const std::string& instance_name, const std::string& config) {
   for (auto& effect : *effects_processor_) {
     if (effect.instance_name() == instance_name) {
-      if (effect.UpdateConfiguration(config) == ZX_OK) {
-        return fpromise::ok();
-      } else {
-        return fpromise::error(fuchsia::media::audio::UpdateEffectError::INVALID_CONFIG);
+      auto status = effect.UpdateConfiguration(config);
+
+      if constexpr (kLogEffectsUpdates) {
+        FX_LOGS(INFO) << this << "::" << __func__ << ": effect '" << instance_name << "', message '"
+                      << config << "' was " << (status == ZX_OK ? "" : "NOT ") << "successful";
       }
+
+      if (status == ZX_OK) {
+        return fpromise::ok();
+      }
+      return fpromise::error(fuchsia::media::audio::UpdateEffectError::INVALID_CONFIG);
     }
   }
   return fpromise::error(fuchsia::media::audio::UpdateEffectError::NOT_FOUND);

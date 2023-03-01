@@ -378,6 +378,22 @@ fpromise::result<std::shared_ptr<EffectsStageV2>, zx_status_t> EffectsStageV2::C
         : EffectsStageV2(std::move(config), std::move(source)) {}
   };
 
+  if constexpr (kLogEffectsV2CtorValues) {
+    FX_LOGS(INFO) << "About to create EffectsStageV2 for ReadableStream 0x" << &(*source);
+    FX_LOGS(INFO) << "Config 0x" << &config << " has"                          //
+                  << " block_size_frames " << config.block_size_frames()       //
+                  << ", max_frames_per_call " << config.max_frames_per_call()  //
+                  << ", processor 0x" << &config.processor();
+    FX_LOGS(INFO) << "Input sample_format " << static_cast<size_t>(input.format().sample_format)  //
+                  << " frames_per_second " << input.format().frames_per_second                    //
+                  << " channel_count " << input.format().channel_count;
+    FX_LOGS(INFO) << "Output latency_frames " << output.latency_frames()                       //
+                  << ", ring_out_frames " << output.ring_out_frames()                          //
+                  << ", sample_format " << static_cast<size_t>(output.format().sample_format)  //
+                  << " frames_per_second " << output.format().frames_per_second                //
+                  << " channel_count " << output.format().channel_count;
+  }
+
   return fpromise::ok(std::make_shared<MakeSharedEnabler>(std::move(config), std::move(source)));
 }
 
@@ -396,6 +412,19 @@ EffectsStageV2::EffectsStageV2(fuchsia_audio_effects::wire::ProcessorConfigurati
   // Initialize our lead time. Passing 0 here will resolve to our effect's lead time
   // not counting the impact of any downstream processors.
   SetPresentationDelay(zx::duration(0));
+
+  if constexpr (kLogEffectsV2CtorValues) {
+    FX_LOGS(INFO) << "Creating EffectsStageV2 0x" << this << " '" << name() << "'";
+    FX_LOGS(INFO) << " for ReadableStream 0x" << &(*source_) << ": sample_format "
+                  << static_cast<size_t>(source_->format().sample_format())         //
+                  << ", bytes_per_sample " << source_->format().bytes_per_sample()  //
+                  << ", channels " << source_->format().channels()                  //
+                  << ", frames_per_second " << source_->format().frames_per_second();
+    FX_LOGS(INFO) << " with Processor 0x" << &processor_                   //
+                  << " with max_frames_per_call " << max_frames_per_call_  //
+                  << ", block_size_frames " << block_size_frames_          //
+                  << ", output_shift_frames_ " << output_shift_frames_;
+  }
 }
 
 std::optional<ReadableStream::Buffer> EffectsStageV2::ReadLockImpl(ReadLockContext& ctx,
