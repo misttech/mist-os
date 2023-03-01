@@ -107,21 +107,37 @@ else export RBE_cache_dir="/tmp/.cache/reproxy/deps"
 fi
 mkdir -p "$RBE_cache_dir"
 
-gcloud="$(which gcloud)" || {
-  cat <<EOF
+# Check authentication.
+auth_option=()
+if [[ -n "${USER+x}" ]]
+then
+  gcert="$(which gcert)"
+  if [[ "$?" = 0 ]]
+  then
+    # In a Corp environment.
+    # For developers (not infra), automatically use LOAS credentials
+    # to acquire an OAuth2 token.  This saves a step of having to
+    # authenticate with a second mechanism.
+    # bootstrap --automatic_auth is available in re-client 0.97+
+    # See go/rbe/dev/x/reclientoptions#autoauth
+    auth_option+=( --automatic_auth=true )
+    # bootstrap will call gcert (prompting the user) as needed.
+  else
+    # Everyone else uses gcloud authentication.
+    gcloud="$(which gcloud)" || {
+      cat <<EOF
 \`gcloud\` command not found (but is needed to authenticate).
 \`gcloud\` can be installed from the Cloud SDK:
 
   http://go/cloud-sdk#installing-and-using-the-cloud-sdk
 
 EOF
-  exit 1
-}
+      exit 1
+    }
 
-# Check authentication first.
-# Instruct user to authenticate if needed.
-"$gcloud" auth list 2>&1 | grep -q "$USER@google.com" || {
-  cat <<EOF
+    # Instruct user to authenticate if needed.
+    "$gcloud" auth list 2>&1 | grep -q "$USER@google.com" || {
+      cat <<EOF
 Did not find credentialed account (\`gcloud auth list\`): $USER@google.com.
 You may need to re-authenticate every 20 hours.
 
@@ -130,8 +146,11 @@ To authenticate, run:
   gcloud auth login --update-adc
 
 EOF
-  exit 1
-}
+      exit 1
+    }
+  fi
+fi
+
 
 # If configured, collect reproxy logs.
 BUILD_METRICS_ENABLED=0
@@ -155,7 +174,11 @@ EOF
 # Use the same config for bootstrap as for reproxy.
 # This also checks for authentication, and prompts the user to
 # re-authenticate if needed.
-"$bootstrap" --re_proxy="$reproxy" --cfg="$reproxy_cfg" "${bootstrap_options[@]}"
+"$bootstrap" \
+  --re_proxy="$reproxy" \
+  --cfg="$reproxy_cfg" \
+  "${auth_option[@]}" \
+  "${bootstrap_options[@]}"
 
 test "$BUILD_METRICS_ENABLED" = 0 || {
   # Pre-authenticate for uploading metrics and logs
