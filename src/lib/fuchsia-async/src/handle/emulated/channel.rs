@@ -83,28 +83,6 @@ impl Channel {
         self.channel.poll_read(cx, bytes, handles)
     }
 
-    /// Reads a message from a channel into a fixed size buffer. If either `buf` or `handles` is
-    /// not large enough to hold the message, then `Err((buf_len, handles_len))` is returned. The
-    /// caller is then expected to invoke the read function again, albeit with a resized buffer
-    /// large enough to fit the output values.
-    ///
-    /// If there are any general errors that happen during read, then `Ok(Err(_), (0, 0))` is
-    /// returned.
-    ///
-    /// On success, `Ok(Ok(()), (buf_len, handles_len))` is returned. As with zx_channel_read, of
-    /// which this function is an analogue, there are no partial reads.
-    ///
-    /// It is important to remember to check the `Ok(_)` result for potential errors, like
-    /// `PEER_CLOSED`, for example.
-    pub fn read_raw(
-        &self,
-        cx: &mut Context<'_>,
-        bytes: &mut [u8],
-        handles: &mut [std::mem::MaybeUninit<Handle>],
-    ) -> Poll<Result<(Result<(), zx_status::Status>, usize, usize), (usize, usize)>> {
-        self.channel.poll_read_raw(cx, bytes, handles)
-    }
-
     /// Receives a message on the channel and registers this `Channel` as
     /// needing a read on receiving a `io::std::ErrorKind::WouldBlock`.
     ///
