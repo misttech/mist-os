@@ -62,11 +62,21 @@ variant("coverage") {
     rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
   }
 
+  cflags = []
+
   # Enable runtime counter relocation in Linux.
   if (is_linux) {
-    cflags = [
+    cflags += [
       "-mllvm",
       "-runtime-counter-relocation",
+    ]
+  }
+
+  # Enable coverage from system headers in Fuchsia.
+  if (is_fuchsia) {
+    cflags += [
+      "-mllvm",
+      "-system-headers-coverage",
     ]
   }
 }
@@ -91,11 +101,21 @@ variant("coverage-cts") {
     rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
   }
 
+  cflags = []
+
   # Enable runtime counter relocation in Linux.
   if (is_linux) {
-    cflags = [
+    cflags += [
       "-mllvm",
       "-runtime-counter-relocation",
+    ]
+  }
+
+  # Enable coverage from system headers in Fuchsia.
+  if (is_fuchsia) {
+    cflags += [
+      "-mllvm",
+      "-system-headers-coverage",
     ]
   }
 }
