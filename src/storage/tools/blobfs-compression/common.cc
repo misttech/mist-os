@@ -25,6 +25,8 @@ using chunked_compression::ChunkedCompressor;
 using chunked_compression::CompressionParams;
 
 zx::result<std::vector<uint8_t>> GenerateBlobType1(cpp20::span<const uint8_t> data) {
+  // WARNING: If we use different compression parameters here, the `compressed_file_size` in the
+  // blob info JSON file will be incorrect.
   const CompressionParams params = blobfs::GetDefaultChunkedCompressionParams(data.size_bytes());
   ChunkedCompressor compressor(params);
 

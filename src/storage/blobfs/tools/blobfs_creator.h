@@ -66,10 +66,6 @@ class BlobfsCreator : public FsCreator {
   // The format blobfs should use to store blobs.
   blobfs::BlobLayoutFormat blob_layout_format_ = blobfs::BlobLayoutFormat::kCompactMerkleTreeAtEnd;
 
-  // When adding blobs, will generate a compressed version of the blob in the internal format at the
-  // specified prefix.
-  std::string compressed_copy_prefix_;
-
   // The number of inodes required in the resultant blobfs image.
   uint64_t required_inodes_ = 0;
 };

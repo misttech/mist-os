@@ -39,40 +39,13 @@ namespace {
 
 constexpr uint32_t kDefaultConcurrency = 4;
 
-std::string CompressedName(const std::string& prefix_path, const blobfs::BlobInfo& info) {
-  return std::string(prefix_path).append(info.GetDigest().ToString()) +
-         blobfs::kChunkedFileExtension;
-}
-
-zx::result<> WriteCompressedBlob(const std::string& path, const blobfs::BlobInfo& blob) {
-  std::ofstream file(path, std::ofstream::out | std::ofstream::binary);
-  if (!file.is_open()) {
-    fprintf(stderr, "Failed to open: %s for write\n", path.c_str());
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-  file.write(reinterpret_cast<const char*>(blob.GetData().data()),
-             static_cast<std::streamsize>(blob.GetData().size()));
-  file.close();
-  if (file.fail()) {
-    fprintf(stderr, "Writing to %s failed\n", path.c_str());
-    return zx::error(ZX_ERR_IO);
-  }
-  return zx::ok();
-}
-
-void WriteBlobInfoToJson(std::ofstream& file, const blobfs::BlobInfo& blob,
-                         const std::string& compressed_copy_prefix) {
+void WriteBlobInfoToJson(std::ofstream& file, const blobfs::BlobInfo& blob) {
   std::filesystem::path path =
       std::filesystem::relative(std::filesystem::canonical(blob.GetSrcFilePath()));
   const auto& blob_layout = blob.GetBlobLayout();
   uint64_t total_size = uint64_t{blob_layout.TotalBlockCount()} * blobfs::kBlobfsBlockSize;
   file << "  {\n";
   file << "    \"source_path\": " << path << ",\n";
-  if (!compressed_copy_prefix.empty() && blob.IsCompressed()) {
-    std::filesystem::path compressed_path = std::filesystem::relative(
-        std::filesystem::canonical(CompressedName(compressed_copy_prefix, blob)));
-    file << "    \"compressed_source_path\": " << compressed_path << ",\n";
-  }
   file << "    \"merkle\": \"" << blob.GetDigest().ToString() << "\",\n";
   file << "    \"bytes\": " << blob_layout.FileSize() << ",\n";
   file << "    \"size\": " << total_size << ",\n";
@@ -84,8 +57,7 @@ void WriteBlobInfoToJson(std::ofstream& file, const blobfs::BlobInfo& blob,
 }
 
 zx::result<> RecordBlobs(const std::filesystem::path& path,
-                         std::map<digest::Digest, blobfs::BlobInfo>& blobs,
-                         const std::string& compressed_copy_prefix) {
+                         std::map<digest::Digest, blobfs::BlobInfo>& blobs) {
   std::ofstream file(path);
   if (!file.is_open()) {
     fprintf(stderr, "Failed to open: %s\n", path.c_str());
@@ -99,7 +71,7 @@ zx::result<> RecordBlobs(const std::filesystem::path& path,
     } else {
       file << ",\n";
     }
-    WriteBlobInfoToJson(file, blob, compressed_copy_prefix);
+    WriteBlobInfoToJson(file, blob);
   }
   file << "]\n";
   file.close();
@@ -136,12 +108,6 @@ zx_status_t BlobfsCreator::Usage() {
           "\t--deprecated_padded_format\tFormat blobfs using the deprecated format that uses more "
           "space.\n"
           "Valid for the commands: mkfs and create.\n");
-  fprintf(stderr,
-          "\t--save_compressed_blobs <PATH>\tProduces compressed versions of blobs with %s "
-          "extension if it would\n"
-          "save space, placing an entry in the output json with the resulting path. Valid for the "
-          "commands: mkfs and add.\n",
-          blobfs::kChunkedFileExtension);
   // Additional information about manifest format.
   fprintf(stderr, "\nEach manifest line must adhere to one of the following formats:\n");
   fprintf(stderr, "\t'dst/path=src/path'\n");
@@ -240,20 +206,6 @@ zx_status_t BlobfsCreator::ProcessCustom(int argc, char** argv, uint8_t* process
     return ZX_OK;
   }
 
-  if (strcmp(argv[0], "--compressed_copy_prefix") == 0) {
-    if (argc < 2) {
-      fprintf(stderr, "Not enough arguments for %s\n", argv[0]);
-      return ZX_ERR_INVALID_ARGS;
-    }
-    if (strlen(argv[1]) == 0) {
-      compressed_copy_prefix_ = "./";
-    } else {
-      compressed_copy_prefix_ = std::string(argv[1]);
-    }
-    *processed = 2;
-    return ZX_OK;
-  }
-
   fprintf(stderr, "Argument not found: %s\n", argv[0]);
   return ZX_ERR_INVALID_ARGS;
 }
@@ -277,13 +229,6 @@ zx::result<blobfs::BlobInfo> BlobfsCreator::ProcessBlobToBlobInfo(
   if (blob_info.is_error()) {
     fprintf(stderr, "Error here: %d\n", blob_info.error_value());
     return blob_info;
-  }
-  if (blob_info->IsCompressed() && !compressed_copy_prefix_.empty()) {
-    zx::result copy_status =
-        WriteCompressedBlob(CompressedName(compressed_copy_prefix_, *blob_info), blob_info.value());
-    if (copy_status.is_error()) {
-      return copy_status.take_error();
-    }
   }
   return blob_info;
 }
@@ -433,9 +378,7 @@ zx_status_t BlobfsCreator::Add() {
   }
 
   if (json_output_path().has_value()) {
-    if (zx::result status =
-            RecordBlobs(*json_output_path(), blob_info_list_, compressed_copy_prefix_);
-        status.is_error()) {
+    if (zx::result status = RecordBlobs(*json_output_path(), blob_info_list_); status.is_error()) {
       return status.status_value();
     }
   }
