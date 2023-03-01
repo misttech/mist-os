@@ -92,58 +92,25 @@ For example:
   }
   ```
 
-## Give the trace manager component access {#give-trace-manager-component-access}
+## Setup Routing {#setup-routing}
 
-In the component manifest file (a `.cml` file) of your component, you must
-specify that it needs to communicate with the Fuchsia trace manager.
-
-Note: For information on component manifests, see
-[Component Manifests](/docs/concepts/components/v2/component_manifests.md).
-
-To give the trace manager component access, specify
-the protocol `fuchsia.tracing.provider.Registry` as a `use` declaration. For
-example:
+Ensure that your component requests the appropriate tracing capabilities by
+including the following in your component manifest:
 
 * {.cml file}
 
   ```json5
   {
-      program: {
-          runner: "elf",
-          binary: "bin/app",
-      },
-      use: [
-          {
-              protocol: [
-                  "fuchsia.tracing.provider.Registry",
-              ],
-          },
-      ],
+    include: [
+      "trace/client.shard.cml",
+    ],
+    ...
   }
   ```
 
-If your component is in core, you should route the capability from
-trace\_manager to your component directly in `core.cml`. Otherwise, you
-should do so in your component's core\_shard.cml.
-
-* {.cml file}
-
-  ```json5
-  // component.core_shard.cml
-  {
-  offer: [
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "#trace_manager",
-            to: "#your_component",
-
-            // Allows manifest validation to succeed if tracing is not compiled
-            // into the product
-            source_availability: "unknown",
-        },
-  ]
-  }
-  ```
+This allows your component to communicate with trace_manager using the
+fuchsia.tracing.provider.Registry protocol as well as forward the offer to its
+children.
 
 If your component uses a Chromium-based `fuchsia.web` service and you would like to be able to collect
 trace data from it, ensure that your `Context` is provided both
