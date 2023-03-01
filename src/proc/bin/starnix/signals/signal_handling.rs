@@ -11,7 +11,7 @@ use crate::types::*;
 pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     let mut task_state = task.write();
 
-    let action_is_masked = siginfo.signal.is_in_set(task_state.signals.mask());
+    let action_is_masked = task_state.signals.mask().has_signal(siginfo.signal);
     let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
     let action = action_for_signal(&siginfo, sigaction);
 
@@ -94,7 +94,7 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
 
     let mask = task_state.signals.mask();
     let siginfo =
-        task_state.signals.take_next_where(|sig| !sig.signal.is_in_set(mask) || sig.force);
+        task_state.signals.take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force);
     prepare_to_restart_syscall(
         current_task,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),

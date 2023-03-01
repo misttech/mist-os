@@ -755,7 +755,7 @@ impl CurrentTask {
     /// The returned result is the result returned from the wait function.
     pub fn wait_with_temporary_mask<F, T>(
         &mut self,
-        signal_mask: u64,
+        signal_mask: SigSet,
         wait_function: F,
     ) -> Result<T, Errno>
     where

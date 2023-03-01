@@ -66,7 +66,7 @@ pub struct SignalState {
 
     /// The signal mask of the task.
     // See https://man7.org/linux/man-pages/man2/rt_sigprocmask.2.html
-    mask: sigset_t,
+    mask: SigSet,
 
     /// The signal mask that should be restored by the signal handling machinery, after dequeuing
     /// a signal.
@@ -75,7 +75,7 @@ pub struct SignalState {
     /// This means that the mask must be set to the temporary mask when the signal is dequeued,
     /// which is done by the syscall dispatch loop before returning to userspace. After the signal
     /// is dequeued `mask` can be reset to `saved_mask`.
-    saved_mask: Option<sigset_t>,
+    saved_mask: Option<SigSet>,
 
     /// The queue of signals for a given task.
     ///
@@ -86,9 +86,9 @@ pub struct SignalState {
 
 impl SignalState {
     /// Sets the signal mask of the state, and returns the old signal mask.
-    pub fn set_mask(&mut self, signal_mask: u64) -> u64 {
+    pub fn set_mask(&mut self, signal_mask: SigSet) -> SigSet {
         let old_mask = self.mask;
-        self.mask = signal_mask & !UNBLOCKABLE_SIGNALS;
+        self.mask = signal_mask.with_sigset_removed(UNBLOCKABLE_SIGNALS);
         old_mask
     }
 
@@ -96,10 +96,10 @@ impl SignalState {
     /// next dequeue operation. This can be used by syscalls that want to change the signal mask
     /// during a wait, but want the signal mask to be reset before returning back to userspace after
     /// the wait.
-    pub fn set_temporary_mask(&mut self, signal_mask: u64) {
+    pub fn set_temporary_mask(&mut self, signal_mask: SigSet) {
         assert!(self.saved_mask.is_none());
         self.saved_mask = Some(self.mask);
-        self.mask = signal_mask & !UNBLOCKABLE_SIGNALS;
+        self.mask = signal_mask.with_sigset_removed(UNBLOCKABLE_SIGNALS);
     }
 
     /// Restores the signal mask to what it was before the previous call to `set_temporary_mask`.
@@ -111,7 +111,7 @@ impl SignalState {
         }
     }
 
-    pub fn mask(&self) -> u64 {
+    pub fn mask(&self) -> SigSet {
         self.mask
     }
 
@@ -139,8 +139,8 @@ impl SignalState {
     }
 
     /// Returns whether any signals are queued and not blocked by the given mask.
-    pub fn is_any_allowed_by_mask(&self, mask: sigset_t) -> bool {
-        self.queue.iter().any(|sig| !sig.signal.is_in_set(mask))
+    pub fn is_any_allowed_by_mask(&self, mask: SigSet) -> bool {
+        self.queue.iter().any(|sig| !mask.has_signal(sig.signal))
     }
 
     /// Iterates over queued signals with the given number.

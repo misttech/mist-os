@@ -12,11 +12,11 @@ use std::convert::TryInto;
 use zerocopy::AsBytes;
 
 pub struct SignalFd {
-    mask: sigset_t,
+    mask: SigSet,
 }
 
 impl SignalFd {
-    pub fn new_file(current_task: &CurrentTask, mask: sigset_t, flags: u32) -> FileHandle {
+    pub fn new_file(current_task: &CurrentTask, mask: SigSet, flags: u32) -> FileHandle {
         let mut open_flags = OpenFlags::RDONLY;
         if flags & SFD_NONBLOCK != 0 {
             open_flags |= OpenFlags::NONBLOCK;
@@ -43,7 +43,7 @@ impl FileOps for SignalFd {
                     let signal = current_task
                         .write()
                         .signals
-                        .take_next_where(|sig| sig.signal.is_in_set(self.mask))
+                        .take_next_where(|sig| self.mask.has_signal(sig.signal))
                         .ok_or_else(|| errno!(EAGAIN))?;
                     let mut siginfo = signalfd_siginfo {
                         ssi_signo: signal.signal.number(),
@@ -116,7 +116,7 @@ impl FileOps for SignalFd {
 
     fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
         let mut events = FdEvents::empty();
-        if current_task.read().signals.is_any_allowed_by_mask(!self.mask) {
+        if current_task.read().signals.is_any_allowed_by_mask(self.mask.to_inverted()) {
             events |= FdEvents::POLLIN;
         }
         events

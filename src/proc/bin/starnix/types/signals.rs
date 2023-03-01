@@ -9,7 +9,7 @@ use std::fmt;
 use crate::types::*;
 use zerocopy::{AsBytes, FromBytes};
 
-pub const UNBLOCKABLE_SIGNALS: sigset_t = SIGKILL.mask() | SIGSTOP.mask();
+pub const UNBLOCKABLE_SIGNALS: SigSet = SigSet(SIGKILL.mask() | SIGSTOP.mask());
 
 /// An unchecked signal represents a signal that has not been through verification, and may
 /// represent an invalid signal number.
@@ -49,11 +49,6 @@ impl Signal {
         1 << (self.number - 1)
     }
 
-    /// Returns whether the signal is in the specified signal set.
-    pub fn is_in_set(&self, set: sigset_t) -> bool {
-        set & self.mask() != 0
-    }
-
     /// Returns true if the signal is a real-time signal.
     pub fn is_real_time(&self) -> bool {
         self.number >= uapi::SIGRTMIN
@@ -61,7 +56,7 @@ impl Signal {
 
     /// Returns true if this signal can't be blocked. This means either SIGKILL or SIGSTOP.
     pub fn is_unblockable(&self) -> bool {
-        self.is_in_set(UNBLOCKABLE_SIGNALS)
+        UNBLOCKABLE_SIGNALS.has_signal(*self)
     }
 
     /// The number of signals, also the highest valid signal number.

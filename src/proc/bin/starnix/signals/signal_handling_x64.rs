@@ -110,7 +110,7 @@ pub fn dispatch_signal_handler(
                 rsp: registers.rsp,
                 rip: registers.rip,
                 eflags: registers.rflags,
-                oldmask: signal_state.mask(),
+                oldmask: signal_state.mask().into(),
                 ..Default::default()
             },
             uc_stack: signal_state
@@ -122,7 +122,7 @@ pub fn dispatch_signal_handler(
                     ..Default::default()
                 })
                 .unwrap_or_default(),
-            uc_sigmask: signal_state.mask(),
+            uc_sigmask: signal_state.mask().into(),
             ..Default::default()
         },
         action.sa_restorer.ptr() as u64,
@@ -157,7 +157,7 @@ pub fn dispatch_signal_handler(
     // Write the signal stack frame at the updated stack pointer.
     task.mm.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes()).unwrap();
 
-    signal_state.set_mask(action.sa_mask);
+    signal_state.set_mask(SigSet::from(action.sa_mask));
 
     registers.rsp = stack_pointer;
     registers.rdi = siginfo.signal.number() as u64;
@@ -204,7 +204,7 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
         gs_base: current_task.registers.gs_base,
     }
     .into();
-    current_task.write().signals.set_mask(signal_stack_frame.context.uc_sigmask);
+    current_task.write().signals.set_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));
     Ok(())
 }
 

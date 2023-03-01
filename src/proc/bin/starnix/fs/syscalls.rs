@@ -1631,7 +1631,7 @@ pub fn sys_epoll_wait(
     max_events: i32,
     timeout: i32,
 ) -> Result<usize, Errno> {
-    sys_epoll_pwait(current_task, epfd, events, max_events, timeout, UserRef::<sigset_t>::default())
+    sys_epoll_pwait(current_task, epfd, events, max_events, timeout, UserRef::<SigSet>::default())
 }
 
 // Backend for sys_epoll_pwait and sys_epoll_pwait2 that takes an already-decoded duration.
@@ -1641,7 +1641,7 @@ fn do_epoll_pwait(
     events: UserRef<EpollEvent>,
     unvalidated_max_events: i32,
     timeout: zx::Duration,
-    user_sigmask: UserRef<sigset_t>,
+    user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
@@ -1681,7 +1681,7 @@ pub fn sys_epoll_pwait(
     events: UserRef<EpollEvent>,
     max_events: i32,
     timeout: i32,
-    user_sigmask: UserRef<sigset_t>,
+    user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let timeout = duration_from_poll_timeout(timeout)?;
     do_epoll_pwait(current_task, epfd, events, max_events, timeout, user_sigmask)
@@ -1693,7 +1693,7 @@ pub fn sys_epoll_pwait2(
     events: UserRef<EpollEvent>,
     max_events: i32,
     user_timespec: UserRef<timespec>,
-    user_sigmask: UserRef<sigset_t>,
+    user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let timeout = if user_timespec.is_null() {
         zx::Duration::INFINITE
@@ -1713,7 +1713,7 @@ fn poll(
     current_task: &mut CurrentTask,
     user_pollfds: UserRef<pollfd>,
     num_fds: i32,
-    mask: Option<sigset_t>,
+    mask: Option<SigSet>,
     timeout: i32,
 ) -> Result<usize, Errno> {
     // TODO: Update this to use a dynamic limit (that can be set by setrlimit).
@@ -1780,7 +1780,7 @@ pub fn sys_ppoll(
     user_fds: UserRef<pollfd>,
     num_fds: i32,
     user_timespec: UserRef<timespec>,
-    user_mask: UserRef<sigset_t>,
+    user_mask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let timeout = if user_timespec.is_null() {
         // Passing -1 to poll is equivalent to an infinite timeout.
