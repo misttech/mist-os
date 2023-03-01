@@ -40,6 +40,7 @@ if (is_host) {
     public_deps = [
       ":ffx_cli_test($host_toolchain)",
       ":host_utils_test($host_toolchain)",
+      ":http_utils_test($host_toolchain)",
     ]
   }
 }
