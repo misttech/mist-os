@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 mod convert;
+mod inspect;
 
+use self::inspect::{inspect_record_stats, Stats};
 use crate::{IpVersions, State};
 
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_async as fasync;
+use fuchsia_inspect::Node as InspectNode;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::{select, Future, StreamExt};
@@ -117,6 +120,7 @@ const TELEMETRY_QUERY_INTERVAL: zx::Duration = zx::Duration::from_seconds(10);
 
 pub fn serve_telemetry(
     cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    inspect_node: InspectNode,
 ) -> (TelemetrySender, impl Future<Output = ()>) {
     let (sender, mut receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
     let sender = TelemetrySender::new(sender);
@@ -129,7 +133,7 @@ pub fn serve_telemetry(
             (ONE_MINUTE.into_nanos() / TELEMETRY_QUERY_INTERVAL.into_nanos()) as u64;
         const INTERVAL_TICKS_PER_HR: u64 = INTERVAL_TICKS_PER_MINUTE * 60;
         let mut interval_tick = 0u64;
-        let mut telemetry = Telemetry::new(cloned_sender, cobalt_proxy);
+        let mut telemetry = Telemetry::new(cloned_sender, cobalt_proxy, inspect_node);
         loop {
             select! {
                 event = receiver.next() => {
@@ -138,9 +142,17 @@ pub fn serve_telemetry(
                     }
                 }
                 _ = report_interval_stream.next() => {
+                    telemetry.handle_ten_secondly_telemetry().await;
+
                     interval_tick += 1;
                     if interval_tick % INTERVAL_TICKS_PER_HR == 0 {
                         telemetry.handle_hourly_telemetry().await;
+                    }
+
+                    if interval_tick % INTERVAL_TICKS_PER_MINUTE == 0 {
+                        // Slide the window of all the stats only after finishing
+                        // computation for the preceding periods
+                        telemetry.stats.lock().slide_minute();
                     }
                 }
             }
@@ -175,30 +187,47 @@ macro_rules! log_cobalt_batch {
     }};
 }
 
+fn round_to_nearest_second(duration: zx::Duration) -> i64 {
+    const MILLIS_PER_SEC: i64 = 1000;
+    let millis = duration.into_millis();
+    let rounded_portion = if millis % MILLIS_PER_SEC >= 500 { 1 } else { 0 };
+    millis / MILLIS_PER_SEC + rounded_portion
+}
+
 struct Telemetry {
     cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     state_summary: Option<SystemStateSummary>,
-    state_last_refreshed: fasync::Time,
+    state_last_refreshed_for_cobalt: fasync::Time,
+    state_last_refreshed_for_inspect: fasync::Time,
     reachability_lost_at: Option<(
         fasync::Time,
         metrics::ReachabilityGlobalSnapshotDurationMetricDimensionRouteConfig,
     )>,
     network_config: Option<NetworkConfig>,
     network_config_last_refreshed: fasync::Time,
+
+    _inspect_node: InspectNode,
+    stats: Arc<Mutex<Stats>>,
 }
 
 impl Telemetry {
     pub fn new(
         _telemetry_sender: TelemetrySender,
         cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        inspect_node: InspectNode,
     ) -> Self {
+        let stats = Arc::new(Mutex::new(Stats::new()));
+        inspect_record_stats(&inspect_node, "stats", Arc::clone(&stats));
         Self {
             cobalt_proxy,
             state_summary: None,
-            state_last_refreshed: fasync::Time::now(),
+            state_last_refreshed_for_cobalt: fasync::Time::now(),
+            state_last_refreshed_for_inspect: fasync::Time::now(),
             reachability_lost_at: None,
             network_config: None,
             network_config_last_refreshed: fasync::Time::now(),
+            _inspect_node: inspect_node,
+            stats,
         }
     }
 
@@ -276,15 +305,19 @@ impl Telemetry {
         now: fasync::Time,
         ctx: &'static str,
     ) {
-        let duration = now - self.state_last_refreshed;
+        let duration_cobalt = now - self.state_last_refreshed_for_cobalt;
+        let duration_sec_inspect =
+            round_to_nearest_second(now - self.state_last_refreshed_for_inspect) as i32;
         let mut metric_events = vec![];
+
+        self.stats.lock().total_duration_sec.add_value(&duration_sec_inspect);
 
         if let Some(prev) = &self.state_summary {
             if prev.system_state.has_interface_up() {
                 metric_events.push(MetricEvent {
                     metric_id: metrics::REACHABILITY_STATE_UP_OR_ABOVE_DURATION_METRIC_ID,
                     event_codes: vec![],
-                    payload: MetricEventPayload::IntegerValue(duration.into_micros()),
+                    payload: MetricEventPayload::IntegerValue(duration_cobalt.into_micros()),
                 });
 
                 let route_config_dim = convert::convert_route_config(&prev.system_state);
@@ -303,8 +336,15 @@ impl Telemetry {
                             gateway_reachable_dim as u32,
                             dns_active_dim as u32,
                         ],
-                        payload: MetricEventPayload::IntegerValue(duration.into_micros()),
+                        payload: MetricEventPayload::IntegerValue(duration_cobalt.into_micros()),
                     });
+                }
+
+                if prev.system_state.has_internet() {
+                    self.stats.lock().internet_available_sec.add_value(&duration_sec_inspect);
+                }
+                if prev.dns_active {
+                    self.stats.lock().dns_active_sec.add_value(&duration_sec_inspect);
                 }
             }
         }
@@ -322,6 +362,7 @@ impl Telemetry {
                     });
                     self.reachability_lost_at = Some((now, route_config_dim));
                 }
+                self.stats.lock().reachability_lost_count.add_value(&1);
             }
 
             if !previously_reachable && now_reachable {
@@ -345,7 +386,8 @@ impl Telemetry {
         if let Some(new_state) = new_state {
             self.state_summary = Some(new_state);
         }
-        self.state_last_refreshed = now;
+        self.state_last_refreshed_for_cobalt = now;
+        self.state_last_refreshed_for_inspect = now;
     }
 
     async fn log_network_config_metrics(
@@ -387,6 +429,24 @@ impl Telemetry {
         self.network_config_last_refreshed = now;
     }
 
+    pub async fn handle_ten_secondly_telemetry(&mut self) {
+        let now = fasync::Time::now();
+        let duration_sec_inspect =
+            round_to_nearest_second(now - self.state_last_refreshed_for_inspect) as i32;
+
+        self.stats.lock().total_duration_sec.add_value(&duration_sec_inspect);
+
+        if let Some(current) = &self.state_summary {
+            if current.system_state.has_internet() {
+                self.stats.lock().internet_available_sec.add_value(&duration_sec_inspect);
+            }
+            if current.dns_active {
+                self.stats.lock().dns_active_sec.add_value(&duration_sec_inspect);
+            }
+        }
+        self.state_last_refreshed_for_inspect = now;
+    }
+
     pub async fn handle_hourly_telemetry(&mut self) {
         let now = fasync::Time::now();
         self.log_system_state_metrics(None, now, "handle_hourly_telemetry").await;
@@ -398,6 +458,7 @@ impl Telemetry {
 mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_inspect::{assert_data_tree, Inspector};
     use fuchsia_zircon::DurationNum;
     use futures::task::Poll;
     use std::pin::Pin;
@@ -615,8 +676,177 @@ mod tests {
         assert_eq!(logged_metrics, expected_metrics);
     }
 
+    #[test]
+    fn test_state_snapshot_duration_inspect_stats() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        test_helper.advance_by(25.seconds(), &mut test_fut);
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    internet_available_sec: {
+                        "1m": vec![0i64],
+                        "15m": vec![0i64],
+                        "1h": vec![0i64],
+                    },
+                    dns_active_sec: {
+                        "1m": vec![0i64],
+                        "15m": vec![0i64],
+                        "1h": vec![0i64],
+                    },
+                    total_duration_sec: {
+                        "1m": vec![20i64],
+                        "15m": vec![20i64],
+                        "1h": vec![20i64],
+                    },
+                }
+            }
+        });
+
+        let update = SystemStateUpdate {
+            system_state: IpVersions { ipv4: Some(State::Internet), ipv6: None },
+        };
+        test_helper.telemetry_sender.send(TelemetryEvent::SystemStateUpdate { update });
+        test_helper.advance_test_fut(&mut test_fut);
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    total_duration_sec: {
+                        "1m": vec![25i64],
+                        "15m": vec![25i64],
+                        "1h": vec![25i64],
+                    },
+                }
+            }
+        });
+
+        test_helper.advance_by(15.seconds(), &mut test_fut);
+
+        // Now 40 seconds mark
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    internet_available_sec: {
+                        "1m": vec![15i64],
+                        "15m": vec![15i64],
+                        "1h": vec![15i64],
+                    },
+                    dns_active_sec: {
+                        "1m": vec![0i64],
+                        "15m": vec![0i64],
+                        "1h": vec![0i64],
+                    },
+                    total_duration_sec: {
+                        "1m": vec![40i64],
+                        "15m": vec![40i64],
+                        "1h": vec![40i64],
+                    },
+                }
+            }
+        });
+
+        test_helper.telemetry_sender.send(TelemetryEvent::DnsProbe { dns_active: true });
+
+        test_helper.advance_by(50.seconds(), &mut test_fut);
+
+        // Now 90 seconds mark
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    internet_available_sec: {
+                        "1m": vec![35i64, 30],
+                        "15m": vec![65i64],
+                        "1h": vec![65i64],
+                    },
+                    dns_active_sec: {
+                        "1m": vec![20i64, 30],
+                        "15m": vec![50i64],
+                        "1h": vec![50i64],
+                    },
+                    total_duration_sec: {
+                        "1m": vec![30i64],
+                        "15m": vec![90i64],
+                        "1h": vec![90i64],
+                    },
+                }
+            }
+        });
+
+        test_helper.advance_by(3510.seconds(), &mut test_fut);
+
+        // Now 3600 seconds mark
+
+        // Verify that the longer windows do rotate
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    internet_available_sec: contains {
+                        "15m": vec![875i64, 900, 900, 900, 0],
+                        "1h": vec![3575i64, 0],
+                    },
+                    dns_active_sec: contains {
+                        "15m": vec![860i64, 900, 900, 900, 0],
+                        "1h": vec![3560i64, 0],
+                    },
+                    total_duration_sec: contains {
+                        "1m": vec![0i64],
+                        "15m": vec![0i64],
+                        "1h": vec![0i64],
+                    },
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn test_reachability_lost_count_inspect_stats() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        let update = SystemStateUpdate {
+            system_state: IpVersions { ipv4: None, ipv6: Some(State::Internet) },
+            ..SystemStateUpdate::default()
+        };
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
+        test_helper.telemetry_sender.send(TelemetryEvent::DnsProbe { dns_active: true });
+        test_helper.advance_test_fut(&mut test_fut);
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    reachability_lost_count: {
+                        "1m": vec![0u64],
+                        "15m": vec![0u64],
+                        "1h": vec![0u64],
+                    },
+                }
+            }
+        });
+
+        test_helper.telemetry_sender.send(TelemetryEvent::DnsProbe { dns_active: false });
+        test_helper.advance_test_fut(&mut test_fut);
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    reachability_lost_count: {
+                        "1m": vec![1u64],
+                        "15m": vec![1u64],
+                        "1h": vec![1u64],
+                    },
+                }
+            }
+        });
+    }
+
     struct TestHelper {
         telemetry_sender: TelemetrySender,
+        inspector: Inspector,
         cobalt_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
         /// As requests to Cobalt are responded to via `self.drain_cobalt_events()`,
         /// their payloads are drained to this HashMap.
@@ -742,13 +972,16 @@ mod tests {
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
                 .expect("failed to create MetricsEventLogger proxy");
 
-        let (telemetry_sender, test_fut) = serve_telemetry(cobalt_proxy);
+        let inspector = Inspector::default();
+        let inspect_node = inspector.root().create_child("telemetry");
+
+        let (telemetry_sender, test_fut) = serve_telemetry(cobalt_proxy, inspect_node);
         let mut test_fut = Box::pin(test_fut);
 
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let test_helper =
-            TestHelper { telemetry_sender, cobalt_stream, cobalt_events: vec![], exec };
+            TestHelper { telemetry_sender, inspector, cobalt_stream, cobalt_events: vec![], exec };
         (test_helper, test_fut)
     }
 }

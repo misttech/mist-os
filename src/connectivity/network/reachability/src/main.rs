@@ -37,7 +37,7 @@ fn main() {
     let () = monitor.set_inspector(inspector);
 
     info!("monitoring");
-    let mut eventloop = EventLoop::new(monitor, handler);
+    let mut eventloop = EventLoop::new(monitor, handler, inspector);
     let eventloop_fut = eventloop.run().fuse();
     let serve_fut = fs.fuse().collect();
     futures::pin_mut!(eventloop_fut, serve_fut);

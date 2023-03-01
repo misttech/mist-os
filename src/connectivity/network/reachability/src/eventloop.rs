@@ -15,7 +15,7 @@ use {
     fidl_fuchsia_net_name as fnet_name, fidl_fuchsia_net_neighbor as fnet_neighbor,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
     fuchsia_async::{self as fasync},
-    fuchsia_inspect::health::Reporter,
+    fuchsia_inspect::{health::Reporter, Inspector},
     fuchsia_zircon as zx,
     futures::{future::FusedFuture, pin_mut, prelude::*, select},
     named_timer::NamedTimeoutExt,
@@ -150,11 +150,16 @@ pub struct EventLoop {
     routes: RouteTable,
     latest_dns_addresses: Vec<fnet::IpAddress>,
     telemetry_sender: Option<TelemetrySender>,
+    inspector: &'static Inspector,
 }
 
 impl EventLoop {
     /// `new` returns an `EventLoop` instance.
-    pub fn new(monitor: Monitor, handler: ReachabilityHandler) -> Self {
+    pub fn new(
+        monitor: Monitor,
+        handler: ReachabilityHandler,
+        inspector: &'static Inspector,
+    ) -> Self {
         fuchsia_inspect::component::health().set_starting_up();
         EventLoop {
             monitor,
@@ -165,6 +170,7 @@ impl EventLoop {
             routes: Default::default(),
             latest_dns_addresses: Vec::new(),
             telemetry_sender: None,
+            inspector,
         }
     }
 
@@ -192,7 +198,9 @@ impl EventLoop {
             }
         };
 
-        let (telemetry_sender, telemetry_fut) = telemetry::serve_telemetry(cobalt_proxy);
+        let telemetry_inspect_node = self.inspector.root().create_child("telemetry");
+        let (telemetry_sender, telemetry_fut) =
+            telemetry::serve_telemetry(cobalt_proxy, telemetry_inspect_node);
         let telemetry_fut = telemetry_fut.fuse();
         self.telemetry_sender = Some(telemetry_sender.clone());
         self.monitor.set_telemetry_sender(telemetry_sender);
@@ -391,7 +399,7 @@ impl EventLoop {
                     }
                 },
                 () = telemetry_fut => {
-                    error!("unspectedly stopped serving telemetry");
+                    error!("unexpectedly stopped serving telemetry");
                 },
             }
         }
