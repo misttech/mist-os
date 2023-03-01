@@ -25,7 +25,7 @@ async fn show(rcs_proxy: rc::RemoteControlProxy, _cmd: SessionShowCommand) -> Re
         .map_err(|i| Status::ok(i).unwrap_err())
         .context("opening realm query")?;
 
-    show_cmd_print("session::session".to_string(), query_proxy, std::io::stdout())
+    show_cmd_print("session:session".to_string(), query_proxy, std::io::stdout())
         .await
         .context(DETAILS_FAILURE)?;
 
