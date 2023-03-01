@@ -356,7 +356,11 @@ class MetadataList {
 
 class DeviceAddArgs {
  public:
-  explicit DeviceAddArgs(const char* name) { args_.name = name; }
+  explicit DeviceAddArgs(const char* name) {
+    args_.name = name;
+    args_.version = DEVICE_ADD_ARGS_VERSION;
+  }
+
   DeviceAddArgs& operator=(const DeviceAddArgs& other) {
     metadata_list_ = std::move(other.metadata_list_);
     args_ = other.args_;
@@ -364,6 +368,7 @@ class DeviceAddArgs {
     args_.metadata_count = metadata_list_.count();
     return *this;
   }
+
   DeviceAddArgs(const DeviceAddArgs& other) { *this = other; }
 
   DeviceAddArgs& set_name(const char* name) {
