@@ -180,6 +180,7 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
 
     fuchsia::web::CreateContextParams params;
     params.set_service_directory(std::move(incoming_service_clone));
+    params.set_features(fuchsia::web::ContextFeatureFlags::NETWORK);
     web_context_provider->Create(std::move(params), web_context_.NewRequest());
     web_context_.set_error_handler([](zx_status_t status) {
       FX_LOGS(WARNING) << "web_context_: " << zx_status_get_string(status);
