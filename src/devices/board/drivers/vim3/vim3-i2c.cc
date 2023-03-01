@@ -10,6 +10,9 @@
 #include <lib/ddk/platform-defs.h>
 #include <limits.h>
 
+#include <span>
+#include <vector>
+
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
@@ -22,32 +25,15 @@ using i2c_channel_t = fidl_metadata::i2c::Channel;
 
 // Only the AO and EE_M3 i2c busses are used on VIM3
 
-static const std::vector<fpbus::Mmio> i2c_mmios{
-    {{
-        .base = A311D_I2C_AOBUS_BASE,
-        .length = A311D_I2C_LENGTH,
-    }},
-    {{
-        .base = A311D_EE_I2C_M3_BASE,
-        .length = A311D_I2C_LENGTH,
-    }},
+struct I2cBus {
+  zx_paddr_t mmio;
+  uint32_t irq;
+  cpp20::span<const i2c_channel_t> channels;
 };
 
-static const std::vector<fpbus::Irq> i2c_irqs{
-    {{
-        .irq = A311D_I2C_AO_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
-    }},
-    {{
-        .irq = A311D_I2C_M3_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
-    }},
-};
-
-static const i2c_channel_t i2c_channels[] = {
+constexpr i2c_channel_t i2c_ao_channels[]{
     // RTC
     {
-        .bus_id = 0,
         .address = 0x51,
         .vid = PDEV_VID_NXP,
         .pid = PDEV_PID_GENERIC,
@@ -55,7 +41,6 @@ static const i2c_channel_t i2c_channels[] = {
     },
     // STM8s microcontroller
     {
-        .bus_id = 0,
         .address = 0x18,
         .vid = PDEV_VID_KHADAS,
         .pid = PDEV_PID_VIM3,
@@ -63,7 +48,6 @@ static const i2c_channel_t i2c_channels[] = {
     },
     // USB PD
     {
-        .bus_id = 0,
         .address = 0x22,
         .vid = 0,
         .pid = 0,
@@ -71,49 +55,83 @@ static const i2c_channel_t i2c_channels[] = {
     },
     // TCA6408 (U17) IO expander (used for various lcd/cam signals and LEDs)
     {
-        .bus_id = 0,
         .address = 0x20,
         .vid = 0,
         .pid = 0,
         .did = 0,
     },
-    // SDIO test rig on the J4 GPIO header. May or may not be connected.
-    {
-        .bus_id = 1,
-        .address = 0x32,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-#if 0  // placeholder until driver implemented and vid/pid/did assigned
-       // bus_ids and addresses are correct
+};
+#if 0
+    // placeholder until driver implemented and vid/pid/did assigned
+    // bus_ids and addresses are correct
     // KXTJ3 (U18) 3 axis accelerometer
     {
-        .bus_id = 0,
         .address = 0x0E,
         .vid = 0,
         .pid = 0,
         .did = 0,
     },
+};
 #endif
+
+constexpr i2c_channel_t i2c_ee_m3_channels[]{
+    // SDIO test rig on the J4 GPIO header. May or may not be connected.
+    {
+        .address = 0x32,
+        .vid = 0,
+        .pid = 0,
+        .did = 0,
+    },
 };
 
-zx_status_t Vim3::I2cInit() {
+constexpr I2cBus buses[]{
+    {
+        .mmio = A311D_I2C_AOBUS_BASE,
+        .irq = A311D_I2C_AO_IRQ,
+        .channels{i2c_ao_channels, std::size(i2c_ao_channels)},
+    },
+    {
+        .mmio = A311D_EE_I2C_M3_BASE,
+        .irq = A311D_I2C_M3_IRQ,
+        .channels{i2c_ee_m3_channels, std::size(i2c_ee_m3_channels)},
+    },
+};
+
+zx_status_t AddI2cBus(const uint32_t bus_id, const I2cBus& bus,
+                      const fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
+  const std::vector<fpbus::Mmio> mmios{
+      {{
+          .base = bus.mmio,
+          .length = A311D_I2C_LENGTH,
+      }},
+  };
+
+  const std::vector<fpbus::Irq> irqs{
+      {{
+          .irq = bus.irq,
+          .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+      }},
+  };
+
+  char name[32];
+  snprintf(name, sizeof(name), "i2c-%u", bus_id);
+
   fpbus::Node i2c_dev;
-  i2c_dev.name() = "i2c";
+  i2c_dev.name() = name;
   i2c_dev.vid() = PDEV_VID_AMLOGIC;
   i2c_dev.pid() = PDEV_PID_GENERIC;
   i2c_dev.did() = PDEV_DID_AMLOGIC_I2C;
-  i2c_dev.mmio() = i2c_mmios;
-  i2c_dev.irq() = i2c_irqs;
+  i2c_dev.instance_id() = bus_id;
+  i2c_dev.mmio() = mmios;
+  i2c_dev.irq() = irqs;
 
-  auto i2c_status = fidl_metadata::i2c::I2CChannelsToFidl(i2c_channels);
-  if (i2c_status.is_error()) {
-    zxlogf(ERROR, "I2cInit: Failed to fidl encode i2c channels: %d", i2c_status.error_value());
-    return i2c_status.error_value();
+  auto i2c_metadata_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus_id, bus.channels);
+  if (i2c_metadata_fidl.is_error()) {
+    zxlogf(ERROR, "Failed to FIDL encode I2C channels: %s", i2c_metadata_fidl.status_string());
+    return i2c_metadata_fidl.error_value();
   }
 
-  auto& data = i2c_status.value();
+  auto& data = i2c_metadata_fidl.value();
 
   std::vector<fpbus::Metadata> i2c_metadata{
       {{
@@ -123,6 +141,24 @@ zx_status_t Vim3::I2cInit() {
   };
   i2c_dev.metadata() = std::move(i2c_metadata);
 
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('I2C_');
+  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, i2c_dev));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Request to add I2C bus %u failed: %s", bus_id,
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to add I2C bus %u: %s", bus_id,
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t Vim3::I2cInit() {
   // AO
   gpio_impl_.SetAltFunction(A311D_GPIOAO(2), A311D_GPIOAO_2_M0_SCL_FN);
   gpio_impl_.SetAltFunction(A311D_GPIOAO(3), A311D_GPIOAO_3_M0_SDA_FN);
@@ -132,18 +168,8 @@ zx_status_t Vim3::I2cInit() {
   gpio_impl_.SetAltFunction(A311D_GPIOA(15), A311D_GPIOA_15_I2C_EE_M3_SCL_FN);
   gpio_impl_.SetAltFunction(A311D_GPIOA(14), A311D_GPIOA_14_I2C_EE_M3_SDA_FN);
 
-  fidl::Arena<> fidl_arena;
-  fdf::Arena arena('I2C_');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, i2c_dev));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd I2c(i2c_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd I2c(i2c_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  for (uint32_t i = 0; i < std::size(buses); i++) {
+    AddI2cBus(i, buses[i], pbus_);
   }
 
   return ZX_OK;

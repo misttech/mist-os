@@ -13,6 +13,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1/aml-gpio",
       "sys/platform/05:06:14/clocks",
       "sys/platform/05:00:2/aml-i2c",
+      "sys/platform/05:00:2:1/aml-i2c",
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-81/rtc",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
       // TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
