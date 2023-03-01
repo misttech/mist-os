@@ -9,17 +9,23 @@ Description:
 A fork of OpenSSL, as described at https://www.imperialviolet.org/2014/06/20/boringssl.html
 
 Prerequisites:
-* apt install curl git golang perl python llvm-dev libclang-dev clang
-* curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+* apt install curl git golang perl python
 
 To update:
-1. `rustup update`
-1. `rustup component add rustfmt`
-1. `cargo install bindgen-cli` and update BINDGEN_EXPECTED_VERSION in
-   ./rust/boringssl-sys/bindgen.sh to `bindgen --version`. (If things regress,
-   revert back to pinned version with `cargo install bindgen --version
-   ${BINDGEN_EXPECTED_VERSION}` and investigate).
-1. `go run roll_boringssl.go`
+1. Locate bindgen and rustfmt:
+   ```
+   PATH=$PATH:$(find $FUCHSIA_DIR/prebuilt -name bindgen | xargs dirname)
+   PATH=$PATH:$(find $FUCHSIA_DIR/prebuilt -name rustfmt | xargs dirname)
+   ```
+1. Update `BINDGEN_EXPECTED_VERSION`:
+   ```
+   sed -E -i \
+     "s/BINDGEN_EXPECTED_VERSION='bindgen [0-9\.]*'/BINDGEN_EXPECTED_VERSION='$(bindgen --version)'/" \
+     $FUCHSIA_DIR/third_party/boringssl/rust/boringssl-sys/bindgen.sh
+1. Roll BoringSSL:
+   ```
+   go run $FUCHSIA_DIR/third_party/boringssl/roll_boringssl.go
+   ```
 1. Test according to instructions given by the previous step.
 1. Commit, review, and submit the changes to this repository. If CQ fails, this
    is likely a breaking change and need to be submitted together with the
