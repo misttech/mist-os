@@ -16,13 +16,18 @@
 
 #include <iomanip>
 
+#include "src/media/audio/audio_core/shared/logging_flags.h"
+
 namespace media::audio {
+namespace {
 
 // Memory is considered "unused" if it has not been touched for more than 30s.
 // However in critical situations (to avoid OOM), memory not touched in 10s might be evicted.
 // To keep all executable memory pinned, we must run at least once every 10s.
 // To ensure we never miss a deadline, do this twice every 10s.
-static constexpr auto kTimeBetweenPins = zx::sec(5);
+constexpr auto kTimeBetweenPins = zx::sec(5);
+
+}  // namespace
 
 PinExecutableMemory& PinExecutableMemory::Singleton() {
   static PinExecutableMemory* p = new PinExecutableMemory;
@@ -118,10 +123,14 @@ void PinExecutableMemory::Pin() {
 
   if (marks > 0 || old_pinned_bytes != pinned_bytes_) {
     TRACE_INSTANT("audio", "Pinned bytes", TRACE_SCOPE_THREAD, pinned_bytes_);
-    auto end_time = zx::clock::get_monotonic();
-    FX_LOGS(INFO) << "pinned " << pinned_bytes_ << " total bytes: " << marks
-                  << " new VMO mappings, " << old_pinned_bytes << " bytes pinned previously, "
-                  << (end_time - start_time).to_nsecs() << " ns to update";
+    if constexpr (kLogMemoryPins) {
+      FX_LOGS(INFO) << "pinned " << pinned_bytes_ << " total bytes: " << marks
+                    << " new VMO mappings, " << old_pinned_bytes << " bytes pinned previously, "
+                    << (zx::clock::get_monotonic() - start_time).to_nsecs() << " ns to update";
+    }
+  } else if constexpr (kLogMemoryPinsIfNoChange) {
+    FX_LOGS(INFO) << "no change in pinned memory, "
+                  << (zx::clock::get_monotonic() - start_time).to_nsecs() << " ns to update";
   }
 }
 

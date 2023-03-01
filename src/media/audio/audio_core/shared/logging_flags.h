@@ -11,6 +11,11 @@
 
 namespace media::audio {
 
+// Logging related to our periodic memory pinning (to avoid page faults on deadline threads).
+// This occurs no sooner than every `kTimeBetweenPins`, as defined in `PinExecutableMemory`.
+inline constexpr bool kLogMemoryPins = true;
+inline constexpr bool kLogMemoryPinsIfNoChange = false;
+
 // Render-related logging
 //
 // Timing and lifetime for AudioRenderers (including timestamps).

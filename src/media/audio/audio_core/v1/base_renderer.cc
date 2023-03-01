@@ -255,8 +255,10 @@ void BaseRenderer::AddPayloadBufferInternal(uint32_t id, zx::vmo payload_buffer)
       FX_PLOGS(ERROR, status) << "Failed to lock payload buffer";
       return;
     }
-    FX_LOGS(INFO) << "Mapping discardable buffer: " << ls.discarded_size << "/" << ls.size
-                  << " bytes were previously discarded";
+    if (ls.discarded_size) {
+      FX_LOGS(INFO) << "Mapping discardable buffer: " << ls.discarded_size << "/" << ls.size
+                    << " bytes were previously discarded";
+    }
   }
 
   // ZX_VM_ALLOW_FAULTS is required to support discardable VMOs.
