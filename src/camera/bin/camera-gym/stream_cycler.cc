@@ -13,6 +13,7 @@
 
 #include <sstream>
 
+#include "fuchsia/camera3/cpp/fidl.h"
 #include "src/camera/bin/camera-gym/moving_window.h"
 #include "src/lib/fsl/handles/object_info.h"
 
@@ -96,8 +97,8 @@ void StreamCycler::WatchDevicesCallback(std::vector<fuchsia::camera3::WatchDevic
       device_->WatchMuteState(fit::bind_member(this, &StreamCycler::WatchMuteStateHandler));
 
       // Fetch camera configurations
-      device_->GetConfigurations(
-          [this](std::vector<fuchsia::camera3::Configuration> configurations) {
+      device_->GetConfigurations2(
+          [this](std::vector<fuchsia::camera3::Configuration2> configurations) mutable {
             configurations_ = std::move(configurations);
 
             // Once we have the known camera configurations, default to the first configuration
@@ -131,7 +132,7 @@ void StreamCycler::WatchMuteStateHandler(bool software_muted, bool hardware_mute
 void StreamCycler::ForceNextStreamConfiguration() {
   uint32_t config_index = NextConfigIndex();
   ZX_ASSERT(configurations_.size() > config_index);
-  ZX_ASSERT(!configurations_[config_index].streams.empty());
+  ZX_ASSERT(!configurations_[config_index].streams().empty());
   device_->SetCurrentConfiguration(config_index);
 }
 
@@ -163,15 +164,15 @@ void StreamCycler::WatchCurrentConfigurationCallback(uint32_t config_index) {
 }
 
 void StreamCycler::ConnectToAllStreams() {
-  for (size_t i = 0; i < configurations_[current_config_index_].streams.size(); i++) {
+  for (size_t i = 0; i < configurations_[current_config_index_].streams().size(); i++) {
     ConnectToStream(current_config_index_, static_cast<uint32_t>(i));
   }
 }
 
 void StreamCycler::ConnectToStream(uint32_t config_index, uint32_t stream_index) {
   ZX_ASSERT(configurations_.size() > config_index);
-  ZX_ASSERT(configurations_[config_index].streams.size() > stream_index);
-  auto image_format = configurations_[config_index].streams[stream_index].image_format;
+  ZX_ASSERT(configurations_[config_index].streams().size() > stream_index);
+  auto image_format = configurations_[config_index].streams()[stream_index].image_format();
 
   // Connect to specific stream
   StreamInfo new_stream_info;
@@ -183,6 +184,8 @@ void StreamCycler::ConnectToStream(uint32_t config_index, uint32_t stream_index)
   if (config_index == 1 || config_index == 2) {
     stream_infos_[stream_index].source_highlight = 0;
   }
+  stream.set_error_handler(
+      [this, stream_index](zx_status_t status) { DisconnectStream(stream_index); });
 
   // Allocate buffer collection
   fuchsia::sysmem::BufferCollectionTokenPtr token_orig;
@@ -216,43 +219,41 @@ void StreamCycler::ConnectToStream(uint32_t config_index, uint32_t stream_index)
     ResetStreamWatchdog(stream_index);
 
     // Kick start the stream
-    stream->GetNextFrame([this, stream_index](fuchsia::camera3::FrameInfo frame_info) {
+    stream->GetNextFrame2([this, stream_index](fuchsia::camera3::FrameInfo2 frame_info) {
       OnNextFrame(stream_index, std::move(frame_info));
     });
   });
 
   device_->ConnectToStream(stream_index, std::move(stream_request));
-
-  stream.set_error_handler(
-      [this, stream_index](zx_status_t status) { DisconnectStream(stream_index); });
 }
 
-void StreamCycler::OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInfo frame_info) {
+void StreamCycler::OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInfo2 frame_info) {
   TRACE_DURATION("camera", "StreamCycler::OnNextFrame");
   TRACE_FLOW_END("camera", "camera3::Stream::GetNextFrame",
-                 fsl::GetKoid(frame_info.release_fence.get()));
+                 fsl::GetKoid(frame_info.release_fence().get()));
 
   // Reset the watchdog for this particular stream.
   ResetStreamWatchdog(stream_index);
 
   auto& stream_info = stream_infos_[stream_index];
   if (show_buffer_handler_ && stream_info.add_collection_handler_returned_value) {
+    FX_LOGS(INFO) << "!! DEBUG: " << frame_info.buffer_index();
     show_buffer_handler_(stream_info.add_collection_handler_returned_value.value(),
-                         frame_info.buffer_index, std::move(frame_info.release_fence),
+                         frame_info.buffer_index(), frame_info.mutable_release_fence(),
                          stream_info.highlight);
   } else {
-    frame_info.release_fence.reset();
+    frame_info.mutable_release_fence()->reset_and_get_address();
   }
   auto& stream = stream_infos_[stream_index].stream;
 
   // Set the region of interest if appropriate.
   ZX_ASSERT(configurations_.size() > current_config_index_);
   auto& current_configuration = configurations_[current_config_index_];
-  ZX_ASSERT(current_configuration.streams.size() > stream_index);
-  auto& current_stream = current_configuration.streams[stream_index];
+  ZX_ASSERT(current_configuration.streams().size() > stream_index);
+  auto& current_stream = current_configuration.streams()[stream_index];
 
   // If automatic mode, sequence through the crop region automatically.
-  if (current_stream.supports_crop_region && !manual_mode_) {
+  if (current_stream.supports_crop_region() && !manual_mode_) {
     const uint32_t limit = kRegionOfInterestFramesPerMoveRatio;
     static uint32_t count = 0;
     ++count;
@@ -269,7 +270,7 @@ void StreamCycler::OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInf
     }
   }
 
-  stream->GetNextFrame([this, stream_index](fuchsia::camera3::FrameInfo frame_info) {
+  stream->GetNextFrame2([this, stream_index](fuchsia::camera3::FrameInfo2 frame_info) {
     OnNextFrame(stream_index, std::move(frame_info));
   });
 }
@@ -315,7 +316,7 @@ void StreamCycler::DisconnectStream(uint32_t stream_index) {
 }
 
 uint32_t StreamCycler::NextConfigIndex() {
-  ZX_ASSERT(configurations_.size() > 0);
+  ZX_ASSERT(!configurations_.empty());
   ZX_ASSERT(current_config_index_ < configurations_.size());
   return (current_config_index_ + 1) % configurations_.size();
 }
@@ -400,7 +401,7 @@ void StreamCycler::ExecuteAddStreamCommand(AddStreamCommand& command) {
   uint32_t stream_index = command.stream_id;
   uint32_t config_index = current_config_index_;
   ZX_ASSERT(config_index < configurations_.size());
-  if (stream_index >= configurations_[config_index].streams.size()) {
+  if (stream_index >= configurations_[config_index].streams().size()) {
     FX_LOGS(INFO) << "MANUAL MODE: ERROR: stream_index " << stream_index
                   << " out of range for config_index " << config_index;
     CommandFailureNotify(::fuchsia::camera::gym::CommandError::OUT_OF_RANGE);
@@ -418,7 +419,7 @@ void StreamCycler::ExecuteSetCropCommand(SetCropCommand& command) {
   float height = command.height;
   uint32_t config_index = current_config_index_;
   ZX_ASSERT(config_index < configurations_.size());
-  if (stream_index >= configurations_[config_index].streams.size()) {
+  if (stream_index >= configurations_[config_index].streams().size()) {
     FX_LOGS(INFO) << "MANUAL MODE: ERROR: stream_index " << stream_index
                   << " out of range for config_index " << config_index;
     CommandFailureNotify(::fuchsia::camera::gym::CommandError::OUT_OF_RANGE);

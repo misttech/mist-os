@@ -496,7 +496,10 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     // Warming the pipeline cache causes some non-Flatland tests to time out, so don't warm unless
     // |i_can_haz_flatland| is true.
     flatland_renderer->WarmPipelineCache();
-    flatland_renderer->set_disable_lazy_pipeline_creation(true);
+
+    // TODO(fxb/122155) Support camera image in shader pre-warmup.
+    // Disabling this line allows any shaders that weren't warmed up to be lazily created later.
+    // flatland_renderer->set_disable_lazy_pipeline_creation(true);
   }
 
   // Flatland compositor must be made first; it is needed by the manager and the engine.

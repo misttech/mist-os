@@ -152,7 +152,7 @@ class FakeDevice : public fuchsia::camera3::testing::Device_TestBase {
   FakeDeviceServ* owner() { return owner_; }
 
   // FIDL API
-  void GetConfigurations(GetConfigurationsCallback callback) override;
+  void GetConfigurations2(GetConfigurations2Callback callback) override;
   void WatchCurrentConfiguration(WatchCurrentConfigurationCallback callback) override;
   void SetCurrentConfiguration(uint32_t index) override;
   void WatchMuteState(WatchMuteStateCallback callback) override;
@@ -165,7 +165,7 @@ class FakeDevice : public fuchsia::camera3::testing::Device_TestBase {
   CallStat& watch_mute_state_stat() { return watch_mute_state_stat_; }
   CallStat& connect_to_stream_stat() { return connect_to_stream_stat_; }
 
-  void SetupConfigurations(std::vector<fuchsia::camera3::Configuration> configurations) {
+  void SetupConfigurations(std::vector<fuchsia::camera3::Configuration2> configurations) {
     configurations_ = std::move(configurations);
   }
 
@@ -179,7 +179,7 @@ class FakeDevice : public fuchsia::camera3::testing::Device_TestBase {
 
   uint32_t watch_current_configuration_config_id_ = kFakeConfigId;
 
-  std::vector<fuchsia::camera3::Configuration> configurations_;
+  std::vector<fuchsia::camera3::Configuration2> configurations_;
 };
 
 class FakeDeviceWatcher : public fuchsia::camera3::testing::DeviceWatcher_TestBase {
@@ -219,7 +219,7 @@ class FakeStream : public fuchsia::camera3::testing::Stream_TestBase {
   void WatchCropRegion(WatchCropRegionCallback callback) override;
   void SetBufferCollection(BufferCollectionTokenHandle token) override;
   void WatchBufferCollection(WatchBufferCollectionCallback callback) override;
-  void GetNextFrame(GetNextFrameCallback callback) override;
+  void GetNextFrame2(GetNextFrame2Callback callback) override;
 
   // Stats/Counters
   CallStat& get_properties_stat() { return get_properties_stat_; }
@@ -420,7 +420,7 @@ void FakeBufferCollectionToken::Sync(SyncCallback callback) {
   }
 }
 
-void FakeDevice::GetConfigurations(GetConfigurationsCallback callback) {
+void FakeDevice::GetConfigurations2(GetConfigurations2Callback callback) {
   get_configurations_stat().Enter();
   callback(fidl::Clone(configurations_));
 }
@@ -486,7 +486,7 @@ void FakeStream::WatchBufferCollection(WatchBufferCollectionCallback callback) {
   }
 }
 
-void FakeStream::GetNextFrame(GetNextFrameCallback callback) { get_next_frame_stat().Enter(); }
+void FakeStream::GetNextFrame2(GetNextFrame2Callback callback) { get_next_frame_stat().Enter(); }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -627,7 +627,7 @@ class StreamCyclerTest : public gtest::TestLoopFixture {
     on_remove_collection_stat().Enter();
     set_on_remove_collection_id(id);
   }
-  void OnShowBuffer(uint32_t collection_id, uint32_t buffer_index, zx::eventpair release_fence,
+  void OnShowBuffer(uint32_t collection_id, uint32_t buffer_index, zx::eventpair* release_fence,
                     std::optional<fuchsia::math::RectF> subregion) {
     on_show_buffer_stat().Enter();
     set_on_show_buffer_id(collection_id);
@@ -662,78 +662,105 @@ class StreamCyclerTest : public gtest::TestLoopFixture {
   // "Simple" configuration is where there is only 1 configuration supported by the fake device,
   // and there is only 1 stream in that configuration.
   void SetupFakeSimpleConfigurations() {
-    std::vector<fuchsia::camera3::Configuration> configurations;
+    std::vector<fuchsia::camera3::Configuration2> configurations;
     configurations.clear();
-
-    // Config 0
     configurations.push_back({});
-
+    std::vector<fuchsia::camera3::StreamProperties2> streams;
+    fuchsia::camera3::StreamProperties2 properties;
+    properties.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                  .has_format_modifier = false},
+                                 .coded_width = 2345,
+                                 .coded_height = 789,
+                                 .bytes_per_row = 2345,
+                                 .display_width = 1920,
+                                 .display_height = 1080,
+                                 .color_space = {.type = fuchsia::sysmem::ColorSpaceType::SRGB},
+                                 .has_pixel_aspect_ratio = false,
+                                 .pixel_aspect_ratio_width = 1,
+                                 .pixel_aspect_ratio_height = 1});
     // Config 0 stream 0
-    configurations[0].streams.push_back({});
-    configurations[0].streams[0].image_format.coded_width = 2345;
-    configurations[0].streams[0].image_format.coded_height = 789;
-    configurations[0].streams[0].image_format.bytes_per_row = 2345;
-
+    streams.push_back(std::move(properties));
+    configurations[0].set_streams(std::move(streams));
     device_impl()->SetupConfigurations(std::move(configurations));
   }
 
   // "Complex" configuration is where there is only 3 configurations supported by the fake device,
   // and there are 3, 2 & 2 streams in those configurations.
   void SetupFakeComplexConfigurations() {
-    std::vector<fuchsia::camera3::Configuration> configurations;
+    std::vector<fuchsia::camera3::Configuration2> configurations;
     configurations.clear();
 
-    // Config 0
-    configurations.push_back({});
+    // Config 0, 3 streams.
+    std::vector<fuchsia::camera3::StreamProperties2> streams0;
 
-    // Config 0 stream 0
-    configurations[0].streams.push_back({});
-    configurations[0].streams[0].image_format.coded_width = 1234;
-    configurations[0].streams[0].image_format.coded_height = 678;
-    configurations[0].streams[0].image_format.bytes_per_row = 1234;
+    fuchsia::camera3::StreamProperties2 properties1;
+    properties1.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                   .has_format_modifier = false},
+                                  .coded_width = 1234,
+                                  .coded_height = 678,
+                                  .bytes_per_row = 1234});
 
-    // Config 0 stream 1
-    configurations[0].streams.push_back({});
-    configurations[0].streams[1].image_format.coded_width = 864;
-    configurations[0].streams[1].image_format.coded_height = 468;
-    configurations[0].streams[1].image_format.bytes_per_row = 864;
+    fuchsia::camera3::StreamProperties2 properties2;
+    properties2.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                   .has_format_modifier = false},
+                                  .coded_width = 864,
+                                  .coded_height = 468,
+                                  .bytes_per_row = 864});
 
-    // Config 0 stream 2
-    configurations[0].streams.push_back({});
-    configurations[0].streams[2].image_format.coded_width = 654;
-    configurations[0].streams[2].image_format.coded_height = 432;
-    configurations[0].streams[2].image_format.bytes_per_row = 654;
+    fuchsia::camera3::StreamProperties2 properties3;
+    properties3.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                   .has_format_modifier = false},
+                                  .coded_width = 654,
+                                  .coded_height = 432,
+                                  .bytes_per_row = 654});
+    streams0.push_back(std::move(properties1));
+    streams0.push_back(std::move(properties2));
+    streams0.push_back(std::move(properties3));
+    fuchsia::camera3::Configuration2 configuration0;
+    configuration0.set_streams(std::move(streams0));
+    configurations.push_back(std::move(configuration0));
 
-    // Config 1
-    configurations.push_back({});
+    // Config 1, 2 streams.
+    std::vector<fuchsia::camera3::StreamProperties2> streams1;
+    fuchsia::camera3::StreamProperties2 properties4;
+    properties4.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                   .has_format_modifier = false},
+                                  .coded_width = 876,
+                                  .coded_height = 456,
+                                  .bytes_per_row = 876});
+    fuchsia::camera3::StreamProperties2 properties5;
+    properties5.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                   .has_format_modifier = false},
+                                  .coded_width = 576,
+                                  .coded_height = 392,
+                                  .bytes_per_row = 576});
+    streams1.push_back(std::move(properties4));
+    streams1.push_back(std::move(properties5));
 
-    // Config 1 stream 0
-    configurations[1].streams.push_back({});
-    configurations[1].streams[0].image_format.coded_width = 876;
-    configurations[1].streams[0].image_format.coded_height = 456;
-    configurations[1].streams[0].image_format.bytes_per_row = 876;
+    fuchsia::camera3::Configuration2 configuration1;
+    configuration1.set_streams(std::move(streams1));
+    configurations.push_back(std::move(configuration1));
 
-    // Config 1 stream 1
-    configurations[1].streams.push_back({});
-    configurations[1].streams[1].image_format.coded_width = 576;
-    configurations[1].streams[1].image_format.coded_height = 392;
-    configurations[1].streams[1].image_format.bytes_per_row = 576;
+    // Config 2, 2 streams.
+    std::vector<fuchsia::camera3::StreamProperties2> streams2;
+    fuchsia::camera3::StreamProperties2 properties6;
+    properties6.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                   .has_format_modifier = false},
+                                  .coded_width = 744,
+                                  .coded_height = 588,
+                                  .bytes_per_row = 744});
 
-    // Config 2
-    configurations.push_back({});
-
-    // Config 2 stream 0
-    configurations[2].streams.push_back({});
-    configurations[2].streams[0].image_format.coded_width = 744;
-    configurations[2].streams[0].image_format.coded_height = 588;
-    configurations[2].streams[0].image_format.bytes_per_row = 744;
-
-    // Config 2 stream 1
-    configurations[2].streams.push_back({});
-    configurations[2].streams[1].image_format.coded_width = 468;
-    configurations[2].streams[1].image_format.coded_height = 345;
-    configurations[2].streams[1].image_format.bytes_per_row = 468;
-
+    fuchsia::camera3::StreamProperties2 properties7;
+    properties7.set_image_format({.pixel_format = {.type = fuchsia::sysmem::PixelFormatType::NV12,
+                                                   .has_format_modifier = false},
+                                  .coded_width = 468,
+                                  .coded_height = 345,
+                                  .bytes_per_row = 468});
+    streams2.push_back(std::move(properties6));
+    streams2.push_back(std::move(properties7));
+    fuchsia::camera3::Configuration2 configuration2;
+    configuration2.set_streams(std::move(streams2));
+    configurations.push_back(std::move(configuration2));
     device_impl()->SetupConfigurations(std::move(configurations));
   }
 

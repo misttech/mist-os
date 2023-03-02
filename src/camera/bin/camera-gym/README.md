@@ -2,28 +2,49 @@
 
 Example app to exercise the various stream configurations available for Sherlock.
 
+## Flatland Instruction
+See go/try-flatland
+
+Note: Currently flatland support is limited to showing only camera streams on supported physical device.
+Bug that tracks full flatland migration for camera-gym is fxb/122163.
+
+### Run camera-gym
+
+Note: Component `camera-gym` now runs using Flatland. To switch to GFX, update `fx vendor google camera-gym` to launch component name `camera-gym-gfx`.
+
+```
+> fx vendor google camera-gym
+```
+
 ## How To Select Config
 
 TBD
 
-## Building camera-gym
+## Building camera-gym for GFX
 
 Include the `camera-gym` package and disable flatland:
 
 ```
-> fx set <product>.<arch> --with //src/camera/bin/camera-gym --args=use_flatland_by_default=false
+> fx set <product>.<arch> --with //src/camera/bin/camera-gym --args=use_flatland_by_default=false --args=use_scene_manager_as_scene_owner=false
 ```
 
 ### How to Run in Automatic Mode
 
+Flatland
 ```
 > ffx session add fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym.cm
 ```
 
+GFX
+```
+> ffx session add fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym-gfx.cm
+```
+
 ### How to Run in Manual Mode
+Currently only supported in GFX
 
 ```
-> ffx session add fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym-manual.cm
+> ffx session add fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym-gfx-manual.cm
 ```
 
 ### camera-gym-ctl
@@ -31,12 +52,12 @@ Include the `camera-gym` package and disable flatland:
 camera-gym-ctl is a tool that can interact with a camera-gym in manual mode.
 The tool can be activated from `ffx component explore`.
 
-Start by finding the moniker of the camera-gym-manual that you started above.
+Start by finding the moniker of the camera-gym-gfx-manual that you started above.
 
 ```
-> ffx component show camera-gym-manual
+> ffx component show camera-gym-gfx-manual
                Moniker:  /core/session-manager/session:session/workstation_session/login_shell/application_shell:1/elements:vd5ioej4lvcshlgb
-                   URL:  fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym-manual.cm
+                   URL:  fuchsia-pkg://fuchsia.com/camera-gym#meta/camera-gym-gfx-manual.cm
            Instance ID:  None
                   Type:  CML Component
        Component State:  Resolved

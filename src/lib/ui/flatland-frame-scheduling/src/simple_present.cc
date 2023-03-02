@@ -81,7 +81,7 @@ void FlatlandConnection::Present(fuchsia::ui::composition::PresentArgs present_a
                                  OnFramePresentedCallback callback) {
   if (present_credits_ == 0) {
     pending_presents_.emplace(std::move(present_args), std::move(callback));
-    FX_DCHECK(pending_presents_.size() <= 3u) << "Too many pending presents.";
+    FX_DCHECK(pending_presents_.size() <= 10u) << "Too many pending presents.";
     return;
   }
   --present_credits_;

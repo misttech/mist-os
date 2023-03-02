@@ -101,7 +101,7 @@ class BufferCollage : public fuchsia::ui::app::ViewProvider {
   // Updates the view to show the given |buffer_index| in for the given |collection_id|'s node.
   // Holds |release_fence| until the buffer is no longer needed, then closes the handle. If
   // non-null, |subregion| specifies what sub-region of the buffer to highlight.
-  void PostShowBuffer(uint32_t collection_id, uint32_t buffer_index, zx::eventpair release_fence,
+  void PostShowBuffer(uint32_t collection_id, uint32_t buffer_index, zx::eventpair* release_fence,
                       std::optional<fuchsia::math::RectF> subregion);
 
   // Updates the view to show or hide a collection with the given |id|.
@@ -169,7 +169,7 @@ class BufferCollage : public fuchsia::ui::app::ViewProvider {
   void SetRemoveCollectionViewOnError(fidl::InterfacePtr<T>& p, uint32_t view_id, std::string name);
 
   // See PostShowBuffer.
-  void ShowBuffer(uint32_t collection_id, uint32_t buffer_index, zx::eventpair release_fence,
+  void ShowBuffer(uint32_t collection_id, uint32_t buffer_index, zx::eventpair* release_fence,
                   std::optional<fuchsia::math::RectF> subregion);
 
   // Repositions scenic nodes to fit all collections on the screen.

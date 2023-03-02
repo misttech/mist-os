@@ -38,6 +38,8 @@ source_set("lib") {
   sources = [
     "buffer_collage.cc",
     "buffer_collage.h",
+    "buffer_collage_flatland.cc",
+    "buffer_collage_flatland.h",
     "controller_receiver.cc",
     "controller_receiver.h",
     "frame_capture.cc",
@@ -46,6 +48,8 @@ source_set("lib") {
     "lifecycle_impl.h",
     "moving_window.cc",
     "moving_window.h",
+    "screen_util.cc",
+    "screen_util.h",
     "stream_cycler.cc",
     "stream_cycler.h",
   ]
@@ -67,6 +71,9 @@ source_set("lib") {
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
+    "//src/lib/ui/flatland-frame-scheduling:simple_present",
+    "//src/ui/scenic/lib/allocation",
+    "//src/ui/scenic/lib/utils:utils",
     "//third_party/googletest:gtest_prod",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -151,21 +158,28 @@ template("camera_gym_component") {
   }
 }
 
+# Note: This defaults to Flatland, use camera-gym-gfx for GFX implementation.
 camera_gym_component("auto") {
   component_name = "camera-gym"
   manifest = "meta/camera-gym.cml"
 }
 
-camera_gym_component("manual") {
-  component_name = "camera-gym-manual"
-  manifest = "meta/camera-gym-manual.cml"
+camera_gym_component("gfx_manual") {
+  component_name = "camera-gym-gfx-manual"
+  manifest = "meta/camera-gym-gfx-manual.cml"
+}
+
+camera_gym_component("gfx") {
+  component_name = "camera-gym-gfx"
+  manifest = "meta/camera-gym-gfx.cml"
 }
 
 fuchsia_package("camera_gym_pkg") {
   package_name = "camera-gym"
   deps = [
     ":camera_gym_auto",
-    ":camera_gym_manual",
+    ":camera_gym_gfx",
+    ":camera_gym_gfx_manual",
     "controller_client:bin",
   ]
 }

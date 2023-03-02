@@ -50,7 +50,7 @@ constexpr float kHeartbeatDepth = -1.0f;
 // eventpair is closed. This can be used to bridge event- and eventpair-based fence semantics. If
 // this function returns an error, |eventpair| is closed immediately.
 fpromise::result<zx::event, zx_status_t> MakeEventBridge(async_dispatcher_t* dispatcher,
-                                                         zx::eventpair eventpair) {
+                                                         zx::eventpair* eventpair) {
   zx::event caller_event;
   zx::event waiter_event;
   zx_status_t status = zx::event::create(0, &caller_event);
@@ -65,13 +65,12 @@ fpromise::result<zx::event, zx_status_t> MakeEventBridge(async_dispatcher_t* dis
   }
   // A shared_ptr is necessary in order to begin the wait after setting the wait handler.
   auto wait = std::make_shared<async::Wait>(waiter_event.get(), ZX_EVENT_SIGNALED);
-  wait->set_handler(
-      [wait, waiter_event = std::move(waiter_event), eventpair = std::move(eventpair)](
-          async_dispatcher_t* /*unused*/, async::Wait* /*unused*/, zx_status_t /*unused*/,
-          const zx_packet_signal_t* /*unused*/) mutable {
-        // Close the waiter along with its captures.
-        wait = nullptr;
-      });
+  wait->set_handler([wait, waiter_event = std::move(waiter_event)](
+                        async_dispatcher_t* /*unused*/, async::Wait* /*unused*/,
+                        zx_status_t /*unused*/, const zx_packet_signal_t* /*unused*/) mutable {
+    // Close the waiter along with its captures.
+    wait = nullptr;
+  });
   status = wait->Begin(dispatcher);
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status);
@@ -324,15 +323,15 @@ void BufferCollage::RemoveCollection(uint32_t id) {
 }
 
 void BufferCollage::PostShowBuffer(uint32_t collection_id, uint32_t buffer_index,
-                                   zx::eventpair release_fence,
+                                   zx::eventpair* release_fence,
                                    std::optional<fuchsia::math::RectF> subregion) {
   auto nonce = TRACE_NONCE();
   TRACE_DURATION("camera", "BufferCollage::PostShowBuffer");
   TRACE_FLOW_BEGIN("camera", "post_show_buffer", nonce);
-  async::PostTask(loop_.dispatcher(), [=, release_fence = std::move(release_fence)]() mutable {
+  async::PostTask(loop_.dispatcher(), [=, release_fence = release_fence]() mutable {
     TRACE_DURATION("camera", "BufferCollage::PostShowBuffer.task");
     TRACE_FLOW_END("camera", "post_show_buffer", nonce);
-    ShowBuffer(collection_id, buffer_index, std::move(release_fence), subregion);
+    ShowBuffer(collection_id, buffer_index, release_fence, subregion);
   });
 }
 
@@ -409,7 +408,7 @@ void BufferCollage::SetRemoveCollectionViewOnError(fidl::InterfacePtr<T>& p, uin
 }
 
 void BufferCollage::ShowBuffer(uint32_t collection_id, uint32_t buffer_index,
-                               zx::eventpair release_fence,
+                               zx::eventpair* release_fence,
                                std::optional<fuchsia::math::RectF> subregion) {
   TRACE_DURATION("camera", "BufferCollage::ShowBuffer");
   auto it = collection_views_.find(collection_id);
@@ -453,7 +452,7 @@ void BufferCollage::ShowBuffer(uint32_t collection_id, uint32_t buffer_index,
     view.highlight_node->SetTranslation(0, 0, kOffscreenDepth);
   }
 
-  auto result = MakeEventBridge(loop_.dispatcher(), std::move(release_fence));
+  auto result = MakeEventBridge(loop_.dispatcher(), release_fence);
   if (result.is_error()) {
     FX_PLOGS(ERROR, result.error());
     Stop();

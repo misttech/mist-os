@@ -31,7 +31,7 @@ class StreamCycler {
                                                       fuchsia::sysmem::ImageFormat_2, std::string)>;
   using RemoveCollectionHandler = fit::function<void(uint32_t)>;
   using ShowBufferHandler =
-      fit::function<void(uint32_t, uint32_t, zx::eventpair, std::optional<fuchsia::math::RectF>)>;
+      fit::function<void(uint32_t, uint32_t, zx::eventpair*, std::optional<fuchsia::math::RectF>)>;
   using MuteStateHandler = fit::function<void(bool)>;
   // Registers handlers that are called when the cycler adds or removes a buffer collection. The
   // value returned by |on_add_collection| will be subsequently passed to |on_remove_collection|.
@@ -80,7 +80,7 @@ class StreamCycler {
   void WatchCropRegionCallback(uint32_t stream_index, std::unique_ptr<fuchsia::math::RectF> region);
 
   // Next camera frame on given stream is available.
-  void OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInfo frame_info);
+  void OnNextFrame(uint32_t stream_index, fuchsia::camera3::FrameInfo2 frame_info);
 
   // Disconnect a single stream.
   void DisconnectStream(uint32_t stream_index);
@@ -117,7 +117,7 @@ class StreamCycler {
   fuchsia::camera3::DeviceWatcherPtr watcher_;
   fuchsia::sysmem::AllocatorPtr allocator_;
   fuchsia::camera3::DevicePtr device_;
-  std::vector<fuchsia::camera3::Configuration> configurations_;
+  std::vector<fuchsia::camera3::Configuration2> configurations_;
 
   bool manual_mode_;
   std::optional<zx::duration> auto_cycle_interval_;
