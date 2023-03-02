@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/asm.h>
+#include "test.h"
 
 .text
 
@@ -24,4 +25,7 @@
   .error "unknown architecture"
 #endif
   ret
+  .if (. - multiply_by_ten) != PATCH_SIZE_MULTIPLY_BY_FACTOR
+    .error "PATCH_SIZE_MULTIPLY_BY_FACTOR doesn't match the code"
+  .endif
 .end_function

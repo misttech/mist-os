@@ -27,7 +27,7 @@
 #elif defined(__riscv)
 
 #define PATCH_SIZE_ADD_ONE 2
-#define PATCH_SIZE_MULTIPLY_BY_FACTOR 10
+#define PATCH_SIZE_MULTIPLY_BY_FACTOR 12
 
 #else
 #error "unknown architecture"
