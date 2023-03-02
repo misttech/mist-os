@@ -36,9 +36,9 @@ test_suite(
         "//fuchsia/assembly:images_config_golden_test",
         "//fuchsia/assembly:images_config_no_vbmeta_no_account_golden_test",
         "//fuchsia/assembly:partitions_config_golden_test",
-        "//fuchsia/assembly:product_config_add_package_golden_test",
         "//fuchsia/assembly:product_config_golden_test",
-        "//fuchsia/assembly:product_config_no_identity_golden_test",
+        "//fuchsia/assembly:product_config_raw_config_golden_test",
+        "//fuchsia/assembly:product_config_raw_config_with_labels_golden_test",
     ],
 )
 

@@ -49,9 +49,10 @@ def _collect_file_deps(dep):
 
     return dep[FuchsiaAssembledPackageInfo].files
 
-def _create_platform_config(ctx):
-    platform = {}
-    platform["build_type"] = ctx.attr.build_type
+def _create_platform_config(ctx, initial_value):
+    platform = initial_value
+    if "build_type" not in platform and ctx.attr.build_type:
+        platform["build_type"] = ctx.attr.build_type
     if len(ctx.attr.additional_serial_log_tags) > 0:
         platform["additional_serial_log_tags"] = ctx.attr.additional_serial_log_tags
     if ctx.attr.identity != None:
@@ -79,55 +80,28 @@ def _create_platform_config(ctx):
 
     return platform
 
-def _create_product_config_from_pre_existing_config(ctx):
-    # We only support adding base package for now.
-    deps = []
-    deps += ctx.files.product_config_files
-    base_pkg_details = []
-    for dep in ctx.attr.base_packages:
-        base_pkg_details.append(_create_pkg_detail(dep))
-        deps += _collect_file_deps(dep)
-    product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
-    artifact_base_path = product_config_file.path
-    if ctx.attr.artifact_base_path:
-        artifact_base_path = ctx.file.artifact_base_path.path
-
-    ctx.actions.run(
-        outputs = [product_config_file],
-        inputs = [ctx.file.product_config],
-        executable = ctx.executable._add_base_pkgs,
-        arguments = [
-            "--product-config",
-            ctx.file.product_config.path,
-            "--base-details",
-            str(base_pkg_details),
-            "--updated-product-config",
-            product_config_file.path,
-            "--relative-base",
-            artifact_base_path,
-        ],
-    )
-    deps.append(product_config_file)
-
-    return [
-        DefaultInfo(
-            files = depset(
-                direct = deps,
-            ),
-        ),
-        FuchsiaProductConfigInfo(
-            product_config = product_config_file,
-        ),
-    ]
-
 def _fuchsia_product_configuration_impl(ctx):
-    if ctx.attr.product_config:
-        return _create_product_config_from_pre_existing_config(ctx)
+    product_config = json.decode(ctx.attr.raw_config)
 
-    product_config = {}
-    product_config["platform"] = _create_platform_config(ctx)
+    # Replace "Label(...)" strings in the product config with real label paths from raw_config_labels.
+    inverted_raw_config_labels = {}
+    for label, string in ctx.attr.raw_config_labels.items():
+        inverted_raw_config_labels[string] = label
 
-    product = {}
+    def _replace_labels_visitor(dictionary, key, value):
+        if type(value) == "string" and value in inverted_raw_config_labels:
+            label = inverted_raw_config_labels.get(value)
+            label_files = label.files.to_list()
+            dictionary[key] = label_files[0].path
+
+    _walk_json(product_config, _replace_labels_visitor)
+
+    product_config["platform"] = _create_platform_config(
+        ctx,
+        product_config.get("platform", {}),
+    )
+
+    product = product_config.get("product", {})
     if ctx.attr.session_url:
         product["session_url"] = ctx.attr.session_url
     packages = {}
@@ -144,7 +118,6 @@ def _fuchsia_product_configuration_impl(ctx):
         cache_pkg_details.append(_create_pkg_detail(dep))
         pkg_files += _collect_file_deps(dep)
     packages["cache"] = cache_pkg_details
-
     product["packages"] = packages
 
     driver_details = []
@@ -161,23 +134,7 @@ def _fuchsia_product_configuration_impl(ctx):
 
     product_config_file_rebased = ctx.actions.declare_file(ctx.label.name + "_product_config_rebased.json")
     content = json.encode_indent(product_config, indent = "  ")
-
-    if ctx.attr.artifact_base_path:
-        artifact_base_path = ctx.file.artifact_base_path.path
-        ctx.actions.run(
-            outputs = [product_config_file_rebased],
-            executable = ctx.executable._rebase_product_config,
-            arguments = [
-                "--product-config-content",
-                content,
-                "--product-config-path",
-                product_config_file_rebased.path,
-                "--relative-base",
-                artifact_base_path,
-            ],
-        )
-    else:
-        ctx.actions.write(product_config_file_rebased, content)
+    ctx.actions.write(product_config_file_rebased, content)
 
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
     ctx.actions.run(
@@ -199,63 +156,67 @@ def _fuchsia_product_configuration_impl(ctx):
     )
 
     return [
-        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files)),
+        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files + ctx.files.raw_config_labels)),
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
         ),
     ]
 
-fuchsia_product_configuration = rule(
+_fuchsia_product_configuration = rule(
     doc = """Generates a product configuration file.""",
     implementation = _fuchsia_product_configuration_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
+        "raw_config": attr.string(
+            doc = "Raw json config. Used as a base template for the config",
+            default = "{}",
+        ),
         "build_type": attr.string(
-            doc = "Build type of this product.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Build type of this product.",
             values = [BUILD_TYPES.ENG, BUILD_TYPES.USER, BUILD_TYPES.USER_DEBUG],
         ),
         "identity": attr.label(
-            doc = "Identity configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Identity configuration.",
             providers = [FuchsiaIdentityConfigInfo],
             default = None,
         ),
         "input": attr.label(
-            doc = "Input Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Input Configuration.",
             providers = [FuchsiaInputConfigInfo],
             default = None,
         ),
         "connectivity": attr.label(
-            doc = "Connectivity Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Connectivity Configuration.",
             providers = [FuchsiaConnectivityConfigInfo],
             default = None,
         ),
         "diagnostics": attr.label(
-            doc = "Diagnostics Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Diagnostics Configuration.",
             providers = [FuchsiaDiagnosticsConfigInfo],
             default = None,
         ),
         "development_support": attr.label(
-            doc = "Developement Support Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Developement Support Configuration.",
             providers = [FuchsiaDevelopmentSupportConfigInfo],
             default = None,
         ),
         "driver_framework": attr.label(
-            doc = "Driver Framework Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Driver Framework Configuration.",
             providers = [FuchsiaDriverFrameworkConfigInfo],
             default = None,
         ),
         "starnix": attr.label(
-            doc = "Starnix Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Starnix Configuration.",
             providers = [FuchsiaStarnixConfigInfo],
             default = None,
         ),
         "storage": attr.label(
-            doc = "Storage Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Storage Configuration.",
             providers = [FuchsiaStorageConfigInfo],
             default = None,
         ),
         "virtualization": attr.label(
-            doc = "Virtualization Configuration.",
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Virtualization Configuration.",
             providers = [FuchsiaVirtualizationConfigInfo],
             default = None,
         ),
@@ -281,57 +242,135 @@ fuchsia_product_configuration = rule(
             default = [],
         ),
         "session_url": attr.string(
-            doc = "Session url string that will be included in product_config.json.",
-        ),
-        #TODO(lijiaming) After the product configuration generation is moved OOT
-        #, we can remove this workaround.
-        "product_config": attr.label(
-            doc = "Relative path of built product_config files. If this file is" +
-                  "provided we will skip building product config from scratch.",
-            allow_single_file = [".json"],
-        ),
-        "product_config_files": attr.label(
-            doc = "a list of files used to provide deps of product configuration.",
-            allow_files = True,
-        ),
-        "artifact_base_path": attr.label(
-            doc = "The artifact base directory. The paths in the product" +
-                  "configuration will be relative to this directory. If this" +
-                  "path is not provided, paths in product configuration will be" +
-                  "relative to product configuration itself",
-            allow_single_file = True,
-            default = None,
+            doc = "(Deprecated: Will be removed as part of fxb/122897) Session url string that will be included in product_config.json.",
         ),
         "additional_serial_log_tags": attr.string_list(
-            doc = """A list of logging tags to forward to the serial console.""",
+            doc = """(Deprecated: Will be removed as part of fxb/122897) A list of logging tags to forward to the serial console.""",
             default = [],
         ),
         "additional_platform_flags_bool": attr.string_dict(
-            doc = """This is a dictionary map from json path of platform config
+            doc = """(Deprecated: Will be removed as part of fxb/122897) This is a dictionary map from json path of platform config
 to a bool value. The values are passed in as string formed true/false.""",
         ),
         "additional_platform_flags_string": attr.string_dict(
-            doc = """This is a dictionary map from json path of platform config
+            doc = """(Deprecated: Will be removed as part of fxb/122897) This is a dictionary map from json path of platform config
 to a string value. """,
         ),
         "additional_platform_flags_int": attr.string_dict(
-            doc = """This is a dictionary map from json path of platform config
+            doc = """(Deprecated: Will be removed as part of fxb/122897) This is a dictionary map from json path of platform config
 to a int value. The values are passed in as an int string""",
         ),
-        "_rebase_product_config": attr.label(
-            default = "//fuchsia/tools:rebase_product_config",
-            executable = True,
-            cfg = "exec",
+        "raw_config_labels": attr.label_keyed_string_dict(
+            doc = """Used internally by fuchsia_product_configuration.
+Do not use otherwise""",
+            allow_files = True,
+            default = {},
         ),
         "_add_parameters": attr.label(
             default = "//fuchsia/tools:add_parameters",
             executable = True,
             cfg = "exec",
         ),
-        "_add_base_pkgs": attr.label(
-            default = "//fuchsia/tools:add_base_pkgs",
-            executable = True,
-            cfg = "exec",
-        ),
     },
 )
+
+def _walk_json(json_dict, visit_node_func):
+    """Walks a json dictionary, applying the function `visit_node_func` on every node.
+
+    Args:
+        json_dict: The dictionary to walk.
+        visit_node_func: A function that takes 3 arguments: dictionary, key, value.
+    """
+    nodes_to_visit = []
+
+    def _enqueue(dictionary, k, v):
+        nodes_to_visit.append(struct(
+            dictionary = dictionary,
+            key = k,
+            value = v,
+        ))
+
+    def _enqueue_dictionary_children(dictionary):
+        for key, value in dictionary.items():
+            _enqueue(dictionary, key, value)
+
+    _enqueue_dictionary_children(json_dict)
+
+    # Bazel doesn't support recursions, but we don't expect
+    # a json object with more than 100K nodes, so this iteration
+    # suffices.
+    max_nodes = 100000
+    for _unused in range(0, max_nodes):
+        if not len(nodes_to_visit):
+            break
+        node = nodes_to_visit.pop()
+        visit_node_func(dictionary = node.dictionary, key = node.key, value = node.value)
+        if type(node.value) == "dict":
+            _enqueue_dictionary_children(node.value)
+
+    if nodes_to_visit:
+        fail("More than %s nodes in the input json_dict" % max_nodes)
+
+def fuchsia_product_configuration(
+        name,
+        json_config = None,
+        base_packages = None,
+        cache_packages = None,
+        driver_packages = None,
+        **kargs):
+    """A new implementation of fuchsia_product_configuration that takes raw a json config.
+
+    Args:
+        name: Name of the rule.
+        TODO(fxb/122898): Point to document instead of Rust definition
+        json_config: product assembly json config, as a starlark dictionary.
+            Format of this JSON config can be found in this Rust definitions: 
+               //src/lib/assembly/config_schema/src/assembly_config.rs
+
+            Key values that take file paths should be declared as a string with
+            the label path wrapped via "LABEL(" prefix and ")" suffix. For
+            example:
+            ```
+            {
+                "platform": {
+                    "some_file": "LABEL(//path/to/file)",
+                },
+            },
+            ```
+
+            All assembly json inputs are supported, except for product.packages
+            and product.drivers, which must be specified through the
+            following args.
+        base_packages: Fuchsia packages to be included in base.
+        cache_packages: Fuchsia packages to be included in cache.
+        driver_packages: Driver packages to include in product.
+        TODO(fxb/122897): Remove post migration
+        **kargs: Additional attributes propagated into
+        _fuchsia_product_configuration rule.
+    """
+
+    if not json_config:
+        json_config = {}
+    if type(json_config) != "dict":
+        fail("expecting a dictionary")
+
+    extracted_raw_config_labels = {}
+
+    def _extract_labels_visitor(dictionary, key, value):
+        if type(value) == "string" and value.startswith("LABEL("):
+            if not value.endswith(")"):
+                fail("Syntax error: LABEL does not have closing bracket")
+            label = value[6:-1]
+            extracted_raw_config_labels[label] = value
+
+    _walk_json(json_config, _extract_labels_visitor)
+
+    _fuchsia_product_configuration(
+        name = name,
+        raw_config = json.encode_indent(json_config, indent = "    "),
+        raw_config_labels = extracted_raw_config_labels,
+        base_packages = base_packages,
+        cache_packages = cache_packages,
+        driver_packages = driver_packages,
+        **kargs
+    )

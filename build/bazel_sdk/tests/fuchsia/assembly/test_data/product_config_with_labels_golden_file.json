@@ -1,0 +1,13 @@
+{
+  "platform": {
+    "foo": "fuchsia/assembly/test_data/foo.txt"
+  },
+  "product": {
+    "bar": "fuchsia/assembly/test_data/bar.txt",
+    "drivers": [],
+    "packages": {
+      "base": [],
+      "cache": []
+    }
+  }
+}
