@@ -168,14 +168,14 @@ zx_status_t WriteStringRecord(Writer* writer, uint16_t index, const char* string
 //
 // See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#thread-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0>
-zx_status_t WriteThreadRecord(Writer* writer, uint16_t index, Koid process_koid, Koid thread_koid) {
+zx_status_t WriteThreadRecord(Writer* writer, uint16_t index, Koid process, Koid thread) {
   const WordSize record_size(3);
   const uint64_t header =
       MakeHeader(RecordType::kThread, record_size) | ThreadRecordFields::ThreadIndex::Make(index);
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
-    res->WriteWord(process_koid);
-    res->WriteWord(thread_koid);
+    res->WriteWord(process.koid);
+    res->WriteWord(thread.koid);
     res->Commit();
   }
   return res.status_value();

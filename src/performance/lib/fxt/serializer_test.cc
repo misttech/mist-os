@@ -893,4 +893,26 @@ TEST(Serializer, LargeBlobWithNoMetadataRecord) {
   EXPECT_EQ(std::memcmp(words + 7, "er\0\0\0\0\0\0", 8), 0);
 }
 
+TEST(Serializer, ThreadRecord) {
+  uint16_t index = 0xAA;
+  fxt::Koid process{0x0123'4567'89AB'CDEF};
+  fxt::Koid thread{0xFECD'BA98'7654'3210};
+
+  FakeWriter writer;
+  EXPECT_EQ(ZX_OK, fxt::WriteThreadRecord(&writer, index, process, thread));
+
+  // One word for the header, one for the process koid, one for the thread koid
+  EXPECT_EQ(writer.bytes.size(), fxt::WordSize(3).SizeInBytes());
+
+  uint64_t* words = reinterpret_cast<uint64_t*>(writer.bytes.data());
+  uint64_t header = words[0];
+  // Thread records have record type 3
+  EXPECT_EQ((header & 0x0000'0000'0000'000F), uint64_t{3});
+  // The header should also indicate that we have 3 words
+  EXPECT_EQ((header & 0x0000'0000'0000'FFF0) >> 4, uint64_t{3});
+  EXPECT_EQ((header & 0x0000'0000'00FF'0000) >> 16, uint64_t{index});
+  EXPECT_EQ(words[1], process.koid);
+  EXPECT_EQ(words[2], thread.koid);
+}
+
 }  // namespace
