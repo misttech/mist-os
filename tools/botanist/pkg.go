@@ -34,10 +34,8 @@ const (
 	DefaultPkgSrvPort    = 8083
 )
 
-var (
-	// getGCSReader allows us to stub out the GCS communiciation in the tests.
-	getGCSReader = getGCSReaderImpl
-)
+// getGCSReader allows us to stub out the GCS communiciation in the tests.
+var getGCSReader = getGCSReaderImpl
 
 // downloadRecord contains a path we fetched from the remote and how much data
 // we retrieved.
@@ -109,7 +107,7 @@ func newCachedPkgRepo(ctx context.Context, repoPath, repoURL, blobURL string) (*
 }
 
 func (c *cachedPkgRepo) logf(msg string, args ...interface{}) {
-	logger.Debugf(c.loggerCtx, fmt.Sprintf("[package server] %s", msg), args)
+	logger.Debugf(c.loggerCtx, fmt.Sprintf("[package server] %s", msg), args...)
 }
 
 func (c *cachedPkgRepo) ServeHTTP(w http.ResponseWriter, r *http.Request) {
