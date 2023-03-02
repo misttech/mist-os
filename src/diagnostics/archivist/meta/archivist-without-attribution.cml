@@ -26,6 +26,12 @@
             ],
         },
     ],
+    use: [
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            availability: "optional",
+        },
+    ],
     expose: [
         {
             protocol: [
