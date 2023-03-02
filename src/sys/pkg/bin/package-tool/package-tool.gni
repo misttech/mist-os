@@ -270,6 +270,10 @@ template("package_tool_repository_publish") {
         "--delivery-blob-type",
         "${repository_publish_delivery_blob_type}",
       ]
+
+      deps += [ "//src/storage/tools/blobfs-compression:blobfs-compression($host_toolchain)" ]
+
+      inputs += [ "$root_build_dir/host_x64/blobfs-compression" ]
     }
 
     if (defined(sources)) {
