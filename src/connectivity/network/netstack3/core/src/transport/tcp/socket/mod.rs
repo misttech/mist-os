@@ -2818,7 +2818,7 @@ mod tests {
         },
         testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
         transport::tcp::{
-            buffer::{Buffer, RingBuffer, SendPayload},
+            buffer::{Buffer, BufferLimits, RingBuffer, SendPayload},
             segment::Payload,
             UserError,
         },
@@ -2894,12 +2894,8 @@ mod tests {
     type TcpNonSyncCtx = FakeNonSyncCtx<TimerId, (), ()>;
 
     impl Buffer for Rc<RefCell<RingBuffer>> {
-        fn len(&self) -> usize {
-            self.borrow().len()
-        }
-
-        fn capacity(&self) -> usize {
-            self.borrow().capacity()
+        fn limits(&self) -> BufferLimits {
+            self.borrow().limits()
         }
 
         fn target_capacity(&self) -> usize {
@@ -2929,14 +2925,12 @@ mod tests {
     }
 
     impl Buffer for TestSendBuffer {
-        fn len(&self) -> usize {
+        fn limits(&self) -> BufferLimits {
             let Self { fake_stream, ring } = self;
-            ring.len() + fake_stream.borrow().len()
-        }
-
-        fn capacity(&self) -> usize {
-            let Self { fake_stream, ring } = self;
-            ring.capacity() + fake_stream.borrow().capacity()
+            let BufferLimits { capacity: ring_capacity, len: ring_len } = ring.limits();
+            let len = ring_len + fake_stream.borrow().len();
+            let capacity = ring_capacity + fake_stream.borrow().capacity();
+            BufferLimits { len, capacity }
         }
 
         fn target_capacity(&self) -> usize {
@@ -2963,7 +2957,8 @@ mod tests {
             let Self { fake_stream, ring } = self;
             if !fake_stream.borrow().is_empty() {
                 // Pull from the fake stream into the ring if there is capacity.
-                let len = (ring.capacity() - ring.len()).min(fake_stream.borrow().len());
+                let BufferLimits { capacity, len } = ring.limits();
+                let len = (capacity - len).min(fake_stream.borrow().len());
                 let rest = fake_stream.borrow_mut().split_off(len);
                 let first = fake_stream.replace(rest);
                 assert_eq!(ring.enqueue_data(&first[..]), len);

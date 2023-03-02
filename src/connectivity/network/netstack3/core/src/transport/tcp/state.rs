@@ -20,7 +20,7 @@ use explicit::ResultExt as _;
 
 use crate::{
     transport::tcp::{
-        buffer::{Assembler, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
+        buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
         congestion::CongestionControl,
         rtt::Estimator,
         segment::{Options, Payload, Segment},
@@ -632,7 +632,8 @@ struct Recv<R: ReceiveBuffer> {
 
 impl<R: ReceiveBuffer> Recv<R> {
     fn wnd(&self) -> WindowSize {
-        WindowSize::new(self.buffer.capacity() - self.buffer.len()).unwrap_or(WindowSize::MAX)
+        let BufferLimits { capacity, len } = self.buffer.limits();
+        WindowSize::new(capacity - len).unwrap_or(WindowSize::MAX)
     }
 
     fn nxt(&self) -> SeqNum {
@@ -710,6 +711,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             timer,
             congestion_control,
         } = self;
+        let BufferLimits { capacity: _, len: readable_bytes } = buffer.limits();
         let mss = u32::from(congestion_control.mss());
         let mut zero_window_probe = false;
         match timer {
@@ -732,7 +734,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 }
             }
             Some(SendTimer::ZeroWindowProbe(retrans_timer)) => {
-                debug_assert!(buffer.len() > 0 || FIN_QUEUED);
+                debug_assert!(readable_bytes > 0 || FIN_QUEUED);
                 if retrans_timer.at <= now {
                     zero_window_probe = true;
                     *snd_nxt = *snd_una;
@@ -747,7 +749,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 //   Keep-alive packets MUST only be sent when no sent data is
                 //   outstanding, and no data or acknowledgment packets have
                 //   been received for the connection within an interval.
-                if keep_alive.enabled && !FIN_QUEUED && buffer.len() == 0 {
+                if keep_alive.enabled && !FIN_QUEUED && readable_bytes == 0 {
                     if *at <= now {
                         *at = now.checked_add(keep_alive.interval.into()).unwrap_or_else(|| {
                             panic!(
@@ -781,7 +783,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             usize::try_from(next_seg - *snd_una).unwrap_or_else(|TryFromIntError { .. }| {
                 panic!("next_seg({:?}) should never fall behind snd.una({:?})", *snd_nxt, *snd_una);
             });
-        let available = u32::try_from(buffer.len() + usize::from(FIN_QUEUED) - offset)
+        let available = u32::try_from(readable_bytes + usize::from(FIN_QUEUED) - offset)
             .unwrap_or(WindowSize::MAX.into());
         // We can only send the minimum of the open window and the bytes that
         // are available, additionally, if in zero window probe mode, allow at
@@ -929,7 +931,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 .unwrap_or_else(|| {
                     panic!("seg_ack({:?}) - snd_una({:?}) must be positive", seg_ack, snd_una);
                 });
-            let fin_acked = FIN_QUEUED && seg_ack == *snd_una + buffer.len() + 1;
+            let BufferLimits { len, capacity: _ } = buffer.limits();
+            let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
             // Remove the acked bytes from the send buffer. The following
             // operation should not panic because we are in this branch
             // means seg_ack is before snd.max, thus seg_ack - snd.una
@@ -1508,7 +1511,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         }
                     }
                     State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => {
-                        let fin_seq = snd.una + snd.buffer.len() + 1;
+                        let BufferLimits { len, capacity: _ } = snd.buffer.limits();
+                        let fin_seq = snd.una + len + 1;
                         if let Some(ack) = snd.process_ack(
                             seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now, keep_alive,
                         ) {
@@ -1519,7 +1523,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         }
                     }
                     State::FinWait1(FinWait1 { snd, rcv }) => {
-                        let fin_seq = snd.una + snd.buffer.len() + 1;
+                        let BufferLimits { len, capacity: _ } = snd.buffer.limits();
+                        let fin_seq = snd.una + len + 1;
                         if let Some(ack) = snd.process_ack(
                             seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now, keep_alive,
                         ) {
@@ -1535,7 +1540,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         }
                     }
                     State::Closing(Closing { snd, last_ack, last_wnd }) => {
-                        let fin_seq = snd.una + snd.buffer.len() + 1;
+                        let BufferLimits { len, capacity: _ } = snd.buffer.limits();
+                        let fin_seq = snd.una + len + 1;
                         if let Some(ack) = snd.process_ack(
                             seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now, keep_alive,
                         ) {
@@ -2111,12 +2117,8 @@ mod test {
     struct NullBuffer;
 
     impl Buffer for NullBuffer {
-        fn len(&self) -> usize {
-            0
-        }
-
-        fn capacity(&self) -> usize {
-            0
+        fn limits(&self) -> BufferLimits {
+            BufferLimits { len: 0, capacity: 0 }
         }
 
         fn target_capacity(&self) -> usize {
@@ -2637,7 +2639,7 @@ mod test {
             assert_eq!(snd.nxt, ISS_1 + 1 + TEST_BYTES.len());
             assert_eq!(snd.max, ISS_1 + 1 + TEST_BYTES.len());
             assert_eq!(snd.una, ISS_1 + 1 + TEST_BYTES.len());
-            assert_eq!(snd.buffer.len(), 0);
+            assert_eq!(snd.buffer.limits().len, 0);
         }
     }
 
@@ -3991,12 +3993,8 @@ mod test {
     }
 
     impl<B: Buffer> Buffer for ReservingBuffer<B> {
-        fn len(&self) -> usize {
-            self.buffer.len()
-        }
-
-        fn capacity(&self) -> usize {
-            self.buffer.capacity()
+        fn limits(&self) -> BufferLimits {
+            self.buffer.limits()
         }
 
         fn target_capacity(&self) -> usize {
@@ -4045,7 +4043,7 @@ mod test {
                 buffer: RingBuffer::with_data(DATA_LEN, &vec![VALUE; DATA_LEN]),
                 reserved_bytes: NUM_RESERVED,
             };
-            assert_eq!(buffer.len(), DATA_LEN);
+            assert_eq!(buffer.limits().len, DATA_LEN);
 
             let mut snd = Send::<FakeInstant, _, HAS_FIN> {
                 nxt: ISS_1,

@@ -29,11 +29,11 @@ use crate::transport::tcp::{
 
 /// Common super trait for both sending and receiving buffer.
 pub trait Buffer: Takeable + Debug + Sized {
-    /// Returns the number of bytes in the buffer that can be read.
-    fn len(&self) -> usize;
-
-    /// Returns the maximum number of bytes that can reside in the buffer.
-    fn capacity(&self) -> usize;
+    /// Returns information about the number of bytes in the buffer.
+    ///
+    /// Returns a [`BufferLimits`] instance with information about the number of
+    /// bytes in the buffer.
+    fn limits(&self) -> BufferLimits;
 
     /// Gets the target size of the buffer, in bytes.
     ///
@@ -100,6 +100,15 @@ pub trait SendBuffer: Buffer {
     fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
     where
         F: FnOnce(SendPayload<'a>) -> R;
+}
+
+/// Information about the number of bytes in a [`Buffer`].
+pub struct BufferLimits {
+    /// The total number of bytes that the buffer can hold.
+    pub capacity: usize,
+
+    /// The number of readable bytes that the buffer currently holds.
+    pub len: usize,
 }
 
 /// A type for the payload being sent.
@@ -378,7 +387,8 @@ impl RingBuffer {
 
     /// Returns the writable regions of the [`RingBuffer`].
     pub fn writable_regions(&mut self) -> impl IntoIterator<Item = &mut [u8]> {
-        let available = self.capacity() - self.len();
+        let BufferLimits { capacity, len } = self.limits();
+        let available = capacity - len;
         let Self { storage, head, len, shrink: _ } = self;
 
         let mut write_start = *head + *len;
@@ -448,13 +458,10 @@ impl RingBuffer {
 }
 
 impl Buffer for RingBuffer {
-    fn len(&self) -> usize {
-        self.len
-    }
-
-    fn capacity(&self) -> usize {
-        let Self { storage, shrink, len: _, head: _ } = self;
-        storage.len() - shrink.as_ref().map_or(0, |r| r.current)
+    fn limits(&self) -> BufferLimits {
+        let Self { storage, shrink, len, head: _ } = self;
+        let capacity = storage.len() - shrink.as_ref().map_or(0, |r| r.current);
+        BufferLimits { len: *len, capacity }
     }
 
     fn target_capacity(&self) -> usize {
@@ -465,7 +472,8 @@ impl Buffer for RingBuffer {
 
 impl ReceiveBuffer for RingBuffer {
     fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
-        let available = self.capacity() - self.len();
+        let BufferLimits { capacity, len } = self.limits();
+        let available = capacity - len;
         let Self { storage, head, len, shrink: _ } = self;
         if storage.len() == 0 {
             return 0;
@@ -488,7 +496,8 @@ impl ReceiveBuffer for RingBuffer {
     }
 
     fn make_readable(&mut self, count: usize) {
-        debug_assert!(count <= self.capacity() - self.len());
+        let BufferLimits { capacity, len } = self.limits();
+        debug_assert!(count <= capacity - len);
         self.len += count;
     }
 }
@@ -752,7 +761,7 @@ mod test {
         fn ring_buffer_make_readable((mut rb, avail) in ring_buffer::with_written()) {
             let old_storage = rb.storage.clone();
             let old_head = rb.head;
-            let old_len = rb.len();
+            let old_len = rb.limits().len;
             let old_shrink = rb.shrink;
             rb.make_readable(avail);
             // Assert that length is updated but everything else is unchanged.
@@ -766,10 +775,10 @@ mod test {
         #[test]
         fn ring_buffer_write_at((mut rb, offset, data) in ring_buffer::with_offset_data()) {
             let old_head = rb.head;
-            let old_len = rb.len();
+            let old_len = rb.limits().len;
             assert_eq!(rb.write_at(offset, &&data[..]), data.len());
             assert_eq!(rb.head, old_head);
-            assert_eq!(rb.len(), old_len);
+            assert_eq!(rb.limits().len, old_len);
             for i in 0..data.len() {
                 let masked = (rb.head + rb.len + offset + i) % rb.storage.len();
                 // Make sure that data are written.
@@ -782,7 +791,7 @@ mod test {
 
         #[test]
         fn ring_buffer_read_with((mut rb, expected, consume) in ring_buffer::with_read_data()) {
-            assert_eq!(rb.len(), expected.len());
+            assert_eq!(rb.limits().len, expected.len());
             let nread = rb.read_with(|readable| {
                 assert!(readable.len() == 1 || readable.len() == 2);
                 let got = readable.concat();
@@ -790,7 +799,7 @@ mod test {
                 consume
             });
             assert_eq!(nread, consume);
-            assert_eq!(rb.len(), expected.len() - consume);
+            assert_eq!(rb.limits().len, expected.len() - consume);
         }
 
         #[test]
@@ -802,7 +811,7 @@ mod test {
             });
             let old_storage = rb.storage.clone();
             let old_head = rb.head;
-            let old_len = rb.len();
+            let old_len = rb.limits().len;
             let old_shrink = rb.shrink;
 
             rb.mark_read(readable);
@@ -830,11 +839,11 @@ mod test {
 
         #[test]
         fn ring_buffer_peek_with((mut rb, expected, offset) in ring_buffer::with_read_data()) {
-            assert_eq!(rb.len(), expected.len());
+            assert_eq!(rb.limits().len, expected.len());
             let () = rb.peek_with(offset, |readable| {
                 assert_eq!(readable.to_vec(), &expected[offset..]);
             });
-            assert_eq!(rb.len(), expected.len());
+            assert_eq!(rb.limits().len, expected.len());
         }
 
         #[test]
@@ -844,9 +853,10 @@ mod test {
                 slice.fill(BYTE_TO_WRITE);
                 acc + slice.len()
             });
-            assert_eq!(writable_len + rb.len(), rb.capacity());
-            for i in 0..rb.capacity() {
-                let expected = if i < rb.len() {
+            let BufferLimits {len, capacity} = rb.limits();
+            assert_eq!(writable_len + len, capacity);
+            for i in 0..capacity {
+                let expected = if i < len {
                     0
                 } else {
                     BYTE_TO_WRITE
@@ -884,15 +894,16 @@ mod test {
                 acc + slice.len()
             });
 
-            let old_len = rb.len();
+            let old_len = rb.limits().len;
             rb.set_target_size(new_cap);
 
-            assert_eq!(rb.len(), old_len);
+            assert_eq!(rb.limits().len, old_len);
             let new_writable = rb.writable_regions().into_iter().fold(Vec::new(), |mut acc, slice| {
                 acc.extend_from_slice(slice);
                 acc
             });
-            assert_eq!(new_writable.len() + rb.len(), rb.capacity());
+            let BufferLimits {len, capacity} = rb.limits();
+            assert_eq!(new_writable.len() + len, capacity);
             assert!(new_writable.len() >= written);
             for (i, x) in new_writable.iter().enumerate() {
                 let expected = (i < written).then_some(BYTE_TO_WRITE).unwrap_or(0);
@@ -1060,7 +1071,7 @@ mod test {
             }),
             6
         );
-        assert_eq!(rb.len(), 4);
+        assert_eq!(rb.limits().len, 4);
         assert_eq!(
             rb.read_with(|readable| {
                 assert_eq!(readable, &["orld".as_bytes()]);
@@ -1068,10 +1079,10 @@ mod test {
             }),
             4
         );
-        assert_eq!(rb.len(), 0);
+        assert_eq!(rb.limits().len, 0);
 
         assert_eq!(rb.enqueue_data("Hello".as_bytes()), 5);
-        assert_eq!(rb.len(), 5);
+        assert_eq!(rb.limits().len, 5);
 
         let () = rb.peek_with(3, |readable| {
             assert_eq!(readable.to_vec(), "lo".as_bytes());

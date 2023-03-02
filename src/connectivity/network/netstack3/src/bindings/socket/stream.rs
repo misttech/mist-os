@@ -34,7 +34,9 @@ use netstack3_core::{
     ip::IpExt,
     transport::tcp::{
         self,
-        buffer::{Buffer, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload},
+        buffer::{
+            Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
+        },
         segment::Payload,
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
@@ -218,13 +220,10 @@ impl Takeable for ReceiveBufferWithZirconSocket {
 }
 
 impl Buffer for ReceiveBufferWithZirconSocket {
-    fn len(&self) -> usize {
-        let info = self.socket.info().expect("failed to get socket info");
-        info.tx_buf_size
-    }
-
-    fn capacity(&self) -> usize {
-        self.capacity
+    fn limits(&self) -> BufferLimits {
+        let Self { capacity, out_of_order: _, socket } = self;
+        let info = socket.info().expect("failed to get socket info");
+        BufferLimits { capacity: *capacity, len: info.tx_buf_size }
     }
 
     fn target_capacity(&self) -> usize {
@@ -271,7 +270,8 @@ impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
         // Bindings, we can reclaim the memory more promptly by teaching Core
         // about SHUT_RD.
         if shut_rd {
-            if self.out_of_order.capacity() != 0 {
+            let BufferLimits { len: _, capacity } = self.out_of_order.limits();
+            if capacity != 0 {
                 self.out_of_order = RingBuffer::new(0);
             }
             return;
@@ -302,14 +302,15 @@ pub(crate) struct SendBufferWithZirconSocket {
 }
 
 impl Buffer for SendBufferWithZirconSocket {
-    fn len(&self) -> usize {
-        let info = self.socket.info().expect("failed to get socket info");
-        info.rx_buf_size + self.ready_to_send.len()
-    }
+    fn limits(&self) -> BufferLimits {
+        let Self { zx_socket_capacity, socket, ready_to_send, notifier: _ } = self;
+        let info = socket.info().expect("failed to get socket info");
 
-    fn capacity(&self) -> usize {
-        let Self { zx_socket_capacity, socket: _, ready_to_send, notifier: _ } = self;
-        *zx_socket_capacity + ready_to_send.capacity()
+        let BufferLimits { capacity: ready_to_send_capacity, len: ready_to_send_len } =
+            ready_to_send.limits();
+        let len = info.rx_buf_size + ready_to_send_len;
+        let capacity = *zx_socket_capacity + ready_to_send_capacity;
+        BufferLimits { capacity, len }
     }
 
     fn target_capacity(&self) -> usize {
@@ -350,7 +351,10 @@ impl SendBufferWithZirconSocket {
     }
 
     fn poll(&mut self) {
-        let want_bytes = self.ready_to_send.capacity() - self.ready_to_send.len();
+        let want_bytes = {
+            let BufferLimits { len, capacity } = self.ready_to_send.limits();
+            capacity - len
+        };
         if want_bytes == 0 {
             return;
         }
@@ -408,7 +412,8 @@ impl SendBuffer for SendBufferWithZirconSocket {
         // `socket`, a reasonable caller could try to peek at those. Since only
         // the bytes in `ready_to_send` are peekable, don't pass through a
         // request that would result in an out-of-bounds peek.
-        if offset >= ready_to_send.len() {
+        let BufferLimits { len, capacity: _ } = ready_to_send.limits();
+        if offset >= len {
             f(SendPayload::Contiguous(&[]))
         } else {
             ready_to_send.peek_with(offset, f)
@@ -1431,7 +1436,7 @@ mod tests {
         assert_eq!(rbuf.write_at(TEST_BYTES.len(), &TEST_BYTES), TEST_BYTES.len());
         rbuf.make_readable(TEST_BYTES.len() * 3);
         let mut buf = [0u8; TEST_BYTES.len() * 3];
-        assert_eq!(rbuf.len(), TEST_BYTES.len() * 3);
+        assert_eq!(rbuf.limits().len, TEST_BYTES.len() * 3);
         assert_eq!(peer.read(&mut buf), Ok(TEST_BYTES.len() * 3));
         assert_eq!(&buf, b"HelloHelloHello");
     }
@@ -1443,14 +1448,14 @@ mod tests {
         let mut sbuf =
             SendBufferWithZirconSocket::new(Arc::new(local), notifier, u16::MAX as usize);
         assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
-        assert_eq!(sbuf.len(), TEST_BYTES.len());
+        assert_eq!(sbuf.limits().len, TEST_BYTES.len());
         sbuf.peek_with(0, |avail| {
             assert_eq!(avail, SendPayload::Contiguous(TEST_BYTES));
         });
         assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
-        assert_eq!(sbuf.len(), TEST_BYTES.len() * 2);
+        assert_eq!(sbuf.limits().len, TEST_BYTES.len() * 2);
         sbuf.mark_read(TEST_BYTES.len());
-        assert_eq!(sbuf.len(), TEST_BYTES.len());
+        assert_eq!(sbuf.limits().len, TEST_BYTES.len());
         sbuf.peek_with(0, |avail| {
             assert_eq!(avail, SendPayload::Contiguous(TEST_BYTES));
         });
@@ -1463,7 +1468,7 @@ mod tests {
         let (local, _peer) = zx::Socket::create_stream();
         let notifier = NeedsDataNotifier::default();
         let sbuf = SendBufferWithZirconSocket::new(Arc::new(local), notifier, target);
-        let ring_buffer_capacity = sbuf.capacity() - sbuf.socket.info().unwrap().rx_buf_max;
+        let ring_buffer_capacity = sbuf.limits().capacity - sbuf.socket.info().unwrap().rx_buf_max;
         assert_eq!(ring_buffer_capacity, expected)
     }
 
@@ -1486,7 +1491,10 @@ mod tests {
             }
         }
 
-        assert!(sbuf.len() > SendBufferWithZirconSocket::MIN_CAPACITY, "len includes zx socket");
+        assert!(
+            sbuf.limits().len > SendBufferWithZirconSocket::MIN_CAPACITY,
+            "len includes zx socket"
+        );
 
         // Peeking past the end of the ring buffer should not cause a crash.
         sbuf.peek_with(SendBufferWithZirconSocket::MIN_CAPACITY, |payload| {
@@ -1531,7 +1539,7 @@ mod tests {
         }
 
         // Request a shrink of the send buffer.
-        let capacity_before = sbuf.capacity();
+        let capacity_before = sbuf.limits().capacity;
         sbuf.request_capacity(SendBufferWithZirconSocket::MIN_CAPACITY);
 
         // Empty out the ring buffer and zircon socket by reading from them.
@@ -1541,7 +1549,7 @@ mod tests {
             len != 0
         } {}
 
-        let capacity = sbuf.capacity();
+        let capacity = sbuf.limits().capacity;
         // The requested capacity isn't directly reflected in `cap` but we can
         // assert that its change is equal to the requested change.
         const EXPECTED_CAPACITY_DECREASE: usize =
@@ -1558,7 +1566,7 @@ mod tests {
         // hold. If the socket is implemented correctly, this loop will continue
         // until the send buffer's ring buffer is full and the socket buffer is
         // full, then exit.
-        while sbuf.len() < capacity {
+        while sbuf.limits().len < capacity {
             let _: usize = peer.write(TEST_BYTES).expect("can write");
             sbuf.poll();
         }
