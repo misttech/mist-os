@@ -154,8 +154,9 @@ TEST_F(CarnelianPixelTest, ValidPixelTest) {
   // Take screenshots till the background color shows up.
   ASSERT_TRUE(TakeScreenshotUntil(
       ui_testing::Screenshot::kBlue, [&](std::map<ui_testing::Pixel, uint32_t> histogram) {
-        EXPECT_EQ(histogram[ui_testing::Screenshot::kMagenta], square_pixels);
-        EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue], background_pixels);
+        // TODO(fxb/116631): Switch to exact comparisons after Astro precision issues are resolved.
+        EXPECT_NEAR(histogram[ui_testing::Screenshot::kMagenta], square_pixels, display_width_);
+        EXPECT_NEAR(histogram[ui_testing::Screenshot::kBlue], background_pixels, display_width_);
       }));
 }
 
