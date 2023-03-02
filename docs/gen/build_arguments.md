@@ -1604,7 +1604,7 @@ be removed after everyone has had a chance to get hold of their machines.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:29
+From //zircon/kernel/BUILD.gn:31
 
 ### dev_bootfs_labels
 
