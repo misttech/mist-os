@@ -62,6 +62,7 @@ if (use_bringup_assembly) {
       files.final_zbi,
       files.final_recovery_zbi,
       files.installer_zbi,
+      files.installer_vbmeta,
       input_images_json_file,
     ]
 

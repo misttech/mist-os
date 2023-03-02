@@ -1,3 +1,6 @@
 include /src/recovery/system/installer/OWNERS
 
+dpursell@google.com
+zyecheng@google.com
+
 # Component: Workstation>platform

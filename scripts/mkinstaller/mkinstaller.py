@@ -14,6 +14,7 @@ import platform
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import typing
 
@@ -37,8 +38,11 @@ if sys.hexversion < 0x030700F0:
       % (platform.python_version()))
   sys.exit(1)
 
+# The GUIDs are from zircon/system/public/zircon/hw/gpt.h
 WORKSTATION_INSTALLER_GPT_GUID = '4dce98ce-e77e-45c1-a863-caf92f1330c1'
 ZIRCON_R_GPT_GUID = 'a0e5cf57-2def-46be-a80c-a2067c37cd49'
+VBMETA_R_GPT_GUID = '6a2460c3-cd11-4e8b-80a8-12cce268ed0a'
+ABR_META_GPT_GUID = '1d75395d-f2c6-476b-a8b7-45cc1c97b476'
 
 def make_unique_name(name, type):
   return f'{name}_{type}'
@@ -72,6 +76,7 @@ IMAGES_RECOVERY_INSTALLER = [
 
     # The recovery image and a bootloader for x64.
     ManifestImage('recovery-installer', [ZIRCON_R_GPT_GUID], 'zbi', 'zircon-r'),
+    ManifestImage('recovery-installer', [VBMETA_R_GPT_GUID], 'vbmeta', 'vbmeta_r'),
     ManifestImage('fuchsia.esp', ['efi'], 'blk'),
 
     # Standard x64 partitions
@@ -467,11 +472,27 @@ def Main(args):
   if not parts:
     return 1
 
-  output = Image(args.FILE, not args.create, ParseSize(args.block_size))
-  for p in parts:
-    output.AddPartition(p)
+  # Add a abr metadata partition
+  with tempfile.TemporaryDirectory() as temp_dir:
+    # A pre-generated abr metadata that can only boots zircon-r
+    abr_data_file = os.path.join(temp_dir, 'abr_data')
+    with open(abr_data_file, 'wb') as abr_data:
+      abr_data.write(
+        (
+          b'\x00\x41\x42\x30\x02\x01\x00\x00\x0f\x00\x00\x00\x0e\x00\x00\x00\x00'
+          b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x6b\xa3\x22\x12'
+        ).ljust(1024 * 1024)  # Make a 1MB partition.
+      )
 
-  output.Finalise()
+    #TODO(b/268532862): Use new GUID once switched to gigaboot++.
+    parts.append(
+      Partition(str(abr_data_file), ABR_META_GPT_GUID, 'durable_boot'))
+
+    output = Image(args.FILE, not args.create, ParseSize(args.block_size))
+    for p in parts:
+      output.AddPartition(p)
+
+    output.Finalise()
   if not args.create:
     EjectDisk(path)
   return 0
