@@ -8,6 +8,7 @@
 
 use crate::api::Blob as BlobApi;
 use crate::api::DataSource as DataSourceApi;
+use crate::api::Error as ErrorApi;
 use crate::api::MetaContents as MetaContentsApi;
 use crate::api::MetaPackage as MetaPackageApi;
 use crate::api::Package as PackageApi;
@@ -25,7 +26,7 @@ use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
 use fuchsia_pkg::MetaPackageError as FuchsiaMetaPackageError;
 use scrutiny_utils::io::ReadSeek;
 use std::cell::RefCell;
-use std::error;
+use std::fmt::Debug;
 use std::io;
 use std::iter;
 use std::path::PathBuf;
@@ -363,10 +364,10 @@ impl<
 
 /// Errors that can occur attempting to use a `ContentBlob` as a `Blob`.
 #[derive(Debug, Error)]
-pub enum ContentBlobError<BlobSourceError: error::Error, BlobError: error::Error> {
-    #[error("failed to lookup package content blob: {0}")]
+pub enum ContentBlobError<BlobSourceError: ErrorApi, BlobError: ErrorApi> {
+    #[error("failed to lookup package content blob: {0:?}")]
     BlobSourceError(BlobSourceError),
-    #[error("failed to open package content blob: {0}")]
+    #[error("failed to open package content blob: {0:?}")]
     BlobError(BlobError),
 }
 
@@ -480,8 +481,8 @@ impl<
 /// Errors that can occur attempting to use a `Blob` as a `crate::api::Blob`.
 #[derive(Debug, Error)]
 pub enum BlobError<
-    BlobSourceErrorForContentBlobError: 'static + error::Error,
-    BlobErrorForContentBlobError: 'static + error::Error,
+    BlobSourceErrorForContentBlobError: ErrorApi,
+    BlobErrorForContentBlobError: ErrorApi,
 > {
     #[error("error accessing meta blob: {0}")]
     MetaBlobError(#[from] MetaBlobError),

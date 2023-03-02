@@ -11,6 +11,13 @@ use std::io::Seek;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// The type of errors returned by API interfaces.
+///
+/// `Error` is a shorthand for `Debug + Into<Box<dyn error::Error + 'static>> + 'static`.
+pub trait Error: Debug + Into<Box<dyn error::Error + 'static>> + 'static {}
+
+impl<E: Debug + Into<Box<dyn error::Error + 'static>> + 'static> Error for E {}
+
 /// Instance of the scrutiny framework backed by a particular set of artifacts.
 pub trait Scrutiny {
     /// Concrete type used for accessing blobs.
@@ -393,7 +400,7 @@ pub trait Blob {
     type DataSource: DataSource;
 
     /// Concrete type for errors that may arise from attempting to open this blob for reading.
-    type Error: error::Error;
+    type Error: Error;
 
     /// Accessor for the hash (i.e., content-addressed identity) of this file.
     fn hash(&self) -> Self::Hash;

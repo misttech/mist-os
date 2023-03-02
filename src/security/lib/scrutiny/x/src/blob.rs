@@ -4,6 +4,7 @@
 
 use crate::api::Blob as BlobApi;
 use crate::api::DataSource as DataSourceApi;
+use crate::api::Error as ErrorApi;
 use crate::api::Hash as HashApi;
 use crate::data_source::BlobDirectory;
 use crate::data_source::BlobSource;
@@ -14,7 +15,7 @@ use fuchsia_merkle::Hash as FuchsiaMerkleHash;
 use fuchsia_merkle::MerkleTree;
 use rayon::prelude::*;
 use scrutiny_utils::io::ReadSeek;
-use std::error;
+use std::fmt::Debug;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -34,7 +35,7 @@ pub trait BlobSet {
     type DataSource: DataSourceApi;
 
     /// Concrete type for errors returned by `BlobSet::blob`.
-    type Error: error::Error;
+    type Error: ErrorApi;
 
     /// Iterate over blobs in this set.
     fn iter(&self) -> Box<dyn Iterator<Item = Self::Blob>>;
