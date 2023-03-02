@@ -42,6 +42,7 @@ pub fn create_device_file(current_task: &CurrentTask, device_path: FsString) -> 
     let (device_parent, device_basename) =
         current_task.lookup_parent_at(FdNumber::AT_FDCWD, &device_path)?;
     let mode = current_task.fs().apply_umask(mode!(IFREG, 0o777));
-    let _device_entry = device_parent.entry.add_node_ops(device_basename, mode, DmaBufNode {})?;
+    let _device_entry =
+        device_parent.entry.add_node_ops(current_task, device_basename, mode, DmaBufNode {})?;
     Ok(())
 }

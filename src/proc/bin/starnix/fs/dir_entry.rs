@@ -175,7 +175,8 @@ impl DirEntry {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
-        let (node, _) = self.get_or_create_child(name, || self.node.lookup(current_task, name))?;
+        let (node, _) =
+            self.get_or_create_child(current_task, name, || self.node.lookup(current_task, name))?;
         Ok(node)
     }
 
@@ -188,6 +189,7 @@ impl DirEntry {
     /// returned.
     pub fn create_entry<F>(
         self: &DirEntryHandle,
+        current_task: &CurrentTask,
         name: &FsStr,
         create_node_fn: F,
     ) -> Result<DirEntryHandle, Errno>
@@ -201,7 +203,7 @@ impl DirEntry {
         if name.len() > NAME_MAX as usize {
             return error!(ENAMETOOLONG);
         }
-        let (entry, exists) = self.get_or_create_child(name, create_node_fn)?;
+        let (entry, exists) = self.get_or_create_child(current_task, name, create_node_fn)?;
         if exists {
             return error!(EEXIST);
         }
@@ -214,21 +216,23 @@ impl DirEntry {
     /// functions go through the filesystem, such as create_node or create_symlink.
     pub fn add_node_ops(
         self: &DirEntryHandle,
+        current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         ops: impl FsNodeOps,
     ) -> Result<DirEntryHandle, Errno> {
-        self.add_node_ops_dev(name, mode, DeviceType::NONE, ops)
+        self.add_node_ops_dev(current_task, name, mode, DeviceType::NONE, ops)
     }
 
     pub fn add_node_ops_dev(
         self: &DirEntryHandle,
+        current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
         ops: impl FsNodeOps,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(name, || {
+        self.create_entry(current_task, name, || {
             let node = self.node.fs().create_node(ops, mode, FsCred::root());
             {
                 let mut info = node.info_write();
@@ -247,7 +251,7 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         // TODO: apply_umask
-        self.create_entry(name, || {
+        self.create_entry(current_task, name, || {
             self.node.mkdir(current_task, name, mode!(IFDIR, 0o777), FsCred::root())
         })
     }
@@ -262,7 +266,7 @@ impl DirEntry {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(name, || {
+        self.create_entry(current_task, name, || {
             if mode.is_dir() {
                 self.node.mkdir(current_task, name, mode, owner)
             } else {
@@ -289,7 +293,7 @@ impl DirEntry {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(name, || {
+        self.create_entry(current_task, name, || {
             let node = self.node.mknod(current_task, name, mode, DeviceType::NONE, owner)?;
             if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
                 unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
@@ -307,7 +311,9 @@ impl DirEntry {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(name, || self.node.create_symlink(current_task, name, target, owner))
+        self.create_entry(current_task, name, || {
+            self.node.create_symlink(current_task, name, target, owner)
+        })
     }
 
     pub fn link(
@@ -319,7 +325,7 @@ impl DirEntry {
         if DirEntry::is_reserved_name(name) {
             return error!(EEXIST);
         }
-        let (entry, exists) = self.get_or_create_child(name, || {
+        let (entry, exists) = self.get_or_create_child(current_task, name, || {
             self.node.link(current_task, name, child)?;
             Ok(child.clone())
         })?;
@@ -578,6 +584,7 @@ impl DirEntry {
 
     fn get_or_create_child<F>(
         self: &DirEntryHandle,
+        current_task: &CurrentTask,
         name: &FsStr,
         create_fn: F,
     ) -> Result<(DirEntryHandle, bool), Errno>
@@ -591,6 +598,10 @@ impl DirEntry {
         }
         // Check if the child is already in children. In that case, we can
         // simply return the child and we do not need to call init_fn.
+        //
+        // The user must be able to search the directory (requires the EXEC permission)
+        self.node.check_access(current_task, Access::EXEC)?;
+
         let mut children = self.lock_children();
         if let Some(child) = children.children.get(name).and_then(Weak::upgrade) {
             return Ok((child, true));

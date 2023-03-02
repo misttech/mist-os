@@ -493,7 +493,7 @@ pub fn create_filesystem(
         b"selinuxfs" => selinux_fs(kernel).clone(),
         b"sysfs" => sys_fs(kernel).clone(),
         b"tmpfs" => TmpFs::new_fs_with_data(kernel, data),
-        b"binder" => BinderFs::new_fs(kernel)?,
+        b"binder" => BinderFs::new_fs(task)?,
         b"bpf" => BpfFs::new_fs(kernel)?,
         _ => return error!(ENODEV, String::from_utf8_lossy(fs_type)),
     };

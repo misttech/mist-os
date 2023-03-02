@@ -270,7 +270,12 @@ pub fn sys_bpf(
             let (parent, basename) =
                 current_task.lookup_parent_at(FdNumber::AT_FDCWD, &pathname)?;
             parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
-            parent.entry.add_node_ops(basename, mode!(IFREG, 0o600), BpfFsObject(object))?;
+            parent.entry.add_node_ops(
+                current_task,
+                basename,
+                mode!(IFREG, 0o600),
+                BpfFsObject(object),
+            )?;
             Ok(SUCCESS)
         }
 

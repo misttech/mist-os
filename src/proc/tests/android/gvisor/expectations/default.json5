@@ -372,9 +372,6 @@
                 "MincoreTest.ZeroLengthSucceedsAndAllowsAnyVecBelowTaskSize",
                 "MincoreTest.InvalidLengthFails",
 
-                // mkdir_test - https://fxbug.dev/79298
-                "MkdirTest.DirAlreadyExists",
-
                 // mlock_test
                 "MlockTest.Basic",
                 "MapLockedTest.Basic",
@@ -1192,7 +1189,6 @@
                 "UnameTest.UnshareUTS",
 
                 // unlink_test
-                "UnlinkTest.ParentDegradedPermissions",
                 "RmdirTest.CanRemoveWithTrailingSlashes",
 
                 // vfork_test: Unknown why this fails, this is theoretically implemented.

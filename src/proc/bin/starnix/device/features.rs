@@ -39,6 +39,7 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                     .register_chrdev_major(StarnixDevice, STARNIX_MAJOR)?;
 
                 dev_tmp_fs(current_task).root().add_node_ops_dev(
+                    current_task,
                     b"magma0",
                     mode!(IFCHR, 0o600),
                     DeviceType::new(STARNIX_MAJOR, STARNIX_MINOR_MAGMA),

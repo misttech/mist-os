@@ -3594,29 +3594,30 @@ impl FsNodeOps for BinderFsDir {
 
 const BINDERS: &[&FsStr] = &[b"binder", b"hwbinder", b"vndbinder"];
 
-fn make_binder_nodes(kernel: &Kernel, dir: &DirEntryHandle) -> Result<(), Errno> {
+fn make_binder_nodes(current_task: &CurrentTask, dir: &DirEntryHandle) -> Result<(), Errno> {
+    let kernel = current_task.kernel();
     let mut registered_binders = kernel.binders.write();
     for name in BINDERS {
         let driver = BinderDriver::new();
         let dev = kernel.device_registry.write().register_dyn_chrdev(driver.clone())?;
-        dir.add_node_ops_dev(name, mode!(IFCHR, 0o600), dev, SpecialNode)?;
+        dir.add_node_ops_dev(current_task, name, mode!(IFCHR, 0o600), dev, SpecialNode)?;
         registered_binders.insert(dev, driver);
     }
     Ok(())
 }
 
 impl BinderFs {
-    pub fn new_fs(kernel: &Kernel) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new_with_permanent_entries(kernel, BinderFs);
+    pub fn new_fs(current_task: &CurrentTask) -> Result<FileSystemHandle, Errno> {
+        let fs = FileSystem::new_with_permanent_entries(current_task.kernel(), BinderFs);
         fs.set_root(BinderFsDir);
-        make_binder_nodes(kernel, fs.root())?;
+        make_binder_nodes(current_task, fs.root())?;
         Ok(fs)
     }
 }
 
 pub fn create_binders(current_task: &CurrentTask) -> Result<(), Errno> {
     let fs = dev_tmp_fs(current_task);
-    make_binder_nodes(current_task.kernel(), fs.root())
+    make_binder_nodes(current_task, fs.root())
 }
 
 #[cfg(test)]
