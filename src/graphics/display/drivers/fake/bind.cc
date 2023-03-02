@@ -9,28 +9,34 @@
 #include "fake-display.h"
 #include "src/graphics/display/drivers/fake/fake-display-bind.h"
 
+namespace fake_display {
+
+namespace {
+
 // main bind function called from dev manager
-static zx_status_t fake_display_bind(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<fake_display::FakeDisplay>(&ac, parent);
-  if (!ac.check()) {
+zx_status_t CreateAndBindFakeDisplay(void* ctx, zx_device_t* parent) {
+  fbl::AllocChecker alloc_checker;
+  auto fake_display = fbl::make_unique_checked<fake_display::FakeDisplay>(&alloc_checker, parent);
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  auto status = dev->Bind(/*start_vsync=*/true);
+  auto status = fake_display->Bind(/*start_vsync_thread=*/true);
   if (status == ZX_OK) {
-    // devmgr is now in charge of the memory for dev
-    [[maybe_unused]] auto ptr = dev.release();
+    // devmgr now owns `fake_display`
+    [[maybe_unused]] auto ptr = fake_display.release();
   }
   return status;
 }
 
-static constexpr zx_driver_ops_t fake_display_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = fake_display_bind;
-  return ops;
-}();
+constexpr zx_driver_ops_t kDriverOps = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = CreateAndBindFakeDisplay,
+};
+
+}  // namespace
+
+}  // namespace fake_display
 
 // clang-format off
-ZIRCON_DRIVER(fake_display, fake_display_ops, "zircon", "0.1");
+ZIRCON_DRIVER(fake_display, fake_display::kDriverOps, "zircon", "0.1");
