@@ -70,6 +70,7 @@ class EfiVariables {
     uint64_t max_var_size;
 
     bool operator==(const EfiVariableInfo&) const noexcept;
+    bool operator!=(const EfiVariableInfo&) const noexcept;
   };
   virtual fit::result<efi_status, EfiVariableInfo> EfiQueryVariableInfo() const;
   virtual fit::result<efi_status, fbl::Vector<uint8_t>> EfiGetVariable(
@@ -137,6 +138,7 @@ class EfiVariables {
 };
 
 bool operator==(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b);
+bool operator!=(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b);
 
 }  // namespace gigaboot
 

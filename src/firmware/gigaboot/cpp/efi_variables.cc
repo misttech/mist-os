@@ -164,6 +164,9 @@ fit::result<efi_status, efi_guid> EfiVariables::GetGuid(std::u16string_view var_
 bool operator==(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b) {
   return a.name == b.name && a.vendor_guid == b.vendor_guid;
 }
+bool operator!=(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b) {
+  return !(a == b);
+}
 
 bool EfiVariables::iterator::operator==(const iterator& other) const {
   return (is_end_ == other.is_end_) && (is_end_ || variable_id_ == other.variable_id_);
@@ -206,6 +209,10 @@ bool EfiVariables::EfiVariableInfo::operator==(
   return max_var_storage_size == other.max_var_storage_size &&
          remaining_var_storage_size == other.remaining_var_storage_size &&
          max_var_size == other.max_var_size;
+}
+
+bool EfiVariables::EfiVariableInfo::operator!=(const EfiVariableInfo& other) const noexcept {
+  return !(*this == other);
 }
 
 }  // namespace gigaboot

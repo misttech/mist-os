@@ -66,7 +66,7 @@ TEST_P(EfiVariableIdFixture, Ne) {
   std::list<EfiVariables::EfiVariableId> input = GetParam();
   for (auto a = input.begin(); a != input.end(); a++) {
     for (auto b = std::next(a); b != input.end(); b++) {
-      EXPECT_NE(a, b);
+      EXPECT_NE(*a, *b);
     }
   }
 }
@@ -250,7 +250,7 @@ TEST_P(EfiVariableInfoFixture, Ne) {
   std::list<EfiVariables::EfiVariableInfo> input = GetParam();
   for (auto a = input.begin(); a != input.end(); a++) {
     for (auto b = std::next(a); b != input.end(); b++) {
-      EXPECT_NE(a, b);
+      EXPECT_NE(*a, *b);
     }
   }
 }
