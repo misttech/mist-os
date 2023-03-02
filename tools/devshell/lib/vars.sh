@@ -799,7 +799,7 @@ function fx-run-ninja {
   local user_env=()
   if fx-rbe-enabled
   then
-    rbe_wrapper=("${RBE_WRAPPER[@]}")
+    rbe_wrapper=("FUCHSIA_BUILD_DIR=${FUCHSIA_BUILD_DIR}" "${RBE_WRAPPER[@]}")
     # Automatic auth with gcert (from re-client bootstrap) needs $USER.
     user_env=( "USER=${USER}" )
   fi
