@@ -71,6 +71,11 @@ function fx-rbe-enabled {
 function fx-check-rbe-setup {
   if ! fx-rbe-enabled ; then return ; fi
 
+  # build/rbe/fuchsia-reproxy-wrap.sh now uses gcert to authenticate
+  # See go/rbe/dev/x/reclientoptions#autoauth
+  if which gcert ; then return ; fi
+
+  # gcloud is only needed as a backup authentication method
   gcloud="$(which gcloud)" || {
     cat <<EOF
 
