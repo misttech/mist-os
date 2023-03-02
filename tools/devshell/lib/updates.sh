@@ -213,16 +213,34 @@ function check-for-package-server {
 }
 
 function check-for-incremental-publisher {
-  if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
+  # FIXME(http://fxbug.dev/122899) During the transition to the new incremental
+  # publisher, we should check for both the new and the old one, since both
+  # should result in packages being published.
+  if is_feature_enabled "incremental" || is_feature_enabled "incremental_new" || is_feature_enabled "incremental_legacy"; then
+
     if [[ -z $(pgrep -f "package-tool repository publish $(fx get-build-dir)/amber-files --watch") ]]; then
-      fx-error "It looks like the incremental publisher is not running."
-      fx-error "You probably need to start \"fx --enable=incremental serve\""
-      return 1
+      local is_incremental_running=1 # means that the publisher is not running
+    else
+      local is_incremental_running=0 # means that the publisher is running
     fi
-  elif is_feature_enabled "incremental_legacy"; then
+
     if [[ -z $(pgrep -f "pm serve .* -p all_package_manifests.list") ]]; then
+      local is_incremental_legacy_running=1 # means the legacy publisher is not running
+    else
+      local is_incremental_legacy_running=0 # means the legacy publisher is running
+    fi
+
+    if [[ "${is_incremental_running}" -eq 0 || "${is_incremental_legacy_running}" -eq 0 ]]; then
+      return 0
+    else
       fx-error "It looks like the incremental publisher is not running."
-      fx-error "You probably need to start \"fx --enable=incremental_legacy serve\""
+
+      if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
+        fx-error "You probably need to start \"fx --enable=incremental serve\""
+      else
+        fx-error "You probably need to start \"fx --enable=incremental_legacy serve\""
+      fi
+
       return 1
     fi
   else
