@@ -6,4 +6,6 @@
     initial_frequency_ppm: 1000000,
     monitor_uses_pull: false,
     back_off_time_between_pull_samples_sec: 5,
+    primary_uses_pull: false,
+    monitor_time_source_url: "",
 }

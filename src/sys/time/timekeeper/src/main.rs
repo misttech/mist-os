@@ -58,6 +58,10 @@ impl Config {
         self.source_config.primary_time_source_url.clone()
     }
 
+    fn get_monitor_time_source_url(&self) -> Option<String> {
+        Some(self.source_config.monitor_time_source_url.clone()).filter(|s| !s.is_empty())
+    }
+
     fn get_oscillator_error_std_dev_ppm(&self) -> f64 {
         self.source_config.oscillator_error_std_dev_ppm as f64
     }
@@ -78,14 +82,16 @@ impl Config {
         self.source_config.initial_frequency_ppm as f64 / MILLION as f64
     }
 
-    // TODO(fxb/115021): Implement.
-    #[allow(dead_code)]
     fn get_monitor_uses_pull(&self) -> bool {
         self.source_config.monitor_uses_pull
     }
 
     fn get_back_off_time_between_pull_samples(&self) -> zx::Duration {
         zx::Duration::from_seconds(self.source_config.back_off_time_between_pull_samples_sec)
+    }
+
+    fn get_primary_uses_pull(&self) -> bool {
+        self.source_config.primary_uses_pull
     }
 }
 
@@ -99,6 +105,19 @@ struct TimeSourceUrls {
 struct TimeSourceDetails {
     url: String,
     name: String,
+}
+
+/// Instantiates a [TimeSource::Push] or [TimeSource::Pull] depending on
+/// `use_pull`.
+fn new_time_source(use_pull: bool, details: &TimeSourceDetails) -> TimeSource {
+    let launcher = TimeSourceLauncher::new(&details.url, &details.name);
+    if use_pull {
+        info!("time source {} uses pull", &details.name);
+        TimeSource::Pull(launcher.into())
+    } else {
+        info!("time source {} uses push", &details.name);
+        TimeSource::Push(launcher.into())
+    }
 }
 
 /// The experiment to record on Cobalt events.
@@ -136,19 +155,18 @@ async fn main() -> Result<(), Error> {
             url: config.get_primary_time_source_url().clone(),
             name: Role::Primary.to_string(),
         },
-        monitor: None,
+        monitor: config
+            .get_monitor_time_source_url()
+            .map(|url| TimeSourceDetails { url, name: Role::Monitor.to_string() }),
     };
 
     info!("constructing time sources");
     let primary_track = PrimaryTrack {
-        time_source: TimeSource::Push(
-            TimeSourceLauncher::new(&time_source_urls.primary.url, &time_source_urls.primary.name)
-                .into(),
-        ),
+        time_source: new_time_source(config.get_primary_uses_pull(), &time_source_urls.primary),
         clock: Arc::new(utc_clock),
     };
-    let monitor_track = time_source_urls.monitor.map(|info| MonitorTrack {
-        time_source: TimeSource::Push(TimeSourceLauncher::new(&info.url, &info.name).into()),
+    let monitor_track = time_source_urls.monitor.map(|details| MonitorTrack {
+        time_source: new_time_source(config.get_monitor_uses_pull(), &details),
         clock: Arc::new(create_monitor_clock(&primary_track.clock)),
     });
 
@@ -373,6 +391,8 @@ mod tests {
             initial_frequency_ppm: 1_000_000,
             monitor_uses_pull: false,
             back_off_time_between_pull_samples_sec: 0,
+            monitor_time_source_url: "".to_string(),
+            primary_uses_pull: false,
         }))
     }
 

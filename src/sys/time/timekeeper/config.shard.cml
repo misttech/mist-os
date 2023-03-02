@@ -12,6 +12,13 @@
             max_size: 4096,
         },
 
+        // If set, causes the monitor time source to start this component as a
+        // monitor mode time source.
+        monitor_time_source_url: {
+            type: "string",
+            max_size: 4096,
+        },
+
         // The standard deviation of the system oscillator frequency error in parts per million,
         // used to control the growth in error bound and bound the allowed frequency estimates.
         oscillator_error_std_dev_ppm: { type: "uint32" },
@@ -35,5 +42,9 @@
         // The time to wait until retrying to sample the pull
         // time source, expressed in seconds.
         back_off_time_between_pull_samples_sec: { type: "int64" },
+
+        // Flag for enabling usage of `PullSource` API for the primary track.
+        // If set to false, `PullSource` is not used.
+        primary_uses_pull: { type: "bool" },
     },
 }

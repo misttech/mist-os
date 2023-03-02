@@ -14,7 +14,10 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.time.external.PushSource" ],
+            protocol: [
+                "fuchsia.time.external.PullSource",
+                "fuchsia.time.external.PushSource",
+            ],
         },
     ],
     use: [
@@ -30,7 +33,10 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.time.external.PushSource" ],
+            protocol: [
+                "fuchsia.time.external.PullSource",
+                "fuchsia.time.external.PushSource",
+            ],
             from: "self",
         },
     ],

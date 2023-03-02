@@ -274,7 +274,7 @@ impl PullSourceImpl {
     ) -> Result<Sample, Error> {
         let proxy =
             client::connect_to_protocol_at_dir_root::<ftexternal::PullSourceMarker>(directory)
-                .context("failed to connect to the fuchsia.time.external.PushSource")?;
+                .context("failed to connect to the fuchsia.time.external.PullSource")?;
         proxy
             .sample(*urgency)
             .await?
