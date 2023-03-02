@@ -336,20 +336,9 @@
                 "MadviseDontforkTest.DontforkAnonPrivate",
 
                 // memfd_test
-                "MemfdTest.SealingDisabledByDefault",
-                "MemfdTest.SealsGetSet",
-                "MemfdTest.SealGrowWithTruncate",
-                "MemfdTest.SealGrowWithWrite",
-                "MemfdTest.SealGrowPartialWriteTruncated",
-                "MemfdTest.SealGrowPartialWriteTruncatedSamePage",
-                "MemfdTest.SealShrink",
-                "MemfdTest.SealWriteWithWrite",
                 "MemfdTest.SealWriteWithMmap",
                 "MemfdTest.SealWriteWithOutstandingWritbleMapping",
                 "MemfdTest.NoPartialSealApplicationWhenWriteSealRejected",
-                "MemfdTest.SealsAreInodeLevelProperties",
-                "MemfdTest.TmpfsFilesHaveSealSeal",
-                "MemfdTest.MemfdMustBeWritableToModifySeals",
 
                 // memory_accounting_test
                 "MemoryAccounting.AnonAccountingPreservedOnSaveRestore",

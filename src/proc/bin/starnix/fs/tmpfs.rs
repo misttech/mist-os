@@ -185,7 +185,8 @@ impl FsNodeOps for TmpfsDirectory {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let ops: Box<dyn FsNodeOps> = match mode.fmt() {
-            FileMode::IFREG => Box::new(VmoFileNode::new()?),
+            // For files created in tmpfs, forbid sealing, by sealing the seal operation.
+            FileMode::IFREG => Box::new(VmoFileNode::new(SealFlags::SEAL)?),
             FileMode::IFIFO | FileMode::IFBLK | FileMode::IFCHR | FileMode::IFSOCK => {
                 Box::new(TmpfsSpecialNode::new())
             }

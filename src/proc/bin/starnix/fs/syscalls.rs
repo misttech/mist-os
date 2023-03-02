@@ -1181,14 +1181,21 @@ pub fn sys_memfd_create(
     user_name: UserCString,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
-    if flags & !MFD_CLOEXEC != 0 {
+    if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING) != 0 {
         not_implemented!(current_task, "memfd_create: flags: {}", flags);
     }
 
     let mut name = [0u8; MEMFD_NAME_MAX_LEN];
     let name = current_task.mm.read_c_string(user_name, &mut name)?.to_owned();
 
-    let file = new_memfd(current_task, name, OpenFlags::RDWR)?;
+    let seals = if flags & MFD_ALLOW_SEALING != 0 {
+        SealFlags::empty()
+    } else {
+        // Forbid sealing, by sealing the seal operation.
+        SealFlags::SEAL
+    };
+
+    let file = new_memfd(current_task, name, seals, OpenFlags::RDWR)?;
     let mut fd_flags = FdFlags::empty();
     if flags & MFD_CLOEXEC != 0 {
         fd_flags |= FdFlags::CLOEXEC;

@@ -4,7 +4,7 @@
 
 use crate::fs::{FdFlags, FdNumber};
 use crate::task::CurrentTask;
-use crate::types::{FileMode, OpenFlags, Signal, UserAddress};
+use crate::types::{FileMode, OpenFlags, SealFlags, Signal, UserAddress};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct SyscallResult(u64);
@@ -29,6 +29,12 @@ impl From<UserAddress> for SyscallResult {
 
 impl From<FileMode> for SyscallResult {
     fn from(value: FileMode) -> Self {
+        SyscallResult(value.bits() as u64)
+    }
+}
+
+impl From<SealFlags> for SyscallResult {
+    fn from(value: SealFlags) -> Self {
         SyscallResult(value.bits() as u64)
     }
 }

@@ -277,6 +277,7 @@ rustc_binary("starnix_kernel_bin") {
     "types/open_flags.rs",
     "types/range_ext.rs",
     "types/resource_limits.rs",
+    "types/seal_flags.rs",
     "types/signals.rs",
     "types/time.rs",
     "types/uapi.rs",

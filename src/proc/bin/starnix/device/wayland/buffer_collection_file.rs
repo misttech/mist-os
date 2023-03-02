@@ -56,7 +56,7 @@ impl FileOps for BufferCollectionFile {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::write_at(&self.vmo, file, current_task, offset, data)
+        VmoFileObject::write_at(&self.vmo, file, current_task, offset, data, None)
     }
 
     fn get_vmo(
