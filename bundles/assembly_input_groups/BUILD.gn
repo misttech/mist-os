@@ -181,6 +181,7 @@ assembly_input_groups("bootfs-package-support") {
 assembly_input_groups("time-service") {
   base_packages = [
     "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
+    "//src/sys/time/httpsdate_time_source:httpsdate-time-source-pull",
     "//src/sys/time/timekeeper",
   ]
 }

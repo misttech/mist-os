@@ -214,6 +214,7 @@ assembly_input_bundle("core_realm") {
     # System Time
     "//src/sys/time/timekeeper",
     "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
+    "//src/sys/time/httpsdate_time_source:httpsdate-time-source-pull",
 
     # Other
     "//src/sys/stash:pkg",
