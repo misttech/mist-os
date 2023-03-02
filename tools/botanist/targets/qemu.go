@@ -254,7 +254,7 @@ func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args 
 	if t.imageOverrides.QEMUKernel != "" {
 		qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
 	} else if t.imageOverrides.EFIDisk == "" {
-		qemuKernel = getImageByName(images, "kernel_qemu-kernel")
+		qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
 	}
 
 	// If a ZBI override is specified, use that; else if no overrides were
@@ -644,5 +644,14 @@ func extendStorageFull(ctx context.Context, storageFull *bootserver.Image, fvmTo
 		return err
 	}
 	storageFull.Size = size
+	return nil
+}
+
+func getImageByNameAndCPU(imgs []bootserver.Image, name, cpu string) *bootserver.Image {
+	for _, img := range imgs {
+		if img.Name == name && img.CPU == cpu {
+ 			return &img
+		}
+	}
 	return nil
 }

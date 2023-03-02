@@ -17,6 +17,9 @@ type Image struct {
 	// Name is the canonical name of the image.
 	Name string `json:"name"`
 
+	// CPU is the target arch this image was built for.
+	CPU string `json:"cpu"`
+
 	// Path is the path to the image within the build directory.
 	Path string `json:"path"`
 
