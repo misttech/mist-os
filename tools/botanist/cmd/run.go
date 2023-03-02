@@ -183,43 +183,13 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.testrunnerOptions.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
 }
 
-func (r *RunCommand) execute(ctx context.Context, args []string) error {
-	ctx, cancel := context.WithCancel(ctx)
-	if r.timeout != 0 {
-		ctx, cancel = context.WithTimeout(ctx, r.timeout)
-	}
-
-	testsPath := args[0]
-
-	go func() {
-		<-ctx.Done()
-		// Log the timeout for tefmocheck to detect it.
-		if ctx.Err() == context.DeadlineExceeded {
-			logger.Errorf(ctx, "%s (%s)", constants.CommandExceededTimeoutMsg, r.timeout)
-		}
-	}()
-	defer cancel()
-
-	if r.skipSetup {
-		if err := testrunner.SetupAndExecute(ctx, r.testrunnerOptions, testsPath); err != nil {
-			return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerOptions, r.timeout, err)
-		}
-		return nil
-	}
-
-	// Parse targets out from the target configuration file.
-	targetSlice, err := r.deriveTargetsFromFile(ctx)
-	if err != nil {
-		return err
-	}
-	// This is the primary target that a command will be run against and that
-	// logs will be streamed from.
-	t0 := targetSlice[0]
+func (r *RunCommand) setupFFX(ctx context.Context, targetSlice []targets.Target, primaryTarget targets.Target, removeFFXOutputsDir *bool) (func(), error) {
+	var cleanup func()
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
-	removeFFXOutputsDir := false
-	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, t0.Nodename(), t0.SSHKey(), ffxOutputsDir)
+
+	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, primaryTarget.Nodename(), primaryTarget.SSHKey(), ffxOutputsDir)
 	if err != nil {
-		return err
+		return cleanup, err
 	}
 	if ffx != nil {
 		stdout, stderr, flush := botanist.NewStdioWriters(ctx)
@@ -227,33 +197,33 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		ffx.SetStdoutStderr(stdout, stderr)
 		if r.ffxExperimentLevel > 0 {
 			if err := ffx.SetLogLevel(ctx, ffxutil.Trace); err != nil {
-				return err
+				return cleanup, err
 			}
 		}
 		if err := ffx.Run(ctx, "config", "env"); err != nil {
-			return err
+			return cleanup, err
 		}
 		// ffxutil disables the mdns discovery if it can find a FUCHSIA_DEVICE_ADDR
 		// to manually add to its targets. We should disable it from the start so
 		// that it is off during target setup as well.
 		if err := ffx.Run(ctx, "config", "set", "discovery.mdns.enabled", "false", "-l", "global"); err != nil {
-			return err
+			return cleanup, err
 		}
 		if r.ffxExperimentLevel >= 2 {
 			if err := ffx.Run(ctx, "config", "set", "overnet.cso", "enabled"); err != nil {
-				return err
+				return cleanup, err
 			}
 		}
 
 		cmd := ffx.Command("daemon", "start")
 		daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
 		if err != nil {
-			return err
+			return cleanup, err
 		}
 		cmd.Stdout = daemonLog
 		logger.Debugf(ctx, "%s", cmd.Args)
 		if err := cmd.Start(); err != nil {
-			return err
+			return cleanup, err
 		}
 		// Wait for the daemon process to terminate in a separate goroutine
 		// and log when it finishes in order to detect if the process gets
@@ -267,7 +237,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 			}
 			cmdWait <- err
 		}()
-		defer func() {
+		cleanup = func() {
 			// TODO(fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
 			// process once that is supported.
 			if err := ffx.Stop(); err != nil {
@@ -278,17 +248,17 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 			if err := daemonLog.Close(); err != nil {
 				logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
 			}
-			if removeFFXOutputsDir {
+			if *removeFFXOutputsDir {
 				os.RemoveAll(ffxOutputsDir)
 			}
-		}()
+		}
 	}
 
 	for _, t := range targetSlice {
 		// Start serial servers for all targets. Will no-op for targets that
 		// already have serial servers.
 		if err := t.StartSerialServer(); err != nil {
-			return err
+			return cleanup, err
 		}
 		// Attach an ffx instance for all targets. All ffx instances will use the same
 		// config and daemon, but run commands against its own specified target.
@@ -299,62 +269,72 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		t.SetImageOverrides(build.ImageOverrides(r.imageOverrides))
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
-	if r.serialLogDir != "" {
-		if err := os.Mkdir(r.serialLogDir, os.ModePerm); err != nil {
-			return err
-		}
-		for _, t := range targetSlice {
-			t := t
-			eg.Go(func() error {
-				logger.Debugf(ctx, "starting serial collection for target %s", t.Nodename())
+	return cleanup, nil
+}
 
-				// Create a new file to capture the serial log for this nodename.
-				serialLogName := fmt.Sprintf("%s_serial_log.txt", t.Nodename())
-				// TODO(fxbug.dev/71529): Remove once there are no dependencies on this filename.
-				if len(targetSlice) == 1 {
-					serialLogName = "serial_log.txt"
-				}
-				serialLogPath := filepath.Join(r.serialLogDir, serialLogName)
-
-				// Start capturing the serial log for this target.
-				if err := t.CaptureSerialLog(serialLogPath); err != nil && ctx.Err() == nil {
-					return err
-				}
-				return nil
-			})
-		}
+func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, targetSlice []targets.Target) error {
+	if r.serialLogDir == "" {
+		return nil
 	}
 
-	// Run any preflights to prepare the testbed.
-	if err := r.runPreflights(ctx); err != nil {
+	if err := os.Mkdir(r.serialLogDir, os.ModePerm); err != nil {
 		return err
 	}
 
-	// Start up a local package server if one was requested.
-	if r.localRepo != "" {
-		var port int
-		pkgSrvPort := os.Getenv(constants.PkgSrvPortKey)
-		if pkgSrvPort == "" {
-			logger.Warningf(ctx, "%s is empty, using default port %d", constants.PkgSrvPortKey, botanist.DefaultPkgSrvPort)
-			port = botanist.DefaultPkgSrvPort
-		} else {
-			var err error
-			port, err = strconv.Atoi(pkgSrvPort)
-			if err != nil {
+	for _, t := range targetSlice {
+		t := t
+		eg.Go(func() error {
+			logger.Debugf(ctx, "starting serial collection for target %s", t.Nodename())
+
+			// Create a new file to capture the serial log for this nodename.
+			serialLogName := fmt.Sprintf("%s_serial_log.txt", t.Nodename())
+			// TODO(fxbug.dev/71529): Remove once there are no dependencies on this filename.
+			if len(targetSlice) == 1 {
+				serialLogName = "serial_log.txt"
+			}
+			serialLogPath := filepath.Join(r.serialLogDir, serialLogName)
+
+			// Start capturing the serial log for this target.
+			if err := t.CaptureSerialLog(serialLogPath); err != nil && ctx.Err() == nil {
 				return err
 			}
-		}
-		pkgSrv, err := botanist.NewPackageServer(ctx, r.localRepo, r.repoURL, r.blobURL, r.downloadManifest, port)
-		if err != nil {
-			return err
-		}
-		defer pkgSrv.Close()
-		// TODO(rudymathu): Once gcsproxy and remote package serving are deprecated, remove
-		// the repoURL and blobURL from the command line flags.
-		r.repoURL = pkgSrv.RepoURL
-		r.blobURL = pkgSrv.BlobURL
+			return nil
+		})
 	}
+	return nil
+}
+
+func (r *RunCommand) setupPackageServer(ctx context.Context) (*botanist.PackageServer, error) {
+	if r.localRepo == "" {
+		return nil, nil
+	}
+
+	var port int
+	pkgSrvPort := os.Getenv(constants.PkgSrvPortKey)
+	if pkgSrvPort == "" {
+		logger.Warningf(ctx, "%s is empty, using default port %d", constants.PkgSrvPortKey, botanist.DefaultPkgSrvPort)
+		port = botanist.DefaultPkgSrvPort
+	} else {
+		var err error
+		port, err = strconv.Atoi(pkgSrvPort)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	pkgSrv, err := botanist.NewPackageServer(ctx, r.localRepo, r.repoURL, r.blobURL, r.downloadManifest, port)
+	if err != nil {
+		return pkgSrv, err
+	}
+	// TODO(rudymathu): Once gcsproxy and remote package serving are deprecated, remove
+	// the repoURL and blobURL from the command line flags.
+	r.repoURL = pkgSrv.RepoURL
+	r.blobURL = pkgSrv.BlobURL
+
+	return pkgSrv, nil
+}
+
+func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, targetSlice []targets.Target, primaryTarget targets.Target, testsPath string) {
 	// Disable usb mass storage to determine if it affects NUC stability.
 	// TODO(rudymathu): Remove this once stability is achieved.
 	r.zirconArgs = append(r.zirconArgs, "driver.usb_mass_storage.disable")
@@ -363,6 +343,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	// has been resolved.
 	r.zirconArgs = append(r.zirconArgs, "driver.usb_cdc.log=debug")
 
+	// Log any failures after running tests.
 	for _, t := range targetSlice {
 		t := t
 		eg.Go(func() error {
@@ -373,8 +354,9 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		})
 	}
 
+	// Dispatch tests.
 	eg.Go(func() error {
-		// Signal other goroutines to exit.
+		// Signal other goroutines to exit when tests complete.
 		defer cancel()
 
 		startOpts := targets.StartOptions{
@@ -438,7 +420,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 				}
 			}
 		}
-		err = r.runAgainstTarget(ctx, t0, testsPath, testbedConfig)
+		err = r.runAgainstTarget(ctx, primaryTarget, testsPath, testbedConfig)
 		// Cancel ctx to notify other goroutines that this routine has completed.
 		// If another goroutine gets an error and the context is canceled, it
 		// should return nil so that we always prioritize the result from this
@@ -446,14 +428,79 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		cancel()
 		return err
 	})
+}
 
-	err = eg.Wait()
-	if err == nil && r.ffxExperimentLevel > 0 {
-		// In the case of a successful run, remove the ffx_outputs dir which contains ffx logs.
-		// These logs can be very large, so we should only upload them in the case of a failure.
-		removeFFXOutputsDir = true
+func (r *RunCommand) execute(ctx context.Context, args []string) error {
+	ctx, cancel := context.WithCancel(ctx)
+	if r.timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
 	}
-	return err
+
+	go func() {
+		<-ctx.Done()
+		// Log the timeout for tefmocheck to detect it.
+		if ctx.Err() == context.DeadlineExceeded {
+			logger.Errorf(ctx, "%s (%s)", constants.CommandExceededTimeoutMsg, r.timeout)
+		}
+	}()
+	defer cancel()
+
+	testsPath := args[0]
+
+	if r.skipSetup {
+		if err := testrunner.SetupAndExecute(ctx, r.testrunnerOptions, testsPath); err != nil {
+			return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerOptions, r.timeout, err)
+		}
+		return nil
+	}
+
+	// Parse targets out from the target configuration file.
+	targetSlice, err := r.deriveTargetsFromFile(ctx)
+	if err != nil {
+		return err
+	}
+	// Determine the target that a command will be run against and logs will be
+	// streamed from.
+	primaryTarget := targetSlice[0]
+
+	removeFFXOutputsDir := false
+	cleanup, err := r.setupFFX(ctx, targetSlice, primaryTarget, &removeFFXOutputsDir)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	if err != nil {
+		return err
+	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+
+	if err := r.setupSerialLog(ctx, eg, targetSlice); err != nil {
+		return err
+	}
+
+	// Run any preflights to prepare the testbed.
+	if err := r.runPreflights(ctx); err != nil {
+		return err
+	}
+
+	pkgSrv, err := r.setupPackageServer(ctx)
+	if pkgSrv != nil {
+		defer pkgSrv.Close()
+	}
+	if err != nil {
+		return err
+	}
+
+	r.dispatchTests(ctx, cancel, eg, targetSlice, primaryTarget, testsPath)
+
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	// In the case of a successful run, remove the ffx_outputs dir which contains ffx logs.
+	// These logs can be very large, so we should only upload them in the case of a failure.
+	removeFFXOutputsDir = true
+	return nil
 }
 
 // runPreflights runs opaque preflight commands passed to botanist from
