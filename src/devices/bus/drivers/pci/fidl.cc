@@ -59,10 +59,6 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
       {BIND_PCI_TOPO, 0, pci_bind_topo},
   };
   // clang-format on
-  std::array protocol_offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
-  };
-
   std::array offers = {
       fpci::Service::Name,
   };
@@ -91,7 +87,6 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
                                             .set_props(pci_device_props)
                                             .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                             .set_outgoing_dir(endpoints->client.TakeChannel())
-                                            .set_fidl_protocol_offers(protocol_offers)
                                             .set_fidl_service_offers(offers));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to create pci fidl fragment %s: %s", device->config()->addr(),

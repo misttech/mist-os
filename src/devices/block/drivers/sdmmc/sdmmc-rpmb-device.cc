@@ -21,10 +21,6 @@ zx_status_t RpmbDevice::Create(zx_device_t* parent, SdmmcBlockDevice* sdmmc,
     return endpoints.status_value();
   }
 
-  std::array protocol_offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_rpmb::Rpmb>,
-  };
-
   std::array offers = {
       fuchsia_hardware_rpmb::Service::Name,
   };
@@ -32,7 +28,6 @@ zx_status_t RpmbDevice::Create(zx_device_t* parent, SdmmcBlockDevice* sdmmc,
   device->outgoing_server_end_ = std::move(endpoints->server);
   auto status = device->DdkAdd(ddk::DeviceAddArgs("rpmb")
                                    .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                                   .set_fidl_protocol_offers(protocol_offers)
                                    .set_fidl_service_offers(offers)
                                    .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
