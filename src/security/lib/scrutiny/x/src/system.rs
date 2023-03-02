@@ -6,14 +6,7 @@
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::Blob as BlobApi;
-    use crate::api::ComponentManagerConfiguration as ComponentManagerConfigurationApi;
-    use crate::api::DevMgrConfiguration as DevMgrConfigurationApi;
-    use crate::api::KernelFlags as KernelFlagsApi;
-    use crate::api::Package as PackageApi;
-    use crate::api::System as SystemApi;
-    use crate::api::VbMeta as VbMetaApi;
-    use crate::api::Zbi as ZbiApi;
+    use crate::api;
     use crate::blob::fake::Blob as FakeBlob;
     use crate::hash::fake::Hash;
     use crate::package::fake::Package as FakePackage;
@@ -22,11 +15,11 @@ pub mod fake {
 
     #[derive(Default)]
     pub(crate) struct System<
-        Blob: BlobApi = FakeBlob<Hash>,
-        Package: Default + PackageApi = FakePackage,
+        Blob: api::Blob = FakeBlob<Hash>,
+        Package: Default + api::Package = FakePackage,
     >(PhantomData<(Blob, Package)>);
 
-    impl<Blob: BlobApi, Package: Default + PackageApi> SystemApi for System<Blob, Package> {
+    impl<Blob: api::Blob, Package: Default + api::Package> api::System for System<Blob, Package> {
         type DataSourcePath = &'static str;
         type Zbi = Zbi;
         type Blob = Blob;
@@ -69,7 +62,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct Zbi;
 
-    impl ZbiApi for Zbi {
+    impl api::Zbi for Zbi {
         type BootfsPath = &'static str;
         type Blob = FakeBlob<Hash>;
 
@@ -82,7 +75,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct KernelFlags;
 
-    impl KernelFlagsApi for KernelFlags {
+    impl api::KernelFlags for KernelFlags {
         fn get(&self, _key: &str) -> Option<&str> {
             None
         }
@@ -96,13 +89,13 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct VbMeta;
 
-    impl VbMetaApi for VbMeta {}
+    impl api::VbMeta for VbMeta {}
 
     /// TODO(fxbug.dev/111251): Implement for production System API.
     #[derive(Default)]
     pub(crate) struct DevMgrConfiguration;
 
-    impl DevMgrConfigurationApi for DevMgrConfiguration {
+    impl api::DevMgrConfiguration for DevMgrConfiguration {
         fn get(&self, _key: &str) -> Option<&str> {
             None
         }
@@ -116,5 +109,5 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct ComponentManagerConfiguration;
 
-    impl ComponentManagerConfigurationApi for ComponentManagerConfiguration {}
+    impl api::ComponentManagerConfiguration for ComponentManagerConfiguration {}
 }

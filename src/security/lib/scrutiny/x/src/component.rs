@@ -6,8 +6,7 @@
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::Component as ComponentApi;
-    use crate::api::PackageResolverUrl;
+    use crate::api;
     use crate::component_capability::fake::ComponentCapability;
     use crate::component_instance::fake::ComponentInstance;
     use crate::package::fake::Package;
@@ -16,7 +15,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct Component;
 
-    impl ComponentApi for Component {
+    impl api::Component for Component {
         type Package = Package;
         type ComponentCapability = ComponentCapability;
         type ComponentInstance = ComponentInstance;
@@ -25,7 +24,7 @@ pub mod fake {
             Box::new(iter::empty())
         }
 
-        fn children(&self) -> Box<dyn Iterator<Item = PackageResolverUrl>> {
+        fn children(&self) -> Box<dyn Iterator<Item = api::PackageResolverUrl>> {
             Box::new(iter::empty())
         }
 

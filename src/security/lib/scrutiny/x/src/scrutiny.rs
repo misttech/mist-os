@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::api::Scrutiny as ScrutinyApi;
+use crate::api;
 use crate::blob::Blob;
 use crate::blob::BlobDirectoryBlobSetBuilderError;
 use crate::blob::BlobSet;
@@ -64,7 +64,7 @@ impl fmt::Debug for Scrutiny {
     }
 }
 
-impl ScrutinyApi for Scrutiny {
+impl api::Scrutiny for Scrutiny {
     type Blob = Blob;
     type Package = ScrutinyPackage;
     type DataSource = DataSource;
@@ -131,7 +131,7 @@ impl ScrutinyApi for Scrutiny {
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::Scrutiny as ScrutinyApi;
+    use crate::api;
     use crate::blob::fake::Blob;
     use crate::component::fake::Component;
     use crate::component_capability::fake::ComponentCapability;
@@ -149,7 +149,7 @@ pub mod fake {
     #[derive(Default)]
     struct Scrutiny;
 
-    impl ScrutinyApi for Scrutiny {
+    impl api::Scrutiny for Scrutiny {
         type Blob = Blob<Hash>;
         type Package = Package;
         type PackageResolver = PackageResolver;

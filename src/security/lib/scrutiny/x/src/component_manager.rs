@@ -6,7 +6,7 @@
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::ComponentManager as ComponentManagerApi;
+    use crate::api;
     use crate::component_capability::fake::ComponentCapability;
     use crate::system::fake::ComponentManagerConfiguration;
     use std::iter;
@@ -14,7 +14,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct ComponentManager;
 
-    impl ComponentManagerApi for ComponentManager {
+    impl api::ComponentManager for ComponentManager {
         type ComponentManagerConfiguration = ComponentManagerConfiguration;
         type ComponentCapability = ComponentCapability;
 

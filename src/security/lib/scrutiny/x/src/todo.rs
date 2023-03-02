@@ -15,35 +15,14 @@ use crate::hash::Hash;
 use crate::package::ScrutinyPackage;
 
 // APIs to be stubbed.
-use crate::api::CapabilityDestination;
-use crate::api::CapabilityKind;
-use crate::api::CapabilitySource;
-use crate::api::Component as ComponentApi;
-use crate::api::ComponentCapability as ComponentCapabilityApi;
-use crate::api::ComponentCapabilityName as ComponentCapabilityNameApi;
-use crate::api::ComponentCapabilityPath as ComponentCapabilityPathApi;
-use crate::api::ComponentInstance as ComponentInstanceApi;
-use crate::api::ComponentInstanceCapability as ComponentInstanceCapabilityApi;
-use crate::api::ComponentManager as ComponentManagerApi;
-use crate::api::ComponentManagerConfiguration as ComponentManagerConfigurationApi;
-use crate::api::ComponentResolver as ComponentResolverApi;
-use crate::api::ComponentResolverUrl;
-use crate::api::DevMgrConfiguration as DevMgrConfigurationApi;
-use crate::api::Environment as EnvironmentApi;
-use crate::api::KernelFlags as KernelFlagsApi;
-use crate::api::Moniker as MonikerApi;
-use crate::api::PackageResolver as PackageResolverApi;
-use crate::api::PackageResolverUrl;
-use crate::api::System as SystemApi;
-use crate::api::VbMeta as VbMetaApi;
-use crate::api::Zbi as ZbiApi;
+use crate::api;
 
 // External dependencies.
 use std::path::PathBuf;
 
 pub struct ComponentInstanceCapability;
 
-impl ComponentInstanceCapabilityApi for ComponentInstanceCapability {
+impl api::ComponentInstanceCapability for ComponentInstanceCapability {
     type ComponentCapability = ComponentCapability;
     type ComponentInstance = ComponentInstance;
 
@@ -62,7 +41,7 @@ impl ComponentInstanceCapabilityApi for ComponentInstanceCapability {
     fn source(
         &self,
     ) -> Box<
-        dyn ComponentInstanceCapabilityApi<
+        dyn api::ComponentInstanceCapability<
             ComponentCapability = Self::ComponentCapability,
             ComponentInstance = Self::ComponentInstance,
         >,
@@ -77,7 +56,7 @@ impl ComponentInstanceCapabilityApi for ComponentInstanceCapability {
     ) -> Box<
         dyn Iterator<
             Item = Box<
-                dyn ComponentInstanceCapabilityApi<
+                dyn api::ComponentInstanceCapability<
                     ComponentCapability = Self::ComponentCapability,
                     ComponentInstance = Self::ComponentInstance,
                 >,
@@ -96,7 +75,7 @@ impl ComponentInstanceCapabilityApi for ComponentInstanceCapability {
             Item = Box<
                 dyn Iterator<
                     Item = Box<
-                        dyn ComponentInstanceCapabilityApi<
+                        dyn api::ComponentInstanceCapability<
                             ComponentCapability = Self::ComponentCapability,
                             ComponentInstance = Self::ComponentInstance,
                         >,
@@ -117,7 +96,7 @@ impl ComponentInstanceCapabilityApi for ComponentInstanceCapability {
             Item = Box<
                 dyn Iterator<
                     Item = Box<
-                        dyn ComponentInstanceCapabilityApi<
+                        dyn api::ComponentInstanceCapability<
                             ComponentCapability = Self::ComponentCapability,
                             ComponentInstance = Self::ComponentInstance,
                         >,
@@ -134,7 +113,7 @@ impl ComponentInstanceCapabilityApi for ComponentInstanceCapability {
 
 pub struct ComponentManager;
 
-impl ComponentManagerApi for ComponentManager {
+impl api::ComponentManager for ComponentManager {
     type ComponentManagerConfiguration = ComponentManagerConfiguration;
     type ComponentCapability = ComponentCapability;
 
@@ -153,7 +132,7 @@ impl ComponentManagerApi for ComponentManager {
 
 pub struct System;
 
-impl SystemApi for System {
+impl api::System for System {
     type DataSourcePath = PathBuf;
     type Zbi = Zbi;
     type Blob = Blob;
@@ -194,7 +173,7 @@ impl SystemApi for System {
 
 pub struct Zbi;
 
-impl ZbiApi for Zbi {
+impl api::Zbi for Zbi {
     type BootfsPath = PathBuf;
     type Blob = Blob;
 
@@ -205,7 +184,7 @@ impl ZbiApi for Zbi {
 
 pub struct KernelFlags;
 
-impl KernelFlagsApi for KernelFlags {
+impl api::KernelFlags for KernelFlags {
     fn get(&self, _key: &str) -> Option<&str> {
         todo!("TODO(fxbug.dev/111251): Integrate with production system API");
     }
@@ -217,11 +196,11 @@ impl KernelFlagsApi for KernelFlags {
 
 pub struct VbMeta;
 
-impl VbMetaApi for VbMeta {}
+impl api::VbMeta for VbMeta {}
 
 pub struct DevMgrConfiguration;
 
-impl DevMgrConfigurationApi for DevMgrConfiguration {
+impl api::DevMgrConfiguration for DevMgrConfiguration {
     fn get(&self, _key: &str) -> Option<&str> {
         todo!("TODO(fxbug.dev/111251): Integrate with production system API");
     }
@@ -233,11 +212,11 @@ impl DevMgrConfigurationApi for DevMgrConfiguration {
 
 pub struct ComponentManagerConfiguration;
 
-impl ComponentManagerConfigurationApi for ComponentManagerConfiguration {}
+impl api::ComponentManagerConfiguration for ComponentManagerConfiguration {}
 
 pub struct ComponentInstance;
 
-impl ComponentInstanceApi for ComponentInstance {
+impl api::ComponentInstance for ComponentInstance {
     type Moniker = Moniker;
     type Environment = Environment;
     type Component = Component;
@@ -258,7 +237,7 @@ impl ComponentInstanceApi for ComponentInstance {
     fn parent(
         &self,
     ) -> Box<
-        dyn ComponentInstanceApi<
+        dyn api::ComponentInstance<
             Moniker = Self::Moniker,
             Environment = Self::Environment,
             Component = Self::Component,
@@ -273,7 +252,7 @@ impl ComponentInstanceApi for ComponentInstance {
     ) -> Box<
         dyn Iterator<
             Item = Box<
-                dyn ComponentInstanceApi<
+                dyn api::ComponentInstance<
                     Moniker = Self::Moniker,
                     Environment = Self::Environment,
                     Component = Self::Component,
@@ -290,7 +269,7 @@ impl ComponentInstanceApi for ComponentInstance {
     ) -> Box<
         dyn Iterator<
             Item = Box<
-                dyn ComponentInstanceApi<
+                dyn api::ComponentInstance<
                     Moniker = Self::Moniker,
                     Environment = Self::Environment,
                     Component = Self::Component,
@@ -307,7 +286,7 @@ impl ComponentInstanceApi for ComponentInstance {
     ) -> Box<
         dyn Iterator<
             Item = Box<
-                dyn ComponentInstanceApi<
+                dyn api::ComponentInstance<
                     Moniker = Self::Moniker,
                     Environment = Self::Environment,
                     Component = Self::Component,
@@ -338,43 +317,43 @@ impl ComponentInstanceApi for ComponentInstance {
 
 pub struct Moniker;
 
-impl MonikerApi for Moniker {}
+impl api::Moniker for Moniker {}
 
 pub struct Environment;
 
-impl EnvironmentApi for Environment {}
+impl api::Environment for Environment {}
 
 pub struct ComponentResolver;
 
-impl ComponentResolverApi for ComponentResolver {
+impl api::ComponentResolver for ComponentResolver {
     type Hash = Hash;
 
-    fn resolve(&self, _url: ComponentResolverUrl) -> Option<Self::Hash> {
+    fn resolve(&self, _url: api::ComponentResolverUrl) -> Option<Self::Hash> {
         todo!("TODO(fxbug.dev/111250): Integrate with production component resolver API");
     }
 
-    fn aliases(&self, _hash: Self::Hash) -> Box<dyn Iterator<Item = ComponentResolverUrl>> {
+    fn aliases(&self, _hash: Self::Hash) -> Box<dyn Iterator<Item = api::ComponentResolverUrl>> {
         todo!("TODO(fxbug.dev/111250): Integrate with production component resolver API");
     }
 }
 
 pub struct PackageResolver;
 
-impl PackageResolverApi for PackageResolver {
+impl api::PackageResolver for PackageResolver {
     type Hash = Hash;
 
-    fn resolve(&self, _url: PackageResolverUrl) -> Option<Self::Hash> {
+    fn resolve(&self, _url: api::PackageResolverUrl) -> Option<Self::Hash> {
         todo!("TODO(fxbug.dev/111249): Integrate with production package resolver API");
     }
 
-    fn aliases(&self, _hash: Self::Hash) -> Box<dyn Iterator<Item = PackageResolverUrl>> {
+    fn aliases(&self, _hash: Self::Hash) -> Box<dyn Iterator<Item = api::PackageResolverUrl>> {
         todo!("TODO(fxbug.dev/111249): Integrate with production package resolver API");
     }
 }
 
 pub struct Component;
 
-impl ComponentApi for Component {
+impl api::Component for Component {
     type Package = ScrutinyPackage;
     type ComponentCapability = ComponentCapability;
     type ComponentInstance = ComponentInstance;
@@ -383,7 +362,7 @@ impl ComponentApi for Component {
         todo!("TODO(fxbug.dev/111243): Integrate with production component API");
     }
 
-    fn children(&self) -> Box<dyn Iterator<Item = PackageResolverUrl>> {
+    fn children(&self) -> Box<dyn Iterator<Item = api::PackageResolverUrl>> {
         todo!("TODO(fxbug.dev/111243): Integrate with production component API");
     }
 
@@ -410,7 +389,7 @@ impl ComponentApi for Component {
 
 pub struct ComponentCapability;
 
-impl ComponentCapabilityApi for ComponentCapability {
+impl api::ComponentCapability for ComponentCapability {
     type Component = Component;
     type CapabilityName = ComponentCapabilityName;
     type CapabilityPath = ComponentCapabilityPath;
@@ -419,15 +398,15 @@ impl ComponentCapabilityApi for ComponentCapability {
         todo!("TODO(fxbug.dev/111244): Integrate with production component capability API");
     }
 
-    fn kind(&self) -> CapabilityKind {
+    fn kind(&self) -> api::CapabilityKind {
         todo!("TODO(fxbug.dev/111244): Integrate with production component capability API");
     }
 
-    fn source(&self) -> CapabilitySource {
+    fn source(&self) -> api::CapabilitySource {
         todo!("TODO(fxbug.dev/111244): Integrate with production component capability API");
     }
 
-    fn destination(&self) -> CapabilityDestination {
+    fn destination(&self) -> api::CapabilityDestination {
         todo!("TODO(fxbug.dev/111244): Integrate with production component capability API");
     }
 
@@ -450,7 +429,7 @@ impl ComponentCapabilityApi for ComponentCapability {
 
 pub struct ComponentCapabilityName;
 
-impl ComponentCapabilityNameApi for ComponentCapabilityName {
+impl api::ComponentCapabilityName for ComponentCapabilityName {
     type ComponentCapability = ComponentCapability;
 
     fn component(&self) -> Self::ComponentCapability {
@@ -460,7 +439,7 @@ impl ComponentCapabilityNameApi for ComponentCapabilityName {
 
 pub struct ComponentCapabilityPath;
 
-impl ComponentCapabilityPathApi for ComponentCapabilityPath {
+impl api::ComponentCapabilityPath for ComponentCapabilityPath {
     type ComponentCapability = ComponentCapability;
 
     fn component(&self) -> Self::ComponentCapability {

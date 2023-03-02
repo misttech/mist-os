@@ -6,12 +6,7 @@
 // warnings.
 #![allow(dead_code)]
 
-use crate::api::Blob as BlobApi;
-use crate::api::DataSource as DataSourceApi;
-use crate::api::Error as ErrorApi;
-use crate::api::MetaContents as MetaContentsApi;
-use crate::api::MetaPackage as MetaPackageApi;
-use crate::api::Package as PackageApi;
+use crate::api;
 use crate::blob::BlobSet;
 use crate::hash::Hash;
 use crate::product_bundle::ProductBundleRepositoryBlobSet;
@@ -40,7 +35,7 @@ use crate::todo::Component;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MetaPackage(FuchsiaMetaPackage);
 
-impl MetaPackageApi for MetaPackage {}
+impl api::MetaPackage for MetaPackage {}
 
 impl From<FuchsiaMetaPackage> for MetaPackage {
     fn from(meta_package: FuchsiaMetaPackage) -> Self {
@@ -58,7 +53,7 @@ impl From<FuchsiaMetaContents> for MetaContents {
     }
 }
 
-impl MetaContentsApi for MetaContents {
+impl api::MetaContents for MetaContents {
     type Hash = Hash;
     type EntryPath = PathBuf;
 
@@ -91,7 +86,7 @@ enum PackageInitializationError {
 /// accessible via an associated `BlobSet`. This object wraps a reference-counted pointer
 /// to its state, which makes it cheap to clone.
 pub struct Package<
-    PackageDataSource: Clone + DataSourceApi,
+    PackageDataSource: Clone + api::DataSource,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 >(Rc<PackageData<PackageDataSource, PackageBlobs, FarReaderSeeker>>);
@@ -102,7 +97,7 @@ pub type ScrutinyPackage =
     Package<ProductBundleRepositoryBlobs, ProductBundleRepositoryBlobSet, Box<dyn ReadSeek>>;
 
 impl<
-        PackageDataSource: Clone + DataSourceApi,
+        PackageDataSource: Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
     > Clone for Package<PackageDataSource, PackageBlobs, FarReaderSeeker>
@@ -113,7 +108,7 @@ impl<
 }
 
 impl<
-        PackageDataSource: Clone + DataSourceApi,
+        PackageDataSource: Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
     > Package<PackageDataSource, PackageBlobs, FarReaderSeeker>
@@ -190,13 +185,13 @@ where
 }
 
 impl<
-        PackageDataSource: 'static + Clone + DataSourceApi,
+        PackageDataSource: 'static + Clone + api::DataSource,
         PackageBlobs: 'static + BlobSet,
         FarReaderSeeker: 'static + io::Read + io::Seek,
-    > PackageApi for Package<PackageDataSource, PackageBlobs, FarReaderSeeker>
+    > api::Package for Package<PackageDataSource, PackageBlobs, FarReaderSeeker>
 where
     <PackageBlobs as BlobSet>::Error: 'static,
-    <<PackageBlobs as BlobSet>::Blob as BlobApi>::Error: 'static,
+    <<PackageBlobs as BlobSet>::Blob as api::Blob>::Error: 'static,
 {
     type Hash = Hash;
     type MetaPackage = MetaPackage;
@@ -243,7 +238,7 @@ where
 // a panicking test-only `Default` implementation is provided.
 #[cfg(test)]
 impl<
-        PackageDataSource: Clone + DataSourceApi,
+        PackageDataSource: Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
     > Default for Package<PackageDataSource, PackageBlobs, FarReaderSeeker>
@@ -255,7 +250,7 @@ impl<
 
 /// Internal state of a [`Package`] object.
 struct PackageData<
-    PackageDataSource: Clone + DataSourceApi,
+    PackageDataSource: Clone + api::DataSource,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 > {
@@ -324,7 +319,7 @@ pub enum MetaBlobError {
 
 /// `Blob` implementation that combines `MetaBlobData` and a `FarReader`.
 pub struct MetaBlob<
-    PackageDataSource: Clone + DataSourceApi,
+    PackageDataSource: Clone + api::DataSource,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 > {
@@ -333,10 +328,10 @@ pub struct MetaBlob<
 }
 
 impl<
-        PackageDataSource: 'static + Clone + DataSourceApi,
+        PackageDataSource: 'static + Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
-    > BlobApi for MetaBlob<PackageDataSource, PackageBlobs, FarReaderSeeker>
+    > api::Blob for MetaBlob<PackageDataSource, PackageBlobs, FarReaderSeeker>
 {
     type Hash = PackageBlobs::Hash;
     type ReaderSeeker = io::Cursor<Vec<u8>>;
@@ -364,7 +359,7 @@ impl<
 
 /// Errors that can occur attempting to use a `ContentBlob` as a `Blob`.
 #[derive(Debug, Error)]
-pub enum ContentBlobError<BlobSourceError: ErrorApi, BlobError: ErrorApi> {
+pub enum ContentBlobError<BlobSourceError: api::Error, BlobError: api::Error> {
     #[error("failed to lookup package content blob: {0:?}")]
     BlobSourceError(BlobSourceError),
     #[error("failed to open package content blob: {0:?}")]
@@ -373,7 +368,7 @@ pub enum ContentBlobError<BlobSourceError: ErrorApi, BlobError: ErrorApi> {
 
 /// `Blob` implementation that combines `ContentBlobData` and a `BlobSet`.
 pub struct ContentBlob<
-    PackageDataSource: Clone + DataSourceApi,
+    PackageDataSource: Clone + api::DataSource,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 > {
@@ -382,17 +377,17 @@ pub struct ContentBlob<
 }
 
 impl<
-        PackageDataSource: 'static + Clone + DataSourceApi,
+        PackageDataSource: 'static + Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
-    > BlobApi for ContentBlob<PackageDataSource, PackageBlobs, FarReaderSeeker>
+    > api::Blob for ContentBlob<PackageDataSource, PackageBlobs, FarReaderSeeker>
 {
     type Hash = PackageBlobs::Hash;
-    type ReaderSeeker = <PackageBlobs::Blob as BlobApi>::ReaderSeeker;
+    type ReaderSeeker = <PackageBlobs::Blob as api::Blob>::ReaderSeeker;
     type DataSource = PackageDataSource;
     type Error = ContentBlobError<
         <PackageBlobs as BlobSet>::Error,
-        <<PackageBlobs as BlobSet>::Blob as BlobApi>::Error,
+        <<PackageBlobs as BlobSet>::Blob as api::Blob>::Error,
     >;
 
     fn hash(&self) -> Self::Hash {
@@ -416,7 +411,7 @@ impl<
 
 /// Iterator implementation for iterating over meta blobs in a package.
 struct MetaBlobIterator<
-    PackageDataSource: Clone + DataSourceApi,
+    PackageDataSource: Clone + api::DataSource,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 > {
@@ -428,7 +423,7 @@ struct MetaBlobIterator<
 }
 
 impl<
-        PackageDataSource: Clone + DataSourceApi,
+        PackageDataSource: Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
     > Iterator for MetaBlobIterator<PackageDataSource, PackageBlobs, FarReaderSeeker>
@@ -448,7 +443,7 @@ impl<
 
 /// Iterator implementation for iterating over content blobs in a package.
 struct ContentBlobIterator<
-    PackageDataSource: Clone + DataSourceApi,
+    PackageDataSource: Clone + api::DataSource,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 > {
@@ -460,7 +455,7 @@ struct ContentBlobIterator<
 }
 
 impl<
-        PackageDataSource: Clone + DataSourceApi,
+        PackageDataSource: Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
     > Iterator for ContentBlobIterator<PackageDataSource, PackageBlobs, FarReaderSeeker>
@@ -481,8 +476,8 @@ impl<
 /// Errors that can occur attempting to use a `Blob` as a `crate::api::Blob`.
 #[derive(Debug, Error)]
 pub enum BlobError<
-    BlobSourceErrorForContentBlobError: ErrorApi,
-    BlobErrorForContentBlobError: ErrorApi,
+    BlobSourceErrorForContentBlobError: api::Error,
+    BlobErrorForContentBlobError: api::Error,
 > {
     #[error("error accessing meta blob: {0}")]
     MetaBlobError(#[from] MetaBlobError),
@@ -496,14 +491,16 @@ pub enum BlobError<
 /// loaded from a [`Package`].
 pub enum BlobReaderSeeker<PackageBlobs: BlobSet> {
     ///`std::io::Read + std::io::Seek` for a content blob loaded from a [`Package`].
-    ContentReaderSeeker(<PackageBlobs::Blob as BlobApi>::ReaderSeeker),
+    ContentReaderSeeker(<PackageBlobs::Blob as api::Blob>::ReaderSeeker),
 
     ///`std::io::Read + std::io::Seek` for a meta blob loaded from a [`Package`].
     MetaReaderSeeker(io::Cursor<Vec<u8>>),
 }
 
 impl<PackageBlobs: BlobSet> BlobReaderSeeker<PackageBlobs> {
-    fn from_content(content_reader_seeker: <PackageBlobs::Blob as BlobApi>::ReaderSeeker) -> Self {
+    fn from_content(
+        content_reader_seeker: <PackageBlobs::Blob as api::Blob>::ReaderSeeker,
+    ) -> Self {
         Self::ContentReaderSeeker(content_reader_seeker)
     }
 
@@ -533,7 +530,7 @@ impl<PackageBlobs: BlobSet> io::Seek for BlobReaderSeeker<PackageBlobs> {
 /// `crate::api::Blob` implementation for either a content blob or a meta blob loaded from a
 /// [`Package`].
 pub enum Blob<
-    PackageDataSource: Clone + DataSourceApi,
+    PackageDataSource: Clone + api::DataSource,
     PackageBlobs: BlobSet,
     FarReaderSeeker: io::Read + io::Seek,
 > {
@@ -545,7 +542,7 @@ pub enum Blob<
 }
 
 impl<
-        PackageDataSource: Clone + DataSourceApi,
+        PackageDataSource: Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
     > From<ContentBlob<PackageDataSource, PackageBlobs, FarReaderSeeker>>
@@ -557,7 +554,7 @@ impl<
 }
 
 impl<
-        PackageDataSource: Clone + DataSourceApi,
+        PackageDataSource: Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
     > From<MetaBlob<PackageDataSource, PackageBlobs, FarReaderSeeker>>
@@ -569,20 +566,20 @@ impl<
 }
 
 impl<
-        PackageDataSource: 'static + Clone + DataSourceApi,
+        PackageDataSource: 'static + Clone + api::DataSource,
         PackageBlobs: BlobSet,
         FarReaderSeeker: io::Read + io::Seek,
-    > BlobApi for Blob<PackageDataSource, PackageBlobs, FarReaderSeeker>
+    > api::Blob for Blob<PackageDataSource, PackageBlobs, FarReaderSeeker>
 where
     <PackageBlobs as BlobSet>::Error: 'static,
-    <<PackageBlobs as BlobSet>::Blob as BlobApi>::Error: 'static,
+    <<PackageBlobs as BlobSet>::Blob as api::Blob>::Error: 'static,
 {
     type Hash = PackageBlobs::Hash;
     type ReaderSeeker = BlobReaderSeeker<PackageBlobs>;
     type DataSource = PackageDataSource;
     type Error = BlobError<
         <PackageBlobs as BlobSet>::Error,
-        <<PackageBlobs as BlobSet>::Blob as BlobApi>::Error,
+        <<PackageBlobs as BlobSet>::Blob as api::Blob>::Error,
     >;
 
     fn hash(&self) -> Self::Hash {
@@ -620,8 +617,8 @@ mod tests {
     use super::MetaPackage;
     use super::Package;
     use super::PackageInitializationError;
-    use crate::api::Blob as BlobApi;
-    use crate::api::Package as PackageApi;
+    use crate::api::Blob as _;
+    use crate::api::Package as _;
     use crate::blob::fake::Blob as FakeBlob;
     use crate::blob::fake::BlobSet;
     use crate::blob::fake::BlobSetError;
@@ -869,9 +866,7 @@ mod tests {
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::MetaContents as MetaContentsApi;
-    use crate::api::MetaPackage as MetaPackageApi;
-    use crate::api::Package as PackageApi;
+    use crate::api;
     use crate::blob::fake::Blob;
     use crate::component::fake::Component;
     use crate::hash::fake::Hash;
@@ -880,7 +875,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct Package;
 
-    impl PackageApi for Package {
+    impl api::Package for Package {
         type Hash = Hash;
         type MetaPackage = MetaPackage;
         type MetaContents = MetaContents;
@@ -917,13 +912,13 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct MetaPackage;
 
-    impl MetaPackageApi for MetaPackage {}
+    impl api::MetaPackage for MetaPackage {}
 
     /// TODO(fxbug.dev/111249): Implement for production package API.
     #[derive(Default)]
     pub(crate) struct MetaContents;
 
-    impl MetaContentsApi for MetaContents {
+    impl api::MetaContents for MetaContents {
         type Hash = Hash;
         type EntryPath = &'static str;
 

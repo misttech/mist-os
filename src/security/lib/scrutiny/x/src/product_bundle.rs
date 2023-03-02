@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::api::Blob as BlobApi;
-use crate::api::DataSource as DataSourceApi;
-use crate::api::DataSourceKind;
-use crate::api::DataSourceVersion;
+use crate::api;
+use crate::blob;
 use crate::blob::BlobDirectoryBlobSet;
 use crate::blob::BlobDirectoryBlobSetBuilderError;
 use crate::blob::BlobDirectoryError;
-use crate::blob::BlobSet as BlobSetApi;
 use crate::blob::FileBlob;
 use crate::hash::Hash;
 use camino::Utf8PathBuf;
@@ -41,10 +38,10 @@ impl From<ProductBundleRepository> for DataSource {
     }
 }
 
-impl DataSourceApi for DataSource {
+impl api::DataSource for DataSource {
     type SourcePath = PathBuf;
 
-    fn kind(&self) -> DataSourceKind {
+    fn kind(&self) -> api::DataSourceKind {
         match self {
             Self::ProductBundle(product_bundle) => product_bundle.kind(),
             Self::ProductBundleRepository(product_bundle_repository) => {
@@ -53,7 +50,7 @@ impl DataSourceApi for DataSource {
         }
     }
 
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+    fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
         match self {
             Self::ProductBundle(product_bundle) => product_bundle.parent(),
             Self::ProductBundleRepository(product_bundle_repository) => {
@@ -64,7 +61,7 @@ impl DataSourceApi for DataSource {
 
     fn children(
         &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+    ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>> {
         match self {
             Self::ProductBundle(product_bundle) => product_bundle.children(),
             Self::ProductBundleRepository(product_bundle_repository) => {
@@ -82,7 +79,7 @@ impl DataSourceApi for DataSource {
         }
     }
 
-    fn version(&self) -> DataSourceVersion {
+    fn version(&self) -> api::DataSourceVersion {
         match self {
             Self::ProductBundle(product_bundle) => product_bundle.version(),
             Self::ProductBundleRepository(product_bundle_repository) => {
@@ -237,21 +234,21 @@ struct ProductBundleData {
     repository_name: String,
 }
 
-impl DataSourceApi for ProductBundle {
+impl api::DataSource for ProductBundle {
     type SourcePath = PathBuf;
 
-    fn kind(&self) -> DataSourceKind {
-        DataSourceKind::ProductBundle
+    fn kind(&self) -> api::DataSourceKind {
+        api::DataSourceKind::ProductBundle
     }
 
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+    fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
         None
     }
 
     fn children(
         &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
-        let repository: Box<dyn DataSourceApi<SourcePath = Self::SourcePath>> =
+    ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>> {
+        let repository: Box<dyn api::DataSource<SourcePath = Self::SourcePath>> =
             Box::new(ProductBundleRepository::new(self.clone()));
         Box::new([repository].into_iter())
     }
@@ -260,9 +257,9 @@ impl DataSourceApi for ProductBundle {
         Some(self.0.directory.clone())
     }
 
-    fn version(&self) -> DataSourceVersion {
+    fn version(&self) -> api::DataSourceVersion {
         // TODO: Add support for exposing the product bundle version.
-        DataSourceVersion::Unknown
+        api::DataSourceVersion::Unknown
     }
 }
 
@@ -282,21 +279,21 @@ impl ProductBundleRepository {
     }
 }
 
-impl DataSourceApi for ProductBundleRepository {
+impl api::DataSource for ProductBundleRepository {
     type SourcePath = PathBuf;
 
-    fn kind(&self) -> DataSourceKind {
-        DataSourceKind::TUFRepository
+    fn kind(&self) -> api::DataSourceKind {
+        api::DataSourceKind::TUFRepository
     }
 
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+    fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
         Some(Box::new(self.0.clone()))
     }
 
     fn children(
         &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
-        let repository_blobs: Box<dyn DataSourceApi<SourcePath = Self::SourcePath>> =
+    ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>> {
+        let repository_blobs: Box<dyn api::DataSource<SourcePath = Self::SourcePath>> =
             Box::new(ProductBundleRepositoryBlobs::new(self.0.clone()));
         Box::new(
             [
@@ -311,9 +308,9 @@ impl DataSourceApi for ProductBundleRepository {
         None
     }
 
-    fn version(&self) -> DataSourceVersion {
+    fn version(&self) -> api::DataSourceVersion {
         // TODO: Add support for exposing the TUF version.
-        DataSourceVersion::Unknown
+        api::DataSourceVersion::Unknown
     }
 }
 
@@ -341,22 +338,22 @@ impl ProductBundleRepositoryBlobs {
     }
 }
 
-impl DataSourceApi for ProductBundleRepositoryBlobs {
+impl api::DataSource for ProductBundleRepositoryBlobs {
     type SourcePath = PathBuf;
 
-    fn kind(&self) -> DataSourceKind {
-        DataSourceKind::ProductBundle
+    fn kind(&self) -> api::DataSourceKind {
+        api::DataSourceKind::ProductBundle
     }
 
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
-        let repository: Box<dyn DataSourceApi<SourcePath = Self::SourcePath>> =
+    fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
+        let repository: Box<dyn api::DataSource<SourcePath = Self::SourcePath>> =
             Box::new(ProductBundleRepository::new(self.0.clone()));
         Some(repository)
     }
 
     fn children(
         &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+    ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>> {
         Box::new(iter::empty())
     }
 
@@ -364,9 +361,9 @@ impl DataSourceApi for ProductBundleRepositoryBlobs {
         Some(self.directory().to_path_buf())
     }
 
-    fn version(&self) -> DataSourceVersion {
+    fn version(&self) -> api::DataSourceVersion {
         // TODO: Add support for exposing the blob identity version.
-        DataSourceVersion::Unknown
+        api::DataSourceVersion::Unknown
     }
 }
 
@@ -382,7 +379,7 @@ impl ProductBundleRepositoryBlobSet {
     }
 }
 
-impl BlobSetApi for ProductBundleRepositoryBlobSet {
+impl blob::BlobSet for ProductBundleRepositoryBlobSet {
     type Hash = Hash;
     type Blob = ProductBundleRepositoryBlob;
     type DataSource = ProductBundleRepositoryBlobs;
@@ -420,7 +417,7 @@ impl ProductBundleRepositoryBlob {
     }
 }
 
-impl BlobApi for ProductBundleRepositoryBlob {
+impl api::Blob for ProductBundleRepositoryBlob {
     type Hash = Hash;
     type ReaderSeeker = Box<dyn ReadSeek>;
     type DataSource = ProductBundleRepositoryBlobs;
@@ -552,8 +549,8 @@ mod tests {
     use super::ProductBundleBuilder;
     use super::ProductBundleBuilderError;
     use super::SystemSlot;
-    use crate::api::DataSource as DataSourceApi;
-    use crate::api::DataSourceKind;
+    use crate::api;
+    use crate::api::DataSource as _;
     use crate::blob::BlobDirectoryBlobSetBuilderError;
     use crate::blob::BlobSet;
     use crate::product_bundle::test::utf8_path;
@@ -689,7 +686,7 @@ mod tests {
 
         assert_eq!(product_bundle.directory(), temp_dir.path());
         assert_eq!(product_bundle.repository_blobs_directory(), blobs_path_buf);
-        assert_eq!(product_bundle.kind(), DataSourceKind::ProductBundle);
+        assert_eq!(product_bundle.kind(), api::DataSourceKind::ProductBundle);
         assert_eq!(product_bundle.parent(), None);
         assert_eq!(product_bundle.path().unwrap(), temp_dir.path());
 
@@ -703,7 +700,7 @@ mod tests {
         let repository_as_data_source = &product_bundle_children[0];
 
         // Expect `children()[0]` and `repository()` to be the same.
-        let repository: Box<dyn DataSourceApi<SourcePath = PathBuf>> =
+        let repository: Box<dyn api::DataSource<SourcePath = PathBuf>> =
             Box::new(product_bundle.repository());
         assert_eq!(&repository, repository_as_data_source);
 
@@ -718,7 +715,7 @@ mod tests {
         let repository = product_bundle.repository();
 
         // Expect `children[0]` and `blobs()` to be the same.
-        let blobs: Box<dyn DataSourceApi<SourcePath = PathBuf>> = Box::new(repository.blobs());
+        let blobs: Box<dyn api::DataSource<SourcePath = PathBuf>> = Box::new(repository.blobs());
         assert_eq!(&blobs, blobs_as_data_source);
 
         // Expect blobs data source to refer to valid (empty) blobs directory that refers back

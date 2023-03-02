@@ -6,22 +6,24 @@
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::ComponentResolver as ComponentResolverApi;
-    use crate::api::ComponentResolverUrl;
+    use crate::api;
     use crate::hash::fake::Hash;
     use std::iter;
 
     #[derive(Default)]
     pub(crate) struct ComponentResolver;
 
-    impl ComponentResolverApi for ComponentResolver {
+    impl api::ComponentResolver for ComponentResolver {
         type Hash = Hash;
 
-        fn resolve(&self, _url: ComponentResolverUrl) -> Option<Self::Hash> {
+        fn resolve(&self, _url: api::ComponentResolverUrl) -> Option<Self::Hash> {
             None
         }
 
-        fn aliases(&self, _hash: Self::Hash) -> Box<dyn Iterator<Item = ComponentResolverUrl>> {
+        fn aliases(
+            &self,
+            _hash: Self::Hash,
+        ) -> Box<dyn Iterator<Item = api::ComponentResolverUrl>> {
             Box::new(iter::empty())
         }
     }

@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::api::Blob as BlobApi;
-use crate::api::DataSource as DataSourceApi;
-use crate::api::Error as ErrorApi;
-use crate::api::Hash as HashApi;
+use crate::api;
 use crate::data_source::BlobDirectory;
 use crate::data_source::BlobSource;
 use crate::hash::Hash;
@@ -26,16 +23,16 @@ use thiserror::Error;
 
 pub trait BlobSet {
     /// Concrete type for the content-addressed hash used to identify blobs.
-    type Hash: HashApi;
+    type Hash: api::Hash;
 
     /// Concrete type for individual blobs.
-    type Blob: BlobApi<DataSource = Self::DataSource>;
+    type Blob: api::Blob<DataSource = Self::DataSource>;
 
     /// Concrete type for data sources of blobs.
-    type DataSource: DataSourceApi;
+    type DataSource: api::DataSource;
 
     /// Concrete type for errors returned by `BlobSet::blob`.
-    type Error: ErrorApi;
+    type Error: api::Error;
 
     /// Iterate over blobs in this set.
     fn iter(&self) -> Box<dyn Iterator<Item = Self::Blob>>;
@@ -77,7 +74,7 @@ mod blobfs {
     use super::parse_path_as_hash;
     use super::BlobSet;
     use super::ParseHashPathError;
-    use crate::api::Blob as BlobApi;
+    use crate::api;
     use crate::data_source::blobfs::BlobFsArchive;
     use crate::hash::Hash;
     use scrutiny_utils::blobfs::BlobFsReader;
@@ -210,7 +207,7 @@ mod blobfs {
         }
     }
 
-    impl BlobApi for BlobFsBlob {
+    impl api::Blob for BlobFsBlob {
         type Hash = Hash;
         type ReaderSeeker = Box<dyn ReadSeek>;
         type DataSource = BlobFsArchive;
@@ -402,7 +399,7 @@ impl FileBlob {
     }
 }
 
-impl BlobApi for FileBlob {
+impl api::Blob for FileBlob {
     type Hash = Hash;
     type ReaderSeeker = Box<dyn ReadSeek>;
     type DataSource = BlobDirectory;
@@ -465,7 +462,7 @@ impl From<ProductBundleRepositoryBlob> for Blob {
     }
 }
 
-impl BlobApi for Blob {
+impl api::Blob for Blob {
     type Hash = Hash;
     type ReaderSeeker = Box<dyn ReadSeek>;
     type DataSource = BlobSource;
@@ -597,7 +594,7 @@ mod tests {
     use super::BlobDirectoryError;
     use super::BlobSet;
     use super::ParseHashPathError;
-    use crate::api::Blob as BlobApi;
+    use crate::api::Blob as _;
     use crate::hash::Hash;
     use fuchsia_hash::HASH_SIZE as FUCHSIA_HASH_SIZE;
     use fuchsia_merkle::Hash as FuchsiaMerkleHash;
@@ -869,9 +866,8 @@ pub mod test {
 
 #[cfg(test)]
 pub mod fake {
-    use super::BlobSet as BlobSetApi;
-    use crate::api::Blob as BlobApi;
-    use crate::api::Hash as HashApi;
+    use crate::api;
+    use crate::blob;
     use crate::data_source::fake::DataSource;
     use crate::hash::test::HashGenerator;
     use std::collections::HashMap;
@@ -885,13 +881,13 @@ pub mod fake {
     }
 
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub(crate) struct Blob<H: HashApi> {
+    pub(crate) struct Blob<H: api::Hash> {
         hash: H,
         blob: Result<Cursor<Vec<u8>>, BlobError>,
         data_sources: Vec<DataSource>,
     }
 
-    impl<H: Default + HashApi> Default for Blob<H> {
+    impl<H: Default + api::Hash> Default for Blob<H> {
         fn default() -> Self {
             Self {
                 hash: H::default(),
@@ -909,7 +905,7 @@ pub mod fake {
         BlobError(#[from] BlobError),
     }
 
-    impl<H: HashApi> Blob<H> {
+    impl<H: api::Hash> Blob<H> {
         pub fn new(hash: H, blob: Vec<u8>) -> Self {
             Self { hash, blob: Ok(Cursor::new(blob)), data_sources: vec![DataSource::default()] }
         }
@@ -935,7 +931,7 @@ pub mod fake {
         }
     }
 
-    impl<H: HashApi> BlobApi for Blob<H> {
+    impl<H: api::Hash> api::Blob for Blob<H> {
         type Hash = H;
         type ReaderSeeker = Cursor<Vec<u8>>;
         type DataSource = DataSource;
@@ -954,11 +950,11 @@ pub mod fake {
         }
     }
 
-    pub(crate) struct BlobSet<H: HashApi> {
+    pub(crate) struct BlobSet<H: api::Hash> {
         blobs: HashMap<H, Result<Blob<H>, BlobError>>,
     }
 
-    impl<H: HashApi> BlobSet<H> {
+    impl<H: api::Hash> BlobSet<H> {
         pub fn from_hash_map(blobs: HashMap<H, Result<Blob<H>, BlobError>>) -> Self {
             Self { blobs }
         }
@@ -968,7 +964,7 @@ pub mod fake {
         }
     }
 
-    impl<H: HashApi + 'static> BlobSetApi for BlobSet<H> {
+    impl<H: api::Hash + 'static> blob::BlobSet for BlobSet<H> {
         type Blob = Blob<H>;
         type DataSource = DataSource;
         type Hash = H;
@@ -997,12 +993,12 @@ pub mod fake {
         }
     }
 
-    pub(crate) struct BlobSetBuilder<H: HashApi + HashGenerator> {
+    pub(crate) struct BlobSetBuilder<H: api::Hash + HashGenerator> {
         next_id: H,
         blobs: HashMap<H, Result<Blob<H>, BlobError>>,
     }
 
-    impl<H: HashApi + HashGenerator> BlobSetBuilder<H> {
+    impl<H: api::Hash + HashGenerator> BlobSetBuilder<H> {
         pub fn new() -> Self {
             Self { next_id: H::default(), blobs: HashMap::new() }
         }
@@ -1059,8 +1055,8 @@ pub mod fake {
         use super::BlobSet;
         use super::BlobSetBuilder;
         use super::BlobSetError;
-        use crate::api::Blob as BlobApi;
-        use crate::blob::BlobSet as BlobSetApi;
+        use crate::api::Blob as _;
+        use crate::blob::BlobSet as _;
         use crate::data_source::fake::DataSource;
         use crate::hash::fake::Hash;
         use maplit::hashmap;

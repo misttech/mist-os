@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::api::DataSource as DataSourceApi;
-use crate::api::DataSourceKind;
-use crate::api::DataSourceVersion;
+use crate::api;
 use crate::product_bundle::DataSource as ProductBundleSource;
 use crate::product_bundle::ProductBundleRepositoryBlobs;
 use std::fmt::Debug;
@@ -30,17 +28,17 @@ impl From<ProductBundleSource> for DataSource {
     }
 }
 
-impl DataSourceApi for DataSource {
+impl api::DataSource for DataSource {
     type SourcePath = PathBuf;
 
-    fn kind(&self) -> DataSourceKind {
+    fn kind(&self) -> api::DataSourceKind {
         match self {
             Self::BlobSource(blob_source) => blob_source.kind(),
             Self::ProductBundleSource(product_bundle_source) => product_bundle_source.kind(),
         }
     }
 
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+    fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
         match self {
             Self::BlobSource(blob_source) => blob_source.parent(),
             Self::ProductBundleSource(product_bundle_source) => product_bundle_source.parent(),
@@ -49,7 +47,7 @@ impl DataSourceApi for DataSource {
 
     fn children(
         &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+    ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>> {
         match self {
             Self::BlobSource(blob_source) => blob_source.children(),
             Self::ProductBundleSource(product_bundle_source) => product_bundle_source.children(),
@@ -63,7 +61,7 @@ impl DataSourceApi for DataSource {
         }
     }
 
-    fn version(&self) -> DataSourceVersion {
+    fn version(&self) -> api::DataSourceVersion {
         match self {
             Self::BlobSource(blob_source) => blob_source.version(),
             Self::ProductBundleSource(product_bundle_source) => product_bundle_source.version(),
@@ -100,10 +98,10 @@ impl From<ProductBundleRepositoryBlobs> for BlobSource {
     }
 }
 
-impl DataSourceApi for BlobSource {
+impl api::DataSource for BlobSource {
     type SourcePath = PathBuf;
 
-    fn kind(&self) -> DataSourceKind {
+    fn kind(&self) -> api::DataSourceKind {
         match self {
             #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.kind(),
@@ -115,7 +113,7 @@ impl DataSourceApi for BlobSource {
         }
     }
 
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+    fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
         match self {
             #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.parent(),
@@ -129,7 +127,7 @@ impl DataSourceApi for BlobSource {
 
     fn children(
         &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+    ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>> {
         match self {
             #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.children(),
@@ -153,7 +151,7 @@ impl DataSourceApi for BlobSource {
         }
     }
 
-    fn version(&self) -> DataSourceVersion {
+    fn version(&self) -> api::DataSourceVersion {
         match self {
             #[cfg(test)]
             Self::BlobFsArchive(blob_fs_archive) => blob_fs_archive.version(),
@@ -168,9 +166,7 @@ impl DataSourceApi for BlobSource {
 
 #[cfg(test)]
 pub mod blobfs {
-    use crate::api::DataSource as DataSourceApi;
-    use crate::api::DataSourceKind;
-    use crate::api::DataSourceVersion;
+    use crate::api;
     use std::iter;
     use std::path::PathBuf;
 
@@ -186,20 +182,20 @@ pub mod blobfs {
         }
     }
 
-    impl DataSourceApi for BlobFsArchive {
+    impl api::DataSource for BlobFsArchive {
         type SourcePath = PathBuf;
 
-        fn kind(&self) -> DataSourceKind {
-            DataSourceKind::BlobfsArchive
+        fn kind(&self) -> api::DataSourceKind {
+            api::DataSourceKind::BlobfsArchive
         }
 
-        fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+        fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
             None
         }
 
         fn children(
             &self,
-        ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>>
+        ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>>
         {
             Box::new(iter::empty())
         }
@@ -208,9 +204,9 @@ pub mod blobfs {
             Some(self.path.clone())
         }
 
-        fn version(&self) -> DataSourceVersion {
+        fn version(&self) -> api::DataSourceVersion {
             // TODO: Add support for exposing the blobfs format version.
-            DataSourceVersion::Unknown
+            api::DataSourceVersion::Unknown
         }
     }
 }
@@ -227,20 +223,20 @@ impl BlobDirectory {
     }
 }
 
-impl DataSourceApi for BlobDirectory {
+impl api::DataSource for BlobDirectory {
     type SourcePath = PathBuf;
 
-    fn kind(&self) -> DataSourceKind {
-        DataSourceKind::BlobDirectory
+    fn kind(&self) -> api::DataSourceKind {
+        api::DataSourceKind::BlobDirectory
     }
 
-    fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+    fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
         None
     }
 
     fn children(
         &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>> {
+    ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>> {
         Box::new(iter::empty())
     }
 
@@ -248,9 +244,9 @@ impl DataSourceApi for BlobDirectory {
         Some(self.directory.clone())
     }
 
-    fn version(&self) -> DataSourceVersion {
+    fn version(&self) -> api::DataSourceVersion {
         // TODO: Add support for directory-as-blob-archive versioning.
-        DataSourceVersion::Unknown
+        api::DataSourceVersion::Unknown
     }
 }
 
@@ -258,28 +254,26 @@ impl DataSourceApi for BlobDirectory {
 
 #[cfg(test)]
 pub(crate) mod fake {
-    use crate::api::DataSource as DataSourceApi;
-    use crate::api::DataSourceKind;
-    use crate::api::DataSourceVersion;
+    use crate::api;
     use std::iter;
 
     #[derive(Clone, Debug, Default, Eq, PartialEq)]
     pub(crate) struct DataSource;
 
-    impl DataSourceApi for DataSource {
+    impl api::DataSource for DataSource {
         type SourcePath = &'static str;
 
-        fn kind(&self) -> DataSourceKind {
-            DataSourceKind::Unknown
+        fn kind(&self) -> api::DataSourceKind {
+            api::DataSourceKind::Unknown
         }
 
-        fn parent(&self) -> Option<Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>> {
+        fn parent(&self) -> Option<Box<dyn api::DataSource<SourcePath = Self::SourcePath>>> {
             None
         }
 
         fn children(
             &self,
-        ) -> Box<dyn Iterator<Item = Box<dyn DataSourceApi<SourcePath = Self::SourcePath>>>>
+        ) -> Box<dyn Iterator<Item = Box<dyn api::DataSource<SourcePath = Self::SourcePath>>>>
         {
             Box::new(iter::empty())
         }
@@ -288,8 +282,8 @@ pub(crate) mod fake {
             None
         }
 
-        fn version(&self) -> DataSourceVersion {
-            DataSourceVersion::Unknown
+        fn version(&self) -> api::DataSourceVersion {
+            api::DataSourceVersion::Unknown
         }
     }
 }

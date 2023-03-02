@@ -6,7 +6,7 @@
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::ComponentInstanceCapability as ComponentInstanceCapabilityApi;
+    use crate::api;
     use crate::component_capability::fake::ComponentCapability;
     use crate::component_instance::fake::ComponentInstance;
     use std::iter;
@@ -14,7 +14,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct ComponentInstanceCapability;
 
-    impl ComponentInstanceCapabilityApi for ComponentInstanceCapability {
+    impl api::ComponentInstanceCapability for ComponentInstanceCapability {
         type ComponentCapability = ComponentCapability;
         type ComponentInstance = ComponentInstance;
 
@@ -29,7 +29,7 @@ pub mod fake {
         fn source(
             &self,
         ) -> Box<
-            dyn ComponentInstanceCapabilityApi<
+            dyn api::ComponentInstanceCapability<
                 ComponentCapability = Self::ComponentCapability,
                 ComponentInstance = Self::ComponentInstance,
             >,
@@ -42,7 +42,7 @@ pub mod fake {
         ) -> Box<
             dyn Iterator<
                 Item = Box<
-                    dyn ComponentInstanceCapabilityApi<
+                    dyn api::ComponentInstanceCapability<
                         ComponentCapability = Self::ComponentCapability,
                         ComponentInstance = Self::ComponentInstance,
                     >,
@@ -59,7 +59,7 @@ pub mod fake {
                 Item = Box<
                     dyn Iterator<
                         Item = Box<
-                            dyn ComponentInstanceCapabilityApi<
+                            dyn api::ComponentInstanceCapability<
                                 ComponentCapability = Self::ComponentCapability,
                                 ComponentInstance = Self::ComponentInstance,
                             >,
@@ -78,7 +78,7 @@ pub mod fake {
                 Item = Box<
                     dyn Iterator<
                         Item = Box<
-                            dyn ComponentInstanceCapabilityApi<
+                            dyn api::ComponentInstanceCapability<
                                 ComponentCapability = Self::ComponentCapability,
                                 ComponentInstance = Self::ComponentInstance,
                             >,

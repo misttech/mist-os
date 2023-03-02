@@ -6,9 +6,7 @@
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::ComponentInstance as ComponentInstanceApi;
-    use crate::api::Environment as EnvironmentApi;
-    use crate::api::Moniker as MonikerApi;
+    use crate::api;
     use crate::component::fake::Component;
     use crate::component_instance_capability::fake::ComponentInstanceCapability;
     use std::iter;
@@ -16,7 +14,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct ComponentInstance;
 
-    impl ComponentInstanceApi for ComponentInstance {
+    impl api::ComponentInstance for ComponentInstance {
         type Moniker = Moniker;
         type Environment = Environment;
         type Component = Component;
@@ -37,7 +35,7 @@ pub mod fake {
         fn parent(
             &self,
         ) -> Box<
-            dyn ComponentInstanceApi<
+            dyn api::ComponentInstance<
                 Moniker = Self::Moniker,
                 Environment = Self::Environment,
                 Component = Self::Component,
@@ -52,7 +50,7 @@ pub mod fake {
         ) -> Box<
             dyn Iterator<
                 Item = Box<
-                    dyn ComponentInstanceApi<
+                    dyn api::ComponentInstance<
                         Moniker = Self::Moniker,
                         Environment = Self::Environment,
                         Component = Self::Component,
@@ -69,7 +67,7 @@ pub mod fake {
         ) -> Box<
             dyn Iterator<
                 Item = Box<
-                    dyn ComponentInstanceApi<
+                    dyn api::ComponentInstance<
                         Moniker = Self::Moniker,
                         Environment = Self::Environment,
                         Component = Self::Component,
@@ -86,7 +84,7 @@ pub mod fake {
         ) -> Box<
             dyn Iterator<
                 Item = Box<
-                    dyn ComponentInstanceApi<
+                    dyn api::ComponentInstance<
                         Moniker = Self::Moniker,
                         Environment = Self::Environment,
                         Component = Self::Component,
@@ -119,11 +117,11 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct Moniker;
 
-    impl MonikerApi for Moniker {}
+    impl api::Moniker for Moniker {}
 
     /// TODO(fxbug.dev/111245): Implement for production component instance API.
     #[derive(Default)]
     pub(crate) struct Environment;
 
-    impl EnvironmentApi for Environment {}
+    impl api::Environment for Environment {}
 }

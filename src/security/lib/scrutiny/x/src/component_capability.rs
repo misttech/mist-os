@@ -6,18 +6,13 @@
 
 #[cfg(test)]
 pub mod fake {
-    use crate::api::CapabilityDestination;
-    use crate::api::CapabilityKind;
-    use crate::api::CapabilitySource;
-    use crate::api::ComponentCapability as ComponentCapabilityApi;
-    use crate::api::ComponentCapabilityName as ComponentCapabilityNameApi;
-    use crate::api::ComponentCapabilityPath as ComponentCapabilityPathApi;
+    use crate::api;
     use crate::component::fake::Component;
 
     #[derive(Default)]
     pub(crate) struct ComponentCapability;
 
-    impl ComponentCapabilityApi for ComponentCapability {
+    impl api::ComponentCapability for ComponentCapability {
         type Component = Component;
         type CapabilityName = ComponentCapabilityName;
         type CapabilityPath = ComponentCapabilityPath;
@@ -26,16 +21,16 @@ pub mod fake {
             Component::default()
         }
 
-        fn kind(&self) -> CapabilityKind {
-            CapabilityKind::Unknown
+        fn kind(&self) -> api::CapabilityKind {
+            api::CapabilityKind::Unknown
         }
 
-        fn source(&self) -> CapabilitySource {
-            CapabilitySource::Unknown
+        fn source(&self) -> api::CapabilitySource {
+            api::CapabilitySource::Unknown
         }
 
-        fn destination(&self) -> CapabilityDestination {
-            CapabilityDestination::Unknown
+        fn destination(&self) -> api::CapabilityDestination {
+            api::CapabilityDestination::Unknown
         }
 
         fn source_name(&self) -> Option<Self::CapabilityName> {
@@ -59,7 +54,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct ComponentCapabilityName;
 
-    impl ComponentCapabilityNameApi for ComponentCapabilityName {
+    impl api::ComponentCapabilityName for ComponentCapabilityName {
         type ComponentCapability = ComponentCapability;
 
         fn component(&self) -> Self::ComponentCapability {
@@ -71,7 +66,7 @@ pub mod fake {
     #[derive(Default)]
     pub(crate) struct ComponentCapabilityPath;
 
-    impl ComponentCapabilityPathApi for ComponentCapabilityPath {
+    impl api::ComponentCapabilityPath for ComponentCapabilityPath {
         type ComponentCapability = ComponentCapability;
 
         fn component(&self) -> Self::ComponentCapability {
