@@ -197,15 +197,29 @@ template("fuchsia_package") {
     }
 
     if (defined(invoker.subpackages) ||
-        defined(invoker.renameable_subpackages)) {
+        defined(invoker.renameable_subpackages) ||
+        defined(invoker.test_pkg__subpackages) ||
+        defined(invoker.test_pkg__renameable_subpackages)) {
+      subpackages_list = []
+
       if (defined(invoker.renameable_subpackages)) {
         subpackages_list = invoker.renameable_subpackages
-      } else {
-        subpackages_list = []
+      }
+      if (defined(invoker.test_pkg__renameable_subpackages)) {
+        subpackages_list = invoker.test_pkg__renameable_subpackages
       }
 
       if (defined(invoker.subpackages)) {
         foreach(subpackage, invoker.subpackages) {
+          subpackages_list += [
+            {
+              package = subpackage
+            },
+          ]
+        }
+      }
+      if (defined(invoker.test_pkg__subpackages)) {
+        foreach(subpackage, invoker.test_pkg__subpackages) {
           subpackages_list += [
             {
               package = subpackage
@@ -404,6 +418,13 @@ template("fuchsia_package") {
       deps = []
       if (_validate_structured_config) {
         deps += [ ":$_validate_config_target" ]
+      }
+
+      if (defined(invoker.subpackages) ||
+          defined(invoker.renameable_subpackages)) {
+        # If the package has subpackages, make it dep on the visibilty-based
+        # allow-list.
+        deps += [ "//build/packages:allowed_to_use_subpackages" ]
       }
 
       if (_is_driver_package) {

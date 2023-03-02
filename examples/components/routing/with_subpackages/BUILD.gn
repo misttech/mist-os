@@ -14,6 +14,7 @@ group("subpackaged-echo-realm") {
 }
 
 fuchsia_package_with_default_component("subpackaged_echo_realm_rust") {
+  testonly = true
   manifest = "meta/subpackaged_echo_realm.cml"
   subpackages = [
     "../rust/echo_client",
@@ -22,6 +23,7 @@ fuchsia_package_with_default_component("subpackaged_echo_realm_rust") {
 }
 
 fuchsia_package_with_default_component("subpackaged_echo_realm_cpp") {
+  testonly = true
   manifest = "meta/subpackaged_echo_realm.cml"
   subpackages = [
     "../cpp/echo_client",

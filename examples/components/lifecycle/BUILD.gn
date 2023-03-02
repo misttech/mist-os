@@ -15,6 +15,7 @@ group("lifecycle-example") {
 }
 
 fuchsia_package("lifecycle-example-cpp") {
+  testonly = true
   deps = [ "cpp:manager-component" ]
   renameable_subpackages = [
     {
@@ -28,6 +29,7 @@ fuchsia_package("lifecycle-example-cpp") {
 }
 
 fuchsia_package("lifecycle-example-rust") {
+  testonly = true
   deps = [ "rust:manager-component" ]
   renameable_subpackages = [
     {

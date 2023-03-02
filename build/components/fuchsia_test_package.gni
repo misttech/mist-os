@@ -187,8 +187,6 @@ template("fuchsia_test_package") {
                                "deps",
                                "disable_elf_binaries_checks",
                                "metadata",
-                               "renameable_subpackages",
-                               "subpackages",
                                "visibility",
                              ])
       package_name = package_name
@@ -198,6 +196,16 @@ template("fuchsia_test_package") {
       deps += invoker.test_components
       deps += test_deps
       testonly = true
+
+      # Pass subpackages through a different parameter than the documented one,
+      # so that the fuchsia_package() can identify these as from a test package.
+      # This is only for allow-list enforcement
+      if (defined(invoker.subpackages)) {
+        test_pkg__subpackages = invoker.subpackages
+      }
+      if (defined(invoker.renameable_subpackages)) {
+        test_pkg__renameable_subpackages = invoker.renameable_subpackages
+      }
 
       validate_structured_config = _validate_structured_config
     }

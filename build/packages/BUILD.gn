@@ -22,3 +22,36 @@ group("json_validator") {
   testonly = true
   public_deps = [ "//build/tools/json_validator:install" ]
 }
+
+#  ________  _________  ________  ________
+# |\   ____\|\___   ___\\   __  \|\   __  \
+# \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+#  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+#   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+#     ____\_\  \   \ \__\ \ \_______\ \__\
+#    |\_________\   \|__|  \|_______|\|__|
+#    \|_________|
+#
+# This is an allow-list for package targets that are not fuchsia_test_package()
+# invocations that can use subpackages.  The use of  subpackages is being
+# restricted in-tree until we finish verifying that all workflows that use
+# packages have been validated to work correctly with subpackages.
+#
+group("allowed_to_use_subpackages") {
+  visibility = [
+    "//examples/components/lifecycle:lifecycle-example-cpp",
+    "//examples/components/lifecycle:lifecycle-example-rust",
+    "//examples/components/routing/with_subpackages:subpackaged_echo_realm_cpp",
+    "//examples/components/routing/with_subpackages:subpackaged_echo_realm_rust",
+    "//examples/components/routing_failed:components-routing-failed-example-cpp",
+    "//examples/components/routing_failed:components-routing-failed-example-rust",
+    "//examples/components/subpackages:echo_client_with_subpackaged_server",
+    "//src/performance/trace_manager:trace_manager_pkg",
+    "//src/sys/pkg/lib/fuchsia-pkg:package_for_archive",
+    "//src/tests/microbenchmarks:starnix_microbenchmarks_perftestmode",
+    "//src/virtualization/bin/guest_manager:debian_guest_manager",
+    "//src/virtualization/bin/guest_manager:zircon_guest_manager",
+    "//src/virtualization/bin/guest_manager_rs:debian_guest_manager_rs",
+    "//src/virtualization/bin/termina_guest_manager:termina_guest_manager",
+  ]
+}

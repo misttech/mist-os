@@ -21,6 +21,7 @@ fuchsia_package_with_default_component("echo_server_bad") {
 
 fuchsia_package_with_default_component(
     "components-routing-failed-example-rust") {
+  testonly = true
   manifest = "meta/echo_realm.cml"
   subpackages = [
     ":echo_server_bad",
@@ -31,6 +32,7 @@ fuchsia_package_with_default_component(
 
 fuchsia_package_with_default_component(
     "components-routing-failed-example-cpp") {
+  testonly = true
   manifest = "meta/echo_realm.cml"
   subpackages = [
     ":echo_server_bad",

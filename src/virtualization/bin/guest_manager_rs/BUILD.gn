@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 group("packages") {
+  testonly = true
   deps = [ ":debian_guest_manager_rs" ]
 }
 
@@ -69,6 +70,7 @@ fuchsia_component("debian_guest_manager_cmp") {
 }
 
 fuchsia_package("debian_guest_manager_rs") {
+  testonly = true
   deps = [ ":debian_guest_manager_cmp" ]
   subpackages = [ "//src/virtualization/packages/debian_guest" ]
 }

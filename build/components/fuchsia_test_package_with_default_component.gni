@@ -124,4 +124,11 @@ template("fuchsia_test_package_with_default_component") {
     package_name = package_name
     test_components = [ ":$component_target" ]
   }
+
+  # Asserting testonly is superfluous, as the templates called will also set it
+  # to true.
+  if (defined(invoker.testonly)) {
+    assert(invoker.testonly, "test packages must always be 'testonly=true'")
+    not_needed(invoker, [ "testonly" ])
+  }
 }

@@ -81,6 +81,7 @@ group("trace_manager") {
   deps = []
 }
 fuchsia_package_with_single_component("trace_manager_pkg") {
+  testonly = true
   manifest = "meta/trace_manager.cml"
   component_name = "trace_manager"
   package_name = "trace_manager"
