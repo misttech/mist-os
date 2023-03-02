@@ -64,7 +64,7 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
   };
 
   std::array offers = {
-      fidl::DiscoverableProtocolName<fpci::Device>,
+      fpci::Service::Name,
   };
 
   zx::result result = fidl_dev->outgoing_dir().AddService<fuchsia_hardware_pci::Service>(
