@@ -134,7 +134,7 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
   }
 
   const std::string role_selector{request->role.get()};
-  FX_SLOG(INFO, "Role requested", KV("ProfileProvider", role_selector.c_str()),
+  FX_SLOG(DEBUG, "Role requested", KV("ProfileProvider", role_selector.c_str()),
           KV("pid", handle_info.related_koid), KV("tid", handle_info.koid),
           KV("tag", "ProfileProvider"));
 
@@ -176,7 +176,7 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     info.deadline_params.relative_deadline = media_role->deadline;
     info.deadline_params.period = media_role->deadline;
   } else {
-    FX_SLOG(WARNING, "Requested role not found", KV("role", role_result->name.c_str()),
+    FX_SLOG(DEBUG, "Requested role not found", KV("role", role_result->name.c_str()),
             KV("tag", "ProfileProvider"));
     return completer.Reply(ZX_ERR_NOT_FOUND);
   }
