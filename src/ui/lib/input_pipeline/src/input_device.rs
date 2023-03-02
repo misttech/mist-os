@@ -227,15 +227,9 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
 /// - `input_device`: The InputDevice to check the type of.
 /// - `device_type`: The type of the device to compare to.
 pub async fn is_device_type(
-    input_device: &fidl_input_report::InputDeviceProxy,
+    device_descriptor: &fidl_input_report::DeviceDescriptor,
     device_type: InputDeviceType,
 ) -> bool {
-    let device_descriptor = match input_device.get_descriptor().await {
-        Ok(descriptor) => descriptor,
-        Err(_) => {
-            return false;
-        }
-    };
     // Return if the device type matches the desired `device_type`.
     match device_type {
         InputDeviceType::ConsumerControls => device_descriptor.consumer_control.is_some(),
@@ -419,275 +413,348 @@ mod tests {
     // consumer controls device exists.
     #[fasync::run_singlethreaded(test)]
     async fn consumer_controls_input_device_exists() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: None,
-                        sensor: None,
-                        touch: None,
-                        keyboard: None,
-                        consumer_control: Some(fidl_input_report::ConsumerControlDescriptor {
-                            input: Some(fidl_input_report::ConsumerControlInputDescriptor {
-                                buttons: Some(vec![
-                                    fidl_input_report::ConsumerControlButton::VolumeUp,
-                                    fidl_input_report::ConsumerControlButton::VolumeDown,
-                                ]),
-                                ..fidl_input_report::ConsumerControlInputDescriptor::EMPTY
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: None,
+                            sensor: None,
+                            touch: None,
+                            keyboard: None,
+                            consumer_control: Some(fidl_input_report::ConsumerControlDescriptor {
+                                input: Some(fidl_input_report::ConsumerControlInputDescriptor {
+                                    buttons: Some(vec![
+                                        fidl_input_report::ConsumerControlButton::VolumeUp,
+                                        fidl_input_report::ConsumerControlButton::VolumeDown,
+                                    ]),
+                                    ..fidl_input_report::ConsumerControlInputDescriptor::EMPTY
+                                }),
+                                ..fidl_input_report::ConsumerControlDescriptor::EMPTY
                             }),
-                            ..fidl_input_report::ConsumerControlDescriptor::EMPTY
-                        }),
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::ConsumerControls).await);
+        assert!(
+            is_device_type(
+                &input_device_proxy
+                    .get_descriptor()
+                    .await
+                    .expect("Failed to get device descriptor"),
+                InputDeviceType::ConsumerControls
+            )
+            .await
+        );
     }
 
     // Tests that is_device_type() returns true for InputDeviceType::Mouse when a mouse exists.
     #[fasync::run_singlethreaded(test)]
     async fn mouse_input_device_exists() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: Some(fidl_input_report::MouseDescriptor {
-                            input: Some(fidl_input_report::MouseInputDescriptor {
-                                movement_x: None,
-                                movement_y: None,
-                                position_x: None,
-                                position_y: None,
-                                scroll_v: None,
-                                scroll_h: None,
-                                buttons: None,
-                                ..fidl_input_report::MouseInputDescriptor::EMPTY
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: Some(fidl_input_report::MouseDescriptor {
+                                input: Some(fidl_input_report::MouseInputDescriptor {
+                                    movement_x: None,
+                                    movement_y: None,
+                                    position_x: None,
+                                    position_y: None,
+                                    scroll_v: None,
+                                    scroll_h: None,
+                                    buttons: None,
+                                    ..fidl_input_report::MouseInputDescriptor::EMPTY
+                                }),
+                                ..fidl_input_report::MouseDescriptor::EMPTY
                             }),
-                            ..fidl_input_report::MouseDescriptor::EMPTY
-                        }),
-                        sensor: None,
-                        touch: None,
-                        keyboard: None,
-                        consumer_control: None,
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+                            sensor: None,
+                            touch: None,
+                            keyboard: None,
+                            consumer_control: None,
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::Mouse).await);
+        assert!(
+            is_device_type(
+                &input_device_proxy
+                    .get_descriptor()
+                    .await
+                    .expect("Failed to get device descriptor"),
+                InputDeviceType::Mouse
+            )
+            .await
+        );
     }
 
     // Tests that is_device_type() returns true for InputDeviceType::Mouse when a mouse doesn't
     // exist.
     #[fasync::run_singlethreaded(test)]
     async fn mouse_input_device_doesnt_exist() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: None,
-                        sensor: None,
-                        touch: None,
-                        keyboard: None,
-                        consumer_control: None,
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: None,
+                            sensor: None,
+                            touch: None,
+                            keyboard: None,
+                            consumer_control: None,
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(!is_device_type(&input_device_proxy, InputDeviceType::Mouse).await);
+        assert!(
+            !is_device_type(
+                &input_device_proxy
+                    .get_descriptor()
+                    .await
+                    .expect("Failed to get device descriptor"),
+                InputDeviceType::Mouse
+            )
+            .await
+        );
     }
 
     // Tests that is_device_type() returns true for InputDeviceType::Touch when a touchscreen
     // exists.
     #[fasync::run_singlethreaded(test)]
     async fn touch_input_device_exists() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: None,
-                        sensor: None,
-                        touch: Some(fidl_input_report::TouchDescriptor {
-                            input: Some(fidl_input_report::TouchInputDescriptor {
-                                contacts: None,
-                                max_contacts: None,
-                                touch_type: None,
-                                buttons: None,
-                                ..fidl_input_report::TouchInputDescriptor::EMPTY
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: None,
+                            sensor: None,
+                            touch: Some(fidl_input_report::TouchDescriptor {
+                                input: Some(fidl_input_report::TouchInputDescriptor {
+                                    contacts: None,
+                                    max_contacts: None,
+                                    touch_type: None,
+                                    buttons: None,
+                                    ..fidl_input_report::TouchInputDescriptor::EMPTY
+                                }),
+                                ..fidl_input_report::TouchDescriptor::EMPTY
                             }),
-                            ..fidl_input_report::TouchDescriptor::EMPTY
-                        }),
-                        keyboard: None,
-                        consumer_control: None,
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+                            keyboard: None,
+                            consumer_control: None,
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::Touch).await);
+        assert!(
+            is_device_type(
+                &input_device_proxy
+                    .get_descriptor()
+                    .await
+                    .expect("Failed to get device descriptor"),
+                InputDeviceType::Touch
+            )
+            .await
+        );
     }
 
     // Tests that is_device_type() returns true for InputDeviceType::Touch when a touchscreen
     // exists.
     #[fasync::run_singlethreaded(test)]
     async fn touch_input_device_doesnt_exist() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: None,
-                        sensor: None,
-                        touch: None,
-                        keyboard: None,
-                        consumer_control: None,
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: None,
+                            sensor: None,
+                            touch: None,
+                            keyboard: None,
+                            consumer_control: None,
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(!is_device_type(&input_device_proxy, InputDeviceType::Touch).await);
+        assert!(
+            !is_device_type(
+                &input_device_proxy
+                    .get_descriptor()
+                    .await
+                    .expect("Failed to get device descriptor"),
+                InputDeviceType::Touch
+            )
+            .await
+        );
     }
 
     // Tests that is_device_type() returns true for InputDeviceType::Keyboard when a keyboard
     // exists.
     #[fasync::run_singlethreaded(test)]
     async fn keyboard_input_device_exists() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: None,
-                        sensor: None,
-                        touch: None,
-                        keyboard: Some(fidl_input_report::KeyboardDescriptor {
-                            input: Some(fidl_input_report::KeyboardInputDescriptor {
-                                keys3: None,
-                                ..fidl_input_report::KeyboardInputDescriptor::EMPTY
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: None,
+                            sensor: None,
+                            touch: None,
+                            keyboard: Some(fidl_input_report::KeyboardDescriptor {
+                                input: Some(fidl_input_report::KeyboardInputDescriptor {
+                                    keys3: None,
+                                    ..fidl_input_report::KeyboardInputDescriptor::EMPTY
+                                }),
+                                output: None,
+                                ..fidl_input_report::KeyboardDescriptor::EMPTY
                             }),
-                            output: None,
-                            ..fidl_input_report::KeyboardDescriptor::EMPTY
-                        }),
-                        consumer_control: None,
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+                            consumer_control: None,
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::Keyboard).await);
+        assert!(
+            is_device_type(
+                &input_device_proxy
+                    .get_descriptor()
+                    .await
+                    .expect("Failed to get device descriptor"),
+                InputDeviceType::Keyboard
+            )
+            .await
+        );
     }
 
     // Tests that is_device_type() returns true for InputDeviceType::Keyboard when a keyboard
     // exists.
     #[fasync::run_singlethreaded(test)]
     async fn keyboard_input_device_doesnt_exist() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: None,
-                        sensor: None,
-                        touch: None,
-                        keyboard: None,
-                        consumer_control: None,
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: None,
+                            sensor: None,
+                            touch: None,
+                            keyboard: None,
+                            consumer_control: None,
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(!is_device_type(&input_device_proxy, InputDeviceType::Keyboard).await);
+        assert!(
+            !is_device_type(
+                &input_device_proxy
+                    .get_descriptor()
+                    .await
+                    .expect("Failed to get device descriptor"),
+                InputDeviceType::Keyboard
+            )
+            .await
+        );
     }
 
     // Tests that is_device_type() returns true for every input device type that exists.
     #[fasync::run_singlethreaded(test)]
     async fn no_input_device_match() {
-        let input_device_proxy = spawn_stream_handler(move |input_device_request| async move {
-            match input_device_request {
-                fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
-                    let _ = responder.send(fidl_input_report::DeviceDescriptor {
-                        device_info: None,
-                        mouse: Some(fidl_input_report::MouseDescriptor {
-                            input: Some(fidl_input_report::MouseInputDescriptor {
-                                movement_x: None,
-                                movement_y: None,
-                                position_x: None,
-                                position_y: None,
-                                scroll_v: None,
-                                scroll_h: None,
-                                buttons: None,
-                                ..fidl_input_report::MouseInputDescriptor::EMPTY
+        let input_device_proxy: fidl_input_report::InputDeviceProxy =
+            spawn_stream_handler(move |input_device_request| async move {
+                match input_device_request {
+                    fidl_input_report::InputDeviceRequest::GetDescriptor { responder } => {
+                        let _ = responder.send(fidl_input_report::DeviceDescriptor {
+                            device_info: None,
+                            mouse: Some(fidl_input_report::MouseDescriptor {
+                                input: Some(fidl_input_report::MouseInputDescriptor {
+                                    movement_x: None,
+                                    movement_y: None,
+                                    position_x: None,
+                                    position_y: None,
+                                    scroll_v: None,
+                                    scroll_h: None,
+                                    buttons: None,
+                                    ..fidl_input_report::MouseInputDescriptor::EMPTY
+                                }),
+                                ..fidl_input_report::MouseDescriptor::EMPTY
                             }),
-                            ..fidl_input_report::MouseDescriptor::EMPTY
-                        }),
-                        sensor: None,
-                        touch: Some(fidl_input_report::TouchDescriptor {
-                            input: Some(fidl_input_report::TouchInputDescriptor {
-                                contacts: None,
-                                max_contacts: None,
-                                touch_type: None,
-                                buttons: None,
-                                ..fidl_input_report::TouchInputDescriptor::EMPTY
+                            sensor: None,
+                            touch: Some(fidl_input_report::TouchDescriptor {
+                                input: Some(fidl_input_report::TouchInputDescriptor {
+                                    contacts: None,
+                                    max_contacts: None,
+                                    touch_type: None,
+                                    buttons: None,
+                                    ..fidl_input_report::TouchInputDescriptor::EMPTY
+                                }),
+                                ..fidl_input_report::TouchDescriptor::EMPTY
                             }),
-                            ..fidl_input_report::TouchDescriptor::EMPTY
-                        }),
-                        keyboard: Some(fidl_input_report::KeyboardDescriptor {
-                            input: Some(fidl_input_report::KeyboardInputDescriptor {
-                                keys3: None,
-                                ..fidl_input_report::KeyboardInputDescriptor::EMPTY
+                            keyboard: Some(fidl_input_report::KeyboardDescriptor {
+                                input: Some(fidl_input_report::KeyboardInputDescriptor {
+                                    keys3: None,
+                                    ..fidl_input_report::KeyboardInputDescriptor::EMPTY
+                                }),
+                                output: None,
+                                ..fidl_input_report::KeyboardDescriptor::EMPTY
                             }),
-                            output: None,
-                            ..fidl_input_report::KeyboardDescriptor::EMPTY
-                        }),
-                        consumer_control: Some(fidl_input_report::ConsumerControlDescriptor {
-                            input: Some(fidl_input_report::ConsumerControlInputDescriptor {
-                                buttons: Some(vec![
-                                    fidl_input_report::ConsumerControlButton::VolumeUp,
-                                    fidl_input_report::ConsumerControlButton::VolumeDown,
-                                ]),
-                                ..fidl_input_report::ConsumerControlInputDescriptor::EMPTY
+                            consumer_control: Some(fidl_input_report::ConsumerControlDescriptor {
+                                input: Some(fidl_input_report::ConsumerControlInputDescriptor {
+                                    buttons: Some(vec![
+                                        fidl_input_report::ConsumerControlButton::VolumeUp,
+                                        fidl_input_report::ConsumerControlButton::VolumeDown,
+                                    ]),
+                                    ..fidl_input_report::ConsumerControlInputDescriptor::EMPTY
+                                }),
+                                ..fidl_input_report::ConsumerControlDescriptor::EMPTY
                             }),
-                            ..fidl_input_report::ConsumerControlDescriptor::EMPTY
-                        }),
-                        ..fidl_input_report::DeviceDescriptor::EMPTY
-                    });
+                            ..fidl_input_report::DeviceDescriptor::EMPTY
+                        });
+                    }
+                    _ => panic!("InputDevice handler received an unexpected request"),
                 }
-                _ => panic!("InputDevice handler received an unexpected request"),
-            }
-        })
-        .unwrap();
+            })
+            .unwrap();
 
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::ConsumerControls).await);
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::Mouse).await);
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::Touch).await);
-        assert!(is_device_type(&input_device_proxy, InputDeviceType::Keyboard).await);
+        let device_descriptor =
+            &input_device_proxy.get_descriptor().await.expect("Failed to get device descriptor");
+        assert!(is_device_type(&device_descriptor, InputDeviceType::ConsumerControls).await);
+        assert!(is_device_type(&device_descriptor, InputDeviceType::Mouse).await);
+        assert!(is_device_type(&device_descriptor, InputDeviceType::Touch).await);
+        assert!(is_device_type(&device_descriptor, InputDeviceType::Keyboard).await);
     }
 
     #[fuchsia::test]

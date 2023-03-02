@@ -558,15 +558,25 @@ async fn add_device_bindings(
     device_id: u32,
 ) {
     let mut matched_device_types = vec![];
-    for device_type in device_types {
-        if input_device::is_device_type(&device_proxy, *device_type).await {
-            matched_device_types.push(device_type);
+    if let Ok(descriptor) = device_proxy.get_descriptor().await {
+        for device_type in device_types {
+            if input_device::is_device_type(&descriptor, *device_type).await {
+                matched_device_types.push(device_type);
+            }
         }
-    }
-    if matched_device_types.is_empty() {
-        fx_log_info!("device {} did not match any supported device types", filename);
+        if matched_device_types.is_empty() {
+            fx_log_info!(
+                "device {} did not match any supported device types: {:?}",
+                filename,
+                device_types
+            );
+            return;
+        }
+    } else {
+        fx_log_err!("cannot bind device {} without a device descriptor", filename);
         return;
     }
+
     fx_log_info!(
         "binding {} to device types: {}",
         filename,
