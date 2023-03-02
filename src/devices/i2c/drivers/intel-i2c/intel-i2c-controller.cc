@@ -99,8 +99,8 @@ zx_status_t IntelI2cController::Init() {
 
   uint16_t vendor_id;
   uint16_t device_id;
-  pci_.ReadConfig16(PCI_CONFIG_VENDOR_ID, &vendor_id);
-  pci_.ReadConfig16(PCI_CONFIG_DEVICE_ID, &device_id);
+  pci_.ReadConfig16(fuchsia_hardware_pci::Config::kVendorId, &vendor_id);
+  pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id);
 
   zx_status_t status = pci_.MapMmio(0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_);
   if (status != ZX_OK) {

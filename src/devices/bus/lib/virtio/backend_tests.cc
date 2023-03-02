@@ -244,11 +244,12 @@ class VirtioTests : public zxtest::Test {
   // Even in the fake device we have to deal with registers being in different
   // places depending on whether MSI has been enabled or not.
   uint16_t LegacyDeviceCfgOffset() {
-    pci_interrupt_mode_t interrupt_mode;
+    fuchsia_hardware_pci::InterruptMode interrupt_mode;
     interrupt_mode =
         async_.SyncCall([](AsyncState* async) { return async->fake_pci.GetIrqMode(); });
-    return (interrupt_mode == PCI_INTERRUPT_MODE_MSI_X) ? VIRTIO_PCI_CONFIG_OFFSET_MSIX
-                                                        : VIRTIO_PCI_CONFIG_OFFSET_NOMSIX;
+    return (interrupt_mode == fuchsia_hardware_pci::InterruptMode::kMsiX)
+               ? VIRTIO_PCI_CONFIG_OFFSET_MSIX
+               : VIRTIO_PCI_CONFIG_OFFSET_NOMSIX;
   }
 
   void SetUpLegacyQueue() { bars_[kLegacyBar]->Write(kQueueSize, VIRTIO_PCI_QUEUE_SIZE); }
@@ -410,7 +411,7 @@ TEST_F(VirtioTests, LegacyMsiX) {
 
   // Verify MSI-X state
   ASSERT_EQ(async_state().SyncCall([](AsyncState* async) { return async->fake_pci.GetIrqMode(); }),
-            PCI_INTERRUPT_MODE_MSI_X);
+            fuchsia_hardware_pci::InterruptMode::kMsiX);
   uint16_t value{};
   value = bars()[kLegacyBar]->Read16(VIRTIO_PCI_MSI_CONFIG_VECTOR);
   ASSERT_EQ(value, virtio::PciBackend::kMsiConfigVector);

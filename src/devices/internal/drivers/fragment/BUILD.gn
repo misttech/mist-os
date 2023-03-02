@@ -4,7 +4,6 @@
 
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 
 driver_bind_rules("fragment-bind") {
   header_output = "fragment-bind.h"
@@ -19,14 +18,7 @@ fuchsia_driver("fragment-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
 
-  if (platform_enable_user_pci) {
-    defines = [ "ENABLE_USER_PCI" ]
-  }
-
-  sources = [
-    "fragment-pci.cc",
-    "fragment.cc",
-  ]
+  sources = [ "fragment.cc" ]
   deps = [
     ":fragment-bind",
     "//sdk/banjo/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_banjo_cpp",
@@ -61,7 +53,6 @@ fuchsia_driver("fragment-driver") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
@@ -104,14 +95,7 @@ fuchsia_driver("fragment.proxy-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
 
-  if (platform_enable_user_pci) {
-    defines = [ "ENABLE_USER_PCI" ]
-  }
-
-  sources = [
-    "fragment-proxy-pci.cc",
-    "fragment-proxy.cc",
-  ]
+  sources = [ "fragment-proxy.cc" ]
   deps = [
     ":fragment-proxy-bind",
     "//sdk/banjo/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_banjo_cpp",
@@ -133,7 +117,6 @@ fuchsia_driver("fragment.proxy-driver") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",

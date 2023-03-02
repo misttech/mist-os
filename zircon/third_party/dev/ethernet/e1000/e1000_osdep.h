@@ -38,7 +38,6 @@
 
 #include <assert.h>
 #include <fuchsia/hardware/ethernet/c/banjo.h>
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -48,6 +47,7 @@
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/pci/hw.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

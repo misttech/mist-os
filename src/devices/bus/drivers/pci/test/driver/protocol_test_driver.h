@@ -5,7 +5,6 @@
 #define SRC_DEVICES_BUS_DRIVERS_PCI_TEST_DRIVER_PROTOCOL_TEST_DRIVER_H_
 
 #include <fidl/fuchsia.device.test/cpp/wire.h>
-#include <fuchsia/hardware/pci/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pci.h>
 

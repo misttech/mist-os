@@ -4,7 +4,6 @@
 
 #include "src/devices/bus/drivers/pci/kpci.h"
 
-#include <fuchsia/hardware/pci/cpp/banjo.h>
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
@@ -32,7 +31,6 @@
 
 #include "lib/fidl/cpp/wire/connect_service.h"
 #include "src/devices/bus/drivers/pci/pci_bind.h"
-#include "src/devices/bus/drivers/pci/proxy_rpc.h"
 #include "zircon/system/ulib/async-loop/include/lib/async-loop/loop.h"
 
 namespace fpci = ::fuchsia_hardware_pci;
@@ -90,7 +88,7 @@ zx_status_t pci_get_next_capability(kpci_device* device, uint8_t cap_id, uint8_t
   // since it contains 0x34 which ppints to the start of the list. Otherwise, we
   // have an existing capability's offset and need to advance one byte to its
   // next pointer.
-  if (offset != PCI_CONFIG_CAPABILITIES_PTR) {
+  if (offset != fidl::ToUnderlying(fuchsia_hardware_pci::Config::kCapabilitiesPtr)) {
     offset++;
   }
 
@@ -163,143 +161,6 @@ static const device_fragment_part_t sysmem_fidl_fragment[] = {
     {std::size(sysmem_fidl_fragment_match), sysmem_fidl_fragment_match},
 };
 
-zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, bool uses_acpi) {
-  auto pci_bind_topo = static_cast<uint32_t>(
-      BIND_PCI_TOPO_PACK(device.info.bus_id, device.info.dev_id, device.info.func_id));
-  zx_device_prop_t fragment_props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_PCI},
-      {BIND_PCI_VID, 0, device.info.vendor_id},
-      {BIND_PCI_DID, 0, device.info.device_id},
-      {BIND_PCI_CLASS, 0, device.info.base_class},
-      {BIND_PCI_SUBCLASS, 0, device.info.sub_class},
-      {BIND_PCI_INTERFACE, 0, device.info.program_interface},
-      {BIND_PCI_REVISION, 0, device.info.revision_id},
-      {BIND_PCI_TOPO, 0, pci_bind_topo},
-  };
-
-  auto kpci = std::unique_ptr<KernelPci>(new KernelPci(parent, device));
-  zx_status_t status = kpci->DdkAdd(
-      ddk::DeviceAddArgs(device.name).set_props(fragment_props).set_proto_id(ZX_PROTOCOL_PCI));
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // DFv2 does not support dynamic binding yet, so we have to specify the bind
-  // rules in C++ rather than in a bind file.
-  const zx_bind_inst_t pci_fragment_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_PCI),
-      BI_ABORT_IF(NE, BIND_PCI_VID, device.info.vendor_id),
-      BI_ABORT_IF(NE, BIND_PCI_DID, device.info.device_id),
-      BI_ABORT_IF(NE, BIND_PCI_CLASS, device.info.base_class),
-      BI_ABORT_IF(NE, BIND_PCI_SUBCLASS, device.info.sub_class),
-      BI_ABORT_IF(NE, BIND_PCI_INTERFACE, device.info.program_interface),
-      BI_ABORT_IF(NE, BIND_PCI_REVISION, device.info.revision_id),
-      BI_ABORT_IF(EQ, BIND_COMPOSITE, 1),
-      BI_MATCH_IF(EQ, BIND_PCI_TOPO, pci_bind_topo),
-  };
-
-  const device_fragment_part_t pci_fragment[] = {
-      {std::size(pci_fragment_match), pci_fragment_match},
-  };
-
-  const zx_bind_inst_t acpi_fragment_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_ACPI),
-      BI_ABORT_IF(NE, BIND_ACPI_BUS_TYPE, bind_fuchsia_acpi::BIND_ACPI_BUS_TYPE_PCI),
-      BI_MATCH_IF(EQ, BIND_PCI_TOPO, pci_bind_topo),
-  };
-
-  const device_fragment_part_t acpi_fragment[] = {
-      {std::size(acpi_fragment_match), acpi_fragment_match},
-  };
-
-  const device_fragment_t fragments[] = {
-      {"sysmem", std::size(sysmem_fragment), sysmem_fragment},
-      {"sysmem-fidl", std::size(sysmem_fidl_fragment), sysmem_fidl_fragment},
-      {"pci", std::size(pci_fragment), pci_fragment},
-      {"acpi", std::size(acpi_fragment), acpi_fragment},
-  };
-  zx_device_prop_t composite_props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_PCI},
-      {BIND_PCI_VID, 0, device.info.vendor_id},
-      {BIND_PCI_DID, 0, device.info.device_id},
-      {BIND_PCI_CLASS, 0, device.info.base_class},
-      {BIND_PCI_SUBCLASS, 0, device.info.sub_class},
-      {BIND_PCI_INTERFACE, 0, device.info.program_interface},
-      {BIND_PCI_REVISION, 0, device.info.revision_id},
-      {BIND_PCI_TOPO, 0, pci_bind_topo},
-  };
-
-  composite_device_desc_t composite_desc = {
-      .props = composite_props,
-      .props_count = std::size(composite_props),
-      .fragments = fragments,
-      .fragments_count = uses_acpi ? std::size(fragments) : std::size(fragments) - 1,
-      .primary_fragment = "pci",
-      .spawn_colocated = false,
-  };
-
-  char composite_name[ZX_DEVICE_NAME_MAX];
-  snprintf(composite_name, sizeof(composite_name), "pci-%s", device.name);
-  auto kpci_composite = std::unique_ptr<KernelPci>(new KernelPci(parent, device));
-  status = kpci_composite->DdkAddComposite(composite_name, &composite_desc);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  static_cast<void>(kpci_composite.release());
-  static_cast<void>(kpci.release());
-  return status;
-}
-
-zx_status_t KernelPci::DdkGetProtocol(uint32_t proto_id, void* out) {
-  switch (proto_id) {
-    case ZX_PROTOCOL_PCI: {
-      auto proto = static_cast<pci_protocol_t*>(out);
-      proto->ctx = this;
-      proto->ops = &pci_protocol_ops_;
-      return ZX_OK;
-    }
-  }
-
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-void KernelPci::DdkRelease() {
-  if (device_.handle != ZX_HANDLE_INVALID) {
-    zx_handle_close(device_.handle);
-  }
-}
-
-zx_status_t KernelPci::PciGetBar(uint32_t bar_id, pci_bar_t* out_res) {
-  return pci_get_bar(&device_, bar_id, out_res);
-}
-
-zx_status_t KernelPci::PciSetBusMastering(bool enable) {
-  return zx_pci_enable_bus_master(device_.handle, enable);
-}
-
-zx_status_t KernelPci::PciResetDevice() { return zx_pci_reset_device(device_.handle); }
-
-zx_status_t KernelPci::PciAckInterrupt() { return ZX_OK; }
-
-zx_status_t KernelPci::PciMapInterrupt(uint32_t which_irq, zx::interrupt* out_handle) {
-  return zx_pci_map_interrupt(device_.handle, which_irq, out_handle->reset_and_get_address());
-}
-
-void KernelPci::PciGetInterruptModes(pci_interrupt_modes_t* out_modes) {
-  return pci_get_interrupt_modes(&device_, out_modes);
-}
-
-zx_status_t KernelPci::PciSetInterruptMode(pci_interrupt_mode_t mode,
-                                           uint32_t requested_irq_count) {
-  return zx_pci_set_irq_mode(device_.handle, mode, requested_irq_count);
-}
-
-zx_status_t KernelPci::PciGetDeviceInfo(pci_device_info_t* out_info) {
-  pci_get_device_info(&device_, out_info);
-  return ZX_OK;
-}
-
 template <typename T>
 zx_status_t ReadConfig(zx_handle_t device, uint16_t offset, T* out_value) {
   uint32_t value;
@@ -308,50 +169,6 @@ zx_status_t ReadConfig(zx_handle_t device, uint16_t offset, T* out_value) {
     *out_value = static_cast<T>(value);
   }
   return st;
-}
-
-zx_status_t KernelPci::PciReadConfig8(uint16_t offset, uint8_t* out_value) {
-  return ReadConfig(device_.handle, offset, out_value);
-}
-
-zx_status_t KernelPci::PciReadConfig16(uint16_t offset, uint16_t* out_value) {
-  return ReadConfig(device_.handle, offset, out_value);
-}
-
-zx_status_t KernelPci::PciReadConfig32(uint16_t offset, uint32_t* out_value) {
-  return ReadConfig(device_.handle, offset, out_value);
-}
-zx_status_t KernelPci::PciWriteConfig8(uint16_t offset, uint8_t value) {
-  return zx_pci_config_write(device_.handle, offset, sizeof(value), value);
-}
-
-zx_status_t KernelPci::PciWriteConfig16(uint16_t offset, uint16_t value) {
-  return zx_pci_config_write(device_.handle, offset, sizeof(value), value);
-}
-
-zx_status_t KernelPci::PciWriteConfig32(uint16_t offset, uint32_t value) {
-  return zx_pci_config_write(device_.handle, offset, sizeof(value), value);
-}
-
-zx_status_t KernelPci::PciGetFirstCapability(uint8_t cap_id, uint8_t* out_offset) {
-  return PciGetNextCapability(cap_id, PCI_CONFIG_CAPABILITIES_PTR, out_offset);
-}
-
-zx_status_t KernelPci::PciGetNextCapability(uint8_t cap_id, uint8_t offset, uint8_t* out_offset) {
-  return pci_get_next_capability(&device_, cap_id, offset, out_offset);
-}
-
-zx_status_t KernelPci::PciGetFirstExtendedCapability(uint16_t cap_id, uint16_t* out_offset) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t KernelPci::PciGetNextExtendedCapability(uint16_t cap_id, uint16_t offset,
-                                                    uint16_t* out_offset) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t KernelPci::PciGetBti(uint32_t index, zx::bti* out_bti) {
-  return pci_get_bti(&device_, index, out_bti);
 }
 
 // Initializes the upper half of a pci / pci.proxy devhost pair.
@@ -404,13 +221,6 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
            device.info.dev_id, device.info.func_id);
   status = KernelPci::CreateComposite(parent, device, uses_acpi);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to create kPCI for %#02x:%#02x.%1x (%#04x:%#04x)", info.bus_id,
-           info.dev_id, info.func_id, info.vendor_id, info.device_id);
-    return status;
-  }
-
-  status = KernelPciFidl::CreateComposite(parent, device, uses_acpi);
-  if (status != ZX_OK) {
     zxlogf(ERROR, "failed to create FIDL kPCI for %#02x:%#02x.%1x (%#04x:%#04x)", info.bus_id,
            info.dev_id, info.func_id, info.vendor_id, info.device_id);
     return status;
@@ -419,8 +229,7 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
   return status;
 }
 
-zx_status_t KernelPciFidl::CreateComposite(zx_device_t* parent, kpci_device device,
-                                           bool uses_acpi) {
+zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, bool uses_acpi) {
   auto pci_bind_topo = static_cast<uint32_t>(
       BIND_PCI_TOPO_PACK(device.info.bus_id, device.info.dev_id, device.info.func_id));
   zx_device_prop_t fragment_props[] = {
@@ -436,7 +245,7 @@ zx_status_t KernelPciFidl::CreateComposite(zx_device_t* parent, kpci_device devi
 
   async_dispatcher_t* dispatcher =
       fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
-  auto kpci = std::make_unique<KernelPciFidl>(parent, device, dispatcher);
+  auto kpci = std::make_unique<KernelPci>(parent, device, dispatcher);
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
@@ -522,11 +331,10 @@ zx_status_t KernelPciFidl::CreateComposite(zx_device_t* parent, kpci_device devi
   return status;
 }
 
-KernelPciFidl::KernelPciFidl(zx_device_t* parent, kpci_device device,
-                             async_dispatcher_t* dispatcher)
-    : KernelPciFidlType(parent), device_(device), dispatcher_(dispatcher), outgoing_(dispatcher) {}
+KernelPci::KernelPci(zx_device_t* parent, kpci_device device, async_dispatcher_t* dispatcher)
+    : KernelPciType(parent), device_(device), dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
-void KernelPciFidl::DdkRelease() {
+void KernelPci::DdkRelease() {
   if (device_.handle != ZX_HANDLE_INVALID) {
     zx_handle_close(device_.handle);
   }
@@ -534,7 +342,7 @@ void KernelPciFidl::DdkRelease() {
   delete this;
 }
 
-void KernelPciFidl::GetBar(GetBarRequestView request, GetBarCompleter::Sync& completer) {
+void KernelPci::GetBar(GetBarRequestView request, GetBarCompleter::Sync& completer) {
   pci_bar_t bar;
   zx_status_t status = pci_get_bar(&device_, request->bar_id, &bar);
   if (status != ZX_OK) {
@@ -557,8 +365,8 @@ void KernelPciFidl::GetBar(GetBarRequestView request, GetBarCompleter::Sync& com
   }
 }
 
-void KernelPciFidl::SetBusMastering(SetBusMasteringRequestView request,
-                                    SetBusMasteringCompleter::Sync& completer) {
+void KernelPci::SetBusMastering(SetBusMasteringRequestView request,
+                                SetBusMasteringCompleter::Sync& completer) {
   zx_status_t status = zx_pci_enable_bus_master(device_.handle, request->enabled);
   if (status == ZX_OK) {
     completer.ReplySuccess();
@@ -567,7 +375,7 @@ void KernelPciFidl::SetBusMastering(SetBusMasteringRequestView request,
   }
 }
 
-void KernelPciFidl::ResetDevice(ResetDeviceCompleter::Sync& completer) {
+void KernelPci::ResetDevice(ResetDeviceCompleter::Sync& completer) {
   zx_status_t status = zx_pci_reset_device(device_.handle);
   if (status == ZX_OK) {
     completer.ReplySuccess();
@@ -576,12 +384,10 @@ void KernelPciFidl::ResetDevice(ResetDeviceCompleter::Sync& completer) {
   }
 }
 
-void KernelPciFidl::AckInterrupt(AckInterruptCompleter::Sync& completer) {
-  completer.ReplySuccess();
-}
+void KernelPci::AckInterrupt(AckInterruptCompleter::Sync& completer) { completer.ReplySuccess(); }
 
-void KernelPciFidl::MapInterrupt(MapInterruptRequestView request,
-                                 MapInterruptCompleter::Sync& completer) {
+void KernelPci::MapInterrupt(MapInterruptRequestView request,
+                             MapInterruptCompleter::Sync& completer) {
   zx::interrupt out_interrupt;
   zx_status_t status = zx_pci_map_interrupt(device_.handle, request->which_irq,
                                             out_interrupt.reset_and_get_address());
@@ -592,7 +398,7 @@ void KernelPciFidl::MapInterrupt(MapInterruptRequestView request,
   }
 }
 
-void KernelPciFidl::GetInterruptModes(GetInterruptModesCompleter::Sync& completer) {
+void KernelPci::GetInterruptModes(GetInterruptModesCompleter::Sync& completer) {
   pci_interrupt_modes_t out_modes;
   pci_get_interrupt_modes(&device_, &out_modes);
   completer.Reply(fpci::wire::InterruptModes{
@@ -602,8 +408,8 @@ void KernelPciFidl::GetInterruptModes(GetInterruptModesCompleter::Sync& complete
   });
 }
 
-void KernelPciFidl::SetInterruptMode(SetInterruptModeRequestView request,
-                                     SetInterruptModeCompleter::Sync& completer) {
+void KernelPci::SetInterruptMode(SetInterruptModeRequestView request,
+                                 SetInterruptModeCompleter::Sync& completer) {
   zx_status_t status = zx_pci_set_irq_mode(device_.handle, fidl::ToUnderlying(request->mode),
                                            request->requested_irq_count);
   if (status == ZX_OK) {
@@ -613,7 +419,7 @@ void KernelPciFidl::SetInterruptMode(SetInterruptModeRequestView request,
   }
 }
 
-void KernelPciFidl::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
+void KernelPci::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
   pci_device_info_t out_info;
   pci_get_device_info(&device_, &out_info);
   completer.Reply(fpci::wire::DeviceInfo{
@@ -629,8 +435,7 @@ void KernelPciFidl::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
   });
 }
 
-void KernelPciFidl::ReadConfig8(ReadConfig8RequestView request,
-                                ReadConfig8Completer::Sync& completer) {
+void KernelPci::ReadConfig8(ReadConfig8RequestView request, ReadConfig8Completer::Sync& completer) {
   uint8_t out_value;
   zx_status_t status = ReadConfig(device_.handle, request->offset, &out_value);
   if (status == ZX_OK) {
@@ -640,8 +445,8 @@ void KernelPciFidl::ReadConfig8(ReadConfig8RequestView request,
   }
 }
 
-void KernelPciFidl::ReadConfig16(ReadConfig16RequestView request,
-                                 ReadConfig16Completer::Sync& completer) {
+void KernelPci::ReadConfig16(ReadConfig16RequestView request,
+                             ReadConfig16Completer::Sync& completer) {
   uint16_t out_value;
   zx_status_t status = ReadConfig(device_.handle, request->offset, &out_value);
   if (status == ZX_OK) {
@@ -651,8 +456,8 @@ void KernelPciFidl::ReadConfig16(ReadConfig16RequestView request,
   }
 }
 
-void KernelPciFidl::ReadConfig32(ReadConfig32RequestView request,
-                                 ReadConfig32Completer::Sync& completer) {
+void KernelPci::ReadConfig32(ReadConfig32RequestView request,
+                             ReadConfig32Completer::Sync& completer) {
   uint32_t out_value;
   zx_status_t status = ReadConfig(device_.handle, request->offset, &out_value);
   if (status == ZX_OK) {
@@ -662,8 +467,8 @@ void KernelPciFidl::ReadConfig32(ReadConfig32RequestView request,
   }
 }
 
-void KernelPciFidl::WriteConfig8(WriteConfig8RequestView request,
-                                 WriteConfig8Completer::Sync& completer) {
+void KernelPci::WriteConfig8(WriteConfig8RequestView request,
+                             WriteConfig8Completer::Sync& completer) {
   zx_status_t status =
       zx_pci_config_write(device_.handle, request->offset, sizeof(request->value), request->value);
   if (status == ZX_OK) {
@@ -673,8 +478,8 @@ void KernelPciFidl::WriteConfig8(WriteConfig8RequestView request,
   }
 }
 
-void KernelPciFidl::WriteConfig16(WriteConfig16RequestView request,
-                                  WriteConfig16Completer::Sync& completer) {
+void KernelPci::WriteConfig16(WriteConfig16RequestView request,
+                              WriteConfig16Completer::Sync& completer) {
   zx_status_t status =
       zx_pci_config_write(device_.handle, request->offset, sizeof(request->value), request->value);
   if (status == ZX_OK) {
@@ -684,8 +489,8 @@ void KernelPciFidl::WriteConfig16(WriteConfig16RequestView request,
   }
 }
 
-void KernelPciFidl::WriteConfig32(WriteConfig32RequestView request,
-                                  WriteConfig32Completer::Sync& completer) {
+void KernelPci::WriteConfig32(WriteConfig32RequestView request,
+                              WriteConfig32Completer::Sync& completer) {
   zx_status_t status =
       zx_pci_config_write(device_.handle, request->offset, sizeof(request->value), request->value);
   if (status == ZX_OK) {
@@ -695,10 +500,10 @@ void KernelPciFidl::WriteConfig32(WriteConfig32RequestView request,
   }
 }
 
-void KernelPciFidl::GetCapabilities(GetCapabilitiesRequestView request,
-                                    GetCapabilitiesCompleter::Sync& completer) {
+void KernelPci::GetCapabilities(GetCapabilitiesRequestView request,
+                                GetCapabilitiesCompleter::Sync& completer) {
   std::vector<uint8_t> capabilities;
-  uint8_t offset = PCI_CONFIG_CAPABILITIES_PTR;
+  uint8_t offset = fidl::ToUnderlying(fuchsia_hardware_pci::Config::kCapabilitiesPtr);
   uint8_t out_offset;
   while (true) {
     zx_status_t status =
@@ -716,12 +521,12 @@ void KernelPciFidl::GetCapabilities(GetCapabilitiesRequestView request,
   completer.Reply(fidl::VectorView<uint8_t>::FromExternal(capabilities));
 }
 
-void KernelPciFidl::GetExtendedCapabilities(GetExtendedCapabilitiesRequestView request,
-                                            GetExtendedCapabilitiesCompleter::Sync& completer) {
+void KernelPci::GetExtendedCapabilities(GetExtendedCapabilitiesRequestView request,
+                                        GetExtendedCapabilitiesCompleter::Sync& completer) {
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void KernelPciFidl::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) {
+void KernelPci::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) {
   zx::bti out_bti;
   zx_status_t status = pci_get_bti(&device_, request->index, &out_bti);
   if (status == ZX_OK) {
@@ -731,8 +536,7 @@ void KernelPciFidl::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& com
   }
 }
 
-zx_status_t KernelPciFidl::SetUpOutgoingDirectory(
-    fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+zx_status_t KernelPci::SetUpOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
   zx::result status = outgoing_.AddService<fuchsia_hardware_pci::Service>(
       fuchsia_hardware_pci::Service::InstanceHandler({
           .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),

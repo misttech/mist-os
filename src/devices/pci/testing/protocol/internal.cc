@@ -15,6 +15,8 @@
 
 namespace pci {
 
+namespace fpci = fuchsia_hardware_pci;
+
 __EXPORT FakePciProtocolInternal::FakePciProtocolInternal() {
   // Reserve space ahead of time to ensure the vectors do not re-allocate so
   // references provided to callers stay valid.
@@ -55,7 +57,7 @@ zx_status_t FakePciProtocolInternal::FakePciProtocolInternal::PciGetBar(uint32_t
 }
 
 zx_status_t FakePciProtocolInternal::PciAckInterrupt() {
-  return (irq_mode_ == PCI_INTERRUPT_MODE_LEGACY) ? ZX_OK : ZX_ERR_BAD_STATE;
+  return (irq_mode_ == fpci::InterruptMode::kLegacy) ? ZX_OK : ZX_ERR_BAD_STATE;
 }
 
 zx_status_t FakePciProtocolInternal::PciMapInterrupt(uint32_t which_irq,
@@ -65,29 +67,31 @@ zx_status_t FakePciProtocolInternal::PciMapInterrupt(uint32_t which_irq,
   }
 
   switch (irq_mode_) {
-    case PCI_INTERRUPT_MODE_LEGACY:
-    case PCI_INTERRUPT_MODE_LEGACY_NOACK:
+    case fpci::InterruptMode::kLegacy:
+    case fpci::InterruptMode::kLegacyNoack:
       if (which_irq > 0) {
         return ZX_ERR_INVALID_ARGS;
       }
       return legacy_interrupt_->duplicate(ZX_RIGHT_SAME_RIGHTS, out_handle);
-    case PCI_INTERRUPT_MODE_MSI:
+    case fpci::InterruptMode::kMsi:
       if (which_irq >= msi_interrupts_.size()) {
         return ZX_ERR_INVALID_ARGS;
       }
       return msi_interrupts_[which_irq].duplicate(ZX_RIGHT_SAME_RIGHTS, out_handle);
-    case PCI_INTERRUPT_MODE_MSI_X:
+    case fpci::InterruptMode::kMsiX:
       if (which_irq >= msix_interrupts_.size()) {
         return ZX_ERR_INVALID_ARGS;
       }
       return msix_interrupts_[which_irq].duplicate(ZX_RIGHT_SAME_RIGHTS, out_handle);
+    default:
+      break;
   }
 
   return ZX_ERR_BAD_STATE;
 }
 
-void FakePciProtocolInternal::PciGetInterruptModes(pci_interrupt_modes* out_modes) {
-  pci_interrupt_modes_t modes{};
+void FakePciProtocolInternal::PciGetInterruptModes(fpci::wire::InterruptModes* out_modes) {
+  fuchsia_hardware_pci::wire::InterruptModes modes{};
   if (legacy_interrupt_) {
     modes.has_legacy = true;
   }
@@ -103,15 +107,15 @@ void FakePciProtocolInternal::PciGetInterruptModes(pci_interrupt_modes* out_mode
   *out_modes = modes;
 }
 
-zx_status_t FakePciProtocolInternal::PciSetInterruptMode(pci_interrupt_mode_t mode,
+zx_status_t FakePciProtocolInternal::PciSetInterruptMode(fpci::InterruptMode mode,
                                                          uint32_t requested_irq_count) {
   if (!AllMappedInterruptsFreed()) {
     return ZX_ERR_BAD_STATE;
   }
 
   switch (mode) {
-    case PCI_INTERRUPT_MODE_LEGACY:
-    case PCI_INTERRUPT_MODE_LEGACY_NOACK:
+    case fpci::InterruptMode::kLegacy:
+    case fpci::InterruptMode::kLegacyNoack:
       if (requested_irq_count > 1) {
         return ZX_ERR_INVALID_ARGS;
       }
@@ -121,7 +125,7 @@ zx_status_t FakePciProtocolInternal::PciSetInterruptMode(pci_interrupt_mode_t mo
         irq_cnt_ = 1;
       }
       return ZX_OK;
-    case PCI_INTERRUPT_MODE_MSI:
+    case fpci::InterruptMode::kMsi:
       if (msi_interrupts_.empty()) {
         break;
       }
@@ -131,10 +135,10 @@ zx_status_t FakePciProtocolInternal::PciSetInterruptMode(pci_interrupt_mode_t mo
       if (msi_interrupts_.size() < requested_irq_count) {
         return ZX_ERR_INVALID_ARGS;
       }
-      irq_mode_ = PCI_INTERRUPT_MODE_MSI;
+      irq_mode_ = fpci::InterruptMode::kMsi;
       irq_cnt_ = requested_irq_count;
       return ZX_OK;
-    case PCI_INTERRUPT_MODE_MSI_X:
+    case fpci::InterruptMode::kMsiX:
       if (msix_interrupts_.empty()) {
         break;
       }
@@ -145,9 +149,11 @@ zx_status_t FakePciProtocolInternal::PciSetInterruptMode(pci_interrupt_mode_t mo
       if (msix_interrupts_.size() < requested_irq_count) {
         return ZX_ERR_INVALID_ARGS;
       }
-      irq_mode_ = PCI_INTERRUPT_MODE_MSI_X;
+      irq_mode_ = fpci::InterruptMode::kMsiX;
       irq_cnt_ = requested_irq_count;
       return ZX_OK;
+    default:
+      break;
   }
 
   return ZX_ERR_NOT_SUPPORTED;
@@ -206,9 +212,10 @@ zx_status_t FakePciProtocolInternal::PciGetBti(uint32_t index, zx::bti* out_bti)
 __EXPORT void FakePciProtocolInternal::AddCapabilityInternal(uint8_t capability_id,
                                                              uint8_t position, uint8_t size) {
   ZX_ASSERT_MSG(
-      capability_id > 0 && capability_id <= PCI_CAPABILITY_ID_FLATTENING_PORTAL_BRIDGE,
+      capability_id > 0 &&
+          capability_id <= fidl::ToUnderlying(fpci::CapabilityId::kFlatteningPortalBridge),
       "FakePciProtocol Error: capability_id must be non-zero and <= %#x (capability_id = %#x).",
-      PCI_CAPABILITY_ID_FLATTENING_PORTAL_BRIDGE, capability_id);
+      fidl::ToUnderlying(fpci::CapabilityId::kFlatteningPortalBridge), capability_id);
   ZX_ASSERT_MSG(position >= PCI_CONFIG_HEADER_SIZE && position + size < PCI_BASE_CONFIG_SIZE,
                 "FakePciProtocolError: capability must fit the range [%#x, %#x] (capability = "
                 "[%#x, %#x]).",
@@ -216,7 +223,7 @@ __EXPORT void FakePciProtocolInternal::AddCapabilityInternal(uint8_t capability_
 
   // We need to update the next pointer of the previous capability, or the
   // original header capabilities pointer if this is the first.
-  uint8_t next_ptr = PCI_CONFIG_CAPABILITIES_PTR;
+  uint8_t next_ptr = fidl::ToUnderlying(fpci::Config::kCapabilitiesPtr);
   if (!capabilities().empty()) {
     for (auto& cap : capabilities()) {
       ZX_ASSERT_MSG(!(position <= cap.position && position + size > cap.position) &&
@@ -237,10 +244,15 @@ __EXPORT void FakePciProtocolInternal::AddCapabilityInternal(uint8_t capability_
   std::sort(capabilities().begin(), capabilities().end());
 }
 
-__EXPORT zx::interrupt& FakePciProtocolInternal::AddInterrupt(pci_interrupt_mode_t mode) {
-  ZX_ASSERT_MSG(!(mode == PCI_INTERRUPT_MODE_LEGACY && legacy_interrupt_),
+__EXPORT void FakePciProtocolInternal::AddCapabilityInternal(
+    fuchsia_hardware_pci::CapabilityId capability_id, uint8_t position, uint8_t size) {
+  return AddCapabilityInternal(fidl::ToUnderlying(capability_id), position, size);
+}
+
+__EXPORT zx::interrupt& FakePciProtocolInternal::AddInterrupt(fpci::InterruptMode mode) {
+  ZX_ASSERT_MSG(!(mode == fpci::InterruptMode::kLegacy && legacy_interrupt_),
                 "FakePciProtocol Error: Legacy interrupt mode only supports 1 interrupt.");
-  ZX_ASSERT_MSG(!(mode == PCI_INTERRUPT_MODE_MSI && msi_interrupts_.size() == MSI_MAX_VECTORS),
+  ZX_ASSERT_MSG(!(mode == fpci::InterruptMode::kMsi && msi_interrupts_.size() == MSI_MAX_VECTORS),
                 "FakePciProtocol Error: MSI interrupt mode only supports up to %u interrupts.",
                 MSI_MAX_VECTORS);
 
@@ -250,30 +262,37 @@ __EXPORT zx::interrupt& FakePciProtocolInternal::AddInterrupt(pci_interrupt_mode
   ZX_ASSERT_MSG(status == ZX_OK, kFakePciInternalError);
 
   switch (mode) {
-    case PCI_INTERRUPT_MODE_LEGACY:
+    case fpci::InterruptMode::kLegacy:
       legacy_interrupt_ = std::move(interrupt);
       return *legacy_interrupt_;
-    case PCI_INTERRUPT_MODE_MSI:
+    case fpci::InterruptMode::kMsi:
       msi_interrupts_.insert(msi_interrupts_.end(), std::move(interrupt));
       msi_count_++;
       return msi_interrupts_[msi_count_ - 1];
-    case PCI_INTERRUPT_MODE_MSI_X:
+    case fpci::InterruptMode::kMsiX:
       msix_interrupts_.insert(msix_interrupts_.end(), std::move(interrupt));
       msix_count_++;
       return msix_interrupts_[msix_count_ - 1];
+    default:
+      break;
   }
 
   ZX_PANIC("%s", kFakePciInternalError);
 }
 
-__EXPORT fuchsia_hardware_pci::wire::DeviceInfo FakePciProtocolInternal::SetDeviceInfoInternal(
-    fuchsia_hardware_pci::wire::DeviceInfo new_info) {
-  config().write(&new_info.vendor_id, PCI_CONFIG_VENDOR_ID, sizeof(info().vendor_id));
-  config().write(&new_info.device_id, PCI_CONFIG_DEVICE_ID, sizeof(info().device_id));
-  config().write(&new_info.revision_id, PCI_CONFIG_REVISION_ID, sizeof(info().revision_id));
-  config().write(&new_info.base_class, PCI_CONFIG_CLASS_CODE_BASE, sizeof(info().base_class));
-  config().write(&new_info.sub_class, PCI_CONFIG_CLASS_CODE_SUB, sizeof(info().sub_class));
-  config().write(&new_info.program_interface, PCI_CONFIG_CLASS_CODE_INTR,
+__EXPORT fpci::wire::DeviceInfo FakePciProtocolInternal::SetDeviceInfoInternal(
+    fpci::wire::DeviceInfo new_info) {
+  config().write(&new_info.vendor_id, fidl::ToUnderlying(fpci::Config::kVendorId),
+                 sizeof(info().vendor_id));
+  config().write(&new_info.device_id, fidl::ToUnderlying(fpci::Config::kDeviceId),
+                 sizeof(info().device_id));
+  config().write(&new_info.revision_id, fidl::ToUnderlying(fpci::Config::kRevisionId),
+                 sizeof(info().revision_id));
+  config().write(&new_info.base_class, fidl::ToUnderlying(fpci::Config::kClassCodeBase),
+                 sizeof(info().base_class));
+  config().write(&new_info.sub_class, fidl::ToUnderlying(fpci::Config::kClassCodeSub),
+                 sizeof(info().sub_class));
+  config().write(&new_info.program_interface, fidl::ToUnderlying(fpci::Config::kClassCodeIntr),
                  sizeof(info().program_interface));
   info_ = new_info;
 
@@ -286,7 +305,7 @@ __EXPORT void FakePciProtocolInternal::reset() {
   msi_count_ = 0;
   msix_interrupts_.clear();
   msix_count_ = 0;
-  irq_mode_ = PCI_INTERRUPT_MODE_DISABLED;
+  irq_mode_ = fpci::InterruptMode::kDisabled;
 
   bars_ = {};
   capabilities_.clear();

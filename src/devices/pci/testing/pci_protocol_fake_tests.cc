@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/pci/c/banjo.h>
-#include <fuchsia/hardware/pci/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
@@ -22,6 +20,10 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
+
+namespace {
+namespace fpci = fuchsia_hardware_pci;
+}
 
 class FakePciProtocolTests : public zxtest::Test {
  protected:
@@ -120,17 +122,17 @@ TEST_F(FakePciProtocolTests, GetDeviceInfo) {
   // Did we update the config header to match the device structure?
   uint8_t val8;
   uint16_t val16;
-  ASSERT_OK(pci().ReadConfig16(PCI_CONFIG_VENDOR_ID, &val16));
+  ASSERT_OK(pci().ReadConfig16(fpci::Config::kVendorId, &val16));
   ASSERT_EQ(expected.vendor_id, val16);
-  ASSERT_OK(pci().ReadConfig16(PCI_CONFIG_DEVICE_ID, &val16));
+  ASSERT_OK(pci().ReadConfig16(fpci::Config::kDeviceId, &val16));
   ASSERT_EQ(expected.device_id, val16);
-  ASSERT_OK(pci().ReadConfig8(PCI_CONFIG_REVISION_ID, &val8));
+  ASSERT_OK(pci().ReadConfig8(fpci::Config::kRevisionId, &val8));
   ASSERT_EQ(expected.revision_id, val8);
-  ASSERT_OK(pci().ReadConfig8(PCI_CONFIG_CLASS_CODE_BASE, &val8));
+  ASSERT_OK(pci().ReadConfig8(fpci::Config::kClassCodeBase, &val8));
   ASSERT_EQ(expected.base_class, val8);
-  ASSERT_OK(pci().ReadConfig8(PCI_CONFIG_CLASS_CODE_SUB, &val8));
+  ASSERT_OK(pci().ReadConfig8(fpci::Config::kClassCodeSub, &val8));
   ASSERT_EQ(expected.sub_class, val8);
-  ASSERT_OK(pci().ReadConfig8(PCI_CONFIG_CLASS_CODE_INTR, &val8));
+  ASSERT_OK(pci().ReadConfig8(fpci::Config::kClassCodeIntr, &val8));
   ASSERT_EQ(expected.program_interface, val8);
 }
 
@@ -187,7 +189,7 @@ TEST_F(FakePciProtocolTests, SetInterruptMode) {
   ASSERT_OK(pci().SetInterruptMode(mode, 1));
   pci::RunAsync(loop_, [&] {
     ASSERT_EQ(1, fake_pci().GetIrqCount());
-    ASSERT_EQ(fidl::ToUnderlying(mode), fake_pci().GetIrqMode());
+    ASSERT_EQ(mode, fake_pci().GetIrqMode());
   });
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, pci().SetInterruptMode(mode, 2));
 
@@ -195,25 +197,25 @@ TEST_F(FakePciProtocolTests, SetInterruptMode) {
   ASSERT_OK(pci().SetInterruptMode(mode, 1));
   pci::RunAsync(loop_, [&] {
     ASSERT_EQ(1, fake_pci().GetIrqCount());
-    ASSERT_EQ(fidl::ToUnderlying(mode), fake_pci().GetIrqMode());
+    ASSERT_EQ(mode, fake_pci().GetIrqMode());
   });
 
   ASSERT_OK(pci().SetInterruptMode(mode, 2));
   pci::RunAsync(loop_, [&] {
     ASSERT_EQ(2, fake_pci().GetIrqCount());
-    ASSERT_EQ(fidl::ToUnderlying(mode), fake_pci().GetIrqMode());
+    ASSERT_EQ(mode, fake_pci().GetIrqMode());
   });
 
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, pci().SetInterruptMode(mode, 3));
   pci::RunAsync(loop_, [&] {
     ASSERT_EQ(2, fake_pci().GetIrqCount());
-    ASSERT_EQ(fidl::ToUnderlying(mode), fake_pci().GetIrqMode());
+    ASSERT_EQ(mode, fake_pci().GetIrqMode());
   });
 
   ASSERT_OK(pci().SetInterruptMode(mode, 4));
   pci::RunAsync(loop_, [&] {
     ASSERT_EQ(4, fake_pci().GetIrqCount());
-    ASSERT_EQ(fidl::ToUnderlying(mode), fake_pci().GetIrqMode());
+    ASSERT_EQ(mode, fake_pci().GetIrqMode());
   });
 }
 
@@ -458,7 +460,7 @@ TEST_F(FakePciProtocolTests, Capabilities) {
     // Try invalid capabilities.
     ASSERT_DEATH([&]() { fake_pci().AddCapability(0, PCI_CONFIG_HEADER_SIZE, 16); });
     ASSERT_DEATH([&]() {
-      fake_pci().AddCapability(PCI_CAPABILITY_ID_FLATTENING_PORTAL_BRIDGE + 1,
+      fake_pci().AddCapability(fidl::ToUnderlying(fpci::CapabilityId::kFlatteningPortalBridge) + 1,
                                PCI_CONFIG_HEADER_SIZE, 16);
     });
 
@@ -485,7 +487,7 @@ TEST_F(FakePciProtocolTests, PciGetFirstAndNextCapability) {
   uint8_t offset1 = 0;
   ASSERT_OK(pci().GetFirstCapability(fuchsia_hardware_pci::CapabilityId::kVendor, &offset1));
   uint8_t val;
-  config->read(&val, PCI_CONFIG_CAPABILITIES_PTR, sizeof(val));
+  config->read(&val, fidl::ToUnderlying(fpci::Config::kCapabilitiesPtr), sizeof(val));
   ASSERT_EQ(0x50, val);
   config->read(&val, offset1, sizeof(val));
   ASSERT_EQ(fidl::ToUnderlying(fuchsia_hardware_pci::CapabilityId::kVendor), val);

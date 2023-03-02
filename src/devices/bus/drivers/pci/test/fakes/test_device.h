@@ -4,6 +4,8 @@
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_TEST_DEVICE_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_TEST_DEVICE_H_
 
+#include <lib/device-protocol/pci.h>
+
 #include <array>
 #include <cstdint>
 

@@ -5,24 +5,84 @@
 #ifndef SRC_DEVICES_PCI_LIB_DEVICE_PROTOCOL_PCI_INCLUDE_LIB_DEVICE_PROTOCOL_PCI_H_
 #define SRC_DEVICES_PCI_LIB_DEVICE_PROTOCOL_PCI_INCLUDE_LIB_DEVICE_PROTOCOL_PCI_H_
 
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <stdio.h>
 #include <zircon/syscalls.h>
 
 __BEGIN_CDECLS
 
-zx_status_t pci_configure_interrupt_mode(const pci_protocol_t* pci, uint32_t requested_irq_count,
-                                         pci_interrupt_mode_t* out_mode);
-zx_status_t pci_map_bar_buffer(const pci_protocol_t* pci, uint32_t bar_id, uint32_t cache_policy,
-                               mmio_buffer_t* buffer);
+typedef uint8_t pci_interrupt_mode_t;
+#define PCI_INTERRUPT_MODE_DISABLED UINT8_C(0)
+#define PCI_INTERRUPT_MODE_LEGACY UINT8_C(1)
+#define PCI_INTERRUPT_MODE_LEGACY_NOACK UINT8_C(2)
+#define PCI_INTERRUPT_MODE_MSI UINT8_C(3)
+#define PCI_INTERRUPT_MODE_MSI_X UINT8_C(4)
+#define PCI_INTERRUPT_MODE_COUNT UINT8_C(5)
+
+typedef uint8_t pci_bar_type_t;
+#define PCI_BAR_TYPE_UNUSED UINT8_C(0)
+#define PCI_BAR_TYPE_MMIO UINT8_C(1)
+#define PCI_BAR_TYPE_IO UINT8_C(2)
+typedef struct pci_io_bar pci_io_bar_t;
+typedef union pci_bar_result pci_bar_result_t;
+typedef struct pci_bar pci_bar_t;
+typedef struct pci_interrupt_modes pci_interrupt_modes_t;
+typedef struct pci_device_info pci_device_info_t;
+
+struct pci_io_bar {
+  uint64_t address;
+  zx_handle_t resource;
+};
+
+union pci_bar_result {
+  pci_io_bar_t io;
+  zx_handle_t vmo;
+};
+
+struct pci_bar {
+  // The BAR id, [0-5).
+  uint32_t bar_id;
+  uint64_t size;
+  pci_bar_type_t type;
+  pci_bar_result_t result;
+};
+
+// Returned by |GetInterruptModes|. Contains the number of interrupts supported
+// by a given PCI device interrupt mode. 0 is returned for a mode if
+// unsupported.
+struct pci_interrupt_modes {
+  // |True| if the device supports a legacy interrupt.
+  bool has_legacy;
+  // The number of Message-Signaled interrupted supported. Will be in the
+  // range of [0, 0x8) depending on device support.
+  uint8_t msi_count;
+  // The number of MSI-X interrupts supported. Will be in the range of [0,
+  // 0x800), depending on device and platform support.
+  uint16_t msix_count;
+};
+
+// Device specific information from a device's configuration header.
+// PCI Local Bus Specification v3, chapter 6.1.
+struct pci_device_info {
+  // Device identification information.
+  uint16_t vendor_id;
+  uint16_t device_id;
+  uint8_t base_class;
+  uint8_t sub_class;
+  uint8_t program_interface;
+  uint8_t revision_id;
+  // Information pertaining to the device's location in the bus topology.
+  uint8_t bus_id;
+  uint8_t dev_id;
+  uint8_t func_id;
+  uint8_t padding1;
+};
 
 __END_CDECLS
 
 #ifdef __cplusplus
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
-#include <fuchsia/hardware/pci/cpp/banjo.h>
 
 #include <optional>
 

@@ -22,6 +22,8 @@
 
 namespace virtio {
 
+namespace fpci = fuchsia_hardware_pci;
+
 PciBackend::PciBackend(ddk::Pci pci, fuchsia_hardware_pci::wire::DeviceInfo info)
     : pci_(std::move(pci)), info_(info) {
   snprintf(tag_, sizeof(tag_), "pci[%02x:%02x.%1x]", info_.bus_id, info_.dev_id, info_.func_id);
@@ -98,9 +100,9 @@ zx_status_t PciBackend::ConfigureInterruptMode() {
     }
     irq_handles().push_back(std::move(interrupt));
   }
-  irq_mode() = static_cast<uint8_t>(mode);
+  irq_mode() = mode;
   zxlogf(DEBUG, "%s: using %s IRQ mode (irq_cnt = %u)", tag(),
-         (irq_mode() == PCI_INTERRUPT_MODE_MSI_X ? "MSI-X" : "legacy"), irq_cnt);
+         (irq_mode() == fpci::InterruptMode::kMsiX ? "MSI-X" : "legacy"), irq_cnt);
   return ZX_OK;
 }
 
@@ -117,7 +119,7 @@ zx::result<uint32_t> PciBackend::WaitForInterrupt() {
 void PciBackend::InterruptAck(uint32_t key) {
   ZX_DEBUG_ASSERT(key < irq_handles().size());
   irq_handles()[key].ack();
-  if (irq_mode() == PCI_INTERRUPT_MODE_LEGACY) {
+  if (irq_mode() == fpci::InterruptMode::kLegacy) {
     pci().AckInterrupt();
   }
 }

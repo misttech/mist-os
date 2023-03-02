@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <lib/ddk/debug.h>
 
 #include <fbl/string_buffer.h>
@@ -17,21 +16,22 @@ void Device::InspectUpdateInterrupts() {
   // In most cases we can just have Inspect handle the storage for these nodes because we don't need
   // to modify them after creation.
   inspect_.interrupts = inspect_.device.CreateChild(Inspect::kInspectHeaderInterrupts);
-  inspect_.interrupts.RecordString(Inspect::kInspectIrqMode, Inspect::kInspectIrqModes[irqs_.mode]);
+  inspect_.interrupts.RecordString(Inspect::kInspectIrqMode,
+                                   Inspect::kInspectIrqModes[fidl::ToUnderlying(irqs_.mode)]);
   switch (irqs_.mode) {
-    case PCI_INTERRUPT_MODE_LEGACY:
+    case fuchsia_hardware_pci::InterruptMode::kLegacy:
       inspect_.legacy_signal_cnt =
           inspect_.interrupts.CreateUint(Inspect::kInspectLegacySignalCount, 0);
       inspect_.legacy_ack_cnt = inspect_.interrupts.CreateUint(Inspect::kInspectLegacyAckCount, 0);
       __FALLTHROUGH;
-    case PCI_INTERRUPT_MODE_LEGACY_NOACK: {
+    case fuchsia_hardware_pci::InterruptMode::kLegacyNoack: {
       char s[2] = {static_cast<char>('A' + (irqs_.legacy_pin - 1)), '\0'};
       inspect_.interrupts.RecordString(Inspect::kInspectLegacyInterruptPin, s);
       inspect_.interrupts.RecordUint(Inspect::kInspectLegacyInterruptLine, irqs_.legacy_vector);
       break;
     }
-    case PCI_INTERRUPT_MODE_MSI:
-    case PCI_INTERRUPT_MODE_MSI_X: {
+    case fuchsia_hardware_pci::InterruptMode::kMsi:
+    case fuchsia_hardware_pci::InterruptMode::kMsiX: {
       zx_info_msi_t info{};
       const zx_status_t status =
           irqs_.msi_allocation.get_info(ZX_INFO_MSI, &info, sizeof(info), nullptr, nullptr);
@@ -48,6 +48,8 @@ void Device::InspectUpdateInterrupts() {
       // way to know to update the inspect information.
       break;
     }
+    default:
+      break;
   }
 }
 

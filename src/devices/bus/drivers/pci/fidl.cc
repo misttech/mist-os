@@ -286,8 +286,7 @@ void FidlDevice::MapInterrupt(MapInterruptRequestView request,
 
 void FidlDevice::SetInterruptMode(SetInterruptModeRequestView request,
                                   SetInterruptModeCompleter::Sync& completer) {
-  zx_status_t status = device_->SetIrqMode(static_cast<pci_interrupt_mode_t>(request->mode),
-                                           request->requested_irq_count);
+  zx_status_t status = device_->SetIrqMode(request->mode, request->requested_irq_count);
   if (status != ZX_OK) {
     completer.ReplyError(status);
     RETURN_DEBUG(status, "%u, %#x", static_cast<uint8_t>(request->mode),

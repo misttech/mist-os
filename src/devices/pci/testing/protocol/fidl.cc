@@ -125,19 +125,14 @@ void FakePciProtocol::ReadConfig32(ReadConfig32RequestView request,
 }
 
 void FakePciProtocol::GetInterruptModes(GetInterruptModesCompleter::Sync& completer) {
-  pci_interrupt_modes_t out_modes;
+  fuchsia_hardware_pci::wire::InterruptModes out_modes;
   PciGetInterruptModes(&out_modes);
-  completer.Reply(fuchsia_hardware_pci::wire::InterruptModes{
-      .has_legacy = out_modes.has_legacy,
-      .msi_count = out_modes.msi_count,
-      .msix_count = out_modes.msix_count,
-  });
+  completer.Reply(out_modes);
 }
 
 void FakePciProtocol::SetInterruptMode(SetInterruptModeRequestView request,
                                        SetInterruptModeCompleter::Sync& completer) {
-  zx_status_t status =
-      PciSetInterruptMode(fidl::ToUnderlying(request->mode), request->requested_irq_count);
+  zx_status_t status = PciSetInterruptMode(request->mode, request->requested_irq_count);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {

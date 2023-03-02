@@ -86,9 +86,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_USB_MODE_SWITCH:
       proto->ops = &usb_mode_switch_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_PCI:
-      proto->ops = &pci_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_POWER_SENSOR:
       proto->ops = &power_sensor_protocol_ops_;
       return ZX_OK;

@@ -311,7 +311,7 @@ zx_status_t PciModernBackend::SetRing(uint16_t index, uint16_t count, zx_paddr_t
   MmioWrite(&common_cfg_->queue_avail, pa_avail);
   MmioWrite(&common_cfg_->queue_used, pa_used);
 
-  if (irq_mode() == PCI_INTERRUPT_MODE_MSI_X) {
+  if (irq_mode() == fuchsia_hardware_pci::InterruptMode::kMsiX) {
     uint16_t vector = 0;
     MmioWrite(&common_cfg_->config_msix_vector, PciBackend::kMsiConfigVector);
     MmioRead(&common_cfg_->config_msix_vector, &vector);

@@ -20,7 +20,6 @@ source_set("user_pci") {
 
   sources = [
     "allocation.cc",
-    "banjo.cc",
     "bridge.cc",
     "bus.cc",
     "bus_device_interface.cc",
@@ -47,7 +46,7 @@ source_set("user_pci") {
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
+    "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-deprecated-binding-headers",
@@ -127,7 +126,7 @@ if (platform_enable_user_pci) {
       "//src/devices/lib/driver",
       "//src/devices/lib/driver:driver_runtime",
       "//src/devices/lib/pci",
-      "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
+      "//src/devices/pci/lib/device-protocol-pci",
       "//src/devices/pci/lib/pci",
       "//src/lib/ddk",
       "//src/lib/ddktl",

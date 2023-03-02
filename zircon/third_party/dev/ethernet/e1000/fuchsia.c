@@ -28,6 +28,8 @@
 
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/device-protocol/pci.h>
+#include <lib/pci/hw.h>
 #include <zircon/hw/pci.h>
 #include <zircon/syscalls/pci.h>
 
@@ -545,8 +547,8 @@ static void e1000_identify_hardware(struct adapter* adapter) {
   adapter->hw.vendor_id = pci_info.vendor_id;
   adapter->hw.device_id = pci_info.device_id;
   adapter->hw.revision_id = pci_info.revision_id;
-  e1000_pci_read_config16(pci, PCI_CONFIG_SUBSYSTEM_VENDOR_ID, &adapter->hw.subsystem_vendor_id);
-  e1000_pci_read_config16(pci, PCI_CONFIG_SUBSYSTEM_ID, &adapter->hw.subsystem_device_id);
+  e1000_pci_read_config16(pci, PCI_CONFIG_SUBSYS_VENDOR_ID, &adapter->hw.subsystem_vendor_id);
+  e1000_pci_read_config16(pci, PCI_CONFIG_SUBSYS_ID, &adapter->hw.subsystem_device_id);
 
   /* Do Shared Code Init and Setup */
   if (e1000_set_mac_type(&adapter->hw)) {

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mmio/mmio.h>
+#include <lib/pci/hw.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
@@ -45,7 +45,7 @@ class PciBusTests : public zxtest::Test {
     ecam.get({0, 1, 0})
         .bridge.set_vendor_id(0x8086)
         .set_device_id(idx++)
-        .set_header_type(PCI_HEADER_TYPE_BRIDGE)
+        .set_header_type(PCI_HEADER_TYPE_PCI_BRIDGE)
         .set_io_base(0x10)
         .set_io_limit(0x0FFF)
         .set_memory_base(0x1000)
@@ -245,7 +245,7 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   // different pins, but the pins are mapped to the same vector.
   for (uint8_t i = 0; i < 2; i++) {
     auto* bus_device = bus->GetDevice({0, 0, i});
-    ASSERT_OK(bus_device->SetIrqMode(PCI_INTERRUPT_MODE_LEGACY, 1));
+    ASSERT_OK(bus_device->SetIrqMode(fuchsia_hardware_pci::InterruptMode::kLegacy, 1));
     // Map the interrupt the same way a driver would.
     auto result = bus->GetDevice({0, 0, i})->MapInterrupt(0);
     ASSERT_TRUE(result.is_ok());
@@ -296,7 +296,8 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
                                              pciroot().ecam().CopyEcam());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
-  ASSERT_OK(bus->GetDevice(device)->SetIrqMode(PCI_INTERRUPT_MODE_LEGACY_NOACK, 1));
+  ASSERT_OK(
+      bus->GetDevice(device)->SetIrqMode(fuchsia_hardware_pci::InterruptMode::kLegacyNoack, 1));
 
   auto* bus_device = bus->GetDevice(device);
   // Quick method to check if the disabled flag is set for a legacy interrupt.

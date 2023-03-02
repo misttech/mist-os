@@ -6,60 +6,6 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio.h>
 
-zx_status_t pci_configure_interrupt_mode(const pci_protocol_t* pci, uint32_t requested_irq_count,
-                                         pci_interrupt_mode_t* out_mode) {
-  // NOTE: Any changes to this method should likely also be reflected in the C++
-  // version, Pci::ConfigureInterruptMode. These two implementations are
-  // temporarily coexisting while we migrate PCI from Banjo to FIDL. Eventually
-  // the C version will go away.
-  //
-  // TODO(fxbug.dev/99914): Remove this function once PCI over Banjo is removed.
-  if (requested_irq_count == 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  pci_interrupt_modes modes{};
-  pci_get_interrupt_modes(pci, &modes);
-  std::pair<pci_interrupt_mode_t, uint32_t> pairs[] = {
-      {PCI_INTERRUPT_MODE_MSI_X, modes.msix_count},
-      {PCI_INTERRUPT_MODE_MSI, modes.msi_count},
-      {PCI_INTERRUPT_MODE_LEGACY, modes.has_legacy}};
-  for (auto& [mode, irq_cnt] : pairs) {
-    if (irq_cnt >= requested_irq_count) {
-      zx_status_t status = pci_set_interrupt_mode(pci, mode, requested_irq_count);
-      if (status == ZX_OK) {
-        if (out_mode) {
-          *out_mode = mode;
-        }
-        return status;
-      }
-    }
-  }
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t pci_map_bar_buffer(const pci_protocol_t* pci, uint32_t bar_id, uint32_t cache_policy,
-                               mmio_buffer_t* buffer) {
-  pci_bar_t bar;
-  zx_status_t st = pci->ops->get_bar(pci->ctx, bar_id, &bar);
-  if (st != ZX_OK) {
-    return st;
-  }
-  // TODO(cja): PIO may be mappable on non-x86 architectures
-  if (bar.type == PCI_BAR_TYPE_IO) {
-    return ZX_ERR_WRONG_TYPE;
-  }
-
-  size_t vmo_size;
-  st = zx_vmo_get_size(bar.result.vmo, &vmo_size);
-  if (st != ZX_OK) {
-    zx_handle_close(bar.result.vmo);
-    return st;
-  }
-
-  return mmio_buffer_init(buffer, 0, vmo_size, bar.result.vmo, cache_policy);
-}
-
 namespace ddk {
 
 namespace fpci = fuchsia_hardware_pci;

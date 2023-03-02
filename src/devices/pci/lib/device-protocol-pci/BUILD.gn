@@ -12,11 +12,11 @@ zx_library("device-protocol-pci") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
 
-    # <lib/device-protocol/pci.h> has #include <fuchsia/hardware/pci/c/banjo.h>
-    "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
-
     # <lib/device-protocol/pci.h> has #include <lib/mmio/mmio-buffer.h>
     "//src/devices/lib/mmio",
+
+    # <lib/device-protocol/pci.h> has #include <ddktl/device.h>
+    "//src/lib/ddktl",
 
     # <lib/device-protocol/pci.h> has #include <zircon/syscalls.h>
     "//zircon/system/ulib/zx",

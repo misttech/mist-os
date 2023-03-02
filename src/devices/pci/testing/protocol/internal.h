@@ -32,8 +32,9 @@ class FakePciProtocolInternal {
   zx_status_t PciGetBar(uint32_t bar_id, pci_bar_t* out_res);
   zx_status_t PciAckInterrupt();
   zx_status_t PciMapInterrupt(uint32_t which_irq, zx::interrupt* out_handle);
-  void PciGetInterruptModes(pci_interrupt_modes* modes);
-  zx_status_t PciSetInterruptMode(pci_interrupt_mode_t mode, uint32_t requested_irq_count);
+  void PciGetInterruptModes(fuchsia_hardware_pci::wire::InterruptModes* modes);
+  zx_status_t PciSetInterruptMode(fuchsia_hardware_pci::InterruptMode mode,
+                                  uint32_t requested_irq_count);
   zx_status_t PciSetBusMastering(bool enable);
   zx_status_t PciResetDevice();
   zx_status_t PciGetDeviceInfo(pci_device_info_t* out_info);
@@ -93,11 +94,13 @@ class FakePciProtocolInternal {
   // layout of the capabilities as necessary to match their device, but we can provide helper
   // methods to ensure they're doing it properly.
   void AddCapabilityInternal(uint8_t capability_id, uint8_t position, uint8_t size);
-  zx::interrupt& AddInterrupt(pci_interrupt_mode_t mode);
+  void AddCapabilityInternal(fuchsia_hardware_pci::CapabilityId capability_id, uint8_t position,
+                             uint8_t size);
+  zx::interrupt& AddInterrupt(fuchsia_hardware_pci::InterruptMode mode);
   fuchsia_hardware_pci::wire::DeviceInfo SetDeviceInfoInternal(
       fuchsia_hardware_pci::wire::DeviceInfo new_info);
 
-  pci_interrupt_mode_t irq_mode() const { return irq_mode_; }
+  fuchsia_hardware_pci::InterruptMode irq_mode() const { return irq_mode_; }
   uint32_t irq_cnt() const { return irq_cnt_; }
   std::array<FakeBar, PCI_DEVICE_BAR_COUNT>& bars() { return bars_; }
   std::vector<FakeCapability>& capabilities() { return capabilities_; }
@@ -145,7 +148,7 @@ class FakePciProtocolInternal {
   std::optional<zx::interrupt> legacy_interrupt_;
   std::vector<zx::interrupt> msi_interrupts_;
   std::vector<zx::interrupt> msix_interrupts_;
-  pci_interrupt_mode_t irq_mode_;
+  fuchsia_hardware_pci::InterruptMode irq_mode_;
   uint32_t irq_cnt_ = 0;
   uint32_t msi_count_ = 0;
   uint32_t msix_count_ = 0;

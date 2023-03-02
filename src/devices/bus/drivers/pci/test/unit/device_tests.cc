@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/vmo/types.h>
@@ -369,18 +368,17 @@ TEST_F(PciDeviceTests, MsixCapabilityTest) {
 }
 
 TEST_F(PciDeviceTests, InspectIrqMode) {
-  auto dev = std::make_unique<BanjoDevice>(
-      parent(), &CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
-                                  kFakeQuadroDeviceConfig.max_size()));
+  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
+                               kFakeQuadroDeviceConfig.max_size());
   {
-    const pci_interrupt_mode_t mode = PCI_INTERRUPT_MODE_LEGACY;
-    ASSERT_OK(dev->PciSetInterruptMode(mode, 1));
+    const auto mode = fuchsia_hardware_pci::InterruptMode::kLegacy;
+    ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
     auto* node =
         hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(node->node(), Device::Inspect::kInspectIrqMode,
-                      inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[mode])));
+    ASSERT_NO_FATAL_FAILURE(CheckProperty(
+        node->node(), Device::Inspect::kInspectIrqMode,
+        inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
     ASSERT_NO_FATAL_FAILURE(CheckProperty(node->node(), Device::Inspect::kInspectLegacyInterruptPin,
                                           inspect::StringPropertyValue("A")));
     ASSERT_NO_FATAL_FAILURE(CheckProperty(node->node(),
@@ -388,48 +386,48 @@ TEST_F(PciDeviceTests, InspectIrqMode) {
                                           inspect::UintPropertyValue(16)));
   }
   {
-    const pci_interrupt_mode_t mode = PCI_INTERRUPT_MODE_LEGACY_NOACK;
-    ASSERT_OK(dev->PciSetInterruptMode(mode, 1));
+    const auto mode = fuchsia_hardware_pci::InterruptMode::kLegacyNoack;
+    ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
     auto* node =
         hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(node->node(), Device::Inspect::kInspectIrqMode,
-                      inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[mode])));
+    ASSERT_NO_FATAL_FAILURE(CheckProperty(
+        node->node(), Device::Inspect::kInspectIrqMode,
+        inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
   }
   {
-    const pci_interrupt_mode_t mode = PCI_INTERRUPT_MODE_MSI;
-    ASSERT_OK(dev->PciSetInterruptMode(mode, 1));
+    const auto mode = fuchsia_hardware_pci::InterruptMode::kMsi;
+    ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
     auto* node =
         hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(node->node(), Device::Inspect::kInspectIrqMode,
-                      inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[mode])));
+    ASSERT_NO_FATAL_FAILURE(CheckProperty(
+        node->node(), Device::Inspect::kInspectIrqMode,
+        inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
   }
 
   {
-    const pci_interrupt_mode_t mode = PCI_INTERRUPT_MODE_MSI_X;
-    ASSERT_OK(dev->PciSetInterruptMode(mode, 1));
+    const auto mode = fuchsia_hardware_pci::InterruptMode::kMsiX;
+    ASSERT_OK(dev.SetIrqMode(mode, 1));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
     auto* node =
         hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(node->node(), Device::Inspect::kInspectIrqMode,
-                      inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[mode])));
+    ASSERT_NO_FATAL_FAILURE(CheckProperty(
+        node->node(), Device::Inspect::kInspectIrqMode,
+        inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
   }
 }
 
 TEST_F(PciDeviceTests, InspectLegacy) {
   // Signal and Ack the legacy IRQ once each to ensure add is happening.
-  auto dev = std::make_unique<BanjoDevice>(
-      parent(), &CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
-                                  kFakeQuadroDeviceConfig.max_size()));
-  ASSERT_OK(dev->PciSetInterruptMode(PCI_INTERRUPT_MODE_LEGACY, 1));
+  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
+                               kFakeQuadroDeviceConfig.max_size());
+  const auto mode = fuchsia_hardware_pci::InterruptMode::kLegacy;
+  ASSERT_OK(dev.SetIrqMode(mode, 1));
   {
-    const fbl::AutoLock _(dev->device()->dev_lock());
-    ASSERT_OK(dev->device()->SignalLegacyIrq(0x10000));
-    ASSERT_OK(dev->device()->AckLegacyIrq());
+    const fbl::AutoLock _(dev.dev_lock());
+    ASSERT_OK(dev.SignalLegacyIrq(0x10000));
+    ASSERT_OK(dev.AckLegacyIrq());
   }
 
   // Verify properties in the general case.
@@ -439,9 +437,8 @@ TEST_F(PciDeviceTests, InspectLegacy) {
         hierarchy().GetByPath({kTestNodeName, Device::Inspect::kInspectHeaderInterrupts})->node();
     ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectLegacyInterruptPin,
                                           inspect::StringPropertyValue("A")));
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(node, Device::Inspect::kInspectLegacyInterruptLine,
-                      inspect::UintPropertyValue(dev->device()->legacy_vector())));
+    ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectLegacyInterruptLine,
+                                          inspect::UintPropertyValue(dev.legacy_vector())));
     ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectLegacyAckCount,
                                           inspect::UintPropertyValue(1)));
     ASSERT_NO_FATAL_FAILURE(CheckProperty(node, Device::Inspect::kInspectLegacySignalCount,
@@ -449,28 +446,28 @@ TEST_F(PciDeviceTests, InspectLegacy) {
   }
 
   {
-    ASSERT_OK(dev->device()->SetIrqMode(PCI_INTERRUPT_MODE_DISABLED, 0));
+    const auto mode = fuchsia_hardware_pci::InterruptMode::kDisabled;
+    ASSERT_OK(dev.SetIrqMode(mode, 0));
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
     auto* node =
         hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderInterrupts});
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(node->node(), Device::Inspect::kInspectIrqMode,
-                      inspect::StringPropertyValue(
-                          Device::Inspect::kInspectIrqModes[PCI_INTERRUPT_MODE_DISABLED])));
+    ASSERT_NO_FATAL_FAILURE(CheckProperty(
+        node->node(), Device::Inspect::kInspectIrqMode,
+        inspect::StringPropertyValue(Device::Inspect::kInspectIrqModes[fidl::ToUnderlying(mode)])));
   }
 }
 
 TEST_F(PciDeviceTests, InspectMsi) {
   const uint32_t irq_cnt = 4;
-  auto dev = std::make_unique<BanjoDevice>(
-      parent(), &CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
-                                  kFakeQuadroDeviceConfig.max_size()));
-  ASSERT_OK(dev->PciSetInterruptMode(PCI_INTERRUPT_MODE_MSI_X, irq_cnt));
+  auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
+                               kFakeQuadroDeviceConfig.max_size());
+  const auto mode = fuchsia_hardware_pci::InterruptMode::kMsiX;
+  ASSERT_OK(dev.SetIrqMode(mode, irq_cnt));
 
   zx_info_msi_t info{};
   {
-    const fbl::AutoLock _(dev->device()->dev_lock());
-    dev->device()->msi_allocation().get_info(ZX_INFO_MSI, &info, sizeof(info), nullptr, nullptr);
+    const fbl::AutoLock _(dev.dev_lock());
+    dev.msi_allocation().get_info(ZX_INFO_MSI, &info, sizeof(info), nullptr, nullptr);
   }
 
   ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));

@@ -4,7 +4,6 @@
 
 #include <fuchsia/hardware/clock/c/banjo.h>
 #include <fuchsia/hardware/gpio/c/banjo.h>
-#include <fuchsia/hardware/pci/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/power/sensor/c/banjo.h>
@@ -48,7 +47,6 @@ enum Fragments_2 {
   FRAGMENT_SPI_2,
   FRAGMENT_PWM_2,
   FRAGMENT_VREG_2,
-  FRAGMENT_PCI_2,
   FRAGMENT_POWER_SENSOR_2,
   FRAGMENT_COUNT_2,
 };
@@ -514,10 +512,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_VREG", DRIVER_NAME);
       return status;
-    }
-    if (strncmp(fragments[FRAGMENT_PCI_2].name, "pci", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME, fragments[FRAGMENT_PCI_2].name);
-      return ZX_ERR_INTERNAL;
     }
     if (strncmp(fragments[FRAGMENT_POWER_SENSOR_2].name, "power-sensor", 32)) {
       zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME,

@@ -44,7 +44,6 @@ fuchsia_driver("test-board-driver") {
     "test-composite-node-spec.cc",
     "test-gpio.cc",
     "test-i2c.cc",
-    "test-pci.cc",
     "test-power-sensor.cc",
     "test-power.cc",
     "test-pwm.cc",
@@ -295,46 +294,6 @@ driver_bind_rules("test-vreg-bind") {
   ]
 }
 
-driver_bind_rules("test-pci-bind") {
-  rules = "test/test-pci.bind"
-  header_output = "test-pci-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.pci",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.test.platform",
-  ]
-}
-
-fuchsia_driver("test-pci-driver") {
-  output_name = "test-pci"
-  testonly = true
-  configs += [ "//build/config:all_source" ]
-  sources = [ "test/pci.cc" ]
-  deps = [
-    ":test-pci-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
-    "//src/devices/pci/testing:pci-protocol-fake",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
-fuchsia_driver_component("test-pci") {
-  testonly = true
-  component_name = "test-pci"
-  deps = [ ":test-pci-driver" ]
-  info = "test-driver-info.json"
-  manifest = "meta/test-pci.cml"
-}
-
 fuchsia_driver("test-vreg-driver") {
   output_name = "test-vreg"
   configs += [ "//build/config:all_source" ]
@@ -412,7 +371,6 @@ fuchsia_driver("test-composite-driver") {
     "//sdk/banjo/fuchsia.hardware.vreg:fuchsia.hardware.vreg_banjo_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver",
-    "//src/devices/pci/lib/fuchsia.hardware.pci:fuchsia.hardware.pci_banjo_cpp",
     "//src/lib/ddk",
 
     # TODO(fxb/38132): Migrate to the new bind rules and delete the below
@@ -498,7 +456,6 @@ fuchsia_unittest_package("platform-bus-test") {
     ":test-composite-node-spec",
     ":test-gpio",
     ":test-i2c",
-    ":test-pci",
     ":test-power",
     ":test-power-sensor",
     ":test-pwm",

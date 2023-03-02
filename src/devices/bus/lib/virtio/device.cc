@@ -23,6 +23,8 @@
 
 namespace virtio {
 
+namespace fpci = fuchsia_hardware_pci;
+
 Device::Device(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
     : bti_(std::move(bti)), backend_(std::move(backend)), bus_device_(bus_device) {
   device_ops_.version = DEVICE_OPS_VERSION;
@@ -39,9 +41,10 @@ void Device::Release() {
 
 void Device::IrqWorker() {
   const auto irq_mode = backend_->InterruptMode();
-  ZX_DEBUG_ASSERT(irq_mode == PCI_INTERRUPT_MODE_LEGACY || irq_mode == PCI_INTERRUPT_MODE_MSI_X);
+  ZX_DEBUG_ASSERT(irq_mode == fpci::InterruptMode::kLegacy ||
+                  irq_mode == fpci::InterruptMode::kMsiX);
   zxlogf(DEBUG, "%s: starting %s irq worker", tag(),
-         (irq_mode == PCI_INTERRUPT_MODE_LEGACY) ? "legacy" : "msi-x");
+         (irq_mode == fpci::InterruptMode::kLegacy) ? "legacy" : "msi-x");
 
   while (backend_->InterruptValid() == ZX_OK) {
     auto result = backend_->WaitForInterrupt();
@@ -62,7 +65,7 @@ void Device::IrqWorker() {
 
     // Read the status before completing the interrupt in case
     // another interrupt fires and changes the status.
-    if (irq_mode == PCI_INTERRUPT_MODE_LEGACY) {
+    if (irq_mode == fpci::InterruptMode::kLegacy) {
       uint32_t irq_status = IsrStatus();
       zxlogf(TRACE, "%s: irq_status: %#x\n", __func__, irq_status);
 

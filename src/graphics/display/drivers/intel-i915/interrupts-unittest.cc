@@ -67,7 +67,7 @@ TEST_F(InterruptTest, Init) {
 
   pci::RunAsync(loop_, [&] {
     EXPECT_EQ(1u, fake_pci_.GetIrqCount());
-    EXPECT_EQ(PCI_INTERRUPT_MODE_LEGACY, fake_pci_.GetIrqMode());
+    EXPECT_EQ(fuchsia_hardware_pci::InterruptMode::kLegacy, fake_pci_.GetIrqMode());
     fake_pci_.AddMsiInterrupt();
   });
 
@@ -75,7 +75,7 @@ TEST_F(InterruptTest, Init) {
 
   pci::RunAsync(loop_, [&] {
     EXPECT_EQ(1u, fake_pci_.GetIrqCount());
-    EXPECT_EQ(PCI_INTERRUPT_MODE_MSI, fake_pci_.GetIrqMode());
+    EXPECT_EQ(fuchsia_hardware_pci::InterruptMode::kMsi, fake_pci_.GetIrqMode());
   });
 }
 

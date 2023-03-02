@@ -775,10 +775,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
       status = RpcVreg(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                        resp_handles, &resp_handle_count);
       break;
-    case ZX_PROTOCOL_PCI:
-      status = RpcPci(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
-                      resp_handles, &resp_handle_count);
-      break;
     case ZX_PROTOCOL_POWER_SENSOR:
       status = RpcPowerSensor(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                               resp_handles, &resp_handle_count);
@@ -1005,14 +1001,6 @@ zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       vreg_client_.proto_client().GetProto(static_cast<vreg_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
-
-    case ZX_PROTOCOL_PCI: {
-      if (!pci_client_.proto_client().is_valid()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      pci_client_.proto_client().GetProto(static_cast<pci_protocol_t*>(out_protocol));
       return ZX_OK;
     }
 

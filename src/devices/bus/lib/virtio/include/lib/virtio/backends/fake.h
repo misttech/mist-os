@@ -129,7 +129,7 @@ class FakeBackend : public Backend {
 
     // The mode is not actually used, but Device initialization verifies a valid
     // mode has been configured.
-    irq_mode() = PCI_INTERRUPT_MODE_LEGACY;
+    irq_mode() = fuchsia_hardware_pci::InterruptMode::kLegacy;
   }
 
   // Returns true if a queue has been kicked (notified) and clears the notified bit.

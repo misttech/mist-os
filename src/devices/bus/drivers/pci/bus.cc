@@ -9,6 +9,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
+#include <lib/pci/hw.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
@@ -218,8 +219,8 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
         continue;
       }
 
-      bool is_bridge =
-          ((config->Read(Config::kHeaderType) & PCI_HEADER_TYPE_MASK) == PCI_HEADER_TYPE_BRIDGE);
+      bool is_bridge = ((config->Read(Config::kHeaderType) & PCI_HEADER_TYPE_MASK) ==
+                        PCI_HEADER_TYPE_PCI_BRIDGE);
       zxlogf(TRACE, "\tfound %s at %02x:%02x.%1x", (is_bridge) ? "bridge" : "device", bus_id,
              dev_id, func_id);
 
@@ -446,7 +447,7 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
                    device.config()->addr(), zx_status_get_string(signal_status));
           }
 
-          // In the case of PCI_INTERRUPT_MODE_LEGACY, disable the legacy interrupt on
+          // In the case of fpci::InterruptMode::kLegacyNoack, disable the legacy interrupt on
           // a device until a driver services and acknowledges it. If we're in
           // the NOACK mode then we update the running total we keep of
           // interrupts per period. If they exceed the configured limit then
@@ -454,7 +455,7 @@ void Bus::LegacyIrqWorker(const zx::port& port, fbl::Mutex* lock, SharedIrqMap* 
           // no way to re-enable it without changing IRQ modes.
           auto& irqs = device.irqs();
           bool disable_irq = true;
-          if (irqs.mode == PCI_INTERRUPT_MODE_LEGACY_NOACK) {
+          if (irqs.mode == fuchsia_hardware_pci::InterruptMode::kLegacyNoack) {
             irqs.irqs_in_period++;
             if (packet.interrupt.timestamp - irqs.legacy_irq_period_start >= kLegacyNoAckPeriod) {
               irqs.legacy_irq_period_start = packet.interrupt.timestamp;

@@ -36,7 +36,7 @@ class Device {
 
   void StartIrqThread();
   // interrupt cases that devices may override
-  pci_interrupt_mode_t InterruptMode() { return backend_->InterruptMode(); }
+  fuchsia_hardware_pci::InterruptMode InterruptMode() { return backend_->InterruptMode(); }
   virtual void IrqRingUpdate() = 0;
   virtual void IrqConfigChange() = 0;
 

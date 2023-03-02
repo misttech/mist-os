@@ -10,7 +10,7 @@ TEST_F(DeviceEnumerationTest, QemuArm64Test) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/qemu-bus",
       "sys/platform/00:00:6/rtc",
-      "sys/platform/pci/00:00.0",
+      "sys/platform/pci/00:00.0_",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

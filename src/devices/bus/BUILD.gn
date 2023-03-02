@@ -23,7 +23,6 @@ group("drivers") {
     "drivers/platform/test:test-gpio",
     "drivers/platform/test:test-i2c",
     "drivers/platform/test:test-parent",
-    "drivers/platform/test:test-pci",
     "drivers/platform/test:test-power",
     "drivers/platform/test:test-power-sensor",
     "drivers/platform/test:test-pwm",

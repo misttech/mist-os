@@ -67,7 +67,7 @@ class Backend {
     return ZX_OK;
   }
   // For Device level access to checking IRQ mode.
-  pci_interrupt_mode_t InterruptMode() const { return irq_mode_; }
+  fuchsia_hardware_pci::InterruptMode InterruptMode() const { return irq_mode_; }
 
   // Wait for the device to raise an interrupt; may return early or may time out after an
   // internal waiting period.
@@ -83,11 +83,11 @@ class Backend {
 
  protected:
   // For derived backends who want to modify the IRQ mode
-  pci_interrupt_mode_t& irq_mode() { return irq_mode_; }
+  fuchsia_hardware_pci::InterruptMode& irq_mode() { return irq_mode_; }
   std::vector<zx::interrupt>& irq_handles() { return irq_handles_; }
 
  private:
-  pci_interrupt_mode_t irq_mode_ = PCI_INTERRUPT_MODE_DISABLED;
+  fuchsia_hardware_pci::InterruptMode irq_mode_ = fuchsia_hardware_pci::InterruptMode::kDisabled;
   std::vector<zx::interrupt> irq_handles_;
 };
 

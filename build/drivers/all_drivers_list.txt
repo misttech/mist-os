@@ -126,7 +126,6 @@
 //src/devices/bus/drivers/platform/test:test-gpio-driver
 //src/devices/bus/drivers/platform/test:test-i2c-driver
 //src/devices/bus/drivers/platform/test:test-parent-driver
-//src/devices/bus/drivers/platform/test:test-pci-driver
 //src/devices/bus/drivers/platform/test:test-power-driver
 //src/devices/bus/drivers/platform/test:test-power-sensor-driver
 //src/devices/bus/drivers/platform/test:test-pwm-driver

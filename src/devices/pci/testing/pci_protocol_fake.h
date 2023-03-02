@@ -37,9 +37,15 @@ class FakePciProtocol : public FakePciProtocolInternal,
  public:
   // Add an interrupt for the specified PCI interrupt mode. A reference to the
   // interrupt object created is returned.
-  zx::interrupt& AddLegacyInterrupt() { return AddInterrupt(PCI_INTERRUPT_MODE_LEGACY); }
-  zx::interrupt& AddMsiInterrupt() { return AddInterrupt(PCI_INTERRUPT_MODE_MSI); }
-  zx::interrupt& AddMsixInterrupt() { return AddInterrupt(PCI_INTERRUPT_MODE_MSI_X); }
+  zx::interrupt& AddLegacyInterrupt() {
+    return AddInterrupt(fuchsia_hardware_pci::InterruptMode::kLegacy);
+  }
+  zx::interrupt& AddMsiInterrupt() {
+    return AddInterrupt(fuchsia_hardware_pci::InterruptMode::kMsi);
+  }
+  zx::interrupt& AddMsixInterrupt() {
+    return AddInterrupt(fuchsia_hardware_pci::InterruptMode::kMsiX);
+  }
 
   // Sets the structure returned by |PciGetDeviceInfo|.
   fuchsia_hardware_pci::wire::DeviceInfo SetDeviceInfo(
@@ -52,7 +58,7 @@ class FakePciProtocol : public FakePciProtocolInternal,
     ZX_ASSERT_MSG(
         size > 2,
         "FakePciProtocol Error: a vendor capability must be at least size 0x3 (size = %#x).", size);
-    AddCapabilityInternal(PCI_CAPABILITY_ID_VENDOR, position, size);
+    AddCapabilityInternal(fuchsia_hardware_pci::CapabilityId::kVendor, position, size);
     // Vendor capabilities store a size at the byte following the next pointer.
     config().write(&size, position + 2, sizeof(size));
   }
@@ -62,7 +68,7 @@ class FakePciProtocol : public FakePciProtocolInternal,
   // capability do so just to understand the configuration space they have
   // available, not to actually attempt to modify this capability.
   void AddPciExpressCapability(uint8_t position) {
-    AddCapabilityInternal(PCI_CAPABILITY_ID_PCI_EXPRESS, position,
+    AddCapabilityInternal(fuchsia_hardware_pci::CapabilityId::kPciExpress, position,
                           FakePciProtocolInternal::kPciExpressCapabilitySize);
   }
 
@@ -112,7 +118,7 @@ class FakePciProtocol : public FakePciProtocolInternal,
   // Returns a VMO corresponding to the device's configuration space.
   zx::unowned_vmo GetConfigVmo() { return config().borrow(); }
   // Returns the presently configured interrupt mode.
-  pci_interrupt_mode_t GetIrqMode() const { return irq_mode(); }
+  fuchsia_hardware_pci::InterruptMode GetIrqMode() const { return irq_mode(); }
   // Returns the present number of interrupts configured by |PciSetInterruptMode|.
   uint32_t GetIrqCount() const { return irq_cnt(); }
   // Returns how many times |PciResetDevice| has been called.

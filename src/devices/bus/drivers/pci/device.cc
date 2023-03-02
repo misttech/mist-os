@@ -166,7 +166,7 @@ zx_status_t Device::InitInterrupts() {
     }
   }
 
-  irqs_.mode = PCI_INTERRUPT_MODE_DISABLED;
+  irqs_.mode = fuchsia_hardware_pci::InterruptMode::kDisabled;
   return ZX_OK;
 }
 
@@ -211,12 +211,7 @@ zx_status_t Device::InitLocked() {
     }
   }
 
-  auto result = BanjoDevice::Create(parent_, this);
-  if (result.is_error()) {
-    return result.status_value();
-  }
-
-  result = FidlDevice::Create(parent_, this);
+  zx::result result = FidlDevice::Create(parent_, this);
   if (result.is_error()) {
     return result.status_value();
   }
