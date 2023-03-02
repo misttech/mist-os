@@ -92,13 +92,13 @@ reproxy="$reclient_bindir"/reproxy
 # Establish a single log dir per reproxy instance so that statistics are
 # accumulated per build invocation.
 date="$(date +%Y%m%d-%H%M%S)"
-reproxy_logdir="$(mktemp -d -t reproxy."$date".XXXX)"
+reproxy_tmpdir="$(mktemp -d -t reproxy."$date".XXXX)"
 # These environment variables take precedence over those found in --cfg.
-export RBE_log_dir="$reproxy_logdir"
-export RBE_proxy_log_dir="$reproxy_logdir"
+export RBE_log_dir="$reproxy_tmpdir"
+export RBE_proxy_log_dir="$reproxy_tmpdir"
 # rbe_metrics.{pb,txt} appears in -output_dir
-export RBE_output_dir="$reproxy_logdir"
-export RBE_server_address=unix://"$reproxy_logdir"/reproxy.sock
+export RBE_output_dir="$reproxy_tmpdir"
+export RBE_server_address=unix://"$reproxy_tmpdir"/reproxy.sock
 # deps cache dir should be somewhere persistent between builds,
 # and thus, not random.  /var/cache can be root-owned and not always writeable.
 if test -n "$HOME"
@@ -170,23 +170,11 @@ EOF
   fi
 }
 
-# reproxy wants temporary space on the same device where
-# the build happens.  The default $TMPDIR is not guaranteed to
-# be on the same physical device.
-# Re-use the randomly generated dir name in a custom tempdir.
-build_dir=.
-reproxy_tmpdir="$build_dir"/reproxy_tmpdirs/"$(basename "$reproxy_logdir")"
-mkdir -p "$reproxy_tmpdir"
-
-function cleanup() {
-  rm -rf "$reproxy_tmpdir"
-}
-
 # Startup reproxy.
 # Use the same config for bootstrap as for reproxy.
 # This also checks for authentication, and prompts the user to
 # re-authenticate if needed.
-TMPDIR="$reproxy_tmpdir" "$bootstrap" \
+"$bootstrap" \
   --re_proxy="$reproxy" \
   --cfg="$reproxy_cfg" \
   "${auth_option[@]}" \
@@ -197,14 +185,12 @@ test "$BUILD_METRICS_ENABLED" = 0 || {
   "$script_dir"/upload_reproxy_logs.sh --auth-only
 
   # Generate a uuid for uploading logs and metrics.
-  echo "$build_uuid" > "$reproxy_logdir"/build_id
+  echo "$build_uuid" > "$reproxy_tmpdir"/build_id
 }
 
 shutdown() {
   # b/188923283 -- added --cfg to shut down properly
   "$bootstrap" --shutdown --cfg="$reproxy_cfg"
-
-  cleanup
 
   test "$BUILD_METRICS_ENABLED" = 0 || {
     # This script uses the 'bq' CLI tool, which is installed in the
@@ -218,7 +204,7 @@ shutdown() {
       --uuid="$build_uuid" \
       --bq-logs-table="$cloud_project:$dataset".rbe_client_command_logs_developer \
       --bq-metrics-table="$cloud_project:$dataset".rbe_client_metrics_developer \
-      "$reproxy_logdir"
+      "$reproxy_tmpdir"
       # The upload exit status does not propagate from inside a trap call.
   }
 }
