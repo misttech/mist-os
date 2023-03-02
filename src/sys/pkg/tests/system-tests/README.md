@@ -51,7 +51,7 @@ You should be able to run the tests with:
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
   --downgrade-builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
-  --upgrade-fuchsia-build-dir $FUCHSIA_BUILD_DIR
+  --upgrade-fuchsia-build-dir $(fx get-build-dir)
 ```
 
 This will run through the whole test paving the build to the latest version
@@ -74,7 +74,7 @@ Or you can combine these options:
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
   --downgrade-build-id 123456789... \
-  --upgrade-fuchsia-build-dir $FUCHSIA_BUILD_DIR
+  --upgrade-fuchsia-build-dir $(fx get-build-dir)
 ```
 
 There are more options to the test, to see them all run
@@ -89,7 +89,7 @@ can be done by running:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_reboot \
   --ssh-private-key ~/.ssh/fuchsia_ed25519 \
-  --fuchsia-build-dir $FUCHSIA_BUILD_DIR
+  --fuchsia-build-dir $(fx get-build-dir)
 ```
 
 Or if you want to test a build, you can use:
