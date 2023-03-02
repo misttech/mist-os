@@ -449,6 +449,11 @@ func (t *DeviceTarget) Wait(context.Context) error {
 	return ErrUnimplemented
 }
 
+// Config returns fields describing the target.
+func (t *DeviceTarget) TestConfig(netboot bool) (any, error) {
+	return TargetInfo(t, netboot)
+}
+
 func parseOutSigners(keyPaths []string) ([]ssh.Signer, error) {
 	if len(keyPaths) == 0 {
 		return nil, errors.New("must supply SSH keys in the config")

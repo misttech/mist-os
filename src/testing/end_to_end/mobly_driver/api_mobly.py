@@ -71,14 +71,18 @@ def new_testbed_config(
     This method expects the |fuchsia_controller| object to follow the schema of
     tools/botanist/cmd/run.go's |targetInfo| struct.
 
-    Example object from |fuchsia_controllers|:
-       {
+    Example |fuchsia_controllers|:
+       [{
+          "type": "FuchsiaDevice",
           "nodename":"fuchsia-54b2-030e-eb19",
           "ipv4":"192.168.42.112",
           "ipv6":"",
           "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
           "ssh_key":"/etc/botanist/keys/pkey_infra"
-       }
+       }, {
+          "type": "AccessPoint",
+          "ip": "192.168.42.11",
+       }]
 
     Example output:
        {
@@ -93,6 +97,11 @@ def new_testbed_config(
                     "ipv6":"",
                     "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
                     "ssh_key":"/etc/botanist/keys/pkey_infra"
+                  }
+                ],
+                "AccessPoint": [
+                  {
+                    "ip": "192.168.42.11"
                   }
                 ]
               },
@@ -112,16 +121,21 @@ def new_testbed_config(
     Returns:
       A Mobly Config that corresponds to the user-specified arguments.
     """
+    controllers = {}
+    for c in fuchsia_controllers:
+        t = c['type']
+        del c['type']
+        if t in controllers:
+            controllers[t].append(c)
+        else:
+            controllers[t] = [c]
+
     config_dict = {
         keys.Config.key_testbed.value:
             [
                 {
                     keys.Config.key_testbed_name.value: testbed_name,
-                    keys.Config.key_testbed_controllers.value:
-                        {
-                            # TODO(fxbug.dev/119213) - Replace using HoneyDew.
-                            'FuchsiaDevice': fuchsia_controllers
-                        },
+                    keys.Config.key_testbed_controllers.value: controllers,
                 },
             ],
         keys.Config.key_mobly_params.value:
@@ -129,6 +143,7 @@ def new_testbed_config(
                 keys.Config.key_log_path.value: log_path
             }
     }
+
     return get_config_with_test_params(config_dict, test_params_dict)
 
 

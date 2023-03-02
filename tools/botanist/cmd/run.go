@@ -115,30 +115,6 @@ func (v *imageOverridesFlagValue) Set(s string) error {
 	return json.Unmarshal([]byte(s), &v)
 }
 
-// targetInfo is the schema for a JSON object used to communicate target
-// information (device properties, serial paths, SSH properties, etc.) to
-// subprocesses.
-
-// LINT.IfChange
-type targetInfo struct {
-	// Nodename is the Fuchsia nodename of the target.
-	Nodename string `json:"nodename"`
-
-	// IPv4 is the IPv4 address of the target.
-	IPv4 string `json:"ipv4"`
-
-	// IPv6 is the IPv6 address of the target.
-	IPv6 string `json:"ipv6"`
-
-	// SerialSocket is the path to the serial socket, if one exists.
-	SerialSocket string `json:"serial_socket"`
-
-	// SSHKey is a path to a private key that can be used to access the target.
-	SSHKey string `json:"ssh_key"`
-}
-
-// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_mobly.py)
-
 func (*RunCommand) Name() string {
 	return "run"
 }
@@ -544,27 +520,13 @@ func (r *RunCommand) runPreflights(ctx context.Context) error {
 // createTestbedConfig creates a configuration file that describes the targets
 // attached and returns the path to the file.
 func (r *RunCommand) createTestbedConfig(targetSlice []targets.Target) (string, error) {
-	var testbedConfig []targetInfo
+	var testbedConfig []any
 	for _, t := range targetSlice {
-		cfg := targetInfo{
-			Nodename:     t.Nodename(),
-			SerialSocket: t.SerialSocketPath(),
+		c, err := t.TestConfig(r.netboot)
+		if err != nil {
+			return "", err
 		}
-		if !r.netboot {
-			cfg.SSHKey = t.SSHKey()
-			if ipv4, err := t.IPv4(); err != nil {
-				return "", err
-			} else if ipv4 != nil {
-				cfg.IPv4 = ipv4.String()
-			}
-
-			if ipv6, err := t.IPv6(); err != nil {
-				return "", err
-			} else if ipv6 != nil {
-				cfg.IPv6 = ipv6.String()
-			}
-		}
-		testbedConfig = append(testbedConfig, cfg)
+		testbedConfig = append(testbedConfig, c)
 	}
 
 	data, err := json.Marshal(testbedConfig)

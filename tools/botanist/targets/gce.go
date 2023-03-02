@@ -466,3 +466,7 @@ func (g *GCETarget) SSHClient() (*sshutil.Client, error) {
 
 	return g.sshClient(&net.IPAddr{IP: addr})
 }
+
+func (g *GCETarget) TestConfig(netboot bool) (any, error) {
+	return TargetInfo(g, netboot)
+}

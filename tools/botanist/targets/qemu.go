@@ -586,6 +586,11 @@ func (t *QEMUTarget) Wait(ctx context.Context) error {
 	}
 }
 
+// Config returns fields describing the target.
+func (t *QEMUTarget) TestConfig(netboot bool) (any, error) {
+	return TargetInfo(t, netboot)
+}
+
 func normalizeFile(path string) (string, error) {
 	if _, err := os.Stat(path); err != nil {
 		return "", err

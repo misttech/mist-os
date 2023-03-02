@@ -113,6 +113,14 @@ type Target interface {
 
 	// SetImageOverrides sets the images to override the defaults in images.json.
 	SetImageOverrides(build.ImageOverrides)
+
+	// TestConfig returns fields describing the target to be provided to tests
+	// during runtime.
+	//
+	// This information will be provided as part of the testbed config. The path
+	// to the testbed config will be available during test runtime via the
+	// FUCHSIA_TESTBED_CONFIG environment variable.
+	TestConfig(netboot bool) (any, error)
 }
 
 // target is a generic Fuchsia instance.
@@ -572,16 +580,15 @@ func DeriveTarget(ctx context.Context, obj []byte, opts Options) (Target, error)
 	}
 }
 
-// StartOptions boundle together some options that might change how a target
-// is started.
+// StartOptions bundles options for starting a target.
 type StartOptions struct {
-	// Netboot tells the image to use Netboot or to Pave
+	// Netboot tells the image to use netboot if true; otherwise, pave.
 	Netboot bool
 
-	// ImageManifest is the path to an image manifest
+	// ImageManifest is the path to an image manifest.
 	ImageManifest string
 
-	// ZirconArgs are kernel command-line arguments to pass on boot.
+	// ZirconArgs are kernel command-line arguments to pass to zircon on boot.
 	ZirconArgs []string
 }
 
@@ -637,4 +644,55 @@ func StopTargets(ctx context.Context, targetSlice []Target) {
 		})
 	}
 	_ = eg.Wait()
+}
+
+// LINT.IfChange
+type targetInfo struct {
+	// Type identifies the type of device.
+	Type string `json:"type"`
+
+	// Nodename is the Fuchsia nodename of the target.
+	Nodename string `json:"nodename"`
+
+	// IPv4 is the IPv4 address of the target.
+	IPv4 string `json:"ipv4"`
+
+	// IPv6 is the IPv6 address of the target.
+	IPv6 string `json:"ipv6"`
+
+	// SerialSocket is the path to the serial socket, if one exists.
+	SerialSocket string `json:"serial_socket"`
+
+	// SSHKey is a path to a private key that can be used to access the target.
+	SSHKey string `json:"ssh_key"`
+}
+
+// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_mobly.py)
+
+// TargetInfo returns config used to communicate with the target (device
+// properties, serial paths, SSH properties, etc.) for use by subprocesses.
+func TargetInfo(t Target, netboot bool) (targetInfo, error) {
+	cfg := targetInfo{
+		Type:         "FuchsiaDevice",
+		Nodename:     t.Nodename(),
+		SerialSocket: t.SerialSocketPath(),
+	}
+	if netboot {
+		return cfg, nil
+	}
+
+	cfg.SSHKey = t.SSHKey()
+	if ipv4, err := t.IPv4(); err != nil {
+		return cfg, err
+	} else if ipv4 != nil {
+		cfg.IPv4 = ipv4.String()
+	}
+
+	if ipv6, err := t.IPv6(); err != nil {
+		return cfg, err
+	} else if ipv6 != nil {
+		cfg.IPv6 = ipv6.String()
+	}
+
+	return cfg, nil
 }
