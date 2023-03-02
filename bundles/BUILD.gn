@@ -10,14 +10,7 @@ import("//build/drivers/create_all_drivers_doc.gni")
 # This provides metadata in the //:boot_tests schema.
 group("boot_tests") {
   testonly = true
-
-  deps = [
-    "//src/bringup/lib:boot_tests",
-    "//src/lib/elfldltl/test:boot_tests",
-    "//zircon/kernel/lib/userabi/userboot/tests:boot_tests",
-    "//zircon/kernel/phys:boot_tests",
-    "//zircon/system/utest/core:boot_tests",
-  ]
+  deps = [ "//bundles/bringup:boot_tests" ]
 }
 
 # A collection of all stress tests available in-tree. The tests in this group will be built

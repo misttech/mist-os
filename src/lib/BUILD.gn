@@ -174,3 +174,9 @@ group("tests") {
     "zxdump:tests",
   ]
 }
+
+group("boot_tests") {
+  testonly = true
+
+  deps = [ "elfldltl:boot_tests" ]
+}

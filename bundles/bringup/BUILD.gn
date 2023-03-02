@@ -22,3 +22,15 @@ group("manual_testing") {
     "//src/zircon/tests/evil",
   ]
 }
+
+# This provides metadata in the //:boot_tests schema.
+group("boot_tests") {
+  testonly = true
+
+  deps = [
+    "//src/bringup/lib:boot_tests",
+    "//src/lib:boot_tests",
+    "//zircon/kernel:boot_tests",
+    "//zircon/system/utest/core:boot_tests",
+  ]
+}
