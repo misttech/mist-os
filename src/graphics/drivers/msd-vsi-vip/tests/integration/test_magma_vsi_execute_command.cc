@@ -249,7 +249,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     // Jump to an unmapped address.
     command_stream->EtnaLink(0x8 /* arbitrary prefetch */, next_gpu_addr_);
 
-    static constexpr uint32_t kTimeoutMs = 10;
+    static constexpr uint32_t kTimeoutMs = 100;
     ExecuteCommand(command_stream, kTimeoutMs);
 
     EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(magma_vsi_.GetConnection()));
@@ -310,7 +310,6 @@ TEST_F(MagmaExecuteMsdVsi, ExecuteMany) {
 }
 
 TEST_F(MagmaExecuteMsdVsi, MmuExceptionRecovery) {
-  GTEST_SKIP() << "TODO(https://fxbug.dev/122408): Skipping flaky test";
   TestExecuteMmuException();
   TearDown();
   // Verify new commands complete successfully.
