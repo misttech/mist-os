@@ -21,7 +21,7 @@ class ZirconPlatformPort : public PlatformPort {
     DASSERT(status == ZX_OK);
   }
 
-  Status Wait(uint64_t* key_out, uint64_t timeout_ms) override;
+  Status Wait(uint64_t* key_out, uint64_t timeout_ms, uint64_t* trigger_time_out) override;
 
   zx::port& zx_port() { return port_; }
 

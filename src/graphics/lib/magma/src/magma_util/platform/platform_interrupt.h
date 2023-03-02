@@ -9,6 +9,8 @@
 
 namespace magma {
 
+class PlatformPort;
+
 // Created from a PlatformPciDevice.
 class PlatformInterrupt {
  public:
@@ -16,9 +18,13 @@ class PlatformInterrupt {
 
   virtual ~PlatformInterrupt() {}
 
+  virtual uint64_t global_id() const = 0;
   virtual void Signal() = 0;
   virtual bool Wait() = 0;
   virtual void Complete() = 0;
+  virtual void Ack() = 0;
+  virtual bool Bind(PlatformPort* port, uint64_t key) = 0;
+  virtual bool Unbind(PlatformPort* port) = 0;
 
   virtual uint64_t GetMicrosecondsSinceLastInterrupt() = 0;
 

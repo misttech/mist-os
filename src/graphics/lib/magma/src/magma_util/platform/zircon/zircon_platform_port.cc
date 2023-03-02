@@ -12,7 +12,11 @@
 
 namespace magma {
 
-Status ZirconPlatformPort::Wait(uint64_t* key_out, uint64_t timeout_ms) {
+Status ZirconPlatformPort::Wait(uint64_t* key_out, uint64_t timeout_ms,
+                                uint64_t* trigger_time_out) {
+  if (trigger_time_out) {
+    *trigger_time_out = 0;
+  }
   if (!port_)
     return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "wait on invalid port");
 
@@ -37,6 +41,9 @@ Status ZirconPlatformPort::Wait(uint64_t* key_out, uint64_t timeout_ms) {
   } else if (packet.type == ZX_PKT_TYPE_SIGNAL_ONE &&
              packet.signal.observed == ZX_CHANNEL_PEER_CLOSED) {
     return DRET(MAGMA_STATUS_CONNECTION_LOST);
+  } else if (packet.type == ZX_PKT_TYPE_INTERRUPT) {
+    if (trigger_time_out)
+      *trigger_time_out = packet.interrupt.timestamp;
   }
 
   *key_out = packet.key;
@@ -45,7 +52,7 @@ Status ZirconPlatformPort::Wait(uint64_t* key_out, uint64_t timeout_ms) {
 
 std::unique_ptr<PlatformPort> PlatformPort::Create() {
   zx::port port;
-  zx_status_t status = zx::port::create(0, &port);
+  zx_status_t status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
   if (status != ZX_OK)
     return DRETP(nullptr, "port::create failed: %d", status);
 

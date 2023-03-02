@@ -97,10 +97,8 @@ class MsdArmDevice : public msd::Device,
     uint32_t job_irq_status;
     uint32_t job_irq_mask;
     uint32_t job_irq_js_state;
-    bool handling_job_interrupt{};
     uint64_t job_interrupt_delay{};
     uint64_t job_interrupt_time{};
-    uint64_t job_interrupt_time_processed{};
 
     uint32_t mmu_irq_rawstat;
     uint32_t mmu_irq_status;
@@ -178,7 +176,6 @@ class MsdArmDevice : public msd::Device,
 
   class DumpRequest;
   class PerfCounterSampleCompletedRequest;
-  class JobInterruptRequest;
   class MmuInterruptRequest;
   class ScheduleAtomRequest;
   class CancelAtomsRequest;
@@ -205,7 +202,6 @@ class MsdArmDevice : public msd::Device,
   void StartDeviceThread();
   int DeviceThreadLoop();
   int GpuInterruptThreadLoop();
-  int JobInterruptThreadLoop();
   int MmuInterruptThreadLoop();
   bool InitializeInterrupts();
   void EnableInterrupts();
@@ -276,19 +272,16 @@ class MsdArmDevice : public msd::Device,
 
   std::atomic_bool interrupt_thread_quit_flag_{false};
   std::thread gpu_interrupt_thread_;
-  std::thread job_interrupt_thread_;
   std::thread mmu_interrupt_thread_;
 
-  std::atomic_bool handling_job_interrupt_;
   std::atomic_bool handling_gpu_interrupt_;
   std::atomic_bool handling_mmu_interrupt_;
   std::atomic<uint64_t> job_interrupt_delay_{};
   std::atomic<uint64_t> gpu_interrupt_delay_{};
   std::atomic<uint64_t> mmu_interrupt_delay_{};
-  std::atomic<uint64_t> job_interrupt_time_{};
   std::atomic<uint64_t> gpu_interrupt_time_{};
   std::atomic<uint64_t> mmu_interrupt_time_{};
-  uint64_t job_interrupt_time_processed_ = {};
+  uint64_t job_interrupt_time_ = {};
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 

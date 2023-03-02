@@ -50,7 +50,11 @@ class FakePlatformInterrupt : public magma::PlatformInterrupt {
 
     return true;
   }
+  uint64_t global_id() const override { return 0; }
   void Complete() override {}
+  void Ack() override {}
+  bool Bind(magma::PlatformPort* port, uint64_t key) override { return true; }
+  bool Unbind(magma::PlatformPort* port) override { return true; }
 
   uint64_t GetMicrosecondsSinceLastInterrupt() override { return 0; }
 

@@ -21,10 +21,13 @@ class PlatformPort {
   virtual void Close() = 0;
 
   // Waits for a port to return a packet.
-  // If a packet is available before the time timeout expires, |key_out| will be set.
-  virtual Status Wait(uint64_t* key_out, uint64_t timeout_ms) = 0;
+  // If a packet is available before the timeout expires, `key_out` will be set.
+  // If the packet is an interrupt, then `*trigger_time_out` will be set to the hardware interrupt
+  // timestamp.
+  virtual Status Wait(uint64_t* key_out, uint64_t timeout_ms, uint64_t* trigger_time_out) = 0;
 
   Status Wait(uint64_t* key_out) { return Wait(key_out, UINT64_MAX); }
+  Status Wait(uint64_t* key_out, uint64_t timeout_ms) { return Wait(key_out, timeout_ms, nullptr); }
 };
 
 }  // namespace magma
