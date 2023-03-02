@@ -10,6 +10,7 @@
 #include <debug.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/console.h>
+#include <lib/debuglog.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,6 +79,8 @@ static int cmd_test(int argc, const cmd_args* argv, uint32_t flags);
 #if CONSOLE_ENABLE_HISTORY
 static int cmd_history(int argc, const cmd_args* argv, uint32_t flags);
 #endif
+static int cmd_boot_test_success(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags);
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("help", "this list", &cmd_help, CMD_AVAIL_ALWAYS)
@@ -86,6 +89,10 @@ STATIC_COMMAND_MASKED("test", "test the command processor", &cmd_test, CMD_AVAIL
 #if CONSOLE_ENABLE_HISTORY
 STATIC_COMMAND_MASKED("history", "command history", &cmd_history, CMD_AVAIL_ALWAYS)
 #endif
+STATIC_COMMAND_MASKED("boot-test-success", "report boot-test success", &cmd_boot_test_success,
+                      CMD_AVAIL_ALWAYS)
+STATIC_COMMAND_MASKED("graceful-shutdown", "shut the system down gracefully",
+                      &cmd_graceful_shutdown, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_END(help)
 
 static void console_init(uint level) {
@@ -564,6 +571,7 @@ static zx_status_t command_loop(int (*get_line)(const char**, void*), void* get_
     const cmd* command = match_command(args[0].str, CMD_AVAIL_NORMAL);
     if (!command) {
       printf("command \"%s\" not found\n", args[0].str);
+      lastresult = -1;
       continue;
     }
 
@@ -634,7 +642,7 @@ static int fetch_next_line(const char** buffer, void* cookie) {
 
   size_t bufpos = 0;
   while (lineread->string[lineread->pos] != 0) {
-    if (lineread->string[lineread->pos] == '\n') {
+    if (char c = lineread->string[lineread->pos]; c == '\n' || c == ';') {
       lineread->pos++;
       break;
     }
@@ -827,6 +835,22 @@ static int cmd_test(int argc, const cmd_args* argv, uint32_t flags) {
   return 0;
 }
 
+static int cmd_boot_test_success(int argc, const cmd_args* argv, uint32_t flags) {
+  printf("*** Last script command result: %d ***\n", lastresult);
+  if (lastresult == 0) {
+    printf("%s\n", BOOT_TEST_SUCCESS_STRING);
+  }
+  return lastresult;
+}
+
+static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags) {
+  printf("*** Performing graceful shutdown from kernel shell... ***\n");
+  const zx_time_t dlog_deadline = current_time() + ZX_SEC(10);
+  dlog_shutdown(dlog_deadline);
+  // Does not return.
+  platform_halt(HALT_ACTION_SHUTDOWN, ZirconCrashReason::NoCrash);
+}
+
 static constexpr TimerSlack kSlack{ZX_MSEC(10), TIMER_SLACK_CENTER};
 
 void RecurringCallback::CallbackWrapper(Timer* t, zx_time_t now, void* arg) {
@@ -861,6 +885,13 @@ void RecurringCallback::Toggle() {
 }
 
 static void kernel_shell_init(uint level) {
+  if (!gBootOptions->shell_script.empty()) {
+    SmallString script = gBootOptions->shell_script;
+    for (char* p = strchr(script.data(), '+'); p; p = strchr(p + 1, '+')) {
+      *p = ' ';
+    }
+    console_run_script(script.data());
+  }
   if (gBootOptions->shell) {
     console_start();
   }

@@ -772,6 +772,15 @@ DEFINE_OPTION("kernel.shell", bool, shell, {false}, R"""(
 Tells the kernel to start its own shell on the kernel console instead of a userspace sh.
 )""")
 
+DEFINE_OPTION("kernel.shell.script", SmallString, shell_script, {}, R"""(
+Tells the kernel to run a canned script of `kernel.shell` commands. If
+`kernel.shell` is also specified, the kernel shell command prompt comes
+after the script completes unless the script shuts down the system.
+Since whitespace on the kernel command line separates different boot options,
+`+` characters in the script are replaced with spaces to allow for commands
+with arguments, and `;` characters can separate commands in the script.
+)""")
+
 DEFINE_OPTION("kernel.smp.ht", bool, smp_ht_enabled, {true}, R"""(
 This option specifies whether the HyperThreading (HT) logical CPUs should be enabled or not.
 )""")

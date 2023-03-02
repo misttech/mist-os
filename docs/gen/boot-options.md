@@ -906,6 +906,16 @@ The option allows a notice to be printed when the root job is either terminated,
 
 Tells the kernel to start its own shell on the kernel console instead of a userspace sh.
 
+### kernel.shell.script=\<string>
+
+
+Tells the kernel to run a canned script of `kernel.shell` commands. If
+`kernel.shell` is also specified, the kernel shell command prompt comes
+after the script completes unless the script shuts down the system.
+Since whitespace on the kernel command line separates different boot options,
+`+` characters in the script are replaced with spaces to allow for commands
+with arguments, and `;` characters can separate commands in the script.
+
 ### kernel.smp.ht=\<bool>
 
 **Default:** `true`

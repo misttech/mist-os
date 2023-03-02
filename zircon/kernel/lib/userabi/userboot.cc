@@ -426,4 +426,4 @@ void userboot_init(uint) {
 
 }  // namespace
 
-LK_INIT_HOOK(userboot, userboot_init, LK_INIT_LEVEL_USER)
+LK_INIT_HOOK(userboot, userboot_init, LK_INIT_LEVEL_USER + 1)

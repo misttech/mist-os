@@ -4,12 +4,15 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/testing/boot_test.gni")
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("console") {
   sources = [ "console.cc" ]
+  defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
   deps = [
     "//zircon/kernel/lib/boot-options:headers",
+    "//zircon/kernel/lib/debuglog:headers",
     "//zircon/kernel/lib/init",
   ]
   public_deps = [
