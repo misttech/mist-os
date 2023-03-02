@@ -19,7 +19,6 @@ products:
   - "Core"
 boards:
   - "NUC"
-  - "Pixelbook Go"
   - "VIM"
 methods:
   - "USB Flash Drive"
@@ -36,13 +35,6 @@ guides:
     host: "N/A"
     url: "/docs/development/hardware/intel_nuc.md"
     title: "Install Fuchsia on a NUC"
-  - type: "Custom"
-    product: "Workstation"
-    board: "Pixelbook Go"
-    method: "USB Flash Drive"
-    host: "N/A"
-    url: "/docs/development/hardware/chromebook.md"
-    title: "Install Fuchsia on a Chromebook"
   - type: "Custom"
     product: "Core"
     board: "VIM"

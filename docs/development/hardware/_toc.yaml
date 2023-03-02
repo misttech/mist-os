@@ -10,8 +10,6 @@ toc:
   path: /docs/development/hardware/README.md
 - title: "Device setup guides index"
   path: /docs/development/hardware/setup/index.md
-- title: "Install Fuchsia on a Chromebook"
-  path: /docs/development/hardware/chromebook.md
 - title: "Install Fuchsia on a NUC"
   path: /docs/development/hardware/intel_nuc.md
 - title: "Install Fuchsia on a NUC using Zedboot (Legacy)"
