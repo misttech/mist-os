@@ -177,6 +177,12 @@ template("zbi_test") {
       ]
     }
 
+    # AEMU does not support RISC-V.
+    if (current_cpu == "riscv64") {
+      device_types += [ "AEMU" ]
+      device_types -= [ "AEMU" ]
+    }
+
     zbi = ":$zbi_target"
     if (use_vbmeta) {
       vbmeta = ":$vbmeta_target"
