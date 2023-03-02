@@ -7,12 +7,15 @@
 
 #include <fuchsia/mediacodec/cpp/fidl.h>
 #include <lib/fit/function.h>
+#include <lib/syslog/cpp/macros.h>
 
+#include <optional>
+
+#include <src/lib/fxl/macros.h>
 #include <va/va.h>
 #include <va/va_magma.h>
 
-#include "media/gpu/h264_decoder.h"
-#include "src/lib/fxl/macros.h"
+#include "geometry.h"
 
 class VADisplayWrapper {
  public:
@@ -192,7 +195,25 @@ class ScopedImageID {
   FXL_DISALLOW_COPY_AND_ASSIGN(ScopedImageID);
 };
 
+std::vector<VAProfile> GetHardwareSupportedProfiles();
+
+struct ProfileDescription {
+ public:
+  VAProfile profile;
+  VAEntrypoint entrypoint;
+  std::optional<uint32_t> min_width;
+  std::optional<uint32_t> max_width;
+  std::optional<uint32_t> min_height;
+  std::optional<uint32_t> max_height;
+};
+
+std::optional<ProfileDescription> GetProfileDescription(
+    const VAProfile& profile, VAEntrypoint required_entrypoint,
+    std::vector<VAConfigAttrib>& required_attribs);
+
 std::vector<fuchsia::mediacodec::CodecDescription> GetCodecList();
+
+std::vector<fuchsia::mediacodec::DetailedCodecDescription> GetDecoderList();
 
 // Copy the memory between arrays with checking the array size.
 template <typename T, size_t N>

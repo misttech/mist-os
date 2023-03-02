@@ -4,6 +4,7 @@
 
 #include "codec_adapter_vaapi_decoder.h"
 
+#include <fuchsia/media/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/defer.h>
 #include <lib/media/codec_impl/fourcc.h>
@@ -799,12 +800,30 @@ void CodecAdapterVaApiDecoder::CoreCodecInit(
 
   switch (media_codec_.value()) {
     case CodecType::kMJPEG:
+      if (initial_input_format_details.has_profile() &&
+          (initial_input_format_details.profile() !=
+           fuchsia::media::CodecProfile::MJPEG_BASELINE)) {
+        SetCodecFailure("CodecCodecInit(): MJPEG decoder only supports BASELINE profile");
+        return;
+      }
       va_profile = VAProfileJPEGBaseline;
       break;
     case CodecType::kH264:
+      if (initial_input_format_details.has_profile() &&
+          (initial_input_format_details.profile() !=
+           fuchsia::media::CodecProfile::H264PROFILE_HIGH)) {
+        SetCodecFailure("CodecCodecInit(): H.264 decoder only supports HIGH profile");
+        return;
+      }
       va_profile = VAProfileH264High;
       break;
     case CodecType::kVP9:
+      if (initial_input_format_details.has_profile() &&
+          (initial_input_format_details.profile() !=
+           fuchsia::media::CodecProfile::VP9PROFILE_PROFILE0)) {
+        SetCodecFailure("CodecCodecInit(): VP9 decoder only supports PROFILE0 profile");
+        return;
+      }
       va_profile = VAProfileVP9Profile0;
       break;
     default:

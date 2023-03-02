@@ -4,6 +4,7 @@
 
 #include "codec_adapter_vaapi_encoder.h"
 
+#include <fuchsia/media/cpp/fidl.h>
 #include <zircon/status.h>
 
 #include <va/va_drmcommon.h>
@@ -73,6 +74,13 @@ bool CodecAdapterVaApiEncoder::HandleInputFormatChange(
   if (!input_format_details.domain().video().is_uncompressed()) {
     events_->onCoreCodecFailCodec("HandleInputFormatChange(): Input not uncompressed");
     return false;
+  }
+  if (input_format_details.has_profile()) {
+    if (input_format_details.profile() != fuchsia::media::CodecProfile::H264PROFILE_HIGH) {
+      events_->onCoreCodecFailCodec(
+          "HandleInputFormatChange(): Encoder only supports HIGH profile");
+      return false;
+    }
   }
   uint32_t width = input_format_details.domain().video().uncompressed().image_format.display_width;
   uint32_t height =

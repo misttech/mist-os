@@ -90,6 +90,19 @@ VAStatus vaQueryConfigAttributes(VADisplay dpy, VAConfigID config_id, VAProfile 
   *num_attribs = 2;
   return VA_STATUS_SUCCESS;
 }
+VAStatus vaQuerySurfaceAttributes(VADisplay dpy, VAConfigID config, VASurfaceAttrib *attrib_list,
+                                  unsigned int *num_attribs) {
+  if (attrib_list != nullptr) {
+    attrib_list[0] = {.type = VASurfaceAttribMinWidth, .value = {.value = {.i = 16}}};
+    attrib_list[1] = {.type = VASurfaceAttribMaxWidth, .value = {.value = {.i = 3840}}};
+    attrib_list[2] = {.type = VASurfaceAttribMinHeight, .value = {.value = {.i = 16}}};
+    attrib_list[3] = {.type = VASurfaceAttribMaxHeight, .value = {.value = {.i = 2160}}};
+  }
+
+  *num_attribs = 4;
+  return VA_STATUS_SUCCESS;
+}
+
 VAStatus vaCreateSurfaces(VADisplay dpy, unsigned int format, unsigned int width,
                           unsigned int height, VASurfaceID *surfaces, unsigned int num_surfaces,
                           VASurfaceAttrib *attrib_list, unsigned int num_attribs) {

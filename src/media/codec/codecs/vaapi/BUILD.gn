@@ -32,15 +32,19 @@ source_set("vaapi_utils") {
   sources = [ "vaapi_utils.cc" ]
   public = [ "vaapi_utils.h" ]
   public_deps = [
+    "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
-    "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/graphics/lib/magma/include:magma",
     "//src/lib/fxl",
-    "//src/media/lib/codec_impl",
-    "//src/media/lib/mpsc_queue",
     "//src/media/third_party/chromium_media",
     "//third_party/intel/libva/fuchsia:headers",
+  ]
+  deps = [
+    "//sdk/lib/fit",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 

@@ -46,6 +46,12 @@ class LocalSingleCodecFactory : public fuchsia::mediacodec::CodecFactory {
     binding_.events().OnCodecList(GetCodecList());
   }
 
+  void GetDetailedCodecDescriptions(GetDetailedCodecDescriptionsCallback callback) override {
+    fuchsia::mediacodec::CodecFactoryGetDetailedCodecDescriptionsResponse response;
+    response.set_codecs(GetDecoderList());
+    callback(std::move(response));
+  }
+
   void CreateDecoder(
       fuchsia::mediacodec::CreateDecoder_Params decoder_params,
       fidl::InterfaceRequest<fuchsia::media::StreamProcessor> decoder_request) override {
