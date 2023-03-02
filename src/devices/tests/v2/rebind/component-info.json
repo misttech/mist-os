@@ -1,9 +1,0 @@
-{
-    "short_description": "Driver used for testing rebinding DFv2 nodes",
-    "manufacturer": "",
-    "families": [],
-    "models": [],
-    "areas": [
-        "DriverFramework"
-    ]
-}

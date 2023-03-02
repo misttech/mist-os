@@ -14,7 +14,6 @@
 
 #include <list>
 
-#include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
 
 namespace dfv2 {
@@ -30,12 +29,6 @@ using NodeId = uint32_t;
 
 using NodeBindingInfoResultCallback =
     fit::callback<void(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>)>;
-
-using AddNodeResultCallback = fit::callback<void(
-    fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>>)>;
-
-using DestroyDriverComponentCallback =
-    fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>;
 
 class BindResultTracker {
  public:
@@ -65,10 +58,6 @@ class NodeManager {
   virtual void Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) = 0;
 
   virtual zx::result<DriverHost*> CreateDriverHost() = 0;
-
-  // Destroys the dynamic child component that runs the driver associated with
-  // `node`.
-  virtual void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) = 0;
 };
 
 enum class Collection {
@@ -89,13 +78,12 @@ enum class RemovalSet {
 };
 
 enum class NodeState {
-  kRunning,                   // Normal running state.
-  kPrestop,                   // Still running, but will remove soon. usually because
-                              //  Received Remove(kPackage), but is a boot driver.
-  kWaitingOnChildren,         // Received Remove, and waiting for children to be removed.
-  kWaitingOnDriver,           // Waiting for driver to respond from Stop() command.
-  kWaitingOnDriverComponent,  // Waiting driver component to be destroyed.
-  kStopping,                  // finishing shutdown of node.
+  kRunning,            // Normal running state.
+  kPrestop,            // Still running, but will remove soon. usually because
+                       //  Received Remove(kPackage), but is a boot driver.
+  kWaitingOnChildren,  // Received Remove, and waiting for children to be removed.
+  kWaitingOnDriver,    // Waiting for driver to respond from Stop() command.
+  kStopping,           // finishing shutdown of node.
 };
 class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
              public fidl::WireServer<fuchsia_driver_framework::Node>,
@@ -132,12 +120,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Errors and disconnects that are unrecoverable should call Remove(kAll, nullptr).
   void Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker);
 
-  // `callback` is invoked once the node has finished being added or an error
-  // has occurred.
-  void AddChild(fuchsia_driver_framework::wire::NodeAddArgs args,
-                fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
-                fidl::ServerEnd<fuchsia_driver_framework::Node> node,
-                AddNodeResultCallback callback);
+  fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> AddChild(
+      fuchsia_driver_framework::wire::NodeAddArgs args,
+      fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
+      fidl::ServerEnd<fuchsia_driver_framework::Node> node);
 
   zx::result<> StartDriver(
       fuchsia_component_runner::wire::ComponentStartInfo start_info,
@@ -167,7 +153,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   fidl::VectorView<fuchsia_component_decl::wire::Offer> offers() const;
   fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const;
   const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties() const;
-  const Collection& collection() const { return collection_; }
 
   void set_collection(Collection collection);
   void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {
@@ -209,23 +194,11 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void RemoveChild(std::shared_ptr<Node> child);
   // Check to see if all children have been removed.  If so, move on to stopping driver.
   void CheckForRemoval();
-  // Close the component connection to signal to CF that the component has
-  // stopped and ensure the component is destroyed.
-  void ScheduleStopComponent();
-  // Cleanup and remove node. Called by `ScheduleStopComponent` once the
-  // associated component has been removed.
+  // After stopping driver, cleanup and remove node.
   void FinishRemoval();
-  // Call `callback` once child node with the name `name` has been removed.
-  // Returns an error if a child node with the name `name` exists and is not in
-  // the process of being removed.
-  void WaitForChildToExit(
-      std::string_view name,
-      fit::callback<void(fit::result<fuchsia_driver_framework::wire::NodeError>)> callback);
 
-  fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> AddChildHelper(
-      fuchsia_driver_framework::wire::NodeAddArgs args,
-      fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
-      fidl::ServerEnd<fuchsia_driver_framework::Node> node);
+  // Close the component connection to signal to CF that the component has stopped.
+  void StopComponent();
 
   std::string name_;
 
@@ -249,8 +222,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<NodeId> removal_id_;
   NodeRemovalTracker* removal_tracker_ = nullptr;
 
-  // Invoked when the node has been fully removed.
-  fit::callback<void()> remove_complete_callback_;
   std::optional<DriverComponent> driver_component_;
   std::optional<fidl::ServerBindingRef<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBindingRef<fuchsia_driver_framework::NodeController>> controller_ref_;

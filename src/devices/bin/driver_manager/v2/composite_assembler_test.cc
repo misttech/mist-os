@@ -27,12 +27,6 @@ class TestNodeManager : public dfv2::NodeManager {
   void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {
     callback(node);
   }
-
-  void DestroyDriverComponent(
-      dfv2::Node& node,
-      fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>
-          callback) override {}
-
   zx::result<dfv2::DriverHost*> CreateDriverHost() override {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
