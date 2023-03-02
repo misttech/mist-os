@@ -224,14 +224,16 @@ def write_toml_file(
     features = []
     extra_configs = []
     feature_pat = re.compile(r"--cfg=feature=\"(.*)\"$")
-    cfg_pat = re.compile(r"--cfg=([^=]*)=\"(.*)\"$")
+    cfg_pat = re.compile(r"--cfg=([^=]*)=(.*)$")
     for flag in metadata["rustflags"]:
         match = feature_pat.match(flag)
         if match:
             features.append(match.group(1))
         elif match := cfg_pat.match(flag):
             if match.group(1) != "__rust_toolchain":
-                extra_configs.append((match.group(1), match.group(2)))
+                extra_configs.append(f"{match.group(1)}={match.group(2)}")
+        elif flag.startswith("--cfg="):
+            extra_configs.append(flag[len("--cfg="):])
 
     crate_type = "rlib"
     package_name = lookup_gn_pkg_name(project, target, for_workspace=for_workspace)
@@ -257,7 +259,8 @@ def write_toml_file(
             "default_target": default_target,
         })
 
-    if extra_configs:
+    env_vars = metadata.get("rustenv", [])
+    if extra_configs or env_vars:
         with open(os.path.join(gn_cargo_dir, str(lookup[target]), "build.rs"), "w") as buildfile:
             template = textwrap.dedent("""\
                 //! build script for {target}
@@ -266,13 +269,16 @@ def write_toml_file(
                 println!("cargo:rerun-if-changed=build.rs");
 
                 {body}
+                {env_vars}
                 }}
             """)
             body="\n".join(
-                'println!("cargo:rustc-cfg={key}=\\"{value}\\"");'.format(key=key, value=value)
-                for key, value in extra_configs
+                f'println!(r#"cargo:rustc-cfg={cfg}"#);' for cfg in extra_configs
             )
-            buildfile.write(template.format(target=target, body=body))
+            env_vars="\n".join(
+                f'println!("cargo:rustc-env={env}");' for env in env_vars
+            )
+            buildfile.write(template.format(target=target, body=body, env_vars=env_vars))
 
     extra_test_deps = set()
     if target_type in {"[lib]", "[[bin]]"}:
