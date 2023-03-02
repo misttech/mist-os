@@ -5,12 +5,13 @@
 //! Synchronized reference counting primitives.
 //!
 //! This module introduces a family of reference counted types that allows
-//! "killing" the underlying data before all strongly-held references to the
-//! data are dropped. This enables the following features:
+//! marking the underlying data for destruction before all strongly references
+//! to the data are dropped. This enables the following features:
 //!   * Upgrading a weak reference to a strong reference succeeds iff at least
-//!     one strong reference exists _and_ the data has not been "killed".
+//!     one strong reference exists _and_ the data has not been marked for
+//!     destruction.
 //!   * Allow waiting for all strongly-held references to be dropped after
-//!     "killing" the data. (TODO: https://fxbug.dev/122388).
+//!     marking the data. (TODO: https://fxbug.dev/122388).
 
 use core::{
     convert::AsRef,
@@ -22,68 +23,76 @@ use derivative::Derivative;
 
 #[derive(Debug)]
 struct Inner<T> {
-    killed: AtomicBool,
+    marked_for_destruction: AtomicBool,
     data: T,
 }
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let Inner { killed, data: _ } = self;
+        let Inner { marked_for_destruction, data: _ } = self;
 
-        // `Ordering::Acquire` because we want to synchronize with the
-        // `Ordering::Release` write to `killed` so that all memory writes
-        // before the reference was killed is visible here.
-        assert!(killed.load(Ordering::Acquire), "Must be killed");
+        // `Ordering::Acquire` because we want to synchronize with with the
+        // `Ordering::Release` write to `marked_for_destruction` so that all
+        // memory writes before the reference was marked for destruction is
+        // visible here.
+        assert!(marked_for_destruction.load(Ordering::Acquire), "Must be marked for destruction");
     }
 }
 
-/// A killable reference.
+/// A primary reference.
 ///
-/// Note that only one `Killable` may be associated with data. This is
+/// Note that only one `Primary` may be associated with data. This is
 /// enforced by not implementing [`Clone`].
 ///
 /// For now, this reference is no different than a [`Strong`] but later changes
-/// will enable blocking the destruction of a killable reference until all
+/// will enable blocking the destruction of a primary reference until all
 /// strongly held references are dropped.
 // TODO(https://fxbug.dev/122388): Implement the blocking.
 #[derive(Debug)]
-pub struct Killable<T>(alloc::sync::Arc<Inner<T>>);
+pub struct Primary<T>(alloc::sync::Arc<Inner<T>>);
 
-impl<T> Drop for Killable<T> {
+impl<T> Drop for Primary<T> {
     fn drop(&mut self) {
         let Self(arc) = self;
-        let Inner { killed, data: _ } = arc.as_ref();
+        let Inner { marked_for_destruction, data: _ } = arc.as_ref();
 
         // `Ordering::Release` because want to make sure that all memory writes
-        // before dropping this `Killable` synchronizes with later attempts to
+        // before dropping this `Primary` synchronizes with later attempts to
         // upgrade weak pointers and the `Drop::drop` impl of `Inner`.
         //
-        // TODO(https://fxbug.dev/122388): Require explicit killing of the
-        // reference and support blocking.
-        assert_eq!(false, killed.swap(true, Ordering::Release), "Must not be killed yet")
+        // TODO(https://fxbug.dev/122388): Require explicit marking for
+        // destruction of the reference and support blocking.
+        assert_eq!(
+            false,
+            marked_for_destruction.swap(true, Ordering::Release),
+            "Must not be marked for destruction yet"
+        )
     }
 }
 
-impl<T> AsRef<T> for Killable<T> {
+impl<T> AsRef<T> for Primary<T> {
     fn as_ref(&self) -> &T {
         self.deref()
     }
 }
 
-impl<T> Deref for Killable<T> {
+impl<T> Deref for Primary<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
         let Self(arc) = self;
-        let Inner { killed: _, data } = arc.deref();
+        let Inner { marked_for_destruction: _, data } = arc.deref();
         data
     }
 }
 
-impl<T> Killable<T> {
+impl<T> Primary<T> {
     /// Returns a new strongly-held reference.
-    pub fn new(data: T) -> Killable<T> {
-        Killable(alloc::sync::Arc::new(Inner { killed: AtomicBool::new(false), data }))
+    pub fn new(data: T) -> Primary<T> {
+        Primary(alloc::sync::Arc::new(Inner {
+            marked_for_destruction: AtomicBool::new(false),
+            data,
+        }))
     }
 
     /// Clones a strongly-held reference.
@@ -106,7 +115,7 @@ impl<T> Killable<T> {
 ///
 /// Similar to an [`alloc::sync::Arc`] but holding a `Strong` acts as a
 /// witness to the live-ness of the underlying data. That is, holding a
-/// `Strong` implies that the underlying data has not yet been "killed".
+/// `Strong` implies that the underlying data has not yet been destroyed.
 ///
 /// Note that `Strong`'s implementation of [`Hash`] operates on the pointer
 /// itself and not the underlying data.
@@ -125,7 +134,7 @@ impl<T> Deref for Strong<T> {
 
     fn deref(&self) -> &T {
         let Self(arc) = self;
-        let Inner { killed: _, data } = arc.deref();
+        let Inner { marked_for_destruction: _, data } = arc.deref();
         data
     }
 }
@@ -142,13 +151,14 @@ impl<T> Strong<T> {
         Weak(alloc::sync::Arc::downgrade(arc))
     }
 
-    /// Returns true if the inner value has since been killed.
-    pub fn killed(Self(arc): &Self) -> bool {
-        let Inner { killed, data: _ } = arc.as_ref();
+    /// Returns true if the inner value has since been marked for destruction.
+    pub fn marked_for_destruction(Self(arc): &Self) -> bool {
+        let Inner { marked_for_destruction, data: _ } = arc.as_ref();
         // `Ordering::Acquire` because we want to synchronize with with the
-        // `Ordering::Release` write to `killed` so that all memory writes
-        // before the reference was killed is visible here.
-        killed.load(Ordering::Acquire)
+        // `Ordering::Release` write to `marked_for_destruction` so that all
+        // memory writes before the reference was marked for destruction is
+        // visible here.
+        marked_for_destruction.load(Ordering::Acquire)
     }
 
     /// Returns true if the two pointers point to the same allocation.
@@ -192,16 +202,17 @@ impl<T> Weak<T> {
 
     /// Attempts to upgrade to a [`Strong`].
     ///
-    /// Returns `None` if the inner value has since been killed.
+    /// Returns `None` if the inner value has since been marked for destruction.
     pub fn upgrade(&self) -> Option<Strong<T>> {
         let Self(weak) = self;
         let arc = weak.upgrade()?;
-        let Inner { killed, data: _ } = arc.deref();
+        let Inner { marked_for_destruction, data: _ } = arc.deref();
 
         // `Ordering::Acquire` because we want to synchronize with with the
-        // `Ordering::Release` write to `killed` so that all memory writes
-        // before the reference was killed is visible here.
-        (!killed.load(Ordering::Acquire)).then(|| Strong(arc))
+        // `Ordering::Release` write to `marked_for_destruction` so that all
+        // memory writes before the reference was marked for destruction is
+        // visible here.
+        (!marked_for_destruction.load(Ordering::Acquire)).then(|| Strong(arc))
     }
 }
 
@@ -211,12 +222,12 @@ mod tests {
 
     #[test]
     fn zombie_weak() {
-        let killable = Killable::new(());
+        let primary = Primary::new(());
         let weak = {
-            let strong = Killable::clone_strong(&killable);
+            let strong = Primary::clone_strong(&primary);
             Strong::downgrade(&strong)
         };
-        core::mem::drop(killable);
+        core::mem::drop(primary);
 
         assert!(weak.upgrade().is_none());
     }
@@ -226,12 +237,12 @@ mod tests {
         const INITIAL_VAL: u8 = 1;
         const NEW_VAL: u8 = 2;
 
-        let killable = Killable::new(std::sync::Mutex::new(INITIAL_VAL));
-        let strong = Killable::clone_strong(&killable);
+        let primary = Primary::new(std::sync::Mutex::new(INITIAL_VAL));
+        let strong = Primary::clone_strong(&primary);
         let weak = Strong::downgrade(&strong);
 
-        *killable.lock().unwrap() = NEW_VAL;
-        assert_eq!(*killable.deref().lock().unwrap(), NEW_VAL);
+        *primary.lock().unwrap() = NEW_VAL;
+        assert_eq!(*primary.deref().lock().unwrap(), NEW_VAL);
         assert_eq!(*strong.deref().lock().unwrap(), NEW_VAL);
         assert_eq!(*weak.upgrade().unwrap().deref().lock().unwrap(), NEW_VAL);
     }
