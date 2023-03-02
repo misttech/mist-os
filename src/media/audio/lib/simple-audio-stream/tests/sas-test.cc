@@ -8,6 +8,7 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/clock.h>
 #include <threads.h>
+#include <zircon/errors.h>
 
 #include <set>
 
@@ -185,6 +186,14 @@ class MockSimpleAudio : public SimpleAudioStream {
       TA_GUARDED(domain_token()){this};
 
   uint64_t us_per_notification_ = 0;  // if 0, do not emit position notifications
+};
+
+class MockSimpleAudioWithExtension : public MockSimpleAudio {
+ public:
+  explicit MockSimpleAudioWithExtension(zx_device_t* parent) : MockSimpleAudio(parent) {}
+  zx_status_t ChangeActiveChannels(uint64_t mask) override __TA_REQUIRES(domain_token()) {
+    return (mask > (1u << kTestNumberOfChannels) - 1u) ? ZX_ERR_INVALID_ARGS : ZX_OK;
+  }
 };
 
 class SimpleAudioTest : public inspect::InspectTestHelper, public zxtest::Test {
@@ -944,7 +953,7 @@ TEST_F(SimpleAudioTest, RingBufferTests) {
 
   constexpr uint64_t kSomeActiveChannelsMask = 0xc3;
   auto active_channels = fidl::WireCall(local)->SetActiveChannels(kSomeActiveChannelsMask);
-  ASSERT_OK(active_channels.status());
+  ASSERT_TRUE(active_channels->is_error());
   ASSERT_EQ(active_channels->error_value(), ZX_ERR_NOT_SUPPORTED);
 
   // Check inspect state.
@@ -980,6 +989,39 @@ TEST_F(SimpleAudioTest, RingBufferTests) {
 
   auto stop = fidl::WireCall(local)->Stop();
   ASSERT_OK(stop.status());
+  loop_.Shutdown();
+  server->DdkAsyncRemove();
+  mock_ddk::ReleaseFlaggedDevices(root_.get());
+}
+
+// Validate that the library can succeed and fail for SetActiveChannels calls.
+TEST_F(SimpleAudioTest, SetActiveChannels) {
+  auto server = SimpleAudioStream::Create<MockSimpleAudioWithExtension>(root_.get());
+  ASSERT_NOT_NULL(server);
+
+  auto stream_client = GetStreamClient(GetClient(server.get()));
+  ASSERT_TRUE(stream_client.is_valid());
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
+  ASSERT_OK(endpoints.status_value());
+  auto [local, remote] = std::move(endpoints.value());
+
+  fidl::Arena allocator;
+  audio_fidl::wire::Format format(allocator);
+  format.set_pcm_format(allocator, GetDefaultPcmFormat());
+
+  auto rb = stream_client->CreateRingBuffer(format, std::move(remote));
+  ASSERT_OK(rb.status());
+
+  auto vmo = fidl::WireCall(local)->GetVmo(MockSimpleAudio::kTestFrameRate, 0);
+  ASSERT_OK(vmo.status());
+
+  auto active_channels1 = fidl::WireCall(local)->SetActiveChannels(0x01);
+  ASSERT_TRUE(active_channels1->is_ok());
+
+  auto active_channels2 = fidl::WireCall(local)->SetActiveChannels(0x0fff);
+  ASSERT_TRUE(active_channels2->is_error());
+  ASSERT_EQ(active_channels2->error_value(), ZX_ERR_INVALID_ARGS);
+
   loop_.Shutdown();
   server->DdkAsyncRemove();
   mock_ddk::ReleaseFlaggedDevices(root_.get());

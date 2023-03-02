@@ -11,6 +11,7 @@
 #include <lib/zx/clock.h>
 #include <math.h>
 #include <string.h>
+#include <zircon/errors.h>
 
 #include <numeric>
 #include <optional>
@@ -473,6 +474,9 @@ zx_status_t AmlG12TdmDspStream::UpdateHardwareSettings() {
 }
 
 zx_status_t AmlG12TdmDspStream::ChangeActiveChannels(uint64_t mask) {
+  if (mask > active_channels_bitmask_max_) {
+    return ZX_ERR_INVALID_ARGS;
+  }
   uint64_t old_mask = active_channels_;
   active_channels_ = mask;
   // Only stop the codecs for channels not active, not the AMLogic HW.
@@ -525,6 +529,7 @@ zx_status_t AmlG12TdmDspStream::ChangeFormat(const audio_proto::StreamSetFmtReq&
       return status;
     }
   }
+  active_channels_bitmask_max_ = (1 << req.channels) - 1;
   SetTurnOnDelay(codecs_turn_on_delay_nsec_);
   cleanup.cancel();
   return ZX_OK;

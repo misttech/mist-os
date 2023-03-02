@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/simple-codec/simple-codec-server.h>
 #include <lib/sync/completion.h>
+#include <zircon/errors.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <fbl/array.h>
@@ -991,7 +992,7 @@ TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
 
   // We now use set active channels to disable.
   auto active1 = fidl::WireCall(local)->SetActiveChannels(0x5);
-  ASSERT_OK(active1.status());
+  ASSERT_TRUE(active1->is_ok());
 
   auto start2 = fidl::WireCall(local)->Start();
   ASSERT_OK(start2.status());
@@ -1001,19 +1002,28 @@ TEST(AmlG12Tdm, I2sOutCodecsChannelsActive) {
   EXPECT_TRUE(codec3->started());
 
   // We update active channels while started.
-  auto active2 = fidl::WireCall(local)->SetActiveChannels(0x2);
-  ASSERT_OK(active2.status());
+  auto active2 = fidl::WireCall(local)->SetActiveChannels(0x08);  // Out of range channel request.
+  ASSERT_TRUE(active2->is_error());                               // Request is ignored, with error.
+  ASSERT_EQ(active2->error_value(), ZX_ERR_INVALID_ARGS);
 
-  EXPECT_FALSE(codec1->started());
-  EXPECT_TRUE(codec2->started());  // Enabled via set active channels 0x02.
-  EXPECT_FALSE(codec3->started());
+  EXPECT_TRUE(codec1->started());  // Values are retained from previous call.
+  EXPECT_FALSE(codec2->started());
+  EXPECT_TRUE(codec3->started());
 
   // We update active channels while started.
   auto active3 = fidl::WireCall(local)->SetActiveChannels(0x0);
-  ASSERT_OK(active3.status());
+  ASSERT_TRUE(active3->is_ok());
 
   EXPECT_FALSE(codec1->started());
   EXPECT_FALSE(codec2->started());  // Stopped via set active channels 0x00.
+  EXPECT_FALSE(codec3->started());
+
+  // We update active channels while started.
+  auto active4 = fidl::WireCall(local)->SetActiveChannels(0x2);
+  ASSERT_TRUE(active4->is_ok());
+
+  EXPECT_FALSE(codec1->started());
+  EXPECT_TRUE(codec2->started());  // Enabled via set active channels 0x02.
   EXPECT_FALSE(codec3->started());
 
   auto stop2 = fidl::WireCall(local)->Stop();

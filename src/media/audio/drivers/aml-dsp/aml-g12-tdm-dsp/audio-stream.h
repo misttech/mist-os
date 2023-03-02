@@ -39,7 +39,7 @@ class AmlG12TdmDspStream : public SimpleAudioStream {
 
  protected:
   zx_status_t Init() __TA_REQUIRES(domain_token()) override;
-  virtual zx_status_t ChangeFormat(const audio_proto::StreamSetFmtReq& req)
+  zx_status_t ChangeFormat(const audio_proto::StreamSetFmtReq& req)
       __TA_REQUIRES(domain_token()) override;  // virtual for unit testing.
   zx_status_t GetBuffer(const audio_proto::RingBufGetBufferReq& req, uint32_t* out_num_rb_frames,
                         zx::vmo* out_buffer) __TA_REQUIRES(domain_token()) override;
@@ -98,6 +98,7 @@ class AmlG12TdmDspStream : public SimpleAudioStream {
 
   zx::bti bti_;
   const ddk::GpioProtocolClient enable_gpio_;
+  uint64_t active_channels_bitmask_max_ = std::numeric_limits<uint64_t>::max();
   uint64_t active_channels_ = std::numeric_limits<uint64_t>::max();  // Enable all.
   bool override_mute_ = true;
   zx::interrupt irq_;

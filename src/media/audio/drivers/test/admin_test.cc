@@ -174,9 +174,12 @@ void AdminTest::ActivateChannels(uint64_t active_channels_bitmask, bool expect_s
 
   SCOPED_TRACE(testing::Message() << "...during ring_buffer_fidl->SetActiveChannels(0x" << std::hex
                                   << active_channels_bitmask << ")");
-  ASSERT_EQ(status, expect_success ? ZX_OK : ZX_ERR_INVALID_ARGS);
   if (expect_success) {
+    ASSERT_EQ(status, ZX_OK) << "SetActiveChannels failed unexpectedly";
     EXPECT_GT(set_time, send_time);
+  } else {
+    ASSERT_NE(status, ZX_OK) << "SetActiveChannels succeeded unexpectedly";
+    EXPECT_EQ(status, ZX_ERR_INVALID_ARGS) << "Unexpected failure code";
   }
 }
 
