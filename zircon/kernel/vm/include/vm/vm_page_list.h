@@ -167,6 +167,7 @@ class VmPageOrMarker {
   }
   bool IsReference() const { return GetType() == kReferenceType; }
   bool IsPageOrRef() const { return IsPage() || IsReference(); }
+  bool IsInterval() const { return GetType() == kIntervalType; }
 
   VmPageOrMarker& operator=(VmPageOrMarker&& other) noexcept {
     // Forbid overriding content, as that would leak it.
@@ -201,6 +202,138 @@ class VmPageOrMarker {
                           (right_split ? kReferenceRightSplit : 0) | kReferenceType);
   }
 
+  // The types of sparse page interval types that are supported.
+  enum class IntervalType : uint64_t {
+    // Represents a range of zero pages.
+    Zero = 0,
+    NumTypes,
+  };
+
+  // Sentinel types that are used to represent a sparse page interval.
+  enum class IntervalSentinel : uint64_t {
+    // Represents a single page interval.
+    Slot = 0,
+    // The first page of a multi-page interval.
+    Start,
+    // The last page of a multi-page interval.
+    End,
+    NumSentinels,
+  };
+
+  // The remaining bits of an interval type store any information specific to the type of interval
+  // being tracked. The ZeroRange class is defined here to group together the encoding of these bits
+  // specific to IntervalType::Zero.
+  class ZeroRange {
+   public:
+    // This is the same as kIntervalBits. Equality is asserted later where kIntervalBits is defined.
+    static constexpr uint64_t kAlignBits = 6;
+    explicit constexpr ZeroRange(uint64_t val) : value_(val) {
+      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+    }
+    // The various dirty states that a zero interval can be in. Refer to VmCowPages::DirtyState for
+    // an explanation of the states. Note that an AwaitingClean state is not encoded in the interval
+    // state bits. This information is instead stored using the AwaitingCleanLength for convenience,
+    // where a non-zero length indicates that the interval is AwaitingClean. Doing this affords
+    // more convenient splitting and merging of intervals.
+    enum class DirtyState : uint64_t {
+      Untracked = 0,
+      Clean,
+      Dirty,
+      NumStates,
+    };
+    ZeroRange(uint64_t val, DirtyState state) : value_(val) {
+      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+      DEBUG_ASSERT(GetDirtyState() == DirtyState::Untracked);
+      SetDirtyState(state);
+    }
+    uint64_t value() const { return value_; }
+
+    // For zero range tracking, we also need to track dirty state information, and if the interval
+    // is AwaitingClean, the length that is AwaitingClean.
+    static constexpr uint64_t kDirtyStateBits = VM_PAGE_OBJECT_DIRTY_STATE_BITS;
+    static_assert(static_cast<uint64_t>(DirtyState::NumStates) <= (1 << kDirtyStateBits));
+    static constexpr uint64_t kDirtyStateShift = kAlignBits;
+    DirtyState GetDirtyState() const {
+      return static_cast<DirtyState>((value_ & (BIT_MASK(kDirtyStateBits) << kDirtyStateShift)) >>
+                                     kDirtyStateShift);
+    }
+    void SetDirtyState(DirtyState state) {
+      // Only allow dirty zero ranges for now.
+      DEBUG_ASSERT(state == DirtyState::Dirty);
+      // Clear the old state.
+      value_ &= ~(BIT_MASK(kDirtyStateBits) << kDirtyStateShift);
+      // Set the new state.
+      value_ |= static_cast<uint64_t>(state) << kDirtyStateShift;
+    }
+
+    // The AwaitingCleanLength will always be a page-aligned length, so we can mask out the low
+    // PAGE_SIZE_SHIFT bits and store only the upper bits.
+    static constexpr uint64_t kAwaitingCleanLengthShift = PAGE_SIZE_SHIFT;
+    // Assert that we are not overlapping with the dirty state bits.
+    static_assert(kAwaitingCleanLengthShift >= kDirtyStateShift + kDirtyStateBits);
+    void SetAwaitingCleanLength(uint64_t len) {
+      DEBUG_ASSERT(GetDirtyState() == DirtyState::Dirty);
+      DEBUG_ASSERT(IS_ALIGNED(len, (1 << kAwaitingCleanLengthShift)));
+      value_ |= (len & ~BIT_MASK(kAwaitingCleanLengthShift));
+    }
+    uint64_t GetAwaitingCleanLength() const {
+      return value_ & ~BIT_MASK(kAwaitingCleanLengthShift);
+    }
+
+   private:
+    uint64_t value_;
+  };
+  using IntervalDirtyState = ZeroRange::DirtyState;
+
+  // Only support creation of zero interval type for now.
+  [[nodiscard]] static VmPageOrMarker ZeroInterval(IntervalSentinel sentinel,
+                                                   IntervalDirtyState state) {
+    uint64_t sentinel_bits = static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
+    uint64_t type_bits = static_cast<uint64_t>(IntervalType::Zero) << kIntervalTypeShift;
+    return VmPageOrMarker(ZeroRange(0, state).value() | type_bits | sentinel_bits | kIntervalType);
+  }
+
+  // Getters and setters for the interval type.
+  bool IsIntervalStart() const {
+    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Start;
+  }
+  bool IsIntervalEnd() const {
+    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::End;
+  }
+  bool IsIntervalSlot() const {
+    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Slot;
+  }
+  bool IsIntervalZero() const { return IsInterval() && GetIntervalType() == IntervalType::Zero; }
+
+  // Getters and setter for the zero interval type.
+  bool IsZeroIntervalClean() const {
+    DEBUG_ASSERT(IsIntervalZero());
+    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+           ZeroRange::DirtyState::Clean;
+  }
+  bool IsZeroIntervalDirty() const {
+    DEBUG_ASSERT(IsIntervalZero());
+    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+           ZeroRange::DirtyState::Dirty;
+  }
+  ZeroRange::DirtyState GetZeroIntervalDirtyState() const {
+    DEBUG_ASSERT(IsIntervalZero());
+    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState();
+  }
+  void SetZeroIntervalAwaitingCleanLength(uint64_t len) {
+    DEBUG_ASSERT(IsIntervalZero());
+    DEBUG_ASSERT(IsIntervalStart() || IsIntervalSlot());
+    DEBUG_ASSERT(IsZeroIntervalDirty());
+    auto interval = ZeroRange(raw_ & ~BIT_MASK(kIntervalBits));
+    interval.SetAwaitingCleanLength(len);
+    raw_ = (raw_ & BIT_MASK(kIntervalBits)) | interval.value();
+  }
+  uint64_t GetZeroIntervalAwaitingCleanLength() const {
+    DEBUG_ASSERT(IsIntervalZero());
+    DEBUG_ASSERT(IsIntervalStart() || IsIntervalSlot());
+    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetAwaitingCleanLength();
+  }
+
  private:
   explicit VmPageOrMarker(uint64_t raw) : raw_(raw) {}
 
@@ -211,6 +344,7 @@ class VmPageOrMarker {
   static constexpr uint64_t kPageType = 0b00;
   static constexpr uint64_t kZeroMarkerType = 0b01;
   static constexpr uint64_t kReferenceType = 0b10;
+  static constexpr uint64_t kIntervalType = 0b11;
 
   // In addition to storing the type, a reference needs to track two additional pieces of data,
   // these being the left and right split bits. The split bits are normally stored in the vm_page_t
@@ -225,6 +359,30 @@ class VmPageOrMarker {
   static_assert(ReferenceValue::kAlignBits == kReferenceBits);
   static constexpr uint64_t kReferenceLeftSplit = 0b10 << kTypeBits;
   static constexpr uint64_t kReferenceRightSplit = 0b01 << kTypeBits;
+
+  // In addition to storing the type for an interval, we also need to track the type of interval
+  // sentinel: the start, the end, or a single slot marker.
+  static constexpr uint64_t kIntervalSentinelBits = 2;
+  static_assert(static_cast<uint64_t>(IntervalSentinel::NumSentinels) <=
+                (1 << kIntervalSentinelBits));
+  static constexpr uint64_t kIntervalSentinelShift = kTypeBits;
+  IntervalSentinel GetIntervalSentinel() const {
+    return static_cast<IntervalSentinel>(
+        (raw_ & (BIT_MASK(kIntervalSentinelBits) << kIntervalSentinelShift)) >>
+        kIntervalSentinelShift);
+  }
+  // Next we also need to store the type of interval being represented; reserve a couple of bits for
+  // this. Currently we only support one type of interval: a range of zero pages, but reserving 2
+  // bits allows for more types in the future.
+  static constexpr uint64_t kIntervalTypeBits = 2;
+  static_assert(static_cast<uint64_t>(IntervalType::NumTypes) <= (1 << kIntervalTypeBits));
+  static constexpr uint64_t kIntervalTypeShift = kIntervalSentinelShift + kIntervalSentinelBits;
+  IntervalType GetIntervalType() const {
+    return static_cast<IntervalType>((raw_ & (BIT_MASK(kIntervalTypeBits) << kIntervalTypeShift)) >>
+                                     kIntervalTypeShift);
+  }
+  static constexpr uint64_t kIntervalBits = kTypeBits + kIntervalSentinelBits + kIntervalTypeBits;
+  static_assert(ZeroRange::kAlignBits == kIntervalBits);
 
   uint64_t GetType() const { return raw_ & BIT_MASK(kTypeBits); }
 
