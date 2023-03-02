@@ -15,6 +15,7 @@ group("tests") {
     "component_debug:tests",
     "component_id_index:tests",
     "config_encoder:tests",
+    "elf_runner:tests",
     "fidl-connector:tests",
     "fidl-fuchsia-component-abi-ext:tests",
     "fidl-fuchsia-pkg-ext:tests",

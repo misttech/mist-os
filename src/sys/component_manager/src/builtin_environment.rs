@@ -9,7 +9,7 @@ use {
             arguments::Arguments as BootArguments,
             capability::BuiltinCapability,
             cpu_resource::CpuResource,
-            crash_introspect::{CrashIntrospectSvc, CrashRecords},
+            crash_introspect::CrashIntrospectSvc,
             debug_resource::DebugResource,
             energy_info_resource::EnergyInfoResource,
             factory_items::FactoryItems,
@@ -24,7 +24,7 @@ use {
             mexec_resource::MexecResource,
             mmio_resource::MmioResource,
             power_resource::PowerResource,
-            process_launcher::ProcessLauncher,
+            process_launcher::ProcessLauncherSvc,
             realm_builder::{
                 RealmBuilderResolver, RealmBuilderRunner, RUNNER_NAME as REALM_BUILDER_RUNNER_NAME,
                 SCHEME as REALM_BUILDER_SCHEME,
@@ -40,7 +40,6 @@ use {
         },
         diagnostics::{cpu::ComponentTreeStats, startup::ComponentEarlyStartupTimeStats},
         directory_ready_notifier::DirectoryReadyNotifier,
-        elf_runner::ElfRunner,
         framework::{
             binder::BinderCapabilityHost, hub::Hub, lifecycle_controller::LifecycleController,
             pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_explorer::RealmExplorer,
@@ -71,10 +70,12 @@ use {
         Availability, CapabilityName, CapabilityPath, RunnerRegistration, UseEventStreamDecl,
         UseSource,
     },
-    fidl::{
-        endpoints::{create_proxy, ServerEnd},
-        AsHandleRef,
+    elf_runner::{
+        crash_info::CrashRecords,
+        vdso_vmo::{get_direct_vdso_vmo, get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
+        ElfRunner,
     },
+    fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -84,10 +85,8 @@ use {
     fuchsia_zbi::{ZbiParser, ZbiType},
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
     futures::prelude::*,
-    lazy_static::lazy_static,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
-    std::{collections::HashMap, str::FromStr, sync::Arc},
-    thiserror::Error,
+    std::{str::FromStr, sync::Arc},
     tracing::{info, warn},
 };
 
@@ -96,58 +95,6 @@ use crate::model::resolver::Resolver;
 
 // Allow shutdown to take up to an hour.
 pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-
-fn take_vdso_vmos() -> Result<HashMap<String, zx::Vmo>, Error> {
-    let mut vmos = HashMap::new();
-    let mut i = 0;
-    while let Some(handle) = take_startup_handle(HandleInfo::new(HandleType::VdsoVmo, i)) {
-        let vmo = zx::Vmo::from(handle);
-        let name = vmo.get_name()?.into_string()?;
-        vmos.insert(name, vmo);
-        i += 1;
-    }
-    Ok(vmos)
-}
-
-#[derive(Debug, Error, Clone)]
-pub enum VdsoError {
-    #[error("Could not duplicate vDSO VMO handle {}: {}", name, status)]
-    CouldNotDuplicate { name: String, status: zx::Status },
-
-    #[error("No vDSO VMO found with name {_0}")]
-    NotFound(String),
-}
-
-fn get_vdso_vmo(name: &str) -> Result<zx::Vmo, VdsoError> {
-    lazy_static! {
-        static ref VMOS: HashMap<String, zx::Vmo> =
-            take_vdso_vmos().expect("Failed to take vDSO VMOs");
-    }
-    if let Some(vmo) = VMOS.get(name) {
-        vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .map_err(|status| VdsoError::CouldNotDuplicate { name: name.to_string(), status })
-    } else {
-        Err(VdsoError::NotFound(name.to_string()))
-    }
-}
-
-/// Returns an owned VMO handle to the stable vDSO, duplicated from the handle
-/// provided to this process through its processargs bootstrap message.
-pub fn get_stable_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo("vdso/stable")
-}
-
-/// Returns an owned VMO handle to the next vDSO, duplicated from the handle
-/// provided to this process through its processargs bootstrap message.
-pub fn get_next_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo("vdso/next")
-}
-
-/// Returns an owned VMO handle to the direct vDSO, duplicated from the handle
-/// provided to this process through its processargs bootstrap message.
-pub fn get_direct_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo("vdso/direct")
-}
 
 pub struct BuiltinEnvironmentBuilder {
     // TODO(60804): Make component manager's namespace injectable here.
@@ -387,7 +334,7 @@ pub struct BuiltinEnvironment {
     pub ioport_resource: Option<Arc<IoportResource>>,
     pub irq_resource: Option<Arc<IrqResource>>,
     pub kernel_stats: Option<Arc<KernelStats>>,
-    pub process_launcher: Option<Arc<ProcessLauncher>>,
+    pub process_launcher: Option<Arc<ProcessLauncherSvc>>,
     pub root_job: Arc<RootJob>,
     pub root_job_for_inspect: Arc<RootJob>,
     pub read_only_log: Option<Arc<ReadOnlyLog>>,
@@ -456,7 +403,7 @@ impl BuiltinEnvironment {
         };
         // Set up ProcessLauncher if available.
         let process_launcher = if runtime_config.use_builtin_process_launcher {
-            let process_launcher = Arc::new(ProcessLauncher::new());
+            let process_launcher = Arc::new(ProcessLauncherSvc::new());
             model.root().hooks.install(process_launcher.hooks()).await;
             Some(process_launcher)
         } else {

@@ -18,6 +18,7 @@ rustc_library("routing") {
     "//src/sys/full-resolver:*",
     "//src/sys/lib/cm_rust/testing:*",
     "//src/sys/lib/component_debug/*",
+    "//src/sys/lib/elf_runner/*",
     "//src/sys/lib/routing/*",
     "//src/sys/test_manager/*",
     "//tools/lib/cm_fidl_analyzer/*",
