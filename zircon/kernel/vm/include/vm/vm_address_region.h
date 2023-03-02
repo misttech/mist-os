@@ -106,6 +106,8 @@ class VmAddressRegionOrMapping
   // accessors
   vaddr_t base() const { return base_; }
   size_t size() const { return size_; }
+  vaddr_t base_locked() const TA_REQ(lock()) { return base_; }
+  size_t size_locked() const TA_REQ(lock()) { return size_; }
   uint32_t flags() const { return flags_; }
   const fbl::RefPtr<VmAspace>& aspace() const { return aspace_; }
 
