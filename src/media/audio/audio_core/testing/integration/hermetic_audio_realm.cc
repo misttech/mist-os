@@ -52,15 +52,14 @@ void ConnectToVirtualAudio(component_testing::RealmRoot& root,
 
 // Implements a simple component that serves fuchsia.audio.effects.ProcessorCreator
 // using a TestEffectsV2.
-class LocalProcessorCreator : public component_testing::LocalComponent {
+class LocalProcessorCreator : public component_testing::LocalComponentImpl {
  public:
   explicit LocalProcessorCreator(std::vector<TestEffectsV2::Effect> effects)
       : effects_(std::move(effects)) {}
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> mock_handles) override {
-    handles_ = std::move(mock_handles);
+  void OnStart() override {
     ASSERT_EQ(ZX_OK,
-              handles_->outgoing()->AddPublicService(
+              outgoing()->AddPublicService(
                   std::make_unique<vfs::Service>([this](zx::channel channel,
                                                         async_dispatcher_t* dispatcher) {
                     if (!server_) {
@@ -78,11 +77,10 @@ class LocalProcessorCreator : public component_testing::LocalComponent {
  private:
   std::vector<TestEffectsV2::Effect> effects_;
   std::unique_ptr<TestEffectsV2> server_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
 };
 
 // Implements a simple component that exports the given local directory as a capability named "dir".
-class LocalDirectoryExporter : public component_testing::LocalComponent {
+class LocalDirectoryExporter : public component_testing::LocalComponentImpl {
  public:
   static inline const char kCapability[] = "exported-dir";
   static inline const char kPath[] = "/exported-dir";
@@ -100,16 +98,15 @@ class LocalDirectoryExporter : public component_testing::LocalComponent {
     local_dir_ = std::move(local);
   }
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> mock_handles) override {
-    handles_ = std::move(mock_handles);
-    ASSERT_EQ(ZX_OK, handles_->outgoing()->root_dir()->AddEntry(
+  void OnStart() override {
+    ASSERT_EQ(ZX_OK, outgoing()->root_dir()->AddEntry(
                          kCapability, std::make_unique<vfs::RemoteDir>(std::move(local_dir_))));
   }
 
  private:
   zx::channel local_dir_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
 };
+
 }  // namespace
 
 // Cannot define these until LocalProcessorCreator is defined.
@@ -154,7 +151,6 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
   using component_testing::LocalComponent;
   using component_testing::ParentRef;
   using component_testing::Protocol;
-  std::vector<std::unique_ptr<LocalComponent>> local_components;
 
   builder.AddChild(kAudioCore, "#meta/audio_core.cm");
 
@@ -198,8 +194,8 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       // we need to publish it in a component's outgoing directory. The simplest way to do that
       // is to export the directory from a local component.
       auto dir = std::get<1>(options.audio_core_config_data).directory_name;
-      auto exporter = std::make_unique<LocalDirectoryExporter>(dir);
-      builder.AddLocalChild("local_config_data_exporter", exporter.get());
+      builder.AddLocalChild("local_config_data_exporter",
+                            [dir] { return std::make_unique<LocalDirectoryExporter>(dir); });
       builder.AddRoute({
           .capabilities = {Directory{
               .name = LocalDirectoryExporter::kCapability,
@@ -210,7 +206,6 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
           .source = ChildRef{"local_config_data_exporter"},
           .targets = {ChildRef{kAudioCore}},
       });
-      local_components.push_back(std::move(exporter));
       break;
     }
     case 2:  // use specified files
@@ -223,15 +218,15 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
 
   // If needed, add a local component to host effects-over-FIDL.
   if (!options.test_effects_v2.empty()) {
-    auto local_processor_creator =
-        std::make_unique<LocalProcessorCreator>(std::move(options.test_effects_v2));
-    builder.AddLocalChild("local_processor_creator", local_processor_creator.get());
+    auto test_effects = std::move(options.test_effects_v2);
+    builder.AddLocalChild("local_processor_creator", [test_effects = std::move(test_effects)] {
+      return std::make_unique<LocalProcessorCreator>(test_effects);
+    });
     builder.AddRoute({
         .capabilities = {Protocol{"fuchsia.audio.effects.ProcessorCreator"}},
         .source = ChildRef{"local_processor_creator"},
         .targets = {ChildRef{kAudioCore}},
     });
-    local_components.push_back(std::move(local_processor_creator));
   }
 
   // Add a hermetic driver realm and route "/dev" to audio_core.
@@ -315,7 +310,9 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
     FX_CHECK(status == ZX_OK) << "customize_realm failed with status=" << status;
   }
 
-  return {builder.Build(dispatcher), std::move(local_components)};
+  // The lifecycle of local components created here is managed by the realm builder,
+  // hence we return empty `.local_components`.
+  return {.root = builder.Build(dispatcher), .local_components = {}};
 }
 
 inspect::Hierarchy HermeticAudioRealm::ReadInspect(std::string_view component_name) {
