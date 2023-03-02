@@ -7,8 +7,10 @@
 import 'package:fidl_fuchsia_ui_views/fidl_async.dart';
 import 'package:flutter/widgets.dart';
 import 'package:fuchsia_scenic/views.dart';
+import 'package:zircon/zircon.dart';
 
 import 'fuchsia_view_controller.dart';
+import 'pointer_injector.dart';
 import 'fuchsia_views_service.dart';
 
 /// Defines a thin wrapper around [FuchsiaViewController].
@@ -27,6 +29,13 @@ class FuchsiaViewConnection extends FuchsiaViewController {
   /// The handle to the view used for [requestFocus] calls.
   final ViewRef? viewRef;
 
+  PointerInjector? _pointerInjector;
+
+  /// Returns the [PointerInjector] instance used by this connection.
+  @visibleForTesting
+  PointerInjector get pointerInjector => _pointerInjector ??=
+      PointerInjector.fromSvcPath(onError: onPointerInjectionError);
+
   /// Callback when the connection to child's view is connected to view tree.
   final FuchsiaViewConnectionCallback? _onViewConnected;
 
@@ -36,7 +45,8 @@ class FuchsiaViewConnection extends FuchsiaViewController {
   /// Callback when the child's view render state changes.
   final FuchsiaViewConnectionStateCallback? _onViewStateChanged;
 
-  /// Deprecated code path. Do not use.
+  /// Set to true if pointer injection into child views should be enabled.
+  /// This requires the view's [ViewRef] to be set during construction.
   final bool usePointerInjection;
 
   /// Set to true if pointer injection into child views should be enabled using
@@ -58,7 +68,7 @@ class FuchsiaViewConnection extends FuchsiaViewController {
   })  : assert(viewHolderToken!.value != null && viewHolderToken.value.isValid),
         assert(
             viewRef?.reference == null || viewRef!.reference.handle!.isValid),
-        assert(!usePointerInjection),
+        assert(!usePointerInjection || viewRef?.reference != null),
         assert(!usePointerInjection2 || viewRef?.reference != null),
         viewportCreationToken = null,
         _onViewConnected = onViewConnected,
@@ -127,24 +137,62 @@ class FuchsiaViewConnection extends FuchsiaViewController {
   static void _handleViewDisconnected(FuchsiaViewController controller) {
     FuchsiaViewConnection connection = controller as FuchsiaViewConnection;
     connection._onViewDisconnected?.call(controller);
+    // TODO(fxbug.dev/84035): Dispose eagerly, on widget disconnect lifecycle
+    // event. Here, injection races with view-disconnect on the server.
+    if (connection.usePointerInjection) {
+      connection.pointerInjector.dispose();
+    }
   }
 
   static Future<void> _handlePointerEvent(
       FuchsiaViewController controller, PointerEvent pointer) async {
     FuchsiaViewConnection connection = controller as FuchsiaViewConnection;
-    if (!connection.usePointerInjection2) {
+    if (!connection.usePointerInjection && !connection.usePointerInjection2) {
       return;
     }
 
-    if (connection.useFlatland) {
-      return FuchsiaViewsService.instance
-          .dispatchPointerEvent(viewId: connection.viewId, pointer: pointer);
+    if (!connection.usePointerInjection2) {
+      // If we haven't made a pointerInjector for this View yet, or if the old one
+      // was torn down, we need to create one.
+      if (!connection.pointerInjector.registered) {
+        // The only valid pointer event to start an injector with is DOWN event.
+        // This check affords protection against the first stream if malformed,
+        // but does not guard against future malformed streams.
+        if (!(pointer is PointerDownEvent)) {
+          return;
+        }
+
+        // Create the pointerInjector.
+        final viewRefDup = ViewRef(
+            reference:
+                connection.viewRef!.reference.duplicate(ZX.RIGHT_SAME_RIGHTS));
+
+        connection.pointerInjector.register(
+          hostViewRef: connection.hostViewRef,
+          viewRef: viewRefDup,
+        );
+      }
+
+      return connection.pointerInjector.dispatchEvent(pointer: pointer);
     } else {
-      assert(connection.viewRef?.reference != null);
-      return FuchsiaViewsService.instance.dispatchPointerEvent(
-          viewId: connection.viewId,
-          pointer: pointer,
-          viewRef: connection.viewRef!.reference.handle!.handle);
+      if (connection.useFlatland) {
+        return FuchsiaViewsService.instance
+            .dispatchPointerEvent(viewId: connection.viewId, pointer: pointer);
+      } else {
+        assert(connection.viewRef?.reference != null);
+        return FuchsiaViewsService.instance.dispatchPointerEvent(
+            viewId: connection.viewId,
+            pointer: pointer,
+            viewRef: connection.viewRef!.reference.handle!.handle);
+      }
     }
+  }
+
+  @visibleForTesting
+  void onPointerInjectionError() {
+    // Dispose the current instance of pointer injector. It gets recreated on
+    // next _handlePointerEvent().
+    pointerInjector.dispose();
+    _pointerInjector = null;
   }
 }

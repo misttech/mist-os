@@ -356,6 +356,26 @@
               "returnType": "ViewRef",
               "type": "MethodDeclarationImpl"
             },
+            "onPointerInjectionError": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "onPointerInjectionError",
+              "returnType": "void",
+              "type": "MethodDeclarationImpl"
+            },
+            "pointerInjector": {
+              "isAbstract": false,
+              "isGetter": true,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "pointerInjector",
+              "returnType": "PointerInjector",
+              "type": "MethodDeclarationImpl"
+            },
             "requestFocus": {
               "isAbstract": false,
               "isGetter": false,
@@ -1094,6 +1114,202 @@
         }
       },
       "name": "fuchsia_views_service.dart",
+      "type": "file"
+    },
+    "pointer_injector.dart": {
+      "ClassDeclarationImpl": {
+        "PointerInjector": {
+          "ConstructorDeclarationImpl": {
+            "PointerInjector": {
+              "FieldFormalParameterImpl": {
+                "required this.onError": {
+                  "name": "required this.onError",
+                  "type": "FieldFormalParameterImpl"
+                }
+              },
+              "SimpleFormalParameterImpl": {
+                "device": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "device",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "DeviceProxy"
+                },
+                "registry": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "registry",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "Registry"
+                }
+              },
+              "name": "PointerInjector",
+              "type": "ConstructorDeclarationImpl"
+            },
+            "PointerInjector.fromSvcPath": {
+              "SimpleFormalParameterImpl": {
+                "onError": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
+                  "isRequiredPositional": false,
+                  "name": "onError",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "ui.VoidCallback"
+                }
+              },
+              "name": "PointerInjector.fromSvcPath",
+              "type": "ConstructorDeclarationImpl"
+            }
+          },
+          "MethodDeclarationImpl": {
+            "dispatchEvent": {
+              "SimpleFormalParameterImpl": {
+                "e": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "e",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "null"
+                },
+                "pointer": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
+                  "isRequiredPositional": false,
+                  "name": "pointer",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "PointerEvent"
+                }
+              },
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "dispatchEvent",
+              "returnType": "Future<void>",
+              "type": "MethodDeclarationImpl"
+            },
+            "dispose": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "dispose",
+              "returnType": "void",
+              "type": "MethodDeclarationImpl"
+            },
+            "register": {
+              "SimpleFormalParameterImpl": {
+                "e": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "e",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "null"
+                },
+                "hostViewRef": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
+                  "isRequiredPositional": false,
+                  "name": "hostViewRef",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "ViewRef"
+                },
+                "viewRef": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
+                  "isRequiredPositional": false,
+                  "name": "viewRef",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "ViewRef"
+                }
+              },
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "register",
+              "returnType": "void",
+              "type": "MethodDeclarationImpl"
+            }
+          },
+          "VariableDeclarationImpl": {
+            "onError": {
+              "isConst": false,
+              "isFinal": true,
+              "isLate": false,
+              "name": "onError",
+              "type": "VariableDeclarationImpl",
+              "varType": "ui.VoidCallback"
+            },
+            "registered": {
+              "isConst": false,
+              "isFinal": false,
+              "isLate": false,
+              "name": "registered",
+              "type": "VariableDeclarationImpl",
+              "varType": "bool"
+            }
+          },
+          "name": "PointerInjector",
+          "type": "ClassDeclarationImpl"
+        }
+      },
+      "name": "pointer_injector.dart",
       "type": "file"
     }
   },
