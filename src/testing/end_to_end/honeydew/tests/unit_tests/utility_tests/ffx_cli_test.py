@@ -123,7 +123,7 @@ class FfxCliTests(unittest.TestCase):
         """Verify ffx_target_show raises an exception when target is not
         connected to host."""
         self.mock_check_output.side_effect = subprocess.CalledProcessError(
-            "some_err", "some_cmd")
+            120, "some_cmd")
 
         with self.assertRaises(errors.FfxCommandError):
             ffx_cli.ffx_target_show(target="fuchsia-d88c-799b-0e3a")
