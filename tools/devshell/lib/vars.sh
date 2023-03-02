@@ -791,10 +791,17 @@ function fx-run-ninja {
   #
   local newpath="${PREBUILT_ALL_PATHS}:${PATH}"
   local rbe_wrapper=()
-  if fx-rbe-enabled ; then rbe_wrapper=("${RBE_WRAPPER[@]}") ; fi
+  local user_env=()
+  if fx-rbe-enabled
+  then
+    rbe_wrapper=("${RBE_WRAPPER[@]}")
+    # Automatic auth with gcert (from re-client bootstrap) needs $USER.
+    user_env=( "USER=${USER}" )
+  fi
 
   full_cmdline=(
     env -i
+    "${user_env[@]}"
     "TERM=${TERM}"
     "PATH=${newpath}"
     # By default, also show the number of actively running actions.
