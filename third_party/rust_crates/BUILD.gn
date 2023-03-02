@@ -80,6 +80,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("async-stream") {
+  public_deps = [ ":async-stream-v0_3_4" ]
+}
+
 group("async-trait") {
   public_deps = [ ":async-trait-v0_1_56($host_toolchain)" ]
 }
@@ -1566,6 +1570,53 @@ rust_library("async-net-v1_7_0") {
     "--edition=2018",
     "-Cmetadata=40ebfd6a451158cd",
     "-Cextra-filename=-40ebfd6a451158cd",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("async-stream-v0_3_4") {
+  crate_name = "async_stream"
+  crate_root = "//third_party/rust_crates/vendor/async-stream-0.3.4/src/lib.rs"
+  output_name = "async_stream-1e2c1872d90466df"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":async-stream-impl-v0_3_4($host_toolchain)" ]
+  deps += [ ":futures-core-v0_3_19" ]
+  deps += [ ":pin-project-lite-v0_2_4" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=1e2c1872d90466df",
+    "-Cextra-filename=-1e2c1872d90466df",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_proc_macro("async-stream-impl-v0_3_4") {
+  crate_name = "async_stream_impl"
+  crate_root =
+      "//third_party/rust_crates/vendor/async-stream-impl-0.3.4/src/lib.rs"
+  output_name = "async_stream_impl-43f6bec800732f62"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_39" ]
+  deps += [ ":quote-v1_0_18" ]
+  deps += [ ":syn-v1_0_98" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=43f6bec800732f62",
+    "-Cextra-filename=-43f6bec800732f62",
   ]
 
   visibility = [ ":*" ]
