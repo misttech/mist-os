@@ -6,7 +6,6 @@ use crate::target_handle::TargetHandle;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
-use emulator_targets::EmulatorTargetAction;
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetInfo};
 use ffx_daemon_target::{
     manual_targets,
@@ -26,7 +25,6 @@ use std::{
 };
 use tasks::TaskManager;
 
-mod emulator_targets;
 mod reboot;
 mod target_handle;
 
@@ -457,7 +455,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 match *e {
                     ffx::MdnsEventType::TargetFound(t)
                     | ffx::MdnsEventType::TargetRediscovered(t) => {
-                        handle_discovered_target(&tc_clone, t);
+                        handle_mdns_event(&tc_clone, t);
                     }
                     _ => {}
                 }
@@ -468,42 +466,6 @@ impl FidlProtocol for TargetCollectionProtocol {
                 handle_fastboot_target(&tc, target);
             }
         });
-
-        let tc2 = cx.get_target_collection().await?;
-        let mut watcher = emulator_targets::start_emulator_watching().await?;
-        self.tasks.spawn(async move {
-            let _ = watcher
-                .check_all_instances()
-                .await
-                .map_err(|e| tracing::error!("Error checking emulator instances: {e:?}"));
-            tracing::trace!("Starting processing emulator instance events");
-            loop {
-                if let Some(emu_target_action) = watcher.emulator_target_detected().await {
-                    match emu_target_action {
-                        EmulatorTargetAction::Add(emu_target) => {
-                            let target = handle_discovered_target(&tc2, emu_target);
-                            if let Some(t) = target {
-                                tracing::info!(
-                                    "Emulator target added. Connected is {}",
-                                    t.is_connected()
-                                );
-                            }
-                        }
-                        EmulatorTargetAction::Remove(emu_target) => {
-                            if let Some(id) = emu_target.nodename {
-                                let result = tc2.remove_target(id.clone());
-                                tracing::info!(
-                                    "Removing emulator instance {} resulted in {}",
-                                    &id,
-                                    result
-                                );
-                            }
-                        }
-                    };
-                }
-            }
-        });
-
         Ok(())
     }
 }
@@ -527,7 +489,7 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
 }
 
 #[tracing::instrument(skip(tc))]
-fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Option<Rc<Target>> {
+fn handle_mdns_event(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) {
     let ssh_address = t.ssh_address;
     let mut t = TargetInfo {
         nodename: t.nodename,
@@ -561,7 +523,7 @@ fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Op
             Ok(ret) => ret,
             Err(e) => {
                 tracing::trace!("Error while making target: {:?}", e);
-                return None;
+                return;
             }
         });
         target.update_connection_state(|s| match s {
@@ -570,7 +532,6 @@ fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Op
             }
             _ => s,
         });
-        return Some(target);
     } else {
         tracing::trace!(
             "Found new target via mdns: {}",
@@ -580,7 +541,6 @@ fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Op
         new_target.update_connection_state(|_| TargetConnectionState::Mdns(Instant::now()));
         let target = tc.merge_insert(new_target);
         target.run_host_pipe();
-        return Some(target);
     }
 }
 
@@ -588,15 +548,12 @@ fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Op
 mod tests {
     use super::*;
     use addr::TargetAddr;
-    use anyhow::Result;
     use assert_matches::assert_matches;
     use async_channel::{Receiver, Sender};
-    use ffx_config::{query, ConfigLevel};
     use fidl_fuchsia_net::{IpAddress, Ipv6Address};
     use protocols::testing::FakeDaemonBuilder;
     use serde_json::{json, Map, Value};
-    use std::{cell::RefCell, path::Path, str::FromStr};
-    use tempfile::tempdir;
+    use std::{cell::RefCell, str::FromStr};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_mdns_non_fastboot() {
@@ -605,7 +562,7 @@ mod tests {
         tc.merge_insert(t.clone());
         let before_update = Instant::now();
 
-        handle_discovered_target(
+        handle_mdns_event(
             &tc,
             ffx::TargetInfo { nodename: Some(t.nodename().unwrap()), ..ffx::TargetInfo::EMPTY },
         );
@@ -620,7 +577,7 @@ mod tests {
         tc.merge_insert(t.clone());
         let before_update = Instant::now();
 
-        handle_discovered_target(
+        handle_mdns_event(
             &tc,
             ffx::TargetInfo {
                 nodename: Some(t.nodename().unwrap()),
@@ -710,23 +667,8 @@ mod tests {
         }
     }
 
-    async fn init_test_config(_env: &ffx_config::TestEnv, temp_dir: &Path) {
-        query(emulator_instance::EMU_INSTANCE_ROOT_DIR)
-            .level(Some(ConfigLevel::User))
-            .set(json!(temp_dir.display().to_string()))
-            .await
-            .unwrap();
-        // Work around to make the host pipe connection not be able to
-        // built. Without this, we get a panic "'Tried to get overnet hoist before it was initialized'"
-        query("ssh.priv").level(Some(ConfigLevel::User)).set(json!("")).await.unwrap();
-    }
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_protocol_integration() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         const NAME: &'static str = "foo";
         const NAME2: &'static str = "bar";
         const NAME3: &'static str = "baz";
@@ -852,10 +794,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_persisted_manual_target_remove() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let tc_impl = Rc::new(RefCell::new(TargetCollectionProtocol::default()));
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
@@ -891,10 +829,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_add_target() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
             .register_fidl_protocol::<FakeFastboot>()
@@ -915,10 +849,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_add_ephemeral_target() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
             .register_fidl_protocol::<FakeFastboot>()
@@ -935,10 +865,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_add_target_with_port() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
             .register_fidl_protocol::<FakeFastboot>()
@@ -959,10 +885,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_add_ephemeral_target_with_port() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
             .register_fidl_protocol::<FakeFastboot>()
@@ -979,10 +901,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_persisted_manual_target_add() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let tc_impl = Rc::new(RefCell::new(TargetCollectionProtocol::default()));
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
@@ -1016,10 +934,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_persisted_ephemeral_target_add() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let tc_impl = Rc::new(RefCell::new(TargetCollectionProtocol::default()));
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
@@ -1058,10 +972,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_persisted_manual_target_load() {
-        let env = ffx_config::test_init().await.unwrap();
-        let temp = tempdir().expect("cannot get tempdir");
-        init_test_config(&env, temp.path()).await;
-
         let tc_impl = Rc::new(RefCell::new(TargetCollectionProtocol::default()));
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()

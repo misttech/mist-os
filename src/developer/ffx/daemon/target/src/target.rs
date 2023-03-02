@@ -31,7 +31,7 @@ use std::{
     fmt,
     fmt::Debug,
     hash::{Hash, Hasher},
-    net::{IpAddr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     rc::{Rc, Weak},
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -766,9 +766,9 @@ impl Target {
             // Do not add localhost to the collection during extend.
             // Note: localhost addresses are added sometimes by direct
             // insertion, in the manual add case.
-            // IPv4 is allowed so that emulators and tunneled devices are handled correctly.
+            let localhost_v4 = IpAddr::V4(Ipv4Addr::LOCALHOST);
             let localhost_v6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
-            if addr.addr.ip() == localhost_v6 {
+            if addr.addr.ip() == localhost_v4 || addr.addr.ip() == localhost_v6 {
                 continue;
             }
 
@@ -912,15 +912,10 @@ impl Target {
             let legacy = async {
                 if modes.use_legacy() {
                     let nr = spawn(weak_target.clone()).await;
-                    match nr {
-                        Ok(mut hp) => {
-                            let r = hp.wait().await;
-                            // XXX(raggi): decide what to do with this log data:
-                            tracing::info!("HostPipeConnection returned: {:?}", r);
-                        }
-                        Err(e) => {
-                            tracing::info!("HostPipeBuilderConnection returned: {:?}", e);
-                        }
+                    if let Ok(mut hp) = nr {
+                        let r = hp.wait().await;
+                        // XXX(raggi): decide what to do with this log data:
+                        tracing::info!("HostPipeConnection returned: {:?}", r);
                     }
                 }
             };
