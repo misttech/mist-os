@@ -79,17 +79,6 @@ class PerfTestHelper {
     return helper;
   }
 
-  // Takes a fuchsiaperf file, specified as a remote filename
-  // (i.e. the path of the file on the Fuchsia device under test).
-  // Publishes this file as results for the current test.
-  Future<void> processResults(String resultsFile) async {
-    final localResultsFile =
-        await storage.dumpFile(resultsFile, 'results', 'fuchsiaperf.json');
-
-    await performance.convertResults('runtime_deps/catapult_converter',
-        localResultsFile, Platform.environment);
-  }
-
   // Takes a set of "raw data" fuchsiaperf files, specified as local
   // files.  Generates a "summary" version of that data, following the
   // process described in summarize.dart, and publishes that as
