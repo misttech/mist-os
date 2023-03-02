@@ -45,6 +45,7 @@ class TestDefaultDispatcher : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
 
     test_environment_.reset();
+    node_server_.reset();
   }
 
   TestDriver* driver() { return driver_; }
@@ -79,7 +80,9 @@ class TestDefaultDispatcherSeparateEnv : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
 
     // fdf::Node
-    node_server_.emplace(env_dispatcher(), "root");
+    result = fdf::RunOnDispatcherSync(env_dispatcher(),
+                                      [this] { node_server_.emplace(env_dispatcher(), "root"); });
+    EXPECT_EQ(ZX_OK, result.status_value());
 
     // Create start args
     zx::result start_args = fdf_testing::CreateStartArgs(node_server_.value());
@@ -105,6 +108,9 @@ class TestDefaultDispatcherSeparateEnv : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
 
     test_environment_.reset();
+
+    result = fdf::RunOnDispatcherSync(env_dispatcher(), [this]() { node_server_.reset(); });
+    EXPECT_EQ(ZX_OK, result.status_value());
 
     result = test_env_dispatcher_.Stop();
     EXPECT_EQ(ZX_OK, result.status_value());
@@ -150,7 +156,9 @@ class TestAllowSyncDriverDispatcherSeparateEnv : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
 
     // fdf::Node
-    node_server_.emplace(env_dispatcher(), "root");
+    result = fdf::RunOnDispatcherSync(env_dispatcher(),
+                                      [this] { node_server_.emplace(env_dispatcher(), "root"); });
+    EXPECT_EQ(ZX_OK, result.status_value());
 
     // Create start args
     zx::result start_args = fdf_testing::CreateStartArgs(node_server_.value());
@@ -177,6 +185,9 @@ class TestAllowSyncDriverDispatcherSeparateEnv : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
 
     result = fdf::RunOnDispatcherSync(env_dispatcher(), [this]() { test_environment_.reset(); });
+    EXPECT_EQ(ZX_OK, result.status_value());
+
+    result = fdf::RunOnDispatcherSync(env_dispatcher(), [this]() { node_server_.reset(); });
     EXPECT_EQ(ZX_OK, result.status_value());
 
     result = test_env_dispatcher_.Stop();

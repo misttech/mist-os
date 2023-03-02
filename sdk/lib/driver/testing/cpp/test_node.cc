@@ -6,6 +6,13 @@
 
 namespace fdf_testing {
 
+TestNode::TestNode(async_dispatcher_t* dispatcher, std::string name)
+    : dispatcher_(dispatcher),
+      name_(std::move(name)),
+      checker_(dispatcher, "|fdf_testing::TestNode| is thread-unsafe.") {}
+
+TestNode::~TestNode() { std::lock_guard guard(checker_); }
+
 zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>> TestNode::CreateNodeChannel() {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
   if (endpoints.is_error()) {
@@ -20,16 +27,18 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>> TestNode::CreateNode
 }
 
 zx::result<> TestNode::Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> server_end) {
+  std::lock_guard guard(checker_);
   if (node_binding_.has_value()) {
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
   node_binding_.emplace(dispatcher_, std::move(server_end), this,
-                        [this](fidl::UnbindInfo) { Remove(); });
+                        [this](fidl::UnbindInfo) { RemoveFromParent(); });
   return zx::ok();
 }
 
 void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
+  std::lock_guard guard(checker_);
   std::string name{request->args.name().get()};
   auto [it, inserted] = children_.try_emplace(name, dispatcher_, name);
   if (!inserted) {
@@ -37,18 +46,25 @@ void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& co
     return;
   }
   TestNode& node = it->second;
-  node.parent_ = *this;
-  node.controller_binding_.emplace(dispatcher_, std::move(request->controller), &node,
-                                   fidl::kIgnoreBindingClosure);
+  node.SetParent(this, std::move(request->controller));
   if (request->node) {
-    node.node_binding_.emplace(dispatcher_, std::move(request->node), &node,
-                               [this](fidl::UnbindInfo) { Remove(); });
+    zx::result result = node.Serve(std::move(request->node));
+    ZX_ASSERT_MSG(result.is_ok(), "|Serve| failed with %s", result.status_string());
   }
 
   completer.ReplySuccess();
 }
 
-void TestNode::Remove() {
+void TestNode::SetParent(TestNode* parent,
+                         fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller) {
+  std::lock_guard guard(checker_);
+  parent_ = *parent;
+  controller_binding_.emplace(dispatcher_, std::move(controller), this,
+                              fidl::kIgnoreBindingClosure);
+}
+
+void TestNode::RemoveFromParent() {
+  std::lock_guard guard(checker_);
   children_.clear();
   node_binding_.reset();
   controller_binding_.reset();
@@ -57,7 +73,12 @@ void TestNode::Remove() {
     return;
   }
   // After this call we are destructed, so don't access anything else.
-  size_t count = parent_.value().get().children_.erase(name_);
+  parent_.value().get().RemoveChild(name_);
+}
+
+void TestNode::RemoveChild(const std::string& name) {
+  std::lock_guard guard(checker_);
+  size_t count = children_.erase(name);
   ZX_ASSERT_MSG(count == 1, "Should've removed 1 child, removed %ld", count);
 }
 

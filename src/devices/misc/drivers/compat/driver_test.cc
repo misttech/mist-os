@@ -473,7 +473,6 @@ class DriverTest : public testing::Test {
   async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
 
  private:
-  std::optional<fdf_testing::TestNode> node_;
   TestRootResource root_resource_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
@@ -485,6 +484,7 @@ class DriverTest : public testing::Test {
   TestExporter exporter_;
   std::optional<fs::ManagedVfs> vfs_;
   fdf::TestSynchronizedDispatcher driver_dispatcher_;
+  std::optional<fdf_testing::TestNode> node_;
 
   // This loop is for FIDL servers that get called in a sync fashion from
   // the driver.

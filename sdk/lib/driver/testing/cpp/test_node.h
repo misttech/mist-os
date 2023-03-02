@@ -14,8 +14,9 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
  public:
   using ChildrenMap = std::unordered_map<std::string, TestNode>;
 
-  TestNode(async_dispatcher_t* dispatcher, std::string name)
-      : dispatcher_(dispatcher), name_(std::move(name)) {}
+  TestNode(async_dispatcher_t* dispatcher, std::string name);
+
+  ~TestNode() override;
 
   ChildrenMap& children() { return children_; }
   const std::string& name() const { return name_; }
@@ -28,24 +29,35 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   // This method is thread-unsafe. Must be called from the same context as the dispatcher.
   zx::result<> Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> server_end);
 
-  bool HasNode() { return node_binding_.has_value(); }
+  bool HasNode() {
+    std::lock_guard guard(checker_);
+    return node_binding_.has_value();
+  }
 
   async_dispatcher_t* dispatcher() const { return dispatcher_; }
 
  private:
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override;
 
-  void Remove(RemoveCompleter::Sync& completer) override { Remove(); }
+  void Remove(RemoveCompleter::Sync& completer) override { RemoveFromParent(); }
 
-  void Remove();
+  void SetParent(TestNode* parent,
+                 fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller);
 
-  std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_binding_;
-  std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_binding_;
+  void RemoveFromParent();
+
+  void RemoveChild(const std::string& name);
+
+  std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_binding_
+      __TA_GUARDED(checker_);
+  std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_binding_
+      __TA_GUARDED(checker_);
 
   async_dispatcher_t* dispatcher_;
-  std::string name_;
-  std::optional<std::reference_wrapper<TestNode>> parent_;
-  ChildrenMap children_;
+  std::string name_ __TA_GUARDED(checker_);
+  std::optional<std::reference_wrapper<TestNode>> parent_ __TA_GUARDED(checker_);
+  ChildrenMap children_ __TA_GUARDED(checker_);
+  async::synchronization_checker checker_;
 };
 
 }  // namespace fdf_testing
