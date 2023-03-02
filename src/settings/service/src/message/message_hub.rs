@@ -470,6 +470,10 @@ impl MessageHub {
                     MessengerType::Addressable(address) => {
                         let _ = self.addresses.insert(address, id);
                     }
+                    #[cfg(test)]
+                    MessengerType::EventSink => {
+                        // Tracked by role handling below.
+                    }
                     MessengerType::Unbound => {
                         // We do not track Unbounded messengers.
                     }

@@ -127,6 +127,9 @@ pub enum MessengerType {
     /// messages. An optional filter may be specified, which limits the messages
     /// directed to this broker.
     Broker(Filter),
+    /// Used in tests to observe broadcast events.
+    #[cfg(test)]
+    EventSink,
     /// A messenger that cannot be reached by an address.
     Unbound,
 }
@@ -138,6 +141,8 @@ impl Debug for MessengerType {
         match self {
             MessengerType::Addressable(addr) => write!(f, "Addressable({addr:?})"),
             MessengerType::Broker(_) => write!(f, "Broker"),
+            #[cfg(test)]
+            MessengerType::EventSink => write!(f, "EventSink"),
             MessengerType::Unbound => write!(f, "Unbound"),
         }
     }
