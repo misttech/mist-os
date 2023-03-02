@@ -44,10 +44,6 @@ pub(super) mod messenger {
         /// Please reference [Audience](crate::message::base::Audience) to see how these types map
         /// to audience targets.
         pub messenger_type: MessengerType,
-        /// The role to associate with this messenger. When a messenger
-        /// is associated with a given [`Role`], any message directed to that
-        /// [`Role`] will be delivered to the messenger.
-        pub role: Option<crate::Role>,
     }
 }
 

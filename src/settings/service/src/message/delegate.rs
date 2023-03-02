@@ -32,10 +32,7 @@ impl Delegate {
 
     #[cfg(test)]
     pub(crate) async fn create_sink(&self) -> CreateMessengerResult {
-        self.messenger_builder(MessengerType::Unbound)
-            .add_role(crate::Role::Event(crate::event::Role::Sink))
-            .build()
-            .await
+        self.messenger_builder(MessengerType::EventSink).build().await
     }
 
     /// Checks whether a messenger is present at the given [`Signature`]. Note

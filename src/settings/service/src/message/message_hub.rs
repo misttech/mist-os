@@ -472,17 +472,11 @@ impl MessageHub {
                     }
                     #[cfg(test)]
                     MessengerType::EventSink => {
-                        // Tracked by role handling below.
+                        let _ = self.sinks.insert(id);
                     }
                     MessengerType::Unbound => {
                         // We do not track Unbounded messengers.
                     }
-                }
-
-                // Track roles
-                if messenger_descriptor.role.is_some() {
-                    // NB: The only role is the event sink type.
-                    let _ = self.sinks.insert(id);
                 }
 
                 let response_result =

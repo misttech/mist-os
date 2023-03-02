@@ -24,8 +24,6 @@ pub struct Builder {
     /// The type of messenger to be created. Along with roles, the messenger
     /// type determines what audiences the messenger is included in.
     messenger_type: MessengerType,
-    /// The optional role to associate with this messenger.
-    role: Option<crate::Role>,
 }
 
 impl Builder {
@@ -35,15 +33,7 @@ impl Builder {
         messenger_action_tx: MessengerActionSender,
         messenger_type: MessengerType,
     ) -> Self {
-        Self { messenger_action_tx, messenger_type, role: None }
-    }
-
-    /// Includes the specified role in the list of roles to be associated with
-    /// the new messenger.
-    #[cfg(test)]
-    pub(crate) fn add_role(mut self, role: crate::Role) -> Self {
-        self.role = Some(role);
-        self
+        Self { messenger_action_tx, messenger_type }
     }
 
     /// Constructs a messenger based on specifications supplied.
@@ -53,7 +43,7 @@ impl Builder {
         // Panic if send failed since a messenger cannot be created.
         self.messenger_action_tx
             .unbounded_send(MessengerAction::Create(
-                messenger::Descriptor { messenger_type: self.messenger_type, role: self.role },
+                messenger::Descriptor { messenger_type: self.messenger_type },
                 tx,
                 self.messenger_action_tx.clone(),
             ))
