@@ -142,6 +142,7 @@ async fn main() -> Result<(), Error> {
             input_pipeline_lib::input_pipeline::InputPipelineAssembly::new()
                 .add_all_handlers(input_handlers)
                 .add_autorepeater(),
+            inspector.root().create_child("input_pipeline"),
         )
         .expect("Failed to create input pipeline")
     };

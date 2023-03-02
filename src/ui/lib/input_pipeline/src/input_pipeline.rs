@@ -248,6 +248,10 @@ pub struct InputPipeline {
 
     /// The InputDeviceBindings bound to this pipeline.
     input_device_bindings: InputDeviceBindingHashMap,
+
+    /// This node is bound to the lifetime of this InputPipeline.
+    /// Inspect data will be dumped for this pipeline as long as it exists.
+    _inspect_node: fuchsia_inspect::Node,
 }
 
 impl InputPipeline {
@@ -256,6 +260,7 @@ impl InputPipeline {
     fn new_common(
         input_device_types: Vec<input_device::InputDeviceType>,
         assembly: InputPipelineAssembly,
+        inspect_node: fuchsia_inspect::Node,
     ) -> Self {
         let (pipeline_sender, receiver, tasks) = assembly.into_components();
 
@@ -275,6 +280,7 @@ impl InputPipeline {
             device_event_receiver,
             input_device_types,
             input_device_bindings,
+            _inspect_node: inspect_node,
         }
     }
 
@@ -289,7 +295,10 @@ impl InputPipeline {
         input_device_types: Vec<input_device::InputDeviceType>,
         assembly: InputPipelineAssembly,
     ) -> Self {
-        Self::new_common(input_device_types, assembly)
+        let inspector = fuchsia_inspect::Inspector::default();
+        let root = inspector.root();
+        let test_node = root.create_child("input_pipeline");
+        Self::new_common(input_device_types, assembly, test_node)
     }
 
     /// Creates a new [`InputPipeline`] for production use.
@@ -300,8 +309,9 @@ impl InputPipeline {
     pub fn new(
         input_device_types: Vec<input_device::InputDeviceType>,
         assembly: InputPipelineAssembly,
+        inspect_node: fuchsia_inspect::Node,
     ) -> Result<Self, Error> {
-        let input_pipeline = Self::new_common(input_device_types, assembly);
+        let input_pipeline = Self::new_common(input_device_types, assembly, inspect_node);
         let input_device_types = input_pipeline.input_device_types.clone();
         let input_event_sender = input_pipeline.device_event_sender.clone();
         let input_device_bindings = input_pipeline.input_device_bindings.clone();
@@ -765,12 +775,15 @@ mod tests {
         // Build the input pipeline.
         let (sender, receiver, tasks) =
             InputPipelineAssembly::new().add_handler(input_handler).into_components();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("input_pipeline");
         let input_pipeline = InputPipeline {
             pipeline_sender: sender,
             device_event_sender,
             device_event_receiver,
             input_device_types: vec![],
             input_device_bindings: Arc::new(Mutex::new(HashMap::new())),
+            _inspect_node: test_node,
         };
         InputPipeline::catch_unhandled(receiver);
         InputPipeline::run(tasks);
@@ -825,12 +838,15 @@ mod tests {
             .add_handler(first_input_handler)
             .add_handler(second_input_handler)
             .into_components();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("input_pipeline");
         let input_pipeline = InputPipeline {
             pipeline_sender: sender,
             device_event_sender,
             device_event_receiver,
             input_device_types: vec![],
             input_device_bindings: Arc::new(Mutex::new(HashMap::new())),
+            _inspect_node: test_node,
         };
         InputPipeline::catch_unhandled(receiver);
         InputPipeline::run(tasks);

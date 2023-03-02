@@ -96,7 +96,7 @@ pub async fn handle_input(
     >,
     keymap_request_stream_receiver: KeymapReceiver,
     icu_data_loader: icu_data::Loader,
-    node: &inspect::Node,
+    node: inspect::Node,
     display_ownership_event: zx::Event,
     focus_chain_publisher: FocusChainProviderPublisher,
     supported_input_devices: Vec<String>,
@@ -153,7 +153,7 @@ pub async fn handle_input(
             use_flatland,
             scene_manager,
             icu_data_loader,
-            node,
+            &node,
             display_ownership_event,
             factory_reset_handler.clone(),
             media_buttons_handler.clone(),
@@ -163,6 +163,7 @@ pub async fn handle_input(
             wayland_input_handler.clone(),
         )
         .await,
+        node,
     )
     .context("Failed to create InputPipeline.")?;
 

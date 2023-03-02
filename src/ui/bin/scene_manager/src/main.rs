@@ -52,7 +52,6 @@ use {
     scene_management::{self, SceneManager, ViewingDistance, ViewportToken},
     std::fs::File,
     std::io::Read,
-    std::rc::Rc,
     std::sync::Arc,
     tracing::{error, info, warn},
 };
@@ -287,7 +286,7 @@ async fn inner_main() -> Result<(), Error> {
         futures::channel::mpsc::unbounded::<KeymapRequestStream>();
 
     // Create a node under root to hang all input pipeline inspect data off of.
-    let inspect_node = Rc::new(inspector.root().create_child("input_pipeline"));
+    let inspect_node = inspector.root().create_child("input_pipeline");
 
     // Start input pipeline.
     let Config { idle_threshold_minutes, supported_input_devices } =
@@ -304,7 +303,7 @@ async fn inner_main() -> Result<(), Error> {
         factory_reset_device_request_stream_receiver,
         keymap_receiver,
         icu_data_loader,
-        &inspect_node.clone(),
+        inspect_node,
         display_ownership,
         focus_chain_publisher,
         supported_input_devices,
