@@ -17,7 +17,7 @@ rustc_library("windowed-stats") {
   ]
 
   sources = [
-    "src/aggregation_fns.rs",
+    "src/aggregations.rs",
     "src/lib.rs",
   ]
 }

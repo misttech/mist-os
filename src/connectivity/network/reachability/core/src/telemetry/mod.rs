@@ -21,6 +21,7 @@ use static_assertions::const_assert_eq;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{info, warn};
+use windowed_stats::aggregations::SumAndCount;
 
 pub async fn create_metrics_logger(
     factory_proxy: fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
@@ -91,6 +92,22 @@ impl TelemetrySender {
 struct SystemStateSummary {
     system_state: IpVersions<Option<State>>,
     dns_active: bool,
+}
+
+impl SystemStateSummary {
+    fn ipv4_state_val(&self) -> u32 {
+        match self.system_state.ipv4 {
+            Some(s) => s as u32,
+            None => 0u32,
+        }
+    }
+
+    fn ipv6_state_val(&self) -> u32 {
+        match self.system_state.ipv6 {
+            Some(s) => s as u32,
+            None => 0u32,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -379,6 +396,17 @@ impl Telemetry {
             }
         }
 
+        if let Some(new_state) = &new_state {
+            self.stats
+                .lock()
+                .ipv4_state
+                .add_value(&SumAndCount { sum: new_state.ipv4_state_val(), count: 1 });
+            self.stats
+                .lock()
+                .ipv6_state
+                .add_value(&SumAndCount { sum: new_state.ipv6_state_val(), count: 1 });
+        }
+
         if !metric_events.is_empty() {
             log_cobalt_batch!(self.cobalt_proxy, &mut metric_events.iter_mut(), ctx);
         }
@@ -443,6 +471,15 @@ impl Telemetry {
             if current.dns_active {
                 self.stats.lock().dns_active_sec.add_value(&duration_sec_inspect);
             }
+
+            self.stats
+                .lock()
+                .ipv4_state
+                .add_value(&SumAndCount { sum: current.ipv4_state_val(), count: 1 });
+            self.stats
+                .lock()
+                .ipv6_state
+                .add_value(&SumAndCount { sum: current.ipv6_state_val(), count: 1 });
         }
         self.state_last_refreshed_for_inspect = now;
     }
@@ -838,6 +875,60 @@ mod tests {
                         "1m": vec![1u64],
                         "15m": vec![1u64],
                         "1h": vec![1u64],
+                    },
+                }
+            }
+        });
+    }
+
+    #[test]
+    fn test_avg_state_inspect_stats() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        let mut update = SystemStateUpdate {
+            system_state: IpVersions { ipv4: None, ipv6: Some(State::Gateway) },
+            ..SystemStateUpdate::default()
+        };
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
+        test_helper.advance_test_fut(&mut test_fut);
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    ipv4_state: {
+                        "1m": vec![0f64],
+                        "15m": vec![0f64],
+                        "1h": vec![0f64],
+                    },
+                    ipv6_state: {
+                        "1m": vec![8f64],
+                        "15m": vec![8f64],
+                        "1h": vec![8f64],
+                    },
+                }
+            }
+        });
+
+        update.system_state.ipv6 = Some(State::Internet);
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
+        test_helper.advance_test_fut(&mut test_fut);
+
+        assert_data_tree!(test_helper.inspector, root: contains {
+            telemetry: contains {
+                stats: contains {
+                    ipv4_state: {
+                        "1m": vec![0f64],
+                        "15m": vec![0f64],
+                        "1h": vec![0f64],
+                    },
+                    ipv6_state: {
+                        "1m": vec![18f64 / 2f64],
+                        "15m": vec![18f64 / 2f64],
+                        "1h": vec![18f64 / 2f64],
                     },
                 }
             }

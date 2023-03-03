@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod aggregation_fns;
+pub mod aggregations;
 
 use {
+    crate::aggregations::SumAndCount,
     fuchsia_inspect::{ArrayProperty, Node as InspectNode},
     std::{collections::VecDeque, default::Default},
 };
@@ -66,6 +67,18 @@ impl<T: Into<i64> + Clone> WindowedStats<T> {
         let inspect_array = node.create_int_array(property_name, iter.len());
         for (i, c) in iter.enumerate() {
             inspect_array.set(i, (*c).clone());
+        }
+        node.record(inspect_array);
+    }
+}
+
+impl WindowedStats<SumAndCount> {
+    pub fn log_avg_inspect_double_array(&self, node: &InspectNode, property_name: &'static str) {
+        let iter = self.stats.iter();
+        let inspect_array = node.create_double_array(property_name, iter.len());
+        for (i, c) in iter.enumerate() {
+            let value = if c.avg().is_finite() { c.avg() } else { 0f64 };
+            inspect_array.set(i, value);
         }
         node.record(inspect_array);
     }
@@ -150,11 +163,21 @@ impl<T: Into<i64> + Clone> CombinedWindowedStats<T> {
     }
 }
 
+impl CombinedWindowedStats<SumAndCount> {
+    pub fn log_avg_inspect_double_array(&mut self, node: &InspectNode, child_name: &'static str) {
+        let child = node.create_child(child_name);
+        self.minutely.log_avg_inspect_double_array(&child, "1m");
+        self.fifteen_minutely.log_avg_inspect_double_array(&child, "15m");
+        self.hourly.log_avg_inspect_double_array(&child, "1h");
+        node.record(child);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
         super::*,
-        crate::aggregation_fns::create_saturating_add_fn,
+        crate::aggregations::create_saturating_add_fn,
         fuchsia_inspect::{assert_data_tree, Inspector},
     };
 
@@ -271,6 +294,32 @@ mod tests {
     }
 
     #[test]
+    fn windowed_stats_sum_and_count_log_avg_inspect_double_array() {
+        let inspector = Inspector::default();
+        let mut windowed_stats = WindowedStats::<SumAndCount>::new(3, create_saturating_add_fn());
+        windowed_stats.add_value(&SumAndCount { sum: 1u32, count: 1 });
+        windowed_stats.add_value(&SumAndCount { sum: 2u32, count: 1 });
+
+        windowed_stats.log_avg_inspect_double_array(inspector.root(), "stats");
+
+        assert_data_tree!(inspector, root: {
+            stats: vec![3f64 / 2f64],
+        });
+    }
+
+    #[test]
+    fn windowed_stats_sum_and_count_log_avg_inspect_double_array_with_nan() {
+        let inspector = Inspector::default();
+        let windowed_stats = WindowedStats::<SumAndCount>::new(3, create_saturating_add_fn());
+
+        windowed_stats.log_avg_inspect_double_array(inspector.root(), "stats");
+
+        assert_data_tree!(inspector, root: {
+            stats: vec![0f64],
+        });
+    }
+
+    #[test]
     fn combined_windowed_stats_log_inspect_uint_array() {
         let inspector = Inspector::default();
 
@@ -309,6 +358,25 @@ mod tests {
                 "1m": vec![1i64],
                 "15m": vec![1i64],
                 "1h": vec![1i64],
+            }
+        });
+    }
+
+    #[test]
+    fn combined_windowed_stats_sum_and_count_log_avg_inspect_double_array() {
+        let inspector = Inspector::default();
+        let mut windowed_stats =
+            CombinedWindowedStats::<SumAndCount>::new(create_saturating_add_fn);
+        windowed_stats.add_value(&SumAndCount { sum: 1u32, count: 1 });
+        windowed_stats.add_value(&SumAndCount { sum: 2u32, count: 1 });
+
+        windowed_stats.log_avg_inspect_double_array(inspector.root(), "stats");
+
+        assert_data_tree!(inspector, root: {
+            stats: {
+                "1m": vec![3f64 / 2f64],
+                "15m": vec![3f64 / 2f64],
+                "1h": vec![3f64 / 2f64],
             }
         });
     }

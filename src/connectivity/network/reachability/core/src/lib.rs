@@ -19,13 +19,14 @@ use {
     fidl_fuchsia_hardware_network, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
-    fuchsia_inspect::Inspector,
+    fuchsia_inspect::{Inspector, Node as InspectNode},
     futures::{FutureExt as _, StreamExt as _},
     inspect::InspectInfo,
     itertools::Itertools,
     named_timer::DeadlineId,
     net_declare::{fidl_subnet, std_ip},
     net_types::ScopeableAddress as _,
+    num_derive::FromPrimitive,
     std::collections::hash_map::{Entry, HashMap},
     tracing::{debug, error, info},
 };
@@ -54,28 +55,29 @@ pub struct Stats {
 // TODO(dpradilla): consider splitting the state in l2 state and l3 state, as there can be multiple
 // L3 networks on the same physical medium.
 /// `State` represents the reachability state.
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy, FromPrimitive)]
+#[repr(u8)]
 pub enum State {
     /// State not yet determined.
-    None,
+    None = 1,
     /// Interface no longer present.
-    Removed,
+    Removed = 2,
     /// Interface is down.
-    Down,
+    Down = 3,
     /// Interface is up, no packets seen yet.
-    Up,
+    Up = 4,
     /// Interface is up, packets seen.
-    LinkLayerUp,
+    LinkLayerUp = 5,
     /// Interface is up, and configured as an L3 interface.
-    NetworkLayerUp,
+    NetworkLayerUp = 6,
     /// L3 Interface is up, local neighbors seen.
-    Local,
+    Local = 7,
     /// L3 Interface is up, local gateway configured and reachable.
-    Gateway,
+    Gateway = 8,
     /// Expected response not seen from reachability test URL.
-    WalledGarden,
+    WalledGarden = 9,
     /// Expected response seen from reachability test URL.
-    Internet,
+    Internet = 10,
 }
 
 impl State {
@@ -98,6 +100,17 @@ impl State {
 
     fn has_gateway(&self) -> bool {
         *self == State::Gateway || *self == State::Internet
+    }
+
+    fn log_state_vals_inspect(node: &InspectNode, name: &str) {
+        let child = node.create_child(name);
+        for i in State::None as u32..=State::Internet as u32 {
+            match <State as num_traits::FromPrimitive>::from_u32(i) {
+                Some(state) => child.record_string(i.to_string(), format!("{:?}", state)),
+                None => (),
+            }
+        }
+        node.record(child);
     }
 }
 
@@ -480,6 +493,8 @@ impl Monitor {
 
         let system_node = InspectInfo::new(inspector.root(), "system", "");
         self.system_node = Some(system_node);
+
+        State::log_state_vals_inspect(inspector.root(), "state_vals");
     }
 
     pub fn set_telemetry_sender(&mut self, telemetry_sender: TelemetrySender) {
@@ -851,6 +866,7 @@ mod tests {
         },
         async_trait::async_trait,
         fidl_fuchsia_net as fnet, fuchsia_async as fasync,
+        fuchsia_inspect::assert_data_tree,
         net_declare::{fidl_ip, fidl_subnet, std_ip},
         net_types::ip,
         std::task::Poll,
@@ -879,6 +895,26 @@ mod tests {
         fn construct(state: StateEvent) -> Self {
             Self { ipv4: state, ipv6: state }
         }
+    }
+
+    #[test]
+    fn test_log_state_vals_inspect() {
+        let inspector = Inspector::default();
+        State::log_state_vals_inspect(inspector.root(), "state_vals");
+        assert_data_tree!(inspector, root: {
+            state_vals: {
+                "1": "None",
+                "2": "Removed",
+                "3": "Down",
+                "4": "Up",
+                "5": "LinkLayerUp",
+                "6": "NetworkLayerUp",
+                "7": "Local",
+                "8": "Gateway",
+                "9": "WalledGarden",
+                "10": "Internet",
+            }
+        })
     }
 
     #[test]

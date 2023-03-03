@@ -6,7 +6,7 @@ use fuchsia_inspect::{Inspector, Node as InspectNode};
 use futures::FutureExt;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use windowed_stats::aggregation_fns::create_saturating_add_fn;
+use windowed_stats::aggregations::{create_saturating_add_fn, SumAndCount};
 use windowed_stats::{
     CombinedWindowedStats, FifteenMinutelyWindows, HourlyWindows, MinutelyWindows,
 };
@@ -16,6 +16,8 @@ pub(crate) struct Stats {
     pub(crate) internet_available_sec: CombinedWindowedStats<i32>,
     pub(crate) dns_active_sec: CombinedWindowedStats<i32>,
     pub(crate) total_duration_sec: CombinedWindowedStats<i32>,
+    pub(crate) ipv4_state: CombinedWindowedStats<SumAndCount>,
+    pub(crate) ipv6_state: CombinedWindowedStats<SumAndCount>,
 }
 
 impl Stats {
@@ -36,6 +38,9 @@ impl Stats {
                 HourlyWindows(1),
                 create_saturating_add_fn,
             ),
+
+            ipv4_state: CombinedWindowedStats::new(create_saturating_add_fn),
+            ipv6_state: CombinedWindowedStats::new(create_saturating_add_fn),
         }
     }
 
@@ -44,6 +49,8 @@ impl Stats {
         self.internet_available_sec.slide_minute();
         self.dns_active_sec.slide_minute();
         self.total_duration_sec.slide_minute();
+        self.ipv4_state.slide_minute();
+        self.ipv6_state.slide_minute();
     }
 
     pub(crate) fn log_inspect(&mut self, node: &InspectNode) {
@@ -51,6 +58,8 @@ impl Stats {
         self.internet_available_sec.log_inspect_int_array(node, "internet_available_sec");
         self.dns_active_sec.log_inspect_int_array(node, "dns_active_sec");
         self.total_duration_sec.log_inspect_int_array(node, "total_duration_sec");
+        self.ipv4_state.log_avg_inspect_double_array(node, "ipv4_state");
+        self.ipv6_state.log_avg_inspect_double_array(node, "ipv6_state");
     }
 }
 
