@@ -26,6 +26,7 @@ group("tools") {
     "//tools/fidl",
     "//tools/fidlcat:fidlcat_host",
     "//tools/fvdl:host($host_toolchain)",
+    "//tools/gn_desc:gn_desc($host_toolchain)",
     "//tools/jq5:install($host_toolchain)",
     "//tools/loglistener:host($host_toolchain)",
     "//tools/make-fuchsia-vol:host",

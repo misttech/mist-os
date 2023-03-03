@@ -6,7 +6,7 @@
 
 import argparse
 from os import path
-import platform
+import os
 import subprocess
 import sys
 
@@ -48,7 +48,7 @@ def write_if_changed(outpath, content):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_build_dir", required=True)
+    parser.add_argument("--root_build_dir", default=".")
     parser.add_argument("--fuchsia_dir", required=True)
     parser.add_argument("--gn_binary", required=True)
     parser.add_argument("--output", required=True)
@@ -59,6 +59,7 @@ def main():
     write_if_changed(args.output, fake_project_json)
 
     depfile = generate_depfile(args.output, args.root_build_dir)
+    os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
     with open(args.depfile, "w") as outfile:
         outfile.write(depfile)
     return 0

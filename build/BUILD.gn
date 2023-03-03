@@ -51,6 +51,7 @@ group("non_hermetic_deps") {
   # { fx gn refs $(fx get-build-dir) '//build:non_hermetic_deps'; fx gn refs $(fx get-build-dir) '//build:non_hermetic_deps(//build/toolchain:host_x64)'; } | sed 's|\([^:]*\):.*|"\1/*",|' | sort | uniq
   visibility = [
     "//third_party/crashpad/src/*",
+    "//tools/gn_desc:gn_desc.json",
     "//vendor/google/*",
     "//zircon/kernel/lib/version/*",
   ]
