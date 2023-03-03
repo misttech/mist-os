@@ -83,7 +83,6 @@ TEST_F(IovarTest, CheckIovarSet) {
   EXPECT_EQ(status, ZX_OK);
   // Get the value again through the public iovar interface and compare
   sim->sim_fw->IovarsGet(client_ifc_.iface_id_, "mpc", &cur_val, sizeof(cur_val), &fw_err);
-  printf("new value of mpc is: %d\n", cur_val);
   EXPECT_EQ(cur_val, new_val);
 }
 
