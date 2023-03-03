@@ -625,7 +625,7 @@ fbl::Array<AmlSpi::ChipInfo> AmlSpi::InitChips(amlogic_spi::amlspi_config_t* con
 }
 
 zx_status_t AmlSpi::Create(void* ctx, zx_device_t* device) {
-  auto pdev = ddk::PDev::FromFragment(device);
+  auto pdev = ddk::PDevFidl::FromFragment(device);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Failed to get platform device fragment");
     return ZX_ERR_NO_RESOURCES;
@@ -675,7 +675,7 @@ zx_status_t AmlSpi::Create(void* ctx, zx_device_t* device) {
   }
 
   zx::interrupt interrupt;
-  if ((status = pdev.GetInterrupt(0, &interrupt)) != ZX_OK) {
+  if ((status = pdev.GetInterrupt(0, 0, &interrupt)) != ZX_OK) {
     zxlogf(ERROR, "Failed to get SPI interrupt: %d", status);
     return status;
   }

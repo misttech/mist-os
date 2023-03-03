@@ -49,12 +49,15 @@ test("aml-spi-test-bin") {
   deps = [
     ":common",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 

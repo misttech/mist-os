@@ -8,6 +8,9 @@
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -26,6 +29,11 @@
 
 namespace spi {
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 class AmlSpiTest : public zxtest::Test {
  public:
   static AmlSpiTest* instance() { return instance_; }
@@ -39,13 +47,15 @@ class AmlSpiTest : public zxtest::Test {
     instance_ = this;
   }
 
-  virtual void SetUpInterrupt() {
+  virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
     zx::interrupt dut_interrupt;
     ASSERT_OK(interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dut_interrupt));
-    pdev_.set_interrupt(0, std::move(dut_interrupt));
+    config.irqs[0] = std::move(dut_interrupt);
     interrupt_.trigger(0, zx::clock::get_monotonic());
   }
+
+  virtual void SetUpBti(fake_pdev::FakePDevFidl::Config& config) {}
 
   virtual void SetUpFragments() {
     root_->AddProtocol(ZX_PROTOCOL_REGISTERS, registers_.proto()->ops, registers_.proto()->ctx,
@@ -55,31 +65,46 @@ class AmlSpiTest : public zxtest::Test {
   void SetUp() override {
     SetUpFragments();
 
-    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    fake_pdev::FakePDevFidl::Config config;
+    config.device_info = pdev_device_info_t{
+        .mmio_count = 1,
+        .irq_count = 1u,
+    };
+
+    ASSERT_OK(
+        mmio_mapper_.CreateAndMap(0x100, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &mmio_));
+    zx::vmo dup;
+    ASSERT_OK(mmio_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
+    config.mmios[0] = fake_pdev::MmioInfo{
+        .vmo = std::move(dup),
+        .offset = 0,
+        .size = mmio_mapper_.size(),
+    };
+    SetUpInterrupt(config);
+    SetUpBti(config);
+
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                          std::move(outgoing_endpoints->client), "pdev");
+
     root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-2");
     root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-3");
     root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-5");
 
     root_->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kSpiConfig, sizeof(kSpiConfig));
 
-    ASSERT_OK(
-        mmio_mapper_.CreateAndMap(0x100, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &mmio_));
-
-    pdev_.set_device_info(pdev_device_info_t{.mmio_count = 1, .irq_count = 1u});
-
-    zx::vmo dup;
-    ASSERT_OK(mmio_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
-
-    pdev_.set_mmio(0, {
-                          .vmo = std::move(dup),
-                          .offset = 0,
-                          .size = mmio_mapper_.size(),
-                      });
-
     EXPECT_OK(loop_.StartThread("aml-spi-test-registers-thread"));
     registers_.fidl_service()->ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
-
-    SetUpInterrupt();
 
     // Set the transfer complete bit so the driver doesn't get stuck waiting on the interrupt.
     mmio_region_[AML_SPI_STATREG].SetReadCallback(
@@ -91,8 +116,6 @@ class AmlSpiTest : public zxtest::Test {
   MockDevice* root() { return root_.get(); }
   ddk::MockGpio& gpio() { return gpio_; }
   ddk_fake::FakeMmioRegRegion& mmio() { return mmio_region_; }
-  fake_pdev::FakePDev& pdev() { return pdev_; }
-
   bool ControllerReset() {
     zx_status_t status = registers_.fidl_service()->VerifyAll();
     if (status == ZX_OK) {
@@ -120,7 +143,9 @@ class AmlSpiTest : public zxtest::Test {
   zx::vmo mmio_;
   fzl::VmoMapper mmio_mapper_;
   ddk::MockGpio gpio_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   zx::interrupt interrupt_;
   ddk_fake::FakeMmioReg mmio_registers_[17];
   ddk_fake::FakeMmioRegRegion mmio_region_;
@@ -758,7 +783,23 @@ TEST_F(AmlSpiTest, EnhancedClockModeInvalidDivider) {
   EXPECT_EQ(AmlSpi::Create(nullptr, root()), ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(AmlSpiTest, ExchangeDma) {
+class AmlSpiBtiPaddrTest : public AmlSpiTest {
+ public:
+  static constexpr zx_paddr_t kDmaPaddrs[] = {0x1212'0000, 0xabab'000};
+
+  virtual void SetUpBti(fake_pdev::FakePDevFidl::Config& config) override {
+    zx::bti bti;
+    ASSERT_OK(fake_bti_create_with_paddrs(kDmaPaddrs, std::size(kDmaPaddrs),
+                                          bti.reset_and_get_address()));
+    bti_local_ = bti.borrow();
+    config.btis[0] = std::move(bti);
+  }
+
+ protected:
+  zx::unowned_bti bti_local_;
+};
+
+TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   constexpr uint8_t kTxData[24] = {
       0x3c, 0xa7, 0x5f, 0xc8, 0x4b, 0x0b, 0xdf, 0xef, 0xb9, 0xa0, 0xcb, 0xbd,
       0xd4, 0xcf, 0xa8, 0xbf, 0x85, 0xf2, 0x6a, 0xe3, 0xba, 0xf1, 0x49, 0x00,
@@ -784,15 +825,6 @@ TEST_F(AmlSpiTest, ExchangeDma) {
     memcpy(reversed_expected_rx_data + i, &tmp, sizeof(tmp));
   }
 
-  constexpr zx_paddr_t kDmaPaddrs[] = {0x1212'0000, 0xabab'000};
-
-  zx::bti bti;
-  ASSERT_OK(
-      fake_bti_create_with_paddrs(kDmaPaddrs, std::size(kDmaPaddrs), bti.reset_and_get_address()));
-
-  zx::unowned_bti bti_local = bti.borrow();
-  pdev().set_bti(0, std::move(bti));
-
   EXPECT_OK(AmlSpi::Create(nullptr, root()));
 
   ASSERT_EQ(root()->child_count(), 1);
@@ -801,7 +833,7 @@ TEST_F(AmlSpiTest, ExchangeDma) {
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
   EXPECT_OK(
-      fake_bti_get_pinned_vmos(bti_local->get(), dma_vmos, std::size(dma_vmos), &actual_vmos));
+      fake_bti_get_pinned_vmos(bti_local_->get(), dma_vmos, std::size(dma_vmos), &actual_vmos));
   EXPECT_EQ(actual_vmos, std::size(dma_vmos));
 
   zx::vmo tx_dma_vmo(dma_vmos[0].vmo);
@@ -837,19 +869,26 @@ TEST_F(AmlSpiTest, ExchangeDma) {
   EXPECT_FALSE(ControllerReset());
 }
 
-TEST_F(AmlSpiTest, ExchangeFallBackToPio) {
+class AmlSpiBtiEmptyTest : public AmlSpiTest {
+ public:
+  virtual void SetUpBti(fake_pdev::FakePDevFidl::Config& config) override {
+    zx::bti bti;
+    ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
+    bti_local_ = bti.borrow();
+    config.btis[0] = std::move(bti);
+  }
+
+ protected:
+  zx::unowned_bti bti_local_;
+};
+
+TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   constexpr uint8_t kTxData[15] = {
       0x3c, 0xa7, 0x5f, 0xc8, 0x4b, 0x0b, 0xdf, 0xef, 0xb9, 0xa0, 0xcb, 0xbd, 0xd4, 0xcf, 0xa8,
   };
   constexpr uint8_t kExpectedRxData[15] = {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f,
   };
-
-  zx::bti bti;
-  ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
-
-  zx::unowned_bti bti_local = bti.borrow();
-  pdev().set_bti(0, std::move(bti));
 
   EXPECT_OK(AmlSpi::Create(nullptr, root()));
 
@@ -859,7 +898,7 @@ TEST_F(AmlSpiTest, ExchangeFallBackToPio) {
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
   EXPECT_OK(
-      fake_bti_get_pinned_vmos(bti_local->get(), dma_vmos, std::size(dma_vmos), &actual_vmos));
+      fake_bti_get_pinned_vmos(bti_local_->get(), dma_vmos, std::size(dma_vmos), &actual_vmos));
   EXPECT_EQ(actual_vmos, std::size(dma_vmos));
 
   zx_paddr_t tx_paddr = 0;
@@ -891,7 +930,7 @@ TEST_F(AmlSpiTest, ExchangeFallBackToPio) {
   EXPECT_FALSE(ControllerReset());
 }
 
-TEST_F(AmlSpiTest, ExchangeDmaClientReversesBuffer) {
+TEST_F(AmlSpiBtiPaddrTest, ExchangeDmaClientReversesBuffer) {
   constexpr uint8_t kTxData[24] = {
       0x3c, 0xa7, 0x5f, 0xc8, 0x4b, 0x0b, 0xdf, 0xef, 0xb9, 0xa0, 0xcb, 0xbd,
       0xd4, 0xcf, 0xa8, 0xbf, 0x85, 0xf2, 0x6a, 0xe3, 0xba, 0xf1, 0x49, 0x00,
@@ -900,15 +939,6 @@ TEST_F(AmlSpiTest, ExchangeDmaClientReversesBuffer) {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f,
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f,
   };
-
-  constexpr zx_paddr_t kDmaPaddrs[] = {0x1212'0000, 0xabab'000};
-
-  zx::bti bti;
-  ASSERT_OK(
-      fake_bti_create_with_paddrs(kDmaPaddrs, std::size(kDmaPaddrs), bti.reset_and_get_address()));
-
-  zx::unowned_bti bti_local = bti.borrow();
-  pdev().set_bti(0, std::move(bti));
 
   constexpr amlogic_spi::amlspi_config_t kSpiConfig[] = {
       {
@@ -930,7 +960,7 @@ TEST_F(AmlSpiTest, ExchangeDmaClientReversesBuffer) {
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
   EXPECT_OK(
-      fake_bti_get_pinned_vmos(bti_local->get(), dma_vmos, std::size(dma_vmos), &actual_vmos));
+      fake_bti_get_pinned_vmos(bti_local_->get(), dma_vmos, std::size(dma_vmos), &actual_vmos));
   EXPECT_EQ(actual_vmos, std::size(dma_vmos));
 
   zx::vmo tx_dma_vmo(dma_vmos[0].vmo);
@@ -1051,7 +1081,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
 
 class AmlSpiNoIrqTest : public AmlSpiTest {
  public:
-  virtual void SetUpInterrupt() override {}
+  virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) override {}
 };
 
 TEST_F(AmlSpiNoIrqTest, InterruptRequired) {
