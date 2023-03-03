@@ -512,19 +512,11 @@ impl MockController {
             kill_resp: kill_response,
         }
     }
-    /// Spawn an async execution context which takes ownership of `server_end`
-    /// and inserts `ControlMessage`s into `messages` based on events sent on
-    /// the `ComponentController` channel. This simply spawns a future which
-    /// awaits self.run().
-    pub fn serve(mut self) -> AbortHandle {
-        // Listen to the ComponentController server end and record the messages
-        // that arrive. Exit after the first one, as this is the contract we
-        // have implemented so far. Exiting will cause our handle to the
-        // channel to drop and close the channel.
 
-        let (handle, registration) = AbortHandle::new_pair();
-
-        // Send default job for the sake of testing only.
+    /// Create a future which takes ownership of `server_end` and inserts
+    /// `ControlMessage`s into `messages` based on events sent on the
+    /// `ComponentController` channel.
+    pub fn into_serve_future(mut self) -> impl Future<Output = ()> {
         let job_dup = fuchsia_runtime::job_default()
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .expect("duplicate default job");
@@ -540,63 +532,75 @@ impl MockController {
             .unwrap_or_else(|e| {
                 warn!("sending diagnostics failed: {:?}", e);
             });
-        let fut = Abortable::new(
-            async move {
-                self.messages.lock().await.insert(self.koid, Vec::new());
-                while let Ok(Some(request)) = self.request_stream.try_next().await {
-                    match request {
-                        fcrunner::ComponentControllerRequest::Stop { control_handle: c } => {
-                            self.messages
-                                .lock()
-                                .await
-                                .get_mut(&self.koid)
-                                .expect("component channel koid key missing from mock runner map")
-                                .push(ControlMessage::Stop);
-                            if let Some(delay) = self.stop_resp.delay {
-                                let delay_copy = delay.clone();
-                                let close_channel = self.stop_resp.close_channel;
-                                fasync::Task::spawn(async move {
-                                    fasync::Timer::new(fasync::Time::after(delay_copy)).await;
-                                    if close_channel {
-                                        c.shutdown_with_epitaph(zx::Status::OK);
-                                    }
-                                })
-                                .detach();
-                            } else if self.stop_resp.close_channel {
-                                c.shutdown_with_epitaph(zx::Status::OK);
-                                break;
-                            }
-                        }
-                        fcrunner::ComponentControllerRequest::Kill { control_handle: c } => {
-                            self.messages
-                                .lock()
-                                .await
-                                .get_mut(&self.koid)
-                                .expect("component channel koid key missing from mock runner map")
-                                .push(ControlMessage::Kill);
-                            if let Some(delay) = self.kill_resp.delay {
-                                let delay_copy = delay.clone();
-                                let close_channel = self.kill_resp.close_channel;
-                                fasync::Task::spawn(async move {
-                                    fasync::Timer::new(fasync::Time::after(delay_copy)).await;
-                                    if close_channel {
-                                        c.shutdown_with_epitaph(zx::Status::OK);
-                                    }
-                                })
-                                .detach();
-                                if self.kill_resp.close_channel {
-                                    break;
+        async move {
+            self.messages.lock().await.insert(self.koid, Vec::new());
+            while let Ok(Some(request)) = self.request_stream.try_next().await {
+                match request {
+                    fcrunner::ComponentControllerRequest::Stop { control_handle: c } => {
+                        self.messages
+                            .lock()
+                            .await
+                            .get_mut(&self.koid)
+                            .expect("component channel koid key missing from mock runner map")
+                            .push(ControlMessage::Stop);
+                        if let Some(delay) = self.stop_resp.delay {
+                            let delay_copy = delay.clone();
+                            let close_channel = self.stop_resp.close_channel;
+                            fasync::Task::spawn(async move {
+                                fasync::Timer::new(fasync::Time::after(delay_copy)).await;
+                                if close_channel {
+                                    c.shutdown_with_epitaph(zx::Status::OK);
                                 }
-                            } else if self.kill_resp.close_channel {
-                                c.shutdown_with_epitaph(zx::Status::OK);
+                            })
+                            .detach();
+                        } else if self.stop_resp.close_channel {
+                            c.shutdown_with_epitaph(zx::Status::OK);
+                            break;
+                        }
+                    }
+                    fcrunner::ComponentControllerRequest::Kill { control_handle: c } => {
+                        self.messages
+                            .lock()
+                            .await
+                            .get_mut(&self.koid)
+                            .expect("component channel koid key missing from mock runner map")
+                            .push(ControlMessage::Kill);
+                        if let Some(delay) = self.kill_resp.delay {
+                            let delay_copy = delay.clone();
+                            let close_channel = self.kill_resp.close_channel;
+                            fasync::Task::spawn(async move {
+                                fasync::Timer::new(fasync::Time::after(delay_copy)).await;
+                                if close_channel {
+                                    c.shutdown_with_epitaph(zx::Status::OK);
+                                }
+                            })
+                            .detach();
+                            if self.kill_resp.close_channel {
                                 break;
                             }
+                        } else if self.kill_resp.close_channel {
+                            c.shutdown_with_epitaph(zx::Status::OK);
+                            break;
                         }
                     }
                 }
-            },
-            registration,
-        );
+            }
+        }
+    }
+
+    /// Spawn an async execution context which takes ownership of `server_end`
+    /// and inserts `ControlMessage`s into `messages` based on events sent on
+    /// the `ComponentController` channel. This simply spawns a future which
+    /// awaits self.run().
+    pub fn serve(self) -> AbortHandle {
+        // Listen to the ComponentController server end and record the messages
+        // that arrive. Exit after the first one, as this is the contract we
+        // have implemented so far. Exiting will cause our handle to the
+        // channel to drop and close the channel.
+
+        let (handle, registration) = AbortHandle::new_pair();
+        let fut = Abortable::new(self.into_serve_future(), registration);
+        // Send default job for the sake of testing only.
         fasync::Task::spawn(async move {
             fut.await.unwrap_or(()); // Ignore cancellation.
         })
