@@ -46,7 +46,7 @@ group("allowed_to_use_subpackages") {
     "//examples/components/routing_failed:components-routing-failed-example-cpp",
     "//examples/components/routing_failed:components-routing-failed-example-rust",
     "//examples/components/subpackages:echo_client_with_subpackaged_server",
-    "//src/performance/trace_manager:trace_manager_pkg",
+    "//src/performance/trace_manager:trace_manager",
     "//src/sys/pkg/lib/fuchsia-pkg:package_for_archive",
     "//src/tests/microbenchmarks:starnix_microbenchmarks_perftestmode",
     "//src/virtualization/bin/guest_manager:debian_guest_manager",

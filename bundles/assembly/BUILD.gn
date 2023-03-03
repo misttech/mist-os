@@ -426,7 +426,7 @@ assembly_input_bundle("common_minimal") {
 #
 assembly_input_bundle("common_minimal_eng") {
   testonly = true
-  base_packages = [ "//src/performance/trace_manager:trace_manager_pkg" ]
+  base_packages = [ "//src/performance/trace_manager" ]
 }
 
 # This is common across all eng-mode and user-debug products, at the minimal or

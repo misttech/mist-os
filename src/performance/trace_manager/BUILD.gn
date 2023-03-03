@@ -74,13 +74,7 @@ fuchsia_component("component_hermetic") {
   ]
 }
 
-# TODO(fxb/112433): Soft transition the trace manager group while we remove
-# out of tree references. Rename trace_manager_pkg back to trace_manager after
-# the references are removed.
-group("trace_manager") {
-  deps = []
-}
-fuchsia_package_with_single_component("trace_manager_pkg") {
+fuchsia_package_with_single_component("trace_manager") {
   testonly = true
   manifest = "meta/trace_manager.cml"
   component_name = "trace_manager"
@@ -94,6 +88,17 @@ fuchsia_package_with_single_component("trace_manager_pkg") {
     "//src/performance/ktrace_provider",
     "//src/performance/perfetto-bridge",
   ]
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//bundles/assembly_input_groups/*",
+    "//src/performance/cpuperf_provider/*",
+  ]
+}
+
+group("trace_manager_pkg") {
+  testonly = true
+  deps = [ ":trace_manager" ]
 }
 
 core_shard("trace_manager_core_shard") {
