@@ -56,7 +56,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={"result": _INPUT_ARGS["device_name"]},
         autospec=True)
     @mock.patch.object(
@@ -133,7 +133,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         name_func=_custom_test_name_func)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.fuchsia_device.ffx_cli,
@@ -182,7 +182,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={
             "result":
                 {
@@ -202,7 +202,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={
             "result":
                 {
@@ -222,7 +222,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={
             "result":
                 {
@@ -242,7 +242,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={"result": {
             "serial_number": "default-serial-number",
         }},
@@ -258,7 +258,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     # List all the tests related to dynamic properties in alphabetical order
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={"result": "1.2.3"},
         autospec=True)
     def test_firmware_version(self, mock_send_sl4f_command):
@@ -300,7 +300,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         name_func=_custom_test_name_func)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         autospec=True)
     def test_log_message_to_device(
             self, parameterized_dict, mock_send_sl4f_command):
@@ -325,7 +325,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         autospec=True)
     def test_reboot(
             self, mock_send_sl4f_command, mock_wait_for_offline,
@@ -362,7 +362,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         name_func=_custom_test_name_func)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={"result": {
             "zip": _BASE64_ENCODED_STR
         }},
@@ -403,7 +403,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_send_sl4f_command",
+        "send_sl4f_command",
         return_value={"result": _MOCK_ARGS["device_name"]},
         autospec=True)
     def test_check_sl4f_connection(self, mock_send_sl4f_command):
@@ -553,10 +553,10 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_send_sl4f_command_success(
             self, parameterized_dict, mock_send_http_request):
-        """Testcase for FuchsiaDeviceBase._send_sl4f_command() success case"""
+        """Testcase for FuchsiaDeviceBase.send_sl4f_command() success case"""
         method = parameterized_dict["method"]
 
-        response = self.fd_obj._send_sl4f_command(method=method)
+        response = self.fd_obj.send_sl4f_command(method=method)
 
         self.assertEqual(response, parameterized_dict["mock_http_response"])
 
@@ -569,14 +569,13 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_send_sl4f_command_fail_because_of_error_in_resp(
             self, mock_send_http_request):
-        """Testcase for FuchsiaDeviceBase._send_sl4f_command() failure case when
+        """Testcase for FuchsiaDeviceBase.send_sl4f_command() failure case when
         there is 'error' in SL4F response received."""
         method = _MOCK_ARGS["sl4f_request"]
         expected_error = _MOCK_ARGS['sl4f_error_response']['error']
         with self.assertRaisesRegex(errors.FuchsiaDeviceError,
                                     f"Error: '{expected_error}'"):
-            self.fd_obj._send_sl4f_command(
-                method=method, attempts=5, interval=0)
+            self.fd_obj.send_sl4f_command(method=method, attempts=5, interval=0)
 
         self.assertEqual(mock_send_http_request.call_count, 5)
 
@@ -587,14 +586,13 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_send_sl4f_command_fail_because_of_exception(
             self, mock_send_http_request):
-        """Testcase for FuchsiaDeviceBase._send_sl4f_command() failure case when
+        """Testcase for FuchsiaDeviceBase.send_sl4f_command() failure case when
         there is an exception thrown while sending HTTP request."""
         method = _MOCK_ARGS["sl4f_request"]
         with self.assertRaisesRegex(
                 errors.FuchsiaDeviceError,
                 f"SL4F method '{method}' failed on '{self.fd_obj.name}'."):
-            self.fd_obj._send_sl4f_command(
-                method=method, attempts=5, interval=0)
+            self.fd_obj.send_sl4f_command(method=method, attempts=5, interval=0)
 
         mock_send_http_request.assert_called_once()
 

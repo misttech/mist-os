@@ -18,6 +18,7 @@ from honeydew import custom_types, errors
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.device_classes import (
     component_capable_device, fuchsia_device)
+from honeydew.interfaces.transports import sl4f
 from honeydew.utils import ffx_cli, host_utils, http_utils
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ _SSH_COMMAND = \
 
 
 # pylint: disable=attribute-defined-outside-init, too-many-instance-attributes
-class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
+class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                         component_capable_device.ComponentCapableDevice):
     """Default implementation of Fuchsia device abstract base class.
 
@@ -162,7 +163,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        get_version_resp = self._send_sl4f_command(
+        get_version_resp = self.send_sl4f_command(
             method=_SL4F_METHODS["GetVersion"])
         return get_version_resp["result"]
 
@@ -191,7 +192,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        self._send_sl4f_command(
+        self.send_sl4f_command(
             method=_SL4F_METHODS[f"Log{level.name.capitalize()}"],
             params={"message": message})
 
@@ -202,11 +203,85 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
             errors.FuchsiaDeviceError: On failure.
         """
         _LOGGER.info("Rebooting %s...", self.name)
-        self._send_sl4f_command(
+        self.send_sl4f_command(
             method=_SL4F_METHODS["Reboot"],
             exceptions_to_skip=[RemoteDisconnected])
         self._wait_for_offline()
         self._wait_for_bootup_complete()
+
+    # pylint: disable=too-many-arguments
+    def send_sl4f_command(
+        self,
+        method: str,
+        params: Optional[Dict[str, Any]] = None,
+        attempts: int = 3,
+        interval: int = 3,
+        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
+    ) -> Dict[str, Any]:
+        """Sends SL4F command from host to Fuchsia device and returns the
+        response.
+
+        Args:
+            method: SL4F method.
+            params: Any optional params needed for method param.
+            attempts: number of attempts to try in case of a failure.
+            interval: wait time in sec before each retry in case of a failure.
+            exceptions_to_skip: Any non fatal exceptions for which retry will
+                not be attempted and no error will be raised.
+
+        Returns:
+            SL4F command response returned by the Fuchsia device.
+                Note: If SL4F command raises any exception specified in
+                exceptions_to_skip then a empty dict will be returned.
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+        if not params:
+            params = {}
+
+        if not exceptions_to_skip:
+            exceptions_to_skip = []
+
+        # pylint: disable=protected-access
+        if host_utils._get_ip_version(self._ip_address) == 6:
+            url = f"http://[{self._ip_address}]:{_SL4F_PORT}"
+        else:
+            url = f"http://{self._ip_address}:{_SL4F_PORT}"
+
+        # id is required by the SL4F server to parse test_data but is not
+        # currently used.
+        data = {"jsonrpc": "2.0", "id": "", "method": method, "params": params}
+
+        exception_msg = f"SL4F method '{method}' failed on '{self.name}'."
+        for attempt in range(1, attempts + 1):
+            # if this is not first attempt wait for sometime before next retry.
+            if attempt > 1:
+                time.sleep(interval)
+            try:
+                http_response = http_utils.send_http_request(
+                    url,
+                    data,
+                    attempts=attempts,
+                    interval=interval,
+                    exceptions_to_skip=exceptions_to_skip)
+
+                error = http_response.get('error')
+                if not error:
+                    return http_response
+
+                if attempt < attempts:  # pylint: disable=no-else-continue
+                    _LOGGER.warning(
+                        "SL4F method '%s' failed with error: '%s' on "
+                        "iteration %s/%s", method, error, attempt, attempts)
+                    continue
+                else:
+                    exception_msg = f"{exception_msg} Error: '{error}'."
+                    break
+
+            except Exception as err:
+                raise errors.FuchsiaDeviceError(exception_msg) from err
+        raise errors.FuchsiaDeviceError(exception_msg)
 
     def snapshot(
             self, directory: str, snapshot_file: Optional[str] = None) -> str:
@@ -238,8 +313,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
             snapshot_file = f"Snapshot_{self.name}_{timestamp}.zip"
         snapshot_file_path = os.path.join(directory, snapshot_file)
 
-        snapshot_resp = self._send_sl4f_command(
-            method=_SL4F_METHODS["Snapshot"])
+        snapshot_resp = self.send_sl4f_command(method=_SL4F_METHODS["Snapshot"])
         snapshot_base64_encoded_str = snapshot_resp["result"]["zip"]
         snapshot_base64_decoded_bytes = base64.b64decode(
             snapshot_base64_encoded_str)
@@ -257,7 +331,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: If SL4F connection is not successful.
         """
-        get_device_name_resp = self._send_sl4f_command(
+        get_device_name_resp = self.send_sl4f_command(
             method=_SL4F_METHODS["GetDeviceName"])
         device_name = get_device_name_resp["result"]
 
@@ -360,7 +434,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        get_product_info_resp = self._send_sl4f_command(
+        get_product_info_resp = self.send_sl4f_command(
             method=_SL4F_METHODS["GetProductInfo"])
         return get_product_info_resp["result"]
 
@@ -407,83 +481,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice,
             Created this method instead of directly calling this method's
             implementation in `device_type` to address type hinting error.
         """
-        get_device_info_resp = self._send_sl4f_command(
+        get_device_info_resp = self.send_sl4f_command(
             method=_SL4F_METHODS["GetDeviceInfo"])
         return get_device_info_resp["result"]["serial_number"]
-
-    # pylint: disable=too-many-arguments
-    def _send_sl4f_command(
-        self,
-        method: str,
-        params: Optional[Dict[str, Any]] = None,
-        attempts: int = 3,
-        interval: int = 3,
-        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
-    ) -> Dict[str, Any]:
-        """Sends SL4F command from host to Fuchsia device and returns the
-        response.
-
-        Args:
-            method: SL4F method.
-            params: Any optional params needed for method param.
-            attempts: number of attempts to try in case of a failure.
-            interval: wait time in sec before each retry in case of a failure.
-            exceptions_to_skip: Any non fatal exceptions for which retry will
-                not be attempted.
-
-        Returns:
-            SL4F command response returned by the Fuchsia device.
-                Note: If SL4F command raises any exception specified in
-                exceptions_to_skip then a empty dict will be returned.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
-        """
-        if not params:
-            params = {}
-
-        if not exceptions_to_skip:
-            exceptions_to_skip = []
-
-        # pylint: disable=protected-access
-        if host_utils._get_ip_version(self._ip_address) == 6:
-            url = f"http://[{self._ip_address}]:{_SL4F_PORT}"
-        else:
-            url = f"http://{self._ip_address}:{_SL4F_PORT}"
-
-        # id is required by the SL4F server to parse test_data but is not
-        # currently used.
-        data = {"jsonrpc": "2.0", "id": "", "method": method, "params": params}
-
-        exception_msg = f"SL4F method '{method}' failed on '{self.name}'."
-        for attempt in range(1, attempts + 1):
-            # if this is not first attempt wait for sometime before next retry.
-            if attempt > 1:
-                time.sleep(interval)
-            try:
-                http_response = http_utils.send_http_request(
-                    url,
-                    data,
-                    attempts=attempts,
-                    interval=interval,
-                    exceptions_to_skip=exceptions_to_skip)
-                error = http_response.get('error')
-
-                if error is None:
-                    return http_response
-
-                if attempt < attempts:  # pylint: disable=no-else-continue
-                    _LOGGER.warning(
-                        "SL4F method '%s' failed with error: '%s' on "
-                        "iteration %s/%s", method, error, attempt, attempts)
-                    continue
-                else:
-                    exception_msg = f"{exception_msg} Error: '{error}'."
-                    break
-
-            except Exception as err:
-                raise errors.FuchsiaDeviceError(exception_msg) from err
-        raise errors.FuchsiaDeviceError(exception_msg)
 
     def _start_sl4f_server(self) -> None:
         """Starts the SL4F server on fuchsia device.
