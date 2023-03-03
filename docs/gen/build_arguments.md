@@ -263,7 +263,7 @@ Base) for a product. These packages are never evicted by the system.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:14
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -271,7 +271,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:14
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -996,7 +996,7 @@ pressure arises or other policies indicate.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -1004,7 +1004,7 @@ From //BUILD.gn:56
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:15
+From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
@@ -3710,7 +3710,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3854,17 +3854,17 @@ If you add labels to this variable, these will be included in the 'host'
 artifact set, which represents an additional set of host-only software that
 is produced by the build.
 
-**Current value for `target_cpu = "arm64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
+**Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
 From //BUILD.gn:79
 
-**Current value for `target_cpu = "x64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
+**Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
@@ -4173,7 +4173,7 @@ Debug build.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:8
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `true`
 
@@ -4181,7 +4181,7 @@ From //build/config/BUILDCONFIG.gn:24
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:8
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `true`
 
@@ -5511,7 +5511,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:39
+From //products/common/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
@@ -5519,7 +5519,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:39
+From //products/common/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
@@ -7274,7 +7274,7 @@ Set to true to enable distributed compilation of Rust using RBE.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
@@ -7282,7 +7282,7 @@ From //build/toolchain/rbe.gni:41
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
@@ -7446,7 +7446,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:41
+From //products/common/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
@@ -7454,7 +7454,7 @@ From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:41
+From //products/common/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
@@ -7755,13 +7755,13 @@ From //src/proc/bin/starnix/BUILD.gn:14
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `""`
 
@@ -7958,7 +7958,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8253,7 +8253,7 @@ This has lower precedence than `use_reclient_cxx` in
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
@@ -8261,7 +8261,7 @@ From //build/toolchain/goma.gni:13
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
