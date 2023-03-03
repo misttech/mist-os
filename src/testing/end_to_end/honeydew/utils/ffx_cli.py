@@ -11,8 +11,7 @@ from typing import Any, Dict, List
 from honeydew import errors
 
 _CMDS = {
-    "FUCHSIA_TARGETS_SHOW":
-        "ffx -t {target} --timeout {timeout} target show --json",
+    "FUCHSIA_TARGETS_SHOW": "ffx -t {target} target show --json",
 }
 
 _TIMEOUTS = {
@@ -36,16 +35,15 @@ def ffx_target_show(
     Raises:
         errors.FfxCommandError: In case of failure.
     """
+    cmd = _CMDS["FUCHSIA_TARGETS_SHOW"].format(target=target)
     try:
-        cmd = _CMDS["FUCHSIA_TARGETS_SHOW"].format(
-            target=target, timeout=timeout)
         output = subprocess.check_output(
-            cmd, shell=True, stderr=subprocess.STDOUT).decode()
+            cmd, shell=True, stderr=subprocess.STDOUT,
+            timeout=timeout).decode()
         ffx_target_show_info: List[Dict[str, Any]] = json.loads(output)
         return ffx_target_show_info
     except Exception as err:
-        raise errors.FfxCommandError(
-            f"`ffx -t {target} target show` command failed") from err
+        raise errors.FfxCommandError(f"{cmd} command failed") from err
 
 
 def get_target_address(
