@@ -363,6 +363,7 @@ TRBPromise UsbXhci::SetMaxPacketSizeCommand(uint8_t slot_id, uint8_t bMaxPacketS
 
 zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t speed) {
   bool is_usb_3 = false;
+  zxlogf(DEBUG, "Device online. slot - %d port - %d", slot, port);
   {
     auto state = device_state_[slot - 1];
     if (!state) {
