@@ -101,7 +101,7 @@ async fn monitor_control_requests<T: TimeSource>(
 /// best-effort and should not block update checks.
 async fn file_report(proxy: &CrashReporterProxy, signature: &str) {
     if let Err(e) = proxy
-        .file(CrashReport {
+        .file_report(CrashReport {
             crash_signature: Some(signature.to_owned()),
             program_name: Some("system".to_owned()),
             // Need to do syscall because `std::time::Instant` cannot be converted into nanos.
