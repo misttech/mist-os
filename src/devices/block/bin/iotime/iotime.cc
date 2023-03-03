@@ -9,6 +9,7 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
+#include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/fifo.h>
@@ -157,6 +158,8 @@ static zx::duration iotime_fifo(const char* dev, int is_read, fbl::unique_fd fd,
     fprintf(stderr, "error: cannot attach vmo for '%s':%s\n", dev, zx_status_get_string(status));
     return zx::duration::infinite();
   }
+
+  auto cleanup = fit::defer([&]() { block_device->BlockDetachVmo(std::move(vmoid)); });
 
   block_fifo_request_t request = {
       .opcode = static_cast<uint32_t>(is_read ? BLOCKIO_READ : BLOCKIO_WRITE),
