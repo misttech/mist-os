@@ -49,10 +49,13 @@ test("aml-ram-test-bin") {
   deps = [
     ":aml_ram_bind",
     ":common",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest",
   ]

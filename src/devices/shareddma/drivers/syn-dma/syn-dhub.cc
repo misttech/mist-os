@@ -26,7 +26,7 @@ namespace as370 {
 std::unique_ptr<SynDhub> SynDhub::Create(zx_device_t* parent) {
   fbl::AllocChecker ac;
 
-  ddk::PDev pdev = ddk::PDev(parent);
+  ddk::PDevFidl pdev = ddk::PDevFidl(parent);
   std::optional<ddk::MmioBuffer> mmio;
   auto status = pdev.MapMmio(0, &mmio);
   if (status != ZX_OK) {
@@ -48,14 +48,14 @@ std::unique_ptr<SynDhub> SynDhub::Create(zx_device_t* parent) {
 }
 
 zx_status_t SynDhub::Bind() {
-  ddk::PDev pdev = ddk::PDev(parent());
+  ddk::PDevFidl pdev = ddk::PDevFidl(parent());
   auto status = pdev.GetBti(0, &bti_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "could not obtain bti %s", zx_status_get_string(status));
     return status;
   }
 
-  status = pdev.GetInterrupt(0, &interrupt_);
+  status = pdev.GetInterrupt(0, 0, &interrupt_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "GetInterrupt failed %s", zx_status_get_string(status));
     return status;

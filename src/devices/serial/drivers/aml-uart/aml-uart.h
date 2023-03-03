@@ -51,10 +51,10 @@ class AmlUart : public DeviceType,
 
   zx_status_t Init();
 
-  explicit AmlUart(zx_device_t* parent, const ddk::PDev& pdev,
+  explicit AmlUart(zx_device_t* parent, ddk::PDevFidl pdev,
                    const serial_port_info_t& serial_port_info, fdf::MmioBuffer mmio)
       : DeviceType(parent),
-        pdev_(pdev),
+        pdev_(std::move(pdev)),
         serial_port_info_(serial_port_info),
         mmio_(std::move(mmio)) {}
 
@@ -75,7 +75,7 @@ class AmlUart : public DeviceType,
   fit::closure MakeReadCallbackLocked(zx_status_t status, void* buf, size_t len) TA_REQ(read_lock_);
   fit::closure MakeWriteCallbackLocked(zx_status_t status) TA_REQ(write_lock_);
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   const serial_port_info_t serial_port_info_;
   fdf::MmioBuffer mmio_;
   zx::interrupt irq_;

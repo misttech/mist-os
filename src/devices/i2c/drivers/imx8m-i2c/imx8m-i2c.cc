@@ -479,7 +479,7 @@ zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
   fbl::AllocChecker ac;
 
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Could not get pdev.");
     return ZX_ERR_NO_RESOURCES;
@@ -507,7 +507,7 @@ zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
     }
 
     zx::interrupt irq;
-    if ((status = pdev.GetInterrupt(i, &irq)) != ZX_OK) {
+    if ((status = pdev.GetInterrupt(i, 0, &irq)) != ZX_OK) {
       return status;
     }
 

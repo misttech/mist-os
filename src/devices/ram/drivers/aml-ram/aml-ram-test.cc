@@ -6,6 +6,9 @@
 
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 
@@ -44,20 +47,39 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 class AmlRamDeviceTest : public zxtest::Test {
  public:
   void SetUp() override {
-    irq_signaller_ = pdev_.CreateVirtualInterrupt(0);
+    fake_pdev::FakePDevFidl::Config config;
+    config.irqs[0] = {};
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    irq_signaller_ = config.irqs[0].borrow();
+    config.mmios[0] = mmio_.mmio_info();
 
-    pdev_.set_device_info(pdev_device_info_t{
+    config.device_info = pdev_device_info_t{
         .pid = PDEV_PID_AMLOGIC_T931,
-    });
+    };
 
     dmc_offsets_ = g12_dmc_regs;
 
-    pdev_.set_mmio(0, mmio_.mmio_info());
-
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                                 std::move(outgoing_endpoints->client));
 
     EXPECT_OK(amlogic_ram::AmlRam::Create(nullptr, fake_parent_.get()));
   }
@@ -84,7 +106,9 @@ class AmlRamDeviceTest : public zxtest::Test {
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   FakeMmio mmio_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   zx::unowned_interrupt irq_signaller_;
   std::optional<fidl::ServerBindingRef<ram_metrics::Device>> binding_;
 

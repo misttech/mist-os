@@ -9,6 +9,9 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/event.h>
@@ -156,6 +159,10 @@ class DeviceState {
   zx::unowned_interrupt irq_signaller_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+};
+
 class AmlUartHarness : public zxtest::Test {
  public:
   void SetUp() override {
@@ -166,10 +173,23 @@ class AmlUartHarness : public zxtest::Test {
     };
     fake_parent_->SetMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, &kSerialInfo, sizeof(kSerialInfo));
 
-    state_.set_irq_signaller(pdev_.CreateVirtualInterrupt(0));
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
-    auto uart = std::make_unique<serial::AmlUart>(fake_parent_.get(), pdev_.proto(), kSerialInfo,
-                                                  state_.GetMmio());
+    fake_pdev::FakePDevFidl::Config config;
+    config.irqs[0] = {};
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    state_.set_irq_signaller(config.irqs[0].borrow());
+
+    zx::result pdev = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
+    ASSERT_OK(pdev);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config),
+                        server = std::move(pdev->server)](IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      infra->pdev_server.Connect(std::move(server));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+
+    auto uart = std::make_unique<serial::AmlUart>(
+        fake_parent_.get(), ddk::PDevFidl(std::move(pdev->client)), kSerialInfo, state_.GetMmio());
     zx_status_t status = uart->Init();
     ASSERT_OK(status);
     device_ = uart.get();
@@ -184,7 +204,9 @@ class AmlUartHarness : public zxtest::Test {
  private:
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   DeviceState state_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   serial::AmlUart* device_;
 };
 

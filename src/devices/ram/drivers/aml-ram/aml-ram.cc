@@ -69,7 +69,7 @@ zx_status_t ValidateRequest(const ram_metrics::wire::BandwidthMeasurementConfig&
 
 zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
   zx_status_t status;
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   std::optional<fdf::MmioBuffer> mmio;
   if ((status = pdev.MapMmio(0, &mmio)) != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to map mmio, st = %d", status);
@@ -77,7 +77,7 @@ zx_status_t AmlRam::Create(void* context, zx_device_t* parent) {
   }
 
   zx::interrupt irq;
-  status = pdev.GetInterrupt(0, &irq);
+  status = pdev.GetInterrupt(0, 0, &irq);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-ram: Failed to map interrupt, st = %d", status);
     return status;

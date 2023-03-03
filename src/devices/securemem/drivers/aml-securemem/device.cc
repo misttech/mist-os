@@ -42,7 +42,7 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
                                               0);
 
   zx_status_t status = ZX_OK;
-  status = ddk::PDevProtocolClient::CreateFromDevice(parent(), "pdev", &pdev_proto_client_);
+  status = ddk::PDevFidl::FromFragment(parent(), &pdev_proto_client_);
   if (status != ZX_OK) {
     LOG(ERROR, "Unable to get pdev protocol - status: %d", status);
     return status;

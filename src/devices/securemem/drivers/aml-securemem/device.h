@@ -11,6 +11,7 @@
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/hardware/tee/cpp/banjo.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/zx/bti.h>
 #include <threads.h>
@@ -56,7 +57,7 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   zx_status_t CreateAndServeSysmemTee();
 
   fdf_dispatcher_t* fdf_dispatcher_ = nullptr;
-  ddk::PDevProtocolClient pdev_proto_client_;
+  ddk::PDevFidl pdev_proto_client_;
   ddk::SysmemProtocolClient sysmem_proto_client_;
   ddk::TeeProtocolClient tee_proto_client_;
 

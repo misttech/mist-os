@@ -32,7 +32,7 @@ constexpr auto kMinBaudRate = 2;
 
 zx_status_t AmlUart::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "AmlUart::Create: Could not get pdev");
     return ZX_ERR_NO_RESOURCES;
@@ -59,7 +59,7 @@ zx_status_t AmlUart::Create(void* ctx, zx_device_t* parent) {
   }
 
   fbl::AllocChecker ac;
-  auto* uart = new (&ac) AmlUart(parent, pdev, info, *std::move(mmio));
+  auto* uart = new (&ac) AmlUart(parent, std::move(pdev), info, *std::move(mmio));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -292,7 +292,7 @@ zx_status_t AmlUart::SerialImplAsyncEnable(bool enable) {
   fbl::AutoLock al(&enable_lock_);
 
   if (enable && !enabled_) {
-    zx_status_t status = pdev_.GetInterrupt(0, &irq_);
+    zx_status_t status = pdev_.GetInterrupt(0, 0, &irq_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: pdev_get_interrupt failed %d", __func__, status);
       return status;

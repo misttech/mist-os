@@ -6,7 +6,10 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
+#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/testing.h>
 #include <lib/fpromise/result.h>
@@ -76,12 +79,31 @@ class FakeTee : public ddk::TeeProtocol<FakeTee> {
   tee_protocol_t proto_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 class AmlogicSecureMemTest : public zxtest::Test {
  protected:
   AmlogicSecureMemTest() {
-    pdev_.UseFakeBti();
+    fake_pdev::FakePDevFidl::Config config;
+    config.use_fake_bti = true;
 
-    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                          std::move(outgoing_endpoints->client), "pdev");
+
     root_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_.proto()->ops, sysmem_.proto()->ctx, "sysmem");
     root_->AddProtocol(ZX_PROTOCOL_TEE, tee_.proto()->ops, tee_.proto()->ctx, "tee");
 
@@ -134,7 +156,9 @@ class AmlogicSecureMemTest : public zxtest::Test {
 
  private:
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   FakeSysmem sysmem_;
   FakeTee tee_;
   amlogic_secure_mem::AmlogicSecureMemDevice* dev_;

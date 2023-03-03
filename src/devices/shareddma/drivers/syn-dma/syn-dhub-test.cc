@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 #include "syn-dhub.h"
 
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/clock.h>
@@ -205,20 +208,41 @@ struct SynDhubLocal : public SynDhub {
   zx_status_t Bind() { return SynDhub::Bind(); }
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 class DhubTest : public zxtest::Test {
  public:
   DhubTest() : mmio_(as370::kAudioDhubSize) {}
   void SetUp() override {
     fake_parent_ = MockDevice::FakeRootParent();
-    pdev_.set_mmio(0, mmio_.mmio_info());
-    pdev_.UseFakeBti();
-    zx::interrupt irq;
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-    ASSERT_OK(irq.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_));
-    pdev_.set_interrupt(0, std::move(irq));
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
 
-    ddk::PDev pdev = ddk::PDev(fake_parent_.get());
+    fake_pdev::FakePDevFidl::Config config;
+    config.mmios[0] = mmio_.mmio_info();
+    config.use_fake_bti = true;
+
+    config.irqs[0] = {};
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    ASSERT_OK(config.irqs[0].duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_));
+
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                                 std::move(outgoing_endpoints->client));
+
+    ddk::PDevFidl pdev = ddk::PDevFidl(fake_parent_.get());
+    ASSERT_TRUE(pdev.is_valid());
     std::optional<ddk::MmioBuffer> mmio;
     ASSERT_OK(pdev.MapMmio(0, &mmio));
     auto server = std::make_unique<SynDhubLocal>(fake_parent_.get(), *std::move(mmio));
@@ -244,7 +268,9 @@ class DhubTest : public zxtest::Test {
 
  private:
   zx::interrupt irq_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   FakeMmio mmio_;
   std::shared_ptr<MockDevice> fake_parent_;
   SynDhubLocal* server_;
