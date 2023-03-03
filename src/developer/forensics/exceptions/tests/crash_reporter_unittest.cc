@@ -208,10 +208,10 @@ class HandlerTest : public UnitTestFixture {
   StubCrashIntrospectV2 introspect_v2_;
 };
 
-bool RetrieveExceptionContext(ExceptionContext* pe) {
+bool RetrieveExceptionContext(ExceptionContext* pe, const std::string& process_name = "crasher") {
   // Create a process that crashes and obtain the relevant handles and exception.
   // By the time |SpawnCrasher| has returned, the thread has already thrown an exception.
-  if (!SpawnCrasher(pe))
+  if (!SpawnCrasher(pe, process_name))
     return false;
 
   // We mark the exception to be handled. We need this because we pass on the exception to the
@@ -526,6 +526,53 @@ TEST_F(HandlerTest, ProcessTerminated) {
                           {kCrashProcessStateKey, "terminated"},
                       });
   ValidateCrashSignature(report, "fuchsia-no-minidump-process-terminated");
+}
+
+TEST_F(HandlerTest, DelayForFeedbackCrash) {
+  SetUpCrashReporter();
+  SetUpCrashIntrospect();
+
+  // Create the exception.
+  ExceptionContext exception;
+  ASSERT_TRUE(RetrieveExceptionContext(&exception, "feedback.cm"));
+
+  zx::process process;
+  ASSERT_EQ(exception.exception.get_process(&process), ZX_OK);
+  const std::string process_name = fsl::GetObjectName(process.get());
+  const zx_koid_t process_koid = fsl::GetKoid(process.get());
+
+  zx::thread thread;
+  ASSERT_EQ(exception.exception.get_thread(&thread), ZX_OK);
+  const std::string thread_name = fsl::GetObjectName(thread.get());
+  const zx_koid_t thread_koid = fsl::GetKoid(thread.get());
+
+  const std::string kComponentUrl = "feedback.cm";
+  const std::string kComponentMoniker = "/realm/path/component_name";
+  introspect_v2().AddThreadKoidToComponentInfo(thread_koid, StubCrashIntrospectV2::ComponentInfo{
+                                                                .url = kComponentUrl,
+                                                                .moniker = kComponentMoniker,
+                                                            });
+
+  bool called = false;
+  HandleException(std::move(exception.exception), zx::duration::infinite(),
+                  [&called](const ::fidl::StringPtr& moniker) { called = true; });
+
+  ASSERT_FALSE(called);
+  RunLoopFor(zx::sec(5));
+  ASSERT_TRUE(called);
+
+  ASSERT_EQ(crash_reporter().reports().size(), 1u);
+  auto& report = crash_reporter().reports().front();
+
+  ValidateCrashReport(report, kComponentUrl, process_name, process_koid, thread_name, thread_koid,
+                      {
+                          {kCrashProcessStateKey, "in exception"},
+                      });
+
+  // We kill the jobs. This kills the underlying process. We do this so that the crashed process
+  // doesn't get rescheduled. Otherwise the exception on the crash program would bubble out of our
+  // environment and create noise on the overall system.
+  exception.job.kill();
 }
 
 }  // namespace

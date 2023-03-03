@@ -13,7 +13,7 @@
 namespace forensics {
 namespace exceptions {
 
-bool SpawnCrasher(ExceptionContext* pe) {
+bool SpawnCrasher(ExceptionContext* pe, const std::string& process_name) {
   zx::unowned_job current_job(zx_job_default());
   if (zx_status_t res = zx::job::create(*current_job, 0, &pe->job); res != ZX_OK) {
     FX_PLOGS(ERROR, res) << "Coult not create current job handle.";
@@ -38,7 +38,7 @@ bool SpawnCrasher(ExceptionContext* pe) {
   }
 
   // Create the process.
-  const char* argv[] = {"crasher", nullptr};
+  const char* argv[] = {process_name.c_str(), nullptr};
   constexpr char kCrasherPath[] = "/pkg/bin/exception_broker_crasher";
   char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
   if (zx_status_t res =

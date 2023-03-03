@@ -19,6 +19,10 @@ constexpr zx::duration kExceptionTtl = zx::min(5);
 // generation happens prior to component lookup and could take some arbitrary time.
 constexpr zx::duration kComponentLookupTimeout{zx::sec(30)};
 
+// The handler waits on a response from the feedback service for 15 seconds. This value is intended
+// to allow for most, but not all requests to return a response before the timeout is hit.
+constexpr zx::duration kFileReportTimeout{zx::sec(15)};
+
 constexpr const char kCrashProcessStateKey[] = "crash.process.state";
 
 }  // namespace exceptions

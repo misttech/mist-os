@@ -38,7 +38,7 @@ struct ExceptionContext {
 
 // Spawns a process that will crash and waits for the exception.
 // Returns |true| if the process was crashed and the exception was retrieved successfully.
-bool SpawnCrasher(ExceptionContext* pe);
+bool SpawnCrasher(ExceptionContext* pe, const std::string& process_name = "crasher");
 
 bool MarkExceptionAsHandled(ExceptionContext* pe);
 

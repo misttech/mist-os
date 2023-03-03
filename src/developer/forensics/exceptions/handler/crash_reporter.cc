@@ -5,16 +5,20 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/string.h>
+#include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/exception.h>
 #include <zircon/syscalls/object.h>
 
 #include <optional>
 
+#include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/exceptions/handler/component_lookup.h"
 #include "src/developer/forensics/exceptions/handler/minidump.h"
 #include "src/developer/forensics/exceptions/handler/report_builder.h"
+#include "src/developer/forensics/utils/fidl_oneshot.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/join_strings.h"
 
@@ -73,6 +77,22 @@ bool IsProcessTerminated(zx::process& crashed_process) {
   return process_info.flags & ZX_INFO_PROCESS_FLAG_EXITED;
 }
 
+fpromise::promise<> Delay(async_dispatcher_t* dispatcher, const zx::duration duration) {
+  fpromise::bridge<> bridge;
+
+  if (const zx_status_t status = async::PostDelayedTask(
+          dispatcher,
+          [completer = std::move(bridge.completer)]() mutable { completer.complete_ok(); },
+          zx::sec(5));
+      status != ZX_OK) {
+    // When |bridge.completer| gets destroyed, the completer is considered abandoned and the
+    // consumer will receive an error result.
+    FX_PLOGS(ERROR, status) << "Failed to delay connecting to the crash reporter, connecting now";
+  }
+
+  return bridge.consumer.promise_or(fpromise::error());
+}
+
 }  // namespace
 
 CrashReporter::CrashReporter(async_dispatcher_t* dispatcher,
@@ -114,49 +134,39 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
   const auto thread_koid = fsl::GetKoid(crashed_thread.get());
   auto file_crash_report =
       GetComponentInfo(dispatcher_, services_, component_lookup_timeout_, thread_koid)
-          .then(
-              [dispatcher = dispatcher_, services = services_, builder = std::move(builder),
-               callback = std::move(callback)](::fpromise::result<ComponentInfo>& result) mutable {
-                ComponentInfo component_info;
-                if (result.is_ok()) {
-                  component_info = result.take_value();
-                }
+          .then([dispatcher = dispatcher_, services = services_, builder = std::move(builder),
+                 callback =
+                     std::move(callback)](::fpromise::result<ComponentInfo>& result) mutable {
+            ComponentInfo component_info;
+            if (result.is_ok()) {
+              component_info = result.take_value();
+            }
 
-                builder.SetComponentInfo(component_info);
+            builder.SetComponentInfo(component_info);
 
-                fuchsia::feedback::CrashReporterPtr crash_reporter;
+            fpromise::promise<> delay = (builder.ProcessName() != "feedback.cm")
+                                            ? fpromise::make_ok_promise()
+                                            : Delay(dispatcher, /*duration=*/zx::sec(5));
 
-                if (builder.ProcessName() == "feedback.cm") {
-                  // Delay connecting to the crash reporter by 5 seconds if the crashed process is
-                  // the crash reporter. This gives the system time to route the request to a new
-                  // instance of the crash reporter instead of sending it into oblivion.
-                  if (const zx_status_t status = async::PostDelayedTask(
-                          dispatcher,
-                          [services,
-                           connection_request = crash_reporter.NewRequest(dispatcher)]() mutable {
-                            services->Connect(std::move(connection_request));
-                          },
-                          zx::sec(5));
-                      status != ZX_OK) {
-                    FX_PLOGS(ERROR, status)
-                        << "Failed to delay connecting to the crash reporter, connecting now";
-                    services->Connect(crash_reporter.NewRequest(dispatcher));
+            return delay
+                .then([dispatcher, services,
+                       builder = std::move(builder)](const fpromise::result<>& result) mutable {
+                  return OneShotCall<fuchsia::feedback::CrashReporter,
+                                     &fuchsia::feedback::CrashReporter::File>(
+                      dispatcher, services, kFileReportTimeout, builder.Consume());
+                })
+                .then([component_info = std::move(component_info), callback = std::move(callback)](
+                          const fpromise::result<fuchsia::feedback::CrashReporter_File_Result,
+                                                 forensics::Error>& result) {
+                  ::fidl::StringPtr moniker = std::nullopt;
+                  if (!component_info.moniker.empty()) {
+                    moniker = component_info.moniker;
                   }
-                } else {
-                  services->Connect(crash_reporter.NewRequest(dispatcher));
-                }
+                  callback(std::move(moniker));
 
-                crash_reporter->File(builder.Consume(),
-                                     [](fuchsia::feedback::CrashReporter_File_Result result) {});
-
-                ::fidl::StringPtr moniker = std::nullopt;
-                if (!component_info.moniker.empty()) {
-                  moniker = component_info.moniker;
-                }
-                callback(std::move(moniker));
-
-                return ::fpromise::ok();
-              });
+                  return ::fpromise::ok();
+                });
+          });
 
   executor_.schedule_task(std::move(file_crash_report));
 }
