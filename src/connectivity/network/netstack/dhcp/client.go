@@ -86,11 +86,12 @@ type Client struct {
 	logThrottler logThrottler
 
 	// Stubbable in test.
-	rand               *rand.Rand
-	retransTimeout     func(time.Duration) <-chan time.Time
-	acquire            func(context.Context, *Client, string, *Info) (Config, error)
-	now                func() time.Time
-	contextWithTimeout func(context.Context, time.Duration) (context.Context, context.CancelFunc)
+	rand                 *rand.Rand
+	retransTimeout       func(time.Duration) <-chan time.Time
+	acquire              func(context.Context, *Client, string, *Info) (Config, error)
+	now                  func() time.Time
+	contextWithTimeout   func(context.Context, time.Duration) (context.Context, context.CancelFunc)
+	createPacketEndpoint func(*stack.Stack, bool, tcpip.NetworkProtocolNumber, *waiter.Queue) (tcpip.Endpoint, tcpip.Error)
 }
 
 type PacketDiscardStats struct {
@@ -188,16 +189,17 @@ func NewClient(
 		panic(fmt.Sprintf("stack.GetNetworkEndpoint(%d, header.IPv4ProtocolNumber): %s", nicid, err))
 	}
 	c := &Client{
-		stack:              s,
-		networkEndpoint:    ep,
-		acquiredFunc:       acquiredFunc,
-		sem:                make(chan struct{}, 1),
-		rand:               rand.New(rand.NewSource(time.Now().MonotonicNano())),
-		retransTimeout:     time.After,
-		acquire:            acquire,
-		now:                time.Now,
-		stateRecentHistory: util.MakeCircularLogs(stateRecentHistoryLength),
-		contextWithTimeout: time.ContextWithTimeout,
+		stack:                s,
+		networkEndpoint:      ep,
+		acquiredFunc:         acquiredFunc,
+		createPacketEndpoint: packet.NewEndpoint,
+		sem:                  make(chan struct{}, 1),
+		rand:                 rand.New(rand.NewSource(time.Now().MonotonicNano())),
+		retransTimeout:       time.After,
+		acquire:              acquire,
+		now:                  time.Now,
+		stateRecentHistory:   util.MakeCircularLogs(stateRecentHistoryLength),
+		contextWithTimeout:   time.ContextWithTimeout,
 	}
 	c.logThrottler.init(s.Clock())
 	c.stats.PacketDiscardStats.Init()
@@ -636,7 +638,7 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 	//
 	// This prevents us from receiving packets that arrive on interfaces different
 	// from the interface the client is performing DHCP on.
-	ep, err := packet.NewEndpoint(c.stack, true /* cooked */, 0 /* netProto */, &c.wq)
+	ep, err := c.createPacketEndpoint(c.stack, true /* cooked */, 0 /* netProto */, &c.wq)
 	if err != nil {
 		return Config{}, fmt.Errorf("packet.NewEndpoint(_, true, 0, _): %s", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"testing"
 	stdtime "time"
@@ -27,6 +28,7 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 	"gvisor.dev/gvisor/pkg/tcpip/transport/udp"
+	"gvisor.dev/gvisor/pkg/waiter"
 )
 
 const (
@@ -788,10 +790,8 @@ func TestAcquisitionAfterNAK(t *testing.T) {
 				ipv4Header.SetChecksum(^ipv4Header.CalculateChecksum())
 				return pkt, true
 			}
-			responseDelivered := make(chan struct{})
-			serverEP.onPacketDelivered = func() {
-				signal(ctx, responseDelivered)
-			}
+			responseReceived := make(chan struct{})
+			signalOnPacketDelivered(c, responseReceived)
 
 			wg.Add(1)
 			go func() {
@@ -799,10 +799,10 @@ func TestAcquisitionAfterNAK(t *testing.T) {
 				for i := uint64(0); i < tc.wantNaks+tc.wantAcks; i++ {
 					waitForSignal(ctx, requestDelivered)
 					signal(ctx, unblockResponse)
-					waitForSignal(ctx, responseDelivered)
+					waitForSignal(ctx, responseReceived)
 					waitForSignal(ctx, requestDelivered)
 					signal(ctx, unblockResponse)
-					waitForSignal(ctx, responseDelivered)
+					waitForSignal(ctx, responseReceived)
 					if tc.initialStateTransitionTimeout && i == 0 {
 						signalTimeout(ctx, timeoutCh)
 					}
@@ -1227,7 +1227,7 @@ func TestRetransmissionTimeoutWithUnexpectedPackets(t *testing.T) {
 	}
 
 	unblockResponse := make(chan struct{})
-	responseSent := make(chan struct{})
+	responseReceived := make(chan struct{})
 
 	var serverShouldDecline bool
 	serverEP.onWritePacket = func(pkt stack.PacketBufferPtr) (stack.PacketBufferPtr, bool) {
@@ -1238,9 +1238,7 @@ func TestRetransmissionTimeoutWithUnexpectedPackets(t *testing.T) {
 		}
 		return pkt, false
 	}
-	serverEP.onPacketDelivered = func() {
-		signal(ctx, responseSent)
-	}
+	signalOnPacketDelivered(c, responseReceived)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -1258,7 +1256,7 @@ func TestRetransmissionTimeoutWithUnexpectedPackets(t *testing.T) {
 			// forward, otherwise the timout signal below will cause the client to
 			// send another request and change the server's behavior on how to
 			// respond.
-			waitForSignal(ctx, responseSent)
+			waitForSignal(ctx, responseReceived)
 
 			signalTimeout(ctx, timeoutCh)
 
@@ -1267,7 +1265,7 @@ func TestRetransmissionTimeoutWithUnexpectedPackets(t *testing.T) {
 
 			serverShouldDecline = false
 			signal(ctx, unblockResponse)
-			waitForSignal(ctx, responseSent)
+			waitForSignal(ctx, responseReceived)
 		}
 	}()
 
@@ -1330,7 +1328,7 @@ func TestClientDropsIrrelevantFrames(t *testing.T) {
 		}
 
 		unblockResponse := make(chan struct{})
-		responseSent := make(chan struct{})
+		responseReceived := make(chan struct{})
 
 		serverEP.onWritePacket = func(pkt stack.PacketBufferPtr) (stack.PacketBufferPtr, bool) {
 			waitForSignal(ctx, unblockResponse)
@@ -1356,9 +1354,7 @@ func TestClientDropsIrrelevantFrames(t *testing.T) {
 
 			return pkt, true
 		}
-		serverEP.onPacketDelivered = func() {
-			signal(ctx, responseSent)
-		}
+		signalOnPacketDelivered(c, responseReceived)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -1370,7 +1366,7 @@ func TestClientDropsIrrelevantFrames(t *testing.T) {
 
 			// Receive discardable response from server.
 			signal(ctx, unblockResponse)
-			waitForSignal(ctx, responseSent)
+			waitForSignal(ctx, responseReceived)
 
 			// Then timeout.
 			signalTimeout(ctx, timeoutCh)
@@ -1417,6 +1413,33 @@ func TestClientDropsIrrelevantFrames(t *testing.T) {
 		if got := c.stats.RecvOfferTimeout.Value(); got != 1 {
 			t.Errorf("acquire(...) got RecvOfferTimeout count: %d, want: 1", got)
 		}
+	}
+}
+
+// Endpoint wrapper that signals a channel when a Read succeeds.
+type interceptReadEndpoint struct {
+	tcpip.Endpoint
+	notifyOnRead chan struct{}
+}
+
+func (i interceptReadEndpoint) Read(w io.Writer, o tcpip.ReadOptions) (tcpip.ReadResult, tcpip.Error) {
+	result, err := i.Endpoint.Read(w, o)
+	if err == nil {
+		i.notifyOnRead <- struct{}{}
+	}
+	return result, err
+}
+
+func signalOnPacketDelivered(c *Client, responseReceived chan struct{}) {
+	createEndpoint := c.createPacketEndpoint
+
+	c.createPacketEndpoint = func(s *stack.Stack, b bool, npn tcpip.NetworkProtocolNumber, q *waiter.Queue) (tcpip.Endpoint, tcpip.Error) {
+		endpoint, err := createEndpoint(s, b, npn, q)
+		if err != nil {
+			return endpoint, err
+		}
+
+		return interceptReadEndpoint{Endpoint: endpoint, notifyOnRead: responseReceived}, nil
 	}
 }
 
