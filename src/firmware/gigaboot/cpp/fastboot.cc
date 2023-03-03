@@ -402,7 +402,7 @@ zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *tran
     return SendResponse(ResponseType::kFail, "UTF8->UC2 convertion failed for variable name",
                         transport);
   }
-  std::u16string &var_name = res_var_name.value();
+  fbl::Vector<char16_t> &var_name = res_var_name.value();
 
   efi_guid guid;
   if (args.num_args == 4) {
@@ -431,7 +431,7 @@ zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *tran
   }
 
   // Print VariableName
-  EfiVariables::EfiVariableId v_id{var_name, guid};
+  EfiVariables::EfiVariableId v_id(var_name, guid);
   auto v_id_utf8 = efi_variables_->Ucs2ToStr(v_id.name);
   if (v_id_utf8.is_error()) {
     const auto err_str = "Failed to convert UCS2 variable name to UTF8\n";

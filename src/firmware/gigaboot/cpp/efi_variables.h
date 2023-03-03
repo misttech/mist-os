@@ -10,14 +10,19 @@
 #include <stdio.h>
 
 #include <compare>
+#include <initializer_list>
 #include <iterator>
-#include <string>
+#include <string_view>
 #include <variant>
 
 #include <efi/types.h>
 #include <fbl/vector.h>
 
 namespace gigaboot {
+
+inline std::u16string_view ToU16StringView(const fbl::Vector<char16_t>& v) {
+  return std::u16string_view(v.data(), v.size());
+}
 
 // Helper wrapper class for EFI C API
 //
@@ -43,26 +48,34 @@ class EfiVariables {
   virtual ~EfiVariables() = default;
 
   struct EfiVariableId {
-    std::u16string name{kPreBeginVarName};
+    fbl::Vector<char16_t> name{kPreBeginVarNameInit};
     efi_guid vendor_guid;
+
+    EfiVariableId() = default;
+    EfiVariableId(const fbl::Vector<char16_t>& name_in, const efi_guid& vendor_guid_in);
+    EfiVariableId(const EfiVariableId& src);
+    EfiVariableId& operator=(const EfiVariableId& src);
 
     // Special constant for `EfiGetNextVariableName()` to start from the beginning.
     // Also used to indicate invalid value, since it is not allowed as variable name.
-    constexpr static std::u16string_view kPreBeginVarName{u"\0", 1};
+    // constexpr static std::initializer_list<char16_t> kPreBeginVarNameInit{u'\0'};
+    constexpr static char16_t kPreBeginVarNameInit = u'\0';
 
     // EFI API calls can fail. This method allows to check if iterator contains valid data
     // or is invalid (in case of failure).
-    bool IsValid() const { return name != kPreBeginVarName; }
+    bool IsValid() const;
 
     // Marks iterator as invalid in case of error.
-    void Invalidate() { name = kPreBeginVarName; }
+    void Invalidate() { name = {kPreBeginVarNameInit}; }
   };
 
   // UCS2 -> UTF8 string converter
   // ucs2 is expected to be a c-string
   static fit::result<efi_status, fbl::Vector<char>> Ucs2ToStr(std::u16string_view ucs2);
+  static fit::result<efi_status, fbl::Vector<char>> Ucs2ToStr(const fbl::Vector<char16_t>& ucs2);
   // Basic UTF8 (ASCII) -> UCS2 string converter
-  static fit::result<efi_status, std::u16string> StrToUcs2(std::string_view str);
+  static fit::result<efi_status, fbl::Vector<char16_t>> StrToUcs2(std::string_view str);
+  static fit::result<efi_status, fbl::Vector<char16_t>> StrToUcs2(const fbl::Vector<char>& str);
 
   struct EfiVariableInfo {
     uint64_t max_var_storage_size;
@@ -85,6 +98,7 @@ class EfiVariables {
   // EFI_ABORTED on any other error
   // EFI_INVALID_PARAMETER if there were multiple variables with the same name were found
   virtual fit::result<efi_status, efi_guid> GetGuid(std::u16string_view var_name);
+  fit::result<efi_status, efi_guid> GetGuid(const fbl::Vector<char16_t>& var_name);
 
   class iterator {
     friend EfiVariables;
@@ -139,6 +153,9 @@ class EfiVariables {
 
 bool operator==(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b);
 bool operator!=(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b);
+
+fbl::Vector<char> ToVector(std::string_view str);
+fbl::Vector<char16_t> ToVector(std::u16string_view str);
 
 }  // namespace gigaboot
 

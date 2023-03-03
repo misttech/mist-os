@@ -42,7 +42,23 @@ using ::testing::Test;
 
 const efi_handle kImageHandle = reinterpret_cast<efi_handle>(0x10);
 
+namespace fbl {
+template <typename T>
+inline bool operator==(const fbl::Vector<T>& a, const fbl::Vector<T>& b) {
+  return std::equal(a.begin(), a.end(), b.begin(), b.end());
+}
+
+template <typename T>
+inline bool operator!=(const fbl::Vector<T>& a, const fbl::Vector<T>& b) {
+  return !(a == b);
+}
+}  // namespace fbl
+
 namespace gigaboot {
+
+fbl::Vector<char> EfiCString(const std::string_view sv);
+fbl::Vector<char16_t> EfiCString(const std::u16string_view sv);
+fbl::Vector<char16_t> EfiCString(const fbl::Vector<char16_t>& v);
 
 TEST(EfiVariableId, DefaultInvalid) { EXPECT_FALSE(EfiVariables::EfiVariableId().IsValid()); }
 
@@ -74,16 +90,16 @@ TEST_P(EfiVariableIdFixture, Ne) {
 constexpr efi_guid kEfiGuid0 = {0x0, 0x0, 0x0, {0x0}};
 INSTANTIATE_TEST_SUITE_P(EfiVariableIdTest, EfiVariableIdFixture,
                          ::testing::Values(std::list<EfiVariables::EfiVariableId>{
-                             {u"", kEfiGuid0},
-                             {u"", {0x1, 0x0, 0x0, {0x0}}},
-                             {u"var0", kEfiGuid0},
-                             {u"var0", {0x1, 0x0, 0x0, {0x0}}},
-                             {u"var0", {0x0, 0x1, 0x0, {0x0}}},
-                             {u"var0", {0x0, 0x0, 0x1, {0x0}}},
-                             {u"var0", {0x0, 0x0, 0x1, {0x1}}},
-                             {u"var1", kEfiGuid0},
-                             {u"abcDEF123!@#", kEfiGuid0},
-                             {u"a\tb\nc\x0001\x0002", kEfiGuid0}}));
+                             {EfiCString(u""), kEfiGuid0},
+                             {EfiCString(u""), {0x1, 0x0, 0x0, {0x0}}},
+                             {EfiCString(u"var0"), kEfiGuid0},
+                             {EfiCString(u"var0"), {0x1, 0x0, 0x0, {0x0}}},
+                             {EfiCString(u"var0"), {0x0, 0x1, 0x0, {0x0}}},
+                             {EfiCString(u"var0"), {0x0, 0x0, 0x1, {0x0}}},
+                             {EfiCString(u"var0"), {0x0, 0x0, 0x1, {0x1}}},
+                             {EfiCString(u"var1"), kEfiGuid0},
+                             {EfiCString(u"abcDEF123!@#"), kEfiGuid0},
+                             {EfiCString(u"a\tb\nc\x0001\x0002"), kEfiGuid0}}));
 
 TEST(EfiVariablesUcs2ToStr, EmptyStringView) {
   auto res = EfiVariables::Ucs2ToStr(u"");
@@ -110,9 +126,28 @@ TEST(EfiVariablesUcs2ToStr, LongString) {
   EXPECT_EQ(res.value().data(), expected);
 }
 
+template <typename T>
+fbl::Vector<T> copy(const fbl::Vector<T>& src) {
+  fbl::Vector<T> res;
+  res.resize(src.size());
+  std::copy(src.begin(), src.end(), res.begin());
+  return res;
+}
+
 struct Ucs2Str {
-  std::u16string ucs2;
-  std::string str;
+  fbl::Vector<char16_t> ucs2;
+  fbl::Vector<char> str;
+
+  Ucs2Str(const fbl::Vector<char16_t>& ucs2_in, const fbl::Vector<char>& str_in)
+      : ucs2(copy(ucs2_in)), str(copy(str_in)) {}
+  Ucs2Str(const std::u16string_view ucs2_in, const std::string_view str_in)
+      : ucs2(EfiCString(ucs2_in)), str(EfiCString(str_in)) {}
+  Ucs2Str(const Ucs2Str& src) : ucs2(copy(src.ucs2)), str(copy(src.str)) {}
+  Ucs2Str& operator=(const Ucs2Str& src) {
+    ucs2 = copy(src.ucs2);
+    str = copy(src.str);
+    return *this;
+  }
 };
 
 class Ucs2StrFixture : public ::testing::TestWithParam<Ucs2Str> {};
@@ -120,21 +155,16 @@ class Ucs2StrFixture : public ::testing::TestWithParam<Ucs2Str> {};
 TEST_P(Ucs2StrFixture, Ucs2StrConvertSuccess) {
   Ucs2Str ucs2_str = GetParam();
 
-  // Convert input to correct c-string
-  auto ucs2 = ucs2_str.ucs2;
-  ucs2.push_back('\0');
-
-  auto res = EfiVariables::Ucs2ToStr(ucs2);
-
+  auto res = EfiVariables::Ucs2ToStr(ucs2_str.ucs2);
   ASSERT_TRUE(res.is_ok());
-  EXPECT_EQ(res.value().data(), ucs2_str.str);
+  EXPECT_EQ(res.value(), ucs2_str.str);
 }
 
 TEST_P(Ucs2StrFixture, Str2UcsConvertSuccess) {
   Ucs2Str ucs2_str = GetParam();
 
   // Convert input to correct c-string
-  auto ucs2 = ucs2_str.ucs2;
+  auto ucs2 = copy(ucs2_str.ucs2);
   ucs2.push_back('\0');
 
   auto res = EfiVariables::StrToUcs2(ucs2_str.str);
@@ -162,7 +192,7 @@ TEST(EfiVariablesStrToUcs2, LongString) {
   auto res = EfiVariables::StrToUcs2(input);
 
   ASSERT_TRUE(res.is_ok());
-  EXPECT_EQ(res.value(), expected);
+  EXPECT_EQ(res.value(), ToVector(expected));
 }
 
 class EfiVariablesTest : public Test {
@@ -232,7 +262,11 @@ class EfiVariablesStubTest : public Test {
 
   static inline StubRuntimeServices::VariableName ToVariableName(
       const EfiVariables::EfiVariableId& v) {
-    return StubRuntimeServices::VariableName{v.name, v.vendor_guid};
+    // make sure we remove trailing null-character
+    auto tmp = copy(v.name);
+    if (!tmp.is_empty() && tmp[tmp.size() - 1] == u'\0')
+      tmp.pop_back();
+    return StubRuntimeServices::VariableName(tmp, v.vendor_guid);
   }
 };
 
@@ -315,13 +349,6 @@ TEST_F(EfiVariablesTest, DumpVarInfoMaxValues) {
   EXPECT_EQ(res.value(), expected);
 }
 
-std::u16string EfiCString(std::u16string_view sv) {
-  std::u16string res(sv);
-  if (res.back() != '\0') {
-    res.push_back('\0');
-  }
-  return res;
-}
 constexpr efi_guid kGuid[] = {
     {0x0, 0x0, 0x0, {0x0}},
     {0x1, 0x1, 0x1, {0x1}},
@@ -329,10 +356,10 @@ constexpr efi_guid kGuid[] = {
     {0x3, 0x3, 0x3, {0x3}},
 };
 static const EfiVariables::EfiVariableId kVariableId[] = {
-    {u"var0", kGuid[0]},
-    {u"var1", kGuid[1]},
-    {u"var2", kGuid[2]},
-    {u"var3", kGuid[3]},
+    {EfiCString(u"var0"), kGuid[0]},
+    {EfiCString(u"var1"), kGuid[1]},
+    {EfiCString(u"var2"), kGuid[2]},
+    {EfiCString(u"var3"), kGuid[3]},
 };
 static const std::vector<uint8_t> kValue[] = {
     {0x00},
@@ -476,6 +503,25 @@ TEST_F(EfiVariablesStubTest, IterateOverList) {
     EXPECT_EQ(v_id.vendor_guid, kVariableId[i].vendor_guid);
     ++i;
   }
+}
+
+fbl::Vector<char> EfiCString(const std::string_view sv) {
+  fbl::Vector<char> res = ToVector(sv);
+  if (res.is_empty() || res[res.size() - 1] != '\0') {
+    res.push_back('\0');
+  }
+  return res;
+}
+fbl::Vector<char16_t> EfiCString(const std::u16string_view sv) {
+  fbl::Vector<char16_t> res = ToVector(sv);
+  if (res.is_empty() || res[res.size() - 1] != '\0') {
+    res.push_back('\0');
+  }
+  return res;
+}
+fbl::Vector<char16_t> EfiCString(const fbl::Vector<char16_t>& v) {
+  std::u16string_view sv(v.data(), v.size());
+  return EfiCString(sv);
 }
 
 }  // namespace gigaboot

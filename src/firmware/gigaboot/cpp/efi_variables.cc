@@ -9,11 +9,45 @@
 
 #include <string>
 
+#include <fbl/vector.h>
 #include <phys/efi/main.h>
 
 #include "src/lib/utf_conversion/utf_conversion.h"
 
+namespace fbl {
+template <typename T>
+inline bool operator==(const fbl::Vector<T>& a, const fbl::Vector<T>& b) {
+  return std::equal(a.begin(), a.end(), b.begin(), b.end());
+}
+
+template <typename T>
+inline bool operator!=(const fbl::Vector<T>& a, const fbl::Vector<T>& b) {
+  return !(a == b);
+}
+}  // namespace fbl
+
 namespace gigaboot {
+
+EfiVariables::EfiVariableId::EfiVariableId(const EfiVariableId& src)
+    : EfiVariableId(src.name, src.vendor_guid) {}
+
+EfiVariables::EfiVariableId::EfiVariableId(const fbl::Vector<char16_t>& name_in,
+                                           const efi_guid& vendor_guid_in)
+    : vendor_guid(vendor_guid_in) {
+  name.resize(name_in.size());
+  std::copy(name_in.begin(), name_in.end(), name.begin());
+}
+
+EfiVariables::EfiVariableId& EfiVariables::EfiVariableId::operator=(const EfiVariableId& src) {
+  vendor_guid = src.vendor_guid;
+  name.resize(src.name.size());
+  std::copy(src.name.begin(), src.name.end(), name.begin());
+  return *this;
+}
+
+bool EfiVariables::EfiVariableId::IsValid() const {
+  return name != fbl::Vector<char16_t>({kPreBeginVarNameInit});
+}
 
 fit::result<efi_status, EfiVariables::EfiVariableInfo> EfiVariables::EfiQueryVariableInfo() const {
   efi_status status;
@@ -89,12 +123,18 @@ fit::result<efi_status, fbl::Vector<char>> EfiVariables::Ucs2ToStr(std::u16strin
   return fit::success(std::move(out));
 }
 
-fit::result<efi_status, std::u16string> EfiVariables::StrToUcs2(std::string_view str) {
-  size_t dst_len = str.size() + 1;
-  std::u16string out(dst_len, u'\0');
+fit::result<efi_status, fbl::Vector<char>> EfiVariables::Ucs2ToStr(
+    const fbl::Vector<char16_t>& ucs2) {
+  return Ucs2ToStr(ToU16StringView(ucs2));
+}
 
-  if (str.length() == 0) {
-    return fit::success(std::u16string(u"", 1));
+fit::result<efi_status, fbl::Vector<char16_t>> EfiVariables::StrToUcs2(std::string_view str) {
+  size_t dst_len = str.size() + 1;
+  fbl::Vector<char16_t> out;
+  out.resize(dst_len, u'\0');
+
+  if (str.empty()) {
+    return fit::success(fbl::Vector<char16_t>{u'\0'});
   }
 
   // Get required length for dst buffer
@@ -112,6 +152,12 @@ fit::result<efi_status, std::u16string> EfiVariables::StrToUcs2(std::string_view
   return fit::success(std::move(out));
 }
 
+fit::result<efi_status, fbl::Vector<char16_t>> EfiVariables::StrToUcs2(
+    const fbl::Vector<char>& str) {
+  const std::string_view sv(str.data(), str.size());
+  return StrToUcs2(sv);
+}
+
 fit::result<efi_status, fbl::Vector<uint8_t>> EfiVariables::EfiGetVariable(
     const EfiVariables::EfiVariableId& v_id) const {
   fbl::Vector<uint8_t> res;
@@ -120,14 +166,14 @@ fit::result<efi_status, fbl::Vector<uint8_t>> EfiVariables::EfiGetVariable(
   size_t variable_size = 0;
   efi_guid vendor_guid = v_id.vendor_guid;
   efi_status status = gEfiSystemTable->RuntimeServices->GetVariable(
-      const_cast<char16_t*>(v_id.name.c_str()), &vendor_guid, NULL, &variable_size, nullptr);
+      const_cast<char16_t*>(v_id.name.data()), &vendor_guid, NULL, &variable_size, nullptr);
 
   // Get buffer of the correct size and read into it
   if (EFI_BUFFER_TOO_SMALL == status) {
     res.resize(variable_size);
 
     status = gEfiSystemTable->RuntimeServices->GetVariable(
-        const_cast<char16_t*>(v_id.name.c_str()), &vendor_guid, NULL, &variable_size, res.data());
+        const_cast<char16_t*>(v_id.name.data()), &vendor_guid, NULL, &variable_size, res.data());
   }
 
   if (EFI_ERROR(status)) {
@@ -139,7 +185,8 @@ fit::result<efi_status, fbl::Vector<uint8_t>> EfiVariables::EfiGetVariable(
 
 fit::result<efi_status, efi_guid> EfiVariables::GetGuid(std::u16string_view var_name) {
   auto IsNameMatch = [&var_name](const EfiVariables::EfiVariableId& variable_id) {
-    return variable_id.name == var_name;
+    return std::equal(variable_id.name.begin(), variable_id.name.end(), var_name.begin(),
+                      var_name.end());
   };
 
   auto res = std::find_if(begin(), end(), IsNameMatch);
@@ -159,6 +206,10 @@ fit::result<efi_status, efi_guid> EfiVariables::GetGuid(std::u16string_view var_
   }
 
   return fit::success(res.variable_id_.vendor_guid);
+}
+
+fit::result<efi_status, efi_guid> EfiVariables::GetGuid(const fbl::Vector<char16_t>& var_name) {
+  return GetGuid(ToU16StringView(var_name));
 }
 
 bool operator==(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b) {
@@ -213,6 +264,20 @@ bool EfiVariables::EfiVariableInfo::operator==(
 
 bool EfiVariables::EfiVariableInfo::operator!=(const EfiVariableInfo& other) const noexcept {
   return !(*this == other);
+}
+
+fbl::Vector<char16_t> ToVector(std::u16string_view str) {
+  fbl::Vector<char16_t> res;
+  res.resize(str.size());
+  std::copy(str.begin(), str.end(), res.begin());
+  return res;
+}
+
+fbl::Vector<char> ToVector(std::string_view str) {
+  fbl::Vector<char> res;
+  res.resize(str.size());
+  std::copy(str.begin(), str.end(), res.begin());
+  return res;
 }
 
 }  // namespace gigaboot

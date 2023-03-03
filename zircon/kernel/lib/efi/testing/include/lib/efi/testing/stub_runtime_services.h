@@ -8,8 +8,11 @@
 #include <list>
 #include <map>
 #include <optional>
+#include <string_view>
+#include <vector>
 
 #include <efi/runtime-services.h>
+#include <fbl/vector.h>
 #include <gmock/gmock.h>
 
 #include "mock_protocol_base.h"
@@ -46,8 +49,13 @@ class StubRuntimeServices {
   efi_runtime_services* services() { return &services_; }
 
   struct VariableName {
-    std::u16string var_name;
+    fbl::Vector<char16_t> var_name;
     efi_guid guid;
+
+    VariableName(std::u16string_view var_name, const efi_guid& guid);
+    VariableName(const fbl::Vector<char16_t>& var_name, const efi_guid& guid);
+    VariableName(const VariableName& src);
+    VariableName& operator=(const VariableName& src);
   };
   using VariableValue = std::vector<uint8_t>;
 
