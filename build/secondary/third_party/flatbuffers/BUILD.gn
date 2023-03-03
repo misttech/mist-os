@@ -1,0 +1,77 @@
+# Copyright 2017 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//third_party/flatbuffers/flatbuffer.gni")
+
+config("flatbuffers_warnings") {
+  cflags = [
+    "-Wno-conversion",
+    "-Wno-implicit-fallthrough",
+    "-Wno-extra-semi",
+  ]
+}
+
+config("flatbuffers_config") {
+  include_dirs = [ "include" ]
+}
+
+source_set("flatbuffers") {
+  sources = [
+    "include/flatbuffers/flatbuffers.h",
+    "include/flatbuffers/hash.h",
+  ]
+
+  configs += [ ":flatbuffers_warnings" ]
+  public_configs = [
+    ":flatbuffers_config",
+
+    # TODO(fxbug.dev/78646) Remove this config after std::iterator usages are cleaned up.
+    "//build/config:suppress_iterator_warnings",
+  ]
+
+  # TODO(46773): UBSan has found an instance of undefined behavior in this target.
+  # Disable UBSan for this target temporarily until it is migrated into CI/CQ.
+  public_configs += [ "//build/config:temporarily_disable_ubsan_do_not_use" ]
+}
+
+source_set("compiler_files") {
+  sources = [
+    "grpc/src/compiler/cpp_generator.cc",
+    "grpc/src/compiler/cpp_generator.h",
+    "grpc/src/compiler/go_generator.cc",
+    "grpc/src/compiler/go_generator.h",
+    "grpc/src/compiler/schema_interface.h",
+    "include/flatbuffers/code_generators.h",
+    "include/flatbuffers/idl.h",
+    "include/flatbuffers/util.h",
+    "src/idl_gen_cpp.cpp",
+    "src/idl_gen_fbs.cpp",
+    "src/idl_gen_general.cpp",
+    "src/idl_gen_go.cpp",
+    "src/idl_gen_grpc.cpp",
+    "src/idl_gen_js.cpp",
+    "src/idl_gen_php.cpp",
+    "src/idl_gen_python.cpp",
+    "src/idl_gen_text.cpp",
+    "src/idl_parser.cpp",
+    "src/reflection.cpp",
+    "src/util.cpp",
+  ]
+  include_dirs = [ "grpc" ]
+  visibility = [ ":*" ]
+  deps = [ ":flatbuffers" ]
+  configs += [ ":flatbuffers_warnings" ]
+}
+
+executable("flatc") {
+  sources = [ "src/flatc.cpp" ]
+  deps = [
+    ":compiler_files",
+    ":flatbuffers",
+  ]
+
+  if (is_linux) {
+    libs = [ "pthread" ]
+  }
+}
