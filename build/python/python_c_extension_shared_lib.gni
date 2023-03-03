@@ -1,0 +1,52 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Defines a python C extension shared library.
+#
+# Parameters
+#
+#   library_name (optional)
+#     Name of the library (with .so on the end). Defaults to the target name of the library
+#     Type: string
+#     Default: ${target_name}
+#
+# This is not directly importable into a Python `.pyz`.
+# This builds a .so file that can be loaded into python if its parent directory
+# is included in the PYTHONPATH environment variable.
+template("python_c_extension_shared_lib") {
+  assert(defined(invoker.sources), "sources is required")
+  assert(is_host, "python C extensions can only be built on host")
+
+  # TODO(awdavies): copy the output of this file to be the library name without
+  # including "lib" on the front.
+  shlib_output_name = target_name
+  if (defined(invoker.library_name)) {
+    shlib_output_name = invoker.library_name
+  }
+  shared_library(target_name) {
+    output_prefix_override = true
+    output_name = shlib_output_name
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "sources",
+                             "deps",
+                             "visibility",
+                           ])
+    configs += [ "//build/config/python:include_python" ]
+
+    # Since this is building a .so there should be no errors about undefined
+    # symbols. Some systems may not have this enabled, so add it before
+    # subsequently removing it. A better approach might be to find out why this
+    # symbol isn't present in the first place and conditionally remove it only
+    # if it is there.
+    configs += [ "//build/config:symbol_no_undefined" ]
+    configs -= [ "//build/config:symbol_no_undefined" ]
+
+    # pie is not used when building on Linux. If this is enabled a warning is emitted.
+    if (host_os == "linux") {
+      configs -= [ "//build/config/linux:default-pie" ]
+    }
+  }
+}
