@@ -15,6 +15,7 @@ go_binary("bin") {
 go_library("lib") {
   deps = [
     "//src/lib/component",
+    "//src/lib/syslog/go",
     "//src/tests/fidl/server_suite/fidl:fidl.serversuite_go($go_toolchain)",
   ]
   sources = [ "main.go" ]

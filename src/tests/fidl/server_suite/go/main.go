@@ -15,6 +15,7 @@ import (
 	"syscall/zx/fidl"
 
 	"go.fuchsia.dev/fuchsia/src/lib/component"
+	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
 	"fidl/fidl/serversuite"
 	fidlzx "fidl/zx"
@@ -270,7 +271,11 @@ func (*runnerImpl) Start(
 				sutChannel: sutChannel,
 			},
 		}
-		component.Serve(context.Background(), &stub, controllerChannel, component.ServeOptions{})
+		component.Serve(context.Background(), &stub, controllerChannel, component.ServeOptions{
+			OnError: func(err error) {
+				_ = syslog.WarnTf("server_suite/go", "%s", err)
+			},
+		})
 	}()
 	go func() {
 		controllerEventProxy := serversuite.ClosedTargetControllerEventProxy(fidl.ChannelProxy{Channel: controllerChannel})
