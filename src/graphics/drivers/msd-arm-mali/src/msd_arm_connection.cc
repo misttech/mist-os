@@ -745,23 +745,25 @@ ArmMaliResultCode MsdArmConnection::WriteJitRegionAdddress(
         info.address - it->second->gpu_va() + it->second->page_offset() * magma::page_size();
     {
       TRACE_DURATION("magma", "MsdArmConnection::AllocateJitMemory write");
-      // Prefer zx_vmo_write(), since it's faster for writing small amounts of data. It won't work
-      // on write-combining memory, so fall back to mapping and writing if that fails.
-      bool result = buffer->platform_buffer()->Write(&address, offset, sizeof(address));
-      if (result) {
-        result = buffer->platform_buffer()->CleanCache(offset, sizeof(uint64_t), false);
-        DASSERT(result);
-      } else {
-        void* mapped;
-        if (!buffer->platform_buffer()->MapCpu(&mapped)) {
-          DLOG("Mapping JIT region failed");
-          return kArmMaliResultJobInvalid;
-        }
-        DASSERT(!(info.address & 7));
-        // Guaranteed not to straddle pages.
-        *reinterpret_cast<uint64_t*>(static_cast<uint8_t*>(mapped) + offset) = address;
-        result = buffer->platform_buffer()->CleanCache(offset, sizeof(uint64_t), false);
-        DASSERT(result);
+      bool was_mapped = buffer->platform_buffer()->IsMapped();
+      // zx_vmo_write and zx_vmo_op_range can take around 11us each on low-end
+      // ARM devices. Instead keep buffers mapped on the CPU. Having buffers
+      // mapped should have pretty low overhead. Note that for efficiency this
+      // assumes that the pages used to store JIT addresses are reused
+      // relatively often.
+      void* mapped;
+      if (!buffer->platform_buffer()->MapCpu(&mapped)) {
+        DLOG("Mapping JIT region failed");
+        return kArmMaliResultJobInvalid;
+      }
+      DASSERT(!(info.address & 7));
+      // Guaranteed not to straddle pages.
+      *reinterpret_cast<uint64_t*>(static_cast<uint8_t*>(mapped) + offset) = address;
+      bool result = buffer->platform_buffer()->CleanCache(offset, sizeof(uint64_t), false);
+      DASSERT(result);
+      // Don't unmap if that would reduce the refcount to zero, since we want to keep the mapping
+      // cached.
+      if (was_mapped) {
         result = buffer->platform_buffer()->UnmapCpu();
         DASSERT(result);
       }

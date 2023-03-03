@@ -65,6 +65,8 @@ class PlatformBuffer : public PlatformObject {
   // Returns the size of the buffer.
   virtual uint64_t size() const = 0;
 
+  virtual bool IsMapped() const = 0;
+
   // Creates a duplicate handle whose lifetime can be tracked with HasChildren.
   virtual bool CreateChild(uint32_t* handle_out) = 0;
 

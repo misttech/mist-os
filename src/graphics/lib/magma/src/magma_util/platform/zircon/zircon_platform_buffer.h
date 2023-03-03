@@ -51,6 +51,8 @@ class ZirconPlatformBuffer : public PlatformBuffer {
   // PlatformBuffer implementation
   uint64_t size() const override { return size_; }
 
+  bool IsMapped() const override { return map_count_ > 0; }
+
   void set_local_id(uint64_t id) override {
     DASSERT(id);
     DASSERT(!local_id_);
