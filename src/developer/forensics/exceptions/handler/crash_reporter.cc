@@ -152,11 +152,11 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
                 .then([dispatcher, services,
                        builder = std::move(builder)](const fpromise::result<>& result) mutable {
                   return OneShotCall<fuchsia::feedback::CrashReporter,
-                                     &fuchsia::feedback::CrashReporter::File>(
+                                     &fuchsia::feedback::CrashReporter::FileReport>(
                       dispatcher, services, kFileReportTimeout, builder.Consume());
                 })
                 .then([component_info = std::move(component_info), callback = std::move(callback)](
-                          const fpromise::result<fuchsia::feedback::CrashReporter_File_Result,
+                          const fpromise::result<fuchsia::feedback::CrashReporter_FileReport_Result,
                                                  forensics::Error>& result) {
                   ::fidl::StringPtr moniker = std::nullopt;
                   if (!component_info.moniker.empty()) {
