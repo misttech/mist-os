@@ -1439,7 +1439,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 Some(seg_ack) => match self {
                     State::Closed(_) | State::Listen(_) | State::SynSent(_) => {
                         // This unreachable assert is justified by note (1).
-                        unreachable!("encountered an alread-handled state: {:?}", self)
+                        unreachable!("encountered an already-handled state: {:?}", self)
                     }
                     State::SynRcvd(SynRcvd {
                         iss,
@@ -1590,7 +1590,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 match self {
                     State::Closed(_) | State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
                         // This unreachable assert is justified by note (1) and (2).
-                        unreachable!("encountered an alread-handled state: {:?}", self)
+                        unreachable!("encountered an already-handled state: {:?}", self)
                     }
                     State::Established(Established { snd: _, rcv })
                     | State::FinWait1(FinWait1 { snd: _, rcv })
@@ -1633,7 +1633,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 match self {
                     State::Closed(_) | State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
                         // This unreachable assert is justified by note (1) and (2).
-                        unreachable!("encountered an alread-handled state: {:?}", self)
+                        unreachable!("encountered an already-handled state: {:?}", self)
                     }
                     State::Established(Established { snd, rcv }) => {
                         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
