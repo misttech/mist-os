@@ -4,7 +4,7 @@
 {
     include: [
         "//src/proc/tests/android/benchmarks/meta/benchmark.shard.cml",
-        "//src/proc/tests/android/gvisor/meta/gvisor_galaxy.shard.cml",
+        "//src/proc/tests/android/gvisor/meta/gvisor_container.shard.cml",
     ],
     program: {
         binary: "data/tests/benchmarks",

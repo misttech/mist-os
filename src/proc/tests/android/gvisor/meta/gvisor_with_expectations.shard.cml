@@ -4,7 +4,7 @@
 {
     include: [
         "//src/lib/testing/expectation/meta/client.shard.cml",
-        "//src/proc/tests/android/gvisor/meta/gvisor_galaxy.shard.cml",
+        "//src/proc/tests/android/gvisor/meta/gvisor_container.shard.cml",
         "//src/proc/tests/starnix_test_with_expectations.shard.cml",
     ],
     program: {

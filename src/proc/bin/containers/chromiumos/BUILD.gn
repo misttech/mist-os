@@ -16,9 +16,9 @@ if (target_cpu == "x64") {
 }
 
 fuchsia_package_with_single_component("chromiumos_package") {
-  manifest = "meta/chromiumos_galaxy.cml"
+  manifest = "meta/chromiumos_container.cml"
   package_name = "starmium"
-  component_name = "chromiumos_galaxy"
+  component_name = "chromiumos_container"
 
   if (target_cpu == "x64") {
     deps = [

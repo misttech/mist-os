@@ -14,9 +14,9 @@ use {argh::FromArgs, ffx_core::ffx_command};
 )]
 
 pub struct AdbStarnixCommand {
-    /// the galaxy in which to connect to adb
+    /// the container in which to connect to adb
     #[argh(option, short = 'g', default = "String::from(\"bionic\")")]
-    pub galaxy: String,
+    pub container: String,
     /// which port to serve the adb server on
     #[argh(option, short = 'p', default = "5556")]
     pub port: u16,

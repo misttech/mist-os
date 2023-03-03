@@ -77,7 +77,7 @@ foreach(test_name, wayland_tests) {
   }
 }
 
-group("galaxy_resources") {
+group("container_resources") {
   deps = [
     "//src/proc/bin/containers:data_tmp_target",
     "//src/proc/bin/containers:default_init",
@@ -96,5 +96,5 @@ fuchsia_test_package("starnix_wayland_tests") {
     subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
   }
 
-  deps = [ ":galaxy_resources" ]
+  deps = [ ":container_resources" ]
 }

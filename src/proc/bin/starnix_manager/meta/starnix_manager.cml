@@ -11,22 +11,22 @@
         {
             name: "bionic",
             url: "fuchsia-pkg://fuchsia.com/starbionic#meta/bionic_galaxy.cm",
-            environment: "#galaxy-env",
+            environment: "#container-env",
         },
         {
             name: "stardroid",
             url: "fuchsia-pkg://fuchsia.com/stardroid#meta/stardroid.cm",
-            environment: "#galaxy-env",
+            environment: "#container-env",
         },
         {
             name: "chromiumos",
             url: "fuchsia-pkg://fuchsia.com/starmium#meta/chromiumos_galaxy.cm",
-            environment: "#galaxy-env",
+            environment: "#container-env",
         },
         {
             name: "empty_container",
             url: "fuchsia-pkg://fuchsia.com/starless#meta/empty_container.cm",
-            environment: "#galaxy-env",
+            environment: "#container-env",
         },
     ],
     collections: [
@@ -194,7 +194,7 @@
             ],
         },
         {
-            name: "galaxy-env",
+            name: "container-env",
             extends: "realm",
             runners: [
                 {

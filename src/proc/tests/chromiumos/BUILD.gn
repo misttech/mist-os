@@ -22,7 +22,7 @@ group("tests") {
   }
 }
 
-group("galaxy_resources") {
+group("container_resources") {
   if (target_cpu == "x64") {
     deps = [
       "//src/proc/bin/containers:data_tmp_target",
@@ -56,7 +56,7 @@ fuchsia_test_package("test_chromiumos_distro") {
   if (target_cpu == "x64") {
     subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
   }
-  deps = [ ":galaxy_resources" ]
+  deps = [ ":container_resources" ]
 }
 
 if (target_cpu == "x64") {
@@ -77,7 +77,7 @@ if (target_cpu == "x64") {
       #":virtmagma_image_tests",
     ]
 
-    deps = [ ":galaxy_resources" ]
+    deps = [ ":container_resources" ]
 
     subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
 

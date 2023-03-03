@@ -269,7 +269,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     outputs = [ "data/tmp/.placeholder" ]
   }
 
-  group("galaxy_resources") {
+  group("container_resources") {
     if (target_cpu == "x64") {
       deps = [
         ":data_tmp_target",
@@ -287,9 +287,9 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     }
 
     deps = [
-      ":galaxy_resources",
+      ":container_resources",
       "//src/lib/testing/expectation:expectation_comparer",
-      "//src/proc/tests/chromiumos/syscalls:galaxy_resources",
+      "//src/proc/tests/chromiumos/syscalls:container_resources",
     ]
   }
 
@@ -301,7 +301,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     }
 
     deps = [
-      ":galaxy_resources",
+      ":container_resources",
       ":starnix_microbenchmarks_component",
     ]
 

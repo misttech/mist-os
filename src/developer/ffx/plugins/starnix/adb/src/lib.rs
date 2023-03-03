@@ -61,7 +61,7 @@ pub async fn adb_starnix(manager_proxy: ManagerProxy, command: AdbStarnixCommand
         let (sbridge, cbridge) = fidl::Socket::create_stream();
 
         manager_proxy
-            .vsock_connect(&command.galaxy, ADB_DEFAULT_PORT, sbridge)
+            .vsock_connect(&command.container, ADB_DEFAULT_PORT, sbridge)
             .map_err(|e| anyhow!("Error connecting to adbd: {:?}", e))?;
 
         fasync::Task::spawn(async move {

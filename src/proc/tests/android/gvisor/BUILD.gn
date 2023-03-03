@@ -267,14 +267,14 @@ gvisor_benchmarks = [
 expect_includes("gvisor_test") {
   includes = [
     "meta/gvisor.shard.cml",
-    "meta/gvisor_galaxy.shard.cml",
+    "meta/gvisor_container.shard.cml",
   ]
 }
 
 expect_includes("gvisor_test_with_expectations") {
   includes = [
     "meta/gvisor_with_expectations.shard.cml",
-    "meta/gvisor_galaxy.shard.cml",
+    "meta/gvisor_container.shard.cml",
   ]
 }
 
@@ -283,7 +283,7 @@ zip_resource("gvisor_runfiles") {
   dest_prefix = "data/tests"
 }
 
-group("galaxy_resources") {
+group("container_resources") {
   if (target_cpu == "x64") {
     deps = [
       ":gvisor_runfiles",
@@ -341,7 +341,7 @@ foreach(benchmark_name, gvisor_benchmarks) {
 }
 
 fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
-  deps = [ ":galaxy_resources" ]
+  deps = [ ":container_resources" ]
 
   if (target_cpu == "x64") {
     subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
@@ -373,7 +373,7 @@ fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
 }
 
 fuchsia_test_package("starnix_gvisor_benchmarks") {
-  deps = [ ":galaxy_resources" ]
+  deps = [ ":container_resources" ]
 
   test_components = []
 

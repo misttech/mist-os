@@ -7,8 +7,8 @@ bridge between Fuchsia's execution model and Linux tasks.
 ## Common logic
 
 Starnix supports running multiple Linux programs with different levels of sharing. The top of the
-hierarchy is a "galaxy" which provides a shared environment similar to a virtual machine or Docker
-container. A galaxy is associated with a single Starnix Kernel object, a root system image and init
+hierarchy is a "container" which provides a shared environment similar to a virtual machine or Docker
+container. A container is associated with a single Starnix Kernel object, a root system image and init
 configuration.
 
 ## Executors
@@ -80,7 +80,7 @@ elaborate fashion compared to the exception executor. A Zircon process is create
 thread group. The process' address space is divided in to two ranges: a restricted range covering
 the lower half of the userspace range and a shared range covering the upper half. Linux programs
 have access to the restricted range. The shared range is the same for every process in the same
-galaxy and is used to manage Starnix state across the galaxy. Threads in this process can be
+container and is used to manage Starnix state across the container. Threads in this process can be
 executing in either "restricted mode" or "normal mode". Threads begin execution in normal mode with
 the shared range accessible. Starnix enters restricted mode by issuing a `zx_restricted_enter()`
 syscall which makes the restricted range accessible and the shared range inaccessible. Linux code
@@ -134,7 +134,7 @@ restricted_enter |          |           |
 ```
 
 The shared portion of the address space is shared between all Linux thread groups in the same
-galaxy. This allows Starnix to access information about any thread group in the galaxy when handling
+container. This allows Starnix to access information about any thread group in the container when handling
 a system call or exception.
 
 ## Future work

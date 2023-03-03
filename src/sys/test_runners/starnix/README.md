@@ -11,14 +11,14 @@ This directory contains two [test runners][test-runner]:
 
 The Starnix test runner runs test binaries that are compiled for Linux. Each
 such Linux binary expects to run in a particular environment (e.g., a particular
-system image). Starnix calls such an environment a "galaxy."
+system image). Starnix calls such an environment a "container."
 
 All galaxies share the same `starnix_kernel.cml`, but they differ in their
-configuration. A galaxy is simply a package that contains the Starnix kernel
+configuration. A container is simply a package that contains the Starnix kernel
 component along with a system image and configuration values for its
 `starnix_kernel.cml`.
 
-The Starnix test runner expects each test component to provide its galaxy
+The Starnix test runner expects each test component to provide its container
 configuration via the `program` block in the test's `.cml`.  The Starnix test
 runner then instantiates the bundled Starnix kernel for each test, and uses
 that runner to actually run the test binary.
@@ -38,8 +38,8 @@ creates the collection that `starnix_test_runner` will use to instantiate the
 test's `starnix_kernel` instance.
 
 Once the `.cml` is defined, the test needs to be updated to include the
-appropriate galaxy configuration values. For example,
-`chromiumos_galaxy.shard.cml` contains:
+appropriate container configuration values. For example,
+`chromiumos_container.shard.cml` contains:
 
 ```{
     program: {

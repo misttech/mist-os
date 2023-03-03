@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/proc/tests/android/meta/bionic_galaxy.shard.cml",
+        "//src/proc/tests/android/meta/bionic_container.shard.cml",
         "//src/proc/tests/starnix_test.shard.cml",
     ],
     program: {

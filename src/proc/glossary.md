@@ -54,10 +54,10 @@ as a [lutex](#lutex).
 The performance of the system overall is quite sensitive to the performance of
 futexes.
 
-## Galaxy
+## Container
 
-The term "galaxy" refers to the [Starnix kernel](#starnix-kernel) bundled with a particular
-system image and configuration. For example, the `bionic` galaxy is a starnix kernel instance
+The term "container" refers to the [Starnix kernel](#starnix-kernel) bundled with a particular
+system image and configuration. For example, the `bionic` container is a starnix kernel instance
 configured to run binaries using an Android system image (Bionic libc).
 
 

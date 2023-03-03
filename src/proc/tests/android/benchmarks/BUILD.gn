@@ -31,5 +31,5 @@ fuchsia_test_package("starnix_benchmarks") {
     subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
   }
 
-  deps = [ "//src/proc/tests/android/gvisor:galaxy_resources" ]
+  deps = [ "//src/proc/tests/android/gvisor:container_resources" ]
 }

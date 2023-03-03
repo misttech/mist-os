@@ -68,7 +68,7 @@ fuchsia_component("boringssl_self_test64") {
   manifest = "meta/boringssl_self_test64.cml"
 }
 
-group("galaxy_resources") {
+group("container_resources") {
   if (target_cpu == "x64") {
     deps = [
       "//src/proc/bin/containers:data_tmp_target",
@@ -93,7 +93,7 @@ fuchsia_test_package("android") {
   }
 
   deps = [
-    ":galaxy_resources",
+    ":container_resources",
     "//src/lib/testing/expectation:expectation_comparer",
   ]
 }
@@ -111,7 +111,7 @@ fuchsia_test_package("android_with_init") {
   }
 
   deps = [
-    ":galaxy_resources",
+    ":container_resources",
     "//src/lib/testing/expectation:expectation_comparer",
   ]
 }
