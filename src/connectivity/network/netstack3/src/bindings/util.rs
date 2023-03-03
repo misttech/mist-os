@@ -74,6 +74,12 @@ impl NeedsData {
     }
 }
 
+impl Drop for NeedsData {
+    fn drop(&mut self) {
+        self.schedule()
+    }
+}
+
 /// The notifier side of the underlying signal struct, it is meant to be held
 /// by the Core side and schedule signals to be received by the Bindings.
 #[derive(Default, Debug, Clone)]
