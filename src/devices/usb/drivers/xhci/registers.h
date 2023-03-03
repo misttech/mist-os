@@ -224,10 +224,23 @@ struct Isoch : TRB {
   // Number of packets remaining in this TD
   // See section 4.10.2.4
   DEF_SUBFIELD(status, 21, 17, SIZE);
+  // SIZE can at max be 31 and anything above it must be set to 31.
+  // See section 4.11.2.4
+  constexpr auto& set_SIZE(size_t size) {
+    ZX_ASSERT(size <= UINT32_MAX);
+    uint32_t size_u32 = static_cast<uint32_t>(size);
+    set_SIZE(size_u32 > 31 ? 31u : size_u32);
+    return *this;
+  }
   // Transfer Last Burst Packet count (number of packets in the last burst)
   // Refer to section 4.11.2.3 for more information
   DEF_SUBFIELD(control, 19, 16, TLBPC);
   DEF_SUBFIELD(status, 16, 0, LENGTH);
+  constexpr auto& set_LENGTH(size_t len) {
+    ZX_ASSERT(len <= UINT16_MAX);
+    set_LENGTH(static_cast<uint32_t>(len));
+    return *this;
+  }
   // Block event interrupt -- inserts an event into the event ring
   // but does not assert the interrupt line.
   DEF_SUBBIT(control, 9, BEI);
@@ -253,7 +266,20 @@ struct Normal : TRB {
   // Number of packets remaining in this TD
   // See section 4.10.2.4
   DEF_SUBFIELD(status, 21, 17, SIZE);
+  // SIZE can at max be 31 and anything above it must be set to 31.
+  // See section 4.11.2.4
+  constexpr auto& set_SIZE(size_t size) {
+    ZX_ASSERT(size <= UINT32_MAX);
+    uint32_t size_u32 = static_cast<uint32_t>(size);
+    set_SIZE(size_u32 > 31 ? 31u : size_u32);
+    return *this;
+  }
   DEF_SUBFIELD(status, 16, 0, LENGTH);
+  constexpr auto& set_LENGTH(size_t len) {
+    ZX_ASSERT(len <= UINT16_MAX);
+    set_LENGTH(static_cast<uint32_t>(len));
+    return *this;
+  }
   // Block event interrupt -- inserts an event into the event ring
   // but does not assert the interrupt line.
   DEF_SUBBIT(control, 9, BEI);
@@ -299,7 +325,20 @@ struct ControlData : TRB {
   // Number of packets remaining in this TD
   // See section 4.10.2.4
   DEF_SUBFIELD(status, 21, 17, SIZE);
+  // SIZE can at max be 31 and anything above it must be set to 31.
+  // See section 4.11.2.4
+  constexpr auto& set_SIZE(size_t size) {
+    ZX_ASSERT(size <= UINT32_MAX);
+    uint32_t size_u32 = static_cast<uint32_t>(size);
+    set_SIZE(size_u32 > 31 ? 31u : size_u32);
+    return *this;
+  }
   DEF_SUBFIELD(status, 16, 0, LENGTH);
+  constexpr auto& set_LENGTH(size_t len) {
+    ZX_ASSERT(len <= UINT16_MAX);
+    set_LENGTH(static_cast<uint32_t>(len));
+    return *this;
+  }
   // 0 == OUT, 1 == IN
   DEF_SUBBIT(control, 16, DIRECTION);
   // Immediate data instead of ptr

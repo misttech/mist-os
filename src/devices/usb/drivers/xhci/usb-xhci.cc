@@ -880,8 +880,8 @@ void UsbXhci::ContinueNormalTransaction(UsbRequestState* state) {
                 static_cast<uint32_t>(state->context->request->request()->header.frame % 2048))
             .set_TBC(burst_count)
             .set_INTERRUPTER(state->interrupter)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(packet_count)
             .set_NO_SNOOP(!has_coherent_cache_)
             .set_IOC(next == nullptr)
             .set_ISP(true);
@@ -890,8 +890,8 @@ void UsbXhci::ContinueNormalTransaction(UsbRequestState* state) {
         Normal* data = reinterpret_cast<Normal*>(current);
         data->set_CHAIN(next != nullptr)
             .set_INTERRUPTER(state->interrupter)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(state->packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(state->packet_count)
             .set_NO_SNOOP(!has_coherent_cache_)
             .set_IOC(next == nullptr)
             .set_ISP(true);
@@ -1195,8 +1195,8 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
             .set_DIRECTION(
                 (state->context->request->request()->setup.bm_request_type & USB_DIR_IN) != 0)
             .set_INTERRUPTER(0)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(state->packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(state->packet_count)
             .set_ISP(true)
             .set_NO_SNOOP(!has_coherent_cache_);
       } else {
@@ -1204,8 +1204,8 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
         Normal* data = reinterpret_cast<Normal*>(current);
         data->set_CHAIN(next != nullptr)
             .set_INTERRUPTER(0)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(state->packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(state->packet_count)
             .set_ISP(true)
             .set_NO_SNOOP(!has_coherent_cache_);
       }
