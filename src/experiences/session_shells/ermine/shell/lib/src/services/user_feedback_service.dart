@@ -37,7 +37,7 @@ class UserFeedbackService {
 
     try {
       // TODO(fxb/88445): Add the latency handling UX
-      await reporter.file(report);
+      await reporter.fileReport(report);
       log.info('Filed a user feedback report with eventID: $eventId');
       onSubmit(eventId);
     } on Exception catch (e) {

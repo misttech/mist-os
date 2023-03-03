@@ -82,11 +82,11 @@ class CrashReportingRunner {
   Future<void> _fileReport(CrashReport report) async {
     log.severe('Caught unhandled error in ermine. Generating crash report');
     if (reporter != null) {
-      await reporter!.file(report);
+      await reporter!.fileReport(report);
     } else {
       final reporterProxy = CrashReporterProxy();
       final incoming = Incoming.fromSvcPath()..connectToService(reporterProxy);
-      await reporterProxy.file(report);
+      await reporterProxy.fileReport(report);
       reporterProxy.ctrl.close();
       await incoming.close();
     }
