@@ -21,7 +21,6 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_roo
   pdev_fidl_.SetConfig({
       .use_fake_bti = true,
   });
-  pdev_banjo_.UseFakeBti();
   mock_root_->SetMetadata(SYSMEM_METADATA_TYPE, &sysmem_metadata_, sizeof(sysmem_metadata_));
 
   // Protocols for sysmem
@@ -42,8 +41,9 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_roo
       fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>(std::move(sysmem_endpoints->client));
 
   // Fragment for fake-display
-  mock_root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_banjo_.proto()->ops, pdev_banjo_.proto()->ctx,
-                          "pdev");
+  client = SetUpPDevFidlServer();
+  mock_root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name, std::move(client),
+                             "pdev");
   mock_root_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_->proto()->ops, sysmem_->proto()->ctx,
                           "sysmem");
 

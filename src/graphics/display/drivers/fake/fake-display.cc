@@ -674,13 +674,14 @@ void FakeDisplay::SendVsync() {
 }
 
 zx_status_t FakeDisplay::Bind(bool start_vsync_thread) {
-  zx_status_t status = ddk::PDev::FromFragment(parent(), &pdev_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get PDev protocol: %s", zx_status_get_string(status));
-    return status;
+  zx::result pdev_result = ddk::PDevFidl::Create(parent(), ddk::PDevFidl::kFragmentName);
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "Failed to get PDev protocol: %s", pdev_result.status_string());
+    return pdev_result.error_value();
   }
+  pdev_ = std::move(pdev_result.value());
 
-  status = ddk::SysmemProtocolClient::CreateFromDevice(parent(), "sysmem", &sysmem_);
+  zx_status_t status = ddk::SysmemProtocolClient::CreateFromDevice(parent(), "sysmem", &sysmem_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get Display Sysmem protocol: %s", zx_status_get_string(status));
     return status;

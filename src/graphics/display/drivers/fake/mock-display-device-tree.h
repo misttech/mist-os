@@ -45,10 +45,7 @@ class MockDisplayDeviceTree {
 
   std::shared_ptr<zx_device> mock_root_;
 
-  // Display device tree needs two platform-device nodes, one as the parent of sysmem and one as a
-  // fragment of the composite parent of display. The latter uses Banjo while the former uses FIDL.
   fake_pdev::FakePDevFidl pdev_fidl_;
-  fake_pdev::FakePDev pdev_banjo_;
 
   std::unique_ptr<SysmemDeviceWrapper> sysmem_;
 

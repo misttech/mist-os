@@ -139,7 +139,7 @@ class FakeDisplay : public DeviceType,
 
   display_controller_impl_protocol_t dcimpl_proto_ = {};
   display_clamp_rgb_impl_protocol_t clamp_rgbimpl_proto_ = {};
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   ddk::SysmemProtocolClient sysmem_;
 
   std::atomic_bool vsync_shutdown_flag_ = false;
