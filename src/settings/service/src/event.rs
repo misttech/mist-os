@@ -4,7 +4,6 @@
 
 use crate::base::SettingType;
 use crate::config;
-use crate::event;
 use crate::message::base::Audience;
 use crate::payload_convert;
 use crate::service;
@@ -175,10 +174,7 @@ impl Publisher {
 
     /// Broadcasts event to the message hub.
     pub(crate) fn send_event(&self, event: Event) {
-        let _ = self.messenger.message(
-            Payload::Event(event).into(),
-            Audience::Role(service::Role::Event(event::Role::Sink)),
-        );
+        let _ = self.messenger.message(Payload::Event(event).into(), Audience::EventSink);
     }
 }
 

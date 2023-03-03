@@ -91,8 +91,8 @@ pub enum Audience {
     Address(crate::Address),
     // The messenger with the specified signature.
     Messenger(Signature),
-    // A messenger who belongs to the specified role.
-    Role(crate::Role),
+    // A messenger that is an event sink.
+    EventSink,
 }
 
 /// An identifier that can be used to send messages directly to a Messenger.

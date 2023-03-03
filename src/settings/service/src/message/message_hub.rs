@@ -377,8 +377,7 @@ impl MessageHub {
                     return Err(format_err!("could not resolve address"));
                 }
             }
-            Audience::Role(_) => {
-                // NB: The only supporte role is the event sink role.
+            Audience::EventSink => {
                 return_set.extend(self.sinks.iter());
             }
             Audience::Messenger(signature) => {

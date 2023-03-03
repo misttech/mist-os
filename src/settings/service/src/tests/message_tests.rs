@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::event;
 use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{Audience, Filter, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
@@ -42,8 +41,6 @@ static MODIFIED: &crate::Payload = &test_message::QUX;
 static MODIFIED_2: &crate::Payload = &test_message::THUD;
 static BROADCAST: &crate::Payload = &test_message::BAZ;
 static REPLY: &crate::Payload = &test_message::BAR;
-
-const EVENT_SINK: crate::Role = crate::Role::Event(event::Role::Sink);
 
 mod test {
     pub(crate) type MessageHub = crate::message::message_hub::MessageHub;
@@ -784,7 +781,7 @@ async fn test_roles_membership() {
         delegate.create(MessengerType::Unbound).await.expect("sending messenger should be created");
 
     let message = test_message::FOO.clone();
-    let audience = Audience::Role(EVENT_SINK);
+    let audience = Audience::EventSink;
     let _ = sender.message(message.clone(), audience);
 
     // Verify payload received by role members.
@@ -815,7 +812,7 @@ async fn test_roles_audience() {
     // Send message to role.
     {
         let message = test_message::FOO.clone();
-        let audience = Audience::Role(EVENT_SINK);
+        let audience = Audience::EventSink;
         let _ = sender.message(message.clone(), audience);
 
         // Verify payload received by role members.
