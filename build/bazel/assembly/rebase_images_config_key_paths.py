@@ -23,7 +23,7 @@ def main():
         '--key-dir',
         required=True,
         help='Directory where key files are located')
-    parser.add_argument('--output', required=True, type=argparse.FileType('w'))
+    parser.add_argument('--output', required=True)
     args = parser.parse_args()
 
     config = json.load(args.images_config)
@@ -32,7 +32,13 @@ def main():
         vbmeta['key'] = f'{_BAZEL_INPUT_WORKSPACE_ROOT}/{args.key_dir}/key.pem'
         vbmeta[
             'key_metadata'] = f'{_BAZEL_INPUT_WORKSPACE_ROOT}/{args.key_dir}/key_metadata.bin'
-    json.dump(config, args.output)
+
+    # It is possible for `--output` to be a hardlink of `--images-config`
+    # (input), so unlink to avoid writing inputs. See https://fxbug.dev/122948.
+    if os.path.exists(args.output):
+        os.unlink(args.output)
+    with open(args.output, 'w') as f:
+        json.dump(config, f)
 
 
 def find_vbmeta(images_config):
