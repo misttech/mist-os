@@ -1,9 +1,15 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// This shard includes the set of capabilities that are used or exposed
+// specifically by Netstack2 in all environments and configurations, including
+// test environments and production.
+//
+// It does not include capabilities that are common between Netstack2 and
+// Netstack3.
 {
     include: [
-        "//src/connectivity/network/meta/netstack-common.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
