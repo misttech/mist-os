@@ -67,7 +67,7 @@ class A1UsbPhy : public A1UsbPhyType, public ddk::UsbPhyProtocol<A1UsbPhy, ddk::
   void InitUsbClk();
   zx_status_t UsbPowerOn();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy_mmio_;
   std::optional<fdf::MmioBuffer> reset_mmio_;
