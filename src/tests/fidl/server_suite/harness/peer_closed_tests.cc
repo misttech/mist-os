@@ -19,6 +19,7 @@ OPEN_SERVER_TEST(EventSendingDoNotReportPeerClosed) {
 
   WAIT_UNTIL([this] { return reporter().teardown_reason().has_value(); });
   EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);
+  WAIT_UNTIL_CONTROLLER_CALLBACK_RUN();
 }
 
 CLOSED_SERVER_TEST(ReplySendingDoNotReportPeerClosed) {
