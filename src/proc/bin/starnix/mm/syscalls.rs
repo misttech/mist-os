@@ -221,12 +221,22 @@ pub fn sys_process_vm_readv(
     remote_iov_count: i32,
     _flags: usize,
 ) -> Result<usize, Errno> {
+    // Source and destination are allowed to be of different length. It is valid to use a nullptr if
+    // the associated length is 0. Thus, if either source or destination length is 0 and nullptr,
+    // make sure to return Ok(0) before doing any other validation/operations.
+    if (local_iov_count == 0 && local_iov_addr.is_null())
+        || (remote_iov_count == 0 && remote_iov_addr.is_null())
+    {
+        return Ok(0);
+    }
+
     let task = current_task.get_task(pid).ok_or_else(|| errno!(ESRCH))?;
     // When this check is loosened to allow reading memory from other processes, the check should
     // be like checking if the current process is allowed to debug the other process.
     if !Arc::ptr_eq(&task.thread_group, &current_task.thread_group) {
         return error!(EPERM);
     }
+
     let local_iov = task.mm.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = task.mm.read_iovec(remote_iov_addr, remote_iov_count)?;
     log_trace!(
@@ -239,8 +249,8 @@ pub fn sys_process_vm_readv(
     // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
-    let mut input = UserBuffersInputBuffer::new(&current_task.mm, local_iov)?;
-    let mut output = UserBuffersOutputBuffer::new(&current_task.mm, remote_iov)?;
+    let mut input = UserBuffersInputBuffer::new(&current_task.mm, remote_iov)?;
+    let mut output = UserBuffersOutputBuffer::new(&current_task.mm, local_iov)?;
     output.write_buffer(&mut input)
 }
 
