@@ -48,6 +48,15 @@ dual_mode_plugins = [
   "//src/virtualization/ffx:ffx_guest",
 ]
 
+# Config default files from tools listed above so they can be included in
+# the build.
+dual_mode_defaults = [
+  "//src/developer/ffx/plugins/emulator/data/config.json",
+  "//src/developer/ffx/plugins/log/data/config.json",
+  "//src/developer/ffx/plugins/product/data/config.json",
+  "//src/developer/ffx/plugins/repository/data/config.json",
+]
+
 # The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to
 # subtools.
 dual_mode_subtools = []

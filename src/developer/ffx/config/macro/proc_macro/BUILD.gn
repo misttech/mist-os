@@ -5,6 +5,7 @@
 import("//build/rust/rustc_macro.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/tools/json_merge/json_merge.gni")
+import("//src/developer/ffx/config.gni")
 
 if (is_host) {
   json_merge("config.json") {
@@ -14,6 +15,14 @@ if (is_host) {
       get_label_info("//src/developer/ffx:config.json", "target_out_dir") +
           "/config.json",
     ]
+
+    # Add in the 'dual-mode' config default files if we're doing dual mode
+    if (ffx_build_dual_mode_plugins_as_subtools) {
+      foreach(config, dual_mode_defaults) {
+        sources += [ rebase_path(config) ]
+      }
+    }
+
     deps = [ "//src/developer/ffx:config.json" ]
   }
 
