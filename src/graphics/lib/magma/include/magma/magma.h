@@ -156,18 +156,6 @@ MAGMA_EXPORT void magma_connection_release_buffer(
     magma_buffer_t buffer);
 
 ///
-/// \brief DEPRECATED - Exports the given buffer, returning a handle that may be imported into
-///        another connection.
-/// \param connection An open connection.
-/// \param buffer A valid buffer.
-/// \param buffer_handle_out The returned handle.
-///
-MAGMA_EXPORT magma_status_t magma_connection_export_buffer(
-    magma_connection_t connection,
-    magma_buffer_t buffer,
-    magma_handle_t* buffer_handle_out);
-
-///
 /// \brief DEPRECATED. TODO(fxbug.dev/121902): Remove. Imports and takes ownership of the buffer
 ///        referred to by the given handle.
 /// \param connection An open connection.
@@ -211,18 +199,6 @@ MAGMA_EXPORT magma_status_t magma_connection_create_semaphore(
 MAGMA_EXPORT void magma_connection_release_semaphore(
     magma_connection_t connection,
     magma_semaphore_t semaphore);
-
-///
-/// \brief DEPRECATED - Exports the given semaphore, returning a handle that may be imported into
-///        another connection
-/// \param connection An open connection.
-/// \param semaphore A valid semaphore.
-/// \param semaphore_handle_out The returned handle.
-///
-MAGMA_EXPORT magma_status_t magma_connection_export_semaphore(
-    magma_connection_t connection,
-    magma_semaphore_t semaphore,
-    magma_handle_t* semaphore_handle_out);
 
 ///
 /// \brief Imports and takes ownership of the semaphore referred to by the given handle.

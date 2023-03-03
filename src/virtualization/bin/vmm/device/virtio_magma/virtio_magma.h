@@ -86,9 +86,6 @@ class VirtioMagma : public VirtioMagmaGeneric,
   zx_status_t Handle_internal_release_handle(
       const virtio_magma_internal_release_handle_ctrl_t* request,
       virtio_magma_internal_release_handle_resp_t* response) override;
-  zx_status_t Handle_connection_export_buffer(
-      const virtio_magma_connection_export_buffer_ctrl_t* request,
-      virtio_magma_connection_export_buffer_resp_t* response) override;
   zx_status_t Handle_buffer_export(const virtio_magma_buffer_export_ctrl_t* request,
                                    virtio_magma_buffer_export_resp_t* response) override;
   zx_status_t Handle_connection_import_buffer(

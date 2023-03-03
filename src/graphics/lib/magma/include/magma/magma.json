@@ -221,29 +221,6 @@
                 ]
             },
             {
-                "ordinal": 26,
-                "name": "magma_connection_export_buffer",
-                "type": "magma_status_t",
-                "description": "DEPRECATED - Exports the given buffer, returning a handle that may be imported into another connection.",
-                "arguments": [
-                    {
-                        "name": "connection",
-                        "type": "magma_connection_t",
-                        "description": "An open connection."
-                    },
-                    {
-                        "name": "buffer",
-                        "type": "magma_buffer_t",
-                        "description": "A valid buffer."
-                    },
-                    {
-                        "name": "buffer_handle_out",
-                        "type": "magma_handle_t*",
-                        "description": "The returned handle."
-                    }
-                ]
-            },
-            {
                 "ordinal": 27,
                 "name": "magma_connection_import_buffer",
                 "type": "magma_status_t",
@@ -332,29 +309,6 @@
                         "name": "semaphore",
                         "type": "magma_semaphore_t",
                         "description": "A valid semaphore."
-                    }
-                ]
-            },
-            {
-                "ordinal": 40,
-                "name": "magma_connection_export_semaphore",
-                "type": "magma_status_t",
-                "description": "DEPRECATED - Exports the given semaphore, returning a handle that may be imported into another connection",
-                "arguments": [
-                    {
-                        "name": "connection",
-                        "type": "magma_connection_t",
-                        "description": "An open connection."
-                    },
-                    {
-                        "name": "semaphore",
-                        "type": "magma_semaphore_t",
-                        "description": "A valid semaphore."
-                    },
-                    {
-                        "name": "semaphore_handle_out",
-                        "type": "magma_handle_t*",
-                        "description": "The returned handle."
                     }
                 ]
             },

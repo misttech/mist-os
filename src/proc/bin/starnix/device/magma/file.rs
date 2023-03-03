@@ -273,42 +273,6 @@ impl FileOps for MagmaFile {
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
-            // DEPRECATED
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_BUFFER => {
-                let (control, mut response): (
-                    virtio_magma_connection_export_buffer_ctrl_t,
-                    virtio_magma_connection_export_buffer_resp_t,
-                ) = read_control_and_response(current_task, &command)?;
-
-                let export_buffer_request = virtio_magma_buffer_export_ctrl_t {
-                    hdr: virtio_magma_ctrl_hdr {
-                        type_: virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_EXPORT as u32,
-                        flags: 0,
-                    },
-                    buffer: control.buffer,
-                };
-                let mut export_buffer_response = virtio_magma_buffer_export_resp_t {
-                    hdr: virtio_magma_ctrl_hdr {
-                        type_: virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER
-                            as u32,
-                        flags: 0,
-                    },
-                    buffer_handle_out: 0,
-                    result_return: 0,
-                };
-
-                export_buffer(
-                    current_task,
-                    export_buffer_request,
-                    &mut export_buffer_response,
-                    &self.connections.lock(),
-                )?;
-
-                response.buffer_handle_out = export_buffer_response.buffer_handle_out;
-                response.result_return = export_buffer_response.result_return;
-
-                current_task.mm.write_object(UserRef::new(response_address), &response)
-            }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_EXPORT => {
                 let (control, mut response): (
                     virtio_magma_buffer_export_ctrl_t,
@@ -591,25 +555,6 @@ impl FileOps for MagmaFile {
 
                 response.hdr.type_ =
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_SEMAPHORE as u32;
-                current_task.mm.write_object(UserRef::new(response_address), &response)
-            }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_SEMAPHORE => {
-                let (control, mut response): (
-                    virtio_magma_connection_export_semaphore_ctrl_t,
-                    virtio_magma_connection_export_semaphore_resp_t,
-                ) = read_control_and_response(current_task, &command)?;
-
-                let mut semaphore_handle_out = 0;
-                response.result_return = unsafe {
-                    magma_semaphore_export(
-                        control.semaphore as magma_semaphore_t,
-                        &mut semaphore_handle_out,
-                    ) as u64
-                };
-                response.semaphore_handle_out = semaphore_handle_out as u64;
-
-                response.hdr.type_ =
-                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_SEMAPHORE as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_SEMAPHORE_EXPORT => {

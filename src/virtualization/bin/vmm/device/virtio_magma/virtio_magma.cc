@@ -434,26 +434,11 @@ zx_status_t VirtioMagma::Handle_poll(VirtioDescriptor* request_desc,
   return status;
 }
 
-zx_status_t VirtioMagma::Handle_connection_export_buffer(
-    const virtio_magma_connection_export_buffer_ctrl_t* request,
-    virtio_magma_connection_export_buffer_resp_t* response) {
-  virtio_magma_buffer_export_ctrl_t request_copy = {.hdr = {.type = VIRTIO_MAGMA_CMD_BUFFER_EXPORT},
-                                                    .buffer = request->buffer};
-  virtio_magma_buffer_export_resp_t response_copy{};
-
-  response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER;
-  zx_status_t status = Handle_buffer_export(&request_copy, &response_copy);
-  response->buffer_handle_out = response_copy.buffer_handle_out;
-  response->result_return = response_copy.result_return;
-
-  return status;
-}
-
 zx_status_t VirtioMagma::Handle_buffer_export(const virtio_magma_buffer_export_ctrl_t* request,
                                               virtio_magma_buffer_export_resp_t* response) {
   if (!wayland_importer_) {
     LOG_VERBOSE("driver attempted to export a buffer without wayland present");
-    response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER;
+    response->hdr.type = VIRTIO_MAGMA_RESP_BUFFER_EXPORT;
     response->buffer_handle_out = 0;
     response->result_return = MAGMA_STATUS_UNIMPLEMENTED;
     return ZX_OK;

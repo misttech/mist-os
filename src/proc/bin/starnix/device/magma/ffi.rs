@@ -358,7 +358,7 @@ pub fn export_buffer(
     }
 
     response.result_return = status as u64;
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER as u32;
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_EXPORT as u32;
 
     Ok(())
 }

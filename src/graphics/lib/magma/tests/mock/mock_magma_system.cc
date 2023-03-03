@@ -119,15 +119,6 @@ magma_status_t magma_connection_execute_immediate_commands(
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_connection_export_buffer(magma_connection_t connection, magma_buffer_t buffer,
-                                              uint32_t* buffer_handle_out) {
-  uint32_t handle;
-  reinterpret_cast<magma::PlatformBuffer*>(buffer)->duplicate_handle(&handle);
-  exported_buffers[handle] = magma::PlatformBuffer::Import(handle).release();
-  *buffer_handle_out = handle;
-  return MAGMA_STATUS_OK;
-}
-
 magma_status_t magma_connection_import_buffer(magma_connection_t connection, uint32_t buffer_handle,
                                               magma_buffer_t* buffer_out) {
   *buffer_out = reinterpret_cast<magma_buffer_t>(exported_buffers[buffer_handle]);
@@ -166,16 +157,6 @@ uint64_t magma_semaphore_get_id(magma_semaphore_t semaphore) {
 void magma_semaphore_signal(magma_semaphore_t semaphore) {}
 
 void magma_semaphore_reset(magma_semaphore_t semaphore) {}
-
-magma_status_t magma_connection_export_semaphore(magma_connection_t connection,
-                                                 magma_semaphore_t semaphore,
-                                                 uint32_t* semaphore_handle_out) {
-  uint32_t handle;
-  reinterpret_cast<magma::PlatformSemaphore*>(semaphore)->duplicate_handle(&handle);
-  exported_semaphores[handle] = magma::PlatformSemaphore::Import(handle).release();
-  *semaphore_handle_out = handle;
-  return MAGMA_STATUS_OK;
-}
 
 magma_status_t magma_connection_import_semaphore(magma_connection_t connection,
                                                  uint32_t semaphore_handle,
