@@ -19,7 +19,13 @@
 ##   --files   Allows the user to specify files.  Files are comma separated.
 ##             Globs are dealt with by bash; fx format-code "--files=foo/*" will
 ##             work as expected.
-##   --target  Allows the user to specify a gn target.
+##   --target  Allows the user to specify a gn target. If the template for the
+##             given target is defined in a .gni file, the files to format may
+##             be forwarded to another target, and specifying the target may not
+##             work.  The workaround is to pass the target to which the files
+##             are forwarded, instead.  Specifically, as of January 2023, you
+##             can only use this with rustc binary and library targets by
+##             appending ".actual" to them.
 ##   --git     The default; it uses `git diff` against the newest parent
 ##             commit in the upstream branch (or against HEAD if no such commit
 ##             is found).  Files that are locally modified, staged or touched by
@@ -156,6 +162,10 @@ function format-file() {
 # Removes leading //, resolves to absolute path, and resolves globs.  The first
 # argument is a path prefix, and the remaining arguments are relative to that
 # path prefix.
+#
+# When calling this function, it is usually a good idea to set IFS to something
+# that is not likely to be contained in a filename being canonicalized (e.g.,
+# IFS=$'\n')
 function canonicalize() {
   local root_dir="$1"
   shift
@@ -166,8 +176,8 @@ function canonicalize() {
     else
       local dir=""
     fi
-    for file in "${dir}"${fileglob#"//"}; do
-      echo "${file}"
+    for file in "${dir}""${fileglob#"//"}"; do
+      printf "${file}\n"
     done
   done
 }
@@ -202,24 +212,29 @@ while [ $# -gt 0 ]; do
     --files=*)
       FILES_SPECIFIED=true
       GET_FILES=:
-      FILES=( \
+      OLDIFS=$IFS && IFS=$'\n' \
+      && FILES=( \
         $(canonicalize "${PWD}" $(zap-commas "${ARG#--files=}")) \
-      )
+      ) \
+      && IFS=$OLDIFS
       ;;
     --target=*)
       GET_FILES=:
-      FILES=( \
+      OLDIFS=$IFS && IFS=$'\n' \
+      && FILES=( \
         $(canonicalize "${FUCHSIA_DIR}" \
           $(fx-gn desc "${FUCHSIA_BUILD_DIR}" "${ARG#--target=}" sources)) \
       ) \
       && RUST_ENTRY_POINT=$(canonicalize "${FUCHSIA_DIR}" \
-          $(fx rustfmt --print-sources ${ARG#--target=}))
+          $(fx rustfmt --print-sources ${ARG#--target=})) \
+      && IFS=$OLDIFS
       ;;
     --) break ;;
     *) usage && printf "Unknown flag %s\n" "${ARG}" && exit 1 ;;
   esac
   shift
 done
+
 GIT_FILTER=(
   "$@"
   ":(top,exclude)third_party/golibs/vendor"
@@ -230,16 +245,19 @@ GIT_FILTER=(
 )
 
 get_git_files() {
-  FILES=( \
+  OLDIFS=$IFS && IFS=$'\n' \
+    && FILES=( \
     $(canonicalize $(git rev-parse --show-toplevel) \
       $(git diff --name-only $(get-diff-base) "${GIT_FILTER[@]}")) \
-  )
+    ) \
+    && IFS=$OLDIFS
 }
 
 get_all_files() {
-  FILES=( \
+  OLDIFS=$IFS && IFS=$'\n' && FILES=( \
     $(canonicalize "${PWD}" $(git ls-files "${GIT_FILTER[@]}")) \
-  )
+  ) \
+  && IFS=$OLDIFS
 }
 
 # Print lines changed in the given file.
