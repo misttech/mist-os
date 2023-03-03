@@ -5,6 +5,7 @@
 use {
     crate::args::RepoPublishCommand,
     anyhow::{format_err, Context, Result},
+    camino::{Utf8Path, Utf8PathBuf},
     fuchsia_async as fasync,
     fuchsia_lockfile::Lockfile,
     fuchsia_pkg::PackageManifest,
@@ -134,10 +135,7 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
             anyhow::bail!("--signing-keys path {} does not exist", path);
         }
 
-        let keys = RepoKeys::from_dir(path.as_std_path())?;
-        deps.insert(path.clone());
-
-        Some(keys)
+        Some(read_repo_keys_if_exists(&mut deps, path)?)
     } else {
         None
     };
@@ -149,9 +147,9 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
             anyhow::bail!("--trusted-keys path {} does not exist", path);
         }
 
-        RepoKeys::from_dir(path.as_std_path())?
+        read_repo_keys_if_exists(&mut deps, path)?
     } else {
-        repo.repo_keys()?
+        read_repo_keys_if_exists(&mut deps, &cmd.repo_path.join("keys"))?
     };
 
     // Try to connect to the repository. This should succeed if we have at least some root metadata
@@ -243,6 +241,36 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -> Result<RepoKeys> {
+    let mut builder = RepoKeys::builder();
+
+    let root_path = path.join("root.json");
+    if root_path.exists() {
+        builder = builder.load_root_keys(root_path.as_std_path())?;
+        deps.insert(root_path);
+    }
+
+    let targets_path = path.join("targets.json");
+    if targets_path.exists() {
+        builder = builder.load_targets_keys(targets_path.as_std_path())?;
+        deps.insert(targets_path);
+    }
+
+    let snapshot_path = path.join("snapshot.json");
+    if snapshot_path.exists() {
+        builder = builder.load_snapshot_keys(snapshot_path.as_std_path())?;
+        deps.insert(snapshot_path);
+    }
+
+    let timestamp_path = path.join("timestamp.json");
+    if timestamp_path.exists() {
+        builder = builder.load_timestamp_keys(timestamp_path.as_std_path())?;
+        deps.insert(timestamp_path);
+    }
+
+    Ok(builder.build())
 }
 
 #[cfg(test)]
@@ -689,8 +717,18 @@ mod tests {
         assert_eq!(repo_client.database().trusted_snapshot().map(|m| m.version()), Some(2));
         assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(2));
 
-        let expected_deps =
-            BTreeSet::from_iter(env.manifest_paths.iter().chain(env.list_paths.iter()).cloned());
+        let expected_deps = BTreeSet::from_iter(
+            env.manifest_paths
+                .iter()
+                .chain(env.list_paths.iter())
+                .chain([
+                    &env.repo_path.join("keys").join("root.json"),
+                    &env.repo_path.join("keys").join("targets.json"),
+                    &env.repo_path.join("keys").join("snapshot.json"),
+                    &env.repo_path.join("keys").join("timestamp.json"),
+                ])
+                .cloned(),
+        );
         env.validate_manifest_blobs(expected_deps);
     }
 

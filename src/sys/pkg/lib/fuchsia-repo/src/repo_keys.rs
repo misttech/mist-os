@@ -129,19 +129,19 @@ impl RepoKeysBuilder {
         self
     }
 
-    /// Add a [PrivateKey] that will be used as a root key.
+    /// Add a [PrivateKey] that will be used as a targets key.
     pub fn add_targets_key(mut self, key: Box<dyn PrivateKey>) -> Self {
         self.keys.targets_keys.push(key);
         self
     }
 
-    /// Add a [PrivateKey] that will be used as a root key.
+    /// Add a [PrivateKey] that will be used as a snapshot key.
     pub fn add_snapshot_key(mut self, key: Box<dyn PrivateKey>) -> Self {
         self.keys.snapshot_keys.push(key);
         self
     }
 
-    /// Add a [PrivateKey] that will be used as a root key.
+    /// Add a [PrivateKey] that will be used as a timestamp key.
     pub fn add_timestamp_key(mut self, key: Box<dyn PrivateKey>) -> Self {
         self.keys.timestamp_keys.push(key);
         self
