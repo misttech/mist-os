@@ -10,6 +10,7 @@ use {
     chrono::{DateTime, Duration, Utc},
     fuchsia_merkle::Hash,
     fuchsia_pkg::{BlobInfo, PackageManifest, PackageManifestList, PackagePath, SubpackageInfo},
+    futures::stream::{StreamExt as _, TryStreamExt as _},
     std::{
         collections::{hash_map, BTreeMap, HashMap, HashSet},
         future::Future,
@@ -485,9 +486,15 @@ where
         repo_builder.commit().await.context("publishing metadata")?;
 
         // Stage the blobs.
-        for (blob_hash, blob) in staged_blobs {
-            self.repo.store_blob(&blob_hash, Utf8Path::new(&blob.source_path)).await?;
-        }
+        let () = futures::stream::iter(staged_blobs)
+            .map(Ok)
+            .try_for_each_concurrent(
+                std::thread::available_parallelism()?.get(),
+                |(blob_hash, blob)| {
+                    self.repo.store_blob(&blob_hash, Utf8Path::new(&blob.source_path))
+                },
+            )
+            .await?;
 
         Ok(self.deps)
     }
