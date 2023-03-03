@@ -9,15 +9,19 @@
 // regardless of which HW a build is for.
 #include "codec_factory_hw_policy_astro.h"
 
+#define LIMIT_ASTRO_HW_DECODE_CONCURRENCY (0)
+
 CodecFactoryPolicy::CodecFactoryPolicy(CodecFactoryApp* app) : app_(app) {
   ZX_DEBUG_ASSERT(hw_policies_.empty());
   std::string board_name = app_->board_name();
   FX_LOGS(INFO) << "board_name: " << board_name.c_str();
+#if LIMIT_ASTRO_HW_DECODE_CONCURRENCY
   if (board_name == "astro") {
     FX_LOGS(INFO) << "baord name is astro";
     hw_policies_.emplace_back(
         std::unique_ptr<CodecFactoryHwPolicy>(new CodecFactoryHwPolicyAstro(this)));
   }
+#endif
 }
 
 bool CodecFactoryPolicy::AdmitHwDecoder(const fuchsia::mediacodec::CreateDecoder_Params& params,
