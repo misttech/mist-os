@@ -54,7 +54,7 @@ zx::result<std::vector<uint8_t>> GenerateBlobType1(cpp20::span<const uint8_t> da
       MetadataType1::Create(header, payload_length, use_compressed_result);
   std::memcpy(delivery_blob.data() + sizeof header, &metadata, sizeof metadata);
   // Overwrite the payload with original data if we aren't compressing the blob.
-  if (!use_compressed_result) {
+  if (!use_compressed_result && payload_length > 0) {
     std::memcpy(delivery_blob.data() + kPayloadOffset, data.data(), payload_length);
   }
   return zx::ok(delivery_blob);
