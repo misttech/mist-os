@@ -457,9 +457,10 @@ bool HandleLESetAdvData(const CommandData* cmd_data, const fxl::CommandLine& cmd
     return false;
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::LESetAdvertisingDataCommandParams);
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetAdvertisingData, kPayloadSize);
-  packet->mutable_view()->mutable_payload_data().SetToZeros();
+  auto packet =
+      ::bt::hci::EmbossCommandPacket::New<pw::bluetooth::emboss::LESetAdvertisingDataCommandWriter>(
+          ::bt::hci_spec::kLESetAdvertisingData);
+  auto params = packet.view_t();
 
   std::string name;
   if (cmd_line.GetOptionValue("name", &name)) {
@@ -471,14 +472,11 @@ bool HandleLESetAdvData(const CommandData* cmd_data, const fxl::CommandLine& cmd
       return false;
     }
 
-    auto params = packet->mutable_payload<::bt::hci_spec::LESetAdvertisingDataCommandParams>();
-    params->adv_data_length = adv_data_len;
-    params->adv_data[0] = adv_data_len - 1;
-    params->adv_data[1] = 0x09;  // Complete Local Name
-    std::strncpy((char*)params->adv_data + 2, name.c_str(), name.length());
-  } else {
-    packet->mutable_payload<::bt::hci_spec::LESetAdvertisingDataCommandParams>()->adv_data_length =
-        0;
+    params.advertising_data_length().Write(static_cast<uint8_t>(adv_data_len));
+    unsigned char* data = params.advertising_data().BackingStorage().data();
+    data[0] = static_cast<uint8_t>(adv_data_len - 1);  // Length
+    data[1] = 0x09;                                    // Type: Complete Local Name
+    std::strncpy((char*)data + 2, name.c_str(), name.length());
   }
 
   auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
