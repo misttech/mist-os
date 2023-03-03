@@ -1190,9 +1190,6 @@ fn handle_periodic_connection_stats(
     // consider roaming. Currently this will never cause a scan.
     let connection_quality = score_connection_quality(&connection_stats);
     if connection_quality < THRESHOLD_BAD_CONNECTION {
-        // Record for metrics that a scan was performed for roaming.
-        iface_manager.telemetry_sender.send(TelemetryEvent::RoamingScan);
-
         // Record that a roam scan happened and another should not happen again for a while.
         iface_manager.set_iface_roam_scan_time(connection_stats.iface_id, fasync::Time::now());
 
