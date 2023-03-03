@@ -7,8 +7,6 @@ use args::Args;
 use gn_graph::Graph;
 use gn_json::target::AllTargets;
 use humansize::{file_size_opts, FileSize};
-use std::fs::File;
-use std::io::BufReader;
 use std::time::Instant;
 
 mod args;
@@ -17,10 +15,6 @@ mod display;
 
 fn main() -> Result<(), anyhow::Error> {
     let args: Args = argh::from_env();
-
-    let file =
-        File::open(&args.file).with_context(|| format!("Unable to open file: {}", args.file))?;
-    let reader = BufReader::new(file);
 
     // Read all the Targets into a single map.
     if args.verbose {
@@ -31,8 +25,14 @@ fn main() -> Result<(), anyhow::Error> {
             file_metadata.len().file_size(file_size_opts::CONVENTIONAL).map_err(|s| anyhow!(s))?;
         println!(" ({})", file_size);
     }
+
     let start_time = Instant::now();
-    let all_targets: AllTargets = serde_json::from_reader(reader)
+    // Reading to a string before parsing is considerably faster than letting
+    // serde parse from a BufferedReader (saves about 30% based on testing with
+    // with large gn_desc.json files (>500MB).
+    let gn_desc_json = std::fs::read_to_string(&args.file)
+        .with_context(|| format!("Unable to open file: {}", args.file))?;
+    let all_targets: AllTargets = serde_json::from_str(&gn_desc_json)
         .with_context(|| format!("Unable to parse file as json: {}", &args.file))?;
 
     if args.verbose {

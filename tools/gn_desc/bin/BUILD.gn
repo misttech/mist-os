@@ -19,7 +19,7 @@ rustc_binary("gn_desc") {
 
   # This needs to be compiled with optimizations enabled to be at all
   # performant when deserializing the 100s of MBs of `gn desc` json output.
-  configs += [ "//build/config:optimize_default" ]
+  configs += [ "//build/config:optimize_speed" ]
 
   deps = [
     "//third_party/rust_crates:anyhow",
