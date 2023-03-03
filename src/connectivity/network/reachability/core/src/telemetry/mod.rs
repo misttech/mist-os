@@ -495,7 +495,7 @@ impl Telemetry {
 mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
-    use fuchsia_inspect::{assert_data_tree, Inspector};
+    use fuchsia_inspect::{assert_data_tree, AnyProperty, Inspector};
     use fuchsia_zircon::DurationNum;
     use futures::task::Poll;
     use std::pin::Pin;
@@ -723,16 +723,19 @@ mod tests {
             telemetry: contains {
                 stats: contains {
                     internet_available_sec: {
+                        "@time": AnyProperty,
                         "1m": vec![0i64],
                         "15m": vec![0i64],
                         "1h": vec![0i64],
                     },
                     dns_active_sec: {
+                        "@time": AnyProperty,
                         "1m": vec![0i64],
                         "15m": vec![0i64],
                         "1h": vec![0i64],
                     },
                     total_duration_sec: {
+                        "@time": AnyProperty,
                         "1m": vec![20i64],
                         "15m": vec![20i64],
                         "1h": vec![20i64],
@@ -750,7 +753,7 @@ mod tests {
         assert_data_tree!(test_helper.inspector, root: contains {
             telemetry: contains {
                 stats: contains {
-                    total_duration_sec: {
+                    total_duration_sec: contains {
                         "1m": vec![25i64],
                         "15m": vec![25i64],
                         "1h": vec![25i64],
@@ -766,17 +769,17 @@ mod tests {
         assert_data_tree!(test_helper.inspector, root: contains {
             telemetry: contains {
                 stats: contains {
-                    internet_available_sec: {
+                    internet_available_sec: contains {
                         "1m": vec![15i64],
                         "15m": vec![15i64],
                         "1h": vec![15i64],
                     },
-                    dns_active_sec: {
+                    dns_active_sec: contains {
                         "1m": vec![0i64],
                         "15m": vec![0i64],
                         "1h": vec![0i64],
                     },
-                    total_duration_sec: {
+                    total_duration_sec: contains {
                         "1m": vec![40i64],
                         "15m": vec![40i64],
                         "1h": vec![40i64],
@@ -794,17 +797,17 @@ mod tests {
         assert_data_tree!(test_helper.inspector, root: contains {
             telemetry: contains {
                 stats: contains {
-                    internet_available_sec: {
+                    internet_available_sec: contains {
                         "1m": vec![35i64, 30],
                         "15m": vec![65i64],
                         "1h": vec![65i64],
                     },
-                    dns_active_sec: {
+                    dns_active_sec: contains {
                         "1m": vec![20i64, 30],
                         "15m": vec![50i64],
                         "1h": vec![50i64],
                     },
-                    total_duration_sec: {
+                    total_duration_sec: contains {
                         "1m": vec![30i64],
                         "15m": vec![90i64],
                         "1h": vec![90i64],
@@ -857,6 +860,7 @@ mod tests {
             telemetry: contains {
                 stats: contains {
                     reachability_lost_count: {
+                        "@time": AnyProperty,
                         "1m": vec![0u64],
                         "15m": vec![0u64],
                         "1h": vec![0u64],
@@ -871,7 +875,7 @@ mod tests {
         assert_data_tree!(test_helper.inspector, root: contains {
             telemetry: contains {
                 stats: contains {
-                    reachability_lost_count: {
+                    reachability_lost_count: contains {
                         "1m": vec![1u64],
                         "15m": vec![1u64],
                         "1h": vec![1u64],
@@ -898,11 +902,13 @@ mod tests {
             telemetry: contains {
                 stats: contains {
                     ipv4_state: {
+                        "@time": AnyProperty,
                         "1m": vec![0f64],
                         "15m": vec![0f64],
                         "1h": vec![0f64],
                     },
                     ipv6_state: {
+                        "@time": AnyProperty,
                         "1m": vec![8f64],
                         "15m": vec![8f64],
                         "1h": vec![8f64],
@@ -920,12 +926,12 @@ mod tests {
         assert_data_tree!(test_helper.inspector, root: contains {
             telemetry: contains {
                 stats: contains {
-                    ipv4_state: {
+                    ipv4_state: contains {
                         "1m": vec![0f64],
                         "15m": vec![0f64],
                         "1h": vec![0f64],
                     },
-                    ipv6_state: {
+                    ipv6_state: contains {
                         "1m": vec![18f64 / 2f64],
                         "15m": vec![18f64 / 2f64],
                         "1h": vec![18f64 / 2f64],

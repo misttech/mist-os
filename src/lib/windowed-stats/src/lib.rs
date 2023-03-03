@@ -7,6 +7,7 @@ pub mod aggregations;
 use {
     crate::aggregations::SumAndCount,
     fuchsia_inspect::{ArrayProperty, Node as InspectNode},
+    fuchsia_inspect_contrib::nodes::NodeExt,
     std::{collections::VecDeque, default::Default},
 };
 
@@ -146,6 +147,7 @@ impl<T> CombinedWindowedStats<T> {
 impl<T: Into<u64> + Clone> CombinedWindowedStats<T> {
     pub fn log_inspect_uint_array(&mut self, node: &InspectNode, child_name: &'static str) {
         let child = node.create_child(child_name);
+        child.record_time("@time");
         self.minutely.log_inspect_uint_array(&child, "1m");
         self.fifteen_minutely.log_inspect_uint_array(&child, "15m");
         self.hourly.log_inspect_uint_array(&child, "1h");
@@ -156,6 +158,7 @@ impl<T: Into<u64> + Clone> CombinedWindowedStats<T> {
 impl<T: Into<i64> + Clone> CombinedWindowedStats<T> {
     pub fn log_inspect_int_array(&mut self, node: &InspectNode, child_name: &'static str) {
         let child = node.create_child(child_name);
+        child.record_time("@time");
         self.minutely.log_inspect_int_array(&child, "1m");
         self.fifteen_minutely.log_inspect_int_array(&child, "15m");
         self.hourly.log_inspect_int_array(&child, "1h");
@@ -166,6 +169,7 @@ impl<T: Into<i64> + Clone> CombinedWindowedStats<T> {
 impl CombinedWindowedStats<SumAndCount> {
     pub fn log_avg_inspect_double_array(&mut self, node: &InspectNode, child_name: &'static str) {
         let child = node.create_child(child_name);
+        child.record_time("@time");
         self.minutely.log_avg_inspect_double_array(&child, "1m");
         self.fifteen_minutely.log_avg_inspect_double_array(&child, "15m");
         self.hourly.log_avg_inspect_double_array(&child, "1h");
@@ -178,6 +182,7 @@ mod tests {
     use {
         super::*,
         crate::aggregations::create_saturating_add_fn,
+        fuchsia_async as fasync,
         fuchsia_inspect::{assert_data_tree, Inspector},
     };
 
@@ -321,6 +326,8 @@ mod tests {
 
     #[test]
     fn combined_windowed_stats_log_inspect_uint_array() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(123456789));
         let inspector = Inspector::default();
 
         let mut windowed_stats = CombinedWindowedStats::<u32>::new(create_saturating_add_fn);
@@ -337,6 +344,7 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             stats: {
+                "@time": 123456789i64,
                 "1m": vec![3u64, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22],
                 "15m": vec![14u64, 22],
                 "1h": vec![36u64],
@@ -346,6 +354,8 @@ mod tests {
 
     #[test]
     fn combined_windowed_stats_log_inspect_int_array() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(123456789));
         let inspector = Inspector::default();
 
         let mut windowed_stats = CombinedWindowedStats::<i32>::new(create_saturating_add_fn);
@@ -355,6 +365,7 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             stats: {
+                "@time": 123456789i64,
                 "1m": vec![1i64],
                 "15m": vec![1i64],
                 "1h": vec![1i64],
@@ -364,6 +375,8 @@ mod tests {
 
     #[test]
     fn combined_windowed_stats_sum_and_count_log_avg_inspect_double_array() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(123456789));
         let inspector = Inspector::default();
         let mut windowed_stats =
             CombinedWindowedStats::<SumAndCount>::new(create_saturating_add_fn);
@@ -374,6 +387,7 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             stats: {
+                "@time": 123456789i64,
                 "1m": vec![3f64 / 2f64],
                 "15m": vec![3f64 / 2f64],
                 "1h": vec![3f64 / 2f64],
