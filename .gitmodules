@@ -153,11 +153,6 @@
 	url = https://fuchsia.googlesource.com/third_party/expat
 	name = third_party/expat
 	ignore = all
-[submodule "third_party/flatbuffers"]
-	path = third_party/flatbuffers
-	url = https://fuchsia.googlesource.com/third_party/flatbuffers
-	name = third_party/flatbuffers
-	ignore = all
 [submodule "third_party/flite"]
 	path = third_party/flite
 	url = https://fuchsia.googlesource.com/third_party/flite
@@ -602,4 +597,9 @@
 	path = third_party/chromiumos-xorg-conf/src
 	url = https://fuchsia.googlesource.com/third_party/chromium.googlesource.com/chromiumos/platform/xorg-conf
 	name = chromiumos-xorg-conf
+	ignore = all
+[submodule "third_party/flatbuffers/src"]
+	path = third_party/flatbuffers/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/google/flatbuffers
+	name = third_party/github.com/google/flatbuffers
 	ignore = all
