@@ -104,47 +104,40 @@ zx_status_t AudioStreamIn::InitPDev() {
     return status;
   }
 
-  pdev_protocol_t pdev;
-  status = device_get_protocol(parent(), ZX_PROTOCOL_PDEV, &pdev);
-  if (status) {
-    status = device_get_fragment_protocol(parent(), "pdev", ZX_PROTOCOL_PDEV, &pdev);
-    if (status) {
-      zxlogf(ERROR, "get pdev protocol failed %d", status);
-      return status;
+  zx::result pdev_result = ddk::PDevFidl::Create(parent());
+  if (pdev_result.is_error()) {
+    pdev_result = ddk::PDevFidl::Create(parent(), ddk::PDevFidl::kFragmentName);
+    if (pdev_result.is_error()) {
+      zxlogf(ERROR, "get pdev protocol failed %s", pdev_result.status_string());
+      return pdev_result.error_value();
     }
   }
-
-  ddk::PDev pdev2(&pdev);
-  if (!pdev2.is_valid()) {
-    zxlogf(ERROR, "could not get pdev");
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  status = pdev2.GetBti(0, &bti_);
+  ddk::PDevFidl pdev = std::move(pdev_result.value());
+  status = pdev.GetBti(0, &bti_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "could not obtain bti %d", status);
     return status;
   }
 
   std::optional<fdf::MmioBuffer> mmio0, mmio1, mmio2;
-  status = pdev2.MapMmio(0, &mmio0);
+  status = pdev.MapMmio(0, &mmio0);
   if (status != ZX_OK) {
     zxlogf(ERROR, "could not map mmio0 %d", status);
     return status;
   }
-  status = pdev2.MapMmio(1, &mmio1);
+  status = pdev.MapMmio(1, &mmio1);
   if (status != ZX_OK) {
     zxlogf(ERROR, "could not map mmio1 %d", status);
     return status;
   }
   if (metadata_.version == metadata::AmlVersion::kA5) {
-    status = pdev2.MapMmio(2, &mmio2);
+    status = pdev.MapMmio(2, &mmio2);
     if (status != ZX_OK) {
       zxlogf(ERROR, "could not map mmio2 %d", status);
       return status;
     }
   }
-  status = pdev2.GetInterrupt(0, 0, &irq_);
+  status = pdev.GetInterrupt(0, 0, &irq_);
   if (status != ZX_ERR_OUT_OF_RANGE) {  // Not specified in the board file.
     if (status != ZX_OK) {
       zxlogf(ERROR, "could not get IRQ %d", status);

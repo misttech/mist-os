@@ -5,6 +5,9 @@
 #include <fuchsia/hardware/clock/cpp/banjo-mock.h>
 #include <fuchsia/hardware/shareddma/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -158,11 +161,32 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 struct As370TdmOutputTest : public zxtest::Test {
   void SetUp() override {
-    pdev_.set_mmio(0, mmio0_.mmio_info());
-    pdev_.set_mmio(1, mmio1_.mmio_info());
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    fake_pdev::FakePDevFidl::Config config;
+    config.mmios[0] = mmio0_.mmio_info();
+    config.mmios[1] = mmio1_.mmio_info();
+
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                                 std::move(outgoing_endpoints->client), "pdev");
+
     fake_parent_->AddProtocol(ZX_PROTOCOL_CLOCK, clock_.GetProto()->ops, clock_.GetProto()->ctx,
                               "clock");
     fake_parent_->AddProtocol(ZX_PROTOCOL_SHARED_DMA, dma_.GetProto()->ops, dma_.GetProto()->ctx,
@@ -176,7 +200,9 @@ struct As370TdmOutputTest : public zxtest::Test {
   std::shared_ptr<zx_device> fake_parent_ = MockDevice::FakeRootParent();
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   fbl::RefPtr<As370AudioStreamOut> device_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   FakeClockDevice clock_;
   FakeSharedDmaDevice dma_;
   FakeCodecDevice codec_;

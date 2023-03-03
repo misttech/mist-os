@@ -64,7 +64,7 @@ class As370AudioStreamOut : public SimpleAudioStream {
   uint32_t us_per_notification_ = 0;
   async::TaskClosureMethod<As370AudioStreamOut, &As370AudioStreamOut::ProcessRingNotification>
       notify_timer_ TA_GUARDED(domain_token()){this};
-  ddk::PDev pdev_ TA_GUARDED(domain_token());
+  ddk::PDevFidl pdev_ TA_GUARDED(domain_token());
   zx::vmo ring_buffer_vmo_ TA_GUARDED(domain_token());
   std::unique_ptr<SynAudioOutDevice> lib_;
   ddk::ClockProtocolClient clks_[kClockCount] TA_GUARDED(domain_token());

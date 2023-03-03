@@ -312,7 +312,7 @@ class Dwc3 : public Dwc3Type, public ddk::UsbDciProtocol<Dwc3, ddk::base_protoco
   fbl::Mutex lock_;
   fbl::Mutex dci_lock_;
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 
   TA_GUARDED(dci_lock_) std::optional<ddk::UsbDciInterfaceProtocolClient> dci_intf_;
 

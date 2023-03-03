@@ -36,7 +36,7 @@ As370AudioStreamOut::As370AudioStreamOut(zx_device_t* parent)
     : SimpleAudioStream(parent, false), pdev_(parent) {}
 
 zx_status_t As370AudioStreamOut::InitPdev() {
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "could not get pdev");
     return ZX_ERR_NO_RESOURCES;

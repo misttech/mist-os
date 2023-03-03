@@ -349,7 +349,7 @@ zx_status_t Lp8556Device::Init() {
     return ZX_ERR_BAD_STATE;
   }
 
-  ddk::PDevProtocolClient pdev(parent(), "pdev");
+  ddk::PDevFidl pdev(parent(), "pdev");
   if (pdev.is_valid()) {
     pdev_board_info_t board_info{};
     if (zx_status_t status = pdev.GetBoardInfo(&board_info); status == ZX_OK) {

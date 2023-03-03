@@ -4,6 +4,9 @@
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
@@ -288,6 +291,11 @@ class FakeUsbBus : public ddk::UsbBusInterfaceProtocol<FakeUsbBus> {
   usb_bus_interface_protocol_t proto_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 using TestRequest = usb::CallbackRequest<sizeof(max_align_t)>;
 class XhciHarness : public zxtest::Test {
  public:
@@ -406,7 +414,9 @@ class XhciHarness : public zxtest::Test {
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   MockDevice* mock_ddk_xhci_ = nullptr;
   FakeDevice fake_device_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
 
  private:
   std::vector<uint8_t> slot_freelist_;
@@ -417,11 +427,27 @@ class XhciHarness : public zxtest::Test {
 class XhciMmioHarness : public XhciHarness {
  public:
   void SetUp() override {
-    pdev_.set_mmio(0, fake_device_.mmio_info());
-    fake_device_.set_irq_signaller(pdev_.CreateVirtualInterrupt(0));
-    pdev_.UseFakeBti();
+    fake_pdev::FakePDevFidl::Config config;
+    config.mmios[0] = fake_device_.mmio_info();
+    config.irqs[0] = {};
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    fake_device_.set_irq_signaller(config.irqs[0].borrow());
+    config.use_fake_bti = true;
 
-    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                          std::move(outgoing_endpoints->client));
 
     auto dev = std::make_unique<UsbXhci>(root_.get(), ddk_fake::CreateBufferFactory());
     dev->SetTestHarness(this);
@@ -948,8 +974,8 @@ TEST_F(XhciMmioHarness, GetMaxDeviceCount) { ASSERT_EQ(GetMaxDeviceCount(), 34);
 
 }  // namespace usb_xhci
 
-zx_status_t ddk::PDev::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
-                               uint32_t cache_policy) {
+zx_status_t ddk::PDevFidl::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
+                                   uint32_t cache_policy) {
   pdev_mmio_t pdev_mmio;
   zx_status_t status = GetMmio(index, &pdev_mmio);
   if (status != ZX_OK) {

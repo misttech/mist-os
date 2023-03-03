@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
+#include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/sync/completion.h>
@@ -89,18 +92,38 @@ audio_fidl::wire::PcmFormat GetDefaultPcmFormat() {
   return format;
 }
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 struct AudioStreamInTest : public inspect::InspectTestHelper, public zxtest::Test {
   void SetUp() override {
     fake_parent_ = MockDevice::FakeRootParent();
 
-    pdev_.set_mmio(0, mmio_.mmio_info());
-    pdev_.set_mmio(1, mmio_.mmio_info());
-    pdev_.UseFakeBti();
+    fake_pdev::FakePDevFidl::Config config;
+
+    config.mmios[0] = mmio_.mmio_info();
+    config.mmios[1] = mmio_.mmio_info();
+    config.use_fake_bti = true;
     zx::interrupt irq;
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-    pdev_.set_interrupt(0, std::move(irq));
+    config.irqs[0] = std::move(irq);
 
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                                 std::move(outgoing_endpoints->client));
   }
 
   void TestRingBufferSize(uint8_t number_of_channels, uint32_t frames_req,
@@ -141,7 +164,9 @@ struct AudioStreamInTest : public inspect::InspectTestHelper, public zxtest::Tes
     mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
   }
 
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   FakeMmio mmio_;
   std::shared_ptr<MockDevice> fake_parent_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};

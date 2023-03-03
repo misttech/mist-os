@@ -4,6 +4,10 @@
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
@@ -12,6 +16,11 @@
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
 
 namespace dwc3 {
+
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
 
 class TestFixture : public zxtest::Test {
  public:
@@ -60,7 +69,9 @@ class TestFixture : public zxtest::Test {
   bool stuck_reset_test_{false};
 
   std::shared_ptr<MockDevice> mock_parent_{MockDevice::FakeRootParent()};
-  fake_pdev::FakePDev fake_pdev_{};
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   std::array<ddk_fake::FakeMmioReg, kRegCount> registers_;
   ddk_fake::FakeMmioRegRegion reg_region_{registers_.data(), kRegSize, registers_.size()};
 };
@@ -75,12 +86,26 @@ TestFixture::TestFixture() {
   dctl_reg.SetReadCallback([this]() -> uint64_t { return Read_DCTL(); });
   dctl_reg.SetWriteCallback([this](uint64_t val) { return Write_DCTL(val); });
 
-  fake_pdev_.set_mmio(0, mmio_info());
-  fake_pdev_.UseFakeBti(true);
-  fake_pdev_.CreateVirtualInterrupt(0);
+  fake_pdev::FakePDevFidl::Config config;
+  config.mmios[0] = mmio_info();
+  config.use_fake_bti = true;
+  config.irqs[0] = {};
+  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
 
-  // TODO(johngro): Lifecycle?  How is this managed by the testing framework?
-  mock_parent_->AddProtocol(ZX_PROTOCOL_PDEV, fake_pdev_.proto()->ops, fake_pdev_.proto()->ctx);
+  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(outgoing_endpoints);
+  ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+  incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                         IncomingNamespace* infra) mutable {
+    infra->pdev_server.SetConfig(std::move(config));
+    ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+        infra->pdev_server.GetInstanceHandler()));
+
+    ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+  });
+  ASSERT_NO_FATAL_FAILURE();
+  mock_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                               std::move(outgoing_endpoints->client));
 }
 
 void TestFixture::SetUp() { stuck_reset_test_ = false; }

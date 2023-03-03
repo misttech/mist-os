@@ -63,10 +63,14 @@ test("as370-pdm-input-unit-tests") {
     ":common",
     "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.shareddma:fuchsia.hardware.shareddma_banjo_cpp_mock",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-reg",
+    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

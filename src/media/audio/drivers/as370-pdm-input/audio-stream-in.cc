@@ -62,7 +62,7 @@ zx_status_t As370AudioStreamIn::Init() {
 }
 
 zx_status_t As370AudioStreamIn::InitPDev() {
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "could not get pdev");
     return ZX_ERR_NO_RESOURCES;

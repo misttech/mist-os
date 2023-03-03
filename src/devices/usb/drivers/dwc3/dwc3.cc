@@ -33,11 +33,12 @@ zx_status_t Dwc3::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t Dwc3::AcquirePDevResources() {
-  if (zx_status_t status = device_get_protocol(parent_, ZX_PROTOCOL_PDEV, &pdev_);
-      status != ZX_OK) {
-    zxlogf(ERROR, "could not get pdev %s", zx_status_get_string(status));
-    return status;
+  zx::result pdev_result = ddk::PDevFidl::Create(parent());
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "could not get pdev %s", pdev_result.status_string());
+    return pdev_result.error_value();
   }
+  pdev_ = std::move(pdev_result.value());
 
   if (zx_status_t status = pdev_.MapMmio(0, &mmio_); status != ZX_OK) {
     zxlogf(ERROR, "MapMmio failed: %s", zx_status_get_string(status));
@@ -49,7 +50,7 @@ zx_status_t Dwc3::AcquirePDevResources() {
     return status;
   }
 
-  if (zx_status_t status = pdev_.GetInterrupt(0, &irq_); status != ZX_OK) {
+  if (zx_status_t status = pdev_.GetInterrupt(0, 0, &irq_); status != ZX_OK) {
     zxlogf(ERROR, "GetInterrupt failed: %s", zx_status_get_string(status));
     return status;
   }

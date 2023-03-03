@@ -1874,7 +1874,7 @@ zx_status_t UsbXhci::InitMmio() {
     return ZX_ERR_NO_MEMORY;
   }
   for (uint16_t i = 0; i < irq_count_; i++) {
-    status = pdev_.GetInterrupt(i, &interrupter(i).GetIrq());
+    status = pdev_.GetInterrupt(i, 0, &interrupter(i).GetIrq());
     if (status != ZX_OK) {
       zxlogf(ERROR, "UsbXhci: failed fetch interrupt (%s)", zx_status_get_string(status));
       return status;
@@ -2203,26 +2203,26 @@ zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  pdev_protocol_t proto;
-  zx_status_t status =
-      device_get_fragment_protocol(parent, ddk::PDev::kFragmentName, ZX_PROTOCOL_PDEV, &proto);
-  // A device doesn't have to have a PDEV. It might use PCI instead.
-  if (status != ZX_ERR_NOT_FOUND) {
+  zx::result pdev_result = ddk::PDevFidl::Create(parent, ddk::PDev::kFragmentName);
+  if (pdev_result.is_ok()) {
+    dev->pdev_ = std::move(pdev_result.value());
     // We need at least a PDEV, but the PHY is optional
     // for devices not implementing OTG.
-    dev->pdev_ = ddk::PDev::FromFragment(parent);
-    if (!dev->pdev_.is_valid()) {
-      zxlogf(ERROR, "UsbXhci::Init: could not get platform device protocol");
+    dev->phy_ = ddk::UsbPhyProtocolClient(parent, "xhci-phy");
+  } else {
+    // A device doesn't have to have a PDEV. It might use PCI instead.
+    if (pdev_result.error_value() != ZX_ERR_NOT_FOUND) {
+      zxlogf(ERROR, "UsbXhci::Init: could not get platform device protocol: %s",
+             pdev_result.status_string());
       return ZX_ERR_NOT_SUPPORTED;
     }
-    dev->phy_ = ddk::UsbPhyProtocolClient(parent, "xhci-phy");
   }
 
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  status = dev->Init();
+  zx_status_t status = dev->Init();
   if (status != ZX_OK) {
     return status;
   }

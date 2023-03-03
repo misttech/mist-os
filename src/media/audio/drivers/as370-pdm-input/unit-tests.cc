@@ -5,9 +5,13 @@
 #include <fuchsia/hardware/clock/cpp/banjo-mock.h>
 #include <fuchsia/hardware/shareddma/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/fake-bti/bti.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
@@ -44,8 +48,9 @@ fidl::WireSyncClient<audio_fidl::StreamConfig> GetStreamClient(
 
 class FakeSharedDmaDevice : public ddk::SharedDmaProtocol<FakeSharedDmaDevice, ddk::base_protocol> {
  public:
-  FakeSharedDmaDevice(fake_pdev::FakePDev& pdev)
-      : pdev_(pdev), proto_({&shared_dma_protocol_ops_, this}) {}
+  FakeSharedDmaDevice() : proto_({&shared_dma_protocol_ops_, this}) {}
+
+  void SetBti(zx::bti bti) { bti_ = std::move(bti); }
 
   void SharedDmaStart(uint32_t dma_id) {}
   void SharedDmaStop(uint32_t dma_id) {}
@@ -53,7 +58,6 @@ class FakeSharedDmaDevice : public ddk::SharedDmaProtocol<FakeSharedDmaDevice, d
   uint32_t SharedDmaGetBufferPosition(uint32_t dma_id) { return 0; }
   zx_status_t SharedDmaInitializeAndGetBuffer(uint32_t dma_id, dma_type_t type, uint32_t size,
                                               zx::vmo* out_vmo) {
-    pdev_.PDevGetBti(0, &bti_);
     return zx::vmo::create_contiguous(bti_, 4096, 0, out_vmo);
 
     return ZX_OK;
@@ -67,7 +71,6 @@ class FakeSharedDmaDevice : public ddk::SharedDmaProtocol<FakeSharedDmaDevice, d
   const shared_dma_protocol_t* GetProto() const { return &proto_; }
 
  private:
-  fake_pdev::FakePDev& pdev_;
   zx::bti bti_;
   shared_dma_protocol_t proto_;
 };
@@ -117,12 +120,37 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 struct As370PdmInputTest : public zxtest::Test {
   void SetUp() override {
-    pdev_.UseFakeBti();
-    pdev_.set_mmio(0, mmio0_.mmio_info());
-    pdev_.set_mmio(1, mmio1_.mmio_info());
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    fake_pdev::FakePDevFidl::Config config;
+    config.mmios[0] = mmio0_.mmio_info();
+    config.mmios[1] = mmio1_.mmio_info();
+    config.btis[0] = {};
+    ASSERT_OK(fake_bti_create(config.btis[0].reset_and_get_address()));
+    zx::bti dup;
+    ASSERT_OK(config.btis[0].duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
+    dma_.SetBti(std::move(dup));
+
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                                 std::move(outgoing_endpoints->client), "pdev");
+
     fake_parent_->AddProtocol(ZX_PROTOCOL_CLOCK, clock_.GetProto()->ops, clock_.GetProto()->ctx,
                               "clock");
     fake_parent_->AddProtocol(ZX_PROTOCOL_SHARED_DMA, dma_.GetProto()->ops, dma_.GetProto()->ctx,
@@ -134,9 +162,11 @@ struct As370PdmInputTest : public zxtest::Test {
   std::shared_ptr<zx_device> fake_parent_ = MockDevice::FakeRootParent();
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   fbl::RefPtr<As370AudioStreamIn> device_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   FakeClockDevice clock_;
-  FakeSharedDmaDevice dma_{pdev_};
+  FakeSharedDmaDevice dma_;
   FakeMmio mmio0_{::as370::kAudioGlobalSize}, mmio1_{::as370::kAudioI2sSize};
 };
 

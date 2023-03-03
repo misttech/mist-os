@@ -380,7 +380,7 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
   ddk::Pci pci_;
 
   // PDev (if ARM)
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 
   // MMIO buffer for communicating with the physical hardware
   // Must be optional to allow for asynchronous initialization,

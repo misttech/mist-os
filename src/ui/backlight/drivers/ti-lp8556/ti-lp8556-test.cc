@@ -7,6 +7,8 @@
 #include <fidl/fuchsia.hardware.adhoc.lp8556/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/inspect/cpp/reader.h>
@@ -164,7 +166,6 @@ TEST_F(Lp8556DeviceTest, InitRegisters) {
   //     0x01, 0x85, 0xa2, 0x30, 0xa3, 0x32, 0xa5, 0x54, 0xa7, 0xf4, 0xa9, 0x60, 0xae, 0x09,
   // };
 
-  fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, nullptr, nullptr, "pdev");
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kDeviceMetadata, sizeof(kDeviceMetadata));
 
   mock_i2c_.ExpectWriteStop({0x01, 0x85})
@@ -455,6 +456,10 @@ TEST_F(Lp8556DeviceTest, Inspect) {
   EXPECT_FALSE(
       root_node.get_property<inspect::DoublePropertyValue>("max_absolute_brightness_nits"));
 }
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
 
 TEST_F(Lp8556DeviceTest, GetBackLightPower) {
   TiLp8556Metadata kDeviceMetadata = {
@@ -465,10 +470,29 @@ TEST_F(Lp8556DeviceTest, GetBackLightPower) {
 
   constexpr uint32_t kPanelId = 2;
 
-  fake_pdev::FakePDev pdev;
-  pdev.set_board_info(pdev_board_info_t{.pid = PDEV_PID_NELSON});
+  async::Loop incoming_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
+                                                                  std::in_place};
+  fake_pdev::FakePDevFidl::Config config;
+  config.board_info = pdev_board_info_t{
+      .pid = PDEV_PID_NELSON,
+  };
 
-  fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev.proto()->ops, pdev.proto()->ctx, "pdev");
+  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(outgoing_endpoints);
+  ASSERT_OK(incoming_loop.StartThread("incoming-ns-thread"));
+  incoming.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                        IncomingNamespace* infra) mutable {
+    infra->pdev_server.SetConfig(std::move(config));
+    ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+        infra->pdev_server.GetInstanceHandler()));
+
+    ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+  });
+  ASSERT_NO_FATAL_FAILURE();
+  fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                               std::move(outgoing_endpoints->client), "pdev");
+
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kDeviceMetadata, sizeof(kDeviceMetadata));
   fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &kPanelId, sizeof(kPanelId));
 
@@ -505,10 +529,29 @@ TEST_F(Lp8556DeviceTest, GetPowerWatts) {
 
   constexpr uint32_t kPanelId = 2;
 
-  fake_pdev::FakePDev pdev;
-  pdev.set_board_info(pdev_board_info_t{.pid = PDEV_PID_NELSON});
+  async::Loop incoming_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
+                                                                  std::in_place};
+  fake_pdev::FakePDevFidl::Config config;
+  config.board_info = pdev_board_info_t{
+      .pid = PDEV_PID_NELSON,
+  };
 
-  fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, pdev.proto()->ops, pdev.proto()->ctx, "pdev");
+  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(outgoing_endpoints);
+  ASSERT_OK(incoming_loop.StartThread("incoming-ns-thread"));
+  incoming.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                        IncomingNamespace* infra) mutable {
+    infra->pdev_server.SetConfig(std::move(config));
+    ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+        infra->pdev_server.GetInstanceHandler()));
+
+    ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+  });
+  ASSERT_NO_FATAL_FAILURE();
+  fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                               std::move(outgoing_endpoints->client), "pdev");
+
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kDeviceMetadata, sizeof(kDeviceMetadata));
   fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &kPanelId, sizeof(kPanelId));
 
