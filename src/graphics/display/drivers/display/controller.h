@@ -45,14 +45,20 @@ class ControllerTest;
 class DisplayConfig;
 class IntegrationTest;
 
-using ControllerParent = ddk::Device<Controller, ddk::Unbindable,
-                                     ddk::Messageable<fuchsia_hardware_display::Provider>::Mixin>;
-class Controller : public ControllerParent,
+using DeviceType = ddk::Device<Controller, ddk::Unbindable,
+                               ddk::Messageable<fuchsia_hardware_display::Provider>::Mixin>;
+
+// Multiplexes between display controller clients and display engine drivers.
+class Controller : public DeviceType,
                    public ddk::DisplayControllerInterfaceProtocol<Controller>,
                    public ddk::DisplayCaptureInterfaceProtocol<Controller>,
                    public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_CONTROLLER> {
  public:
   explicit Controller(zx_device_t* parent);
+
+  Controller(const Controller&) = delete;
+  Controller& operator=(const Controller&) = delete;
+
   ~Controller() override;
 
   static void PopulateDisplayMode(const edid::timing_params_t& params, display_mode_t* mode);

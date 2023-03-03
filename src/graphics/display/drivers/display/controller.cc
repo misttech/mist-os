@@ -963,7 +963,7 @@ void Controller::DdkRelease() {
 }
 
 Controller::Controller(zx_device_t* parent)
-    : ControllerParent(parent),
+    : DeviceType(parent),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
                 loop_.dispatcher()) {
