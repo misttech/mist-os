@@ -9,6 +9,7 @@
 #include <optional>
 
 #include "magma/magma_common_defs.h"
+#include "platform_trace.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 
 namespace {
@@ -236,6 +237,8 @@ void ZirconConnection::FlowControl(uint64_t size) {
 
 void ZirconConnection::ImportObject2(ImportObject2RequestView request,
                                      ImportObject2Completer::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::ImportObject2", "type",
+                 static_cast<uint32_t>(request->object_type));
   DLOG("ZirconConnection: ImportObject2");
 
   auto object_type = GetObjectType(request->object_type);
@@ -262,6 +265,8 @@ void ZirconConnection::ImportObject2(ImportObject2RequestView request,
 
 void ZirconConnection::ReleaseObject(ReleaseObjectRequestView request,
                                      ReleaseObjectCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::ReleaseObject", "type",
+                 static_cast<uint32_t>(request->object_type));
   DLOG("ZirconConnection: ReleaseObject");
   FlowControl();
 
@@ -277,6 +282,7 @@ void ZirconConnection::ReleaseObject(ReleaseObjectRequestView request,
 
 void ZirconConnection::CreateContext(CreateContextRequestView request,
                                      CreateContextCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::CreateContext");
   DLOG("ZirconConnection: CreateContext");
   FlowControl();
 
@@ -287,6 +293,7 @@ void ZirconConnection::CreateContext(CreateContextRequestView request,
 
 void ZirconConnection::DestroyContext(DestroyContextRequestView request,
                                       DestroyContextCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::DestroyContext");
   DLOG("ZirconConnection: DestroyContext");
   FlowControl();
 
@@ -297,6 +304,7 @@ void ZirconConnection::DestroyContext(DestroyContextRequestView request,
 
 void ZirconConnection::ExecuteCommand(ExecuteCommandRequestView request,
                                       ExecuteCommandCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::ExecuteCommand");
   FlowControl();
 
   // TODO(fxbug.dev/92606) - support > 1 command buffer
@@ -348,6 +356,7 @@ void ZirconConnection::ExecuteCommand(ExecuteCommandRequestView request,
 void ZirconConnection::ExecuteImmediateCommands(
     ExecuteImmediateCommandsRequestView request,
     ExecuteImmediateCommandsCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::ExecuteImmediateCommands");
   DLOG("ZirconConnection: ExecuteImmediateCommands");
   FlowControl();
 
@@ -359,12 +368,14 @@ void ZirconConnection::ExecuteImmediateCommands(
 }
 
 void ZirconConnection::Flush(FlushCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::Flush");
   DLOG("ZirconConnection: Flush");
   completer.Reply();
 }
 
 void ZirconConnection::MapBuffer(MapBufferRequestView request,
                                  MapBufferCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::MapBuffer");
   DLOG("ZirconConnection: MapBufferFIDL");
   FlowControl();
 
@@ -384,6 +395,7 @@ void ZirconConnection::MapBuffer(MapBufferRequestView request,
 
 void ZirconConnection::UnmapBuffer(UnmapBufferRequestView request,
                                    UnmapBufferCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::UnmapBuffer");
   DLOG("ZirconConnection: UnmapBufferFIDL");
   FlowControl();
 
@@ -399,6 +411,7 @@ void ZirconConnection::UnmapBuffer(UnmapBufferRequestView request,
 
 void ZirconConnection::BufferRangeOp2(BufferRangeOp2RequestView request,
                                       BufferRangeOp2Completer::Sync& completer) {
+  TRACE_DURATION("magma", "ZirconConnection::BufferRangeOp2");
   DLOG("ZirconConnection:::BufferRangeOp2");
   FlowControl();
 

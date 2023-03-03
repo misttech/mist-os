@@ -1116,6 +1116,7 @@ magma::Status MsdArmDevice::ProcessDumpStatusToLog() {
 }
 
 magma::Status MsdArmDevice::ProcessScheduleAtoms() {
+  TRACE_DURATION("magma", "MsdArmDevice::ProcessScheduleAtoms");
   std::vector<std::shared_ptr<MsdArmAtom>> atoms_to_schedule;
   {
     std::lock_guard<std::mutex> lock(schedule_mutex_);
@@ -1209,7 +1210,7 @@ void MsdArmDevice::ExecuteAtomOnDevice(MsdArmAtom* atom, mali::RegisterIo* regis
 void MsdArmDevice::RunAtom(MsdArmAtom* atom) { ExecuteAtomOnDevice(atom, register_io_.get()); }
 
 void MsdArmDevice::AtomCompleted(MsdArmAtom* atom, ArmMaliResultCode result) {
-  TRACE_DURATION("magma", "AtomCompleted", "address", atom->gpu_address());
+  TRACE_DURATION("magma", "AtomCompleted", "address", atom->gpu_address(), "flags", atom->flags());
   TRACE_FLOW_END("magma", "atom", atom->trace_nonce());
 
   DLOG("Completed job atom: 0x%lx", atom->gpu_address());
