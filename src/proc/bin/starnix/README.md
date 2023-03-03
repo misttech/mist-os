@@ -245,7 +245,7 @@ You can view Inspect data exposed by starnix using `ffx inspect`.
 To view the thread groups currently running, run:
 
 ```
-ffx inspect show core/starnix_manager/bionic:root/galaxy/kernel/thread_groups
+ffx inspect show core/starnix_manager/bionic:root/container/kernel/thread_groups
 ```
 
 You can also view the number of syscalls that have been executed (after enabling

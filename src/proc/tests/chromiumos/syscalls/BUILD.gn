@@ -123,9 +123,9 @@ starnix_linux_test_component("crash_test") {
 group("galaxy_resources") {
   if (target_cpu == "x64") {
     deps = [
-      "//src/proc/bin/galaxies:data_tmp_target",
-      "//src/proc/bin/galaxies:default_init",
-      "//src/proc/bin/galaxies/chromiumos:system_image",
+      "//src/proc/bin/containers:data_tmp_target",
+      "//src/proc/bin/containers:default_init",
+      "//src/proc/bin/containers/chromiumos:system_image",
     ]
   }
 }

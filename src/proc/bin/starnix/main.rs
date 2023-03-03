@@ -10,7 +10,7 @@
 #[macro_use]
 extern crate macro_rules_attribute;
 
-use crate::execution::create_galaxy;
+use crate::execution::create_container;
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_process_lifecycle as flifecycle;
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Error> {
         fuchsia_trace::Scope::Thread
     );
 
-    let galaxy = create_galaxy().await?;
+    let container = create_container().await?;
 
     if let Some(lifecycle) =
         fruntime::take_startup_handle(fruntime::HandleInfo::new(fruntime::HandleType::Lifecycle, 0))
@@ -78,9 +78,9 @@ async fn main() -> Result<(), Error> {
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(|stream| {
-        let galaxy = galaxy.clone();
+        let container = container.clone();
         fasync::Task::local(async move {
-            execution::serve_component_runner(stream, galaxy)
+            execution::serve_component_runner(stream, container)
                 .await
                 .expect("failed to start runner.")
         })
@@ -88,9 +88,9 @@ async fn main() -> Result<(), Error> {
     });
 
     fs.dir("svc").add_fidl_service(|stream| {
-        let galaxy = galaxy.clone();
+        let container = container.clone();
         fasync::Task::local(async move {
-            execution::serve_galaxy_controller(stream, galaxy)
+            execution::serve_container_controller(stream, container)
                 .await
                 .expect("failed to start manager.")
         })
@@ -98,14 +98,14 @@ async fn main() -> Result<(), Error> {
     });
 
     fs.dir("svc").add_fidl_service(|stream| {
-        let galaxy = galaxy.clone();
+        let container = container.clone();
         fasync::Task::local(async move {
-            execution::serve_dev_binder(stream, galaxy).await.expect("failed to start manager.")
+            execution::serve_dev_binder(stream, container).await.expect("failed to start manager.")
         })
         .detach();
     });
 
-    fs.add_remote("linux_root", execution::expose_root(&galaxy)?);
+    fs.add_remote("linux_root", execution::expose_root(&container)?);
 
     inspect_runtime::serve(fuchsia_inspect::component::inspector(), &mut fs)?;
 

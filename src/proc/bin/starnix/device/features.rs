@@ -10,7 +10,7 @@ use crate::types::*;
 
 /// Parses and runs the features from the provided "program strvec". Some features,
 /// such as Wayland, should be enabled on a per-component basis. We run this when we first
-/// make the Galaxy. When we start the component, we run the run_component_features
+/// make the container. When we start the component, we run the run_component_features
 /// function.
 pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result<(), Errno> {
     for entry in entries {

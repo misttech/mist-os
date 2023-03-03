@@ -10,7 +10,7 @@
         init_user: "root:x:0:0",
         kernel_cmdline: "",
         mounts: [ "/:remotefs" ],
-        name: "empty_galaxy",
+        name: "empty_container",
         startup_file_path: "",
     },
     capabilities: [

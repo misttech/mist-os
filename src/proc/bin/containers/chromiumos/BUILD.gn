@@ -23,8 +23,8 @@ fuchsia_package_with_single_component("chromiumos_package") {
   if (target_cpu == "x64") {
     deps = [
       ":system_image",
-      "//src/proc/bin/galaxies:data_tmp_target",
-      "//src/proc/bin/galaxies:default_init",
+      "//src/proc/bin/containers:data_tmp_target",
+      "//src/proc/bin/containers:default_init",
     ]
   }
 }

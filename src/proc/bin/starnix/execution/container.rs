@@ -7,7 +7,7 @@ use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_binder as fbinder;
-use fidl_fuchsia_starnix_galaxy as fstargalaxy;
+use fidl_fuchsia_starnix_galaxy as fstarcontainer;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
 use fuchsia_component::server::ServiceFs;
@@ -34,20 +34,20 @@ use crate::task::*;
 use crate::types::*;
 use fidl::HandleBased;
 
-/// A temporary wrapper struct that contains both a `Config` for the galaxy, as well as optional
-/// handles for the galaxy's component controller and `/pkg` directory.
+/// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
+/// handles for the container's component controller and `/pkg` directory.
 ///
 /// When using structured_config, the `component_controller` handle will not be set. When all
-/// galaxies are run as components, by starnix_manager, the `component_controller` will always
+/// containers are run as components, by starnix_manager, the `component_controller` will always
 /// exist.
 struct ConfigWrapper {
     config: Config,
 
-    /// The `/pkg` directory of the galaxy.
+    /// The `/pkg` directory of the container.
     pkg_dir: Option<zx::Channel>,
 
-    /// The outgoing directory of the galaxy, used to serve protocols on behalf of the galaxy.
-    /// For example, the starnix_kernel serves a component runner in the galaxies outgoing
+    /// The outgoing directory of the container, used to serve protocols on behalf of the container.
+    /// For example, the starnix_kernel serves a component runner in the containers' outgoing
     /// directory.
     #[allow(dead_code)]
     outgoing_dir: Option<zx::Channel>,
@@ -60,7 +60,7 @@ impl std::ops::Deref for ConfigWrapper {
     }
 }
 
-/// Returns the configuration object for the galaxy being run by this `starnix_kernel`.
+/// Returns the configuration object for the container being run by this `starnix_kernel`.
 fn get_config() -> ConfigWrapper {
     if let Ok(config_bytes) = std::fs::read("/galaxy_config/config") {
         let program_dict: fdata::Dictionary = fidl::encoding::unpersist(&config_bytes)
@@ -134,31 +134,31 @@ fn to_cstr(str: &str) -> CString {
     CString::new(str.to_string()).unwrap()
 }
 
-pub struct Galaxy {
-    /// The `Kernel` object that is associated with the galaxy.
+pub struct Container {
+    /// The `Kernel` object that is associated with the container.
     pub kernel: Arc<Kernel>,
 
-    /// The root filesystem context for the galaxy.
+    /// The root filesystem context for the container.
     pub root_fs: Arc<FsContext>,
 
     /// The system task to execute action as the system.
     pub system_task: Arc<CurrentTask>,
 
-    /// Inspect node holding information about the state of the galaxy.
+    /// Inspect node holding information about the state of the container.
     _node: inspect::Node,
 }
 
-/// The services that are exposed in the galaxy component's outgoing directory.
+/// The services that are exposed in the container component's outgoing directory.
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     Binder(fbinder::DevBinderRequestStream),
-    Galaxy(fstargalaxy::ControllerRequestStream),
+    Container(fstarcontainer::ControllerRequestStream),
 }
 
-/// Creates a new galaxy.
-pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
-    fuchsia_trace::duration!(trace_category_starnix!(), trace_name_create_galaxy!());
-    const DEFAULT_INIT: &str = "/galaxy/init";
+/// Creates a new container.
+pub async fn create_container() -> Result<Arc<Container>, Error> {
+    fuchsia_trace::duration!(trace_category_starnix!(), trace_name_create_container!());
+    const DEFAULT_INIT: &str = "/container/init";
     let mut config = get_config();
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
@@ -166,8 +166,8 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
     let kernel =
         Kernel::new(config.name.as_bytes(), config.kernel_cmdline.as_bytes(), &config.features)?;
 
-    let node = inspect::component::inspector().root().create_child("galaxy");
-    create_galaxy_inspect(kernel.clone(), &node);
+    let node = inspect::component::inspector().root().create_child("container");
+    create_container_inspect(kernel.clone(), &node);
 
     let mut init_task = create_init_task(&kernel, &config)?;
     let fs_context = create_fs_context(&init_task, &config, &pkg_dir_proxy)?;
@@ -214,29 +214,30 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
         wait_for_init_file(&startup_file_path, &system_task).await?;
     };
 
-    let galaxy = Arc::new(Galaxy { kernel, root_fs, system_task, _node: node });
+    let container = Arc::new(Container { kernel, root_fs, system_task, _node: node });
 
     let serve_binder = config.features.contains(&"binder".to_string());
     if let Some(outgoing_dir_channel) = config.outgoing_dir.take() {
-        let galaxy_clone = galaxy.clone();
-        // Add `ComponentRunner` to the exposed services of the galaxy, and then serve the
+        let container_clone = container.clone();
+        // Add `ComponentRunner` to the exposed services of the container, and then serve the
         // outgoing directory.
         let mut outgoing_directory = ServiceFs::new_local();
         outgoing_directory.dir("svc").add_fidl_service(ExposedServices::ComponentRunner);
         outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Binder);
-        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Galaxy);
+        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::Container);
         outgoing_directory
             .serve_connection(outgoing_dir_channel.into())
             .map_err(|_| errno!(EINVAL))?;
 
         fasync::Task::local(async move {
-            let galaxy_clone = galaxy_clone.clone();
+            let container_clone = container_clone.clone();
             while let Some(request_stream) = outgoing_directory.next().await {
-                let galaxy_clone = galaxy_clone.clone();
+                let container_clone = container_clone.clone();
                 match request_stream {
                     ExposedServices::ComponentRunner(request_stream) => {
                         fasync::Task::local(async move {
-                            match serve_component_runner(request_stream, galaxy_clone.clone()).await
+                            match serve_component_runner(request_stream, container_clone.clone())
+                                .await
                             {
                                 Ok(_) => {}
                                 Err(e) => {
@@ -249,16 +250,16 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
                     ExposedServices::Binder(request_stream) => {
                         if serve_binder {
                             fasync::Task::local(async move {
-                                serve_dev_binder(request_stream, galaxy_clone.clone())
+                                serve_dev_binder(request_stream, container_clone.clone())
                                     .await
                                     .expect("failed to start binder.")
                             })
                             .detach();
                         }
                     }
-                    ExposedServices::Galaxy(request_stream) => {
+                    ExposedServices::Container(request_stream) => {
                         fasync::Task::local(async move {
-                            serve_galaxy_controller(request_stream, galaxy_clone.clone())
+                            serve_container_controller(request_stream, container_clone.clone())
                                 .await
                                 .expect("failed to start manager.")
                         })
@@ -270,7 +271,7 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
         .detach();
     }
 
-    Ok(galaxy)
+    Ok(container)
 }
 
 fn create_fs_context(
@@ -296,19 +297,22 @@ fn create_fs_context(
         anyhow::bail!("how did a bind mount manage to get created as the root?")
     };
 
-    // Create a layered fs to handle /galaxy and /galaxy/pkg
-    // /galaxy will mount the galaxy pkg
-    // /galaxy/pkg will be a tmpfs where component using the starnix kernel will have their package
+    // Create a layered fs to handle /container and /container/pkg
+    // /container will mount the container pkg
+    // /container/pkg will be a tmpfs where component using the starnix kernel will have their package
     // mounted.
     let kernel = task.kernel();
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let galaxy_fs = LayeredFs::new_fs(
+    let container_fs = LayeredFs::new_fs(
         kernel,
         create_remotefs_filesystem(kernel, pkg_dir_proxy, rights, "data")?,
         BTreeMap::from([(b"pkg".to_vec(), TmpFs::new_fs(kernel))]),
     );
-    let mut mappings =
-        vec![(b"galaxy".to_vec(), galaxy_fs), (b"data".to_vec(), TmpFs::new_fs(kernel))];
+    let mut mappings = vec![
+        (b"container".to_vec(), container_fs.clone()),
+        (b"galaxy".to_vec(), container_fs),
+        (b"data".to_vec(), TmpFs::new_fs(kernel)),
+    ];
     if config.features.contains(&"custom_artifacts".to_string()) {
         mappings.push((b"custom_artifacts".to_vec(), TmpFs::new_fs(kernel)));
     }
@@ -390,7 +394,7 @@ async fn wait_for_init_file(
 }
 
 /// Creates a lazy node that will contain the Kernel thread groups state.
-fn create_galaxy_inspect(kernel: Arc<Kernel>, parent: &inspect::Node) {
+fn create_container_inspect(kernel: Arc<Kernel>, parent: &inspect::Node) {
     parent.record_lazy_child("kernel", move || {
         let inspector = inspect::Inspector::default();
         let thread_groups = inspector.root().create_child("thread_groups");

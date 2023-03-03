@@ -5,12 +5,12 @@
 import("//build/components.gni")
 import("//src/proc/bin/starnix/starnix.gni")
 
-fuchsia_package_with_single_component("empty_galaxy") {
-  manifest = "meta/empty_galaxy.cml"
+fuchsia_package_with_single_component("empty_container") {
+  manifest = "meta/empty_container.cml"
   package_name = "starless"
-  component_name = "empty_galaxy"
+  component_name = "empty_container"
 
   if (target_cpu == "x64") {
-    deps = [ "//src/proc/bin/galaxies:default_init" ]
+    deps = [ "//src/proc/bin/containers:default_init" ]
   }
 }

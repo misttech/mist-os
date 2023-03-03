@@ -14,8 +14,8 @@ fuchsia_trace::string_name_macro!(trace_name_user_space, "UserSpace");
 // The name used to track the duration of a syscall.
 fuchsia_trace::string_name_macro!(trace_name_execute_syscall, "ExecuteSyscall");
 
-// The name used to track the duration of creating a galaxy.
-fuchsia_trace::string_name_macro!(trace_name_create_galaxy, "CreateGalaxy");
+// The name used to track the duration of creating a container.
+fuchsia_trace::string_name_macro!(trace_name_create_container, "CreateContainer");
 
 // The name used to track the start time of the starnix kernel.
 fuchsia_trace::string_name_macro!(trace_name_start_kernel, "StartKernel");

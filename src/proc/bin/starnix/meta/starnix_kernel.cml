@@ -90,7 +90,7 @@
             max_count: 100,
         },
 
-        // The features to run in the galaxy (e.g., wayland support).
+        // The features to run in the container (e.g., wayland support).
         features: {
             type: "vector",
             element: {
@@ -122,7 +122,7 @@
             max_size: 256,
         },
 
-        //  The filesystems that get mounted when the galaxy is created.
+        //  The filesystems that get mounted when the container is created.
         mounts: {
             type: "vector",
             element: {
@@ -132,7 +132,7 @@
             max_count: 100,
         },
 
-        // The name of the galaxy.
+        // The name of the container.
         name: {
             type: "string",
             max_size: 256,

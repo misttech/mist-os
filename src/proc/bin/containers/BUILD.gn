@@ -5,12 +5,12 @@
 import("//build/components.gni")
 import("//src/proc/bin/starnix/starnix.gni")
 
-group("galaxies") {
+group("containers") {
   if (target_cpu == "x64" && !is_asan) {
     deps = [
       "bionic",
       "chromiumos",
-      "empty_galaxy",
+      "empty_container",
     ]
   }
 }
@@ -20,27 +20,28 @@ group("release") {
     deps = [
       "bionic",
       "chromiumos",
-      "empty_galaxy",
+      "empty_container",
     ]
   }
 }
 
 group("tests") {
   if (target_cpu == "x64" && !is_asan) {
-    deps = [ "empty_galaxy" ]
+    deps = [ "empty_container" ]
   }
 }
 
 if (target_cpu == "x64") {
   # This target creates a placeholder in data/tmp, allowing the tests to mount things there.
   resource("data_tmp_target") {
-    sources = [ "//src/proc/bin/galaxies/placeholder" ]
+    sources = [ "//src/proc/bin/containers/placeholder" ]
     outputs = [ "data/tmp/.placeholder" ]
   }
 
   # The default init executable. Used if the starnix kernel configuration has no init.
   resource("default_init") {
-    init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
+    init_label =
+        "//src/proc/bin/containers/default_init($target_linux_toolchain)"
     out_dir = get_label_info(init_label, "root_out_dir")
     sources = [ "${out_dir}/default_init" ]
     outputs = [ "data/init" ]

@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use crate::auth::{Credentials, FsCred};
 use crate::execution::{
-    create_filesystem_from_spec, create_remotefs_filesystem, execute_task, galaxy::Galaxy,
+    container::Container, create_filesystem_from_spec, create_remotefs_filesystem, execute_task,
     get_pkg_hash, parse_numbered_handles,
 };
 use crate::fs::*;
@@ -23,9 +23,9 @@ use crate::logging::{log_error, log_info};
 use crate::task::*;
 use crate::types::*;
 
-/// Starts a component in an isolated environment, called a "galaxy".
+/// Starts a component in an isolated environment, called a "container".
 ///
-/// The galaxy will be configured according to a configuration file in the Starnix kernel's package.
+/// The container will be configured according to a configuration file in the Starnix kernel's package.
 /// The configuration file specifies, for example, which binary to run as "init", whether or not the
 /// system should wait for the existence of a given file path to run the component, etc.
 ///
@@ -33,13 +33,13 @@ use crate::types::*;
 ///
 /// The component's `binary` can either:
 ///   - an absolute path, in which case the path is treated as a path into the root filesystem that
-///     is mounted by the galaxy's configuration
+///     is mounted by the container's configuration
 ///   - relative path, in which case the binary is read from the component's package (which is
-///     mounted at /galaxy/pkg/{HASH}.)
+///     mounted at /container/pkg/{HASH}.)
 pub async fn start_component(
     mut start_info: ComponentStartInfo,
     controller: ServerEnd<ComponentControllerMarker>,
-    galaxy: Arc<Galaxy>,
+    container: Arc<Container>,
 ) -> Result<(), Error> {
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
     log_info!(
@@ -60,7 +60,7 @@ pub async fn start_component(
             .into_channel(),
     );
     // Mount the package directory.
-    let pkg_directory = mount_component_pkg_data(&galaxy, &pkg)?;
+    let pkg_directory = mount_component_pkg_data(&container, &pkg)?;
     let resolve_template = |value: &str| value.replace("{pkg_path}", &pkg_directory);
 
     if let Some(directory) = ns
@@ -69,7 +69,7 @@ pub async fn start_component(
         .and_then(|entry| entry.directory.take())
     {
         let custom_artifacts = fio::DirectorySynchronousProxy::new(directory.into_channel());
-        mount_custom_artifacts(&galaxy, &custom_artifacts)?;
+        mount_custom_artifacts(&container, &custom_artifacts)?;
     }
 
     // Mount `/test_data`, used for gtest output files.
@@ -79,7 +79,7 @@ pub async fn start_component(
         .and_then(|entry| entry.directory.take())
     {
         let test_data = fio::DirectorySynchronousProxy::new(directory.into_channel());
-        mount_test_data(&galaxy, &test_data)?;
+        mount_test_data(&container, &test_data)?;
     }
 
     let args = get_program_strvec(&start_info, "args")
@@ -104,7 +104,7 @@ pub async fn start_component(
         .ok_or_else(|| anyhow!("Missing \"binary\" in manifest"))?;
     let binary_path = CString::new(binary_path.to_owned())?;
 
-    let mut current_task = Task::create_init_child_process(&galaxy.kernel, &binary_path)?;
+    let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
 
     let cwd = current_task
         .lookup_path(
@@ -165,20 +165,20 @@ pub async fn start_component(
 }
 
 /// Attempts to mount the component's package directory in a content addressed directory in the
-/// galaxy's filesystem. This allows components to bundle their own binary in their package,
-/// instead of relying on it existing in the system image of the galaxy.
+/// container's filesystem. This allows components to bundle their own binary in their package,
+/// instead of relying on it existing in the system image of the container.
 fn mount_component_pkg_data(
-    galaxy: &Galaxy,
+    container: &Container,
     pkg: &fio::DirectorySynchronousProxy,
 ) -> Result<String, Error> {
-    const COMPONENT_PKG_ROOT_DIRECTORY: &str = "/galaxy/pkg/";
+    const COMPONENT_PKG_ROOT_DIRECTORY: &str = "/container/pkg/";
 
     // Read the package content file and hash it as the name of the mount.
     let hash = get_pkg_hash(pkg)?;
     let pkg_path = COMPONENT_PKG_ROOT_DIRECTORY.to_owned() + &hash;
 
     // If the directory already exist, return it.
-    match galaxy.system_task.lookup_path_from_root(pkg_path.as_bytes()) {
+    match container.system_task.lookup_path_from_root(pkg_path.as_bytes()) {
         Ok(_) => {
             return Ok(pkg_path);
         }
@@ -191,52 +191,52 @@ fn mount_component_pkg_data(
     // Create the new directory.
     let mount_point = {
         let pkg_dir =
-            galaxy.system_task.lookup_path_from_root(COMPONENT_PKG_ROOT_DIRECTORY.as_bytes())?;
+            container.system_task.lookup_path_from_root(COMPONENT_PKG_ROOT_DIRECTORY.as_bytes())?;
         pkg_dir.entry.create_node(
-            &galaxy.system_task,
+            &container.system_task,
             hash.as_bytes(),
             mode!(IFDIR, 0o755),
             DeviceType::NONE,
             FsCred::root(),
         )?;
-        galaxy.system_task.lookup_path_from_root(pkg_path.as_bytes())?
+        container.system_task.lookup_path_from_root(pkg_path.as_bytes())?
     };
 
     // Create the filesystem and mount it.
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let fs = create_remotefs_filesystem(&galaxy.kernel, pkg, rights, ".")?;
+    let fs = create_remotefs_filesystem(&container.kernel, pkg, rights, ".")?;
     mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
     Ok(pkg_path)
 }
 
 fn mount_custom_artifacts(
-    galaxy: &Galaxy,
+    container: &Container,
     custom_artifacts: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error> {
     const PATH: &str = "/custom_artifacts";
 
     // Create the new directory.
-    let mount_point = galaxy.system_task.lookup_path_from_root(PATH.as_bytes())?;
+    let mount_point = container.system_task.lookup_path_from_root(PATH.as_bytes())?;
 
     // Create the filesystem and mount it.
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-    let fs = create_remotefs_filesystem(&galaxy.kernel, custom_artifacts, rights, ".")?;
+    let fs = create_remotefs_filesystem(&container.kernel, custom_artifacts, rights, ".")?;
     mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
     Ok(())
 }
 
 fn mount_test_data(
-    galaxy: &Galaxy,
+    container: &Container,
     test_data: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error> {
     const PATH: &str = "/test_data";
 
     // Create the new directory.
-    let mount_point = galaxy.system_task.lookup_path_from_root(PATH.as_bytes())?;
+    let mount_point = container.system_task.lookup_path_from_root(PATH.as_bytes())?;
 
     // Create the filesystem and mount it.
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-    let fs = create_remotefs_filesystem(&galaxy.kernel, test_data, rights, ".")?;
+    let fs = create_remotefs_filesystem(&container.kernel, test_data, rights, ".")?;
     mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
     Ok(())
 }

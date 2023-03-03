@@ -110,9 +110,9 @@ int stack_test_func(void* a) {
 // Returns the full path to the syscall_test_exec_child binary. This is in a directory named
 // according to the hash of the package which is inconvenient. Returns empty string on failure.
 //
-// The location is /galaxy/pkg/<hash>/data/tests/syscall_test_exec_child
+// The location is /container/pkg/<hash>/data/tests/syscall_test_exec_child
 std::string GetTestExecChildBinary() {
-  const char kPkgDir[] = "/galaxy/pkg";
+  const char kPkgDir[] = "/container/pkg";
   const char kInPackage[] = "/data/tests/syscall_test_exec_child";
 
   std::vector<std::string> subs;

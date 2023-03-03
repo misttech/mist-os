@@ -64,18 +64,18 @@ pub struct Kernel {
     /// The registry of device drivers.
     pub device_registry: RwLock<DeviceRegistry>,
 
-    // The features enabled for the galaxy this kernel is associated with, as specified in
-    // the galaxy's configuration file.
+    // The features enabled for the container this kernel is associated with, as specified in
+    // the container's configuration file.
     pub features: HashSet<String>,
 
-    /// A `Framebuffer` that can be used to display a view in the workstation UI. If the galaxy
+    /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
     /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
     ///
-    /// When a component is run in that galaxy and also specifies the `framebuffer` feature, the
+    /// When a component is run in that container and also specifies the `framebuffer` feature, the
     /// framebuffer will be served as the view of the component.
     pub framebuffer: Arc<Framebuffer>,
 
-    /// The binder driver registered for this galaxy, indexed by their device type.
+    /// The binder driver registered for this container, indexed by their device type.
     pub binders: RwLock<BTreeMap<DeviceType, Arc<BinderDriver>>>,
 
     /// The iptables used for filtering network packets.

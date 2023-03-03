@@ -24,8 +24,8 @@
             environment: "#galaxy-env",
         },
         {
-            name: "empty_galaxy",
-            url: "fuchsia-pkg://fuchsia.com/starless#meta/empty_galaxy.cm",
+            name: "empty_container",
+            url: "fuchsia-pkg://fuchsia.com/starless#meta/empty_container.cm",
             environment: "#galaxy-env",
         },
     ],
@@ -79,8 +79,8 @@
         },
         {
             protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#empty_galaxy",
-            path: "/empty_galaxy/fuchsia.starnix.galaxy.Controller",
+            from: "#empty_container",
+            path: "/empty_container/fuchsia.starnix.galaxy.Controller",
             dependency: "weak",
         },
         {
@@ -101,7 +101,7 @@
             ],
             from: "parent",
             to: [
-                "#empty_galaxy",
+                "#empty_container",
                 "#kernels",
                 "#stardroid",
             ],
@@ -150,7 +150,7 @@
         },
         {
             runner: "starnix",
-            from: "#empty_galaxy",
+            from: "#empty_container",
             as: "starnix_empty",
         },
         {
@@ -184,7 +184,7 @@
                 },
                 {
                     runner: "starnix",
-                    from: "#empty_galaxy",
+                    from: "#empty_container",
                     as: "starnix_empty",
                 },
                 {

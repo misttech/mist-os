@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 mod component_runner;
+mod container;
 mod exception_executor;
-mod galaxy;
 mod restricted_executor;
 mod serve_protocols;
 mod shared;
 
 pub use component_runner::*;
+pub use container::*;
 #[cfg(not(feature = "restricted_mode"))]
 pub use exception_executor::*;
-pub use galaxy::*;
 #[cfg(feature = "restricted_mode")]
 pub use restricted_executor::*;
 pub use serve_protocols::*;

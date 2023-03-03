@@ -265,7 +265,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
 
   # This target creates a placeholder in data/tmp, allowing the tests to mount things there.
   resource("data_tmp_target") {
-    sources = [ "//src/proc/bin/galaxies/placeholder" ]
+    sources = [ "//src/proc/bin/containers/placeholder" ]
     outputs = [ "data/tmp/.placeholder" ]
   }
 
@@ -274,7 +274,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
       deps = [
         ":data_tmp_target",
         ":system_image",
-        "//src/proc/bin/galaxies:default_init",
+        "//src/proc/bin/containers:default_init",
       ]
     }
   }

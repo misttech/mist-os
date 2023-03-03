@@ -288,10 +288,10 @@ group("galaxy_resources") {
     deps = [
       ":gvisor_runfiles",
       "//src/connectivity/network/netstack:component",
-      "//src/proc/bin/galaxies:data_tmp_target",
-      "//src/proc/bin/galaxies:default_init",
-      "//src/proc/bin/galaxies/bionic:system_image",
-      "//src/proc/bin/galaxies/bionic:testcases_image",
+      "//src/proc/bin/containers:data_tmp_target",
+      "//src/proc/bin/containers:default_init",
+      "//src/proc/bin/containers/bionic:system_image",
+      "//src/proc/bin/containers/bionic:testcases_image",
     ]
   }
 }
