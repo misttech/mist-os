@@ -429,7 +429,7 @@ func TestGenArgs(t *testing.T) {
 				`base_package_labels+=["//b"]`,
 				`cache_package_labels+=["//c"]`,
 				`universe_package_labels+=["//u1","//u2"]`,
-				`host_labels+=["//src:host-tests"]`,
+				`host_labels=["//src:host-tests"]`,
 			},
 		},
 		{

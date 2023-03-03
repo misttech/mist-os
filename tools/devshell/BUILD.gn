@@ -9,6 +9,13 @@ if (!is_host) {
     deps = []
   }
 } else {
+  # Host tools required by fx commands.
+  #
+  # Generally, an fx command that depends on a host tool should compile that
+  # tool on-the-fly. However, this incurs a significant slowdown due to the
+  # latency of starting up ninja. Therefore, host tools called by commonly-used
+  # and latency-sensitive fx commands may be included here so they're latently
+  # available and get automatically rebuilt by every `fx build`.
   group("fx") {
     deps = [
       "//src/developer/ffx:host",
@@ -39,6 +46,9 @@ if (!is_host) {
       # For compiled dart commands.
       "//scripts/fxtest:fxtest",
       "//scripts/status:status",
+
+      # For `fx bindc`.
+      "//tools/bindc:host",
     ]
   }
 }

@@ -1427,6 +1427,14 @@ group("host") {
     # Tools added by the developer
     ":developer_host_tools",
   ]
+
+  if (has_board) {
+    # This indicates that we're building a product, rather than the SDK. In
+    # this case it is likely useful to have fx tools pre-compiled for testing as
+    # an optimization. That way fx commands can assume the executables exist
+    # instead of running ninja, which is costly even if it's a no-op.
+    public_deps += [ "//tools/devshell:fx($host_toolchain)" ]
+  }
 }
 
 # WARNING: Known to infrastructure

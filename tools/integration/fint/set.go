@@ -322,7 +322,6 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		"base_package_labels":     staticSpec.BasePackages,
 		"cache_package_labels":    staticSpec.CachePackages,
 		"universe_package_labels": staticSpec.UniversePackages,
-		"host_labels":             staticSpec.HostLabels,
 	} {
 		// If product is set, append to the corresponding list variable instead
 		// of overwriting it to avoid overwriting any packages set in the
@@ -333,6 +332,10 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 			appends[varName] = values
 		}
 	}
+
+	// host_labels are not initialized in product files, so should always be
+	// initialized here instead of appended to.
+	vars["host_labels"] = staticSpec.HostLabels
 
 	if len(staticSpec.Variants) != 0 {
 		vars["select_variant"] = staticSpec.Variants
@@ -366,7 +369,11 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 
 	var importArgs, varArgs, appendArgs, localArgs []string
 
-	// add comments
+	// Add comments to make args.gn more readable.
+	//
+	// TODO(olivernewman): target list are sometimes included in `varArgs`
+	// rather than `appendArgs`. Fix this logic to stop conflating appended vars
+	// with target lists.
 	varArgs = append(varArgs, "\n\n# Basic args:")
 	appendArgs = append(appendArgs, "\n\n# Target lists:")
 
