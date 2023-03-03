@@ -542,10 +542,10 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                 count += 1  # Ensure device is really offline not just a blip
             else:
                 count = 0
-            if count == 3:
+            if count == 2:
                 _LOGGER.info("%s is offline.", self.name)
                 break
-            time.sleep(1)
+            time.sleep(.5)
         else:
             raise errors.FuchsiaDeviceError(
                 f"'{self.name}' failed to go offline in {timeout}sec.")

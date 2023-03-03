@@ -13,8 +13,8 @@ from typing import Optional
 _LOGGER = logging.getLogger(__name__)
 
 _DEFAULT_PING_PARAMS = {
-    "TIMEOUT": 5,
-    "PACKET_COUNT": 3,
+    "TIMEOUT": 2,
+    "PACKET_COUNT": 1,
 }
 _PING_CMD = {4: "ping", 6: "ping6"}
 
