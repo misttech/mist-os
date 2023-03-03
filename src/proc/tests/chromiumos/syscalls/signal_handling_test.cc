@@ -117,4 +117,45 @@ TEST(SignalHandling, UseMainStackOnSigaltstackOverflow) {
   EXPECT_EQ(kHandlerOnMainStack, WEXITSTATUS(status));
 }
 
+TEST(SignalHandlingDeathTest, ExitsKilledBySignal) {
+  std::vector<int> term_signals = {SIGABRT, SIGALRM, SIGBUS,  SIGFPE,  SIGHUP,  SIGILL,
+                                   SIGINT,  SIGPIPE, SIGPOLL, SIGPROF, SIGQUIT, SIGSEGV,
+                                   SIGSYS,  SIGTERM, SIGTRAP, SIGUSR1, SIGUSR2};
+
+  for (const auto signal : term_signals) {
+    EXPECT_EXIT(
+        [signal]() {
+          // Reset the action for this signal, the default should cause the
+          // program to terminate.
+          struct sigaction sa = {};
+          sa.sa_handler = SIG_DFL;
+          if (sigaction(signal, &sa, NULL)) {
+            perror("sigaction");
+            exit(EXIT_FAILURE);
+          }
+          raise(signal);
+        }(),
+        testing::KilledBySignal(signal), "");
+  }
+
+  // SIGKILL cannot be handled, so sigaction would fail.
+  EXPECT_EXIT([]() { raise(SIGKILL); }(), testing::KilledBySignal(SIGKILL), "");
+
+  // Generate signals by causing architectural exceptions.
+  EXPECT_EXIT([]() { __builtin_trap(); }(), testing::KilledBySignal(SIGILL), "");
+  EXPECT_EXIT([]() { __builtin_debugtrap(); }(), testing::KilledBySignal(SIGTRAP), "");
+
+  EXPECT_EXIT(
+      []() {
+        // Write to a non-writable memory address to cause a SIGSEGV.
+        void *res = mmap(NULL, 0x1000, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+        if (res == MAP_FAILED) {
+          exit(EXIT_FAILURE);
+        }
+        volatile uint8_t *buf = reinterpret_cast<volatile uint8_t *>(res);
+        buf[0] = 0x1;  // Page Fault.
+      }(),
+      testing::KilledBySignal(SIGSEGV), "");
+}
+
 }  // namespace
