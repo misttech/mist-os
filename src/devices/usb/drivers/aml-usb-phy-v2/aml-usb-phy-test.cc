@@ -6,6 +6,9 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -69,6 +72,11 @@ class FakeMmio {
   uint64_t reg_values_[kRegisterCount] = {};
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 // Fixture that supports tests of AmlUsbPhy::Create.
 class AmlUsbPhyTest : public zxtest::Test {
  public:
@@ -79,11 +87,27 @@ class AmlUsbPhyTest : public zxtest::Test {
     loop_.StartThread("aml-usb-phy-test-thread");
     registers_device_ = std::make_unique<mock_registers::MockRegistersDevice>(loop_.dispatcher());
 
-    irq_ = pdev_.CreateVirtualInterrupt(0);
-    pdev_.set_mmio(0, mmio_[0].mmio_info());
-    pdev_.set_mmio(1, mmio_[1].mmio_info());
-    pdev_.set_mmio(2, mmio_[2].mmio_info());
-    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
+    fake_pdev::FakePDevFidl::Config config;
+    config.irqs[0] = {};
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    irq_ = config.irqs[0].borrow();
+    config.mmios[0] = mmio_[0].mmio_info();
+    config.mmios[1] = mmio_[1].mmio_info();
+    config.mmios[2] = mmio_[2].mmio_info();
+    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(outgoing_endpoints);
+    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
+                           IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          infra->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
+                          std::move(outgoing_endpoints->client), "pdev");
+
     root_->AddProtocol(ZX_PROTOCOL_REGISTERS, registers_device_->proto()->ops,
                        registers_device_->proto()->ctx, "register-reset");
 
@@ -108,10 +132,9 @@ class AmlUsbPhyTest : public zxtest::Test {
   }
 
   mock_registers::MockRegisters* registers() { return registers_device_->fidl_service(); }
-  void TriggerInterrupt(AmlUsbPhy::UsbMode mode) {
-    ddk::PDev client(pdev_.proto());
+  void TriggerInterrupt(ddk::PDevFidl& pdev, AmlUsbPhy::UsbMode mode) {
     std::optional<fdf::MmioBuffer> usbctrl_mmio;
-    ASSERT_OK(client.MapMmio(0, &usbctrl_mmio));
+    ASSERT_OK(pdev.MapMmio(0, &usbctrl_mmio));
 
     // Switch to appropriate mode. This will be read by the irq thread.
     USB_R5_V2::Get()
@@ -128,7 +151,9 @@ class AmlUsbPhyTest : public zxtest::Test {
  private:
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   FakeMmio mmio_[kRegisterBanks];
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
   zx::unowned_interrupt irq_;
   std::unique_ptr<mock_registers::MockRegistersDevice> registers_device_;
 };
@@ -151,7 +176,7 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   ASSERT_EQ(phy->mode(), AmlUsbPhy::UsbMode::HOST);
 
   // Trigger interrupt, and switch to Peripheral mode.
-  TriggerInterrupt(AmlUsbPhy::UsbMode::PERIPHERAL);
+  TriggerInterrupt(phy->pdev(), AmlUsbPhy::UsbMode::PERIPHERAL);
   mock_xhci->WaitUntilAsyncRemoveCalled();
   EXPECT_TRUE(mock_xhci->AsyncRemoveCalled());
   mock_ddk::ReleaseFlaggedDevices(root_.get());
@@ -164,7 +189,7 @@ TEST_F(AmlUsbPhyTest, SetMode) {
   ASSERT_EQ(phy->mode(), AmlUsbPhy::UsbMode::PERIPHERAL);
 
   // Trigger interrupt, and switch (back) to Host mode.
-  TriggerInterrupt(AmlUsbPhy::UsbMode::HOST);
+  TriggerInterrupt(phy->pdev(), AmlUsbPhy::UsbMode::HOST);
   mock_dwc2->WaitUntilAsyncRemoveCalled();
   EXPECT_TRUE(mock_dwc2->AsyncRemoveCalled());
   mock_ddk::ReleaseFlaggedDevices(root_.get());
@@ -180,8 +205,8 @@ TEST_F(AmlUsbPhyTest, SetMode) {
 
 }  // namespace aml_usb_phy
 
-zx_status_t ddk::PDev::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
-                               uint32_t cache_policy) {
+zx_status_t ddk::PDevFidl::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
+                                   uint32_t cache_policy) {
   pdev_mmio_t pdev_mmio;
   zx_status_t status = GetMmio(index, &pdev_mmio);
   if (status != ZX_OK) {

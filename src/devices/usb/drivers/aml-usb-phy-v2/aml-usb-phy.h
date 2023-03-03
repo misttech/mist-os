@@ -54,6 +54,7 @@ class AmlUsbPhy : public AmlUsbPhyType, public ddk::UsbPhyProtocol<AmlUsbPhy, dd
     fbl::AutoLock lock(&lock_);
     return phy_mode_;
   }
+  ddk::PDevFidl& pdev() { return pdev_; }
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(AmlUsbPhy);
@@ -74,7 +75,7 @@ class AmlUsbPhy : public AmlUsbPhyType, public ddk::UsbPhyProtocol<AmlUsbPhy, dd
   zx_status_t Init();
   int IrqThread();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy20_mmio_;

@@ -390,7 +390,7 @@ void AmlUsbPhy::RemoveDwc2Device(SetModeCompletion completion) {
 
 zx_status_t AmlUsbPhy::Init() {
   zx_status_t status = ZX_OK;
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "AmlUsbPhy::Init: could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;
@@ -427,28 +427,34 @@ zx_status_t AmlUsbPhy::Init() {
 
   status = pdev_.MapMmio(0, &usbctrl_mmio_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "MapMmio[0] failed: %s", zx_status_get_string(status));
     return status;
   }
   status = pdev_.MapMmio(1, &usbphy20_mmio_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "MapMmio[1] failed: %s", zx_status_get_string(status));
     return status;
   }
   status = pdev_.MapMmio(2, &usbphy21_mmio_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "MapMmio[2] failed: %s", zx_status_get_string(status));
     return status;
   }
 
-  status = pdev_.GetInterrupt(0, &irq_);
+  status = pdev_.GetInterrupt(0, 0, &irq_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "GetInterrupt failed: %s", zx_status_get_string(status));
     return status;
   }
 
   status = InitPhy();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "InitPhy failed: %s", zx_status_get_string(status));
     return status;
   }
   status = InitOtg();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "InitOtg failed: %s", zx_status_get_string(status));
     return status;
   }
 
