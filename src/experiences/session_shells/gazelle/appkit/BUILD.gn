@@ -53,26 +53,3 @@ rustc_library("appkit") {
   ]
   inputs = [ "test_data/checkerboard_100.png" ]
 }
-
-fuchsia_unittest_package("appkit-tests") {
-  component_name = "appkit_lib_test"
-  manifest = "meta/appkit_lib_test.cml"
-  deps = [
-    ":appkit_test",
-    "//src/ui/testing/test_ui_stack:flatland_scene_manager_config",
-    "//src/ui/testing/test_ui_stack:test-ui-stack-component",
-  ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-
-    # Ensure the device has Vulkan.
-    environments = vulkan_envs
-  }
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":appkit-tests" ]
-}

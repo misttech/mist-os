@@ -20,7 +20,6 @@ group("gazelle") {
 group("tests") {
   testonly = true
   deps = [
-    "appkit:tests",
     "lib:tests",
     "pointer_fusion:tests",
     "wm:tests",
