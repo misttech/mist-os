@@ -26,7 +26,7 @@ enum {
   FRAGMENT_COUNT,
 };
 
-AmlG12TdmDai::AmlG12TdmDai(zx_device_t* parent, ddk::PDev pdev)
+AmlG12TdmDai::AmlG12TdmDai(zx_device_t* parent, ddk::PDevFidl pdev)
     : AmlG12TdmDaiDeviceType(parent),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       pdev_(std::move(pdev)) {
@@ -419,13 +419,12 @@ static zx_status_t dai_bind(void* ctx, zx_device_t* device) {
     zxlogf(ERROR, "device_get_metadata failed %d", status);
     return status;
   }
-  pdev_protocol_t pdev;
-  status = device_get_protocol(device, ZX_PROTOCOL_PDEV, &pdev);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not get pdev %d", status);
-    return status;
+  zx::result pdev_result = ddk::PDevFidl::Create(device);
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "could not get pdev %s", pdev_result.status_string());
+    return pdev_result.error_value();
   }
-  auto dai = std::make_unique<audio::aml_g12::AmlG12TdmDai>(device, ddk::PDev(&pdev));
+  auto dai = std::make_unique<audio::aml_g12::AmlG12TdmDai>(device, std::move(pdev_result.value()));
   if (dai == nullptr) {
     zxlogf(ERROR, "Could not create DAI driver");
     return ZX_ERR_NO_MEMORY;

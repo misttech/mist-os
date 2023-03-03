@@ -5,7 +5,10 @@
 #include "../dai.h"
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
+#include <lib/async-loop/default.h>
 #include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/sync/completion.h>
@@ -96,7 +99,7 @@ class FakeMmio {
 
 class TestAmlG12TdmDai : public AmlG12TdmDai {
  public:
-  explicit TestAmlG12TdmDai(zx_device_t* parent, ddk::PDev pdev)
+  explicit TestAmlG12TdmDai(zx_device_t* parent, ddk::PDevFidl pdev)
       : AmlG12TdmDai(parent, std::move(pdev)) {}
   dai_protocol_t GetProto() { return {&this->dai_protocol_ops_, this}; }
   bool AllowNonContiguousRingBuffer() override { return true; }
@@ -110,16 +113,42 @@ class TestAmlG12TdmDai : public AmlG12TdmDai {
   sync_completion_t stopped_ = {};
 };
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+};
+
 class AmlG12TdmDaiTest : public zxtest::Test {
  public:
-  void SetUp() override {
-    pdev_.set_mmio(0, mmio_.mmio_info());
-    pdev_.UseFakeBti();
-  }
+  void SetUp() override {}
 
  protected:
+  zx::result<ddk::PDevFidl> StartPDev() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+
+    zx_status_t status = incoming_loop_.StartThread("incoming-ns-thread");
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    fake_pdev::FakePDevFidl::Config config;
+    config.mmios[0] = mmio_.mmio_info();
+    config.use_fake_bti = true;
+
+    incoming_.SyncCall([config = std::move(config),
+                        server = std::move(endpoints->server)](IncomingNamespace* infra) mutable {
+      infra->pdev_server.SetConfig(std::move(config));
+      infra->pdev_server.Connect(std::move(server));
+    });
+    return zx::ok(ddk::PDevFidl(std::move(endpoints->client)));
+  }
+
   FakeMmio mmio_;
-  fake_pdev::FakePDev pdev_;
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
 };
 
 TEST_F(AmlG12TdmDaiTest, InitializeI2sOut) {
@@ -138,7 +167,9 @@ TEST_F(AmlG12TdmDaiTest, InitializeI2sOut) {
   metadata.dai.bits_per_slot = 32;
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   auto dai_proto = dai->GetProto();
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));
@@ -241,7 +272,9 @@ TEST_F(AmlG12TdmDaiTest, InitializePcmOut) {
   metadata.dai.sclk_on_raising = true;
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   auto dai_proto = dai->GetProto();
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));
@@ -340,7 +373,9 @@ TEST_F(AmlG12TdmDaiTest, GetPropertiesOutputDai) {
   strncpy(metadata.manufacturer, kTestString.c_str(), sizeof(metadata.manufacturer));
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   auto dai_proto = dai->GetProto();
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));
@@ -373,7 +408,9 @@ TEST_F(AmlG12TdmDaiTest, GetPropertiesInputDai) {
   metadata.dai.bits_per_slot = 32;
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   auto dai_proto = dai->GetProto();
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));
@@ -393,7 +430,9 @@ TEST_F(AmlG12TdmDaiTest, RingBufferOperations) {
   metadata::AmlConfig metadata = GetDefaultMetadata();
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   auto dai_proto = dai->GetProto();
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));
@@ -560,7 +599,9 @@ TEST_F(AmlG12TdmDaiTest, ClientCloseDaiChannel) {
   metadata::AmlConfig metadata = GetDefaultMetadata();
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));
   auto* child_dev = fake_parent->GetLatestChild();
@@ -609,7 +650,9 @@ TEST_F(AmlG12TdmDaiTest, ClientCloseRingBufferChannel) {
   metadata::AmlConfig metadata = GetDefaultMetadata();
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));
   auto* child_dev = fake_parent->GetLatestChild();
@@ -658,7 +701,9 @@ TEST_F(AmlG12TdmDaiTest, GetDelayForMultipleRingBuffers) {
   metadata::AmlConfig metadata = GetDefaultMetadata();
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  zx::result pdev = StartPDev();
+  ASSERT_OK(pdev);
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), std::move(pdev.value()));
   auto dai_proto = dai->GetProto();
   ASSERT_OK(dai->InitPDev());
   ASSERT_OK(dai->DdkAdd("test"));

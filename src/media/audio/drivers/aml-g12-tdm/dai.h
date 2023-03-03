@@ -40,7 +40,7 @@ class AmlG12TdmDai : public AmlG12TdmDaiDeviceType,
                      public ::fuchsia::hardware::audio::RingBuffer,
                      public ::fuchsia::hardware::audio::Dai {
  public:
-  AmlG12TdmDai(zx_device_t* parent, ddk::PDev pdev);
+  AmlG12TdmDai(zx_device_t* parent, ddk::PDevFidl pdev);
 
   void DdkRelease();
   zx_status_t DaiConnect(zx::channel channel);
@@ -110,7 +110,7 @@ class AmlG12TdmDai : public AmlG12TdmDaiDeviceType,
   uint32_t frame_size_ = 0;
   std::atomic<uint32_t> expected_notifications_per_ring_{0};
   std::optional<WatchClockRecoveryPositionInfoCallback> position_callback_;
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 };
 
 }  // namespace audio::aml_g12

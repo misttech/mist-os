@@ -31,7 +31,7 @@ namespace aml_g12 {
 
 class AmlG12TdmStream : public SimpleAudioStream {
  public:
-  AmlG12TdmStream(zx_device_t* parent, bool is_input, ddk::PDev pdev,
+  AmlG12TdmStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
                   const ddk::GpioProtocolClient enable_gpio);
 
  protected:
@@ -83,7 +83,7 @@ class AmlG12TdmStream : public SimpleAudioStream {
   async::TaskClosureMethod<AmlG12TdmStream, &AmlG12TdmStream::ProcessRingNotification> notify_timer_
       __TA_GUARDED(domain_token()){this};
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 
   zx::vmo ring_buffer_vmo_;
   fzl::PinnedVmo pinned_ring_buffer_;
