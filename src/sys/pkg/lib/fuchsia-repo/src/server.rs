@@ -15,7 +15,9 @@ use {
     chrono::Utc,
     fidl_fuchsia_developer_ffx::ListFields,
     fuchsia_async as fasync,
+    fuchsia_url::RepositoryUrl,
     futures::{future::Shared, prelude::*, AsyncRead, AsyncWrite, TryStreamExt},
+    http::Uri,
     http_sse::{Event, EventSender, SseResponseCreator},
     hyper::{body::Body, header::RANGE, service::service_fn, Request, Response, StatusCode},
     serde::{Deserialize, Serialize},
@@ -438,6 +440,50 @@ async fn handle_request(
                 return status_response(StatusCode::NOT_FOUND);
             }
         }
+        // Enable config retrieval over HTTP to support backwards-compatible repository registration.
+        "repo.config" => {
+            // Retrieve "host" ssh connection from request header.
+            let host_ssh_connection = match headers.get("host") {
+                Some(h) => h.to_str().unwrap(),
+                _ => {
+                    error!("failed to find host header in headers list");
+                    return status_response(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            };
+
+            let mirror_url = match Uri::try_from(format!("http://{host_ssh_connection}")) {
+                Ok(m) => m,
+                Err(e) => {
+                    error!("invalid mirror uri conversion: {:?}", e);
+                    return status_response(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            };
+
+            let repo_url = match RepositoryUrl::parse(format!("fuchsia-pkg://{repo_name}").as_str())
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    error!("invalid repo url conversion: {:?}", e);
+                    return status_response(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            };
+
+            let config = match repo.read().await.get_config(repo_url, mirror_url, None) {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("failed to generate config: {:?}", e);
+                    return status_response(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            };
+
+            match config.try_into() {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("failed to generate config: {:?}", e);
+                    return status_response(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
         _ => {
             let res = if let Some(resource_path) = resource_path.strip_prefix("blobs/") {
                 repo.read().await.fetch_blob_range(resource_path, range).await
@@ -774,12 +820,13 @@ mod tests {
         super::*,
         crate::{
             manager::RepositoryManager,
-            test_utils::{make_file_system_repository, make_writable_empty_repository},
+            test_utils::{make_file_system_repository, make_writable_empty_repository, repo_key},
         },
         anyhow::Result,
         assert_matches::assert_matches,
         bytes::Bytes,
         camino::Utf8Path,
+        fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder},
         fuchsia_async as fasync,
         http_sse::Client as SseClient,
         std::convert::TryInto,
@@ -848,6 +895,27 @@ mod tests {
         let mut tmp = tempfile::NamedTempFile::new().unwrap();
         tmp.write_all(body).unwrap();
         tmp.persist(path).unwrap();
+    }
+
+    async fn verify_repo_json(devhost: &str, server_url: &str) {
+        let json: RepositoryConfig = serde_json::from_slice(
+            &get_bytes(&format!("{server_url}/{devhost}/repo.config")).await.unwrap(),
+        )
+        .unwrap();
+
+        let expected = RepositoryConfigBuilder::new(
+            RepositoryUrl::parse(&format!("fuchsia-pkg://{devhost}")).unwrap(),
+        )
+        .add_mirror(
+            MirrorConfigBuilder::new(Uri::try_from(server_url).unwrap())
+                .unwrap()
+                .subscribe(true)
+                .build(),
+        )
+        .add_root_key(repo_key())
+        .build();
+
+        assert_eq!(json, expected);
     }
 
     async fn run_test<F, R>(manager: Arc<RepositoryManager>, test: F)
@@ -1095,6 +1163,7 @@ mod tests {
                         .unwrap()
                     );
                 }
+                verify_repo_json(devhost, &server_url).await;
             }
         })
         .await
