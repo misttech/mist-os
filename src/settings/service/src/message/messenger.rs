@@ -4,54 +4,14 @@
 
 use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
-    messenger, ActionSender, Attribution, Audience, CreateMessengerResult, Fingerprint, Message,
-    MessageAction, MessageError, MessageType, MessengerAction, MessengerActionSender, MessengerId,
-    MessengerType, Signature,
+    ActionSender, Attribution, Audience, Fingerprint, Message, MessageAction, MessageType,
+    MessengerId, Signature,
 };
 use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::receptor::Receptor;
 
 use fuchsia_syslog::fx_log_warn;
 use fuchsia_zircon::Duration;
-use std::convert::identity;
-
-/// `Builder` is the default way for creating a new messenger. Beyond the base
-/// messenger type, this helper allows for roles to be associated as well
-/// during construction.
-pub struct Builder {
-    /// The sender for sending messenger creation requests to the MessageHub.
-    messenger_action_tx: MessengerActionSender,
-    /// The type of messenger to be created. Along with roles, the messenger
-    /// type determines what audiences the messenger is included in.
-    messenger_type: MessengerType,
-}
-
-impl Builder {
-    /// Creates a new builder for constructing a messenger of the given
-    /// type.
-    pub(super) fn new(
-        messenger_action_tx: MessengerActionSender,
-        messenger_type: MessengerType,
-    ) -> Self {
-        Self { messenger_action_tx, messenger_type }
-    }
-
-    /// Constructs a messenger based on specifications supplied.
-    pub(crate) async fn build(self) -> CreateMessengerResult {
-        let (tx, rx) = futures::channel::oneshot::channel::<CreateMessengerResult>();
-
-        // Panic if send failed since a messenger cannot be created.
-        self.messenger_action_tx
-            .unbounded_send(MessengerAction::Create(
-                messenger::Descriptor { messenger_type: self.messenger_type },
-                tx,
-                self.messenger_action_tx.clone(),
-            ))
-            .expect("Builder::build, messenger_action_tx failed to send message");
-
-        rx.await.map_err(|_| MessageError::Unexpected).and_then(identity)
-    }
-}
 
 /// MessengerClient is a wrapper around a messenger with a fuse.
 #[derive(Clone, Debug)]
