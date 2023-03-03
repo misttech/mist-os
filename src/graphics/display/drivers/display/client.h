@@ -170,9 +170,10 @@ class DisplayControllerBindingState {
       binding_state_;
 };
 
-// The Client class manages all state associated with an open display client
-// connection. Other than initialization, all methods of this class execute on
-// on the controller's looper, so no synchronization is necessary.
+// Manages all state associated with an open display client connection.
+//
+// This class is not thread-safe. After initialization, all methods must be
+// executed on the same thread.
 class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
  public:
   // |controller| must outlive this and |proxy|.
@@ -181,6 +182,9 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   // This is used for testing
   Client(Controller* controller, ClientProxy* proxy, bool is_vc, uint32_t id,
          fidl::ServerEnd<fuchsia_hardware_display::Controller> server_end);
+
+  Client(const Client&) = delete;
+  Client& operator=(const Client&) = delete;
 
   ~Client() override;
 
@@ -216,7 +220,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   uint64_t LatestAckedCookie() const { return acked_cookie_; }
   size_t GetGammaTableSize() const { return gamma_table_map_.size(); }
 
- private:
+  // fidl::WireServer<fuchsia_hardware_display::Controller> overrides:
   void ImportImage2(ImportImage2RequestView request,
                     ImportImage2Completer::Sync& _completer) override;
   void ReleaseImage(ReleaseImageRequestView request,
@@ -286,6 +290,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   void SetDisplayPower(SetDisplayPowerRequestView request,
                        SetDisplayPowerCompleter::Sync& _completer) override;
 
+ private:
   // Cleans up layer state associated with an image. If image == nullptr, then
   // cleans up all image state. Return true if a current layer was modified.
   bool CleanUpImage(Image* image);
