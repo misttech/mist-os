@@ -9,8 +9,11 @@ ffx_plugin("ffx_profile_memory") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.memory:fuchsia.memory_rust",
+    "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection_rust",
     "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
