@@ -15,7 +15,8 @@ from http.client import RemoteDisconnected
 from typing import Any, Dict, Iterable, Optional, Type
 
 from honeydew import custom_types, errors
-from honeydew.interfaces.affordances import component
+from honeydew.affordances import component_default
+from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.device_classes import (
     component_capable_device, fuchsia_device)
 from honeydew.interfaces.transports import sl4f
@@ -169,13 +170,13 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
 
     # List all the affordances in alphabetical order
     @property
-    def component(self) -> component.Component:
+    def component(self) -> component_interface.Component:
         """Returns a component affordance object.
 
         Returns:
             component.Component object
         """
-        raise NotImplementedError
+        return self._component
 
     # List all the public methods in alphabetical order
     def close(self) -> None:
@@ -362,6 +363,17 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             raise errors.FuchsiaDeviceError(
                 f"Failed to connect to '{self.name}' via SSH.")
         _LOGGER.info("%s is available via ssh.", self.name)
+
+    @property
+    @lru_cache
+    def _component(self) -> component_interface.Component:
+        """Returns a component affordance object.
+
+        Returns:
+            component.Component object
+        """
+        return component_default.ComponentDefault(
+            device_name=self.name, sl4f=self)
 
     @property
     @lru_cache

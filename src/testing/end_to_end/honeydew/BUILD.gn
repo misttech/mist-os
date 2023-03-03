@@ -9,6 +9,8 @@ python_library("honeydew") {
   source_root = "."
   sources = [
     "__init__.py",
+    "affordances/__init__.py",
+    "affordances/component_default.py",
     "custom_types.py",
     "device_classes/__init__.py",
     "device_classes/fuchsia_device_base.py",
