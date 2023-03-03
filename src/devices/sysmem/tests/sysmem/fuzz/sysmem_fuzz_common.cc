@@ -40,12 +40,6 @@ bool MockDdkSysmem::Init() {
   };
   root_->SetMetadata(SYSMEM_METADATA_TYPE, &metadata, sizeof(metadata));
 
-  pdev_.UseFakeBti();
-
-  root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
-  if (ZX_OK == sysmem_.Bind()) {
-    initialized_ = true;
-  }
   sysmem_.set_settings(sysmem_driver::Settings{.max_allocation_size = 256 * 1024});
 
   loop_.StartThread();

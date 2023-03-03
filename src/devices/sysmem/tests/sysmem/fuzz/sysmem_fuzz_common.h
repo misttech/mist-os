@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/sysmem/drivers/sysmem/driver.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
@@ -22,7 +21,6 @@ class MockDdkSysmem {
 
  protected:
   bool initialized_ = false;
-  fake_pdev::FakePDev pdev_;
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
 
   sysmem_driver::Driver sysmem_ctx_;
