@@ -31,6 +31,11 @@ namespace {
 
 using usb_virtual::BusLauncher;
 
+std::string GetDeviceControllerPath(std::string_view dev_path) {
+  auto dev_path_modified = std::string(dev_path);
+  return dev_path_modified.append("/device_controller");
+}
+
 class UsbHidTest : public zxtest::Test {
  public:
   void SetUp() override {
@@ -88,8 +93,9 @@ class UsbHidTest : public zxtest::Test {
   // Unbinds Usb HID driver from host.
   void Unbind(const fbl::String& devpath) {
     fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
-    zx::result input_controller =
-        component::ConnectAt<fuchsia_device::Controller>(caller.directory(), devpath_);
+
+    zx::result input_controller = component::ConnectAt<fuchsia_device::Controller>(
+        caller.directory(), GetDeviceControllerPath(devpath_.data()));
     ASSERT_OK(input_controller);
     const fidl::WireResult result = fidl::WireCall(input_controller.value())->GetTopologicalPath();
     ASSERT_OK(result);
@@ -101,11 +107,9 @@ class UsbHidTest : public zxtest::Test {
     const std::string_view hid_device_relpath = hid_device_abspath.substr(kDev.size());
     const std::string_view usb_hid_relpath =
         hid_device_relpath.substr(0, hid_device_relpath.find_last_of('/'));
-    const std::string usb_hid_controller_relpath =
-        std::string(usb_hid_relpath).append("/device_controller");
 
     zx::result usb_hid_controller = component::ConnectAt<fuchsia_device::Controller>(
-        caller.directory(), usb_hid_controller_relpath);
+        caller.directory(), GetDeviceControllerPath(usb_hid_relpath));
     ASSERT_OK(usb_hid_controller);
     const size_t last_slash = usb_hid_relpath.find_last_of('/');
     const std::string_view suffix = usb_hid_relpath.substr(last_slash + 1);
