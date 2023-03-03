@@ -79,6 +79,31 @@ class PerfTestHelper {
     return helper;
   }
 
+  // Copies the given file (remoteFilename) from Fuchsia to a local
+  // file, with a name based on dumpName and extension.
+  //
+  // This is equivalent to storage.dumpFile(), except that it is
+  // implemented using SSH rather than SL4F, and so it does not depend
+  // on having the SL4F server running on Fuchsia.
+  //
+  // This might not work with binary files, because it round trips the
+  // data through the String type using the default encoding.
+  //
+  // It would be better to use scp to copy the file, but the Ssh class
+  // does not provide an interface for that at the moment.
+  Future<File> dumpFile(
+      String remoteFilename, String dumpName, String extension) async {
+    final String command = 'cat $remoteFilename';
+    final processResult = await sl4fDriver.ssh.runWithOutput(command);
+    if (processResult.exitCode != 0) {
+      throw Exception(
+          'Command "$command" failed with exit code ${processResult.exitCode};'
+          ' stderr output:\n${processResult.stderr}');
+    }
+    final String data = processResult.stdout;
+    return dump.writeAsString(dumpName, extension, data);
+  }
+
   // Takes a set of "raw data" fuchsiaperf files, specified as local
   // files.  Generates a "summary" version of that data, following the
   // process described in summarize.dart, and publishes that as
@@ -117,8 +142,8 @@ class PerfTestHelper {
     final result = await sl4fDriver.ssh.run(command);
     expect(result.exitCode, equals(0));
     try {
-      final File localResultsFile = await storage.dumpFile(
-          resultsFile, 'results', 'fuchsiaperf_full.json');
+      final File localResultsFile =
+          await dumpFile(resultsFile, 'results', 'fuchsiaperf_full.json');
       await processResultsSummarized([localResultsFile],
           expectedMetricNamesFile: expectedMetricNamesFile);
     } finally {
@@ -161,7 +186,7 @@ class PerfTestHelper {
       final List<String> targetOutputFiles = findOutput.split('\n');
       expect(targetOutputFiles.length, equals(1));
 
-      return await storage.dumpFile(targetOutputFiles[0],
+      return await dumpFile(targetOutputFiles[0],
           'results_$packageName$resultsFileSuffix', 'fuchsiaperf_full.json');
     } finally {
       // Clean up: remove the output tree.
