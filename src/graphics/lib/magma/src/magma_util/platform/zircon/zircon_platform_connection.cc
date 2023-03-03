@@ -169,16 +169,24 @@ struct AsyncHandleWait : public async_wait {
   void* completer_context;
 };
 
+void ZirconPlatformConnection::SendNotification(msd_notification_t* notification) {
+  DASSERT(static_cast<MSD_CONNECTION_NOTIFICATION_TYPE>(notification->type) ==
+          MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND);
+  zx_status_t status =
+      zx_channel_write(server_notification_endpoint_.get(), 0, notification->u.channel_send.data,
+                       notification->u.channel_send.size, nullptr, 0);
+  if (status != ZX_OK) {
+    DMESSAGE("Failed writing to channel: %s", zx_status_get_string(status));
+  }
+}
+
 bool ZirconPlatformConnection::AsyncTaskHandler(async_dispatcher_t* dispatcher, AsyncTask* task,
                                                 zx_status_t status) {
   switch (static_cast<MSD_CONNECTION_NOTIFICATION_TYPE>(task->notification.type)) {
     case MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND: {
-      zx_status_t status = zx_channel_write(server_notification_endpoint_.get(), 0,
-                                            task->notification.u.channel_send.data,
-                                            task->notification.u.channel_send.size, nullptr, 0);
-      if (status != ZX_OK)
-        return DRETF(false, "Failed writing to channel: %s", zx_status_get_string(status));
-      return true;
+      // Should be handled in NotificationCallbackStatic
+      DASSERT(false);
+      return false;
     }
 
     case MSD_CONNECTION_NOTIFICATION_CONTEXT_KILLED:

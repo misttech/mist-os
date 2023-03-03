@@ -119,6 +119,11 @@ class ZirconPlatformConnection : public fidl::WireServer<fuchsia_gpu_magma::Prim
   // MSD must ensure we aren't in the process of destroying our connection.
   static void NotificationCallbackStatic(void* token, msd_notification_t* notification) {
     auto connection = static_cast<ZirconPlatformConnection*>(token);
+    if (static_cast<MSD_CONNECTION_NOTIFICATION_TYPE>(notification->type) ==
+        MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND) {
+      connection->SendNotification(notification);
+      return;
+    }
     zx_status_t status = async_post_task(connection->async_loop()->dispatcher(),
                                          new AsyncTask(connection, notification));
     if (status != ZX_OK)
@@ -132,6 +137,7 @@ class ZirconPlatformConnection : public fidl::WireServer<fuchsia_gpu_magma::Prim
     delete task;
   }
 
+  void SendNotification(msd_notification_t* notification);
   bool AsyncTaskHandler(async_dispatcher_t* dispatcher, AsyncTask* task, zx_status_t status);
 
   void ImportObject2(ImportObject2RequestView request,

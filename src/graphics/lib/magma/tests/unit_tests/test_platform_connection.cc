@@ -308,12 +308,8 @@ class TestPlatformConnection {
   void TestNotificationChannel() {
     FlowControlSkip();
 
-    // Notification messages are written when the delegate is created (SetNotificationCallback).
-    // Notification callbacks post async tasks to the IpcThread.
-    // Busy wait to ensure those notification requests are sent.
-    while (connection_->get_request_count() < kNotificationCount) {
-      usleep(10 * 1000);
-    }
+    // Notification requests will be sent when the ZirconConnection is created, before this test is
+    // called.
 
     {
       uint8_t buffer_too_small;
