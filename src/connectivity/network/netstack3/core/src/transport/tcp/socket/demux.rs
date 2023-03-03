@@ -286,7 +286,7 @@ where
         state,
         ip_sock,
         defunct,
-        socket_options: SocketOptions { keep_alive, nagle_enabled: _ },
+        socket_options: SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _ },
     } = conn;
 
     // Send the reply to the segment immediately.
@@ -443,6 +443,7 @@ where
         buffer_sizes.clone(),
         device_mss,
         Mss::default::<I>(),
+        socket_options.user_timeout,
     ));
     let reply = assert_matches!(
         state.on_segment::<_, C>(incoming, now, &KeepAlive::default()),

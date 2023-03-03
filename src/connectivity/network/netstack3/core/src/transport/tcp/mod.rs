@@ -135,6 +135,9 @@ pub struct SocketOptions {
     pub keep_alive: KeepAlive,
     /// Switch to turn nagle algorithm on/off.
     pub nagle_enabled: bool,
+    /// The period of time after which the connection should be aborted if no
+    /// ACK is received.
+    pub user_timeout: Option<NonZeroDuration>,
 }
 
 impl Default for SocketOptions {
@@ -145,6 +148,7 @@ impl Default for SocketOptions {
             //   A TCP implementation SHOULD implement the Nagle algorithm to
             //   coalesce short segments
             nagle_enabled: true,
+            user_timeout: None,
         }
     }
 }

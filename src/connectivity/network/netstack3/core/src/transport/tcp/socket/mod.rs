@@ -2308,6 +2308,7 @@ where
         buffer_sizes,
         Mss::from_mms::<I>(device_mms).ok_or(ConnectError::NoRoute)?,
         Mss::default::<I>(),
+        socket_options.user_timeout,
     );
     let state = State::SynSent(syn_sent);
     let poll_send_at = state.poll_send_at().expect("no retrans timer");

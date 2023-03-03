@@ -1361,14 +1361,24 @@ where
             fposix_socket::StreamSocketRequest::GetTcpCongestion { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetTcpUserTimeout {
-                value_millis: _,
-                responder,
-            } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetTcpUserTimeout { value_millis, responder } => {
+                let user_timeout =
+                    NonZeroU64::new(value_millis.into()).map(NonZeroDuration::from_nonzero_millis);
+                self.with_socket_options_mut(|so| {
+                    so.user_timeout = user_timeout;
+                })
+                .await;
+                responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpUserTimeout { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let millis = self
+                    .with_socket_options(|so| {
+                        so.user_timeout.map(|d| d.get().as_millis()).unwrap_or(0)
+                    })
+                    .await;
+                let mut result =
+                    u32::try_from(millis).map_err(|_: TryFromIntError| fposix::Errno::Einval);
+                responder_send!(responder, &mut result);
             }
         }
         ControlFlow::Continue(None)

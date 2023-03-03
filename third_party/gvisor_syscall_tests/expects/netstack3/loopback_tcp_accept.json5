@@ -21,5 +21,18 @@
                 "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
             ],
         },
+        {
+            type: "expect_pass",
+            matchers: [
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Loopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Loopback_ConnectV6Loopback",
+            ],
+        },
     ],
 }
