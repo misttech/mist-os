@@ -75,7 +75,6 @@ FuchsiaVirtualizationConfigInfo = provider(
     },
 )
 
-
 FuchsiaConnectivityConfigInfo = provider(
     doc = "Platform configuration options for the connectivity area.",
     fields = {
@@ -87,7 +86,6 @@ FuchsiaConnectivityWlanConfigInfo = provider(
     doc = "Platform configuration options for the connectivity area wlan field.",
     fields = {
         "legacy_privacy_support": "A bool value for legacy_privacy_support of wlan",
-        "include_wlan_aibs": "A bool value for include_wlan_aibs of wlan",
     },
 )
 

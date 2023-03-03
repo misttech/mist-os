@@ -9,7 +9,6 @@ def _fuchsia_platform_connectivity_wlan_configuration_impl(ctx):
     return [
         FuchsiaConnectivityWlanConfigInfo(
             legacy_privacy_support = ctx.attr.legacy_privacy_support,
-            include_wlan_aibs = ctx.attr.include_wlan_aibs,
         ),
     ]
 
@@ -20,9 +19,6 @@ fuchsia_platform_connectivity_wlan_configuration = rule(
     attrs = {
         "legacy_privacy_support": attr.bool(
             doc = "A bool value for legacy_privacy_support of wlan",
-        ),
-        "include_wlan_aibs": attr.bool(
-            doc = "A bool value for include_wlan_aibs of wlan",
         ),
     },
 )

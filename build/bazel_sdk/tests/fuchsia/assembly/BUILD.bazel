@@ -76,7 +76,6 @@ fuchsia_platform_identity_configuration(
 
 fuchsia_platform_connectivity_wlan_configuration(
     name = "testing_wlan",
-    include_wlan_aibs = True,
     legacy_privacy_support = True,
 )
 
@@ -164,7 +163,6 @@ fuchsia_product_configuration(
                 "session:session",
             ],
             "connectivity": {"wlan": {
-                "include_wlan_aibs": True,
                 "legacy_privacy_support": True,
             }},
             "development_support": {"enabled": True},
