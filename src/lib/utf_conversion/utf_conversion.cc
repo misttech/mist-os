@@ -138,12 +138,14 @@ zx_status_t Utf16ToUtf8(const uint16_t* src, size_t src_len, uint8_t* dst, size_
 // If the input is an invalid Unicode codepoint, signal this by returning 0.
 // Input length is in bytes.  Output length is in 16-bit units.
 uint32_t EncodeUtf16CodePoint(uint32_t code_point, uint16_t* tgt, size_t tgt_len, size_t offset) {
-  if (code_point > kMaxUnicodeCodePoint || tgt_len <= offset) {
+  if (code_point > kMaxUnicodeCodePoint) {
     return 0;
   }
 
   // TODO: this only works with single-byte UTF8 characters.
-  tgt[offset] = static_cast<uint16_t>(code_point);
+  if (tgt_len > offset) {
+    tgt[offset] = static_cast<uint16_t>(code_point);
+  }
   return 1;
 }
 

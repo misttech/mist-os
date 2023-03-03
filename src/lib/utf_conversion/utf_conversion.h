@@ -55,7 +55,8 @@ __BEGIN_CDECLS
 //
 // src     : a pointer to the source string, encoded using UTF16
 // src_len : The number of code units (uint16_t) in the source to process.
-// dst     : a pointer to the buffer (not null terminated).
+// dst     : a pointer to the buffer (not null terminated), or NULL to query
+//           dst_len without actually writing anything.
 // dst_len : A pointer to the length of of the destination buffer (in bytes).
 //           Afterwards, this parameter will be updated to indicate the total
 //           number of bytes it would take to hold a representation of the UTF8

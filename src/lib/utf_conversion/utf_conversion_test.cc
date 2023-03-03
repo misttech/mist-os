@@ -215,12 +215,13 @@ TEST(UTF16To8TestCase, BufferLengths) {
   const uint8_t expected[] = {'T', 'e', 's', 't'};
   uint8_t actual[16];
 
-  // Perform a conversion, but test three cases.
+  // Perform a conversion, but test multiple cases.
   //
   // 1) The destination buffer size is exactly what is required.
   // 2) The destination buffer size is more than what is required.
   // 3) The destination buffer size is less than what is required.
-  static const size_t DST_LENGTHS[] = {sizeof(expected), sizeof(actual), sizeof(expected) >> 1};
+  // 4) The destination buffer is NULL and buffer size is 0.
+  static const size_t DST_LENGTHS[] = {sizeof(expected), sizeof(actual), sizeof(expected) >> 1, 0};
   for (const auto& d : DST_LENGTHS) {
     char case_id[64];
     size_t encoded_len = d;
@@ -230,7 +231,8 @@ TEST(UTF16To8TestCase, BufferLengths) {
     ::memset(actual, 0xAB, sizeof(actual));
 
     ASSERT_LE(encoded_len, sizeof(actual), "%s", case_id);
-    res = utf16_to_utf8(src, std::size(src), actual, &encoded_len);
+    uint8_t* dest = (d == 0 ? nullptr : actual);
+    res = utf16_to_utf8(src, std::size(src), dest, &encoded_len);
 
     ASSERT_OK(res, "%s", case_id);
     ASSERT_EQ(sizeof(expected), encoded_len, "%s", case_id);
@@ -334,31 +336,29 @@ TEST(UTF8To16TestCase, BufferLengths) {
   const uint16_t expected[] = {'T', 'e', 's', 't'};
   uint16_t actual[16];
 
-  // Perform a conversion, but test three cases.
+  // Perform a conversion, but test multiple cases.
   //
   // 1) The destination buffer size is exactly what is required.
   // 2) The destination buffer size is more than what is required.
   // 3) The destination buffer size is less than what is required.
+  // 4) The destination buffer is NULL and buffer size is 0.
   constexpr size_t DST_LENGTHS[] = {std::size(expected), std::size(actual),
-                                    std::size(expected) >> 1};
+                                    std::size(expected) >> 1, 0};
   for (const auto& d : DST_LENGTHS) {
     char case_id[64];
     size_t encoded_len = d;
     zx_status_t res;
 
-    snprintf(case_id, sizeof(case_id), "case id [needed %zu, provided %zu]", sizeof(expected), d);
+    snprintf(case_id, sizeof(case_id), "case id [needed %zu, provided %zu]", std::size(expected),
+             d);
     ::memset(actual, 0xAB, sizeof(actual));
 
     ASSERT_LE(encoded_len, sizeof(actual), "%s", case_id);
-    res = utf8_to_utf16(src, std::size(src), actual, &encoded_len);
+    uint16_t* dest = (d == 0 ? nullptr : actual);
+    res = utf8_to_utf16(src, std::size(src), dest, &encoded_len);
 
     ASSERT_OK(res, "%s", case_id);
-
-    if (d < std::size(expected)) {
-      ASSERT_LE(encoded_len, d, "%s", case_id);
-    } else {
-      ASSERT_EQ(std::size(expected), encoded_len, "%s", case_id);
-    }
+    ASSERT_EQ(std::size(expected), encoded_len, "%s", case_id);
     static_assert(sizeof(expected) <= sizeof(actual),
                   "'actual' buffer must be large enough to hold 'expected' result");
     ASSERT_BYTES_EQ(expected, actual, std::min(d, encoded_len) * sizeof(uint16_t), "%s", case_id);
