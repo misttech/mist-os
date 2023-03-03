@@ -219,6 +219,18 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcf
     // Stubbed out implementation that does nothing.
   }
 
+  template <class IoProvider>
+  void InitInterrupt(IoProvider& io) {
+    // Stubber out implementation.
+    // TODO(fxbug.dev/115620): implement me
+  }
+
+  template <class IoProvider, class Lock, class Waiter, class Tx, class Rx>
+  void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
+    // Stubber out implementation.
+    // TODO(fxbug.dev/115620): implement me
+  }
+
  private:
   uint32_t rx_fifo_depth_ = 0;
   uint32_t tx_fifo_depth_ = 0;

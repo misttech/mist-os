@@ -11,7 +11,7 @@
 namespace {
 
 using SimpleTestDriver =
-    uart::KernelDriver<uart::imx::Driver, uart::mock::IoProvider, uart::Unsynchronized>;
+    uart::KernelDriver<uart::imx::Driver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>;
 constexpr zbi_dcfg_simple_t kTestConfig = {};
 
 TEST(ImxTests, Write) {

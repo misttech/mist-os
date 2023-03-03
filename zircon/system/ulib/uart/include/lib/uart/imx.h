@@ -146,6 +146,18 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_IMX_UART, zbi_dcfg_s
     // Stubbed out implementation that does nothing.
     // TODO(fxbug.dev/115620): implement me
   }
+
+  template <class IoProvider>
+  void InitInterrupt(IoProvider& io) {
+    // Stubber out implementation.
+    // TODO(fxbug.dev/115620): implement me
+  }
+
+  template <class IoProvider, class Lock, class Waiter, class Tx, class Rx>
+  void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& rx, Rx&& tx) {
+    // Stubber out implementation.
+    // TODO(fxbug.dev/115620): implement me
+  }
 };
 
 }  // namespace uart::imx

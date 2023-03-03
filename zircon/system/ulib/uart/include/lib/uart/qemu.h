@@ -48,7 +48,8 @@ using Driver = null::Driver;
 
 // uart::qemu::KernelDriver is default-constructible and usable right away.
 
-template <template <typename> class IoProvider = BasicIoProvider, typename Sync = Unsynchronized>
+template <template <typename> class IoProvider = BasicIoProvider,
+          typename Sync = UnsynchronizedPolicy>
 using KernelDriver = uart::KernelDriver<Driver, IoProvider, Sync>;
 
 }  // namespace qemu

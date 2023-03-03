@@ -349,8 +349,8 @@ class DriverImpl
     mcr.set_auxiliary_out_2(true).WriteTo(io.io());
   }
 
-  template <class IoProvider, typename Tx, typename Rx>
-  void Interrupt(IoProvider& io, Tx&& tx, Rx&& rx) {
+  template <class IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>
+  void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
     auto iir = InterruptIdentRegister::Get();
     InterruptType id;
     while ((id = iir.ReadFrom(io.io()).interrupt_id()) != InterruptType::kNone) {
@@ -358,16 +358,17 @@ class DriverImpl
         case InterruptType::kRxDataAvailable:
         case InterruptType::kCharTimeout:
           // Read the character if there's a place to put it.
-          rx([&]() { return RxBufferRegister::Get().ReadFrom(io.io()).data(); },
-             [&]() {
-               // If the buffer is full, disable the receive interrupt instead.
-               EnableRxInterrupt(io, false);
-             });
+          rx(
+              lock,  //
+              [&]() { return RxBufferRegister::Get().ReadFrom(io.io()).data(); },
+              [&]() {
+                // If the buffer is full, disable the receive interrupt instead.
+                EnableRxInterrupt(io, false);
+              });
           break;
 
         case InterruptType::kTxEmpty:
-          tx();
-          EnableTxInterrupt(io, false);
+          tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
           break;
 
         case InterruptType::kRxLineStatus:
@@ -375,7 +376,7 @@ class DriverImpl
           break;
 
         default:
-          ZX_PANIC("unhandled interrupt ID %#x", id);
+          ZX_PANIC("unhandled interrupt ID %#x", static_cast<unsigned int>(id));
       }
     }
   }

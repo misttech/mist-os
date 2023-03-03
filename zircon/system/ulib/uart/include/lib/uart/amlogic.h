@@ -98,7 +98,8 @@ struct IrqControlRegister : public hwreg::RegisterBase<IrqControlRegister, uint3
 struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t> {
   template <typename... Args>
   explicit Driver(Args&&... args)
-      : DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t>(std::forward<Args>(args)...) {}
+      : DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t>(
+            std::forward<Args>(args)...) {}
 
   static constexpr std::string_view config_name() { return "amlogic"; }
 
@@ -169,16 +170,17 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
     EnableRxInterrupt(io);
   }
 
-  template <class IoProvider, typename Tx, typename Rx>
-  void Interrupt(IoProvider& io, Tx&& tx, Rx&& rx) {
+  template <class IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>
+  void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
     auto sr = StatusRegister::Get().ReadFrom(io.io());
 
     bool tx_done = false;
     auto check_tx = [&]() {
       if (!tx_done && !sr.tx_fifo_full()) {
-        tx();
-        EnableTxInterrupt(io, false);
-        tx_done = true;
+        tx(lock, waiter, [&]() {
+          EnableTxInterrupt(io, false);
+          tx_done = true;
+        });
       }
     };
     check_tx();
@@ -186,13 +188,15 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
     bool full = false;
     while (!full && !sr.rx_fifo_empty()) {
       // Read the character if there's a place to put it.
-      rx([&]() { return ReadFifoRegister::Get().ReadFrom(io.io()).data(); },
-         [&]() {
-           // If the buffer is full, disable the receive interrupt instead
-           // and stop checking.
-           EnableRxInterrupt(io, false);
-           full = true;
-         });
+      rx(
+          lock,  //
+          [&]() { return ReadFifoRegister::Get().ReadFrom(io.io()).data(); },
+          [&]() {
+            // If the buffer is full, disable the receive interrupt instead
+            // and stop checking.
+            EnableRxInterrupt(io, false);
+            full = true;
+          });
 
       // Fetch fresh status for next iteration to check.
       sr.ReadFrom(io.io());

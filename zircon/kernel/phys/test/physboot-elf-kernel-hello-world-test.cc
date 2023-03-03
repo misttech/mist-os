@@ -13,7 +13,7 @@
 #include <phys/handoff.h>
 
 void PhysbootHandoff(PhysHandoff* handoff) {
-  uart::all::KernelDriver<uart::BasicIoProvider, uart::Unsynchronized>(
+  uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy>(
       handoff->boot_options->serial)
       .Visit([](auto& uart) {
         uart.Write("Hello world!\n");

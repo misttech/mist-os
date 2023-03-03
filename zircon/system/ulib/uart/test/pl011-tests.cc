@@ -13,7 +13,7 @@
 namespace {
 
 using SimpleTestDriver =
-    uart::KernelDriver<uart::pl011::Driver, uart::mock::IoProvider, uart::Unsynchronized>;
+    uart::KernelDriver<uart::pl011::Driver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>;
 constexpr zbi_dcfg_simple_t kTestConfig = {};
 
 TEST(Pl011Tests, HelloWorld) {
@@ -115,9 +115,9 @@ TEST(Pl011Tests, RxIrqEmptyFifo) {
   // Empty Fifo bit is set, so it should just return.
 
   int call_count = 0;
-  driver.Interrupt(
-      [](auto& sync, auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-      [&](auto& sync, auto&& reader, auto&& full) { call_count++; });
+  driver.Interrupt([](auto& sync, auto& waiter,
+                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& sync, auto&& reader, auto&& full) { call_count++; });
 
   driver.io().mock().VerifyAndClear();
   EXPECT_EQ(call_count, 0);
@@ -139,15 +139,15 @@ TEST(Pl011Tests, RxIrqWithNonEmptyFifoAndNonFullQueue) {
       .ExpectRead<uint16_t>(0b1'0000, 0x18);  // Read from flag register, fifo is empty.
 
   int call_count = 0;
-  driver.Interrupt(
-      [](auto& sync, auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-      [&](auto& sync, auto&& reader, auto&& full) {
-        char expected_c = call_count == 0 ? 123 : 111;
-        call_count++;
-        auto c = reader();
-        ASSERT_TRUE(c);
-        EXPECT_EQ(c, expected_c);
-      });
+  driver.Interrupt([](auto& sync, auto& waiter,
+                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& sync, auto&& reader, auto&& full) {
+                     char expected_c = call_count == 0 ? 123 : 111;
+                     call_count++;
+                     auto c = reader();
+                     ASSERT_TRUE(c);
+                     EXPECT_EQ(c, expected_c);
+                   });
 
   EXPECT_EQ(call_count, 2);
 }
@@ -168,15 +168,15 @@ TEST(Pl011Tests, RxTimeoutIrqWithNonEmptyFifoAndNonFullQueue) {
       .ExpectRead<uint16_t>(0b1'0000, 0x18);   // Read from flag register, fifo is empty.
 
   int call_count = 0;
-  driver.Interrupt(
-      [](auto& sync, auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-      [&](auto& sync, auto&& reader, auto&& full) {
-        char expected_c = call_count == 0 ? 123 : 111;
-        call_count++;
-        auto c = reader();
-        ASSERT_TRUE(c);
-        EXPECT_EQ(c, expected_c);
-      });
+  driver.Interrupt([](auto& sync, auto& waiter,
+                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& sync, auto&& reader, auto&& full) {
+                     char expected_c = call_count == 0 ? 123 : 111;
+                     call_count++;
+                     auto c = reader();
+                     ASSERT_TRUE(c);
+                     EXPECT_EQ(c, expected_c);
+                   });
 
   EXPECT_EQ(call_count, 2);
 }
@@ -196,12 +196,12 @@ TEST(Pl011Tests, RxIrqWithNonEmptyFifoAndFullQueue) {
           0, 0x38);  // The SW queue is full, so we should disable the RX interrupts.
 
   int call_count = 0;
-  driver.Interrupt(
-      [](auto& sync, auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
-      [&](auto& sync, auto&& reader, auto&& full) {
-        full();
-        call_count++;
-      });
+  driver.Interrupt([](auto& sync, auto& waiter,
+                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& sync, auto&& reader, auto&& full) {
+                     full();
+                     call_count++;
+                   });
 
   EXPECT_EQ(call_count, 1);
 }
@@ -220,7 +220,7 @@ TEST(Pl011Tests, TxIrqOnly) {
 
   int call_count = 0;
   driver.Interrupt(
-      [&](auto& sync, auto&& disable_tx_irq) {
+      [&](auto& sync, auto& waiter, auto&& disable_tx_irq) {
         call_count++;
         disable_tx_irq();
       },

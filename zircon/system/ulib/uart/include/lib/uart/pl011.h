@@ -194,15 +194,15 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
     cr.set_rx_enable(true).WriteTo(io.io());
   }
 
-  template <class IoProvider, typename Sync, typename Tx, typename Rx>
-  void Interrupt(IoProvider& io, Sync& sync, Tx&& tx, Rx&& rx) {
+  template <class IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>
+  void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
     auto misr = InterruptMaskedStatusRegister::Get().ReadFrom(io.io());
     if (misr.rx_timeout() || misr.rx()) {
       bool full = false;
       while (!full && !FlagRegister::Get().ReadFrom(io.io()).rx_fifo_empty()) {
         // Read the character if there's a place to put it.
         rx(
-            sync,  //
+            lock,  //
             [&]() { return DataRegister::Get().ReadFrom(io.io()).data(); },
             [&]() {
               // If the buffer is full, disable the receive interrupt instead
@@ -213,7 +213,7 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
       }
     }
     if (misr.tx()) {
-      tx(sync, [&]() { EnableTxInterrupt(io, false); });
+      tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
     }
   }
 };

@@ -16,7 +16,7 @@ using namespace std::literals;
 namespace {
 
 TEST(UartTests, Nonblocking) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::Sync> driver;
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
 
   driver.uart()
       .ExpectLock()
@@ -37,13 +37,37 @@ TEST(UartTests, Nonblocking) {
       .ExpectWrite("world\r\n"sv)
       .ExpectUnlock();
 
-  driver.Init();
-  EXPECT_EQ(driver.Write("hi!"), 3);
-  EXPECT_EQ(driver.Write("hello world\n"), 12);
+  driver.Init<uart::mock::Locking>();
+  EXPECT_EQ(driver.Write<uart::mock::Locking>("hi!"), 3);
+  EXPECT_EQ(driver.Write<uart::mock::Locking>("hello world\n"), 12);
+}
+
+TEST(UartTests, LockPolicy) {
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
+
+  driver.uart()
+      .ExpectLock()
+      .ExpectInit()
+      .ExpectUnlock()
+      // First Write call -> sends all chars, no waiting.
+      .ExpectTxReady(true)
+      .ExpectWrite("hi!"sv)
+      // Second Write call -> sends half, then waits.
+      .ExpectTxReady(true)
+      .ExpectWrite("hello "sv)
+      .ExpectTxReady(false)
+      .ExpectWait(false)
+      .ExpectTxReady(true)
+      .ExpectWrite("world\r\n"sv);
+
+  driver.Init<uart::mock::Locking>();
+  // Just check that lock args are forwarded correctly.
+  EXPECT_EQ(driver.Write<uart::mock::NoopLocking>("hi!"), 3);
+  EXPECT_EQ(driver.Write<uart::mock::NoopLocking>("hello world\n"), 12);
 }
 
 TEST(UartTests, Blocking) {
-  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::Sync> driver;
+  uart::KernelDriver<uart::mock::Driver, uart::mock::IoProvider, uart::mock::SyncPolicy> driver;
 
   driver.uart()
       .ExpectLock()
@@ -66,14 +90,14 @@ TEST(UartTests, Blocking) {
       .ExpectWrite("world\r\n"sv)
       .ExpectUnlock();
 
-  driver.Init();
-  EXPECT_EQ(driver.Write("hi!"), 3);
-  EXPECT_EQ(driver.Write("hello world\n"), 12);
+  driver.Init<uart::mock::Locking>();
+  EXPECT_EQ(driver.Write<uart::mock::Locking>("hi!"), 3);
+  EXPECT_EQ(driver.Write<uart::mock::Locking>("hello world\n"), 12);
 }
 
 TEST(UartTests, Null) {
-  uart::KernelDriver<uart::null::Driver, uart::mock::IoProvider, uart::Unsynchronized> driver;
-
+  uart::KernelDriver<uart::null::Driver, uart::mock::IoProvider, uart::UnsynchronizedPolicy> driver;
+  // Unsynchronized LockPolicy is dropped.
   driver.Init();
   EXPECT_EQ(driver.Write("hi!"), 3);
   EXPECT_EQ(driver.Write("hello world\n"), 12);
@@ -81,7 +105,7 @@ TEST(UartTests, Null) {
 }
 
 TEST(UartTests, All) {
-  using AllDriver = uart::all::KernelDriver<uart::mock::IoProvider, uart::Unsynchronized>;
+  using AllDriver = uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy>;
 
   AllDriver driver;
 
@@ -90,15 +114,15 @@ TEST(UartTests, All) {
 
   // Use selected driver.
   driver.Visit([](auto&& driver) {
-    driver.Init();
-    EXPECT_EQ(driver.Write("hi!"), 3);
+    driver.template Init();
+    EXPECT_EQ(driver.template Write("hi!"), 3);
   });
 
   // Transfer state to a new instantiation and pick up using it.
   AllDriver newdriver{driver.uart()};
   newdriver.Visit([](auto&& driver) {
-    EXPECT_EQ(driver.Write("hello world\n"), 12);
-    EXPECT_FALSE(driver.Read());
+    EXPECT_EQ(driver.template Write("hello world\n"), 12);
+    EXPECT_FALSE(driver.template Read());
   });
 }
 

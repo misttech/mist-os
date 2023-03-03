@@ -93,6 +93,9 @@ struct Driver {
   template <typename IoProvider>
   void InitInterrupt(IoProvider& io) {}
 
+  template <typename IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>
+  void Interrupt(IoProvider&, Lock&, Waiter&, Tx&&, Rx&&) {}
+
   // This tells the IoProvider what device resources to provide.
   constexpr config_type config() const { return {}; }
 

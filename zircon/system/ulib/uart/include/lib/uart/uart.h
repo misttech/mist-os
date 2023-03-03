@@ -6,6 +6,7 @@
 #define LIB_UART_UART_H_
 
 #include <lib/arch/intrin.h>
+#include <lib/zircon-internal/macros.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/assert.h>
 #include <zircon/boot/driver-config.h>
@@ -21,6 +22,7 @@
 #include <hwreg/pio.h>
 
 #include "chars-from.h"
+#include "sync.h"
 
 namespace acpi_lite {
 struct AcpiDebugPortDescriptor;
@@ -331,51 +333,6 @@ class BasicIoProvider<zbi_dcfg_simple_pio_t> {
 };
 #endif
 
-// The Sync class provides synchronization around the UartDriver.
-//
-// This is the degenerate case of the uart::KernelDriver Sync API.
-// It busy-waits with no locking.
-struct TA_CAP("uart") Unsynchronized {
-  // This is returned by lock() and passed back to unlock().
-  struct InterruptState {};
-
-  // The Sync object is normally default-constructed.
-  Unsynchronized() = default;
-
-  // The constructor argument is the UartDriver object.  This is only used
-  // by uart::mock::Sync so other implementations use a template just to
-  // ignore the argument without specializing the whole class on its type.
-  template <typename T>
-  explicit Unsynchronized(const T&) {}
-
-  // Runtime assertion that the underlying capability/resource is held.
-  void AssertHeld() TA_ASSERT() {}
-
-  // This is the normal pair, used in "process context", i.e. where
-  // interrupts might happen.  unlock takes the state returned by lock.
-  [[nodiscard]] const InterruptState lock() TA_ACQ() { return {}; }
-  void unlock(InterruptState) TA_REL() {}
-
-  // Wait for a good time to check again.  Implementations that actually
-  // block pending an interrupt first call enable_tx_interrupt(), then
-  // unlock to block, and finally relock when woken before return.
-  //
-  // This method is not annotated as requiring the associated capability since
-  // there is no clean way to generally ensure that `enable_tx_interrupt`'s
-  // call body actually acquired it. Instead, AssertHeld() is ensured to be
-  // called within that body.
-  template <typename T>
-  InterruptState Wait(InterruptState, T&& enable_tx_interrupt) {
-    arch::Yield();
-    return {};
-  }
-
-  // In blocking implementations, the interrupt handler calls this.  It should
-  // statically never be reached in an instantiation using this implementation,
-  // but static_assert for that only works in templates.
-  void Wake() TA_REQ(this) { ZX_PANIC("uart::Unsynchronized::Wake() should never be called"); }
-};
-
 // Forward declaration.
 namespace mock {
 class Driver;
@@ -390,8 +347,18 @@ class Driver;
 // handed off from one KernelDriver instantiation to a different one using a
 // different IoProvider (physboot vs kernel) and/or Sync (polling vs blocking).
 //
-template <class UartDriver, template <typename> class IoProvider, class Sync>
+template <class UartDriver, template <typename> class IoProvider, class SyncPolicy>
 class KernelDriver {
+  using Waiter = typename SyncPolicy::Waiter;
+
+  template <typename LockPolicy>
+  using Guard = typename SyncPolicy::template Guard<LockPolicy>;
+
+  template <typename MemberOf>
+  using Lock = typename SyncPolicy::template Lock<MemberOf>;
+
+  using DefaultLockPolicy = typename SyncPolicy::DefaultLockPolicy;
+
  public:
   using uart_type = UartDriver;
   static_assert(std::is_copy_constructible_v<uart_type>);
@@ -404,7 +371,13 @@ class KernelDriver {
   // replaced with a different one before ever calling Init.
   template <typename... Args>
   explicit KernelDriver(Args&&... args)
-      : uart_(std::forward<Args>(args)...), io_(uart_.config(), uart_.pio_size()) {}
+      : uart_(std::forward<Args>(args)...), io_(uart_.config(), uart_.pio_size()) {
+    if constexpr (std::is_same_v<mock::Driver, uart_type>) {
+      // Initialize the mock sync object with the mock driver.
+      lock_.Init(uart_);
+      waiter_.Init(uart_);
+    }
+  }
 
   // Access underlying hardware driver object.
   const auto& uart() const { return uart_; }
@@ -416,8 +389,9 @@ class KernelDriver {
   // Set up the device for nonblocking output and polling input.
   // If the device is handed off from a different instantiation,
   // this won't be called in the new instantiation.
+  template <typename LockPolicy = DefaultLockPolicy>
   void Init() {
-    Guard lock(sync_);
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     uart_.Init(io_);
   }
 
@@ -427,15 +401,17 @@ class KernelDriver {
   // left as previously configured.
   //
   // TODO(fxbug.dev/102726): Separate out the setting of baud rate.
+  template <typename LockPolicy = DefaultLockPolicy>
   void SetLineControl(std::optional<DataBits> data_bits = DataBits::k8,
                       std::optional<Parity> parity = Parity::kNone,
                       std::optional<StopBits> stop_bits = StopBits::k1) {
-    Guard lock(sync_);
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     uart_.SetLineControl(io_, data_bits, parity, stop_bits);
   }
 
+  template <typename LockPolicy = DefaultLockPolicy>
   void InitInterrupt() {
-    Guard lock(sync_);
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     uart_.InitInterrupt(io_);
   }
 
@@ -443,22 +419,23 @@ class KernelDriver {
   void Interrupt(Tx&& tx, Rx&& rx) TA_NO_THREAD_SAFETY_ANALYSIS {
     // Interrupt is responsible for properly acquiring and releasing sync
     // where needed.
-    uart_.Interrupt(io_, sync_, std::forward<Tx>(tx), std::forward<Rx>(rx));
+    uart_.Interrupt(io_, lock_, waiter_, std::forward<Tx>(tx), std::forward<Rx>(rx));
   }
 
   // This is the FILE-compatible API: `FILE::stdout_ = FILE{&driver};`.
+  template <typename LockPolicy = DefaultLockPolicy>
   int Write(std::string_view str) {
     uart::CharsFrom chars(str);  // Massage into uint8_t with \n -> CRLF.
     auto it = chars.begin();
-    Guard lock(sync_);
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     while (it != chars.end()) {
       // Wait until the UART is ready for Write.
       auto ready = uart_.TxReady(io_);
       while (!ready) {
         // Block or just unlock and spin or whatever "wait" means to Sync.
         // If that means blocking for interrupt wakeup, enable tx interrupts.
-        lock.Wait([this]() TA_REQ(sync_) {
-          sync_.AssertHeld();
+        waiter_.Wait(lock, [this]() {
+          SyncPolicy::AssertHeld(lock_);
           uart_.EnableTxInterrupt(io_);
         });
         ready = uart_.TxReady(io_);
@@ -470,36 +447,18 @@ class KernelDriver {
   }
 
   // This is a direct polling read, not used in interrupt-based operation.
+  template <typename LockPolicy = DefaultLockPolicy>
   auto Read() {
-    Guard lock(sync_);
+    Guard<LockPolicy> lock(&lock_, SOURCE_TAG);
     return uart_.Read(io_);
   }
 
  private:
-  friend Sync;
-  uart_type uart_ TA_GUARDED(sync_);
+  Lock<KernelDriver> lock_;
+  Waiter waiter_ TA_GUARDED(lock_);
+  uart_type uart_ TA_GUARDED(lock_);
+
   IoProvider<typename uart_type::config_type> io_;
-  Sync sync_{uart_};
-
-  class TA_SCOPED_CAP Guard {
-   public:
-    template <typename... T>
-    __WARN_UNUSED_CONSTRUCTOR explicit Guard(Sync& sync, T... args) TA_ACQ(sync) TA_ACQ(sync_)
-        : sync_(sync), state_(sync_.lock(std::forward<T>(args)...)) {}
-
-    ~Guard() TA_REL() { sync_.unlock(std::move(state_)); }
-
-    template <typename T>
-    void Wait(T&& enable) TA_REQ(sync_) {
-      state_ = sync_.Wait(std::move(state_), std::forward<T>(enable));
-    }
-
-    void Wake() TA_REQ(sync_) { sync_.Wake(); }
-
-   private:
-    Sync& sync_;
-    typename Sync::InterruptState state_;
-  };
 };
 
 // These specializations are defined in the library to cover all the ZBI item

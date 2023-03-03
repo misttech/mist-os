@@ -10,10 +10,12 @@
 // It also serves to demonstrate the API required by uart::KernelDriver.
 
 #include <lib/mock-function/mock-function.h>
+#include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/assert.h>
 #include <zircon/boot/image.h>
 
 #include <string_view>
+#include <type_traits>
 #include <variant>
 
 #include <hwreg/mock.h>
@@ -170,41 +172,80 @@ class Driver {
   using ExpectedResult = std::variant<bool, size_t>;
   mock_function::MockFunction<ExpectedResult, Expected> mock_;
 
-  friend class Sync;
+  friend class Lock;
+  friend class Waiter;
+};
+
+enum class Locking;
+enum class NoopLocking;
+
+template <typename LockType, typename LockTag>
+class TA_SCOPED_CAP Guard {
+ public:
+  template <typename... T>
+  __WARN_UNUSED_CONSTRUCTOR explicit Guard(LockType* sync, const char* tag) TA_ACQ(sync)
+      TA_ACQ(sync_)
+      : sync_(*sync) {
+    if constexpr (std::is_same_v<LockTag, Locking>) {
+      sync_.lock();
+    }
+  }
+
+  ~Guard() TA_REL() {
+    if constexpr (std::is_same_v<LockTag, Locking>) {
+      sync_.unlock();
+    }
+  }
+
+ private:
+  LockType& sync_;
 };
 
 // uart::KernelDriver Sync API
 //
 // The expected calls are primed into the uart::mock::Driver in their
 // appropriate ordering relative to calls into the Driver.
-class TA_CAP("uart") Sync {
+class TA_CAP("uart") Lock {
  public:
-  struct InterruptState {};
+  void Init(Driver& driver) { mock_ = &driver.mock_; }
 
-  explicit Sync(Driver& driver) : mock_(driver.mock_) {}
+  void lock() TA_ACQ() { mock_->Call(Driver::ExpectedLock{false}); }
 
-  InterruptState lock() TA_ACQ() {
-    mock_.Call(Driver::ExpectedLock{false});
-    return {};
-  }
+  void unlock() TA_REL() { mock_->Call(Driver::ExpectedLock{true}); }
 
-  void unlock(InterruptState) TA_REL() { mock_.Call(Driver::ExpectedLock{true}); }
+  void AssertHeld() TA_ASSERT() { mock_->Call(Driver::ExpectedAssertHeld{}); }
 
-  void AssertHeld() TA_ASSERT() { mock_.Call(Driver::ExpectedAssertHeld{}); }
+ private:
+  decltype(std::declval<Driver>().mock_)* mock_;
+};
 
-  template <typename T>
-  InterruptState Wait(InterruptState, T&& enable_tx_interrupt)
-      // TODO(mcgrathr): It doesn't grok that this is the same
-      // capability that the enable_tx_interrupt lambda requires.
-      TA_REQ(this) TA_NO_THREAD_SAFETY_ANALYSIS {
-    if (std::get<bool>(mock_.Call(Driver::ExpectedWait{}))) {
+class Waiter {
+ public:
+  void Init(Driver& driver) { mock_ = &driver.mock_; }
+
+  template <typename Guard, typename T>
+  void Wait(Guard& guard, T&& enable_tx_interrupt) TA_REQ(guard) {
+    if (std::get<bool>(mock_->Call(Driver::ExpectedWait{}))) {
       enable_tx_interrupt();
     }
-    return {};
   }
 
  private:
-  decltype(std::declval<Driver>().mock_)& mock_;
+  decltype(std::declval<Driver>().mock_)* mock_ = nullptr;
+};
+
+struct SyncPolicy {
+  template <typename MemberOf>
+  using Lock = Lock;
+
+  template <typename LockPolicy>
+  using Guard = Guard<mock::Lock, LockPolicy>;
+
+  using Waiter = Waiter;
+
+  using DefaultLockPolicy = Locking;
+
+  static void AssertHeld(mock::Lock& lock) TA_ASSERT(lock) { lock.AssertHeld(); }
 };
 
 }  // namespace mock

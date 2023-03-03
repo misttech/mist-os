@@ -9,7 +9,7 @@
 
 #include <lib/uart/all.h>
 
-using UartDriver = uart::all::KernelDriver<uart::BasicIoProvider, uart::Unsynchronized>;
+using UartDriver = uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy>;
 
 UartDriver& GetUartDriver();
 

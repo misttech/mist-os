@@ -13,6 +13,7 @@ zx_library("uart") {
     "lib/uart/null.h",
     "lib/uart/pl011.h",
     "lib/uart/qemu.h",
+    "lib/uart/sync.h",
     "lib/uart/uart.h",
   ]
 
