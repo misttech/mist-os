@@ -90,6 +90,10 @@ def GetRustToolchainCommands(rust_toolchain_packages, tag):
 
 
 def main():
+    default_jiri_manifest = os.path.join(FUCHSIA_DIR, "integration", "fuchsia", "toolchain")
+    open_source_jiri_manifest = os.path.join(FUCHSIA_DIR, "integration", "toolchain")
+    if not os.path.isfile(default_jiri_manifest) and os.path.isfile(open_source_jiri_manifest):
+      default_jiri_manifest = open_source_jiri_manifest
     parser = argparse.ArgumentParser(
         "fx roll-compiler",
         description="Roll a new compiler into Fuchsia",
@@ -104,7 +108,7 @@ before commands are run for any package.
     parser.add_argument("--package", "-p", action="append", help="CIPD package name")
     parser.add_argument(
         "--manifest",
-        default=os.path.join(FUCHSIA_DIR, "integration", "fuchsia", "toolchain"),
+        default=default_jiri_manifest,
         help="Jiri manifest file to edit",
     )
     parser.add_argument("--tag", default="git_revision", help="CIPD tag to publish")
