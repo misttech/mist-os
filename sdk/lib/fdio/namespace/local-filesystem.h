@@ -92,6 +92,8 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
  private:
   fdio_namespace();
 
+  void ResetRoot() __TA_REQUIRES(lock_);
+
   // Creates a local object with a connection to a vnode.
   // This object will increase the number of references to the namespace by
   // one.

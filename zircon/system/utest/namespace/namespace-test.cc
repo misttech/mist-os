@@ -257,7 +257,7 @@ TEST(NamespaceTest, UnbindNonRoot) {
   ASSERT_EQ(stat("my/local", &st), 0);
   ASSERT_EQ(stat("my/local/path", &st), 0);
 
-  ASSERT_EQ(fdio_ns_unbind(ns, "/"), ZX_ERR_NOT_SUPPORTED);
+  ASSERT_EQ(fdio_ns_unbind(ns, "/"), ZX_ERR_NOT_FOUND);
   ASSERT_EQ(fdio_ns_unbind(ns, "/my"), ZX_ERR_NOT_FOUND);
   ASSERT_EQ(fdio_ns_unbind(ns, "/my/local"), ZX_ERR_NOT_FOUND);
   ASSERT_EQ(fdio_ns_unbind(ns, "/my/local/path/okay/too/much/though"), ZX_ERR_NOT_FOUND);
@@ -274,7 +274,7 @@ TEST(NamespaceTest, UnbindNonRoot) {
   ASSERT_OK(fdio_ns_destroy(ns));
 }
 
-// Tests that we cannot unbind the root of the namespace.
+// Tests that we can unbind the root of the namespace.
 TEST(NamespaceTest, UnbindRoot) {
   fdio_ns_t* old_ns;
   ASSERT_OK(fdio_ns_get_installed(&old_ns));
@@ -282,18 +282,23 @@ TEST(NamespaceTest, UnbindRoot) {
   // Create a namespace with a single entry.
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
-  fbl::unique_fd fd(open("/boot/bin", O_RDONLY | O_DIRECTORY));
+  fbl::unique_fd fd(open("/boot", O_RDONLY | O_DIRECTORY));
   ASSERT_GT(fd.get(), 0);
   ASSERT_OK(fdio_ns_bind_fd(ns, "/", fd.get()));
   ASSERT_EQ(close(fd.release()), 0);
   ASSERT_OK(fdio_ns_chdir(ns));
 
+  constexpr char kBinDir[] = "bin";
   struct stat st;
-  ASSERT_EQ(stat("/", &st), 0);
+  ASSERT_EQ(stat(kBinDir, &st), 0, "%s", strerror(errno));
 
-  // We should not be able to unbind the root.
-  ASSERT_EQ(fdio_ns_unbind(ns, "/"), ZX_ERR_NOT_SUPPORTED);
-  ASSERT_EQ(stat("/", &st), 0);
+  // We should be able to unbind the root.
+  ASSERT_OK(fdio_ns_unbind(ns, "/"));
+  // Re-chdir the namespace so that we bind to the new "/" dir which
+  // was previously backed by "/boot".
+  ASSERT_OK(fdio_ns_chdir(ns));
+  ASSERT_EQ(stat(kBinDir, &st), -1);
+  ASSERT_EQ(errno, ENOENT, "%s", strerror(errno));
 
   ASSERT_OK(fdio_ns_chdir(old_ns));
   ASSERT_OK(fdio_ns_destroy(ns));

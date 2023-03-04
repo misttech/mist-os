@@ -6,6 +6,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/vfs/cpp/composed_service_dir.h>
@@ -17,6 +18,7 @@
 
 namespace {
 
+constexpr char kRootDirectory[] = "/";
 constexpr char kServiceDirectory[] = "/svc";
 constexpr char kNetstackExposedDir[] =
     "/hub-v2/children/core/children/network/children/netstack/out/svc";
@@ -31,91 +33,152 @@ constexpr const char* kPacketSocketProviderName =
 // The packet socket provider exposed by the core realm's netstack is used if it
 // is available.
 __attribute__((constructor)) void init_packet_socket_provider() {
-  if (std::filesystem::exists(std::filesystem::path(kServiceDirectory) /
-                              kPacketSocketProviderName)) {
+  std::filesystem::path svc_dir_path(kServiceDirectory);
+
+  if (std::filesystem::exists(svc_dir_path / kPacketSocketProviderName)) {
     // Packet socket provider is already available.
     return;
   }
 
-  zx::result netstack_exposed_dir = component::OpenServiceRoot(kNetstackExposedDir);
-  switch (zx_status_t status = netstack_exposed_dir.status_value(); status) {
-    case ZX_OK:
-      break;
-    case ZX_ERR_NOT_FOUND:
-      // Most likely in the non-root realm.
-      return;
-    default:
-      ZX_PANIC("Failed to open netstack exposed directory at %s: %s", kNetstackExposedDir,
-               zx_status_get_string(status));
-  }
-
-  static vfs::ComposedServiceDir composed_svc_dir;
-
-  // Our composed service directory should be a superset of the default service
-  // directory.
-  {
-    zx::result result = component::OpenServiceRoot();
-    ZX_ASSERT_MSG(result.is_ok(), "Failed to open root service directory: %s",
-                  result.status_string());
-    // TODO(https://fxbug.dev/72980): Avoid this type-unsafe conversion.
-    composed_svc_dir.set_fallback(
-        fidl::InterfaceHandle<fuchsia::io::Directory>(result->TakeChannel()));
-  }
-
-  // Add the packet socket provider service to our composed service directory
-  // by reaching into netstack's exposed directory via hub(-v2).
-  //
-  // https://fuchsia.dev/fuchsia-src/concepts/components/v2/hub?hl=en
-  composed_svc_dir.AddService(
-      kPacketSocketProviderName,
-      std::make_unique<vfs::Service>(
-          [netstack_exposed_dir = std::move(netstack_exposed_dir.value())](
-              zx::channel request, async_dispatcher_t* dispatcher) mutable {
-            zx::result result = component::ConnectAt(
-                netstack_exposed_dir.borrow(),
-                fidl::ServerEnd<fuchsia_posix_socket_packet::Provider>(std::move(request)));
-            ZX_ASSERT_MSG(result.is_ok(), "Failed to connect to packet socker provider: %s",
-                          result.status_string());
-          }));
-
-  static async::Loop composed_svc_dir_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  static async::Loop composed_dir_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
 
   // Replace the default service directory with our composed service directory
   // to make packet socket provider available to the program and start serving
   // requests to the composed service directory.
   {
-    zx::channel client, server;
-    {
-      zx_status_t status = zx::channel::create(0, &client, &server);
-      ZX_ASSERT_MSG(status == ZX_OK, "Failed to create channels: %s", zx_status_get_string(status));
-    }
-
-    {
-      zx_status_t status = composed_svc_dir.Serve(
-          fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::DIRECTORY,
-          std::move(server), composed_svc_dir_loop.dispatcher());
-      ZX_ASSERT_MSG(status == ZX_OK,
-                    "Failed to start serving requsts for composed service directory: %s",
-                    zx_status_get_string(status));
-    }
-
     fdio_ns_t* ns;
     {
-      zx_status_t status = status = fdio_ns_get_installed(&ns);
-      ZX_ASSERT_MSG(status == ZX_OK, "Failed to get installed namespace: %s",
-                    zx_status_get_string(status));
+      zx_status_t status = fdio_ns_get_installed(&ns);
+      ZX_ASSERT_MSG(status == ZX_OK, "fdio_ns_get_installed(_): %s", zx_status_get_string(status));
     }
+
+    constexpr fuchsia::io::OpenFlags kServeFlags(fuchsia::io::OpenFlags::DIRECTORY);
+
+    auto bind_to_ns = [ns](const char* path, vfs::ComposedServiceDir& composed_dir) {
+      zx::channel client, server;
+      {
+        zx_status_t status = zx::channel::create(0, &client, &server);
+        ZX_ASSERT_MSG(status == ZX_OK, "zx::channel::create(0, _, _): %s",
+                      zx_status_get_string(status));
+      }
+      {
+        zx_status_t status = fdio_ns_bind(ns, path, client.release());
+        ZX_ASSERT_MSG(status == ZX_OK, "fdio_ns_bind(_, %s, _): %s", path,
+                      zx_status_get_string(status));
+      }
+      {
+        zx_status_t status =
+            composed_dir.Serve(kServeFlags, std::move(server), composed_dir_loop.dispatcher());
+        ZX_ASSERT_MSG(status == ZX_OK, "composed_dir.Serve(0x%x, _, _): %s", kServeFlags,
+                      zx_status_get_string(status));
+      }
+    };
+
+    static vfs::ComposedServiceDir composed_svc_dir;
+
+    // Our composed service directory should be a superset of the default service
+    // directory.
     {
-      zx_status_t status = fdio_ns_unbind(ns, kServiceDirectory);
-      ZX_ASSERT_MSG(status == ZX_OK, "Failed to unbind svc: %s", zx_status_get_string(status));
+      zx::result original_svc_dir = component::OpenServiceRoot();
+      switch (zx_status_t status = original_svc_dir.status_value(); status) {
+        case ZX_OK:
+          break;
+        case ZX_ERR_NOT_FOUND:
+          // Environment didn't populate a service directory for us to use as a
+          // fallback.
+          return;
+        default:
+          ZX_PANIC("component::OpenServiceRoot(): %s", zx_status_get_string(status));
+      }
+      // TODO(https://fxbug.dev/72980): Avoid this type-unsafe conversion.
+      composed_svc_dir.set_fallback(
+          fidl::InterfaceHandle<fuchsia::io::Directory>(original_svc_dir->TakeChannel()));
     }
+
+    // Add the packet socket provider service to our composed service directory
+    // by reaching into netstack's exposed directory via hub(-v2).
+    //
+    // https://fuchsia.dev/fuchsia-src/concepts/components/v2/hub?hl=en
     {
-      zx_status_t status = status = fdio_ns_bind(ns, kServiceDirectory, client.release());
-      ZX_ASSERT_MSG(status == ZX_OK, "Failed to bind svc: %s", zx_status_get_string(status));
+      zx::result netstack_exposed_dir = component::OpenServiceRoot(kNetstackExposedDir);
+      switch (zx_status_t status = netstack_exposed_dir.status_value(); status) {
+        case ZX_OK:
+          break;
+        case ZX_ERR_NOT_FOUND:
+          // Most likely in the non-root realm.
+          return;
+        default:
+          ZX_PANIC("component::OpenServiceRoot(%s): %s", kNetstackExposedDir,
+                   zx_status_get_string(status));
+      }
+
+      composed_svc_dir.AddService(
+          kPacketSocketProviderName,
+          std::make_unique<vfs::Service>(
+              [netstack_exposed_dir = std::move(netstack_exposed_dir.value())](
+                  zx::channel request, async_dispatcher_t* dispatcher) mutable {
+                zx::result result = component::ConnectAt(
+                    netstack_exposed_dir.borrow(),
+                    fidl::ServerEnd<fuchsia_posix_socket_packet::Provider>(std::move(request)));
+                ZX_ASSERT_MSG(result.is_ok(), "Failed to connect to packet socker provider: %s",
+                              result.status_string());
+              }));
+    }
+
+    // Attempt to unbind the service directory from the namespace so we can
+    // replace it.
+    switch (zx_status_t status = fdio_ns_unbind(ns, svc_dir_path.c_str()); status) {
+      // We get |ZX_OK| when the namespace the service directory is a mount
+      // point.
+      case ZX_OK:
+        bind_to_ns(svc_dir_path.c_str(), composed_svc_dir);
+        break;
+      // We get |ZX_ERR_BAD_PATH| when the service directory isn't a mount point
+      // in the namespace (process launched with delayed directories after
+      // https://fuchsia.googlesource.com/fuchsia/+/82ad8d81396d5659515e830a7364cf33b1605b69).
+      case ZX_ERR_BAD_PATH: {
+        std::filesystem::path root(kRootDirectory);
+        static vfs::ComposedServiceDir composed_root_dir;
+        {
+          zx::channel client, server;
+          {
+            zx_status_t status = zx::channel::create(0, &client, &server);
+            ZX_ASSERT_MSG(status == ZX_OK, "zx::channel::create(0, _, _): %s",
+                          zx_status_get_string(status));
+          }
+          {
+            zx_status_t status = fdio_service_connect(root.c_str(), server.release());
+            ZX_ASSERT_MSG(status == ZX_OK, "fdio_service_connect(%s, _): %s", root.c_str(),
+                          zx_status_get_string(status));
+          }
+          composed_root_dir.set_fallback(
+              fidl::InterfaceHandle<fuchsia::io::Directory>(std::move(client)));
+        }
+
+        composed_root_dir.AddService(
+            svc_dir_path.filename().c_str(),
+            std::make_unique<vfs::Service>(
+                [](zx::channel request, async_dispatcher_t* dispatcher) mutable {
+                  zx_status_t status =
+                      composed_svc_dir.Serve(kServeFlags, std::move(request), dispatcher);
+                  ZX_ASSERT_MSG(status == ZX_OK, "composed_svc_dir.Serve(0x%x, _, _): %s",
+                                kServeFlags, zx_status_get_string(status));
+                }));
+
+        {
+          zx_status_t status = fdio_ns_unbind(ns, root.c_str());
+          ZX_ASSERT_MSG(status == ZX_OK, "fdio_ns_unbind(_, %s): %s", root.c_str(),
+                        zx_status_get_string(status));
+        }
+
+        bind_to_ns(root.c_str(), composed_root_dir);
+      } break;
+      default:
+        ZX_PANIC("fdio_ns_unbind(_, %s): %s", svc_dir_path.c_str(), zx_status_get_string(status));
     }
   }
 
-  zx_status_t status = composed_svc_dir_loop.StartThread();
+  zx_status_t status = composed_dir_loop.StartThread();
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to start async loop thread: %s",
                 zx_status_get_string(status));
 }
