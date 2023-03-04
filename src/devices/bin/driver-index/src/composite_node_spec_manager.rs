@@ -122,6 +122,11 @@ impl CompositeNodeSpecManager {
                         }),
                     },
                 );
+                log::info!(
+                    "Matched '{}' to composite node spec '{}'",
+                    get_driver_url(&matched_composite),
+                    name
+                );
                 return Ok((matched_composite.info, matched_composite.names));
             }
         }
@@ -166,13 +171,18 @@ impl CompositeNodeSpecManager {
     }
 
     pub fn new_driver_available(&mut self, resolved_driver: ResolvedDriver) {
-        for spec in self.spec_list.values_mut() {
+        for (name, spec) in self.spec_list.iter_mut() {
             if spec.matched.is_some() {
                 continue;
             }
             let matched_composite_result =
                 match_composite_properties(&resolved_driver, &spec.nodes);
             if let Ok(Some(matched_composite)) = matched_composite_result {
+                log::info!(
+                    "Matched '{}' to composite node spec '{}'",
+                    get_driver_url(&matched_composite),
+                    name
+                );
                 spec.matched = Some(matched_composite);
             }
         }
@@ -493,6 +503,15 @@ fn node_matches_composite_driver(
             match_bind(match_bind_data, &props).unwrap_or(false)
         }
     }
+}
+
+fn get_driver_url(composite: &MatchedComposite) -> String {
+    if let Some(driver_info) = &composite.info.driver_info {
+        if let Some(url) = &driver_info.driver_url {
+            return url.to_string();
+        }
+    }
+    "".to_string()
 }
 
 #[cfg(test)]

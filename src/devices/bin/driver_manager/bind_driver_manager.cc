@@ -224,8 +224,8 @@ zx_status_t BindDriverManager::MatchAndBindCompositeNodeSpec(const fbl::RefPtr<D
     bool is_composite_multibind = dev->flags & DEV_CTX_ALLOW_MULTI_COMPOSITE;
     auto bind_result = coordinator_->composite_node_spec_manager().BindParentSpec(
         std::get<fdi::MatchedCompositeNodeParentInfo>(driver), device_ptr, is_composite_multibind);
-    if (bind_result.is_error()) {
-      LOGF(WARNING, "Failed to bind parent: %d", bind_result.status_value());
+    if (bind_result.is_error() && bind_result.status_value() != ZX_ERR_NOT_FOUND) {
+      LOGF(WARNING, "Failed to bind parent: %s", bind_result.status_string());
     }
   }
 
