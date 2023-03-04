@@ -39,6 +39,11 @@
             path: "/dev",
         },
         {
+            directory: "config",
+            rights: [ "r*" ],
+            path: "/config",
+        },
+        {
             protocol: [
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.CpuResource",

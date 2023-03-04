@@ -205,6 +205,22 @@ impl TestEnvBuilder {
             .await
             .unwrap();
 
+        realm_builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("pkg")
+                            .subdir("config/power_manager")
+                            .as_("config")
+                            .path("/config")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .from(Ref::framework())
+                    .to(&power_manager),
+            )
+            .await
+            .unwrap();
+
         let power_manager_to_parent_routes = Route::new()
             .capability(Capability::protocol_by_name(
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",

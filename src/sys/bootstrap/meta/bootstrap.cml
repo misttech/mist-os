@@ -108,7 +108,7 @@
         },
         {
             name: "power_manager",
-            url: "fuchsia-boot:///#meta/power-manager.cm",
+            url: "fuchsia-boot:///power-manager#meta/power-manager.cm",
         },
         {
             name: "virtual_console",
@@ -321,6 +321,14 @@
             to: [ "#virtual_console" ],
             rights: [ "r*" ],
             subdir: "data",
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "config",
+            to: [ "#power_manager" ],
+            rights: [ "r*" ],
+            subdir: "config/power_manager",
         },
         {
             protocol: [

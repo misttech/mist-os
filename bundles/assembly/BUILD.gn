@@ -81,7 +81,6 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/dlog:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
-    "//src/power/power-manager:bootfs",
     "//src/sys/bootstrap:bootfs",
     "//src/sys/component_manager:bootfs",
   ]
@@ -98,6 +97,7 @@ assembly_input_bundle("bootstrap") {
     "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver-index:package",
     "//src/devices/bin/driver_manager:package",
+    "//src/power/power-manager:package",
     "//src/power/shutdown-shim:package",
   ]
   kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]

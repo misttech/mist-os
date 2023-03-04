@@ -473,7 +473,7 @@ pub mod tests {
 
     pub fn setup_test_node(shutdown_function: impl Fn() + 'static) -> Rc<SystemShutdownHandler> {
         SystemShutdownHandlerBuilder::new()
-            .with_force_shutdown_function(Box::new(shutdown_function))
+            .with_component_mgr_proxy(setup_fake_component_mgr_service(shutdown_function))
             .build()
             .unwrap()
     }

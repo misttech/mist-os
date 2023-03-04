@@ -66,7 +66,7 @@ pub struct ThermalStateHandlerBuilder<'a, 'b> {
 
 impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
     /// Default path to the thermal config file. Can be overridden by JSON configuration.
-    const THERMAL_CONFIG_PATH: &'static str = "/pkg/config/power_manager/thermal_config.json";
+    const THERMAL_CONFIG_PATH: &'static str = "/config/thermal_config.json";
 
     pub fn new_from_json(
         json_data: json::Value,

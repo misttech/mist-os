@@ -61,8 +61,7 @@ pub struct SystemPowerModeHandlerBuilder<'a, 'b> {
 
 impl<'a, 'b> SystemPowerModeHandlerBuilder<'a, 'b> {
     /// Default path to the system power mode config file. Can be overridden by JSON configuration.
-    const SYSTEM_POWER_MODE_CONFIG_PATH: &'static str =
-        "/pkg/config/power_manager/system_power_mode_config.json";
+    const SYSTEM_POWER_MODE_CONFIG_PATH: &'static str = "/config/system_power_mode_config.json";
 
     #[cfg(test)]
     pub fn new() -> Self {
