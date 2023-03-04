@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/fit/defer.h>
+#include <lib/fxt/serializer.h>
 #include <lib/ktrace/ktrace_internal.h>
 #include <lib/unittest/unittest.h>
 
@@ -612,8 +613,7 @@ class TestKTraceState : public ::internal::KTraceState {
     uint32_t expected_offset = kInitialOffset;
     ASSERT_TRUE(state.CheckExpectedOffset(expected_offset));
 
-    // Header for a metadata record with a size of 1 * 8 bytes.
-    constexpr uint64_t fxt_header = 1 << 4;
+    constexpr uint64_t fxt_header = fxt::MakeHeader(fxt::RecordType::kMetadata, fxt::WordSize(1));
 
     // This initial Reserve() call should succeed and advance the
     // buffer offset.
@@ -648,7 +648,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
     TestKTraceState state;
     ASSERT_TRUE(state.Init(kDefaultBufferSize, KTRACE_GRP_ALL));
-    constexpr uint64_t fxt_header = 0x0;
+    constexpr uint64_t fxt_header = fxt::MakeHeader(fxt::RecordType::kMetadata, fxt::WordSize(1));
 
     {
       zx::result<PendingCommit> reservation = state.Reserve(fxt_header);

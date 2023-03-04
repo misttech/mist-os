@@ -511,6 +511,9 @@ zx_status_t KTraceState::AllocBuffer() {
 }
 
 uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
+  // At least one word must be reserved to store the trace record header.
+  DEBUG_ASSERT(num_words >= 1);
+
   const uint32_t num_bytes = num_words * sizeof(uint64_t);
 
   constexpr uint64_t kUncommitedRecordTag = 0;
