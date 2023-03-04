@@ -53,14 +53,16 @@ constexpr uint64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
 
 FakeDisplay::FakeDisplay(zx_device_t* parent)
     : DeviceType(parent),
-      dcimpl_proto_({&display_controller_impl_protocol_ops_, this}),
-      clamp_rgbimpl_proto_({&display_clamp_rgb_impl_protocol_ops_, this}) {
+      display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
+      display_clamp_rgb_impl_banjo_protocol_({&display_clamp_rgb_impl_protocol_ops_, this}) {
   ZX_DEBUG_ASSERT(parent);
 }
 
 FakeDisplay::~FakeDisplay() = default;
 
 zx_status_t FakeDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
+  fbl::AutoLock lock(&capture_lock_);
+
   clamp_rgb_value_ = minimum_rgb;
   return ZX_OK;
 }
@@ -78,9 +80,9 @@ void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
 
 zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
   auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (!endpoints.is_ok()) {
+  if (endpoints.is_error()) {
     zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
+    return endpoints.error_value();
   }
   auto& [client, server] = endpoints.value();
   auto status = sysmem_.Connect(server.TakeChannel());
@@ -104,10 +106,10 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
 void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   fbl::AutoLock lock(&display_lock_);
-  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
+  controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
   added_display_args_t args;
   PopulateAddedDisplayArgs(&args);
-  dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
+  controller_interface_client_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
 }
 
 zx_status_t FakeDisplay::ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset) {
@@ -422,7 +424,7 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_i
 zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
     const display_capture_interface_protocol_t* intf) {
   fbl::AutoLock lock(&capture_lock_);
-  capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
+  capture_interface_client_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   capture_active_id_ = INVALID_ID;
   return ZX_OK;
 }
@@ -568,10 +570,15 @@ zx_status_t FakeDisplay::SetupDisplayInterface() {
 
   current_image_valid_ = false;
 
-  if (dc_intf_.is_valid()) {
+  if (controller_interface_client_.is_valid()) {
     added_display_args_t args;
     PopulateAddedDisplayArgs(&args);
-    dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
+
+    controller_interface_client_.OnDisplaysChanged(
+        &args, /*added_display_count=*/1,
+        /*removed_display_list=*/nullptr, /*removed_display_count=*/0,
+        /*out_display_info_list=*/nullptr, /*display_info_count=*/0,
+        /*out_display_info_actual=*/nullptr);
   }
 
   return ZX_OK;
@@ -585,7 +592,7 @@ int FakeDisplay::CaptureThread() {
     }
     {
       fbl::AutoLock lock(&capture_lock_);
-      if (capture_intf_.is_valid() && (capture_active_id_ != INVALID_ID) &&
+      if (capture_interface_client_.is_valid() && (capture_active_id_ != INVALID_ID) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
         {
           fbl::AutoLock lock(&display_lock_);
@@ -646,7 +653,7 @@ int FakeDisplay::CaptureThread() {
             }
           }
         }
-        capture_intf_.OnCaptureComplete();
+        capture_interface_client_.OnCaptureComplete();
         capture_active_id_ = INVALID_ID;
         capture_complete_signal_count_ = 0;
       }
@@ -668,8 +675,9 @@ int FakeDisplay::VSyncThread() {
 
 void FakeDisplay::SendVsync() {
   fbl::AutoLock lock(&display_lock_);
-  if (dc_intf_.is_valid()) {
-    dc_intf_.OnDisplayVsync(kDisplayId, zx_clock_get_monotonic(), &current_config_stamp_);
+  if (controller_interface_client_.is_valid()) {
+    controller_interface_client_.OnDisplayVsync(kDisplayId, zx_clock_get_monotonic(),
+                                                &current_config_stamp_);
   }
 }
 

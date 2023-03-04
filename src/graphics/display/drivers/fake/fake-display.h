@@ -105,13 +105,16 @@ class FakeDisplay : public DeviceType,
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
   void DdkChildPreRelease(void* child_ctx) {
     fbl::AutoLock lock(&display_lock_);
-    dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+    controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient();
   }
 
-  const display_controller_impl_protocol_t* dcimpl_proto() const { return &dcimpl_proto_; }
-  const display_clamp_rgb_impl_protocol_t* clamp_rgbimpl_proto() const {
-    return &clamp_rgbimpl_proto_;
+  const display_controller_impl_protocol_t* display_controller_impl_banjo_protocol() const {
+    return &display_controller_impl_banjo_protocol_;
   }
+  const display_clamp_rgb_impl_protocol_t* display_clamp_rgb_impl_banjo_protocol() const {
+    return &display_clamp_rgb_impl_banjo_protocol_;
+  }
+
   void SendVsync();
 
   // Just for display core unittests.
@@ -122,7 +125,10 @@ class FakeDisplay : public DeviceType,
     return imported_images_.size_slow();
   }
 
-  uint8_t GetClampRgbValue() const { return clamp_rgb_value_; }
+  uint8_t GetClampRgbValue() const {
+    fbl::AutoLock lock(&capture_lock_);
+    return clamp_rgb_value_;
+  }
 
  private:
   zx_status_t SetupDisplayInterface();
@@ -137,23 +143,27 @@ class FakeDisplay : public DeviceType,
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
 
-  display_controller_impl_protocol_t dcimpl_proto_ = {};
-  display_clamp_rgb_impl_protocol_t clamp_rgbimpl_proto_ = {};
+  // Banjo vtable for fuchsia.hardware.display.controller.DisplayControllerImpl.
+  const display_controller_impl_protocol_t display_controller_impl_banjo_protocol_;
+
+  // Banjo vtable for fuchsia.hardware.display.clamprgb.DisplayClampRgbImpl.
+  const display_clamp_rgb_impl_protocol_t display_clamp_rgb_impl_banjo_protocol_;
+
   ddk::PDevFidl pdev_;
   ddk::SysmemProtocolClient sysmem_;
 
   std::atomic_bool vsync_shutdown_flag_ = false;
   std::atomic_bool capture_shutdown_flag_ = false;
 
-  // Thread handles
+  // Thread handles. Only used on the thread that starts/stops us.
   bool vsync_thread_running_ = false;
   thrd_t vsync_thread_;
   thrd_t capture_thread_;
 
   // Locks used by the display driver
-  fbl::Mutex display_lock_;        // general display state (i.e. display_id)
-  mutable fbl::Mutex image_lock_;  // used for accessing imported_images
-  fbl::Mutex capture_lock_;        // general capture state
+  mutable fbl::Mutex display_lock_;  // General display state (i.e. display_id)
+  mutable fbl::Mutex image_lock_;    // Guards `imported_images`_`
+  mutable fbl::Mutex capture_lock_;  // General capture state
 
   // The ID for currently active capture
   uint64_t capture_active_id_ TA_GUARDED(capture_lock_);
@@ -176,16 +186,20 @@ class FakeDisplay : public DeviceType,
 
   // Capture complete is signaled at vsync time. This counter introduces a bit of delay
   // for signal capture complete
-  uint64_t capture_complete_signal_count_ = 0;
+  uint64_t capture_complete_signal_count_ TA_GUARDED(capture_lock_) = 0;
 
-  // Value that holds the clamped RGB value
-  uint8_t clamp_rgb_value_ = 0;
+  // Minimum value of RGB channels, via the DisplayClampRgbImpl protocol.
+  //
+  // This is associated with the display capture lock so we have the option to
+  // reflect the clamping when we simulate display capture.
+  uint8_t clamp_rgb_value_ TA_GUARDED(capture_lock_) = 0;
 
   // Display controller related data
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(display_lock_);
+  ddk::DisplayControllerInterfaceProtocolClient controller_interface_client_
+      TA_GUARDED(display_lock_);
 
   // Display Capture interface protocol
-  ddk::DisplayCaptureInterfaceProtocolClient capture_intf_ TA_GUARDED(capture_lock_);
+  ddk::DisplayCaptureInterfaceProtocolClient capture_interface_client_ TA_GUARDED(capture_lock_);
 };
 
 }  // namespace fake_display
