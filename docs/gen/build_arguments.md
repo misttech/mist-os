@@ -2879,7 +2879,7 @@ From //third_party/perfetto/gn/perfetto.gni:302
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:147
+From //src/power/power-manager/BUILD.gn:145
 
 ### enable_recovery_ui_v2
 
