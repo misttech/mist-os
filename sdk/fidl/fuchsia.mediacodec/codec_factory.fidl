@@ -566,7 +566,6 @@ protocol CodecFactory {
     /// A client should call |GetDetailedCodecDescriptions()| to get a list of
     /// codecs supported either by software implementations or by underlying hardware.
     @available(added=11)
-    @transitional("Temporarily transitional, for OOT servers")
     GetDetailedCodecDescriptions() -> (table {
         1: codecs vector<DetailedCodecDescription>:CODEC_FACTORY_CODEC_LIST_SIZE_MAX;
     });
