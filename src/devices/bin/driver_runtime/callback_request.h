@@ -12,10 +12,13 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/object.h"
 
 // Defined in "src/devices/bin/driver_runtime/dispatcher.h"
-struct fdf_dispatcher;
+namespace driver_runtime {
+class Dispatcher;
+}  // namespace driver_runtime
 
 namespace driver_runtime {
 
@@ -43,7 +46,7 @@ class CallbackRequest
   // Initializes the callback to be queued.
   // Sets the dispatcher, and the callback that will be called by |Call|.
   // |async_operation| is the async_dispatcher_t operation that this callback request manages.
-  void SetCallback(struct fdf_dispatcher* dispatcher, Callback callback,
+  void SetCallback(driver_runtime::Dispatcher* dispatcher, Callback callback,
                    void* async_operation = nullptr) {
     ZX_ASSERT(!dispatcher_);
     ZX_ASSERT(!callback_);
@@ -53,6 +56,8 @@ class CallbackRequest
     if (async_operation) {
       async_operation_ = async_operation;
     }
+    initiating_driver_ = driver_context::GetCurrentDriver();
+    initiating_dispatcher_ = driver_context::GetCurrentDispatcher();
   }
 
   // Calls the callback, returning ownership of the request back the original requester,
@@ -90,15 +95,24 @@ class CallbackRequest
 
   RequestType request_type() { return request_type_; }
 
+  void* async_operation() { return async_operation_.value_or(nullptr); }
+
+  const void* initiating_driver() { return initiating_driver_; }
+  driver_runtime::Dispatcher* initiating_dispatcher() { return initiating_dispatcher_; }
+
  private:
   const RequestType request_type_;
 
-  struct fdf_dispatcher* dispatcher_ = nullptr;
+  driver_runtime::Dispatcher* dispatcher_ = nullptr;
   Callback callback_;
   // Reason for scheduling the callback.
   std::optional<zx_status_t> reason_;
   // The async_dispatcher_t operation that this callback request is wrapping around.
   std::optional<void*> async_operation_;
+
+  // This is for tracking who caused the callback request to be queued.
+  const void* initiating_driver_ = nullptr;
+  driver_runtime::Dispatcher* initiating_dispatcher_ = nullptr;
 };
 
 }  // namespace driver_runtime

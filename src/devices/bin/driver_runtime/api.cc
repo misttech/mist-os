@@ -15,6 +15,7 @@
 #include "src/devices/bin/driver_runtime/dispatcher.h"
 #include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/handle.h"
+#include "src/devices/lib/log/log.h"
 
 // fdf_arena_t interface
 
@@ -197,6 +198,14 @@ __EXPORT zx_status_t fdf_env_dispatcher_create_with_owner(
   }
   *out_dispatcher = static_cast<fdf_dispatcher*>(dispatcher);
   return ZX_OK;
+}
+
+__EXPORT void fdf_env_dispatcher_dump(fdf_dispatcher_t* dispatcher) {
+  std::vector<std::string> dump;
+  dispatcher->DumpToString(&dump);
+  for (auto& str : dump) {
+    LOGF(INFO, "%s", str.c_str());
+  }
 }
 
 __EXPORT const void* fdf_env_get_current_driver() { return driver_context::GetCurrentDriver(); }

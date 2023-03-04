@@ -48,6 +48,9 @@ zx_status_t fdf_env_dispatcher_create_with_owner(const void* driver, uint32_t op
                                                  fdf_dispatcher_shutdown_observer_t* observer,
                                                  fdf_dispatcher_t** out_dispatcher);
 
+// Dumps the state of the dispatcher to the INFO log.
+void fdf_env_dispatcher_dump(fdf_dispatcher_t* dispatcher);
+
 // Asynchronously shuts down all dispatchers owned by |driver|.
 // |observer| will be notified once shutdown completes. This is guaranteed to be
 // after all the dispatcher's shutdown observers have been called, and will be running

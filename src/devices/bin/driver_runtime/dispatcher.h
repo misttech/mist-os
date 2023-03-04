@@ -47,6 +47,17 @@ class Dispatcher : public async_dispatcher_t,
  public:
   using ThreadAdder = fit::callback<zx_status_t()>;
 
+  enum class DispatcherState {
+    // The dispatcher is running and accepting new requests.
+    kRunning,
+    // The dispatcher is in the process of shutting down.
+    kShuttingDown,
+    // The dispatcher has completed shutdown and can be destroyed.
+    kShutdown,
+    // The dispatcher is about to be destroyed.
+    kDestroyed,
+  };
+
   // Indirect irq object which is used to ensure irqs are tracked and synchronize irqs on
   // SYNCHRONIZED dispatchers.
   // Public so it can be referenced by the DispatcherCoordinator.
@@ -93,6 +104,31 @@ class Dispatcher : public async_dispatcher_t,
     async_irq_t* original_irq_;
 
     zx_packet_interrupt_t interrupt_packet_ = {};
+  };
+
+  struct TaskDebugInfo {
+    async_task_t* ptr;
+    async_task_handler_t* handler;
+    Dispatcher* initiating_dispatcher;
+    const void* initiating_driver;
+  };
+
+  // Holds debug information for the current dispatcher state.
+  // Pointers are not guaranteed to stay valid and are for identification purposes only.
+  struct DumpState {
+    // The dispatcher that is running on the current thread.
+    // Will be NULL if the thread is not managed by the driver runtime.
+    Dispatcher* running_dispatcher;
+    const void* running_driver;
+    // The dispatcher that has been requested to be dumped to the log.
+    Dispatcher* dispatcher_to_dump;
+    // State of |dispatcher_to_dump|.
+    const void* driver_owner;
+    fbl::String name;
+    bool synchronized;
+    bool allow_sync_calls;
+    DispatcherState state;
+    std::vector<TaskDebugInfo> queued_tasks;
   };
 
   // Public for std::make_unique.
@@ -231,6 +267,14 @@ class Dispatcher : public async_dispatcher_t,
   // TODO(fxbug.dev/105578): replace fdf::Channel with a generic C++ handle type when available.
   zx_status_t ScheduleTokenCallback(fdf_token_t* token, zx_status_t status, fdf::Channel channel);
 
+  // Dumps the dispatcher state as a vector of formatted strings.
+  void DumpToString(std::vector<std::string>* dump_out);
+  // Dumps the dispatcher state to |out_state|.
+  void Dump(DumpState* out_state);
+  // Converts |dump_state| to a vector of formatted strings.
+  // Any existing contents in |dump_out| will be cleared.
+  void FormatDump(DumpState* dump_state, std::vector<std::string>* dump_out);
+
   // Returns the dispatcher options specified by the user.
   uint32_t options() const { return options_; }
   bool unsynchronized() const { return unsynchronized_; }
@@ -248,17 +292,6 @@ class Dispatcher : public async_dispatcher_t,
   }
 
  private:
-  enum class DispatcherState {
-    // The dispatcher is running and accepting new requests.
-    kRunning,
-    // The dispatcher is in the process of shutting down.
-    kShuttingDown,
-    // The dispatcher has completed shutdown and can be destroyed.
-    kShutdown,
-    // The dispatcher is about to be destroyed.
-    kDestroyed,
-  };
-
   // TODO(fxbug.dev/87834): determine an appropriate size.
   static constexpr uint32_t kBatchSize = 10;
 

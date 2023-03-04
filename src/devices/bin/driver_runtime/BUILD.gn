@@ -27,6 +27,7 @@ source_set("driver_runtime_impl") {
     "arena.cc",
     "channel.cc",
     "dispatcher.cc",
+    "dispatcher_dump.cc",
     "driver_context.cc",
     "handle.cc",
     "message_packet.cc",
@@ -68,6 +69,7 @@ test("driver_runtime_test") {
   sources = [
     "arena_test.cc",
     "channel_test.cc",
+    "dispatcher_dump_test.cc",
     "dispatcher_test.cc",
     "driver_context_test.cc",
     "handle_test.cc",

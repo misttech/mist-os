@@ -31,10 +31,14 @@ Driver::~Driver() {
   // Generally, we will shut down the dispatcher when the last device associated with
   // the driver is unbound.
   // However in some tests we don't properly tear down devices so we also shut down here.
-  ZX_ASSERT_MSG(
-      !fdf_env_dispatcher_has_queued_tasks(dispatcher_.get()),
-      "Driver '%s' released all devices, but still had queued tasks on the default dispatcher",
-      zx_driver_->libname().c_str());
+  bool has_queued_tasks = fdf_env_dispatcher_has_queued_tasks(dispatcher_.get());
+  if (has_queued_tasks) {
+    fdf_env_dispatcher_dump(dispatcher_.get());
+    ZX_ASSERT_MSG(
+        !has_queued_tasks,
+        "Driver '%s' released all devices, but still had queued tasks on the default dispatcher",
+        zx_driver_->libname().c_str());
+  }
   ZX_ASSERT(device_count_ == 0);
   dispatcher_.ShutdownAsync();
   released_.Wait();

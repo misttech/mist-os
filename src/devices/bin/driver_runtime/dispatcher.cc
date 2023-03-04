@@ -1235,6 +1235,11 @@ bool Dispatcher::HasQueuedTasks() {
       return true;
     }
   }
+  for (auto& callback_request : shutdown_queue_) {
+    if (callback_request.request_type() == CallbackRequest::RequestType::kTask) {
+      return true;
+    }
+  }
   return false;
 }
 
