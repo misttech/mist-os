@@ -12,12 +12,12 @@ use {
     fuchsia_inspect::{self as inspect, Property},
     fuchsia_inspect_derive::{AttachError, Inspect},
     futures::{future::BoxFuture, FutureExt, TryFutureExt},
-    std::{collections::HashMap, convert::TryFrom, fmt, sync::Arc},
+    std::{collections::HashMap, convert::TryFrom, fmt, sync::Arc, time::Duration},
     tracing::{info, warn},
 };
 
 use crate::codec::MediaCodecConfig;
-use crate::media_task::{MediaTask, MediaTaskBuilder, MediaTaskRunner};
+use crate::media_task::{MediaTask, MediaTaskBuilder, MediaTaskError, MediaTaskRunner};
 
 /// Manages a local StreamEndpoint and its associated media task, starting and stopping the
 /// related media task in sync with the endpoint's configured or streaming state.
@@ -152,6 +152,17 @@ impl Stream {
             Some(self.build_media_task(peer_id, &config).ok_or(media_unsupported)?);
         self.peer_id = Some(peer_id.clone());
         self.endpoint.configure(remote_id, capabilities)
+    }
+
+    pub fn set_delay(&mut self, delay: Duration) -> Result<(), ErrorCode> {
+        let Some(runner) = self.media_task_runner.as_mut() else {
+            return Err(ErrorCode::BadState);
+        };
+        match runner.set_delay(delay) {
+            Err(MediaTaskError::NotSupported) => Err(ErrorCode::NotSupportedCommand),
+            Err(_) => Err(ErrorCode::BadState),
+            Ok(()) => Ok(()),
+        }
     }
 
     pub fn reconfigure(
@@ -360,7 +371,7 @@ pub(crate) mod tests {
     }
 
     #[fuchsia::test]
-    fn test_streams() {
+    fn streams_basic_functionality() {
         let mut streams = Streams::new();
 
         streams.insert(make_stream(1));
@@ -394,7 +405,7 @@ pub(crate) mod tests {
     }
 
     #[fuchsia::test]
-    fn test_rejects_unsupported_configurations() {
+    fn rejects_unsupported_configurations() {
         // Needed to make fasync::Tasks.
         let _exec = fasync::TestExecutor::new();
         let mut builder = TestMediaTaskBuilder::new_reconfigurable();
@@ -484,7 +495,7 @@ pub(crate) mod tests {
     }
 
     #[fuchsia::test]
-    fn test_reconfigure_runner_fails() {
+    fn reconfigure_runner_fails() {
         // Needed to make fasync::Tasks.
         let _exec = fasync::TestExecutor::new();
         let mut builder = TestMediaTaskBuilder::new();
@@ -560,7 +571,7 @@ pub(crate) mod tests {
     }
 
     #[fuchsia::test]
-    fn test_suspend_stops_media_task() {
+    fn suspend_stops_media_task() {
         let mut exec = fasync::TestExecutor::new();
 
         let mut task_builder = TestMediaTaskBuilder::new();
@@ -615,7 +626,7 @@ pub(crate) mod tests {
     }
 
     #[fuchsia::test]
-    fn test_media_task_ending_ends_future() {
+    fn media_task_ending_ends_future() {
         let mut exec = fasync::TestExecutor::new();
 
         let mut task_builder = TestMediaTaskBuilder::new();
@@ -663,7 +674,7 @@ pub(crate) mod tests {
         // The future should be finished, since the task ended.
         match exec.run_until_stalled(&mut stream_finish_fut) {
             Poll::Ready(Ok(())) => {}
-            x => panic!("Expected to get ready Ok from finish future, but got {:?}", x),
+            x => panic!("Expected to get ready Ok from finish future, but got {x:?}"),
         };
 
         // Should still be able to suspend the stream.
@@ -676,7 +687,7 @@ pub(crate) mod tests {
         pin_mut!(next_task_fut);
         let task = match exec.run_until_stalled(&mut next_task_fut) {
             Poll::Ready(Some(task)) => task,
-            x => panic!("Expected next task to be sent during configure, got {:?}", x),
+            x => panic!("Expected next task to be sent after restart, got {x:?}"),
         };
 
         assert!(task.is_started());
@@ -685,5 +696,40 @@ pub(crate) mod tests {
         drop(result_fut);
 
         assert!(task.is_started());
+    }
+
+    #[fuchsia::test]
+    fn set_delay_correct_results_transmits_to_task() {
+        let mut _exec = fasync::TestExecutor::new();
+
+        let mut task_builder = TestMediaTaskBuilder::new_delayable();
+        let mut stream = Stream::build(
+            make_sbc_endpoint(1, avdtp::EndpointType::Source),
+            task_builder.builder(),
+        );
+        let peer_id = PeerId(1);
+        let remote_id = 1_u8.try_into().expect("good id");
+
+        let sbc_codec_cap = sbc_mediacodec_capability();
+
+        let code = stream
+            .set_delay(std::time::Duration::ZERO)
+            .expect_err("before configure, can't set a delay");
+        assert_eq!(ErrorCode::BadState, code);
+
+        assert!(stream.configure(&peer_id, &remote_id, vec![]).is_err());
+        assert!(stream.configure(&peer_id, &remote_id, vec![sbc_codec_cap]).is_ok());
+
+        let delay_set = std::time::Duration::from_nanos(0xfeed);
+
+        stream.set_delay(delay_set.clone()).expect("after configure, delay is fine");
+
+        stream.endpoint_mut().establish().expect("establishment should start okay");
+        let (_remote, transport) = Channel::create();
+        let _ = stream.endpoint_mut().receive_channel(transport).expect("ready for a channel");
+        let _stream_finish_fut = stream.start().expect("start to succeed with a future");
+
+        let media_task = task_builder.expect_task();
+        assert_eq!(delay_set, media_task.delay);
     }
 }

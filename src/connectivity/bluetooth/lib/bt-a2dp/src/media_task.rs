@@ -2,25 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_avdtp::MediaStream,
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_inspect::Node,
-    fuchsia_inspect_derive::AttachError,
-    futures::{
-        future::{BoxFuture, Shared},
-        FutureExt,
-    },
-    thiserror::Error,
+use bt_avdtp::MediaStream;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_inspect::Node;
+use fuchsia_inspect_derive::AttachError;
+use futures::{
+    future::{BoxFuture, Shared},
+    FutureExt,
 };
+use std::time::Duration;
+use thiserror::Error;
 
 use crate::codec::MediaCodecConfig;
 
 #[derive(Debug, Error, Clone)]
 #[non_exhaustive]
 pub enum MediaTaskError {
-    #[error("Configuration not supported by Builder")]
-    ConfigurationNotSupported,
+    #[error("Operation or configuration not supported")]
+    NotSupported,
     #[error("Peer closed the media stream")]
     PeerClosed,
     #[error("Resources needed are already being used")]
@@ -44,7 +43,7 @@ impl From<bt_avdtp::Error> for MediaTaskError {
 pub trait MediaTaskBuilder: Send + Sync {
     /// Set up to stream based on the given `codec_config` parameters.
     /// Returns a MediaTaskRunner if the configuration is supported, and
-    /// MediaTaskError::ConfigurationNotSupported otherwise.
+    /// MediaTaskError::NotSupported otherwise.
     fn configure(
         &self,
         peer_id: &PeerId,
@@ -63,11 +62,21 @@ pub trait MediaTaskRunner: Send {
     /// This can fail with MediaTaskError::ResourcesInUse if a MediaTask cannot be started because
     /// one is already running.
     fn start(&mut self, stream: MediaStream) -> Result<Box<dyn MediaTask>, MediaTaskError>;
+
     /// Try to reconfigure the MediaTask to accept a new configuration.  This differs from
     /// `MediaTaskBuilder::configure` as it attempts to preserve the same configured session.
     /// The runner remains configured with the initial configuration on an error.
     fn reconfigure(&mut self, _config: &MediaCodecConfig) -> Result<(), MediaTaskError> {
-        Err(MediaTaskError::ConfigurationNotSupported)
+        Err(MediaTaskError::NotSupported)
+    }
+
+    /// Set the delay reported from the peer for this media task.
+    /// This should configure the media source or sink to attempt to compensate.
+    /// Typically this is zero for Sink tasks, but Source tasks can receive this info from the peer.
+    /// May only be supported before start.
+    /// If an Error is returned, the delay has not been set.
+    fn set_delay(&mut self, _delay: Duration) -> Result<(), MediaTaskError> {
+        Err(MediaTaskError::NotSupported)
     }
 
     /// Add information from the running media task to the inspect tree
@@ -121,6 +130,8 @@ pub mod tests {
         sender: Arc<Mutex<Option<oneshot::Sender<Result<(), MediaTaskError>>>>>,
         /// Shared result future.
         result: Shared<BoxFuture<'static, Result<(), MediaTaskError>>>,
+        /// Delay the task was started with.
+        pub delay: Duration,
     }
 
     impl fmt::Debug for TestMediaTask {
@@ -134,7 +145,12 @@ pub mod tests {
     }
 
     impl TestMediaTask {
-        pub fn new(peer_id: PeerId, codec_config: MediaCodecConfig, stream: MediaStream) -> Self {
+        pub fn new(
+            peer_id: PeerId,
+            codec_config: MediaCodecConfig,
+            stream: MediaStream,
+            delay: Duration,
+        ) -> Self {
             let (sender, receiver) = oneshot::channel();
             let result = receiver
                 .map_ok_or_else(
@@ -149,6 +165,7 @@ pub mod tests {
                 stream: Arc::new(Mutex::new(Some(stream))),
                 sender: Arc::new(Mutex::new(Some(sender))),
                 result,
+                delay,
             }
         }
 
@@ -196,16 +213,34 @@ pub mod tests {
         pub codec_config: MediaCodecConfig,
         /// If this is reconfigurable
         pub reconfigurable: bool,
+        /// If this supports delay reporting
+        pub supports_set_delay: bool,
+        /// What the delay is right now
+        pub set_delay: Option<std::time::Duration>,
         /// The Sender that will send a clone of the started tasks to the builder.
         pub sender: mpsc::Sender<TestMediaTask>,
     }
 
     impl MediaTaskRunner for TestMediaTaskRunner {
         fn start(&mut self, stream: MediaStream) -> Result<Box<dyn MediaTask>, MediaTaskError> {
-            let task = TestMediaTask::new(self.peer_id.clone(), self.codec_config.clone(), stream);
+            let task = TestMediaTask::new(
+                self.peer_id.clone(),
+                self.codec_config.clone(),
+                stream,
+                self.set_delay.unwrap_or(Duration::ZERO),
+            );
             // Don't particularly care if the receiver got dropped.
             let _ = self.sender.try_send(task.clone());
             Ok(Box::new(task))
+        }
+
+        fn set_delay(&mut self, delay: std::time::Duration) -> Result<(), MediaTaskError> {
+            if self.supports_set_delay {
+                self.set_delay = Some(delay);
+                Ok(())
+            } else {
+                Err(MediaTaskError::NotSupported)
+            }
         }
 
         fn reconfigure(&mut self, config: &MediaCodecConfig) -> Result<(), MediaTaskError> {
@@ -213,7 +248,7 @@ pub mod tests {
                 self.codec_config = config.clone();
                 Ok(())
             } else {
-                Err(MediaTaskError::ConfigurationNotSupported)
+                Err(MediaTaskError::NotSupported)
             }
         }
     }
@@ -225,16 +260,26 @@ pub mod tests {
         sender: Mutex<mpsc::Sender<TestMediaTask>>,
         receiver: mpsc::Receiver<TestMediaTask>,
         reconfigurable: bool,
+        supports_set_delay: bool,
     }
 
     impl TestMediaTaskBuilder {
         pub fn new() -> Self {
             let (sender, receiver) = mpsc::channel(5);
-            Self { sender: Mutex::new(sender), receiver, reconfigurable: false }
+            Self {
+                sender: Mutex::new(sender),
+                receiver,
+                reconfigurable: false,
+                supports_set_delay: false,
+            }
         }
 
         pub fn new_reconfigurable() -> Self {
             Self { reconfigurable: true, ..Self::new() }
+        }
+
+        pub fn new_delayable() -> Self {
+            Self { supports_set_delay: true, ..Self::new() }
         }
 
         /// Returns a type that implements MediaTaskBuilder.  When a MediaTask is built using
@@ -243,6 +288,7 @@ pub mod tests {
             TestMediaTaskBuilderBuilder(
                 self.sender.lock().expect("locking").clone(),
                 self.reconfigurable,
+                self.supports_set_delay,
             )
         }
 
@@ -262,7 +308,7 @@ pub mod tests {
         }
     }
 
-    struct TestMediaTaskBuilderBuilder(mpsc::Sender<TestMediaTask>, bool);
+    struct TestMediaTaskBuilderBuilder(mpsc::Sender<TestMediaTask>, bool, bool);
 
     impl MediaTaskBuilder for TestMediaTaskBuilderBuilder {
         fn configure(
@@ -275,6 +321,8 @@ pub mod tests {
                 codec_config: codec_config.clone(),
                 sender: self.0.clone(),
                 reconfigurable: self.1,
+                supports_set_delay: self.2,
+                set_delay: None,
             };
             Ok::<Box<dyn MediaTaskRunner>, _>(Box::new(runner))
         }

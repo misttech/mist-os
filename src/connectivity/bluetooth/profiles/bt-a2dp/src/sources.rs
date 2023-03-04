@@ -86,6 +86,7 @@ impl AudioOutStream {
     pub fn new(
         peer_id: &PeerId,
         pcm_format: PcmFormat,
+        external_delay: zx::Duration,
     ) -> Result<fuchsia_audio_device_output::driver::AudioFrameStream, Error> {
         let id = peer_audio_stream_id(*peer_id, AUDIO_SOURCE_UUID);
         let (client, frame_stream) = SoftPcmOutput::build(
@@ -95,6 +96,7 @@ impl AudioOutStream {
             LOCAL_MONOTONIC_CLOCK_DOMAIN,
             pcm_format,
             10.millis(),
+            external_delay,
         )?;
 
         let svc = fuchsia_component::client::connect_to_protocol::<AudioDeviceEnumeratorMarker>()
@@ -139,11 +141,12 @@ pub fn build_stream(
     peer_id: &PeerId,
     pcm_format: PcmFormat,
     source_type: AudioSourceType,
+    delay: std::time::Duration,
     inspect_parent: Option<&fuchsia_inspect::Node>,
 ) -> Result<BoxStream<'static, fuchsia_audio_device_output::Result<Vec<u8>>>, Error> {
     Ok(match source_type {
         AudioSourceType::AudioOut => {
-            let mut stream = AudioOutStream::new(peer_id, pcm_format)?;
+            let mut stream = AudioOutStream::new(peer_id, pcm_format, delay.into())?;
             if let Some(parent) = inspect_parent {
                 let _ = stream.iattach(parent, "audio_out_stream");
             }

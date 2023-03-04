@@ -28,7 +28,8 @@ async fn main() -> Result<(), anyhow::Error> {
         "AudioOutHarness",
         LOCAL_MONOTONIC_CLOCK_DOMAIN,
         pcm_format,
-        12.millis(),
+        10.millis(),
+        0.millis(),
     )?;
 
     // Spawn a task to read all the frames from the audio.

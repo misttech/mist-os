@@ -2,41 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context as _,
-    bt_avdtp::{
-        self as avdtp, MediaCodecType, ServiceCapability, ServiceCategory, StreamEndpoint,
-        StreamEndpointId,
-    },
-    fidl_fuchsia_bluetooth_bredr::{
-        ChannelParameters, ConnectParameters, L2capParameters, ProfileDescriptor, ProfileProxy,
-        PSM_AVDTP,
-    },
-    fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_bluetooth::{
-        inspect::DebugExt,
-        types::{Channel, PeerId},
-    },
-    fuchsia_inspect as inspect,
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc,
-        future::BoxFuture,
-        select,
-        stream::FuturesUnordered,
-        task::{Context, Poll, Waker},
-        Future, FutureExt, StreamExt,
-    },
-    parking_lot::Mutex,
-    std::{
-        collections::{HashMap, HashSet},
-        convert::TryInto,
-        pin::Pin,
-        sync::{Arc, Weak},
-    },
-    tracing::{error, info, trace, warn},
+use anyhow::Context as _;
+use bt_avdtp::{
+    self as avdtp, MediaCodecType, ServiceCapability, ServiceCategory, StreamEndpoint,
+    StreamEndpointId,
 };
+use fidl_fuchsia_bluetooth_bredr::{
+    ChannelParameters, ConnectParameters, L2capParameters, ProfileDescriptor, ProfileProxy,
+    PSM_AVDTP,
+};
+use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_bluetooth::{
+    inspect::DebugExt,
+    types::{Channel, PeerId},
+};
+use fuchsia_inspect as inspect;
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_zircon as zx;
+use futures::{
+    channel::mpsc,
+    future::BoxFuture,
+    select,
+    stream::FuturesUnordered,
+    task::{Context, Poll, Waker},
+    Future, FutureExt, StreamExt,
+};
+use parking_lot::Mutex;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+    pin::Pin,
+    sync::{Arc, Weak},
+};
+use tracing::{error, info, trace, warn};
 
 /// For sending out-of-band commands over the A2DP peer.
 mod controller;
@@ -685,10 +683,10 @@ impl PeerInner {
         let to_start = &[remote_id.clone()];
         avdtp.start(to_start).await?;
         let peer = Self::upgrade(weak.clone())?;
-        let mut peer = peer.lock();
-        let peer_id = peer.peer_id;
-        let start_result = peer.start_local_stream(permit, &local_id);
-        drop(peer);
+        let (peer_id, start_result) = {
+            let mut peer = peer.lock();
+            (peer.peer_id, peer.start_local_stream(permit, &local_id))
+        };
         if let Err(e) = start_result {
             warn!(
                 "{}: Failed media start of {}: {:?}, suspend remote {}",
@@ -920,16 +918,29 @@ impl PeerInner {
             }
             avdtp::Request::DelayReport { responder, delay, stream_id } => {
                 // Delay is in 1/10 ms
-                let delay_ns = delay as i64 * 100000;
-                info!(peer = %self.peer_id, "stream {stream_id} reported delay {}.{} ms", delay / 10, delay % 10);
-                let res = responder.send();
+                let delay_ns = delay as u64 * 100000;
                 // Record delay to cobalt.
                 self.metrics.log_integer(
                     bt_metrics::AVDTP_DELAY_REPORT_IN_NANOSECONDS_METRIC_ID,
-                    delay_ns,
+                    delay_ns.try_into().unwrap_or(-1),
                     vec![],
                 );
-                res
+                // Report should only come after a stream is configured
+                let Some(stream) = self.local.get_mut(&stream_id) else {
+                    return responder.reject(avdtp::ErrorCode::BadAcpSeid);
+                };
+                let delay_str = format!("delay {}.{} ms", delay / 10, delay % 10);
+                let peer = self.peer_id;
+                match stream.set_delay(std::time::Duration::from_nanos(delay_ns)) {
+                    Ok(()) => info!(%peer, %stream_id, "reported {delay_str}"),
+                    Err(avdtp::ErrorCode::BadState) => {
+                        info!(%peer, %stream_id, "bad state {delay_str}");
+                        return responder.reject(avdtp::ErrorCode::BadState);
+                    }
+                    Err(e) => info!(%peer, %stream_id, ?e, "failed {delay_str}"),
+                };
+                // Can't really respond with an Error
+                responder.send()
             }
         }
     }
@@ -1018,7 +1029,7 @@ mod tests {
         ProfileMarker, ProfileRequest, ProfileRequestStream, ServiceClassProfileIdentifier,
     };
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
-    use futures::{future::FutureExt, pin_mut, select};
+    use futures::{future::Either, pin_mut};
     use std::convert::TryInto;
     use std::task::Poll;
 
@@ -1045,7 +1056,7 @@ mod tests {
         let mut streams = Streams::new();
         let source = Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
-            TestMediaTaskBuilder::new().builder(),
+            TestMediaTaskBuilder::new_delayable().builder(),
         );
         streams.insert(source);
         let sink = Stream::build(
@@ -1696,7 +1707,7 @@ mod tests {
             res.expect("should be able to respond");
         }
 
-        // Need to discover the remote streams first, or the stream start will always work.
+        // Need to discover the remote streams first, or the stream start will not work.
         let collect_capabilities_fut = peer.collect_capabilities();
         pin_mut!(collect_capabilities_fut);
 
@@ -1970,33 +1981,123 @@ mod tests {
         }
     }
 
-    /// Test that the delay reports get acknowledged
+    /// Test that the delay reports get acknowledged and they are sent to cobalt.
     #[fuchsia::test]
     async fn test_peer_delay_report() {
-        let (remote, _profile_requests, cobalt_recv, _peer) = setup_peer_test(true);
+        let (remote, _profile_requests, cobalt_recv, peer) = setup_peer_test(true);
         let remote_peer = avdtp::Peer::new(remote);
+        let mut remote_events = remote_peer.take_request_stream();
 
-        // Stream ID chosen randomly by fair dice roll
-        let seid: StreamEndpointId = 0x09_u8.try_into().unwrap();
+        // Respond as if we have a single SBC Sink Stream
+        async fn remote_handle_request(req: avdtp::Request, peer: &avdtp::Peer) {
+            let expected_stream_id: StreamEndpointId = 4_u8.try_into().unwrap();
+            // "peer" in this case is the test code Peer stream
+            let expected_peer_stream_id: StreamEndpointId = 1_u8.try_into().unwrap();
+            use avdtp::Request::*;
+            match req {
+                Discover { responder } => {
+                    let infos = [avdtp::StreamInformation::new(
+                        expected_stream_id,
+                        false,
+                        avdtp::MediaType::Audio,
+                        avdtp::EndpointType::Sink,
+                    )];
+                    responder.send(&infos).expect("response should succeed");
+                }
+                GetAllCapabilities { stream_id, responder }
+                | GetCapabilities { stream_id, responder } => {
+                    assert_eq!(expected_stream_id, stream_id);
+                    let caps = vec![
+                        ServiceCapability::MediaTransport,
+                        ServiceCapability::MediaCodec {
+                            media_type: avdtp::MediaType::Audio,
+                            codec_type: avdtp::MediaCodecType::AUDIO_SBC,
+                            codec_extra: vec![0x11, 0x45, 51, 250],
+                        },
+                    ];
+                    responder.send(&caps[..]).expect("response should succeed");
+                    // Sending a delayreport before the stream is configured is not allowed, it's a
+                    // bad state.
+                    assert!(peer.delay_report(&expected_peer_stream_id, 0xc0de).await.is_err());
+                }
+                Open { responder, stream_id } => {
+                    // Configuration has happened but open not succeeded yet, send delay reports.
+                    assert!(peer.delay_report(&expected_stream_id, 0xc0de).await.is_err());
+                    // Send a delay report to the peer.
+                    peer.delay_report(&expected_peer_stream_id, 0xc0de)
+                        .await
+                        .expect("should get acked correctly");
+                    assert_eq!(expected_stream_id, stream_id);
+                    responder.send().expect("response should succeed");
+                }
+                SetConfiguration { responder, local_stream_id, remote_stream_id, .. } => {
+                    assert_eq!(local_stream_id, expected_stream_id);
+                    assert_eq!(remote_stream_id, expected_peer_stream_id);
+                    responder.send().expect("should send back response without issue");
+                }
+                x => panic!("Unexpected request: {:?}", x),
+            };
+        }
+
+        let collect_fut = peer.collect_capabilities();
+        pin_mut!(collect_fut);
+
+        // Discover then a GetCapabilities.
+        let Either::Left((request, collect_fut)) = futures::future::select(
+            remote_events.next(), collect_fut).await else {
+            panic!("Collect future shouldn't finish first");
+        };
+        pin_mut!(collect_fut);
+        remote_handle_request(request.expect("a request").unwrap(), &remote_peer).await;
+        let Either::Left((request, collect_fut)) = futures::future::select(
+            remote_events.next(), collect_fut).await else {
+            panic!("Collect future shouldn't finish first");
+        };
+        remote_handle_request(request.expect("a request").unwrap(), &remote_peer).await;
+
+        // Collect future should be able to finish now.
+        assert_eq!(1, collect_fut.await.expect("should get the remote endpoints back").len());
+
+        // Try to start the stream.  It should go through the normal motions,
+        let remote_seid = 4_u8.try_into().unwrap();
+
+        let codec_params = ServiceCapability::MediaCodec {
+            media_type: avdtp::MediaType::Audio,
+            codec_type: avdtp::MediaCodecType::AUDIO_SBC,
+            codec_extra: vec![0x11, 0x45, 51, 51],
+        };
+
+        // We don't expect this task to finish before being dropped, since we never respond to the
+        // request to open the transport channel.
+        let _start_task = fasync::Task::spawn(async move {
+            let _ = peer.stream_start(remote_seid, vec![codec_params]).await;
+            panic!("stream start task finished");
+        });
+
+        let request = remote_events.next().await.expect("should have set_config").unwrap();
+        remote_handle_request(request, &remote_peer).await;
+
+        let request = remote_events.next().await.expect("should have open").unwrap();
+        remote_handle_request(request, &remote_peer).await;
+
         let mut cobalt = cobalt_recv.expect("should have receiver");
-        let cobalt_recv_fut = cobalt.next();
-        let delay_report_fut = remote_peer.delay_report(&seid, 0xc0de).fuse();
 
-        pin_mut!(delay_report_fut, cobalt_recv_fut);
-
-        select! {
-            _ = delay_report_fut => {},
-            _ = cobalt_recv_fut => panic!("delay report future should be resolved first"),
-        }
-
-        match cobalt_recv_fut.await {
-            Some(Ok(req)) => {
-                let got = respond_to_metrics_req_for_test(req);
-                assert_eq!(bt_metrics::AVDTP_DELAY_REPORT_IN_NANOSECONDS_METRIC_ID, got.metric_id);
-                assert_eq!(MetricEventPayload::IntegerValue(0xc0de * 100000), got.payload);
+        let mut got_ids = HashMap::new();
+        let delay_metric_id = bt_metrics::AVDTP_DELAY_REPORT_IN_NANOSECONDS_METRIC_ID;
+        while got_ids.len() < 3 || *got_ids.get(&delay_metric_id).unwrap_or(&0) < 3 {
+            let report = respond_to_metrics_req_for_test(cobalt.next().await.unwrap().unwrap());
+            let _ = got_ids.entry(report.metric_id).and_modify(|x| *x += 1).or_insert(1);
+            // All the delay reports should report the same value correctly.
+            if report.metric_id == delay_metric_id {
+                assert_eq!(MetricEventPayload::IntegerValue(0xc0de * 100000), report.payload);
             }
-            _ => panic!("expected cobalt metric event log request"),
         }
+        assert!(got_ids.contains_key(&bt_metrics::A2DP_CODEC_AVAILABILITY_MIGRATED_METRIC_ID));
+        assert!(got_ids.contains_key(&bt_metrics::A2DP_REMOTE_PEER_CAPABILITIES_METRIC_ID));
+        assert!(got_ids.contains_key(&delay_metric_id));
+        // There should have been three reports.
+        // We report the delay amount even if it fails to work.
+        assert_eq!(got_ids.get(&delay_metric_id).cloned(), Some(3));
     }
 
     fn sbc_capabilities() -> Vec<ServiceCapability> {

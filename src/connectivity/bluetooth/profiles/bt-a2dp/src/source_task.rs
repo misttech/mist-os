@@ -14,9 +14,10 @@ use {
     fuchsia_trace as trace,
     futures::{
         channel::oneshot,
-        future::{BoxFuture, Shared},
+        future::{BoxFuture, Shared, WeakShared},
         AsyncWriteExt, FutureExt, TryFutureExt, TryStreamExt,
     },
+    std::time::Duration,
     tracing::{info, trace, warn},
 };
 
@@ -60,7 +61,7 @@ impl SourceTaskBuilder {
         let channel_map = match codec_config.channel_count() {
             Ok(1) => vec![AudioChannelId::Cf],
             Ok(2) => vec![AudioChannelId::Lf, AudioChannelId::Rf],
-            Ok(_) | Err(_) => return Err(MediaTaskError::ConfigurationNotSupported),
+            Ok(_) | Err(_) => return Err(MediaTaskError::NotSupported),
         };
         let pcm_format = PcmFormat {
             pcm_mode: AudioPcmMode::Linear,
@@ -68,9 +69,14 @@ impl SourceTaskBuilder {
             frames_per_second: codec_config.sampling_frequency()?,
             channel_map,
         };
-        let source_stream =
-            sources::build_stream(&peer_id, pcm_format.clone(), self.source_type, None)
-                .map_err(|_e| MediaTaskError::ConfigurationNotSupported)?;
+        let source_stream = sources::build_stream(
+            &peer_id,
+            pcm_format.clone(),
+            self.source_type,
+            Duration::ZERO,
+            None,
+        )
+        .map_err(|_e| MediaTaskError::NotSupported)?;
         if let Err(e) = EncodedStream::build(pcm_format.clone(), source_stream, codec_config) {
             trace!("SourceTaskBuilder: can't build encoded stream: {:?}", e);
             return Err(MediaTaskError::Other(format!("Can't build encoded stream: {}", e)));
@@ -91,6 +97,11 @@ pub(crate) struct ConfiguredSourceTask {
     peer_id: PeerId,
     /// Configuration providing the format of encoded audio requested by the peer.
     codec_config: MediaCodecConfig,
+    /// Delay reported from the peer. Defaults to zero. Passed on to the Audio source.
+    delay: Duration,
+    /// Future if the task is running or has ran and and the shared future has not been dropped.
+    /// Used to indicate errors for set_delay as we currently do not support updating delays dynamically.
+    running: Option<WeakShared<BoxFuture<'static, Result<(), MediaTaskError>>>>,
     /// Inspect node
     inspect: fuchsia_inspect::Node,
 }
@@ -110,6 +121,8 @@ impl ConfiguredSourceTask {
             source_type,
             peer_id,
             codec_config: codec_config.clone(),
+            delay: Duration::ZERO,
+            running: None,
             inspect: Default::default(),
         }
     }
@@ -138,6 +151,7 @@ impl MediaTaskRunner for ConfiguredSourceTask {
             &self.peer_id,
             self.pcm_format.clone(),
             self.source_type,
+            self.delay.into(),
             Some(&self.inspect),
         )
         .map_err(|e| MediaTaskError::Other(format!("Building stream: {}", e)))?;
@@ -152,7 +166,19 @@ impl MediaTaskRunner for ConfiguredSourceTask {
             stream,
             data_stream_inspect,
         );
+        self.running = stream_task.result_fut.downgrade();
         Ok(Box::new(stream_task))
+    }
+
+    fn set_delay(&mut self, delay: Duration) -> Result<(), MediaTaskError> {
+        if let Some(fut) = self.running.as_ref().and_then(WeakShared::upgrade) {
+            // If the Shared isn't done, we are still running and can't update the delay.
+            if fut.now_or_never().is_none() {
+                return Err(MediaTaskError::NotSupported);
+            }
+        }
+        self.delay = delay;
+        Ok(())
     }
 
     /// the running media task to the tree (i.e. data transferred, jitter, etc)
@@ -212,7 +238,6 @@ impl RunningSourceTask {
         inspect: DataStreamInspect,
     ) -> Self {
         let (sender, receiver) = oneshot::channel();
-
         let stream_task_fut =
             Self::stream_task(codec_config, encoded_stream, media_stream, inspect);
         let wrapped_task = fasync::Task::spawn(async move {
@@ -233,11 +258,12 @@ impl MediaTask for RunningSourceTask {
     }
 
     fn stop(&mut self) -> Result<(), MediaTaskError> {
-        if let Some(_task) = self.stream_task.take() {
+        if let Some(task) = self.stream_task.take() {
             trace::instant!("bt-a2dp", "Media:Stopped", trace::Scope::Thread);
+            drop(task);
         }
-        // Either a result already happened, or we just sent an Ok(()) by dropping the result
-        // sender.
+        // Either a result already happened, or we will just have sent an Ok(()) by dropping the result
+        // sender
         self.result().unwrap_or(Ok(()))
     }
 }

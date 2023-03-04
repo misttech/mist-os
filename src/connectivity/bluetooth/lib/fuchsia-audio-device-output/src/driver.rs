@@ -180,6 +180,9 @@ pub struct SoftPcmOutput {
     /// A pointer to the ring buffer for this stream
     frame_vmo: Arc<Mutex<frame_vmo::FrameVmo>>,
 
+    /// The current delay that has been communicated exists after the audio is retrieved.
+    external_delay: zx::Duration,
+
     /// Replied to plugged state watch.
     plug_state_replied: bool,
 
@@ -220,7 +223,8 @@ impl SoftPcmOutput {
     /// Spawns a task to handle messages from the Audio Core and setup of internal VMO buffers
     /// required for audio output.  See AudioFrameStream for more information on timing
     /// requirements for audio output.
-    /// `packet_duration`: the duration of an audio packet returned by the strream.
+    /// `packet_duration`: the duration of an audio packet returned by the stream.
+    /// `initial_external_delay`: delay that is added after packets have been returned from the stream
     pub fn build(
         unique_id: &[u8; 16],
         manufacturer: &str,
@@ -228,6 +232,7 @@ impl SoftPcmOutput {
         clock_domain: u32,
         pcm_format: fidl_fuchsia_media::PcmFormat,
         packet_duration: zx::Duration,
+        initial_external_delay: zx::Duration,
     ) -> Result<(ClientEnd<StreamConfigMarker>, AudioFrameStream)> {
         if pcm_format.bits_per_sample % 8 != 0 {
             // Non-byte-aligned format not allowed.
@@ -268,6 +273,7 @@ impl SoftPcmOutput {
             current_format: None,
             ring_buffer_stream: Default::default(),
             frame_vmo: Arc::new(Mutex::new(frame_vmo::FrameVmo::new()?)),
+            external_delay: initial_external_delay,
             plug_state_replied: false,
             gain_state_replied: false,
             delay_info_replied: false,
@@ -364,7 +370,7 @@ impl SoftPcmOutput {
                 self.delay_info_replied = false;
             }
             StreamConfigRequest::WatchGainState { responder } => {
-                if self.gain_state_replied == true {
+                if self.gain_state_replied {
                     // We will never change gain state.
                     responder.drop_without_shutdown();
                     return Ok(());
@@ -379,7 +385,7 @@ impl SoftPcmOutput {
                 self.gain_state_replied = true
             }
             StreamConfigRequest::WatchPlugState { responder } => {
-                if self.plug_state_replied == true {
+                if self.plug_state_replied {
                     // We will never change plug state.
                     responder.drop_without_shutdown();
                     return Ok(());
@@ -490,19 +496,19 @@ impl SoftPcmOutput {
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             RingBufferRequest::WatchDelayInfo { responder } => {
-                if self.delay_info_replied == true {
+                if self.delay_info_replied {
                     // We will never change delay state.
+                    // TODO(fxbug.dev/51726): Reply again when the external_delay changes from
+                    // outside instead of just on startup.
                     responder.drop_without_shutdown();
                     return Ok(());
                 }
-                // internal_delay is required. Set the minimum we currently know about, which is the
-                // packet duration - since audio is not released until a packet is written, we have
-                // at least that much delay.
-                // TODO(fxbug.dev/51726): Set actual external_delay and internal_delay values
-                // received from outside the crate, and support the hanging-get pattern in order to
-                // dynamically update these values as we learn more about the remote device.
+                // internal_delay is at least our packet duration (we buffer at least that much)
+                // plus whatever delay has been communicated from the client.
                 let delay_info = DelayInfo {
-                    internal_delay: Some(self.packet_duration.into_nanos()),
+                    internal_delay: Some(
+                        self.packet_duration.into_nanos() + self.external_delay.into_nanos(),
+                    ),
                     ..DelayInfo::EMPTY
                 };
                 responder.send(delay_info)?;
@@ -544,6 +550,7 @@ mod tests {
             TEST_CLOCK_DOMAIN,
             format,
             zx::Duration::from_millis(100),
+            zx::Duration::from_millis(50),
         )
         .expect("should always build");
         test(exec, client.into_proxy().expect("channel should be available"), frame_stream)
@@ -591,6 +598,7 @@ mod tests {
             TEST_CLOCK_DOMAIN,
             format,
             zx::Duration::from_millis(100),
+            zx::Duration::from_millis(50),
         )
         .expect("should always build");
 
@@ -879,9 +887,10 @@ mod tests {
 
         let result = exec.run_until_stalled(&mut ring_buffer.watch_delay_info());
 
+        // Should account for the external_delay here.
         match result {
             Poll::Ready(Ok(DelayInfo { internal_delay: Some(x), .. })) => {
-                assert_eq!(100.millis().into_nanos(), x)
+                assert_eq!(150.millis().into_nanos(), x)
             }
             other => panic!("Expected the correct delay info, got {other:?}"),
         }
