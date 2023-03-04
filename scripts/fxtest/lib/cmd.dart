@@ -219,11 +219,10 @@ class FuchsiaTestCommand {
       if (testsConfig.fxEnv.outputDir != null) {
         String outputDir = testsConfig.fxEnv.outputDir!;
 
-        Set<String> packageManifests =
-            TestBundle.calculateIncementalPublishingPackageManifests(
-                testsConfig, parsedManifest.testBundles);
-
-        if (!packageManifests.isEmpty) {
+        if (TestBundle.hasDevicePackages(parsedManifest.testBundles) &&
+            (testsConfig.fxEnv.isFeatureEnabled('incremental') ||
+                testsConfig.fxEnv.isFeatureEnabled('incremental_new') ||
+                testsConfig.fxEnv.isFeatureEnabled('incremental_legacy'))) {
           String amberFilesDir = outputDir + "/amber-files";
 
           List<String> args = [
@@ -232,14 +231,12 @@ class FuchsiaTestCommand {
             "repository",
             "publish",
             "--trusted-root",
-            amberFilesDir + "/repository/root.json"
+            amberFilesDir + "/repository/root.json",
+            "--ignore-missing-packages",
           ];
 
-          for (String packageManifest in packageManifests) {
-            args.add("--package");
-            args.add(outputDir + "/" + packageManifest);
-          }
-
+          args.add("--package-list");
+          args.add(outputDir + "/all_package_manifests.list");
           args.add(amberFilesDir);
 
           emitEvent(TestInfo(testsConfig
