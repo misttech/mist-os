@@ -36,7 +36,7 @@ impl Device {
         };
 
         let download_path = match logical_path.rsplit_once('/') {
-            Some((prefix, suffix)) => Some(format!("/download/{suffix}")),
+            Some((_, suffix)) => Some(format!("/download/{suffix}")),
             None => None,
         };
 
