@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <fbl/unique_fd.h>
@@ -361,6 +362,71 @@ TEST(Pipe2, Cloexec) {
 
   EXPECT_NE(O_NONBLOCK, status_flags & O_NONBLOCK);
   EXPECT_EQ(FD_CLOEXEC, fd_flags & FD_CLOEXEC);
+}
+
+TEST(Pipe, ReadvIovecMaxSize) {
+  int fds[2];
+  ASSERT_SUCCESS(pipe(fds));
+
+  char buf[1] = {'a'};
+
+  std::vector<struct iovec> iovec(IOV_MAX);
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+
+  // Write something in to the pipe so we can read without blocking.
+  ASSERT_EQ(1, write(fds[1], buf, 1), "write %d: %s", errno, strerror(errno));
+
+  EXPECT_LE(0, readv(fds[0], iovec.data(), static_cast<int>(iovec.size())));
+}
+
+TEST(Pipe, ReadvIovecTooLarge) {
+  int fds[2];
+  ASSERT_SUCCESS(pipe(fds));
+
+  char buf[1];
+
+  std::vector<struct iovec> iovec(IOV_MAX + 1);
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+
+  EXPECT_EQ(-1, readv(fds[0], iovec.data(), static_cast<int>(iovec.size())));
+  EXPECT_EQ(errno, EINVAL);
+}
+
+TEST(Pipe, WritevIovecMaxSize) {
+  int fds[2];
+  ASSERT_SUCCESS(pipe(fds));
+
+  char buf[1] = {'a'};
+
+  std::vector<struct iovec> iovec(IOV_MAX);
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+
+  EXPECT_LE(0, writev(fds[1], iovec.data(), static_cast<int>(iovec.size())));
+}
+
+TEST(Pipe, WritevIovecTooLarge) {
+  int fds[2];
+  ASSERT_SUCCESS(pipe(fds));
+
+  char buf[1] = {'a'};
+
+  std::vector<struct iovec> iovec(IOV_MAX + 1);
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+
+  EXPECT_EQ(-1, writev(fds[1], iovec.data(), static_cast<int>(iovec.size())));
+  EXPECT_EQ(errno, EINVAL);
 }
 
 #endif  // defined(__Fuchsia__) || defined(__linux__)

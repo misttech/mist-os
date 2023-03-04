@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <fbl/unique_fd.h>
@@ -330,6 +331,64 @@ TEST(UnistdTest, ReadAndWriteWithNegativeOffsets) {
   ASSERT_EQ(EINVAL, errno, "%s", strerror(errno));
   char buf[5];
   ASSERT_EQ(-1, pwrite(fd.get(), buf, 5, -1));
+  ASSERT_EQ(EINVAL, errno, "%s", strerror(errno));
+}
+
+TEST(UnistdTest, PreadvIovecMaxSize) {
+  std::string filename = TestTempDirPath() + "/preadv-iovec-max-size-test";
+  fbl::unique_fd fd(open(filename.c_str(), O_CREAT | O_RDWR, 0666));
+  ASSERT_TRUE(fd, "open %d: %s", errno, strerror(errno));
+  std::vector<struct iovec> iovec(IOV_MAX);
+  char buf[1];
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+  ASSERT_EQ(0, ftruncate(fd.get(), IOV_MAX), "ftruncate %d: %s", errno, strerror(errno));
+  ASSERT_LE(0, preadv(fd.get(), iovec.data(), static_cast<int>(iovec.size()), 0), "preadv %d: %s",
+            errno, strerror(errno));
+}
+
+TEST(UnistdTest, PreadvIovecTooLarge) {
+  std::string filename = TestTempDirPath() + "/preadv-iovec-too-large-test";
+  fbl::unique_fd fd(open(filename.c_str(), O_CREAT | O_RDWR, 0666));
+  ASSERT_TRUE(fd, "open %d: %s", errno, strerror(errno));
+  std::vector<struct iovec> iovec(IOV_MAX + 1);
+  char buf[1];
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+  ASSERT_EQ(-1, preadv(fd.get(), iovec.data(), static_cast<int>(iovec.size()), 0));
+  ASSERT_EQ(EINVAL, errno, "%s", strerror(errno));
+}
+
+TEST(UnistdTest, PwritevIovecMaxSize) {
+  std::string filename = TestTempDirPath() + "/pwritev-iovec-max-size-test";
+  fbl::unique_fd fd(open(filename.c_str(), O_CREAT | O_RDWR, 0666));
+  ASSERT_TRUE(fd, "open %d: %s", errno, strerror(errno));
+  std::vector<struct iovec> iovec(IOV_MAX);
+  char buf[1] = {'a'};
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+
+  ASSERT_LE(0, pwritev(fd.get(), iovec.data(), static_cast<int>(iovec.size()), 0), "preadv %d: %s",
+            errno, strerror(errno));
+}
+
+TEST(UnistdTest, PwritevIovecTooLarge) {
+  std::string filename = TestTempDirPath() + "/pwritev-iovec-too-large-test";
+  fbl::unique_fd fd(open(filename.c_str(), O_CREAT | O_RDWR, 0666));
+  ASSERT_TRUE(fd, "open %d: %s", errno, strerror(errno));
+  std::vector<struct iovec> iovec(IOV_MAX + 1);
+  char buf[1] = {'a'};
+  for (auto& i : iovec) {
+    i.iov_base = buf;
+    i.iov_len = 1;
+  }
+  ASSERT_EQ(-1, pwritev(fd.get(), iovec.data(), static_cast<int>(iovec.size()), 0));
   ASSERT_EQ(EINVAL, errno, "%s", strerror(errno));
 }
 

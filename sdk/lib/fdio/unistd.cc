@@ -640,6 +640,9 @@ ssize_t preadv(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
   if (!safemath::MakeCheckedNum(offset).AssignIfValid(&zx_offset)) {
     return ERRNO(EINVAL);
   }
+  if (iovcnt > IOV_MAX) {
+    return ERRNO(EINVAL);
+  }
   const fdio_ptr io = fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
@@ -679,6 +682,9 @@ __EXPORT
 ssize_t pwritev(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
   zx_off_t zx_offset;
   if (!safemath::MakeCheckedNum(offset).AssignIfValid(&zx_offset)) {
+    return ERRNO(EINVAL);
+  }
+  if (iovcnt > IOV_MAX) {
     return ERRNO(EINVAL);
   }
   const fdio_ptr io = fd_to_io(fd);

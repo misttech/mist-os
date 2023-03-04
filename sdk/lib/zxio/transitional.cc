@@ -18,6 +18,10 @@ zx_status_t zxio_sendmsg_inner(zxio_t* io, const struct msghdr* msg, int flags,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  if (msg->msg_iovlen > IOV_MAX) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   // Variable length arrays have to have nonzero sizes, so we can't allocate a zx_iov for an empty
   // io vector. Instead, we can allocate 1 entry when msg_iovlen is 0.  This way zx_iov can still be
   // non-nullptr (for example, to avoid failure due to vector nullptr when calling
@@ -44,6 +48,10 @@ zx_status_t zxio_recvmsg_inner(zxio_t* io, struct msghdr* msg, int flags, size_t
   if (flags) {
     // TODO(https://fxbug.dev/67925): support MSG_OOB
     return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (msg->msg_iovlen > IOV_MAX) {
+    return ZX_ERR_INVALID_ARGS;
   }
 
   // Variable length arrays have to have nonzero sizes, so we can't allocate a zx_iov for an empty
