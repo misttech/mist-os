@@ -22,6 +22,8 @@ class CodecFactoryImpl : public fuchsia::mediacodec::CodecFactory {
                               fidl::InterfaceRequest<fuchsia::mediacodec::CodecFactory> request);
 
   // See .fidl file comments.
+  void GetDetailedCodecDescriptions(GetDetailedCodecDescriptionsCallback callback) override;
+
   void CreateDecoder(fuchsia::mediacodec::CreateDecoder_Params params,
                      fidl::InterfaceRequest<fuchsia::media::StreamProcessor> decoder) override;
 

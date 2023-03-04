@@ -39,6 +39,12 @@ class LocalSingleCodecFactory : public fuchsia::mediacodec::CodecFactory {
     ZX_ASSERT(status == ZX_OK);
   }
 
+  void GetDetailedCodecDescriptions(GetDetailedCodecDescriptionsCallback callback) override {
+    // At least for now, SW codecs have their detailed codec descriptions provided directly by the
+    // main CodecFactory, so SW codecs don't need to implement this method.
+    callback({});
+  }
+
   void CreateDecoder(
       fuchsia::mediacodec::CreateDecoder_Params decoder_params,
       fidl::InterfaceRequest<fuchsia::media::StreamProcessor> decoder_request) override {

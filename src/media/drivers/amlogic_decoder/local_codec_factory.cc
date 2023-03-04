@@ -19,6 +19,54 @@ namespace amlogic_decoder {
 
 namespace {
 
+// Mirrors |fuchisa.mediacodec.DetailedCodecDescription| and
+// |fuchsia.mediacodec.DecoderProfileDescription|. Used so that we can construct values statically.
+struct DecoderDescription {
+  struct ProfileDescription {
+    fuchsia::media::CodecProfile profile;
+    fuchsia::math::SizeU min_coded_size;
+    fuchsia::math::SizeU max_coded_size;
+    bool allow_encryption;
+    bool require_encryption;
+    bool allow_input_protection;
+    bool require_input_protection;
+  };
+
+  std::string mime_type;
+  bool is_hw;
+  std::vector<ProfileDescription> profiles;
+};
+
+// List of decoder descriptions supported by this local codec factory.
+const DecoderDescription kDecoderDescriptions[] = {
+    {.mime_type = "video/h264",
+     .is_hw = true,
+     .profiles = {{
+         .profile = fuchsia::media::CodecProfile::H264PROFILE_HIGH,
+         .min_coded_size = {.width = 16u, .height = 16u},
+         .max_coded_size = {.width = 4096u, .height = 4096u},
+         // The decoder itself does not yet support decryption.  Rather the decoder supports
+         // receiving input in protected memory.
+         .allow_encryption = false,
+         .require_encryption = false,
+         .allow_input_protection = true,
+         .require_input_protection = false,
+     }}},
+    {.mime_type = "video/vp9",
+     .is_hw = true,
+     .profiles = {{
+         .profile = fuchsia::media::CodecProfile::VP9PROFILE_PROFILE0,
+         .min_coded_size = {.width = 2u, .height = 2u},
+         .max_coded_size = {.width = 4096u, .height = 4096u},
+         // The decoder itself does not yet support decryption.  Rather the decoder supports
+         // receiving input in protected memory.
+         .allow_encryption = false,
+         .require_encryption = false,
+         .allow_input_protection = true,
+         .require_input_protection = false,
+     }}},
+};
+
 struct CodecAdapterFactory {
   bool is_enabled;
   fuchsia::mediacodec::CodecDescription description;
@@ -226,17 +274,42 @@ void LocalCodecFactory::Bind(zx::channel server_endpoint) {
   // _immediate_ dispatching over on shared_fidl_thread()).
   factory_binding_.Bind(std::move(server_endpoint),
                         device_->driver()->shared_fidl_loop()->dispatcher());
+}
 
-  // All HW-accelerated local CodecFactory(s) must send OnCodecList()
-  // immediately upon creation of the local CodecFactory.
-  std::vector<fuchsia::mediacodec::CodecDescription> codec_descriptions;
-  for (const CodecAdapterFactory& factory : kCodecFactories) {
-    if (!factory.is_enabled) {
-      continue;
+void LocalCodecFactory::GetDetailedCodecDescriptions(
+    GetDetailedCodecDescriptionsCallback callback) {
+  std::vector<fuchsia::mediacodec::DetailedCodecDescription> fidl_codec_descriptions;
+
+  for (const auto& decoder_description : kDecoderDescriptions) {
+    fuchsia::mediacodec::DetailedCodecDescription fidl_codec_description;
+    fidl_codec_description.set_codec_type(::fuchsia::mediacodec::CodecType::DECODER);
+    fidl_codec_description.set_mime_type(decoder_description.mime_type);
+    fidl_codec_description.set_is_hw(decoder_description.is_hw);
+
+    std::vector<fuchsia::mediacodec::DecoderProfileDescription> fidl_profile_description_vector;
+    for (const auto& decoder_profile : decoder_description.profiles) {
+      fuchsia::mediacodec::DecoderProfileDescription profile_description;
+      profile_description.set_profile(decoder_profile.profile);
+      profile_description.set_min_image_size(decoder_profile.min_coded_size);
+      profile_description.set_max_image_size(decoder_profile.max_coded_size);
+      profile_description.set_allow_encryption(decoder_profile.allow_encryption);
+      profile_description.set_require_encryption(decoder_profile.require_encryption);
+      profile_description.set_allow_input_protection(decoder_profile.allow_input_protection);
+      profile_description.set_require_input_protection(decoder_profile.require_input_protection);
+      fidl_profile_description_vector.push_back(std::move(profile_description));
     }
-    codec_descriptions.push_back(fidl::Clone(factory.description));
+
+    fuchsia::mediacodec::ProfileDescriptions fidl_profile_descriptions;
+    fidl_profile_descriptions.set_decoder_profile_descriptions(
+        std::move(fidl_profile_description_vector));
+    fidl_codec_description.set_profile_descriptions(std::move(fidl_profile_descriptions));
+
+    fidl_codec_descriptions.push_back(std::move(fidl_codec_description));
   }
-  factory_binding_.events().OnCodecList(std::move(codec_descriptions));
+
+  fuchsia::mediacodec::CodecFactoryGetDetailedCodecDescriptionsResponse fidl_response;
+  fidl_response.set_codecs(std::move(fidl_codec_descriptions));
+  callback(std::move(fidl_response));
 }
 
 void LocalCodecFactory::CreateDecoder(
@@ -266,7 +339,7 @@ void LocalCodecFactory::CreateDecoder(
     // This shouldn't really happen since the main CodecFactory shouldn't be
     // asking this LocalCodecFactory for a codec fitting a description that's
     // not a description this factory previously delivered to the main
-    // CodecFactory via OnCodecList().
+    // CodecFactory via GetDetailedCodecDescriptions().
     //
     // TODO(dustingreen): epitaph for video_decoder.
     //

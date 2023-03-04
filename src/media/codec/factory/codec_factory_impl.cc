@@ -160,7 +160,17 @@ CodecFactoryImpl::CodecFactoryImpl(
 
   // The app already has all hardware codecs loaded by the time we get to talk
   // to it, so we don't need to wait for it now.
+  //
+  // This message is deprecated, but is sent for the benefit of clients that haven't yet moved to
+  // GetDetailedCodecDescriptions.
+  FX_LOGS(INFO) << "Sending OnCodecList";
   binding_.events().OnCodecList(app_->MakeCodecList());
+}
+
+void CodecFactoryImpl::GetDetailedCodecDescriptions(GetDetailedCodecDescriptionsCallback callback) {
+  fuchsia::mediacodec::CodecFactoryGetDetailedCodecDescriptionsResponse response;
+  response.set_codecs(app_->MakeDetailedCodecDescriptions());
+  callback(std::move(response));
 }
 
 void CodecFactoryImpl::CreateDecoder(
@@ -186,14 +196,15 @@ void CodecFactoryImpl::CreateDecoder(
     // First, try to find a hw-accelerated codec to satisfy the request.
     auto mime_type = params.input_details().mime_type();
     const fuchsia::mediacodec::CodecFactoryPtr* factory = app_->FindHwCodec(
-        [&mime_type](const fuchsia::mediacodec::CodecDescription& hw_codec_description) -> bool {
+        [&mime_type](
+            const fuchsia::mediacodec::DetailedCodecDescription& hw_codec_description) -> bool {
           // TODO(dustingreen): pay attention to the bool constraints of the
           // params vs. the hw_codec_description bools.  For the moment we just
           // match the codec_type, mime_type.
           constexpr fuchsia::mediacodec::CodecType codec_type =
               fuchsia::mediacodec::CodecType::DECODER;
-          return (codec_type == hw_codec_description.codec_type) &&
-                 (mime_type == hw_codec_description.mime_type);
+          return (codec_type == hw_codec_description.codec_type()) &&
+                 (mime_type == hw_codec_description.mime_type());
         });
     if (factory && (!params.has_require_hw() || !params.require_hw()) && !AdmitHwDecoder(params)) {
       factory = nullptr;
@@ -207,14 +218,15 @@ void CodecFactoryImpl::CreateDecoder(
       return;
     }
     hw_isolate = app_->FindHwIsolate(
-        [&mime_type](const fuchsia::mediacodec::CodecDescription& hw_codec_description) -> bool {
+        [&mime_type](
+            const fuchsia::mediacodec::DetailedCodecDescription& hw_codec_description) -> bool {
           // TODO(dustingreen): pay attention to the bool constraints of the
           // params vs. the hw_codec_description bools.  For the moment we just
           // match the codec_type, mime_type.
           constexpr fuchsia::mediacodec::CodecType codec_type =
               fuchsia::mediacodec::CodecType::DECODER;
-          return (codec_type == hw_codec_description.codec_type) &&
-                 (mime_type == hw_codec_description.mime_type);
+          return (codec_type == hw_codec_description.codec_type()) &&
+                 (mime_type == hw_codec_description.mime_type());
         });
     if (hw_isolate) {
       isolate_type = IsolateType::kMagma;
@@ -283,10 +295,10 @@ void CodecFactoryImpl::CreateEncoder(
 
   // First, try to find a hw-accelerated codec to satisfy the request.
   const fuchsia::mediacodec::CodecFactoryPtr* factory = app_->FindHwCodec(
-      [&encoder_params](const fuchsia::mediacodec::CodecDescription& hw_codec_description) -> bool {
-        ;
-        return (fuchsia::mediacodec::CodecType::ENCODER == hw_codec_description.codec_type) &&
-               (encoder_params.input_details().mime_type() == hw_codec_description.mime_type);
+      [&encoder_params](
+          const fuchsia::mediacodec::DetailedCodecDescription& hw_codec_description) -> bool {
+        return (fuchsia::mediacodec::CodecType::ENCODER == hw_codec_description.codec_type()) &&
+               (encoder_params.input_details().mime_type() == hw_codec_description.mime_type());
       });
 
   if (factory && !AdmitHwEncoder(encoder_params)) {
@@ -300,9 +312,10 @@ void CodecFactoryImpl::CreateEncoder(
     return;
   }
   auto hw_isolate = app_->FindHwIsolate(
-      [&encoder_params](const fuchsia::mediacodec::CodecDescription& hw_codec_description) -> bool {
-        return (fuchsia::mediacodec::CodecType::ENCODER == hw_codec_description.codec_type) &&
-               (encoder_params.input_details().mime_type() == hw_codec_description.mime_type);
+      [&encoder_params](
+          const fuchsia::mediacodec::DetailedCodecDescription& hw_codec_description) -> bool {
+        return (fuchsia::mediacodec::CodecType::ENCODER == hw_codec_description.codec_type()) &&
+               (encoder_params.input_details().mime_type() == hw_codec_description.mime_type());
       });
   IsolateType isolate_type = IsolateType::kSw;
   if (hw_isolate) {

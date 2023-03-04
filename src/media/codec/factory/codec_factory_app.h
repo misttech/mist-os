@@ -16,6 +16,7 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 
 #include "codec_factory_policy.h"
 #include "src/lib/fsl/io/device_watcher.h"
@@ -42,12 +43,14 @@ class CodecFactoryApp {
   //
   // This method can return nullptr if a HW decoder isn't found...
   [[nodiscard]] const fuchsia::mediacodec::CodecFactoryPtr* FindHwCodec(
-      fit::function<bool(const fuchsia::mediacodec::CodecDescription&)> is_match);
+      fit::function<bool(const fuchsia::mediacodec::DetailedCodecDescription&)> is_match);
 
   [[nodiscard]] const std::optional<std::string> FindHwIsolate(
-      fit::function<bool(const fuchsia::mediacodec::CodecDescription&)> is_match);
+      fit::function<bool(const fuchsia::mediacodec::DetailedCodecDescription&)> is_match);
 
   [[nodiscard]] std::vector<fuchsia::mediacodec::CodecDescription> MakeCodecList() const;
+  [[nodiscard]] std::vector<fuchsia::mediacodec::DetailedCodecDescription>
+  MakeDetailedCodecDescriptions() const;
 
   [[nodiscard]] async_dispatcher_t* dispatcher() { return dispatcher_; }
   [[nodiscard]] const std::string& board_name() { return board_name_; }
@@ -56,8 +59,17 @@ class CodecFactoryApp {
 
  private:
   struct CodecListEntry {
-    fuchsia::mediacodec::CodecDescription description;
+    fuchsia::mediacodec::DetailedCodecDescription detailed_description;
+    inspect::Node codec_node;
 
+    // The info here is entirely derived from detailed_description, not from info sent from the
+    // codec via OnCodecList.
+    fuchsia::mediacodec::CodecDescription deprecated_codec_description;
+  };
+
+  // A struct that represents a device that implements the fuchsia.mediacodec.CodecFactory protocol.
+  struct CodecFactoryEntry {
+   public:
     std::string component_url;
 
     // When a HW-accelerated CodecFactory supports more than one sort of codec,
@@ -65,10 +77,17 @@ class CodecFactoryApp {
     // via the shared_ptr<> here.  The relevant entries co-own the
     // CodecFactoryPtr, and a shared_ptr<> ref is only transiently held by any
     // other code (not posted; not sent across threads).
-    std::shared_ptr<fuchsia::mediacodec::CodecFactoryPtr> factory;
+    std::shared_ptr<fuchsia::mediacodec::CodecFactoryPtr> codec_factory;
 
+    // If the codec is a one backed by a magma device, this value will be set to the ICD loader, and
+    // if not it will nullptr
     std::shared_ptr<fuchsia::gpu::magma::IcdLoaderDevicePtr> magma_device;
-    inspect::Node codec_node;
+
+    // A list of hardware accelerated codecs provided by this codec device factory.
+    std::list<std::unique_ptr<CodecListEntry>> hw_codecs;
+
+    // Inspect data about this specific CodecFactory
+    inspect::Node factory_node;
   };
 
   void DiscoverMagmaCodecDriversAndListenForMoreAsync();
@@ -89,7 +108,7 @@ class CodecFactoryApp {
 
   std::unique_ptr<sys::ComponentContext> startup_context_;
   std::unique_ptr<sys::ComponentInspector> inspector_;
-  inspect::Node hardware_codec_nodes_;
+  inspect::Node hardware_factory_nodes_;
   std::string board_name_;
 
   // Per-board (or similar) policy on # of concurrent HW decoders that use
@@ -133,7 +152,7 @@ class CodecFactoryApp {
   // to that device's local CodecFactory channel closing.
   //
   // This list is ordered by reverse discovery order.
-  std::list<std::unique_ptr<CodecListEntry>> hw_codecs_;
+  std::list<std::unique_ptr<CodecFactoryEntry>> hw_factories_;
 
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
   std::unique_ptr<fsl::DeviceWatcher> gpu_device_watcher_;
@@ -146,9 +165,18 @@ class CodecFactoryApp {
   //
   // This list is ordered by discovery order.
   struct DeviceDiscoveryEntry {
-    // !driver_codec_list until OnCodecList() has been seen from the
-    // codec_factory.
-    fidl::VectorPtr<fuchsia::mediacodec::CodecDescription> driver_codec_list;
+    // !driver_codec_list until GetDetailedCodecDescriptions response has been received.  This list
+    // is _not_ based on the OnCodecList from each codec (which is now ignored), but rather is
+    // constructed using the GetDetailedCodecDescriptions information, so that each codec only has
+    // to serve the more recent GetDetailedCodecDescriptions, and can immediately stop sending the
+    // deprecated OnCodecList, even while clients are still migrating from OnCodecList to
+    // GetDetailedCodecDescriptions.
+    std::optional<std::vector<fuchsia::mediacodec::CodecDescription>> driver_codec_list;
+
+    // !detailed_codec_descriptions until a device is found and the |GetDetailedCodecDescriptions|
+    // response is received.  Codecs must implement GetDetailedCodecDescriptions.
+    std::optional<std::vector<fuchsia::mediacodec::DetailedCodecDescription>>
+        detailed_codec_descriptions;
 
     // We don't really need a shared_ptr<> until hw_codecs_ (to allow it to be
     // just a flat list).  However, using a shared_ptr<> here seems more

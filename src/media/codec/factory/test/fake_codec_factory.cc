@@ -20,6 +20,8 @@
 
 namespace {
 
+const char* kMimeType = "video/h264";
+
 std::optional<std::string> FindGpuDevice(const std::string dir_name) {
   std::optional<std::string> device;
 
@@ -47,14 +49,47 @@ class CodecFactoryImpl final : public fuchsia::mediacodec::CodecFactory {
             fidl::InterfaceRequest<fuchsia::mediacodec::CodecFactory> request) {
     binding_.Bind(std::move(request));
     binding_.set_error_handler([factory = std::move(factory)](zx_status_t status) {});
-    fuchsia::mediacodec::CodecDescription description;
-    description.codec_type = fuchsia::mediacodec::CodecType::DECODER;
-    description.mime_type = "video/h264";
-    std::vector<fuchsia::mediacodec::CodecDescription> descriptions{description};
-    description.codec_type = fuchsia::mediacodec::CodecType::ENCODER;
-    description.mime_type = "video/h264";
-    descriptions.push_back(description);
-    binding_.events().OnCodecList(std::move(descriptions));
+  }
+
+  void GetDetailedCodecDescriptions(GetDetailedCodecDescriptionsCallback callback) override {
+    std::vector<fuchsia::mediacodec::DetailedCodecDescription> descriptions;
+    {
+      fuchsia::mediacodec::DetailedCodecDescription description;
+      description.set_codec_type(fuchsia::mediacodec::CodecType::DECODER);
+      description.set_mime_type(kMimeType);
+      description.set_is_hw(false);
+
+      fuchsia::mediacodec::DecoderProfileDescription profile;
+      profile.set_profile(fuchsia::media::CodecProfile::H264PROFILE_HIGH);
+      profile.set_min_image_size({16, 16});
+      profile.set_max_image_size({3840, 2160});
+      fuchsia::mediacodec::ProfileDescriptions profile_descriptions;
+      std::vector<fuchsia::mediacodec::DecoderProfileDescription> profiles;
+      profiles.emplace_back(std::move(profile));
+      profile_descriptions.set_decoder_profile_descriptions(std::move(profiles));
+      description.set_profile_descriptions(std::move(profile_descriptions));
+
+      descriptions.push_back(std::move(description));
+    }
+    {
+      fuchsia::mediacodec::DetailedCodecDescription description;
+      description.set_codec_type(fuchsia::mediacodec::CodecType::ENCODER);
+      description.set_mime_type(kMimeType);
+      description.set_is_hw(false);
+
+      fuchsia::mediacodec::EncoderProfileDescription profile;
+      profile.set_profile(fuchsia::media::CodecProfile::H264PROFILE_HIGH);
+      fuchsia::mediacodec::ProfileDescriptions profile_descriptions;
+      std::vector<fuchsia::mediacodec::EncoderProfileDescription> profiles;
+      profiles.emplace_back(std::move(profile));
+      profile_descriptions.set_encoder_profile_descriptions(std::move(profiles));
+      description.set_profile_descriptions(std::move(profile_descriptions));
+
+      descriptions.push_back(std::move(description));
+    }
+    fuchsia::mediacodec::CodecFactoryGetDetailedCodecDescriptionsResponse response;
+    response.set_codecs(std::move(descriptions));
+    callback(std::move(response));
   }
 
   void CreateDecoder(fuchsia::mediacodec::CreateDecoder_Params params,

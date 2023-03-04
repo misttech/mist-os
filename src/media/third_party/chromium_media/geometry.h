@@ -10,8 +10,6 @@
 #include <zircon/assert.h>
 #include <string>
 
-#include "chromium_utils.h"
-
 namespace gfx {
 class Size {
  public:

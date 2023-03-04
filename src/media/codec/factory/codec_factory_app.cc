@@ -6,21 +6,26 @@
 
 #include <dirent.h>
 #include <fuchsia/hardware/mediacodec/cpp/fidl.h>
+#include <fuchsia/media/cpp/fidl.h>
 #include <fuchsia/mediacodec/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/interface_request.h>
+#include <lib/fidl/cpp/string.h>
+#include <lib/fidl/cpp/vector.h>
+#include <lib/sys/cpp/component_context.h>
+#include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
 #include <zircon/status.h>
 
 #include <algorithm>
 #include <random>
 
+#include <src/lib/fsl/io/device_watcher.h>
+
 #include "codec_factory_impl.h"
 #include "codec_isolate.h"
-#include "lib/fidl/cpp/interface_request.h"
-#include "lib/fidl/cpp/string.h"
-#include "lib/sys/cpp/component_context.h"
-#include "src/lib/fsl/io/device_watcher.h"
 
 namespace {
 
@@ -28,9 +33,119 @@ constexpr char kDeviceClass[] = "/dev/class/media-codec";
 constexpr char kGpuDeviceClass[] = "/dev/class/gpu";
 const char* kLogTag = "CodecFactoryApp";
 
-const std::string kAllSwDecoderMimeTypes[] = {
-    "video/h264",  // VIDEO_ENCODING_H264
+struct SwVideoDecoderInfo {
+  const char* mime_type;
+  fuchsia::media::CodecProfile profile;
+  uint32_t min_width;
+  uint32_t min_height;
+  uint32_t max_width;
+  uint32_t max_height;
 };
+const SwVideoDecoderInfo kSwVideoDecoderInfos[] = {
+    {
+        .mime_type = "video/h264",  // VIDEO_ENCODING_H264
+        .profile = fuchsia::media::CodecProfile::H264PROFILE_HIGH,
+        .min_width = 32,
+        .min_height = 32,
+        // The decode performance will likely not be realtime at these dimensions.
+        .max_width = 3840,
+        .max_height = 2160,
+    },
+};
+
+static const char* CodecProfileToString(fuchsia::media::CodecProfile profile) {
+  switch (profile) {
+    case fuchsia::media::CodecProfile::H264PROFILE_BASELINE:
+      return "H264PROFILE_BASELINE";
+    case fuchsia::media::CodecProfile::H264PROFILE_MAIN:
+      return "H264PROFILE_MAIN";
+    case fuchsia::media::CodecProfile::H264PROFILE_EXTENDED:
+      return "H264PROFILE_EXTENDED";
+    case fuchsia::media::CodecProfile::H264PROFILE_HIGH:
+      return "H264PROFILE_HIGH";
+    case fuchsia::media::CodecProfile::H264PROFILE_HIGH10PROFILE:
+      return "H264PROFILE_HIGH10PROFILE";
+    case fuchsia::media::CodecProfile::H264PROFILE_HIGH422PROFILE:
+      return "H264PROFILE_HIGH422PROFILE";
+    case fuchsia::media::CodecProfile::H264PROFILE_HIGH444PREDICTIVEPROFILE:
+      return "H264PROFILE_HIGH444PREDICTIVEPROFILE";
+    case fuchsia::media::CodecProfile::H264PROFILE_SCALABLEBASELINE:
+      return "H264PROFILE_SCALABLEBASELINE";
+    case fuchsia::media::CodecProfile::H264PROFILE_SCALABLEHIGH:
+      return "H264PROFILE_SCALABLEHIGH";
+    case fuchsia::media::CodecProfile::H264PROFILE_STEREOHIGH:
+      return "H264PROFILE_STEREOHIGH";
+    case fuchsia::media::CodecProfile::H264PROFILE_MULTIVIEWHIGH:
+      return "H264PROFILE_MULTIVIEWHIGH";
+    case fuchsia::media::CodecProfile::VP8PROFILE_ANY:
+      return "VP8PROFILE_ANY";
+    case fuchsia::media::CodecProfile::VP9PROFILE_PROFILE0:
+      return "VP9PROFILE_PROFILE0";
+    case fuchsia::media::CodecProfile::VP9PROFILE_PROFILE1:
+      return "VP9PROFILE_PROFILE1";
+    case fuchsia::media::CodecProfile::VP9PROFILE_PROFILE2:
+      return "VP9PROFILE_PROFILE2";
+    case fuchsia::media::CodecProfile::VP9PROFILE_PROFILE3:
+      return "VP9PROFILE_PROFILE3";
+    case fuchsia::media::CodecProfile::HEVCPROFILE_MAIN:
+      return "HEVCPROFILE_MAIN";
+    case fuchsia::media::CodecProfile::HEVCPROFILE_MAIN10:
+      return "HEVCPROFILE_MAIN10";
+    case fuchsia::media::CodecProfile::HEVCPROFILE_MAIN_STILL_PICTURE:
+      return "HEVCPROFILE_MAIN_STILL_PICTURE";
+    case fuchsia::media::CodecProfile::MJPEG_BASELINE:
+      return "MJPEG_BASELINE";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+fuchsia::mediacodec::CodecDescription CreateDeprecatedCodecDescriptionFromDetailedCodecDescription(
+    fuchsia::mediacodec::DetailedCodecDescription& detailed) {
+  fuchsia::mediacodec::CodecDescription deprecated;
+  deprecated.codec_type = detailed.codec_type();
+  deprecated.mime_type = detailed.mime_type();
+  deprecated.is_hw = detailed.is_hw();
+  switch (detailed.codec_type()) {
+    case fuchsia::mediacodec::CodecType::DECODER:
+      // Default to more-capable, but if any per-profile info indicates less-capable, aggregate by
+      // marking less-capable.
+      deprecated.can_stream_bytes_input = true;
+      deprecated.can_find_start = true;
+      deprecated.can_re_sync = true;
+      deprecated.will_report_all_detected_errors = true;
+      deprecated.split_header_handling = true;
+      for (auto& profile : detailed.profile_descriptions().decoder_profile_descriptions()) {
+        if (!profile.has_can_stream_bytes_input() || !profile.can_stream_bytes_input()) {
+          deprecated.can_stream_bytes_input = false;
+        }
+        if (!profile.has_can_find_start() || !profile.can_find_start()) {
+          deprecated.can_find_start = false;
+        }
+        if (!profile.has_can_re_sync() || !profile.can_re_sync()) {
+          deprecated.can_re_sync = false;
+        }
+        if (!profile.has_will_report_all_detected_errors() ||
+            !profile.will_report_all_detected_errors()) {
+          deprecated.will_report_all_detected_errors = false;
+        }
+        if (!profile.has_split_header_handling() || !profile.split_header_handling()) {
+          deprecated.split_header_handling = false;
+        }
+      }
+      break;
+    case fuchsia::mediacodec::CodecType::ENCODER:
+      // These don't make sense for encoders, so set them all to false.  The ambiguity of these
+      // fields appearing to apply to encoders when really they make no sense for encoders is
+      // among the reasons we're deprecating OnCodecList.
+      deprecated.can_stream_bytes_input = false;
+      deprecated.can_find_start = false;
+      deprecated.can_re_sync = false;
+      deprecated.will_report_all_detected_errors = false;
+      deprecated.split_header_handling = false;
+  }
+  return deprecated;
+}
 
 }  // namespace
 
@@ -44,7 +159,7 @@ CodecFactoryApp::CodecFactoryApp(async_dispatcher_t* dispatcher, ProdOrTest prod
       policy_(this) {
   inspector_ = std::make_unique<sys::ComponentInspector>(startup_context_.get());
   inspector_->Health().StartingUp();
-  hardware_codec_nodes_ = inspector_->root().CreateChild("hardware_codec_nodes");
+  hardware_factory_nodes_ = inspector_->root().CreateChild("hardware_factory_nodes");
   // Don't publish service or outgoing()->ServeFromStartupInfo() until after initial discovery is
   // done, else the pumping of the loop will drop the incoming request for CodecFactory before
   // AddPublicService() below has had a chance to register for it.
@@ -72,7 +187,7 @@ CodecFactoryApp::CodecFactoryApp(async_dispatcher_t* dispatcher, ProdOrTest prod
 
 void CodecFactoryApp::PublishService() {
   // We delay doing this until we're completely ready to add services.
-  // We _rely_ on the driver to either fail the channel or send OnCodecList().
+  // We _rely_ on the driver to either fail the channel or respond to GetDetailedCodecDescriptions.
   ZX_DEBUG_ASSERT(existing_devices_discovered_);
   zx_status_t status =
       startup_context_->outgoing()->AddPublicService<fuchsia::mediacodec::CodecFactory>(
@@ -95,10 +210,11 @@ void CodecFactoryApp::PublishService() {
 // TODO(schottm): send encoders as well
 std::vector<fuchsia::mediacodec::CodecDescription> CodecFactoryApp::MakeCodecList() const {
   std::vector<fuchsia::mediacodec::CodecDescription> codecs;
-  for (const auto& mime_type : kAllSwDecoderMimeTypes) {
+
+  for (const auto& info : kSwVideoDecoderInfos) {
     codecs.push_back({
         .codec_type = fuchsia::mediacodec::CodecType::DECODER,
-        .mime_type = mime_type,
+        .mime_type = info.mime_type,
 
         // TODO(schottm): can some of these be true?
         .can_stream_bytes_input = false,
@@ -111,43 +227,94 @@ std::vector<fuchsia::mediacodec::CodecDescription> CodecFactoryApp::MakeCodecLis
     });
   }
 
-  for (const auto& entry : hw_codecs_) {
-    codecs.push_back(entry->description);
+  for (const auto& factory : hw_factories_) {
+    for (const auto& codec : factory->hw_codecs) {
+      codecs.push_back(codec->deprecated_codec_description);
+    }
   }
+
   auto rng = std::default_random_engine();
   std::shuffle(codecs.begin(), codecs.end(), rng);
 
   return codecs;
 }
 
-const fuchsia::mediacodec::CodecFactoryPtr* CodecFactoryApp::FindHwCodec(
-    fit::function<bool(const fuchsia::mediacodec::CodecDescription&)> is_match) {
-  auto iter = std::find_if(hw_codecs_.begin(), hw_codecs_.end(),
-                           [&is_match](const std::unique_ptr<CodecListEntry>& entry) -> bool {
-                             return is_match(entry->description);
-                           });
-  if (iter == hw_codecs_.end()) {
-    return nullptr;
+std::vector<fuchsia::mediacodec::DetailedCodecDescription>
+CodecFactoryApp::MakeDetailedCodecDescriptions() const {
+  std::vector<fuchsia::mediacodec::DetailedCodecDescription> codec_descriptions;
+
+  for (const auto& info : kSwVideoDecoderInfos) {
+    fuchsia::mediacodec::DetailedCodecDescription description;
+    description.set_codec_type(fuchsia::mediacodec::CodecType::DECODER);
+    description.set_mime_type(info.mime_type);
+    description.set_is_hw(false);
+    fuchsia::mediacodec::DecoderProfileDescription profile_description;
+    profile_description.set_profile(info.profile);
+    profile_description.set_min_image_size({info.min_width, info.min_height});
+    profile_description.set_max_image_size({info.max_width, info.max_height});
+    // We leave the rest of the fields un-set intentionally, since clients must accept a non-set
+    // field and know that means what the comments on the field in the FIDL file say it means (no
+    // programmatic field defaults).
+    std::vector<fuchsia::mediacodec::DecoderProfileDescription> profiles;
+    profiles.push_back(std::move(profile_description));
+    fuchsia::mediacodec::ProfileDescriptions profile_descriptions;
+    profile_descriptions.set_decoder_profile_descriptions(std::move(profiles));
+    description.set_profile_descriptions(std::move(profile_descriptions));
+    codec_descriptions.push_back(std::move(description));
   }
-  // HW codecs are connected to using factory, not by launching a component using the URL.
-  if (!(*iter)->component_url.empty())
-    return nullptr;
-  return (*iter)->factory.get();
+
+  for (const auto& factory : hw_factories_) {
+    for (const auto& codec : factory->hw_codecs) {
+      // Need to clone the |DetailedCodecDescription| since it is not copyable
+      fuchsia::mediacodec::DetailedCodecDescription detailed_description;
+      ZX_ASSERT(codec->detailed_description.Clone(&detailed_description) == ZX_OK);
+      codec_descriptions.push_back(std::move(detailed_description));
+    }
+  }
+
+  return codec_descriptions;
+}
+
+const fuchsia::mediacodec::CodecFactoryPtr* CodecFactoryApp::FindHwCodec(
+    fit::function<bool(const fuchsia::mediacodec::DetailedCodecDescription&)> is_match) {
+  for (auto& hw_factory : hw_factories_) {
+    // HW codecs are connected to using factory, not by launching a component using the URL.
+    if (!hw_factory->component_url.empty()) {
+      continue;
+    }
+
+    auto iter = std::find_if(hw_factory->hw_codecs.begin(), hw_factory->hw_codecs.end(),
+                             [&is_match](const std::unique_ptr<CodecListEntry>& entry) -> bool {
+                               return is_match(entry->detailed_description);
+                             });
+
+    if (iter != hw_factory->hw_codecs.end()) {
+      return hw_factory->codec_factory.get();
+    }
+  }
+
+  return nullptr;
 }
 
 const std::optional<std::string> CodecFactoryApp::FindHwIsolate(
-    fit::function<bool(const fuchsia::mediacodec::CodecDescription&)> is_match) {
-  auto iter = std::find_if(hw_codecs_.begin(), hw_codecs_.end(),
-                           [&is_match](const std::unique_ptr<CodecListEntry>& entry) -> bool {
-                             return is_match(entry->description);
-                           });
-  if (iter == hw_codecs_.end()) {
-    return {};
+    fit::function<bool(const fuchsia::mediacodec::DetailedCodecDescription&)> is_match) {
+  for (auto& hw_factory : hw_factories_) {
+    // Isolate codecs are connected by launching a component using the URL.
+    if (hw_factory->component_url.empty()) {
+      continue;
+    }
+
+    auto iter = std::find_if(hw_factory->hw_codecs.begin(), hw_factory->hw_codecs.end(),
+                             [&is_match](const std::unique_ptr<CodecListEntry>& entry) -> bool {
+                               return is_match(entry->detailed_description);
+                             });
+
+    if (iter != hw_factory->hw_codecs.end()) {
+      return hw_factory->component_url;
+    }
   }
-  if ((*iter)->component_url.empty()) {
-    return {};
-  }
-  return (*iter)->component_url;
+
+  return std::nullopt;
 }
 
 void CodecFactoryApp::IdledCodecDiscovery() {
@@ -169,7 +336,7 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
   // the first time a client requests a HW-backed codec, we robustly consider all codecs provided by
   // pre-existing devices.  The request for a HW-backed Codec will have a much higher probability of
   // succeeding vs. if we just discovered pre-existing devices async.  This doesn't prevent the
-  // possiblity that the device might not exist at the moment the CodecFactory is started, but as
+  // possibility that the device might not exist at the moment the CodecFactory is started, but as
   // long as the device does exist by then, this will ensure the device's codecs are considered,
   // including for the first client request.
   device_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
@@ -246,28 +413,33 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
               // processed.
               PostDiscoveryQueueProcessing();
 
-              hw_codecs_.remove_if([factory](const std::unique_ptr<CodecListEntry>& entry) {
-                return factory == entry->factory.get();
-              });
+              hw_factories_.remove_if(
+                  [factory](const std::unique_ptr<CodecFactoryEntry>& factory_entry) {
+                    return factory == factory_entry->codec_factory.get();
+                  });
             });
 
-        discovery_entry->codec_factory->events().OnCodecList =
-            [this, discovery_entry = discovery_entry.get()](
-                std::vector<fuchsia::mediacodec::CodecDescription> codec_list) {
-              discovery_entry->driver_codec_list = fidl::VectorPtr(codec_list);
-
-              // We're no longer interested in OnCodecList events from the
-              // driver's CodecFactory, should the driver send any more. Sending
-              // more is not legal, but disconnect this event just in case,
-              // since we don't want the old lambda that touches
-              // driver_codec_list (this lambda).
-              discovery_entry->codec_factory->events().OnCodecList = nullptr;
-              // In case discovery_entry is the first item which is now ready to
-              // process, process the discovery queue.
-              PostDiscoveryQueueProcessing();
-            };
-
         discovery_entry->codec_factory->Bind(std::move(client_factory_channel), dispatcher());
+
+        // Queue up a call to |GetDetailedCodecDescriptions()| and store the output in the
+        // discovery_entry.
+        FX_LOGS(INFO) << "Calling GetDetailedCodecDescriptions for "
+                      << discovery_entry->device_path;
+        (*discovery_entry->codec_factory)
+            ->GetDetailedCodecDescriptions(
+                [this, discovery_entry = discovery_entry.get()](
+                    fuchsia::mediacodec::CodecFactoryGetDetailedCodecDescriptionsResponse
+                        response) {
+                  ZX_ASSERT(response.has_codecs());
+                  ZX_ASSERT(response.mutable_codecs());
+                  FX_LOGS(INFO) << "GetDetailedCodecDescriptions response received for "
+                                << discovery_entry->device_path;
+                  discovery_entry->detailed_codec_descriptions =
+                      std::move(*response.mutable_codecs());
+                  // In case discovery_entry is the first item which is now ready to
+                  // process, process the discovery queue.
+                  PostDiscoveryQueueProcessing();
+                });
 
         device_discovery_queue_.emplace_back(std::move(discovery_entry));
       },
@@ -283,8 +455,8 @@ void CodecFactoryApp::TeardownMagmaCodec(
         return magma_device.get() == entry->magma_device.get();
       });
 
-  hw_codecs_.remove_if([magma_device](const std::unique_ptr<CodecListEntry>& entry) {
-    return magma_device.get() == entry->magma_device.get();
+  hw_factories_.remove_if([magma_device](const std::unique_ptr<CodecFactoryEntry>& factory_entry) {
+    return magma_device.get() == factory_entry->magma_device.get();
   });
 
   // Perhaps the removed discovery item was the first item in the
@@ -347,21 +519,26 @@ void CodecFactoryApp::DiscoverMagmaCodecDriversAndListenForMoreAsync() {
                           [this, device_path, magma_device](zx_status_t status) {
                             TeardownMagmaCodec(magma_device);
                           });
-                      discovery_entry->codec_factory->events().OnCodecList =
-                          [this, discovery_entry](
-                              std::vector<fuchsia::mediacodec::CodecDescription> codec_list) {
-                            discovery_entry->driver_codec_list = fidl::VectorPtr(codec_list);
-
-                            // We're no longer interested in OnCodecList events from the
-                            // driver's CodecFactory, should the driver send any more. Sending
-                            // more is not legal, but disconnect this event just in case,
-                            // since we don't want the old lambda that touches
-                            // driver_codec_list (this lambda).
-                            discovery_entry->codec_factory->events().OnCodecList = nullptr;
-                            // In case discovery_entry is the first item which is now ready to
-                            // process, process the discovery queue.
-                            PostDiscoveryQueueProcessing();
-                          };
+                      // Queue up a call to |GetDetailedCodecDescriptions()| and store the output
+                      // in the discovery_entry.
+                      FX_LOGS(INFO) << "Calling GetDetailedCodecDescriptions for "
+                                    << discovery_entry->component_url;
+                      (*discovery_entry->codec_factory)
+                          ->GetDetailedCodecDescriptions(
+                              [this, discovery_entry](
+                                  fuchsia::mediacodec::
+                                      CodecFactoryGetDetailedCodecDescriptionsResponse response) {
+                                ZX_ASSERT(response.has_codecs());
+                                ZX_ASSERT(response.mutable_codecs());
+                                FX_LOGS(INFO)
+                                    << "GetDetailedCodecDescriptions response received for "
+                                    << discovery_entry->component_url;
+                                discovery_entry->detailed_codec_descriptions =
+                                    std::move(*response.mutable_codecs());
+                                // In case discovery_entry is the first item which is now ready to
+                                // process, process the discovery queue.
+                                PostDiscoveryQueueProcessing();
+                              });
                     },
                     [this, magma_device]() { TeardownMagmaCodec(magma_device); });
                 found_media_icd = true;
@@ -396,10 +573,10 @@ void CodecFactoryApp::ProcessDiscoveryQueue() {
   // more-recently-discovered device over a less-recently-discovered device (for
   // now at least), so to make that robust, we preserve the device discovery
   // order through the codec discovery sequence, to account for the possibility
-  // that an previously discovered device may have only just recently sent
-  // OnCodecList before failing; without the device_discovery_queue_ that
-  // previously-discovered device's OnCodecList could re-order vs. the
-  // replacement device's OnCodecList.
+  // that an previously discovered device may have only just recently responded
+  // to GetDetailedCodecDescriptions before failing; without the
+  // device_discovery_queue_ that previously-discovered device's response could
+  // re-order vs. the replacement device's response.
   //
   // The device_discovery_queue_ marginally increases the odds of a client
   // request picking up a replacement devhost instead of an old devhost that
@@ -410,7 +587,7 @@ void CodecFactoryApp::ProcessDiscoveryQueue() {
   // discovery of the replacement devhost.
   //
   // The ordering of the hw_codec_ list is the main way in which
-  // more-recently-discovered codecs are prefered over less-recently-discovered
+  // more-recently-discovered codecs are preferred over less-recently-discovered
   // codecs.  The device_discovery_queue_ just makes the hw_codec_ ordering
   // exactly correspond to the device discovery order (reversed) even when
   // devices are discovered near each other in time.
@@ -425,13 +602,14 @@ void CodecFactoryApp::ProcessDiscoveryQueue() {
   // work despite a devhost not always fully working), even if the Codec failure
   // happens quite early.
   while (!device_discovery_queue_.empty()) {
-    std::unique_ptr<DeviceDiscoveryEntry>& front = device_discovery_queue_.front();
-    if (!front->codec_factory && !front->magma_device) {
+    std::unique_ptr<DeviceDiscoveryEntry>& discovered_device = device_discovery_queue_.front();
+    if (!discovered_device->codec_factory && !discovered_device->magma_device) {
       // All pre-existing devices have been processed.
       //
       // Now the CodecFactory can begin serving (shortly).
       if (!existing_devices_discovered_) {
         existing_devices_discovered_ = true;
+        FX_LOGS(INFO) << "CodecFactory calling PublishService()";
         PublishService();
       }
       // The marker has done its job, so remove the marker.
@@ -439,49 +617,153 @@ void CodecFactoryApp::ProcessDiscoveryQueue() {
       return;
     }
 
-    if (!front->driver_codec_list) {
-      // The first item is not yet ready.  The current method will get re-posted
+    // Wait for detailed_codec_descriptions.  We don't wait for driver_codec_list, which is
+    // generated from detailed_codec_descriptions below.
+    if (!discovered_device->detailed_codec_descriptions) {
+      // The first item is not yet ready. The current method will get re-posted
       // when the first item is potentially ready.
       return;
     }
-    if (!front->component_url.empty()) {
+
+    if (!discovered_device->component_url.empty()) {
       // If there's a component URL then a new instance will be launched for every codec, so
       // codec_factory won't be used anymore.
-      front->codec_factory = {};
+      discovered_device->codec_factory = {};
     }
-    FX_DCHECK(front->driver_codec_list.has_value());
 
-    for (auto& codec_description : front->driver_codec_list.value()) {
+    FX_DCHECK(!discovered_device->device_path.empty());
+
+    // Create the hardware codec factory that these codecs will belong to
+    auto hw_codec_factory = std::make_unique<CodecFactoryEntry>();
+    hw_codec_factory->component_url = discovered_device->component_url;
+    hw_codec_factory->codec_factory = discovered_device->codec_factory;
+    hw_codec_factory->magma_device = discovered_device->magma_device;
+
+    // Device paths are always unique and must be provided for hardware factories
+    hw_codec_factory->factory_node =
+        hardware_factory_nodes_.CreateChild(discovered_device->device_path);
+
+    const std::string& device_path =
+        !discovered_device->device_path.empty() ? discovered_device->device_path : "N/A";
+    hw_codec_factory->factory_node.RecordString("device_path", device_path);
+
+    const std::string& component_url =
+        !discovered_device->component_url.empty() ? discovered_device->component_url : "N/A";
+    hw_codec_factory->factory_node.RecordString("component_url", component_url);
+
+    // All codecs must implement GetDetailedCodecDescriptions.  We ignore any OnCodecList from each
+    // codec in favor of building an OnCodecList from GetDetailedCodecDescriptions responses, so
+    // that each codec (roughly speaking) can stop sending the deprecated OnCodecList before all
+    // clients have stopped listening to OnCodecList.
+    FX_CHECK(discovered_device->detailed_codec_descriptions);
+
+    while (!discovered_device->detailed_codec_descriptions->empty()) {
+      auto detailed_description = std::move(discovered_device->detailed_codec_descriptions->back());
+      discovered_device->detailed_codec_descriptions->pop_back();
+
       FX_LOGS(INFO) << "Registering "
-                    << (codec_description.codec_type == fuchsia::mediacodec::CodecType::DECODER
+                    << (detailed_description.codec_type() == fuchsia::mediacodec::CodecType::DECODER
                             ? "decoder"
                             : "encoder")
-                    << ", mime_type: " << codec_description.mime_type
-                    << ", device_path: " << front->device_path
-                    << ", component url: " << front->component_url;
-      static uint64_t hardware_node_id;
-      inspect::Node node = hardware_codec_nodes_.CreateChild(std::to_string(hardware_node_id++));
+                    << ", mime_type: " << detailed_description.mime_type()
+                    << ", device_path: " << discovered_device->device_path
+                    << ", component url: " << discovered_device->component_url;
+
+      if (!detailed_description.has_profile_descriptions()) {
+        FX_LOGS(WARNING) << "!has_profile_descriptions for " << detailed_description.mime_type()
+                         << " "
+                         << ((detailed_description.codec_type() ==
+                              fuchsia::mediacodec::CodecType::DECODER)
+                                 ? "DECODER"
+                                 : "ENCODER");
+        continue;
+      }
+
+      auto deprecated_codec_description =
+          CreateDeprecatedCodecDescriptionFromDetailedCodecDescription(detailed_description);
+
+      auto& parent_node = hw_codec_factory->factory_node;
+      inspect::Node node = parent_node.CreateChild(detailed_description.mime_type());
       node.RecordString("type",
-                        codec_description.codec_type == fuchsia::mediacodec::CodecType::DECODER
+                        detailed_description.codec_type() == fuchsia::mediacodec::CodecType::DECODER
                             ? "decoder"
                             : "encoder");
-      node.RecordString("mime_type", codec_description.mime_type);
-      if (!front->device_path.empty()) {
-        node.RecordString("device_path", front->device_path);
+      node.RecordString("mime_type", detailed_description.mime_type());
+
+      // Populate the detailed inspect values, which is different for decoders vs. encoders.
+      switch (detailed_description.codec_type()) {
+        case fuchsia::mediacodec::CodecType::DECODER:
+          node.RecordChild("supported_profiles", [&detailed_description](
+                                                     inspect::Node& supported_profile_nodes) {
+            if (!detailed_description.has_profile_descriptions()) {
+              // A warning was alraedy printed above.
+              return;
+            }
+            if (!detailed_description.profile_descriptions().is_decoder_profile_descriptions()) {
+              FX_LOGS(WARNING) << "DECODER !is_decoder_profile_descriptions for "
+                               << detailed_description.mime_type();
+              return;
+            }
+            uint32_t profile_ordinal = 0u;
+            const auto& profiles =
+                detailed_description.profile_descriptions().decoder_profile_descriptions();
+            for (const auto& profile : profiles) {
+              supported_profile_nodes.RecordChild(
+                  std::to_string(profile_ordinal), [&profile](inspect::Node& profile_node) {
+                    FX_DCHECK(profile.has_profile());
+                    profile_node.RecordString("profile", CodecProfileToString(profile.profile()));
+
+                    if (profile.has_min_image_size()) {
+                      const auto& min_size = profile.min_image_size();
+                      profile_node.RecordUint("min_width", min_size.width);
+                      profile_node.RecordUint("min_height", min_size.height);
+                    }
+
+                    if (profile.has_max_image_size()) {
+                      const auto& max_size = profile.max_image_size();
+                      profile_node.RecordUint("max_width", max_size.width);
+                      profile_node.RecordUint("max_height", max_size.height);
+                    }
+                  });
+              profile_ordinal += 1u;
+            }
+          });
+          break;
+        case fuchsia::mediacodec::CodecType::ENCODER:
+          node.RecordChild("supported_profiles", [&detailed_description](
+                                                     inspect::Node& supported_profile_nodes) {
+            if (!detailed_description.has_profile_descriptions()) {
+              // A warning was already printed above.
+              return;
+            }
+            if (!detailed_description.profile_descriptions().is_encoder_profile_descriptions()) {
+              FX_LOGS(WARNING) << "ENCODER !is_encoder_profile_descriptions for "
+                               << detailed_description.mime_type();
+              return;
+            }
+            uint32_t profile_ordinal = 0u;
+            const auto& profiles =
+                detailed_description.profile_descriptions().encoder_profile_descriptions();
+            for (const auto& profile : profiles) {
+              supported_profile_nodes.RecordChild(
+                  std::to_string(profile_ordinal), [&profile](inspect::Node& profile_node) {
+                    FX_DCHECK(profile.has_profile());
+                    profile_node.RecordString("profile", CodecProfileToString(profile.profile()));
+                  });
+              profile_ordinal += 1u;
+            }
+          });
+          break;
       }
-      if (!front->component_url.empty()) {
-        node.RecordString("component_url", front->component_url);
-      }
-      hw_codecs_.emplace_front(std::make_unique<CodecListEntry>(CodecListEntry{
-          .description = std::move(codec_description),
-          .component_url = front->component_url,
-          // shared_ptr<>
-          .factory = front->codec_factory,
-          .magma_device = front->magma_device,
+
+      hw_codec_factory->hw_codecs.emplace_front(std::make_unique<CodecListEntry>(CodecListEntry{
+          .detailed_description = std::move(detailed_description),
           .codec_node = std::move(node),
+          .deprecated_codec_description = std::move(deprecated_codec_description),
       }));
     }
 
+    hw_factories_.push_back(std::move(hw_codec_factory));
     device_discovery_queue_.pop_front();
   }
 }
