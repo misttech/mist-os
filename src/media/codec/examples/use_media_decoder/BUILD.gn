@@ -322,6 +322,16 @@ test("h264_decoder_fuzzer_test") {
   deps = [ ":decoder_fuzzer" ]
 }
 
+test("codec_description_test") {
+  testonly = true
+
+  output_name = "codec_description_test"
+
+  sources = [ "test/codec_description_test.cc" ]
+
+  deps = [ ":use_media_decoder_source_set" ]
+}
+
 test("h264_decoder_malformed_stream_test") {
   testonly = true
 

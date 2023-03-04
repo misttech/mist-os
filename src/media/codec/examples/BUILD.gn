@@ -360,6 +360,29 @@ fuchsia_test_package("h264_decoder_fuzzer_tests") {
   }
 }
 
+fuchsia_unittest_component("codec_description_test_comp") {
+  restricted_features = [ "allow_non_hermetic_packages" ]
+  manifest = "use_media_decoder/meta/codec_description_test.cml"
+  deps = [
+    "//src/media/codec:codec_factory",
+    "//src/media/codec/examples/use_media_decoder:codec_description_test",
+  ]
+}
+
+fuchsia_test_package("codec_description_tests") {
+  test_components = [ ":codec_description_test_comp" ]
+
+  test_specs = {
+    environments = [
+      atlas_env,
+      astro_env,
+      sherlock_env,
+      vim3_env,
+      nuc_env,
+    ]
+  }
+}
+
 fuchsia_unittest_component("vp9_decoder_fuzzer_test_comp") {
   restricted_features = [ "allow_non_hermetic_packages" ]
   manifest = "use_media_decoder/meta/vp9_decoder_fuzzer_test.cml"
