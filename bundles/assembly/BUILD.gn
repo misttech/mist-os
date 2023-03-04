@@ -97,6 +97,7 @@ assembly_input_bundle("bootstrap") {
     "//src/devices/bin/devfs:package",
     "//src/devices/bin/driver-index:package",
     "//src/devices/bin/driver_manager:package",
+    "//src/diagnostics/archivist:package",
     "//src/power/power-manager:package",
     "//src/power/shutdown-shim:package",
   ]

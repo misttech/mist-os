@@ -115,7 +115,6 @@ if (labels.images == "//build/images/bringup") {
       "//src/devices/misc/drivers/virtio-rng:virtio_rng",
       "//src/devices/serial/drivers/virtio-console:virtio_console",
       "//src/devices/sysmem/drivers/sysmem",
-      "//src/diagnostics/bundles:bootstrap",
       "//src/graphics/display/drivers/display",
       "//src/graphics/drivers/virtio:virtio_gpu",
       "//src/storage/bin/minfs",

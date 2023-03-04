@@ -1,10 +1,8 @@
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
-import("//build/dist/component_manifest_resources.gni")
 import("//build/fuzz.gni")
 import("//build/images/filesystem_limits.gni")
 import("//build/rust/rustc_binary.gni")
@@ -179,6 +177,16 @@ fuchsia_component_manifest("root-manifest") {
   component_name = "archivist"
 }
 
+fuchsia_component("component") {
+  cm_label = ":root-manifest"
+  deps = [ ":bin" ]
+
+  # console uses the boot log.
+  # The includes checker wants the syslog shard because console gets the
+  # injected dep on the legacy syslog backend.
+  check_includes = false
+}
+
 fuchsia_component_manifest("archivist-for-embedding-v2-manifest") {
   manifest = "meta/archivist-for-embedding.cml"
   component_name = "archivist-for-embedding"
@@ -219,18 +227,16 @@ fuchsia_structured_config_rust_lib("archivist-config") {
   cm_label = ":root-manifest"
 }
 
-group("bootfs") {
-  deps = [
-    ":bin",
-    ":root-manifest",
-  ]
-}
-
 group("archivist-for-embedding-v2") {
   deps = [
     ":archivist-embedded-config",
     ":archivist-for-embedding-v2-component",
   ]
+}
+
+fuchsia_package("package") {
+  package_name = "archivist"
+  deps = [ ":component" ]
 }
 
 fuchsia_package("archivist-without-attribution") {
@@ -288,7 +294,7 @@ fuchsia_test_package("archivist-tests") {
 group("archivist") {
   testonly = true
   deps = [
-    ":bootfs",
+    ":package",
     ":tests",
   ]
 }

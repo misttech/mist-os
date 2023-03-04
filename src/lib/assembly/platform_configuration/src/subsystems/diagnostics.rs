@@ -25,7 +25,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let mut num_threads = 4;
         let mut maximum_concurrent_snapshots_per_reader = 4;
         let mut logs_max_cached_original_bytes = 4194304;
-        let mut archivist_config = builder.bootfs().component("meta/archivist.cm")?;
+        let mut archivist_config = builder.package("archivist").component("meta/archivist.cm")?;
 
         match (context.build_type, context.feature_set_level) {
             // Always clear bind_services for bootstrap (bringup) and utility
@@ -98,7 +98,11 @@ mod tests {
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
-        let archivist_fields = &config.bootfs.components.get("meta/archivist.cm").unwrap().fields;
+        let archivist_fields = &config.package_configs["archivist"]
+            .components
+            .get("meta/archivist.cm")
+            .unwrap()
+            .fields;
         assert_eq!(
             archivist_fields.get("bind_services"),
             Some(&Value::Array(vec![
@@ -147,7 +151,11 @@ mod tests {
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
-        let archivist_fields = &config.bootfs.components.get("meta/archivist.cm").unwrap().fields;
+        let archivist_fields = &config.package_configs["archivist"]
+            .components
+            .get("meta/archivist.cm")
+            .unwrap()
+            .fields;
         assert_eq!(archivist_fields.get("num_threads"), Some(&Value::Number(Number::from(2))));
         assert_eq!(
             archivist_fields.get("logs_max_cached_original_bytes"),
@@ -175,7 +183,11 @@ mod tests {
         )
         .unwrap();
         let config = builder.build();
-        let archivist_fields = &config.bootfs.components.get("meta/archivist.cm").unwrap().fields;
+        let archivist_fields = &config.package_configs["archivist"]
+            .components
+            .get("meta/archivist.cm")
+            .unwrap()
+            .fields;
         assert_eq!(archivist_fields.get("num_threads"), Some(&Value::Number(Number::from(4))));
         assert_eq!(archivist_fields.get("bind_services"), Some(&Value::Array(vec![])));
     }
@@ -196,7 +208,11 @@ mod tests {
         )
         .unwrap();
         let config = builder.build();
-        let archivist_fields = &config.bootfs.components.get("meta/archivist.cm").unwrap().fields;
+        let archivist_fields = &config.package_configs["archivist"]
+            .components
+            .get("meta/archivist.cm")
+            .unwrap()
+            .fields;
         assert_eq!(
             archivist_fields.get("bind_services"),
             Some(&Value::Array(vec![

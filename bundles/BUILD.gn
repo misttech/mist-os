@@ -44,10 +44,7 @@ group("amlogic_hw_dependent_tests") {
 
 # Binaries that form the base of every single product.
 group("bootstrap") {
-  deps = [
-    ":bootstrap-zedboot",
-    "//src/diagnostics/bundles:bootstrap",
-  ]
+  deps = [ ":bootstrap-zedboot" ]
 }
 
 # Binaries that form the base of every single zedboot image.

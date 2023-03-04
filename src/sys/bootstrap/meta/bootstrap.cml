@@ -5,7 +5,7 @@
     children: [
         {
             name: "archivist",
-            url: "fuchsia-boot:///#meta/archivist.cm",
+            url: "fuchsia-boot:///archivist#meta/archivist.cm",
         },
         {
             name: "device_name_provider",
