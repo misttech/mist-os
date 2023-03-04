@@ -60,6 +60,7 @@ pub struct RepoBuilder<'a, R: RepoStorageProvider> {
     trusted_repo_keys: &'a RepoKeys,
     database: Option<&'a Database<Pouf1>>,
     repo: R,
+    ignore_missing_packages: bool,
     current_time: DateTime<Utc>,
     time_versioning: bool,
     refresh_metadata: bool,
@@ -108,6 +109,7 @@ where
             signing_repo_keys: None,
             trusted_repo_keys,
             database,
+            ignore_missing_packages: false,
             current_time: Utc::now(),
             time_versioning: false,
             refresh_metadata: false,
@@ -156,16 +158,29 @@ where
         self
     }
 
+    /// Whether or not to raise an error if a package does not exist.
+    pub fn ignore_missing_packages(mut self, ignore_missing_packages: bool) -> Self {
+        self.ignore_missing_packages = ignore_missing_packages;
+        self
+    }
+
     /// Stage a package manifest from the `path` to be published.
     pub async fn add_package(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
-        let contents = async_fs::read(path.as_std_path())
-            .await
-            .with_context(|| format!("reading package manifest {path}"))?;
+        match async_fs::read(path.as_std_path()).await {
+            Ok(contents) => {
+                let package = PackageManifest::from_reader(&path, &contents[..])
+                    .with_context(|| format!("reading package manifest {path}"))?;
 
-        let package = PackageManifest::from_reader(&path, &contents[..])
-            .with_context(|| format!("reading package manifest {path}"))?;
-
-        self.add_package_manifest(Some(path), package).await
+                self.add_package_manifest(Some(path), package).await
+            }
+            Err(err) => {
+                if self.ignore_missing_packages && err.kind() == std::io::ErrorKind::NotFound {
+                    Ok(self)
+                } else {
+                    Err(err).with_context(|| format!("reading package manifest {path}"))
+                }
+            }
+        }
     }
 
     /// Stage the package manifests from the iterator of paths to be published.
@@ -208,6 +223,10 @@ where
 
     /// Stage a package archive from the `path` to be published.
     pub async fn add_package_archive(self, path: Utf8PathBuf) -> Result<RepoBuilder<'a, R>> {
+        if self.ignore_missing_packages && !path.exists() {
+            return Ok(self);
+        }
+
         let archive_out = TempDir::new().unwrap();
         let manifest = PackageManifest::from_archive(path.as_std_path(), archive_out.path())
             .with_context(|| format!("reading package archive {path}"))

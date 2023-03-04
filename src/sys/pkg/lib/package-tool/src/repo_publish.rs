@@ -196,7 +196,8 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     repo_builder = repo_builder
         .current_time(cmd.metadata_current_time)
         .time_versioning(cmd.time_versioning)
-        .inherit_from_trusted_targets(!cmd.clean);
+        .inherit_from_trusted_targets(!cmd.clean)
+        .ignore_missing_packages(cmd.ignore_missing_packages);
 
     repo_builder = if cmd.refresh_root {
         repo_builder.refresh_metadata(true)
@@ -289,6 +290,7 @@ mod tests {
 
     struct TestEnv {
         _tmp: tempfile::TempDir,
+        root: Utf8PathBuf,
         cmd: RepoPublishCommand,
         repo_path: Utf8PathBuf,
         manifests: Vec<PackageManifest>,
@@ -300,7 +302,7 @@ mod tests {
     impl TestEnv {
         fn new() -> Self {
             let tempdir = tempfile::tempdir().unwrap();
-            let root = Utf8Path::from_path(tempdir.path()).unwrap();
+            let root = Utf8Path::from_path(tempdir.path()).unwrap().to_path_buf();
 
             let repo_path = root.join("repo");
             test_utils::make_empty_pm_repo_dir(&repo_path);
@@ -309,7 +311,7 @@ mod tests {
             let mut manifests = vec![];
             let mut manifest_paths = vec![];
             for name in (1..=5).map(|i| format!("package{i}")) {
-                let (pkg_manifest, pkg_manifest_path) = create_manifest(&name, root);
+                let (pkg_manifest, pkg_manifest_path) = create_manifest(&name, &root);
                 manifests.push(pkg_manifest);
                 manifest_paths.push(pkg_manifest_path);
             }
@@ -347,6 +349,7 @@ mod tests {
 
             TestEnv {
                 _tmp: tempdir,
+                root,
                 cmd,
                 repo_path,
                 manifests,
@@ -402,6 +405,7 @@ mod tests {
             copy_mode: CopyMode::Copy,
             delivery_blob_type: None,
             blobfs_compression_path: None,
+            ignore_missing_packages: false,
             repo_path: "".into(),
         }
     }
@@ -705,6 +709,43 @@ mod tests {
         let env = TestEnv::new();
 
         // Publish the packages.
+        assert_matches!(repo_publish(&env.cmd).await, Ok(()));
+
+        let repo = PmRepository::new(env.repo_path.to_path_buf());
+        let mut repo_client = RepoClient::from_trusted_remote(repo).await.unwrap();
+
+        assert_matches!(repo_client.update().await, Ok(true));
+
+        assert_eq!(repo_client.database().trusted_root().version(), 1);
+        assert_eq!(repo_client.database().trusted_targets().map(|m| m.version()), Some(2));
+        assert_eq!(repo_client.database().trusted_snapshot().map(|m| m.version()), Some(2));
+        assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(2));
+
+        let expected_deps = BTreeSet::from_iter(
+            env.manifest_paths
+                .iter()
+                .chain(env.list_paths.iter())
+                .chain([
+                    &env.repo_path.join("keys").join("root.json"),
+                    &env.repo_path.join("keys").join("targets.json"),
+                    &env.repo_path.join("keys").join("snapshot.json"),
+                    &env.repo_path.join("keys").join("timestamp.json"),
+                ])
+                .cloned(),
+        );
+        env.validate_manifest_blobs(expected_deps);
+    }
+    #[fuchsia::test]
+    async fn test_publish_packages_with_ignored_missing_packages() {
+        let mut env = TestEnv::new();
+
+        // Try to publish the packages, which should error out since we added a
+        // package we know doesn't exist.
+        env.cmd.package_manifests.push(env.root.join("does-not-exist"));
+        assert_matches!(repo_publish(&env.cmd).await, Err(_));
+
+        // Publishing should work if we ignore missing packages.
+        env.cmd.ignore_missing_packages = true;
         assert_matches!(repo_publish(&env.cmd).await, Ok(()));
 
         let repo = PmRepository::new(env.repo_path.to_path_buf());

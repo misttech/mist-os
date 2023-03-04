@@ -124,78 +124,73 @@ pub struct RepoCreateCommand {
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "publish")]
 pub struct RepoPublishCommand {
-    #[argh(
-        option,
-        description = "path to the keys used to sign metadata, but not trust for key rotation"
-    )]
+    /// path to the keys used to sign metadata, but not trust for key rotation
+    #[argh(option)]
     pub signing_keys: Option<Utf8PathBuf>,
 
-    #[argh(
-        option,
-        description = "path to the keys used to sign and trust metadata (default repository `keys/` directory)"
-    )]
+    /// path to the keys used to sign and trust metadata (default repository `keys/` directory)
+    #[argh(option)]
     pub trusted_keys: Option<Utf8PathBuf>,
 
-    #[argh(
-        option,
-        description = "path to the initial trusted root metadata (default is to use 1.root.json from the repository)"
-    )]
+    /// path to the initial trusted root metadata (default is to use 1.root.json from the repository)
+    #[argh(option)]
     pub trusted_root: Option<Utf8PathBuf>,
 
-    #[argh(option, long = "package", description = "path to a package manifest")]
+    /// path to a package manifest
+    #[argh(option, long = "package")]
     pub package_manifests: Vec<Utf8PathBuf>,
 
-    #[argh(option, long = "package-list", description = "path to a packages list manifest")]
+    /// path to a packages list manifest
+    #[argh(option, long = "package-list")]
     pub package_list_manifests: Vec<Utf8PathBuf>,
 
-    #[argh(option, long = "package-archive", description = "path to a package archive")]
+    /// path to a package archive
+    #[argh(option, long = "package-archive")]
     pub package_archives: Vec<Utf8PathBuf>,
 
-    #[argh(
-        switch,
-        description = "set repository version based on time rather than monotonically increasing version"
-    )]
+    /// set repository version based on time rather than monotonically increasing version
+    #[argh(switch)]
     pub time_versioning: bool,
 
-    #[argh(
-        option,
-        default = "Utc::now()",
-        from_str_fn(parse_datetime),
-        description = "the RFC 3339 time used to see if metadata has expired, and when new metadata should expire (default uses the current time)"
-    )]
+    /// the RFC 3339 time used to see if metadata has expired, and when new metadata should expire (default uses the current time)
+    #[argh(option, default = "Utc::now()", from_str_fn(parse_datetime))]
     pub metadata_current_time: DateTime<Utc>,
 
-    #[argh(switch, description = "generate a new root metadata along side all the other metadata")]
+    /// generate a new root metadata along side all the other metadata
+    #[argh(switch)]
     pub refresh_root: bool,
 
-    #[argh(switch, description = "clean the repository so only new publications remain")]
+    /// clean the repository so only new publications remain
+    #[argh(switch)]
     pub clean: bool,
 
-    #[argh(option, description = "produce a depfile file")]
+    /// produce a depfile file
+    #[argh(option)]
     pub depfile: Option<Utf8PathBuf>,
 
-    #[argh(
-        option,
-        default = "CopyMode::Copy",
-        from_str_fn(parse_copy_mode),
-        description = "mode used to copy blobs to repository. Either 'copy', 'copy-overwrite', or 'hard-link' (default 'copy')"
-    )]
+    /// mode used to copy blobs to repository. Either 'copy', 'copy-overwrite', or 'hard-link' (default 'copy').
+    #[argh(option, default = "CopyMode::Copy", from_str_fn(parse_copy_mode))]
     pub copy_mode: CopyMode,
 
-    #[argh(
-        option,
-        description = "the type of delivery blob to generate (default no delivery blobs are generated)"
-    )]
+    /// the type of delivery blob to generate (default no delivery blobs are generated)
+    #[argh(option)]
     pub delivery_blob_type: Option<u32>,
 
-    #[argh(option, description = "path to the blobfs-compression tool")]
+    /// path to the blobfs-compression tool
+    #[argh(option)]
     pub blobfs_compression_path: Option<Utf8PathBuf>,
 
-    #[argh(positional, description = "path to the repository directory")]
-    pub repo_path: Utf8PathBuf,
-
-    #[argh(switch, description = "republish packages on file change")]
+    /// republish packages on file change
+    #[argh(switch)]
     pub watch: bool,
+
+    /// ignore if package paths do not exist
+    #[argh(switch)]
+    pub ignore_missing_packages: bool,
+
+    /// path to the repository directory
+    #[argh(positional)]
+    pub repo_path: Utf8PathBuf,
 }
 
 fn parse_copy_mode(value: &str) -> Result<CopyMode, String> {

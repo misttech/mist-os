@@ -65,6 +65,12 @@ impl From<Vec<Utf8PathBuf>> for PackageManifestList {
     }
 }
 
+impl From<PackageManifestList> for Vec<Utf8PathBuf> {
+    fn from(package_manifest_list: PackageManifestList) -> Self {
+        package_manifest_list.0
+    }
+}
+
 impl fmt::Debug for PackageManifestList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
