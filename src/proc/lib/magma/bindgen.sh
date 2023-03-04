@@ -33,7 +33,6 @@ pub const MAGMA_POLL_TYPE_HANDLE: u32 = 2;
 PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
 ./prebuilt/third_party/rust_bindgen/linux-x64/bindgen \
   --no-layout-tests \
-  --size_t-is-usize \
   --with-derive-default \
   --explicit-padding \
   --raw-line "${RAW_LINES}" \
