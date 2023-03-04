@@ -49,8 +49,8 @@ pub struct AudioFrameStream {
     frame_vmo: Arc<Mutex<frame_vmo::FrameVmo>>,
     /// The index of the next frame we should retrieve.
     next_frame_index: usize,
-    /// Minimum number of frames to return.
-    min_packet_frames: usize,
+    /// Number of frames to return in a packet.
+    packet_frames: usize,
     /// SoftPcmOutput this is attached to, or the task currently processing the FIDL requests.
     output: OutputOrTask,
     /// Inspect node
@@ -62,7 +62,7 @@ impl AudioFrameStream {
         AudioFrameStream {
             frame_vmo: output.frame_vmo.clone(),
             next_frame_index: 0,
-            min_packet_frames: output.min_packet_frames,
+            packet_frames: output.packet_frames,
             output: OutputOrTask::Output(output),
             inspect: Default::default(),
         }
@@ -91,7 +91,7 @@ impl Stream for AudioFrameStream {
         }
         let result = {
             let mut lock = self.frame_vmo.lock();
-            futures::ready!(lock.poll_frames(self.next_frame_index, self.min_packet_frames, cx))
+            futures::ready!(lock.poll_frames(self.next_frame_index, self.packet_frames, cx))
         };
 
         match result {
@@ -132,18 +132,12 @@ impl Inspect for &mut AudioFrameStream {
     }
 }
 
-/// Open front, closed end frames from duration.
-/// This means if duration is an exact duration of a number of frames, the last
-/// frame will be considered to not be inside the duration, and will not be counted.
+/// Number of frames within the duration.  This includes frames that end at exactly the duration.
 pub(crate) fn frames_from_duration(frames_per_second: usize, duration: fasync::Duration) -> usize {
     assert!(duration >= 0.nanos(), "frames_from_duration is not defined for negative durations");
     let mut frames = duration.into_seconds() * frames_per_second as i64;
-    let mut frames_partial =
+    let frames_partial =
         ((duration.into_nanos() % 1_000_000_000) as f64 / 1e9) * frames_per_second as f64;
-    if frames_partial.ceil() == frames_partial && duration > 0.nanos() {
-        // The end of this frame is exactly on the duration, but we don't include it.
-        frames_partial -= 1.0;
-    }
     frames += frames_partial as i64;
     frames as usize
 }
@@ -168,9 +162,14 @@ pub struct SoftPcmOutput {
     /// Currently only support one format per output is supported.
     supported_formats: PcmSupportedFormats,
 
-    /// The minimum number of audio frames output from the frame stream.
-    /// Used to calculate minimum audio buffer sizes.
-    min_packet_frames: usize,
+    /// The size of packet which is produced.
+    /// Note that this may be slightly shorter than the requested duration, as it is always an
+    /// exact (to nanosecond) duration of the frames in a packet.
+    packet_duration: zx::Duration,
+
+    /// The number of audio frames per packet from the frame stream.
+    /// Used to calculate audio buffer sizes.
+    packet_frames: usize,
 
     /// The currently set format, in frames per second, audio sample format, and channels.
     current_format: Option<(u32, AudioSampleFormat, u16)>,
@@ -221,15 +220,14 @@ impl SoftPcmOutput {
     /// Spawns a task to handle messages from the Audio Core and setup of internal VMO buffers
     /// required for audio output.  See AudioFrameStream for more information on timing
     /// requirements for audio output.
-    /// `min_packet_duration`: the minimum duration of an audio packet returned by the strream.
-    /// Setting this higher will mean more memory may be used to buffer audio.
+    /// `packet_duration`: the duration of an audio packet returned by the strream.
     pub fn build(
         unique_id: &[u8; 16],
         manufacturer: &str,
         product: &str,
         clock_domain: u32,
         pcm_format: fidl_fuchsia_media::PcmFormat,
-        min_packet_duration: zx::Duration,
+        packet_duration: zx::Duration,
     ) -> Result<(ClientEnd<StreamConfigMarker>, AudioFrameStream)> {
         if pcm_format.bits_per_sample % 8 != 0 {
             // Non-byte-aligned format not allowed.
@@ -251,8 +249,12 @@ impl SoftPcmOutput {
             ..PcmSupportedFormats::EMPTY
         };
 
-        let min_packet_frames =
-            frames_from_duration(pcm_format.frames_per_second as usize, min_packet_duration);
+        let packet_frames =
+            frames_from_duration(pcm_format.frames_per_second as usize, packet_duration);
+        let packet_duration = zx::Duration::from_nanos(
+            (i64::try_from(packet_frames).unwrap() * 1_000_000_000)
+                / pcm_format.frames_per_second as i64,
+        );
 
         let stream = SoftPcmOutput {
             stream_config_stream: request_stream,
@@ -261,7 +263,8 @@ impl SoftPcmOutput {
             product: product.to_string(),
             clock_domain,
             supported_formats,
-            min_packet_frames,
+            packet_duration,
+            packet_frames,
             current_format: None,
             ring_buffer_stream: Default::default(),
             frame_vmo: Arc::new(Mutex::new(frame_vmo::FrameVmo::new()?)),
@@ -434,8 +437,8 @@ impl SoftPcmOutput {
                     }
                     Some(x) => x.clone(),
                 };
-                // Require a minimum amount of frames for three fetches of packets.
-                let min_frames_from_duration = 3 * self.min_packet_frames as u32;
+                // Require a minimum amount of frames for three packets.
+                let min_frames_from_duration = 3 * self.packet_frames as u32;
                 let ring_buffer_frames = min_frames.max(min_frames_from_duration);
                 self.inspect.record_vmo_status("gotten");
                 match self.frame_vmo.lock().set_format(
@@ -492,11 +495,16 @@ impl SoftPcmOutput {
                     responder.drop_without_shutdown();
                     return Ok(());
                 }
-                // internal_delay is required. For now we just set 0.
+                // internal_delay is required. Set the minimum we currently know about, which is the
+                // packet duration - since audio is not released until a packet is written, we have
+                // at least that much delay.
                 // TODO(fxbug.dev/51726): Set actual external_delay and internal_delay values
                 // received from outside the crate, and support the hanging-get pattern in order to
                 // dynamically update these values as we learn more about the remote device.
-                let delay_info = DelayInfo { internal_delay: Some(0), ..DelayInfo::EMPTY };
+                let delay_info = DelayInfo {
+                    internal_delay: Some(self.packet_duration.into_nanos()),
+                    ..DelayInfo::EMPTY
+                };
                 responder.send(delay_info)?;
                 self.delay_info_replied = true;
             }
@@ -554,14 +562,14 @@ mod tests {
         assert_eq!(0, frames_from_duration(FPS, (ONE_FRAME_NANOS - 1).nanos()));
         assert_eq!(1, frames_from_duration(FPS, ONE_FRAME_NANOS.nanos()));
 
-        // Three frames is an exact number of nanoseconds, so it should only count if we provide
-        // a duration that is LONGER.
+        // Three frames is an exact number of nanoseconds, we should be able to get an exact number
+        // of frames from the duration.
         assert_eq!(2, frames_from_duration(FPS, (THREE_FRAME_NANOS - 1).nanos()));
-        assert_eq!(2, frames_from_duration(FPS, THREE_FRAME_NANOS.nanos()));
+        assert_eq!(3, frames_from_duration(FPS, THREE_FRAME_NANOS.nanos()));
         assert_eq!(3, frames_from_duration(FPS, (THREE_FRAME_NANOS + 1).nanos()));
 
-        assert_eq!(FPS - 1, frames_from_duration(FPS, 1.second()));
-        assert_eq!(72000 - 1, frames_from_duration(FPS, 1500.millis()));
+        assert_eq!(FPS, frames_from_duration(FPS, 1.second()));
+        assert_eq!(72000, frames_from_duration(FPS, 1500.millis()));
 
         assert_eq!(10660, frames_from_duration(FPS, 222084000.nanos()));
     }
@@ -668,15 +676,14 @@ mod tests {
         let audio_vmo = reply.1;
 
         // Frames * bytes per sample * channels per sample.
-        let bytes_per_second = 44100 * 2 * 2;
-        assert!(
-            bytes_per_second <= audio_vmo.get_size().expect("should always exist after getbuffer")
-        );
+        let bytes_per_second: usize = 44100 * 2 * 2;
+        let vmo_size = audio_vmo.get_size().expect("size after getbuffer");
+        assert!(bytes_per_second <= vmo_size as usize);
 
         // Put "audio" in buffer.
         let mut sent_audio = Vec::new();
         let mut x: u8 = 0x01;
-        sent_audio.resize_with(bytes_per_second as usize, || {
+        sent_audio.resize_with(bytes_per_second, || {
             x = x.wrapping_add(2);
             x
         });
@@ -694,20 +701,34 @@ mod tests {
 
         exec.run_until_stalled(&mut frame_fut).expect_pending("no frames until time passes");
 
-        // Run the ring buffer for a bit over 1 second.
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(1001)));
+        // Run the ring buffer for a bit over half a second.
+        exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(500)));
         let _ = exec.wake_expired_timers();
 
         let result = exec.run_until_stalled(&mut frame_fut);
         assert!(result.is_ready());
-        let mut audio_recv = match result {
+        let audio_recv = match result {
             Poll::Ready(Some(Ok(v))) => v,
             x => panic!("expected Ready Ok from frame stream, got {:?}", x),
         };
 
-        // We receive a bit more than 1 second of byte, resize to match and compare.
-        audio_recv.resize(bytes_per_second as usize, 0);
-        assert_eq!(&sent_audio, &audio_recv);
+        // We should receive exactly 100ms of audio
+        let expect_recv_bytes = bytes_per_second / 10;
+        assert_eq!(expect_recv_bytes, audio_recv.len());
+        assert_eq!(&sent_audio[0..expect_recv_bytes], &audio_recv);
+
+        let result = exec.run_until_stalled(&mut frame_fut);
+        assert!(result.is_ready());
+        let audio_recv = match result {
+            Poll::Ready(Some(Ok(v))) => v,
+            x => panic!("expected Ready Ok from frame stream, got {:?}", x),
+        };
+
+        // We should receive exactly the next 100ms of audio
+        let expect_recv_bytes = bytes_per_second / 10;
+        assert_eq!(expect_recv_bytes, audio_recv.len());
+        assert_eq!(&sent_audio[expect_recv_bytes..expect_recv_bytes*2], &audio_recv);
+
 
         let result = exec.run_until_stalled(&mut ring_buffer.stop());
         assert!(result.is_ready());
@@ -725,6 +746,15 @@ mod tests {
         assert!(!result.is_ready());
     }
 
+    // Returns the number of frames that were ready in the stream, draining the stream.
+    fn frames_ready(exec: &mut fasync::TestExecutor, frame_stream: &mut AudioFrameStream) -> usize {
+        let mut frames = 0;
+        while exec.run_until_stalled(&mut frame_stream.next()).is_ready() {
+            frames += 1;
+        }
+        frames
+    }
+
     #[fixture(with_audio_frame_stream)]
     #[fuchsia::test]
     fn send_positions(
@@ -732,9 +762,8 @@ mod tests {
         stream_config: StreamConfigProxy,
         mut frame_stream: AudioFrameStream,
     ) {
-        let mut frame_fut = frame_stream.next();
         // Poll the frame stream, which should start the processing of proxy requests.
-        exec.run_until_stalled(&mut frame_fut).expect_pending("no frames at the start");
+        assert_eq!(0, frames_ready(&mut exec, &mut frame_stream));
         let _stream_config_properties = exec.run_until_stalled(&mut stream_config.get_properties());
         let _formats = exec.run_until_stalled(&mut stream_config.get_supported_formats());
         let (ring_buffer, server) = fidl::endpoints::create_proxy::<RingBufferMarker>()
@@ -751,7 +780,6 @@ mod tests {
             }),
             ..Format::EMPTY
         };
-        let mut frame_fut = frame_stream.next();
 
         let result = stream_config.create_ring_buffer(format, server);
         assert!(result.is_ok());
@@ -790,8 +818,8 @@ mod tests {
         // and 10 notifications per ring we can get watch notifications every 200 msecs.
         exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(201)));
         let _ = exec.wake_expired_timers();
-        let result = exec.run_until_stalled(&mut frame_fut);
-        assert!(result.is_ready());
+        // Each frame is 100ms, there should be two of them ready now.
+        assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
         let result = exec.run_until_stalled(&mut position_info);
         assert!(result.is_ready());
 
@@ -801,8 +829,7 @@ mod tests {
         assert!(!result.is_ready());
         exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(201)));
         let _ = exec.wake_expired_timers();
-        let result = exec.run_until_stalled(&mut frame_fut);
-        assert!(result.is_ready());
+        assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
         let result = exec.run_until_stalled(&mut position_info);
         assert!(result.is_ready());
 
@@ -812,8 +839,7 @@ mod tests {
         assert!(!result.is_ready());
         exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(201)));
         let _ = exec.wake_expired_timers();
-        let result = exec.run_until_stalled(&mut frame_fut);
-        assert!(result.is_ready());
+        assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
         let result = exec.run_until_stalled(&mut position_info);
         assert!(result.is_ready());
 
@@ -852,6 +878,12 @@ mod tests {
         assert!(result.is_ok());
 
         let result = exec.run_until_stalled(&mut ring_buffer.watch_delay_info());
-        assert!(result.is_ready());
+
+        match result {
+            Poll::Ready(Ok(DelayInfo { internal_delay: Some(x), .. })) => {
+                assert_eq!(100.millis().into_nanos(), x)
+            }
+            other => panic!("Expected the correct delay info, got {other:?}"),
+        }
     }
 }

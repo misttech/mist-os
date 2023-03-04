@@ -138,19 +138,33 @@ impl FrameVmo {
         Ok(start_time.is_some())
     }
 
-    /// Retrieve the frames available starting at `next_frame`.
+    /// Set the next-available-frame timer to fire `count` frames in the future from now.
+    /// Replaces the currently active timer.
+    /// Returns Poll::Pending if it was set to a time in the future, or Poll::Ready(()) if it would
+    /// be ready now.
+    fn reset_frame_timer(&mut self, deadline: fasync::Time, cx: &mut Context<'_>) -> Poll<()> {
+        let mut timer = fasync::Timer::new(deadline);
+        let Poll::Pending = timer.poll_unpin(cx) else {
+            return Poll::Ready(());
+        };
+        self.timer = Some(timer);
+        Poll::Pending
+    }
+
+    /// Retrieve `count` audio frames available starting at `next_frame`.
     /// `next_frame` is a frame index, starting at zero when the buffer is started.
     /// Returns a vector of bytes containing the frames, the index of the last frame returned,
-    /// and a count of frames that were unavailable due to buffer overwrite (slow polling).
-    /// If less than min_frames are available, Poll::Pending is returned and the waker
-    /// associated with `cx` will be woken at a time when enough frames should be available.
-    /// If no frames are available and min_frames is zero, an empty vector and next_frame are returned.
+    /// and a count of frames that were missed due to buffer overwrite (slow polling).
+    /// If less than `count` frames are available, Poll::Pending is returned and the waker
+    /// associated with `cx` will be woken at a time when enough frames are expected to be
+    /// available.
     /// If polled before start, it will be woken when started.
-    /// Returns Err(Error::InvalidArgs) if min_frames is larger than the size of the VMO.
+    /// Returns Err(Error::InvalidArgs) if `count` is larger than the size of the frames in the
+    /// buffer, or if `count` is zero.
     pub(crate) fn poll_frames(
         &mut self,
         mut next_frame: usize,
-        min_frames: usize,
+        count: usize,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(Vec<u8>, usize, usize)>> {
         let start_time = match self.start_time.as_ref() {
@@ -161,14 +175,13 @@ impl FrameVmo {
             Some(time) => *time,
         };
         let vmo_frames = self.size / self.bytes_per_frame;
-        if min_frames > vmo_frames {
+        if count > vmo_frames || count == 0 {
             return Poll::Ready(Err(Error::InvalidArgs));
         }
 
         let now = fasync::Time::now();
         // Start time is the zero frame.
-        // Bump one nano so that we catch if a frame ended exactly at now.
-        let current_frame_count = self.frames_before(now + 1.nanos());
+        let current_frame_count = self.frames_before(now);
         let oldest_frame_count = current_frame_count.saturating_sub(vmo_frames);
 
         let missing_frames = if oldest_frame_count <= next_frame {
@@ -182,26 +195,22 @@ impl FrameVmo {
         }
 
         let frames_available = current_frame_count.saturating_sub(next_frame);
-        if frames_available < min_frames {
-            // Set the timer to wake when min_frames will be available
-            let frames_to_wait = min_frames - frames_available;
-            let mut timer = fasync::Timer::new(now + self.duration_from_frames(frames_to_wait));
-            if timer.poll_unpin(cx).is_ready() {
+        if frames_available < count {
+            // Set the timer to wake when enough frames will be available
+            let deadline = now + self.duration_from_frames(count - frames_available);
+            return match self.reset_frame_timer(deadline, cx) {
+                Poll::Pending => Poll::Pending,
                 // Somehow raced to a time where they are available, try again.
-                return self.poll_frames(next_frame, min_frames, cx);
-            }
-            self.timer = Some(timer);
-            return Poll::Pending;
-        } else if frames_available == 0 {
-            // The minimum frames must be 0 and none are available
-            return Poll::Ready(Ok((Vec::new(), next_frame, 0)));
+                Poll::Ready(()) => self.poll_frames(next_frame, count, cx),
+            };
         }
 
-        let bytes_available = frames_available * self.bytes_per_frame;
-        let mut out_vec = vec![0; bytes_available];
+        let bytes = count * self.bytes_per_frame;
+        let mut out_vec = vec![0; bytes];
 
         let mut frame_from_idx = next_frame % vmo_frames;
-        let mut frame_until_idx = current_frame_count % vmo_frames;
+        let frame_until = next_frame + count;
+        let mut frame_until_idx = frame_until % vmo_frames;
 
         // If the until idx is behind the from idx, we need to wrap-around.
         if frame_from_idx >= frame_until_idx {
@@ -231,10 +240,10 @@ impl FrameVmo {
             .read(&mut out_vec[ndx..ndx + bytes_to_read], byte_start as u64)
             .map_err(|e| Error::IOError(e))?;
 
-        // We're returning frames from just after the `since` to this time.
+        // We're returning frames from just after the `next_frame` up to `frame_until`
         // Notify if we have a position responder and we read past the clock notification time.
-        if current_frame_count > self.next_notify_frame && self.position_responder.is_some() {
-            let end_frame_time = start_time + self.duration_from_frames(current_frame_count);
+        if frame_until > self.next_notify_frame && self.position_responder.is_some() {
+            let end_frame_time = start_time + self.duration_from_frames(frame_until);
             let notify_frame_bytes = frame_until_idx * self.bytes_per_frame;
             let next_notify_frame = self.next_notify_frame + self.frames_between_notifications;
             let mut info = RingBufferPositionInfo {
@@ -246,7 +255,7 @@ impl FrameVmo {
             }
         }
         // Index of the last frame returned is -1 because we index from zero.
-        Poll::Ready(Ok((out_vec, current_frame_count - 1, missing_frames)))
+        Poll::Ready(Ok((out_vec, frame_until - 1, missing_frames)))
     }
 
     /// Count of the number of frames that have ended before `time`.
@@ -257,9 +266,7 @@ impl FrameVmo {
         }
     }
 
-    /// Open front, closed end frames from duration.
-    /// This means if duration is an exact duration of a number of frames, the last
-    /// frame will be considered to not be inside the duration, and will not be counted.
+    /// Frames from duration, based on the current frames per second of the ringbuffer.
     fn frames_from_duration(&self, duration: fasync::Duration) -> usize {
         frames_from_duration(self.frames_per_second as usize, duration)
     }
@@ -295,7 +302,7 @@ mod tests {
     const TEST_VMO_DURATION: fasync::Duration = fasync::Duration::from_millis(500);
 
     // At 48kHz, each frame is 20833 and 1/3 nanoseconds. We add one nanosecond
-    // because we always overestimate durations.
+    // so that the one and two frames are completely within the time.
     const ONE_FRAME_NANOS: i64 = 20833 + 1;
     const TWO_FRAME_NANOS: i64 = 20833 * 2 + 1;
     const THREE_FRAME_NANOS: i64 = 20833 * 3 + 1;
@@ -333,14 +340,13 @@ mod tests {
         assert_eq!(0, vmo.frames_from_duration((ONE_FRAME_NANOS - 1).nanos()));
         assert_eq!(1, vmo.frames_from_duration(ONE_FRAME_NANOS.nanos()));
 
-        // Three frames is an exact number of nanoseconds, so it should only count if we provide
-        // a duration that is LONGER.
+        // Three frames is an exact number of nanoseconds, testing the edge.
         assert_eq!(2, vmo.frames_from_duration((THREE_FRAME_NANOS - 1).nanos()));
-        assert_eq!(2, vmo.frames_from_duration(THREE_FRAME_NANOS.nanos()));
+        assert_eq!(3, vmo.frames_from_duration(THREE_FRAME_NANOS.nanos()));
         assert_eq!(3, vmo.frames_from_duration((THREE_FRAME_NANOS + 1).nanos()));
 
-        assert_eq!(TEST_FPS as usize - 1, vmo.frames_from_duration(1.second()));
-        assert_eq!(72000 - 1, vmo.frames_from_duration(1500.millis()));
+        assert_eq!(TEST_FPS as usize, vmo.frames_from_duration(1.second()));
+        assert_eq!(72000, vmo.frames_from_duration(1500.millis()));
 
         assert_eq!(10660, vmo.frames_from_duration(zx::Duration::from_nanos(222084000)));
     }
@@ -395,17 +401,13 @@ mod tests {
         assert_eq!(0, vmo.frames_before(start_time));
 
         assert_eq!(1, vmo.frames_before(start_time + ONE_FRAME_NANOS.nanos()));
-        assert_eq!(2, vmo.frames_before(start_time + THREE_FRAME_NANOS.nanos()));
-        assert_eq!(3, vmo.frames_before(start_time + (THREE_FRAME_NANOS + 1).nanos()));
+        assert_eq!(2, vmo.frames_before(start_time + (THREE_FRAME_NANOS - 1).nanos()));
+        assert_eq!(3, vmo.frames_before(start_time + THREE_FRAME_NANOS.nanos()));
 
-        assert_eq!(TEST_FPS as usize / 4 - 1, vmo.frames_before(start_time + 250.millis()));
+        assert_eq!(TEST_FPS as usize / 4, vmo.frames_before(start_time + 250.millis()));
 
         let three_quarters_dur = 375.millis();
-        assert_eq!(17999, 3 * TEST_FPS as usize / 8 - 1);
-        assert_eq!(
-            3 * TEST_FPS as usize / 8 - 1,
-            vmo.frames_before(start_time + three_quarters_dur)
-        );
+        assert_eq!(3 * TEST_FPS as usize / 8, vmo.frames_before(start_time + three_quarters_dur));
 
         assert_eq!(10521, vmo.frames_before(start_time + 219188000.nanos()));
 
@@ -432,15 +434,15 @@ mod tests {
         let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
-        assert_eq!(TEST_FRAMES / 2, bytes.len());
+        assert_eq!(quart_frames, bytes.len());
         // index returned should be equal to the number of frames returned minus 1 - zero is the
         // first frame
-        assert_eq!(frame_idx, TEST_FRAMES / 2 - 1);
+        assert_eq!(frame_idx, quart_frames - 1);
 
         // After another half_dur, we should be able to read the whole buffer from start to finish.
         exec.set_fake_time(fasync::Time::after(half_dur));
 
-        let res = vmo.poll_frames(0, quart_frames, &mut no_wake_cx);
+        let res = vmo.poll_frames(0, TEST_FRAMES, &mut no_wake_cx);
         let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
@@ -456,7 +458,7 @@ mod tests {
         // Should be able to get frames that span from the middle of the buffer to the middle of the
         // buffer (from index 12000 to index 11999).  This should be 24000 frames.
         // TODO(fxbug.dev/90313): should mark the buffer somehow to confirm that the data is correct
-        let res = vmo.poll_frames(TEST_FRAMES / 2, quart_frames, &mut no_wake_cx);
+        let res = vmo.poll_frames(TEST_FRAMES / 2, TEST_FRAMES, &mut no_wake_cx);
         let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
@@ -498,26 +500,28 @@ mod tests {
         // Woken when we start.
         assert_eq!(count, 1);
 
-        // Polling before a min_duration is ready should return pending, and set a timer.
+        // Polling before frames are ready should return pending, and set a timer.
         let res = vmo.poll_frames(0, quart_frames, &mut counting_wake_cx);
         res.expect_pending("should be pending before start");
 
         // Each `half_dur` period should pseudo-fill half the vmo.
         // After a half_dur, we should have been woken.
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        let new_time = fasync::Time::after(half_dur);
+        exec.set_fake_time(new_time);
         assert!(exec.wake_expired_timers());
 
         assert_eq!(count, 2);
 
-        // Should be ready now, with half the duration in frames.
+        // Should be ready now, with half the duration in frames available.
         let res = vmo.poll_frames(0, quart_frames, &mut counting_wake_cx);
         let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
         assert_eq!(0, missed);
-        assert_eq!(TEST_FRAMES / 2, bytes.len());
-        assert_eq!(frame_idx, TEST_FRAMES / 2 - 1);
+        assert_eq!(quart_frames, bytes.len());
+        assert_eq!(frame_idx, quart_frames - 1);
 
-        // Polling again will return pending because there isn't enough data available.
-        let res = vmo.poll_frames(frame_idx + 1, quart_frames, &mut counting_wake_cx);
+        // Polling again with more frames than we have should return pending because there
+        // isn't enough data available.
+        let res = vmo.poll_frames(frame_idx + 1, quart_frames * 2, &mut counting_wake_cx);
         res.expect_pending("should be pending because not enough data");
 
         assert_eq!(count, 2);
@@ -539,7 +543,7 @@ mod tests {
         vmo.start(start_time).unwrap();
 
         let mut no_wake_cx = Context::from_waker(futures_test::task::panic_waker_ref());
-        let res = vmo.poll_frames(0, 0, &mut no_wake_cx);
+        let res = vmo.poll_frames(0, frames / 2, &mut no_wake_cx);
         let (bytes, _idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
@@ -560,17 +564,11 @@ mod tests {
 
         // Just before the frame finishes, we shouldn't be able to get it.
         exec.set_fake_time(start_time + THREE_FRAME_NANOS.nanos() - 1.nanos());
-        let res = vmo.poll_frames(2, 0, &mut no_wake_cx);
-        let (bytes, idx, missed) = res.expect("frames should be ready").expect("no error");
-        assert_eq!(0, missed);
-        assert_eq!(0, bytes.len());
-        // When no frames are returned, the index is what we passed in.
-        assert_eq!(2, idx);
-
+        vmo.poll_frames(2, 1, &mut no_wake_cx).expect_pending("third frame shouldn't be ready");
         // Exactly when the frame finishes, should be able to get the frame.
         exec.set_fake_time(start_time + THREE_FRAME_NANOS.nanos());
-        let res = vmo.poll_frames(2, 0, &mut no_wake_cx);
-        let (bytes, idx, missed) = res.expect("frames should be ready").expect("no error");
+        let res = vmo.poll_frames(2, 1, &mut no_wake_cx);
+        let (bytes, idx, missed) = res.expect("third frame should be ready").expect("no error");
 
         assert_eq!(0, missed);
         assert_eq!(1, bytes.len());
@@ -578,12 +576,12 @@ mod tests {
         // index we requested.
         assert_eq!(2, idx);
 
-        // a bunch of time has passed, let's get one frame worth again.
+        // a bunch of time has passed, let's get one frame again.
         let much_later_ns = 3999 * THREE_FRAME_NANOS;
         let next_frame_idx = 3998 * 3 + 2;
         exec.set_fake_time(start_time + much_later_ns.nanos());
-        let res = vmo.poll_frames(next_frame_idx, 0, &mut no_wake_cx);
-        let (bytes, idx, missed) = res.expect("frames should be ready").expect("no error");
+        let res = vmo.poll_frames(next_frame_idx, 1, &mut no_wake_cx);
+        let (bytes, idx, missed) = res.expect("frame should be ready").expect("no error");
         assert_eq!(0, missed);
         assert_eq!(1, bytes.len());
         // index is the index of the last frame returned.
@@ -595,14 +593,18 @@ mod tests {
         let moment_length = 10_000.nanos();
 
         let mut moment_start = start_time;
+        let mut moment_end = moment_start;
         let mut next_index = 0;
 
         while total_duration < 250.millis() {
-            let moment_end = moment_start + moment_length;
+            moment_end += moment_length;
             exec.set_fake_time(moment_end);
-            let res = vmo.poll_frames(next_index, 0, &mut no_wake_cx);
             total_duration += moment_length;
-            let (bytes, last_idx, missed) = res.expect("frames should be ready").expect("no error");
+            // the cx here will never be woken since we never wake timers
+            let Poll::Ready(res) = vmo.poll_frames(next_index, 10, &mut no_wake_cx) else {
+                continue;
+            };
+            let (bytes, last_idx, missed) = res.expect("no error");
             assert_eq!(0, missed);
             all_frames_len += bytes.len();
             assert_eq!(
