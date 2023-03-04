@@ -61,7 +61,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1808
+From //build/config/BUILDCONFIG.gn:1809
 
 ### allow_legacy_data_partition_names
 
@@ -3074,7 +3074,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1555
+From //build/config/BUILDCONFIG.gn:1556
 
 ### extra_vbmeta_descriptors
 
@@ -3710,7 +3710,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -4480,7 +4480,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1369
+From //build/config/BUILDCONFIG.gn:1370
 
 ### legacy_base_driver_package_labels
 
@@ -7365,7 +7365,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"PsHIUiIOlKO4vx4Ge0mimolpdBLw9tB6a8Og4JyX0VoC"`
+**Current value (from the default):** `"DFD7rVAGmgIiTbkH0CmhQoUtcmLt39NP2mMlPflo9RgC"`
 
 From //build/rust/config.gni:32
 
@@ -7549,7 +7549,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1798
+From //build/config/BUILDCONFIG.gn:1799
 
 ### select_variant_canonical
 
@@ -7559,7 +7559,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1803
+From //build/config/BUILDCONFIG.gn:1804
 
 ### select_variant_shortcuts
 
@@ -7611,7 +7611,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1601
+From //build/config/BUILDCONFIG.gn:1602
 
 ### size_checker_input
 
@@ -7958,7 +7958,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7994,7 +7994,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:114
+From //build/config/BUILDCONFIG.gn:115
 
 ### tsan_default_options
 
@@ -8047,7 +8047,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1585
+From //build/config/BUILDCONFIG.gn:1586
 
 ### universe_package_labels
 
@@ -8774,7 +8774,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:131
+From //build/config/BUILDCONFIG.gn:132
 
 ### zircon_tracelog
 
