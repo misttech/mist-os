@@ -344,9 +344,18 @@ TEST_F(H264VaapiTestFixture, DelayedConfiguration) {
 
 TEST(H264Vaapi, CodecList) {
   EXPECT_TRUE(VADisplayWrapper::InitializeSingletonForTesting());
-  auto codec_list = GetCodecList();
+  auto codec_list = GetDeprecatedCodecList();
   // video/x-motion-jpeg decode, video/h264 decode, video/vp9 decode, video/h264 encode
   EXPECT_EQ(4u, codec_list.size());
+}
+
+TEST(H264Vaapi, CodecDescriptions) {
+  EXPECT_TRUE(VADisplayWrapper::InitializeSingletonForTesting());
+  auto codec_descriptions = GetCodecDescriptions();
+  // video/x-motion-jpeg decode, video/h264 decode, video/vp9 decode, video/h264 encode
+
+  // TODO(fxb/85214): Uncomment this after new prebuilts have rolled.
+  //EXPECT_EQ(4u, codec_descriptions.size());
 }
 
 // Test that we can connect using the CodecFactory.

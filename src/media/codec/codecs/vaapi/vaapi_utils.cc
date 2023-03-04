@@ -319,7 +319,7 @@ static bool SupportsJPEGDecoder() {
   return SupportsProfile(VAProfileJPEGBaseline, VAEntrypointVLD, attribs);
 }
 
-std::vector<fuchsia::mediacodec::CodecDescription> GetCodecList() {
+std::vector<fuchsia::mediacodec::CodecDescription> GetDeprecatedCodecList() {
   std::vector<fuchsia::mediacodec::CodecDescription> descriptions;
 
   if (SupportsJPEGDecoder()) {
@@ -407,7 +407,7 @@ static fuchsia::media::CodecProfile VaProfileToCodecProfile(VAProfile profile) {
   return fuchsia::media::CodecProfile::Unknown();
 }
 
-std::vector<fuchsia::mediacodec::DetailedCodecDescription> GetDecoderList() {
+std::vector<fuchsia::mediacodec::DetailedCodecDescription> GetCodecDescriptions() {
   std::vector<fuchsia::mediacodec::DetailedCodecDescription> codec_descriptions;
 
   fit::function<void(const std::string&, const std::vector<ProfileDescription>&)>
@@ -471,6 +471,43 @@ std::vector<fuchsia::mediacodec::DetailedCodecDescription> GetDecoderList() {
 
   add_decoder_profiles("video/h264", H264DecoderDescriptions());
   add_decoder_profiles("video/vp9", VP9DecoderDescriptions());
+
+  if (SupportsJPEGDecoder()) {
+    fuchsia::mediacodec::DetailedCodecDescription jpeg_description;
+    jpeg_description.set_codec_type(fuchsia::mediacodec::CodecType::DECODER);
+    jpeg_description.set_mime_type("video/x-motion-jpeg");
+    jpeg_description.set_is_hw(true);
+
+    fuchsia::mediacodec::DecoderProfileDescription decoder_description;
+    decoder_description.set_profile(::fuchsia::media::CodecProfile::MJPEG_BASELINE);
+    decoder_description.set_min_image_size({1, 1});
+    // TBV whether we can successfully decode a max-dimensions jpeg via HW.
+    decoder_description.set_max_image_size({65535, 65535});
+
+    ::std::vector<::fuchsia::mediacodec::DecoderProfileDescription> decoder_descriptions;
+    decoder_descriptions.emplace_back(std::move(decoder_description));
+    fuchsia::mediacodec::ProfileDescriptions descriptions;
+    descriptions.set_decoder_profile_descriptions(std::move(decoder_descriptions));
+    jpeg_description.set_profile_descriptions(std::move(descriptions));
+    codec_descriptions.emplace_back(std::move(jpeg_description));
+  }
+
+  if (SupportsH264Encoder()) {
+    fuchsia::mediacodec::DetailedCodecDescription h264_description;
+    h264_description.set_codec_type(fuchsia::mediacodec::CodecType::ENCODER);
+    h264_description.set_mime_type("video/h264");
+    h264_description.set_is_hw(true);
+
+    fuchsia::mediacodec::EncoderProfileDescription encoder_description;
+    encoder_description.set_profile(::fuchsia::media::CodecProfile::H264PROFILE_HIGH);
+
+    ::std::vector<::fuchsia::mediacodec::EncoderProfileDescription> encoder_descriptions;
+    encoder_descriptions.emplace_back(std::move(encoder_description));
+    fuchsia::mediacodec::ProfileDescriptions descriptions;
+    descriptions.set_encoder_profile_descriptions(std::move(encoder_descriptions));
+    h264_description.set_profile_descriptions(std::move(descriptions));
+    codec_descriptions.emplace_back(std::move(h264_description));
+  }
 
   return codec_descriptions;
 }

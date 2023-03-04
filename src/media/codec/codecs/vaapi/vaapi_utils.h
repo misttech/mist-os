@@ -211,9 +211,9 @@ std::optional<ProfileDescription> GetProfileDescription(
     const VAProfile& profile, VAEntrypoint required_entrypoint,
     std::vector<VAConfigAttrib>& required_attribs);
 
-std::vector<fuchsia::mediacodec::CodecDescription> GetCodecList();
+std::vector<fuchsia::mediacodec::DetailedCodecDescription> GetCodecDescriptions();
 
-std::vector<fuchsia::mediacodec::DetailedCodecDescription> GetDecoderList();
+std::vector<fuchsia::mediacodec::CodecDescription> GetDeprecatedCodecList();
 
 // Copy the memory between arrays with checking the array size.
 template <typename T, size_t N>

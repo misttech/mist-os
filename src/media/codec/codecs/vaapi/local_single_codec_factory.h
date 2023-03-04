@@ -43,12 +43,12 @@ class LocalSingleCodecFactory : public fuchsia::mediacodec::CodecFactory {
     zx_status_t status = binding_.Bind(std::move(request), fidl_dispatcher);
     ZX_ASSERT(status == ZX_OK);
 
-    binding_.events().OnCodecList(GetCodecList());
+    binding_.events().OnCodecList(GetDeprecatedCodecList());
   }
 
   void GetDetailedCodecDescriptions(GetDetailedCodecDescriptionsCallback callback) override {
     fuchsia::mediacodec::CodecFactoryGetDetailedCodecDescriptionsResponse response;
-    response.set_codecs(GetDecoderList());
+    response.set_codecs(GetCodecDescriptions());
     callback(std::move(response));
   }
 
