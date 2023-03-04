@@ -1,6 +1,12 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
 import 'package:fxtest/fxtest.dart';
 import 'package:fxutils/fxutils.dart';
 import 'package:test/test.dart';
+import 'dart:io';
+
 import 'fake_fx_env.dart';
 import 'helpers.dart';
 
@@ -402,9 +408,15 @@ void main() {
   });
 
   group('build targets', () {
+    final fakeDir = Directory.systemTemp.createTempSync();
+    final fxEnv = FakeFxEnv(fuchsiaDir: fakeDir.path);
+    File('${fxEnv.outputDir}/all_package_manifests.list')
+      ..createSync(recursive: true)
+      ..writeAsStringSync("");
+
     var testsConfig = TestsConfig.fromRawArgs(
       rawArgs: [],
-      fxEnv: FakeFxEnv.shared,
+      fxEnv: fxEnv,
     );
 
     List<TestBundle> createBundlesFromJson(

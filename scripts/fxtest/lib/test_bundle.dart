@@ -89,13 +89,28 @@ class TestBundle {
   static Set<String> calculateMinimalBuildTargets(
       TestsConfig testsConfig, List<TestBundle> testBundles) {
     Set<String> targets = {};
+
+    // The incremental publisher uses `all_package_manifests.list` to know which
+    // packages to publish, we'll need to build the `updates` package if it
+    // doesn't exist. This will allow `fx test` to work with incremental and a
+    // clean build directory.
+    bool packageListExists = false;
+    if (testsConfig.fxEnv.outputDir != null) {
+      String packageList =
+          testsConfig.fxEnv.outputDir! + "/all_package_manifests.list";
+      packageListExists = File(packageList).existsSync();
+    }
+
+    final bool incrementalEnabled =
+        (testsConfig.fxEnv.isFeatureEnabled('incremental') ||
+            testsConfig.fxEnv.isFeatureEnabled('incremental_new') ||
+            testsConfig.fxEnv.isFeatureEnabled('incremental_legacy'));
+
     for (var e in testBundles) {
       switch (e.testDefinition.testType) {
         case TestType.suite:
           String? target = 'updates';
-          if (testsConfig.fxEnv.isFeatureEnabled('incremental') ||
-              testsConfig.fxEnv.isFeatureEnabled('incremental_new') ||
-              testsConfig.fxEnv.isFeatureEnabled('incremental_legacy')) {
+          if (packageListExists && incrementalEnabled) {
             if (e.testDefinition.packageLabel?.isNotEmpty ?? false) {
               target = fxutils.getBuildTarget(e.testDefinition.packageLabel);
             } else if (e.testDefinition.label?.isNotEmpty ?? false) {
