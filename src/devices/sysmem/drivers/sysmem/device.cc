@@ -1155,34 +1155,29 @@ FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device
 }
 
 zx_status_t FidlDevice::Bind() {
-  auto status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_sysmem::Sysmem>(
-      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+  auto status = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
+      fuchsia_hardware_sysmem::Service::InstanceHandler({
+          .sysmem = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+          .allocator_v1 =
+              [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
+                zx_status_t status = sysmem_device_->CommonSysmemConnectV1(request.TakeChannel());
+                if (status != ZX_OK) {
+                  LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
+                }
+              },
+          .allocator =
+              [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
+                zx_status_t status = sysmem_device_->CommonSysmemConnectV2(request.TakeChannel());
+                if (status != ZX_OK) {
+                  LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
+                }
+              },
+      }));
+
   if (status.is_error()) {
     zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory (sysmem): %s",
            status.status_string());
     return status.status_value();
-  }
-
-  status = outgoing_.AddUnmanagedProtocol<fuchsia_sysmem::Allocator>(
-      [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
-        zx_status_t status = sysmem_device_->CommonSysmemConnectV1(request.TakeChannel());
-        if (status != ZX_OK) {
-          LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
-        }
-      });
-  if (status.is_error()) {
-    return status.error_value();
-  }
-
-  status = outgoing_.AddUnmanagedProtocol<fuchsia_sysmem2::Allocator>(
-      [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
-        zx_status_t status = sysmem_device_->CommonSysmemConnectV2(request.TakeChannel());
-        if (status != ZX_OK) {
-          LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
-        }
-      });
-  if (status.is_error()) {
-    return status.error_value();
   }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -1192,15 +1187,13 @@ zx_status_t FidlDevice::Bind() {
 
   status = outgoing_.Serve(std::move(endpoints->server));
   std::array offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
-      fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>,
-      fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>,
+      fuchsia_hardware_sysmem::Service::Name,
   };
 
   zx_status_t add_status =
       DdkAdd(ddk::DeviceAddArgs("sysmem-fidl")
                  .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE | DEVICE_ADD_MUST_ISOLATE)
-                 .set_fidl_protocol_offers(offers)
+                 .set_fidl_service_offers(offers)
                  .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (add_status != ZX_OK) {
     DRIVER_ERROR("Failed to bind FIDL device");

@@ -365,17 +365,12 @@ int PipeDevice::IrqHandler() {
 }
 
 zx_status_t PipeDevice::ConnectToSysmem() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem-fidl");
+  if (client.is_error()) {
+    return client.status_value();
   }
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "sysmem-fidl", fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
-      endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    return status;
-  }
-  sysmem_ = fidl::WireSyncClient(std::move(endpoints->client));
+  sysmem_ = fidl::WireSyncClient(std::move(*client));
   return ZX_OK;
 }
 

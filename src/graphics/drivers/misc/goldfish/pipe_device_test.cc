@@ -10,6 +10,8 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/zx/channel.h>
@@ -165,7 +167,7 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
 };
 
 // Test suite creating fake PipeDevice on a mock ACPI bus.
-class PipeDeviceTest : public zxtest::Test {
+class PipeDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
   PipeDeviceTest()
       // The goldfish-pipe server must live on a different thread because the
@@ -173,8 +175,9 @@ class PipeDeviceTest : public zxtest::Test {
       // live on the same thread because the test code reads its public fields
       // without synchronizing access.
       : async_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        sysmem_loop_(&kAsyncLoopConfigAttachToCurrentThread),
+        sysmem_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         fake_sysmem_(&sysmem_loop_),
+        outgoing_(dispatcher()),
         fake_root_(MockDevice::FakeRootParent()) {}
 
   // |zxtest::Test|
@@ -222,31 +225,37 @@ class PipeDeviceTest : public zxtest::Test {
     ASSERT_OK(acpi_client.status_value());
 
     fake_root_->AddProtocol(ZX_PROTOCOL_ACPI, nullptr, nullptr, "acpi");
-    fake_root_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
-        [this](zx::channel channel) {
-          fidl::BindServer(sysmem_loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem>(std::move(channel)),
-                           &fake_sysmem_);
-          return ZX_OK;
-        },
-        "sysmem-fidl");
+
+    zx::result service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
+        fuchsia_hardware_sysmem::Service::InstanceHandler({
+            .sysmem = fake_sysmem_.bind_handler(sysmem_loop_.dispatcher()),
+        }));
+    ASSERT_EQ(service_result.status_value(), ZX_OK);
+
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints.status_value());
+    ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
+
+    fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
+                               "sysmem-fidl");
 
     auto dut = std::make_unique<PipeDevice>(fake_root_.get(), std::move(acpi_client.value()),
                                             async_loop_.dispatcher());
-    ASSERT_OK(dut->ConnectToSysmem());
+    PerformBlockingWork([&] { ASSERT_OK(dut->ConnectToSysmem()); });
     ASSERT_OK(dut->Bind());
     dut_ = dut.release();
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-    EXPECT_EQ(endpoints.status_value(), ZX_OK);
+    {
+      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
+      EXPECT_EQ(endpoints.status_value(), ZX_OK);
 
-    dut_child_ = std::make_unique<PipeChildDevice>(dut_, async_loop_.dispatcher());
-    binding_ =
-        fidl::BindServer(async_loop_.dispatcher(), std::move(endpoints->server), dut_child_.get());
-    EXPECT_TRUE(binding_.has_value());
+      dut_child_ = std::make_unique<PipeChildDevice>(dut_, async_loop_.dispatcher());
+      binding_ = fidl::BindServer(async_loop_.dispatcher(), std::move(endpoints->server),
+                                  dut_child_.get());
+      EXPECT_TRUE(binding_.has_value());
 
-    client_ = fidl::WireSyncClient(std::move(endpoints->client));
+      client_ = fidl::WireSyncClient(std::move(endpoints->client));
+    }
   }
 
   // |zxtest::Test|
@@ -268,6 +277,7 @@ class PipeDeviceTest : public zxtest::Test {
   async::Loop async_loop_;
   async::Loop sysmem_loop_;
   FakeSysmem fake_sysmem_;
+  component::OutgoingDirectory outgoing_;
   acpi::mock::Device mock_acpi_fidl_;
   std::shared_ptr<MockDevice> fake_root_;
   PipeDevice* dut_;

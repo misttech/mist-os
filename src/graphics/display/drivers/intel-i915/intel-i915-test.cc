@@ -252,22 +252,25 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
     });
 
     parent_ = MockDevice::FakeRootParent();
-    parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
-        [this](zx::channel channel) {
-          fidl::BindServer(loop_.dispatcher(),
-                           fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem>(std::move(channel)),
-                           &sysmem_);
-          return ZX_OK;
-        },
-        "sysmem-fidl");
 
-    auto service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
+    zx::result service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
+        fuchsia_hardware_sysmem::Service::InstanceHandler(
+            {.sysmem = sysmem_.bind_handler(loop_.dispatcher())}));
+    ASSERT_EQ(service_result.status_value(), ZX_OK);
+
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
+
+    parent_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
+                            "sysmem-fidl");
+
+    service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
         fuchsia_hardware_pci::Service::InstanceHandler(
             {.device = pci_.bind_handler(loop_.dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
     ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
 

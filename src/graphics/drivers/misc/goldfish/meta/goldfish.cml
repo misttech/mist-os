@@ -16,5 +16,6 @@
     },
     use: [
         { service: "fuchsia.hardware.acpi.Service" },
+        { service: "fuchsia.hardware.sysmem.Service" },
     ],
 }

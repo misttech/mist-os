@@ -46,3 +46,9 @@ protocol Sysmem {
     /// considered an error.
     UnregisterSecureMem() -> () error zx.status;
 };
+
+service Service {
+    sysmem client_end:Sysmem;
+    allocator_v1 client_end:fuchsia.sysmem.Allocator;
+    allocator client_end:fuchsia.sysmem2.Allocator;
+};

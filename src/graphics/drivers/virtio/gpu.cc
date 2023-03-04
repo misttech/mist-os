@@ -733,22 +733,16 @@ zx_status_t GpuDevice::InitSysmemAllocatorClient() {
 zx_status_t GpuDevice::Init() {
   LTRACE_ENTRY;
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "%s: Failed to create SYSMEM endpoints: %s", tag(), endpoints.status_string());
-    return endpoints.status_value();
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem-fidl");
+  if (client.is_error()) {
+    zxlogf(ERROR, "%s: Could not get Display SYSMEM protocol: %s", tag(), client.status_string());
+    return client.status_value();
   }
 
-  zx_status_t status = DdkConnectFragmentFidlProtocol("sysmem-fidl", std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Could not get Display SYSMEM protocol: %s", tag(),
-           zx_status_get_string(status));
-    return status;
-  }
+  sysmem_ = fidl::WireSyncClient(std::move(*client));
 
-  sysmem_ = fidl::WireSyncClient(std::move(endpoints->client));
-
-  status = InitSysmemAllocatorClient();
+  zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Failed to create sysmem Allocator client: %s", tag(),
            zx_status_get_string(status));

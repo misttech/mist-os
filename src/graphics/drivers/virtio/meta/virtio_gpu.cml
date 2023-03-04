@@ -15,5 +15,6 @@
     },
     use: [
         { service: "fuchsia.hardware.pci.Service" },
+        { service: "fuchsia.hardware.sysmem.Service" },
     ],
 }

@@ -13,9 +13,18 @@
         colocate: "false",
         compat: "driver/sysmem.so",
     },
+    capabilities: [
+        { service: 'fuchsia.hardware.sysmem.Service' },
+    ],
     use: [
         { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.boot.Arguments" },
         { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            service: 'fuchsia.hardware.sysmem.Service',
+            from: 'self',
+        },
     ],
 }

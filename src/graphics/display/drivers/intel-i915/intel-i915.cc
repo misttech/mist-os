@@ -2325,24 +2325,17 @@ zx_status_t Controller::InitSysmemAllocatorClient() {
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
-  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-  if (sysmem_endpoints.is_error()) {
-    zxlogf(ERROR, "could not create SYSMEM endpoints: %s", sysmem_endpoints.status_string());
-    return sysmem_endpoints.status_value();
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem-fidl");
+  if (client.is_error()) {
+    zxlogf(ERROR, "could not get SYSMEM protocol: %s", client.status_string());
+    return client.status_value();
   }
 
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "sysmem-fidl", fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
-      sysmem_endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "could not get SYSMEM protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  sysmem_.Bind(std::move(sysmem_endpoints->client));
+  sysmem_.Bind(std::move(*client));
 
   zxlogf(TRACE, "Initializing sysmem allocator");
-  status = InitSysmemAllocatorClient();
+  zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Cannot initialize sysmem allocator: %s", zx_status_get_string(status));
     return status;

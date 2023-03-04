@@ -37,7 +37,7 @@ class DeviceInfoIterator : public fidl::WireServer<fdd::DeviceInfoIterator> {
       : arena_(std::move(arena)), list_(std::move(list)) {}
 
   void GetNext(GetNextCompleter::Sync& completer) {
-    constexpr size_t kMaxEntries = 20;
+    constexpr size_t kMaxEntries = 15;
     auto result =
         cpp20::span(list_.begin() + offset_, std::min(kMaxEntries, list_.size() - offset_));
     offset_ += result.size();
