@@ -115,9 +115,10 @@ class FfxCliTests(unittest.TestCase):
         self.assertEqual(result, _FFX_TARGET_SHOW_JSON)
 
         self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator --timeout 10 target show --json",
+            "ffx -t fuchsia-emulator target show --json",
             shell=True,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+            timeout=10)
 
     def test_ffx_target_show_when_not_connected(self):
         """Verify ffx_target_show raises an exception when target is not
@@ -129,9 +130,10 @@ class FfxCliTests(unittest.TestCase):
             ffx_cli.ffx_target_show(target="fuchsia-d88c-799b-0e3a")
 
         self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-d88c-799b-0e3a --timeout 10 target show --json",
+            "ffx -t fuchsia-d88c-799b-0e3a target show --json",
             shell=True,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+            timeout=10)
 
     def test_get_target_address(self):
         """Verify get_target_address returns ip address of fuchsia device."""
@@ -141,9 +143,10 @@ class FfxCliTests(unittest.TestCase):
         self.assertEqual(result, expected)
 
         self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator --timeout 10 target show --json",
+            "ffx -t fuchsia-emulator target show --json",
             shell=True,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+            timeout=10)
 
     @parameterized.expand(
         [
@@ -170,9 +173,10 @@ class FfxCliTests(unittest.TestCase):
             ffx_cli.get_target_address(target="fuchsia-emulator")
 
         self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator --timeout 10 target show --json",
+            "ffx -t fuchsia-emulator target show --json",
             shell=True,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+            timeout=10)
 
     def test_get_target_type(self):
         """Verify get_target_type returns target type of fuchsia device."""
@@ -182,9 +186,10 @@ class FfxCliTests(unittest.TestCase):
         self.assertEqual(result, expected)
 
         self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator --timeout 10 target show --json",
+            "ffx -t fuchsia-emulator target show --json",
             shell=True,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+            timeout=10)
 
     @parameterized.expand(
         [
@@ -211,9 +216,10 @@ class FfxCliTests(unittest.TestCase):
             ffx_cli.get_target_type(target="fuchsia-emulator")
 
         self.mock_check_output.assert_called_once_with(
-            "ffx -t fuchsia-emulator --timeout 10 target show --json",
+            "ffx -t fuchsia-emulator target show --json",
             shell=True,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+            timeout=10)
 
 
 if __name__ == '__main__':

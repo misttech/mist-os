@@ -47,7 +47,7 @@ class HostUtilsTests(unittest.TestCase):
                         "12.34.56.78",
                     "optional_params": {},
                     "expected_cmd_list":
-                        ["ping", "-c", "3", "-W", "5", "12.34.56.78"]
+                        ["ping", "-c", "1", "-W", "2", "12.34.56.78"]
                 },),
             (
                 {
@@ -94,13 +94,13 @@ class HostUtilsTests(unittest.TestCase):
     def test_is_pingable_failure(self):
         """Verifies is_pingable fails when expected."""
         self.mock_check_output.side_effect = subprocess.CalledProcessError(
-            "some_err", "some_cmd")
+            120, "some_cmd")
 
         result = host_utils.is_pingable("12.34.56.78")
         self.assertFalse(result)
 
         self.mock_check_output.assert_called_once_with(
-            ["ping", "-c", "3", "-W", "5", "12.34.56.78"],
+            ["ping", "-c", "1", "-W", "2", "12.34.56.78"],
             stderr=subprocess.STDOUT)
 
     @parameterized.expand(

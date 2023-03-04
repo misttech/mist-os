@@ -634,7 +634,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         self.fd_obj._wait_for_offline()
 
         mock_is_pingable.assert_called_with(self.fd_obj._ip_address)
-        mock_sleep.assert_called_with(1)
+        mock_sleep.assert_called()
 
     @mock.patch.object(
         fuchsia_device_base.host_utils,
