@@ -3710,7 +3710,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7375,7 +7375,7 @@ Draws the current frame number in the top-left corner.
 
 **Current value (from the default):** `false`
 
-From //src/ui/scenic/lib/gfx/BUILD.gn:10
+From //src/ui/scenic/lib/gfx/BUILD.gn:9
 
 ### scenic_enable_vulkan_validation
 
@@ -7958,7 +7958,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
