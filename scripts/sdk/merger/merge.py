@@ -142,6 +142,8 @@ class ElementMeta(object):
         arch_files = {}
         if type == 'cc_prebuilt_library':
             common_files.update(self._meta['headers'])
+            if 'ifs' in self._meta:
+                common_files.add(os.path.join(self._meta['root'], self._meta['ifs']))
             for arch, binaries in self._meta['binaries'].items():
                 contents = set()
                 contents.add(binaries['link'])
@@ -166,6 +168,8 @@ class ElementMeta(object):
             common_files.update(self._meta['resources'])
             arch_files.update(self._meta['binaries'])
         elif type == 'sysroot':
+            for ifs_file in self._meta['ifs_files']:
+                common_files.add(os.path.join("pkg", "sysroot", ifs_file))
             for arch, version in self._meta['versions'].items():
                 contents = set()
                 contents.update(version['headers'])

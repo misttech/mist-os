@@ -113,6 +113,8 @@ def _generate_bind_library_build_rules(ctx, meta, relative_dir, build_file, proc
 # buildifier: disable=unused-variable
 def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     files = []
+    for ifs_file in meta["ifs_files"]:
+        files.append("pkg/sysroot/" + ifs_file)
     arch_list = process_context.constants.target_cpus
     for arch in arch_list:
         meta_for_arch = meta["versions"][arch]
@@ -397,7 +399,10 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
         "{{headers}}": _get_starlark_list(meta["headers"], remove_prefix = lib_base_path),
         "{{relative_include_dir}}": meta["include_dir"][len(lib_base_path):],
     }
-    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["headers"])
+    files = meta["headers"]
+    if "ifs" in meta:
+        files.append(lib_base_path + meta["ifs"])
+    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files)
 
     prebuilt_select = {}
     dist_select = {}

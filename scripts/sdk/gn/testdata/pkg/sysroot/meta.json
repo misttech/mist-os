@@ -1,6 +1,7 @@
 {
   "name": "sysroot",
   "type": "sysroot",
+  "ifs_files": [],
   "versions": {
     "arm64": {
       "debug_libs": [],

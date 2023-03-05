@@ -245,6 +245,9 @@ class GNBuilder(Frontend):
 
         self.copy_files(atom['headers'], atom['root'], base, library.hdrs)
 
+        if 'ifs' in atom:
+            self.copy_file(os.path.join(atom['root'], atom['ifs']), atom['root'], base)
+
         for arch in self.target_arches:
             binaries = atom['binaries'][arch]
             prebuilt_set = model.CppPrebuiltSet(binaries['link'])
@@ -412,6 +415,10 @@ class GNBuilder(Frontend):
         self.copy_files(atom['data'])
 
     def install_sysroot_atom(self, atom):
+        base = self.dest('pkg', 'sysroot')
+        pkg_sysroot = os.path.join('pkg', 'sysroot')
+        for ifs_file in atom['ifs_files']:
+            self.copy_file(os.path.join(pkg_sysroot, ifs_file), pkg_sysroot, base)
         for arch in self.target_arches:
             base = self.dest('arch', arch, 'sysroot')
             arch_data = atom['versions'][arch]
