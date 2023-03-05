@@ -3,16 +3,16 @@
 namespace snapshot;
 
 struct Vec3 {
-  x:float = 0;
-  y:float = 0;
-  z:float = 0;
+  x:float;
+  y:float;
+  z:float;
 }
 
 struct Quat {
-  x:float = 0;
-  y:float = 0;
-  z:float = 0;
-  w:float = 1;
+  x:float;
+  y:float;
+  z:float;
+  w:float;
 }
 
 union Shape { Mesh, Circle, Rectangle, RoundedRectangle }

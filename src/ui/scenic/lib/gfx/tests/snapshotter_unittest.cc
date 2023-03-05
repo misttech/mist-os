@@ -169,7 +169,7 @@ VK_TEST_F(SnapshotterTest, NonProtectedImage) {
                              auto child = node->children()->Get(0);
                              EXPECT_EQ(snapshot::Material_Image, child->material_type());
                              auto image = static_cast<const snapshot::Image*>(child->material());
-                             EXPECT_TRUE(image->data()->Length() > 0);
+                             EXPECT_GT(image->data()->size(), 0u);
                              EXPECT_EQ(dummy_image->kRedValue, image->data()->Data()[0]);
                              EXPECT_EQ(dummy_image->kGreenValue, image->data()->Data()[1]);
                              EXPECT_EQ(dummy_image->kBlueValue, image->data()->Data()[2]);
@@ -209,7 +209,7 @@ VK_TEST_F(SnapshotterTest, ProtectedImage) {
                              auto child = node->children()->Get(0);
                              EXPECT_EQ(snapshot::Material_Image, child->material_type());
                              auto image = static_cast<const snapshot::Image*>(child->material());
-                             EXPECT_TRUE(image->data()->Length() > 0);
+                             EXPECT_GT(image->data()->size(), 0u);
                              EXPECT_EQ(0, image->data()->Data()[0]);
                              EXPECT_EQ(0, image->data()->Data()[1]);
                              EXPECT_EQ(0, image->data()->Data()[2]);

@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//third_party/flatbuffers/flatbuffer.gni")
 import("build_args.gni")
 
 declare_args() {
@@ -209,8 +208,8 @@ source_set("gfx") {
 
   public_deps = [
     ":gfx_always_optimized",
-    ":snapshot_fbs",
     ":util",
+    "snapshot:fbs",
     "//src/lib/fostr/fidl/fuchsia.ui.gfx",
 
     # TODO(fxbug.dev/44143): Gfx should not depend on Input.
@@ -318,8 +317,4 @@ source_set("validate_eventpair") {
     "//zircon/system/public",
     "//zircon/system/ulib/zx",
   ]
-}
-
-flatbuffer("snapshot_fbs") {
-  sources = [ "snapshot/snapshot.fbs" ]
 }

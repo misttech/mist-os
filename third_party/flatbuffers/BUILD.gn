@@ -2,76 +2,122 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//third_party/flatbuffers/flatbuffer.gni")
-
 config("flatbuffers_warnings") {
-  cflags = [
-    "-Wno-conversion",
-    "-Wno-implicit-fallthrough",
-    "-Wno-extra-semi",
-  ]
+  cflags = [ "-Wno-float-conversion" ]
 }
 
 config("flatbuffers_config") {
   include_dirs = [ "src/include" ]
+
+  # Required to prevent static initialization of locale
+  # in util.cpp
+  defines = [ "FLATBUFFERS_LOCALE_INDEPENDENT=0" ]
 }
 
+# The part of FlatBuffers that Chrome is interested in.
 source_set("flatbuffers") {
-  sources = [
+  public = [
+    "src/include/flatbuffers/base.h",
     "src/include/flatbuffers/flatbuffers.h",
-    "src/include/flatbuffers/hash.h",
+    "src/include/flatbuffers/stl_emulation.h",
+
+    # Required for tflite.
+    "src/include/flatbuffers/flexbuffers.h",
+    "src/include/flatbuffers/util.h",
   ]
 
-  configs += [ ":flatbuffers_warnings" ]
-  public_configs = [
-    ":flatbuffers_config",
-
-    # TODO(fxbug.dev/78646) Remove this config after std::iterator usages are cleaned up.
-    "//build/config:suppress_iterator_warnings",
-  ]
-
-  # TODO(46773): UBSan has found an instance of undefined behavior in this target.
-  # Disable UBSan for this target temporarily until it is migrated into CI/CQ.
-  public_configs += [ "//build/config:temporarily_disable_ubsan_do_not_use" ]
+  public_configs = [ ":flatbuffers_config" ]
 }
 
+# The complete FlatBuffers library, as required to build the flatc compiler and
+# some of the tests.
 source_set("compiler_files") {
+  include_dirs = [ "src/grpc" ]
   sources = [
     "src/grpc/src/compiler/cpp_generator.cc",
     "src/grpc/src/compiler/cpp_generator.h",
     "src/grpc/src/compiler/go_generator.cc",
     "src/grpc/src/compiler/go_generator.h",
+    "src/grpc/src/compiler/java_generator.cc",
+    "src/grpc/src/compiler/java_generator.h",
+    "src/grpc/src/compiler/python_generator.cc",
+    "src/grpc/src/compiler/python_generator.h",
     "src/grpc/src/compiler/schema_interface.h",
+    "src/grpc/src/compiler/swift_generator.cc",
+    "src/grpc/src/compiler/swift_generator.h",
+    "src/grpc/src/compiler/ts_generator.cc",
+    "src/grpc/src/compiler/ts_generator.h",
     "src/include/flatbuffers/code_generators.h",
+    "src/include/flatbuffers/flatc.h",
+    "src/include/flatbuffers/grpc.h",
+    "src/include/flatbuffers/hash.h",
     "src/include/flatbuffers/idl.h",
-    "src/include/flatbuffers/util.h",
+    "src/include/flatbuffers/minireflect.h",
+    "src/include/flatbuffers/reflection.h",
+    "src/include/flatbuffers/reflection_generated.h",
+    "src/include/flatbuffers/registry.h",
+    "src/src/annotated_binary_text_gen.cpp",
+    "src/src/annotated_binary_text_gen.h",
+    "src/src/bfbs_gen.h",
+    "src/src/bfbs_gen_lua.cpp",
+    "src/src/bfbs_gen_lua.h",
+    "src/src/bfbs_gen_nim.cpp",
+    "src/src/bfbs_gen_nim.h",
+    "src/src/bfbs_namer.h",
+    "src/src/binary_annotator.cpp",
+    "src/src/binary_annotator.h",
+    "src/src/code_generators.cpp",
+    "src/src/flatc.cpp",
+    "src/src/idl_gen_binary.cpp",
+    "src/src/idl_gen_binary.h",
     "src/src/idl_gen_cpp.cpp",
+    "src/src/idl_gen_cpp.h",
+    "src/src/idl_gen_csharp.cpp",
+    "src/src/idl_gen_csharp.h",
+    "src/src/idl_gen_dart.cpp",
+    "src/src/idl_gen_dart.h",
     "src/src/idl_gen_fbs.cpp",
-    "src/src/idl_gen_general.cpp",
     "src/src/idl_gen_go.cpp",
+    "src/src/idl_gen_go.h",
     "src/src/idl_gen_grpc.cpp",
-    "src/src/idl_gen_js.cpp",
+    "src/src/idl_gen_java.cpp",
+    "src/src/idl_gen_java.h",
+    "src/src/idl_gen_json_schema.cpp",
+    "src/src/idl_gen_json_schema.h",
+    "src/src/idl_gen_kotlin.cpp",
+    "src/src/idl_gen_kotlin.h",
+    "src/src/idl_gen_lobster.cpp",
+    "src/src/idl_gen_lobster.h",
+    "src/src/idl_gen_lua.cpp",
+    "src/src/idl_gen_lua.h",
     "src/src/idl_gen_php.cpp",
+    "src/src/idl_gen_php.h",
     "src/src/idl_gen_python.cpp",
+    "src/src/idl_gen_python.h",
+    "src/src/idl_gen_rust.cpp",
+    "src/src/idl_gen_rust.h",
+    "src/src/idl_gen_swift.cpp",
+    "src/src/idl_gen_swift.h",
     "src/src/idl_gen_text.cpp",
+    "src/src/idl_gen_text.h",
+    "src/src/idl_gen_ts.cpp",
+    "src/src/idl_gen_ts.h",
+    "src/src/idl_namer.h",
     "src/src/idl_parser.cpp",
+    "src/src/namer.h",
     "src/src/reflection.cpp",
     "src/src/util.cpp",
   ]
-  include_dirs = [ "src/grpc" ]
   visibility = [ ":*" ]
   deps = [ ":flatbuffers" ]
+
   configs += [ ":flatbuffers_warnings" ]
 }
 
 executable("flatc") {
-  sources = [ "src/src/flatc.cpp" ]
+  sources = [ "src/src/flatc_main.cpp" ]
   deps = [
     ":compiler_files",
     ":flatbuffers",
   ]
-
-  if (is_linux) {
-    libs = [ "pthread" ]
-  }
 }
