@@ -285,11 +285,15 @@ class PageQueues {
 
   void Dump() TA_EXCL(lock_);
 
+  // Enables reclamation of anonymous pages by causing them to be placed into the reclaimable queue
+  // instead of the dedicated anonymous queue. The |zero_forks| parameter controls whether the
+  // anonymous zero forks should also go into the general reclaimable queue or not.
+  // Any pages already placed into the anonymous queues will be moved over, and there is no way to
+  // disable this once enabled.
+  void EnableAnonymousReclaim(bool zero_forks);
+
   // Returns whether or not the reclaim queues only include pager backed pages or not.
-  // TODO(fxb/60238) This is a temporary method to ensure existing page queues usages that make
-  // assumptions on all reclaimable pages being pager backed are updated before any non pager backed
-  // reclamation is enabled.
-  static bool ReclaimIsOnlyPagerBacked() { return !kAnonymousIsReclaimable; }
+  bool ReclaimIsOnlyPagerBacked() const { return !anonymous_is_reclaimable_; }
 
   // These query functions are marked Debug as it is generally a racy way to determine a pages state
   // and these are exposed for the purpose of writing tests or asserts against the pagequeue.
@@ -638,16 +642,6 @@ class PageQueues {
   template <typename F>
   bool DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue, F validator) const;
 
-  // Determines if anonymous pages are placed in the reclaimable queues, or in their own non aging
-  // anonymous queues.
-  // TODO(fxbug.dev/60238): Add tests and support options other than hard coding to false.
-  static constexpr bool kAnonymousIsReclaimable = false;
-
-  // Determines if anonymous zero page forks are placed in the zero fork queue or in the reclaimable
-  // queue.
-  // TODO(fxbug.dev/60238): Add tests and support options other than hard coding to false.
-  static constexpr bool kZeroForkIsReclaimable = false;
-
   // The lock_ is needed to protect the linked lists queues as these cannot be implemented with
   // atomics.
   DECLARE_SPINLOCK(PageQueues) mutable lock_;
@@ -780,6 +774,14 @@ class PageQueues {
   // are set before the mru thread is started.
   zx_duration_t min_mru_rotate_time_;
   zx_duration_t max_mru_rotate_time_;
+
+  // Determines if anonymous zero page forks are placed in the zero fork queue or in the reclaimable
+  // queue.
+  bool zero_fork_is_reclaimable_ TA_GUARDED(lock_) = false;
+
+  // Determines if anonymous pages are placed in the reclaimable queues, or in their own non aging
+  // anonymous queues.
+  RelaxedAtomic<bool> anonymous_is_reclaimable_ = false;
 
   // Current active ratio multiplier.
   uint64_t active_ratio_multiplier_ TA_GUARDED(lock_);

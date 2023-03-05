@@ -821,6 +821,22 @@ This option controls whether page compression should be performed in response to
 For this option to have any effect kernel.page-scanner.enable-eviction needs to be enabled and both
 kernel.compression.strategy and kernel.compression.storage-strategy need to be set.
 
+### kernel.compression.reclaim_anonymous=\<bool>
+
+**Default:** `false`
+
+This option controls whether anonymous pages are placed in the reclaimable page queues and have
+associated age information. Enabling this adds a small overhead to anonymous pages for age tracking,
+but is required for options like "kernel.compression.at_memory_pressure" to have any effect.
+
+### kernel.compression.reclaim_zero_forks=\<bool>
+
+**Default:** `false`
+
+This option is similar to "kernel.compression.reclaim_anonymous" but applies to the zero forks of
+anonymous pages. Enabling this makes the "kernel.page-scanner.zero-page-scans-per-second" option
+have no effect, and it is an error to enable this without enabling "kernel.compression.reclaim_anonymous".
+
 ### kernel.pmm-checker.action=\<string>
 
 **Default:** `oops`

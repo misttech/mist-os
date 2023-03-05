@@ -800,7 +800,7 @@ static bool pq_add_remove() {
 
   pq.SetAnonymous(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
-  if (PageQueues::ReclaimIsOnlyPagerBacked()) {
+  if (pq.ReclaimIsOnlyPagerBacked()) {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
   } else {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
@@ -847,7 +847,7 @@ static bool pq_move_queues() {
   pq.MoveToAnonymous(&test_page);
   EXPECT_FALSE(pq.DebugPageIsWired(&test_page));
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
-  if (PageQueues::ReclaimIsOnlyPagerBacked()) {
+  if (pq.ReclaimIsOnlyPagerBacked()) {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
   } else {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
@@ -911,7 +911,7 @@ static bool pq_move_self_queue() {
 
   pq.SetAnonymous(&test_page, vmo->DebugGetCowPages().get(), 0);
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
-  if (PageQueues::ReclaimIsOnlyPagerBacked()) {
+  if (pq.ReclaimIsOnlyPagerBacked()) {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
   } else {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));
@@ -919,7 +919,7 @@ static bool pq_move_self_queue() {
 
   pq.MoveToAnonymous(&test_page);
   EXPECT_TRUE(pq.DebugPageIsAnonymous(&test_page));
-  if (PageQueues::ReclaimIsOnlyPagerBacked()) {
+  if (pq.ReclaimIsOnlyPagerBacked()) {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{0}, 0, 1, 0, 0}));
   } else {
     EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){{1, 0, 0, 0}, 0, 0, 0, 0}));

@@ -393,6 +393,12 @@ static void scanner_init_func(uint level) {
     ASSERT(!gBootOptions->random_debug_compress);
   }
 
+  if (gBootOptions->compression_reclaim_anonymous) {
+    pmm_page_queues()->EnableAnonymousReclaim(gBootOptions->compression_reclaim_zero_forks);
+  } else {
+    ASSERT(!gBootOptions->compression_reclaim_zero_forks);
+  }
+
   thread->Resume();
 }
 

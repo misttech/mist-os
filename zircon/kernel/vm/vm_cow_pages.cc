@@ -2281,9 +2281,10 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
 }
 
 void VmCowPages::UpdateOnAccessLocked(vm_page_t* page, uint pf_flags) {
+  PageQueues* pq = pmm_page_queues();
   // We only care about updating on access if we can reclaim pages, which if reclamation is limited
   // to pager backed can be skipped if eviction isn't possible.
-  if (PageQueues::ReclaimIsOnlyPagerBacked() && !can_evict()) {
+  if (pq->ReclaimIsOnlyPagerBacked() && !can_evict()) {
     return;
   }
 
@@ -2295,7 +2296,7 @@ void VmCowPages::UpdateOnAccessLocked(vm_page_t* page, uint pf_flags) {
     return;
   }
 
-  pmm_page_queues()->MarkAccessed(page);
+  pq->MarkAccessed(page);
 }
 
 // Looks up the page at the requested offset, faulting it in if requested and necessary.  If

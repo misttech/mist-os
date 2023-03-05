@@ -830,7 +830,7 @@ void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page
   Guard<SpinLock, IrqSave> guard{&lock_};
   DEBUG_ASSERT(object);
   SetQueueBacklinkLocked(page, object, page_offset,
-                         kAnonymousIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymous, dps);
+                         anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous, dps);
 #if DEBUG_ASSERT_IMPLEMENTED
   if (debug_compressor_) {
     debug_compressor_->Add(page, object, page_offset);
@@ -841,7 +841,7 @@ void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page
 void PageQueues::MoveToAnonymous(vm_page_t* page) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, kAnonymousIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymous, dps);
+  MoveToQueueLocked(page, anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous, dps);
 #if DEBUG_ASSERT_IMPLEMENTED
   if (debug_compressor_) {
     debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
@@ -885,9 +885,9 @@ void PageQueues::MoveToPagerBackedDirty(vm_page_t* page) {
 void PageQueues::SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
-  SetQueueBacklinkLocked(page, object, page_offset,
-                         kZeroForkIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymousZeroFork,
-                         dps);
+  SetQueueBacklinkLocked(
+      page, object, page_offset,
+      zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork, dps);
 #if DEBUG_ASSERT_IMPLEMENTED
   if (debug_compressor_) {
     debug_compressor_->Add(page, object, page_offset);
@@ -898,8 +898,8 @@ void PageQueues::SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint6
 void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, kZeroForkIsReclaimable ? mru_gen_to_queue() : PageQueueAnonymousZeroFork,
-                    dps);
+  MoveToQueueLocked(
+      page, zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork, dps);
 #if DEBUG_ASSERT_IMPLEMENTED
   if (debug_compressor_) {
     debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
@@ -1204,6 +1204,27 @@ PageQueues::ActiveInactiveCounts PageQueues::GetActiveInactiveCountsLocked() con
     return ActiveInactiveCounts{.cached = false,
                                 .active = static_cast<uint64_t>(active_queue_count_),
                                 .inactive = static_cast<uint64_t>(inactive_queue_count_)};
+  }
+}
+
+void PageQueues::EnableAnonymousReclaim(bool zero_forks) {
+  DeferPendingSignals dps{*this};
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  anonymous_is_reclaimable_ = true;
+  zero_fork_is_reclaimable_ = zero_forks;
+
+  const PageQueue mru_queue = mru_gen_to_queue();
+
+  // Migrate any existing pages into the reclaimable queues.
+
+  while (!list_is_empty(&page_queues_[PageQueueAnonymous])) {
+    vm_page_t* page = list_peek_head_type(&page_queues_[PageQueueAnonymous], vm_page_t, queue_node);
+    MoveToQueueLocked(page, mru_queue, dps);
+  }
+  while (zero_forks && !list_is_empty(&page_queues_[PageQueueAnonymousZeroFork])) {
+    vm_page_t* page =
+        list_peek_head_type(&page_queues_[PageQueueAnonymousZeroFork], vm_page_t, queue_node);
+    MoveToQueueLocked(page, mru_queue, dps);
   }
 }
 
