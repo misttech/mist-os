@@ -148,4 +148,4 @@ principle, and meet regularly.
 [sanitizers]: /docs/contribute/testing/sanitizers.md
 [tsan]: https://clang.llvm.org/docs/ThreadSanitizer.html
 [ubsan]: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
-[ubsan-open-project]: /docs/contribute/open_projects/cpp/ubsan.md
+[ubsan-open-project]: /docs/contribute/open_projects/graduated/ubsan.md

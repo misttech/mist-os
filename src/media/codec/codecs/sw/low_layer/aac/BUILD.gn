@@ -239,5 +239,6 @@ static_library("libFraunhoferAAC") {
 }
 
 config("undefined_behavior_left_shift_negative_number") {
+  visibility = [ ":*" ]
   cflags = [ "-fno-sanitize=shift" ]
 }

@@ -140,25 +140,6 @@ sanitizer_extra_options("suppress-asan-container-overflow") {
   tags = [ "asan" ]
 }
 
-config("suppress-tsan.DO-NOT-USE-THIS") {
-  cflags = [ "-fno-sanitize=thread" ]
-  visibility = []
-}
-
-# TODO(fxbug.dev/118709): Remove this config once all usages of it have been resolved.
-config("suppress-hwasan.DO-NOT-USE-THIS") {
-  cflags = [ "-fno-sanitize=hwaddress" ]
-  visibility = []
-}
-
-config("suppress-ubsan.DO-NOT-USE-THIS") {
-  cflags = [ "-fno-sanitize=undefined" ]
-  visibility = [
-    "//build/config:temporarily_disable_ubsan_do_not_use",
-    "//zircon/third_party/uapp/dash/*",
-  ]
-}
-
 config("no-shadow-call-stack") {
   if (current_cpu == "arm64" && !is_gcc) {
     cflags = [ "-fno-sanitize=shadow-call-stack" ]

@@ -143,8 +143,6 @@ Issues detected by sanitizers typically have similar root causes. You may be
 able to find references for prior work by [searching Fuchsia bugs][fxb] for a
 bug with some of the same keywords that you're seeing in the sanitizer output.
 
-See also: [UBSan issues on Open Projects][ubsan-open-project].
-
 ## Known issues
 
 ### `#[should_panic]`
@@ -196,8 +194,6 @@ executable("please_fix_the_bugs") {
   deps += [ "//build/config/sanitizers:suppress-asan-container-overflow" ]
   # TODO(fxbug.dev/12345): delete the below and fix the memory leak.
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
-  # TODO(fxbug.dev/12345): delete the below and fix undefined behavior.
-  configs += [ "//build/config:temporarily_disable_ubsan_do_not_use" ]
 }
 ```
 
@@ -324,4 +320,3 @@ See also: [sanitizers in the 2021 roadmap][sanitizers-2021-roadmap].
 [syzkaller]: https://github.com/google/syzkaller
 [test-coverage]: /docs/contribute/testing/coverage.md
 [testing-flakiness]: /docs/development/testing/testing_for_flakiness_in_cq.md
-[ubsan-open-project]: /docs/contribute/open_projects/cpp/ubsan.md

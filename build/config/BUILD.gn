@@ -1078,12 +1078,6 @@ config("werror") {
   }
 }
 
-# Please use //build/config/sanitizers:suppress-ubsan.DO-NOT-USE-THIS instead
-config("temporarily_disable_ubsan_do_not_use") {
-  configs = [ "//build/config/sanitizers:suppress-ubsan.DO-NOT-USE-THIS" ]
-  visibility = [ "//third_party/*" ]
-}
-
 config("no_stack_protector") {
   cflags = [ "-fno-stack-protector" ]
 }

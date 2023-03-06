@@ -264,7 +264,7 @@ TEST_F(InterruptTest, WaitThreadFunctionsAfterSuspendResume) {
 
 // Tests support for null output timestamp
 // NOTE: Absent the changes to interrupt.h also submitted in this CL, this test invokes undefined
-//       behavior not detectable at runtime. See also TODO(fxbug.dev/36668): support ubsan checks
+//       behavior not detectable at runtime.
 TEST_F(InterruptTest, NullOutputTimestamp) {
   zx::interrupt interrupt;
 
