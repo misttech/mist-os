@@ -13,6 +13,7 @@ import (
 	"net"
 	"syscall/zx"
 	"time"
+	"unsafe"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
@@ -21,6 +22,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/tracing/trace"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
@@ -275,8 +277,10 @@ func addressWithPrefixRoute(nicid tcpip.NICID, addr tcpip.AddressWithPrefix) tcp
 
 func (ns *Netstack) resetDestinationCache() {
 	ns.destinationCacheMu.Lock()
-	defer ns.destinationCacheMu.Unlock()
+	trace.AsyncBegin("net", "netstack.resetDestinationCache", trace.AsyncID(uintptr(unsafe.Pointer(ns))))
 	ns.destinationCacheMu.destinationCache.reset()
+	trace.AsyncEnd("net", "netstack.resetDestinationCache", trace.AsyncID(uintptr(unsafe.Pointer(ns))))
+	ns.destinationCacheMu.Unlock()
 }
 
 func (ns *Netstack) name(nicid tcpip.NICID) string {

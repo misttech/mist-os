@@ -1850,6 +1850,9 @@ func (c *cmsgCache) initialized() bool {
 }
 
 func (c *cmsgCache) reset() {
+	trace.AsyncBegin("net", "fuchsia_posix_socket.cmsgCache.reset", trace.AsyncID(uintptr(unsafe.Pointer(c))))
+	defer trace.AsyncEnd("net", "fuchsia_posix_socket.cmsgCache.reset", trace.AsyncID(uintptr(unsafe.Pointer(c))))
+
 	if c.initialized() {
 		c.clear()
 	}
@@ -2028,6 +2031,8 @@ func newDatagramSocketImpl(ns *Netstack, transProto tcpip.TransportProtocolNumbe
 // This method should be used to carry out the above procedure for any method that might affect
 // socket state.
 func executeMutatorWithCacheFlushes[Res any, Err error](s *datagramSocketImpl, setter func(ewm endpointWithMutators) (Res, Err)) (Res, Err) {
+	trace.AsyncBegin("net", "fuchsia_posix_socket.executeMutatorWithCacheFlushes", trace.AsyncID(uintptr(unsafe.Pointer(s))))
+	defer trace.AsyncEnd("net", "fuchsia_posix_socket.executeMutatorWithCacheFlushes", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 	s.blockUntilSocketDrained()
 	res, err := setter(endpointWithMutators{
 		ep: &s.endpointWithSocket.endpoint,
@@ -2050,7 +2055,9 @@ func (s *datagramSocketImpl) loopRead(ch chan<- struct{}) {
 	for {
 		payloadBuf := buf[udpRxPreludeSize:]
 		w := tcpip.SliceWriter(payloadBuf)
+		trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.ep.Read", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		res, err := s.ep.Read(&w, tcpip.ReadOptions{NeedRemoteAddr: true})
+		trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.ep.Read", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		if stored := s.sharedState.err.set(err); stored {
 			continue
 		}
@@ -2065,13 +2072,17 @@ func (s *datagramSocketImpl) loopRead(ch chan<- struct{}) {
 			continue
 		}
 
+		trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.SerializeRecvMsgMeta", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		if err := udp_serde.SerializeRecvMsgMeta(s.netProto, res, buf[:udpRxPreludeSize]); err != nil {
 			panic(fmt.Sprintf("serialization error: %s", err))
 		}
+		trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.SerializeRecvMsgMeta", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 
 		v := buf[:udpRxPreludeSize+uint32(res.Count)]
 		for {
+			trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.socket.Write", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 			n, err := s.local.Write(v[:], 0)
+			trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.socket.Write", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 			if err != nil {
 				if err, ok := err.(*zx.Error); ok {
 					if s.handleZxSocketWriteError(*err, uint(len(v))) {
@@ -2102,7 +2113,9 @@ func (s *datagramSocketImpl) loopWrite(ch chan<- struct{}) {
 	defer s.sharedState.localEDrainedCond.L.Unlock()
 	for {
 		v := buf
+		trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.socket.Read", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		n, err := s.local.Read(v, 0)
+		trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.socket.Read", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		if err != nil {
 			if err, ok := err.(*zx.Error); ok {
 				if s.handleZxSocketReadError(*err, func(sigs zx.Signals) zx.Signals {
@@ -2136,7 +2149,9 @@ func (s *datagramSocketImpl) loopWrite(ch chan<- struct{}) {
 			Atomic: true,
 		}
 
+		trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.DeserializeSendMsgMeta", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		addr, cmsgs, err := udp_serde.DeserializeSendMsgMeta(v[:udpTxPreludeSize])
+		trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.DeserializeSendMsgMeta", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 		if err != nil {
 			// Ideally, we'd like to close the socket so as to inform the client
 			// that they're mishandling the ABI. This is complicated by the fact
@@ -2165,7 +2180,9 @@ func (s *datagramSocketImpl) loopWrite(ch chan<- struct{}) {
 			var r bytes.Reader
 			r.Reset(v)
 			lenPrev := len(v)
+			trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.ep.Write", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 			written, err := s.ep.Write(&r, opts)
+			trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.ep.Write", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 			if stored := s.sharedState.err.set(err); stored {
 				continue
 			}
@@ -2648,6 +2665,8 @@ func (s *datagramSocketImpl) GetInfo(fidl.Context) (socket.BaseDatagramSocketGet
 }
 
 func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.DatagramSocketSendMsgPreflightRequest) (socket.DatagramSocketSendMsgPreflightResult, error) {
+	trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.SendMsgPreflight", trace.AsyncID(uintptr(unsafe.Pointer(s))))
+	defer trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.SendMsgPreflight", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 	s.sharedState.destinationCacheMu.Lock()
 	defer s.sharedState.destinationCacheMu.Unlock()
 
@@ -2725,6 +2744,8 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 }
 
 func (s *datagramSocketImpl) RecvMsgPostflight(_ fidl.Context) (socket.DatagramSocketRecvMsgPostflightResult, error) {
+	trace.AsyncBegin("net", "fuchsia_posix_socket.datagramSocket.RecvMsgPostflight", trace.AsyncID(uintptr(unsafe.Pointer(s))))
+	defer trace.AsyncEnd("net", "fuchsia_posix_socket.datagramSocket.RecvMsgPostflight", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 	var response socket.DatagramSocketRecvMsgPostflightResponse
 	s.sharedState.cmsgCacheMu.Lock()
 	defer s.sharedState.cmsgCacheMu.Unlock()
