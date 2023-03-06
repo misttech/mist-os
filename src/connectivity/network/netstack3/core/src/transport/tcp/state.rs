@@ -26,7 +26,7 @@ use crate::{
         rtt::Estimator,
         segment::{Options, Payload, Segment},
         seqnum::{SeqNum, WindowSize},
-        BufferSizes, Control, KeepAlive, Mss, SocketOptions, UserError,
+        BufferSizes, Control, KeepAlive, Mss, OptionalBufferSizes, SocketOptions, UserError,
     },
     Instant,
 };
@@ -674,6 +674,16 @@ impl<R: ReceiveBuffer> Recv<R> {
             buffer: buffer.take(),
             assembler: core::mem::replace(assembler, Assembler::new(SeqNum::new(0))),
         }
+    }
+
+    fn set_capacity(&mut self, size: usize) {
+        let Self { buffer, assembler: _ } = self;
+        buffer.request_capacity(size)
+    }
+
+    fn target_capacity(&self) -> usize {
+        let Self { buffer, assembler: _ } = self;
+        buffer.target_capacity()
     }
 }
 
@@ -2003,7 +2013,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             State::FinWait2(_) | State::TimeWait(_) | State::Closed(_) => (),
             State::Listen(Listen {
                 iss: _,
-                buffer_sizes: BufferSizes { send },
+                buffer_sizes: BufferSizes { send, receive: _ },
                 device_mss: _,
                 default_mss: _,
                 user_timeout: _,
@@ -2014,7 +2024,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 timestamp: _,
                 retrans_timer: _,
                 simultaneous_open: _,
-                buffer_sizes: BufferSizes { send },
+                buffer_sizes: BufferSizes { send, receive: _ },
                 smss: _,
             })
             | State::SynSent(SynSent {
@@ -2022,7 +2032,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 timestamp: _,
                 retrans_timer: _,
                 active_open: _,
-                buffer_sizes: BufferSizes { send },
+                buffer_sizes: BufferSizes { send, receive: _ },
                 device_mss: _,
                 default_mss: _,
             }) => *send = size,
@@ -2034,12 +2044,16 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         }
     }
 
-    pub(crate) fn send_buffer_size(&self) -> Option<usize> {
+    pub(crate) fn set_receive_buffer_size(&mut self, size: usize) {
         match self {
-            State::FinWait2(_) | State::TimeWait(_) | State::Closed(_) => None,
+            State::Closing(_)
+            | State::LastAck(_)
+            | State::CloseWait(_)
+            | State::TimeWait(_)
+            | State::Closed(_) => (),
             State::Listen(Listen {
                 iss: _,
-                buffer_sizes: BufferSizes { send },
+                buffer_sizes: BufferSizes { send: _, receive },
                 device_mss: _,
                 default_mss: _,
                 user_timeout: _,
@@ -2050,7 +2064,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 timestamp: _,
                 retrans_timer: _,
                 simultaneous_open: _,
-                buffer_sizes: BufferSizes { send },
+                buffer_sizes: BufferSizes { send: _, receive },
                 smss: _,
             })
             | State::SynSent(SynSent {
@@ -2058,18 +2072,63 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 timestamp: _,
                 retrans_timer: _,
                 active_open: _,
-                buffer_sizes: BufferSizes { send },
+                buffer_sizes: BufferSizes { send: _, receive },
                 device_mss: _,
                 default_mss: _,
-            }) => Some(*send),
-            State::Established(Established { snd, rcv: _ })
-            | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
-                Some(snd.target_capacity())
+            }) => *receive = size,
+            State::Established(Established { snd: _, rcv }) => rcv.set_capacity(size),
+            State::FinWait1(FinWait1 { snd: _, rcv })
+            | State::FinWait2(FinWait2 { last_seq: _, rcv }) => rcv.set_capacity(size),
+        }
+    }
+
+    pub(crate) fn target_buffer_sizes(&self) -> OptionalBufferSizes {
+        match self {
+            State::TimeWait(_) | State::Closed(_) => {
+                OptionalBufferSizes { send: None, receive: None }
             }
-            State::FinWait1(FinWait1 { snd, rcv: _ })
-            | State::Closing(Closing { snd, last_ack: _, last_wnd: _ })
+            State::Listen(Listen {
+                iss: _,
+                buffer_sizes,
+                device_mss: _,
+                default_mss: _,
+                user_timeout: _,
+            })
+            | State::SynRcvd(SynRcvd {
+                iss: _,
+                irs: _,
+                timestamp: _,
+                retrans_timer: _,
+                simultaneous_open: _,
+                buffer_sizes,
+                smss: _,
+            })
+            | State::SynSent(SynSent {
+                iss: _,
+                timestamp: _,
+                retrans_timer: _,
+                active_open: _,
+                buffer_sizes,
+                device_mss: _,
+                default_mss: _,
+            }) => buffer_sizes.into_optional(),
+            State::Established(Established { snd, rcv }) => OptionalBufferSizes {
+                send: Some(snd.target_capacity()),
+                receive: Some(rcv.target_capacity()),
+            },
+            State::FinWait1(FinWait1 { snd, rcv }) => OptionalBufferSizes {
+                send: Some(snd.target_capacity()),
+                receive: Some(rcv.target_capacity()),
+            },
+            State::FinWait2(FinWait2 { last_seq: _, rcv }) => {
+                OptionalBufferSizes { send: None, receive: Some(rcv.target_capacity()) }
+            }
+            State::Closing(Closing { snd, last_ack: _, last_wnd: _ })
             | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => {
-                Some(snd.target_capacity())
+                OptionalBufferSizes { send: Some(snd.target_capacity()), receive: None }
+            }
+            State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
+                OptionalBufferSizes { send: Some(snd.target_capacity()), receive: None }
             }
         }
     }
@@ -2163,6 +2222,8 @@ mod test {
         fn target_capacity(&self) -> usize {
             0
         }
+
+        fn request_capacity(&mut self, _size: usize) {}
     }
 
     impl ReceiveBuffer for NullBuffer {
@@ -2176,8 +2237,6 @@ mod test {
     }
 
     impl SendBuffer for NullBuffer {
-        fn request_capacity(&mut self, _size: usize) {}
-
         fn mark_read(&mut self, count: usize) {
             assert_eq!(count, 0);
         }
@@ -4066,6 +4125,10 @@ mod test {
         fn target_capacity(&self) -> usize {
             self.buffer.target_capacity()
         }
+
+        fn request_capacity(&mut self, size: usize) {
+            self.buffer.request_capacity(size)
+        }
     }
 
     impl<B: Takeable> Takeable for ReservingBuffer<B> {
@@ -4078,10 +4141,6 @@ mod test {
     impl<B: SendBuffer> SendBuffer for ReservingBuffer<B> {
         fn mark_read(&mut self, count: usize) {
             self.buffer.mark_read(count)
-        }
-
-        fn request_capacity(&mut self, size: usize) {
-            self.buffer.request_capacity(size)
         }
 
         fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R

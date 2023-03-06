@@ -40,13 +40,14 @@ use netstack3_core::{
         segment::Payload,
         socket::{
             accept, bind, close_conn, connect_bound, connect_unbound, create_socket,
-            get_bound_info, get_connection_info, get_listener_info, listen, remove_bound,
-            remove_unbound, reuseaddr, send_buffer_size, set_bound_device, set_connection_device,
-            set_listener_device, set_reuseaddr_bound, set_reuseaddr_listener,
-            set_reuseaddr_unbound, set_send_buffer_size, set_unbound_device, shutdown_conn,
-            shutdown_listener, with_socket_options, with_socket_options_mut, AcceptError, BoundId,
-            BoundInfo, ConnectError, ConnectionId, ConnectionInfo, ListenError, ListenerId,
-            NoConnection, SetReuseAddrError, SocketAddr, UnboundId,
+            get_bound_info, get_connection_info, get_listener_info, listen, receive_buffer_size,
+            remove_bound, remove_unbound, reuseaddr, send_buffer_size, set_bound_device,
+            set_connection_device, set_listener_device, set_receive_buffer_size,
+            set_reuseaddr_bound, set_reuseaddr_listener, set_reuseaddr_unbound,
+            set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
+            with_socket_options, with_socket_options_mut, AcceptError, BoundId, BoundInfo,
+            ConnectError, ConnectionId, ConnectionInfo, ListenError, ListenerId, NoConnection,
+            SetReuseAddrError, SocketAddr, UnboundId,
         },
         state::Takeable,
         BufferSizes, SocketOptions,
@@ -135,13 +136,13 @@ impl IntoBuffers<ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket>
         buffer_sizes: BufferSizes,
     ) -> (ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket) {
         let Self(socket, notifier) = self;
-        let BufferSizes { send } = buffer_sizes;
+        let BufferSizes { send, receive } = buffer_sizes;
         socket
             .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_CONNECTED)
             .expect("failed to signal that the connection is established");
         notifier.schedule();
         (
-            ReceiveBufferWithZirconSocket::new(Arc::clone(&socket)),
+            ReceiveBufferWithZirconSocket::new(Arc::clone(&socket), receive),
             SendBufferWithZirconSocket::new(socket, notifier, send),
         )
     }
@@ -195,14 +196,32 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
 #[derive(Debug)]
 pub(crate) struct ReceiveBufferWithZirconSocket {
     socket: Arc<zx::Socket>,
-    capacity: usize,
+    zx_socket_capacity: usize,
+    // Invariant: `out_of_order` can never hold more bytes than
+    // `zx_socket_capacity`.
     out_of_order: RingBuffer,
 }
 
 impl ReceiveBufferWithZirconSocket {
-    fn new(socket: Arc<zx::Socket>) -> Self {
-        let capacity = socket.info().expect("failed to get socket info").tx_buf_max;
-        Self { capacity, socket, out_of_order: RingBuffer::default() }
+    /// The minimum receive buffer size, in bytes.
+    ///
+    /// Borrowed from Linux: https://man7.org/linux/man-pages/man7/socket.7.html
+    const MIN_CAPACITY: usize = 256;
+
+    fn new(socket: Arc<zx::Socket>, target_capacity: usize) -> Self {
+        let info = socket.info().expect("failed to get socket info");
+        let zx_socket_capacity = info.tx_buf_max;
+        assert!(
+            zx_socket_capacity >= Self::MIN_CAPACITY,
+            "Zircon socket buffer is too small, {} < {}",
+            zx_socket_capacity,
+            Self::MIN_CAPACITY
+        );
+
+        let ring_buffer_size =
+            usize::min(usize::max(target_capacity, Self::MIN_CAPACITY), zx_socket_capacity);
+        let out_of_order = RingBuffer::new(ring_buffer_size);
+        Self { zx_socket_capacity, socket, out_of_order }
     }
 }
 
@@ -211,7 +230,7 @@ impl Takeable for ReceiveBufferWithZirconSocket {
         core::mem::replace(
             self,
             Self {
-                capacity: self.capacity,
+                zx_socket_capacity: self.zx_socket_capacity,
                 socket: Arc::clone(&self.socket),
                 out_of_order: RingBuffer::new(0),
             },
@@ -221,13 +240,36 @@ impl Takeable for ReceiveBufferWithZirconSocket {
 
 impl Buffer for ReceiveBufferWithZirconSocket {
     fn limits(&self) -> BufferLimits {
-        let Self { capacity, out_of_order: _, socket } = self;
+        let Self { socket, out_of_order, zx_socket_capacity } = self;
+        let BufferLimits { len: _, capacity: out_of_order_capacity } = out_of_order.limits();
+
+        debug_assert!(
+            *zx_socket_capacity >= out_of_order_capacity,
+            "ring buffer should never be this large; {} > {}",
+            out_of_order_capacity,
+            *zx_socket_capacity
+        );
+
         let info = socket.info().expect("failed to get socket info");
-        BufferLimits { capacity: *capacity, len: info.tx_buf_size }
+        let len = info.tx_buf_size;
+        // Ensure that capacity is always at least as large as the length, but
+        // also reflects the requested capacity.
+        let capacity = usize::max(len, out_of_order_capacity);
+        BufferLimits { len, capacity }
     }
 
     fn target_capacity(&self) -> usize {
-        self.capacity
+        let Self { socket: _, zx_socket_capacity: _, out_of_order } = self;
+        out_of_order.target_capacity()
+    }
+
+    fn request_capacity(&mut self, size: usize) {
+        let Self { zx_socket_capacity, socket: _, out_of_order } = self;
+
+        let ring_buffer_size =
+            usize::min(usize::max(size, Self::MIN_CAPACITY), *zx_socket_capacity);
+
+        out_of_order.set_target_size(ring_buffer_size);
     }
 }
 
@@ -317,6 +359,17 @@ impl Buffer for SendBufferWithZirconSocket {
         let Self { zx_socket_capacity, socket: _, ready_to_send, notifier: _ } = self;
         *zx_socket_capacity + ready_to_send.target_capacity()
     }
+
+    fn request_capacity(&mut self, size: usize) {
+        let ring_buffer_size = usize::min(usize::max(size, Self::MIN_CAPACITY), Self::MAX_CAPACITY);
+
+        let Self { zx_socket_capacity: _, notifier: _, ready_to_send, socket: _ } = self;
+
+        ready_to_send.set_target_size(ring_buffer_size);
+
+        // Eagerly pull more data out of the Zircon socket into the ring buffer.
+        self.poll()
+    }
 }
 
 impl Takeable for SendBufferWithZirconSocket {
@@ -386,17 +439,6 @@ impl SendBufferWithZirconSocket {
 }
 
 impl SendBuffer for SendBufferWithZirconSocket {
-    fn request_capacity(&mut self, size: usize) {
-        let ring_buffer_size = usize::min(usize::max(size, Self::MIN_CAPACITY), Self::MAX_CAPACITY);
-
-        let Self { zx_socket_capacity: _, notifier: _, ready_to_send, socket: _ } = self;
-
-        ready_to_send.set_target_size(ring_buffer_size);
-
-        // Eagerly pull more data out of the Zircon socket into the ring buffer.
-        self.poll()
-    }
-
     fn mark_read(&mut self, count: usize) {
         self.ready_to_send.mark_read(count);
         self.poll()
@@ -906,6 +948,42 @@ where
         .unwrap_or(u64::MAX)
     }
 
+    async fn set_receive_buffer_size(self, new_size: u64) {
+        let Self { data: BindingData { id, peer: _ }, ctx } = self;
+        let mut guard = ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        let new_size =
+            usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
+        match *id {
+            SocketId::Unbound(id, _) => {
+                set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size)
+            }
+            SocketId::Bound(id, _) => set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
+            SocketId::Connection(id, _) => {
+                set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size)
+            }
+            SocketId::Listener(id) => set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
+        }
+    }
+
+    async fn receive_buffer_size(self) -> u64 {
+        let Self { data: BindingData { id, peer: _ }, ctx } = self;
+        let mut guard = ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = &mut *guard;
+        match *id {
+            SocketId::Unbound(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Bound(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Connection(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Listener(id) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
+        }
+        // If the socket doesn't have a receive buffer (e.g. because the remote
+        // end signalled FIN and all data was sent to the client), return 0.
+        .unwrap_or(0)
+        .try_into()
+        .ok_checked::<TryFromIntError>()
+        .unwrap_or(u64::MAX)
+    }
+
     async fn set_reuse_address(self, value: bool) -> Result<(), fposix::Errno> {
         let Self { data: BindingData { id, peer: _ }, ctx } = self;
         let mut guard = ctx.lock().await;
@@ -1016,11 +1094,14 @@ where
             fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
                 responder_send!(responder, &mut Ok(self.send_buffer_size().await));
             }
-            fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes, responder } => {
+                responder_send!(
+                    responder,
+                    &mut Ok(self.set_receive_buffer_size(value_bytes).await)
+                );
             }
             fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                responder_send!(responder, &mut Ok(self.receive_buffer_size().await));
             }
             fposix_socket::StreamSocketRequest::SetKeepAlive { value: enabled, responder } => {
                 self.with_socket_options_mut(|so| so.keep_alive.enabled = enabled).await;
@@ -1440,7 +1521,7 @@ mod tests {
     #[test]
     fn receive_buffer() {
         let (local, peer) = zx::Socket::create_stream();
-        let mut rbuf = ReceiveBufferWithZirconSocket::new(Arc::new(local));
+        let mut rbuf = ReceiveBufferWithZirconSocket::new(Arc::new(local), u16::MAX as usize);
         assert_eq!(rbuf.write_at(0, &TEST_BYTES), TEST_BYTES.len());
         assert_eq!(rbuf.write_at(TEST_BYTES.len() * 2, &TEST_BYTES), TEST_BYTES.len());
         assert_eq!(rbuf.write_at(TEST_BYTES.len(), &TEST_BYTES), TEST_BYTES.len());

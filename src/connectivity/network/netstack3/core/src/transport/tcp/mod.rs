@@ -117,12 +117,26 @@ impl From<Mss> for u32 {
 pub struct BufferSizes {
     /// The size of the send buffer.
     pub send: usize,
+    /// The size of the receive buffer.
+    pub receive: usize,
 }
 
 impl Default for BufferSizes {
     fn default() -> Self {
-        let send = WindowSize::DEFAULT.into();
-        Self { send }
+        Self { send: WindowSize::DEFAULT.into(), receive: WindowSize::DEFAULT.into() }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct OptionalBufferSizes {
+    pub(crate) send: Option<usize>,
+    pub(crate) receive: Option<usize>,
+}
+
+impl BufferSizes {
+    fn into_optional(&self) -> OptionalBufferSizes {
+        let Self { send, receive } = self;
+        OptionalBufferSizes { send: Some(*send), receive: Some(*receive) }
     }
 }
 

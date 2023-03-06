@@ -47,6 +47,13 @@ pub trait Buffer: Takeable + Debug + Sized {
     /// returned value can be different but should not change unless a resize
     /// was requested.
     fn target_capacity(&self) -> usize;
+
+    /// Requests that the buffer be resized to hold the given number of bytes.
+    ///
+    /// Calling this method suggests to the buffer that it should alter its size.
+    /// Implementations are free to impose constraints or ignore requests
+    /// entirely.
+    fn request_capacity(&mut self, size: usize);
 }
 
 /// A buffer supporting TCP receiving operations.
@@ -68,13 +75,6 @@ pub trait ReceiveBuffer: Buffer {
 
 /// A buffer supporting TCP sending operations.
 pub trait SendBuffer: Buffer {
-    /// Requests that the buffer be resized to hold the given number of bytes.
-    ///
-    /// Calling this method suggests to the buffer that it should alter its size.
-    /// Implementations are free to impose constraints or ignore requests
-    /// entirely.
-    fn request_capacity(&mut self, size: usize);
-
     /// Removes `count` bytes from the beginning of the buffer as already read.
     ///
     /// # Panics
@@ -468,6 +468,10 @@ impl Buffer for RingBuffer {
         let Self { storage, shrink, len: _, head: _ } = self;
         storage.len() - shrink.as_ref().map_or(0, |r| r.target.get())
     }
+
+    fn request_capacity(&mut self, size: usize) {
+        self.set_target_size(size)
+    }
 }
 
 impl ReceiveBuffer for RingBuffer {
@@ -503,10 +507,6 @@ impl ReceiveBuffer for RingBuffer {
 }
 
 impl SendBuffer for RingBuffer {
-    fn request_capacity(&mut self, size: usize) {
-        self.set_target_size(size)
-    }
-
     fn mark_read(&mut self, count: usize) {
         let Self { storage, head, len, shrink: _ } = self;
         assert!(count <= *len);
@@ -684,7 +684,7 @@ pub trait IntoBuffers<R: ReceiveBuffer, S: SendBuffer> {
 impl<R: Default + ReceiveBuffer, S: Default + SendBuffer> IntoBuffers<R, S> for () {
     fn into_buffers(self, buffer_sizes: BufferSizes) -> (R, S) {
         // Ignore buffer sizes since this is a test-only impl.
-        let BufferSizes { send: _ } = buffer_sizes;
+        let BufferSizes { send: _, receive: _ } = buffer_sizes;
         Default::default()
     }
 }

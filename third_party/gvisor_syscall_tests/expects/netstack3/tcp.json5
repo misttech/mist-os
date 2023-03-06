@@ -26,7 +26,6 @@
                 // Otherwise, expect failure.
                 "AllInetTests/TcpSocketTest.ConnectOnEstablishedConnection/*",
                 "AllInetTests/TcpSocketTest.ShutdownWriteInTimeWait/*",
-                "AllInetTests/TcpSocketTest.PollWithFullBufferBlocks/*",
                 "AllInetTests/TcpSocketTest.ClosedWriteBlockingSocket/*",
                 "AllInetTests/TcpSocketTest.MsgTrunc/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
@@ -36,7 +35,6 @@
                 "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
                 "AllInetTests/TcpSocketTest.TcpInq/*",
                 "AllInetTests/TcpSocketTest.TcpSCMPriority/*",
-                "AllInetTests/TcpSocketTest.FullBuffer/*",
                 "AllInetTests/TcpSocketTest.GetSocketAcceptConnListener/*",
                 "AllInetTests/TcpSocketTest.GetSocketAcceptConnNonListener/*",
 

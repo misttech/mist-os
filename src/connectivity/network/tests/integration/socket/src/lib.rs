@@ -1314,24 +1314,50 @@ async fn tcp_socket<N: Netstack>(name: &str) {
     run_tcp_socket_test(&server, SERVER_SUBNET.addr, &client, CLIENT_SUBNET.addr).await
 }
 
-#[netstack_test]
-async fn tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
-    tcp_socket_accept_cross_ns::<I, N, N, _, _>(name, |mut sender, mut receiver| async move {
-        // If the sender supports setting SO_SNDBUF, it should be able to buffer
-        // a large amount of data even if the receiver isn't reading.
-        const BUFFER_SIZE: usize = 1024 * 1024;
-        let sender_ref = SockRef::from(sender.std());
-        sender_ref.set_send_buffer_size(BUFFER_SIZE).expect("set size is infallible");
-        let size = sender_ref.send_buffer_size().expect("get size is infallible");
-        assert!(size >= BUFFER_SIZE, "{} >= {}", size, BUFFER_SIZE);
+enum WhichEnd {
+    Send,
+    Receive,
+}
 
-        let data = Vec::from_iter((0..BUFFER_SIZE).map(|i| i as u8));
+#[netstack_test]
+#[test_case(WhichEnd::Send; "send buffer")]
+#[test_case(WhichEnd::Receive; "receive buffer")]
+async fn tcp_buffer_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(
+    name: &str,
+    which: WhichEnd,
+) {
+    tcp_socket_accept_cross_ns::<I, N, N, _, _>(name, |mut sender, mut receiver| async move {
+        // Set either the sender SO_SNDBUF or receiver SO_RECVBUF so that a
+        // large amount of data can be buffered even if the receiver isn't
+        // reading.
+        let set_size;
+        let size = match which {
+            WhichEnd::Send => {
+                const SEND_BUFFER_SIZE: usize = 1024 * 1024;
+                set_size = SEND_BUFFER_SIZE;
+                let sender_ref = SockRef::from(sender.std());
+                sender_ref.set_send_buffer_size(SEND_BUFFER_SIZE).expect("set size is infallible");
+                sender_ref.send_buffer_size().expect("get size is infallible")
+            }
+            WhichEnd::Receive => {
+                const RECEIVE_BUFFER_SIZE: usize = 128 * 1024;
+                let receiver_ref = SockRef::from(sender.std());
+                set_size = RECEIVE_BUFFER_SIZE;
+                receiver_ref
+                    .set_recv_buffer_size(RECEIVE_BUFFER_SIZE)
+                    .expect("set size is infallible");
+                receiver_ref.recv_buffer_size().expect("get size is infallible")
+            }
+        };
+        assert!(size >= set_size, "{} >= {}", size, set_size);
+
+        let data = Vec::from_iter((0..set_size).map(|i| i as u8));
         sender.write_all(data.as_slice()).await.expect("all written");
         sender.close().await.expect("close succeeds");
 
-        let mut buf = Vec::with_capacity(BUFFER_SIZE);
+        let mut buf = Vec::with_capacity(set_size);
         let read = receiver.read_to_end(&mut buf).await.expect("all bytes read");
-        assert_eq!(read, BUFFER_SIZE);
+        assert_eq!(read, set_size);
     })
     .await
 }

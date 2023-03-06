@@ -12,11 +12,9 @@
         {
             type: "expect_failure",
             matchers: [
-                "NetStreamSocketsTest.PartialWriteStress",
                 "NetStreamSocketsTest.PeerClosedPOLLOUT",
                 "NetStreamSocketsTest.ResetOnFullReceiveBufferShutdown",
                 "NetStreamSocketsTest.ShutdownReset",
-                "NetStreamSocketsTest.ShutdownPendingWrite",
                 "LocalhostTest.AcceptAfterReset",
                 "LocalhostTest.RaceLocalPeerClose",
                 "LocalhostTest.GetAddrInfo",
@@ -33,6 +31,9 @@
         {
             type: "skip",
             matchers: [
+                // TODO(https://fxbug.dev/60337): Re-enable this once the test
+                // isn't trying to accomodate NS2 buffer size values.
+                "NetStreamSocketsTest.PartialWriteStress",
                 "NetStreamTest/ConnectingIOTest.BlockedIO/CloseListener*",
                 "NetStreamTest/BlockedIOTest.CloseWhileBlocked/close*Linger*",
             ],
