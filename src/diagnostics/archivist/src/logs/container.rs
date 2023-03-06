@@ -102,7 +102,7 @@ struct ContainerState {
 impl LogsArtifactsContainer {
     pub async fn new(
         identity: Arc<ComponentIdentity>,
-        interest_selectors: &[LogInterestSelector],
+        interest_selectors: impl Iterator<Item = &LogInterestSelector>,
         parent_node: &inspect::Node,
         budget: BudgetHandle,
     ) -> Self {
@@ -400,7 +400,7 @@ impl LogsArtifactsContainer {
     /// removed from the set of interests.
     pub async fn update_interest(
         &self,
-        interest_selectors: &[LogInterestSelector],
+        interest_selectors: impl Iterator<Item = &LogInterestSelector>,
         previous_selectors: &[LogInterestSelector],
     ) {
         let mut new_interest = FidlInterest::EMPTY;
@@ -662,7 +662,7 @@ mod tests {
                     ]),
                     "fuchsia-pkg://test",
                 )),
-                &[],
+                std::iter::empty(),
                 inspect::component::inspector().root(),
                 budget_manager.handle(),
             )
@@ -702,7 +702,9 @@ mod tests {
             }
         }
         // We should see this interest update. This should unblock the hanging get.
-        container.update_interest(&[interest(&["foo", "bar"], Some(Severity::Info))], &[]).await;
+        container
+            .update_interest([interest(&["foo", "bar"], Some(Severity::Info))].iter(), &[])
+            .await;
 
         // Verify we see the last interest we set.
         assert_eq!(interest_future.await.unwrap().unwrap().min_severity, Some(Severity::Info));
@@ -740,17 +742,23 @@ mod tests {
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, None);
         // Set some interest.
-        container.update_interest(&[interest(&["foo", "bar"], Some(Severity::Info))], &[]).await;
+        container
+            .update_interest([interest(&["foo", "bar"], Some(Severity::Info))].iter(), &[])
+            .await;
         assert_severity(&log_sink, Severity::Info).await;
         assert_interests(&container, [(Severity::Info, 1)]).await;
 
         // Sending a higher interest (WARN > INFO) has no visible effect, even if the new interest
         // (WARN) will be tracked internally until reset.
-        container.update_interest(&[interest(&["foo", "bar"], Some(Severity::Warn))], &[]).await;
+        container
+            .update_interest([interest(&["foo", "bar"], Some(Severity::Warn))].iter(), &[])
+            .await;
         assert_interests(&container, [(Severity::Info, 1), (Severity::Warn, 1)]).await;
 
         // Sending a lower interest (DEBUG < INFO) updates the previous one.
-        container.update_interest(&[interest(&["foo", "bar"], Some(Severity::Debug))], &[]).await;
+        container
+            .update_interest([interest(&["foo", "bar"], Some(Severity::Debug))].iter(), &[])
+            .await;
         assert_severity(&log_sink, Severity::Debug).await;
         assert_interests(
             &container,
@@ -760,7 +768,9 @@ mod tests {
 
         // Sending the same interest leads to tracking it twice, but no updates are sent since it's
         // the same minimum interest.
-        container.update_interest(&[interest(&["foo", "bar"], Some(Severity::Debug))], &[]).await;
+        container
+            .update_interest([interest(&["foo", "bar"], Some(Severity::Debug))].iter(), &[])
+            .await;
         assert_interests(
             &container,
             [(Severity::Debug, 2), (Severity::Info, 1), (Severity::Warn, 1)],
@@ -785,7 +795,7 @@ mod tests {
         // However, we get WARN since that's the minimum severity in the set.
         container
             .update_interest(
-                &[interest(&["foo", "bar"], Some(Severity::Error))],
+                [interest(&["foo", "bar"], Some(Severity::Error))].iter(),
                 &[interest(&["foo", "bar"], Some(Severity::Info))],
             )
             .await;

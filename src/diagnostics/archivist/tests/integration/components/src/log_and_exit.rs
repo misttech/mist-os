@@ -6,5 +6,6 @@
 
 #[fuchsia::main]
 async fn main() {
+    tracing::debug!("debugging world");
     tracing::info!("Hello, world!");
 }

@@ -242,8 +242,6 @@ pub struct LogsRepositoryState {
 
     /// A reference to the budget manager, kept to be passed to containers.
     logs_budget: BudgetManager,
-    /// The current global interest in logs, as defined by the last client to send us selectors.
-    logs_interest: Vec<LogInterestSelector>,
     /// BatchIterators for logs need to be made aware of new components starting and their logs.
     logs_multiplexers: MultiplexerBroker,
 
@@ -266,7 +264,6 @@ impl LogsRepositoryState {
             logs_data_store: trie::Trie::new(),
             logs_budget,
             log_receiver: Some(log_receiver),
-            logs_interest: vec![],
             logs_multiplexers: MultiplexerBroker::new(),
             interest_registrations: BTreeMap::new(),
             drain_klog_task: None,
@@ -286,7 +283,7 @@ impl LogsRepositoryState {
                 let container = Arc::new(
                     LogsArtifactsContainer::new(
                         identity,
-                        &self.logs_interest,
+                        self.interest_registrations.values().flat_map(|s| s.iter()),
                         &self.inspect_node,
                         self.logs_budget.handle(),
                     )
@@ -319,7 +316,7 @@ impl LogsRepositoryState {
         let new_selectors = self.interest_registrations.get(&connection_id).unwrap();
         for (_, data) in self.logs_data_store.iter() {
             if let Some(logs_data) = data {
-                logs_data.update_interest(new_selectors, &previous_selectors).await;
+                logs_data.update_interest(new_selectors.iter(), &previous_selectors).await;
             }
         }
     }
