@@ -18,7 +18,10 @@ group("tests") {
     "cli:tests",
     "grpc:tests",
     "guest_config:tests",
-    "guest_interaction:tests",
+
+    # TODO(https://fxbug.dev/122994): Temporarily disabled until virtualization
+    # tests can be made lighter-weight to infra.
+    # "guest_interaction:tests",
     "machina-virtio-device:tests",
     "qcow:tests",
     "virtio-device:tests",

@@ -137,6 +137,9 @@ group("tests") {
   deps = [
     "test:f2fs-fs-tests",
     "test:f2fs-slow-fs-tests",
-    "test/compatibility:tests",
+
+    # TODO(https://fxbug.dev/122994): Temporarily disabled until virtualization
+    # tests can be made lighter-weight to infra.
+    # "test/compatibility:tests",
   ]
 }

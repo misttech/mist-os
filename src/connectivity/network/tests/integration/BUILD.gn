@@ -200,7 +200,10 @@ group("tests") {
   testonly = true
   deps = [
            ":netstack-integration-tests",
-           "guest:netstack-guest-integration-tests",
+
+           # TODO(https://fxbug.dev/122994): Temporarily disabled until
+           # virtualization tests can be made lighter-weight to infra.
+           # "guest:netstack-guest-integration-tests",
            "macros:netstack_testing_macros_test",
          ] + err_log_package_deps
 

@@ -18,6 +18,9 @@ group("tests") {
   deps = [
     "bin:tests",
     "lib:tests",
-    "tests",
+
+    # TODO(https://fxbug.dev/122994): Temporarily disabled until virtualization
+    # tests can be made lighter-weight to infra.
+    # "tests",
   ]
 }

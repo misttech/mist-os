@@ -93,5 +93,9 @@ fuchsia_test_component("netemul-guest") {
 
 group("tests") {
   testonly = true
-  deps = [ "test:netemul-guest-self-tests" ]
+  deps = [
+    # TODO(https://fxbug.dev/122994): Temporarily disabled until
+    # virtualization tests can be made lighter-weight to infra.
+    # "test:netemul-guest-self-tests"
+  ]
 }
