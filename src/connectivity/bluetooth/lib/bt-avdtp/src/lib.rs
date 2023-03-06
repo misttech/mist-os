@@ -74,6 +74,7 @@ impl Peer {
 
     /// Take the event listener for this peer. Panics if the stream is already
     /// held.
+    #[track_caller]
     pub fn take_request_stream(&self) -> RequestStream {
         {
             let mut lock = self.inner.incoming_requests.lock();

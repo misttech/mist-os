@@ -796,50 +796,43 @@ impl PeerInner {
     }
 
     /// Handle a single request event from the avdtp peer.
-    async fn handle_request(&mut self, r: avdtp::Request) -> avdtp::Result<()> {
-        trace!("Handling {:?} from peer..", r);
-        match r {
-            avdtp::Request::Discover { responder } => responder.send(&self.local.information()),
-            avdtp::Request::GetCapabilities { responder, stream_id }
-            | avdtp::Request::GetAllCapabilities { responder, stream_id } => {
-                match self.local.get(&stream_id) {
-                    None => responder.reject(avdtp::ErrorCode::BadAcpSeid),
-                    Some(stream) => responder.send(stream.endpoint().capabilities()),
-                }
-            }
-            avdtp::Request::Open { responder, stream_id } => {
+    async fn handle_request(&mut self, request: avdtp::Request) -> avdtp::Result<()> {
+        use avdtp::ErrorCode;
+        use avdtp::Request::*;
+        trace!("Handling {request:?} from peer..");
+        match request {
+            Discover { responder } => responder.send(&self.local.information()),
+            GetCapabilities { responder, stream_id }
+            | GetAllCapabilities { responder, stream_id } => match self.local.get(&stream_id) {
+                None => responder.reject(ErrorCode::BadAcpSeid),
+                Some(stream) => responder.send(stream.endpoint().capabilities()),
+            },
+            Open { responder, stream_id } => {
                 if self.opening.is_none() {
-                    return responder.reject(avdtp::ErrorCode::BadState);
+                    return responder.reject(ErrorCode::BadState);
                 }
-                let stream = match self.get_mut(&stream_id) {
-                    Ok(s) => s,
-                    Err(e) => return responder.reject(e),
+                let Ok(stream) = self.get_mut(&stream_id) else {
+                    return responder.reject(ErrorCode::BadAcpSeid);
                 };
                 match stream.endpoint_mut().establish() {
                     Ok(()) => responder.send(),
-                    Err(_) => responder.reject(avdtp::ErrorCode::BadState),
+                    Err(_) => responder.reject(ErrorCode::BadState),
                 }
             }
-            avdtp::Request::Close { responder, stream_id } => {
+            Close { responder, stream_id } => {
                 let peer = self.peer.clone();
-                match self.get_mut(&stream_id) {
-                    Err(e) => responder.reject(e),
-                    Ok(stream) => stream.release(responder, &peer).await,
-                }
+                let Ok(stream) = self.get_mut(&stream_id) else {
+                    return responder.reject(ErrorCode::BadAcpSeid);
+                };
+                stream.release(responder, &peer).await
             }
-            avdtp::Request::SetConfiguration {
-                responder,
-                local_stream_id,
-                remote_stream_id,
-                capabilities,
-            } => {
+            SetConfiguration { responder, local_stream_id, remote_stream_id, capabilities } => {
                 if self.opening.is_some() {
-                    return responder.reject(ServiceCategory::None, avdtp::ErrorCode::BadState);
+                    return responder.reject(ServiceCategory::None, ErrorCode::BadState);
                 }
                 let peer_id = self.peer_id;
-                let stream = match self.get_mut(&local_stream_id) {
-                    Err(e) => return responder.reject(ServiceCategory::None, e),
-                    Ok(stream) => stream,
+                let Ok(stream) = self.get_mut(&local_stream_id) else {
+                    return responder.reject(ServiceCategory::None, ErrorCode::BadAcpSeid);
                 };
                 match stream.configure(&peer_id, &remote_stream_id, capabilities) {
                     Ok(_) => {
@@ -849,74 +842,78 @@ impl PeerInner {
                     Err((category, code)) => responder.reject(category, code),
                 }
             }
-            avdtp::Request::GetConfiguration { stream_id, responder } => {
-                let endpoint = match self.local.get(&stream_id) {
-                    None => return responder.reject(avdtp::ErrorCode::BadAcpSeid),
-                    Some(stream) => stream.endpoint(),
+            GetConfiguration { stream_id, responder } => {
+                let Some(stream) = self.local.get(&stream_id) else {
+                     return responder.reject(ErrorCode::BadAcpSeid);
                 };
-                match endpoint.get_configuration() {
+                match stream.endpoint().get_configuration() {
                     Some(c) => responder.send(&c),
                     // Only happens when the stream is in the wrong state
-                    None => responder.reject(avdtp::ErrorCode::BadState),
+                    None => responder.reject(ErrorCode::BadState),
                 }
             }
-            avdtp::Request::Reconfigure { responder, local_stream_id, capabilities } => {
-                let stream = match self.get_mut(&local_stream_id) {
-                    Err(e) => return responder.reject(ServiceCategory::None, e),
-                    Ok(stream) => stream,
+            Reconfigure { responder, local_stream_id, capabilities } => {
+                let Ok(stream) = self.get_mut(&local_stream_id) else {
+                    return responder.reject(ServiceCategory::None, ErrorCode::BadAcpSeid);
                 };
                 match stream.reconfigure(capabilities) {
                     Ok(_) => responder.send(),
                     Err((cat, code)) => responder.reject(cat, code),
                 }
             }
-            avdtp::Request::Start { responder, stream_ids } => {
-                for seid in stream_ids {
-                    let remote_id =
-                        match self.local.get(&seid).and_then(|s| s.endpoint().remote_id()) {
-                            Some(remote_id) => remote_id.clone(),
-                            None => return responder.reject(&seid, avdtp::ErrorCode::BadAcpSeid),
-                        };
-                    let permit = match self.get_permit(&seid) {
-                        Err(_) => {
-                            // Happens when we cannot start because of permits.
-                            // accept then immediately suspend.
-                            responder.send()?;
-                            return self.peer.suspend(&[remote_id]).await;
-                        }
-                        Ok(permit) => permit,
+            Start { responder, stream_ids } => {
+                let mut immediate_suspend = Vec::new();
+                // Fail on the first failed endpoint, as per the AVDTP spec 8.13 Note 5
+                let result = stream_ids.into_iter().try_for_each(|seid| {
+                    let Some(stream) = self.local.get(&seid) else {
+                        return Err((seid, ErrorCode::BadAcpSeid));
                     };
-                    if let Err(e) = self.start_local_stream(permit, &seid) {
-                        return match e {
-                            avdtp::Error::RequestInvalid(code) => responder.reject(&seid, code),
-                            _ => responder.reject(&seid, avdtp::ErrorCode::BadState),
-                        };
+                    let Some(remote_id) = stream.endpoint().remote_id().cloned() else {
+                        return Err((seid, ErrorCode::BadState));
+                    };
+                    let Ok(permit) = self.get_permit(&seid) else {
+                            // Happens when we cannot start because of permits.
+                            // accept this one, then queue up for suspend.
+                            immediate_suspend.push(remote_id);
+                            return Ok(());
+                    };
+                    match self.start_local_stream(permit, &seid) {
+                        Ok(()) => Ok(()),
+                        Err(avdtp::Error::RequestInvalid(code)) => Err((seid, code)),
+                        Err(_) => Err((seid, ErrorCode::BadState)),
                     }
+                });
+                let response_result = match result {
+                    Ok(()) => responder.send(),
+                    Err((seid, code)) => responder.reject(&seid, code),
+                };
+                if !immediate_suspend.is_empty() {
+                    return self.peer.suspend(immediate_suspend.as_slice()).await;
                 }
-                responder.send()
+                response_result
             }
-            avdtp::Request::Suspend { responder, stream_ids } => {
+            Suspend { responder, stream_ids } => {
                 for seid in stream_ids {
                     match self.suspend_local_stream(&seid) {
                         Ok(_remote_id) => {}
                         Err(avdtp::Error::RequestInvalid(code)) => {
                             return responder.reject(&seid, code)
                         }
-                        Err(_e) => return responder.reject(&seid, avdtp::ErrorCode::BadState),
+                        Err(_e) => return responder.reject(&seid, ErrorCode::BadState),
                     }
                 }
                 responder.send()
             }
-            avdtp::Request::Abort { responder, stream_id } => {
-                let stream = match self.get_mut(&stream_id) {
-                    Err(_) => return Ok(()),
-                    Ok(stream) => stream,
+            Abort { responder, stream_id } => {
+                let Ok(stream) = self.get_mut(&stream_id) else {
+                    // No response is sent on an invalid ID for an Abort
+                    return Ok(());
                 };
                 stream.abort(None).await;
                 self.opening = self.opening.take().filter(|local_id| local_id != &stream_id);
                 responder.send()
             }
-            avdtp::Request::DelayReport { responder, delay, stream_id } => {
+            DelayReport { responder, delay, stream_id } => {
                 // Delay is in 1/10 ms
                 let delay_ns = delay as u64 * 100000;
                 // Record delay to cobalt.
@@ -1022,6 +1019,7 @@ fn capability_to_metric(
 mod tests {
     use super::*;
 
+    use async_utils::PollExt;
     use bt_metrics::respond_to_metrics_req_for_test;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth::ErrorCode;
@@ -2129,8 +2127,6 @@ mod tests {
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
             test_builder.builder(),
         ));
-        let next_task_fut = test_builder.next_task();
-        pin_mut!(next_task_fut);
 
         let peer = Peer::create(
             PeerId(1),
@@ -2212,13 +2208,8 @@ mod tests {
             x => panic!("Start should be ready but got {:?}", x),
         };
 
-        // The task should be created locally
-        let media_task = match exec.run_until_stalled(&mut next_task_fut) {
-            Poll::Ready(Some(task)) => task,
-            x => panic!("Local task should be created at this point: {:?}", x),
-        };
-
-        // Should have started the media task
+        // The task should be created locally and started.
+        let media_task = test_builder.expect_task();
         assert!(media_task.is_started());
 
         let suspend_fut = remote_peer.suspend(&stream_ids);
@@ -2307,8 +2298,6 @@ mod tests {
             make_sbc_endpoint(1, avdtp::EndpointType::Source),
             test_builder.builder(),
         ));
-        let next_task_fut = test_builder.next_task();
-        pin_mut!(next_task_fut);
 
         let peer = Peer::create(
             PeerId(1),
@@ -2364,12 +2353,8 @@ mod tests {
         };
 
         // We should start the media task, so the task should be created locally
-        let media_task = match exec.run_until_stalled(&mut next_task_fut) {
-            Poll::Ready(Some(task)) => task,
-            x => panic!("Local task should be created at this point: {:?}", x),
-        };
-
-        // Should have started the media task
+        let media_task =
+            exec.run_until_stalled(&mut test_builder.next_task()).expect("ready").unwrap();
         assert!(media_task.is_started());
 
         // Remote peer should still be able to suspend the stream.
@@ -2385,7 +2370,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_needs_permit_to_start_stream() {
+    fn test_needs_permit_to_start_streams() {
         let mut exec = fasync::TestExecutor::new();
 
         let (avdtp, remote) = setup_avdtp_peer();
@@ -2395,6 +2380,10 @@ mod tests {
         let mut test_builder = TestMediaTaskBuilder::new();
         streams.insert(Stream::build(
             make_sbc_endpoint(1, avdtp::EndpointType::Sink),
+            test_builder.builder(),
+        ));
+        streams.insert(Stream::build(
+            make_sbc_endpoint(2, avdtp::EndpointType::Sink),
             test_builder.builder(),
         ));
         let next_task_fut = test_builder.next_task();
@@ -2413,7 +2402,7 @@ mod tests {
         );
         let remote_peer = avdtp::Peer::new(remote);
 
-        let sbc_endpoint_id = 1_u8.try_into().expect("should be able to get sbc endpointid");
+        let sbc_endpoint_id = 1_u8.try_into().unwrap();
 
         let sbc_caps = sbc_capabilities();
         let set_config_fut =
@@ -2436,16 +2425,45 @@ mod tests {
         let (_remote_transport, transport) = Channel::create();
         assert_eq!(Some(()), peer.receive_channel(transport).ok());
 
-        // Remote peer should still be able to try to start the stream, and we will say yes.
-        let stream_ids = [sbc_endpoint_id.clone()];
+        // Do the same, but for the OTHER stream.
+        let sbc_endpoint_two = 2_u8.try_into().unwrap();
+
+        let set_config_fut =
+            remote_peer.set_configuration(&sbc_endpoint_two, &sbc_endpoint_two, &sbc_caps);
+        pin_mut!(set_config_fut);
+
+        match exec.run_until_stalled(&mut set_config_fut) {
+            Poll::Ready(Ok(())) => {}
+            x => panic!("Set capabilities should be ready but got {:?}", x),
+        };
+
+        let open_fut = remote_peer.open(&sbc_endpoint_two);
+        pin_mut!(open_fut);
+        match exec.run_until_stalled(&mut open_fut) {
+            Poll::Ready(Ok(())) => {}
+            x => panic!("Open should be ready but got {:?}", x),
+        };
+
+        // Establish a media transport stream
+        let (_remote_transport_two, transport_two) = Channel::create();
+        assert_eq!(Some(()), peer.receive_channel(transport_two).ok());
+
+        // Remote peer should still be able to try to start the stream, and we will say yes, but
+        // that last seid looks wonky.
+        let unknown_endpoint_id: StreamEndpointId = 9_u8.try_into().unwrap();
+        let stream_ids =
+            [sbc_endpoint_id.clone(), sbc_endpoint_two.clone(), unknown_endpoint_id.clone()];
         let start_fut = remote_peer.start(&stream_ids);
         pin_mut!(start_fut);
         match exec.run_until_stalled(&mut start_fut) {
-            Poll::Ready(Ok(())) => {}
+            Poll::Ready(Err(avdtp::Error::RemoteRejected(rejection))) => {
+                assert_eq!(avdtp::ErrorCode::BadAcpSeid, rejection.error_code().unwrap().unwrap());
+                assert_eq!(unknown_endpoint_id, rejection.stream_id().unwrap());
+            }
             x => panic!("Start should be ready but got {:?}", x),
         };
 
-        // We can't get a permit (none are available) so we immediately send a suspend.
+        // We can't get a permit (none are available) so we immediately suspend both of them.
         let mut remote_requests = remote_peer.take_request_stream();
         let next_remote_request_fut = remote_requests.next();
         pin_mut!(next_remote_request_fut);
@@ -2458,7 +2476,9 @@ mod tests {
             x => panic!("Expected to receive a suspend request for the stream, got {:?}", x),
         };
 
-        assert_eq!(suspended_stream_ids, stream_ids);
+        assert!(suspended_stream_ids.contains(&sbc_endpoint_id));
+        assert!(suspended_stream_ids.contains(&sbc_endpoint_two));
+        assert_eq!(2, suspended_stream_ids.len());
 
         // And we should have not tried to start a task.
         match exec.run_until_stalled(&mut next_task_fut) {
@@ -2466,14 +2486,14 @@ mod tests {
             x => panic!("Local task should not have been created at this point: {:?}", x),
         };
 
-        // After the permit is available, they try again, and succeed.
+        // After the permit is available, they try again, and one will be started
         drop(taken_permit);
 
-        let start_fut = remote_peer.start(&stream_ids);
+        let start_fut = remote_peer.start(&stream_ids[0..2]);
         pin_mut!(start_fut);
         match exec.run_until_stalled(&mut start_fut) {
             Poll::Ready(Ok(())) => {}
-            x => panic!("Suspend should be ready but got {:?}", x),
+            x => panic!("Start should be ready but got {:?}", x),
         };
 
         // And we should start a task.
@@ -2483,6 +2503,21 @@ mod tests {
         };
 
         assert!(media_task.is_started());
+
+        // And we immediately suspend the one we couldn't start.
+        let next_remote_request_fut = remote_requests.next();
+        pin_mut!(next_remote_request_fut);
+
+        let suspended_stream_ids = match exec.run_until_stalled(&mut next_remote_request_fut) {
+            Poll::Ready(Some(Ok(avdtp::Request::Suspend { responder, stream_ids }))) => {
+                responder.send().unwrap();
+                stream_ids
+            }
+            x => panic!("Expected to receive a suspend request for the stream, got {:?}", x),
+        };
+
+        assert!(suspended_stream_ids.contains(&sbc_endpoint_two));
+        assert_eq!(1, suspended_stream_ids.len());
     }
 
     fn start_sbc_stream(
@@ -2493,9 +2528,6 @@ mod tests {
         local_id: &StreamEndpointId,
         remote_id: &StreamEndpointId,
     ) -> TestMediaTask {
-        let next_task_fut = media_test_builder.next_task();
-        pin_mut!(next_task_fut);
-
         let sbc_caps = sbc_capabilities();
         let set_config_fut = remote_peer.set_configuration(&local_id, &remote_id, &sbc_caps);
         pin_mut!(set_config_fut);
@@ -2526,10 +2558,7 @@ mod tests {
         };
 
         // And we should start a media task.
-        let media_task = match exec.run_until_stalled(&mut next_task_fut) {
-            Poll::Ready(Some(task)) => task,
-            x => panic!("Local task should be created at this point: {:?}", x),
-        };
+        let media_task = media_test_builder.expect_task();
         assert!(media_task.is_started());
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
@@ -2629,14 +2658,12 @@ mod tests {
             }
         }
         // And we should start two media tasks.
-        let one_media_task = match exec.run_until_stalled(&mut test_builder.next_task()) {
-            Poll::Ready(Some(task)) => task,
-            x => panic!("Local task should be created at this point: {:?}", x),
-        };
+
+        let one_media_task = test_builder.expect_task();
         assert!(one_media_task.is_started());
         let two_media_task = match exec.run_until_stalled(&mut test_builder.next_task()) {
             Poll::Ready(Some(task)) => task,
-            x => panic!("Local task should be created at this point: {:?}", x),
+            x => panic!("Expected another ready task but {x:?}"),
         };
         assert!(two_media_task.is_started());
     }
@@ -2711,7 +2738,7 @@ mod tests {
             x => panic!("Expected suspension and got {:?}", x),
         };
 
-        // And the correct onl of the media tasks should be stopped.
+        // And the correct one of the media tasks should be stopped.
         if suspended_id == remote_sbc_endpoint_id {
             assert!(!one_media_task.is_started());
             assert!(two_media_task.is_started());
@@ -2733,7 +2760,7 @@ mod tests {
         // And we should start another media task.
         let media_task = match exec.run_until_stalled(&mut test_builder.next_task()) {
             Poll::Ready(Some(task)) => task,
-            x => panic!("Local task should be created at this point: {:?}", x),
+            x => panic!("Expected media task to start: {x:?}"),
         };
         assert!(media_task.is_started());
     }
