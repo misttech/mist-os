@@ -148,8 +148,6 @@ class FakeMmio {
         std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), reg_count_);
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
   ddk_fake::FakeMmioReg& reg(size_t ix) {
     return regs_[ix >> 2];  // Registers are in virtual address units.
@@ -169,8 +167,8 @@ struct IncomingNamespace {
 struct As370TdmOutputTest : public zxtest::Test {
   void SetUp() override {
     fake_pdev::FakePDevFidl::Config config;
-    config.mmios[0] = mmio0_.mmio_info();
-    config.mmios[1] = mmio1_.mmio_info();
+    config.mmios[0] = mmio0_.mmio();
+    config.mmios[1] = mmio1_.mmio();
 
     zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(outgoing_endpoints);
@@ -280,11 +278,3 @@ TEST_F(As370TdmOutputTest, GetSupportedFormatsWithMetadata) {
 }
 
 }  // namespace audio::as370
-
-// Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
-zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
-  auto* test_harness = reinterpret_cast<audio::as370::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(test_harness->mmio());
-  return ZX_OK;
-}

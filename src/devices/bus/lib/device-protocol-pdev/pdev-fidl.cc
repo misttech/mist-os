@@ -71,9 +71,9 @@ void PDevFidl::ShowInfo() {
   }
 }
 
-__WEAK zx_status_t PDevFidl::MapMmio(uint32_t index, std::optional<fdf::MmioBuffer>* mmio,
-                                     uint32_t cache_policy) {
-  pdev_mmio_t pdev_mmio;
+zx_status_t PDevFidl::MapMmio(uint32_t index, std::optional<fdf::MmioBuffer>* mmio,
+                              uint32_t cache_policy) {
+  pdev_mmio_t pdev_mmio = {};
 
   zx_status_t status = GetMmio(index, &pdev_mmio);
   if (status != ZX_OK) {

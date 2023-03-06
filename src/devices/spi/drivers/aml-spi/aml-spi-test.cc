@@ -36,16 +36,12 @@ struct IncomingNamespace {
 
 class AmlSpiTest : public zxtest::Test {
  public:
-  static AmlSpiTest* instance() { return instance_; }
-
   AmlSpiTest()
       : root_(MockDevice::FakeRootParent()),
         loop_(&kAsyncLoopConfigNeverAttachToThread),
         registers_(loop_.dispatcher()),
         mmio_region_(mmio_registers_, sizeof(uint32_t),
-                     sizeof(uint32_t) * std::size(mmio_registers_)) {
-    instance_ = this;
-  }
+                     sizeof(uint32_t) * std::size(mmio_registers_)) {}
 
   virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
@@ -75,11 +71,7 @@ class AmlSpiTest : public zxtest::Test {
         mmio_mapper_.CreateAndMap(0x100, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &mmio_));
     zx::vmo dup;
     ASSERT_OK(mmio_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
-    config.mmios[0] = fake_pdev::MmioInfo{
-        .vmo = std::move(dup),
-        .offset = 0,
-        .size = mmio_mapper_.size(),
-    };
+    config.mmios[0] = mmio().GetMmioBuffer();
     SetUpInterrupt(config);
     SetUpBti(config);
 
@@ -110,8 +102,6 @@ class AmlSpiTest : public zxtest::Test {
     mmio_region_[AML_SPI_STATREG].SetReadCallback(
         []() { return StatReg::Get().FromValue(0).set_tc(1).set_te(1).set_rr(1).reg_value(); });
   }
-
-  ~AmlSpiTest() override { instance_ = nullptr; }
 
   MockDevice* root() { return root_.get(); }
   ddk::MockGpio& gpio() { return gpio_; }
@@ -149,30 +139,7 @@ class AmlSpiTest : public zxtest::Test {
   zx::interrupt interrupt_;
   ddk_fake::FakeMmioReg mmio_registers_[17];
   ddk_fake::FakeMmioRegRegion mmio_region_;
-  static AmlSpiTest* instance_;  // See PDevMakeMmioBufferWeak().
 };
-
-AmlSpiTest* AmlSpiTest::instance_ = nullptr;
-
-}  // namespace spi
-
-namespace ddk {
-
-// Override MmioBuffer creation to avoid having to map with ZX_CACHE_POLICY_UNCACHED_DEVICE.
-zx_status_t PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio, std::optional<MmioBuffer>* mmio,
-                                   uint32_t cache_policy) {
-  spi::AmlSpiTest* const instance = spi::AmlSpiTest::instance();
-  if (!instance) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  mmio->emplace(instance->mmio().GetMmioBuffer());
-  return ZX_OK;
-}
-
-}  // namespace ddk
-
-namespace spi {
 
 zx_koid_t GetVmoKoid(const zx::vmo& vmo) {
   zx_info_handle_basic_t info = {};

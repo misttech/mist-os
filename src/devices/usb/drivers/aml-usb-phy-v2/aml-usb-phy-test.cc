@@ -60,8 +60,6 @@ class FakeMmio {
     region_.emplace(regs_, sizeof(uint32_t), kRegisterCount);
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return region_->GetMmioBuffer(); }
 
  private:
@@ -91,9 +89,9 @@ class AmlUsbPhyTest : public zxtest::Test {
     config.irqs[0] = {};
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     irq_ = config.irqs[0].borrow();
-    config.mmios[0] = mmio_[0].mmio_info();
-    config.mmios[1] = mmio_[1].mmio_info();
-    config.mmios[2] = mmio_[2].mmio_info();
+    config.mmios[0] = mmio_[0].mmio();
+    config.mmios[1] = mmio_[1].mmio();
+    config.mmios[2] = mmio_[2].mmio();
     zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(outgoing_endpoints);
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
@@ -204,15 +202,3 @@ TEST_F(AmlUsbPhyTest, SetMode) {
 }
 
 }  // namespace aml_usb_phy
-
-zx_status_t ddk::PDevFidl::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
-                                   uint32_t cache_policy) {
-  pdev_mmio_t pdev_mmio;
-  zx_status_t status = GetMmio(index, &pdev_mmio);
-  if (status != ZX_OK) {
-    return status;
-  }
-  auto* src = reinterpret_cast<aml_usb_phy::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(src->mmio());
-  return ZX_OK;
-}

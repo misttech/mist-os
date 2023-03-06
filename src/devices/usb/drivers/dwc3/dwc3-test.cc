@@ -27,7 +27,6 @@ class TestFixture : public zxtest::Test {
   TestFixture();
   void SetUp() override;
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(reg_region_.GetMmioBuffer()); }
 
  protected:
@@ -87,7 +86,7 @@ TestFixture::TestFixture() {
   dctl_reg.SetWriteCallback([this](uint64_t val) { return Write_DCTL(val); });
 
   fake_pdev::FakePDevFidl::Config config;
-  config.mmios[0] = mmio_info();
+  config.mmios[0] = mmio();
   config.use_fake_bti = true;
   config.irqs[0] = {};
   ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
@@ -146,11 +145,3 @@ TEST_F(TestFixture, DdkHwResetTimeout) {
 }
 
 }  // namespace dwc3
-
-// Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
-zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
-  auto* test_harness = reinterpret_cast<dwc3::TestFixture*>(pdev_mmio.offset);
-  mmio->emplace(test_harness->mmio());
-  return ZX_OK;
-}

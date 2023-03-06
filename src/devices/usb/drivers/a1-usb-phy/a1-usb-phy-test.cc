@@ -62,8 +62,6 @@ class FakeMmio {
     region_.emplace(regs_, sizeof(uint32_t), kRegisterCount);
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return region_->GetMmioBuffer(); }
 
  private:
@@ -87,10 +85,10 @@ class A1UsbPhyTest : public zxtest::Test {
     root_->SetMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers, sizeof(kMagicNumbers));
 
     fake_pdev::FakePDevFidl::Config config;
-    config.mmios[0] = mmio_[0].mmio_info();
-    config.mmios[1] = mmio_[1].mmio_info();
-    config.mmios[2] = mmio_[2].mmio_info();
-    config.mmios[3] = mmio_[3].mmio_info();
+    config.mmios[0] = mmio_[0].mmio();
+    config.mmios[1] = mmio_[1].mmio();
+    config.mmios[2] = mmio_[2].mmio();
+    config.mmios[3] = mmio_[3].mmio();
 
     ASSERT_OK(fake_root_resource_create(smc_monitor_.reset_and_get_address()));
     config.smcs[0] = {};
@@ -127,15 +125,3 @@ class A1UsbPhyTest : public zxtest::Test {
 };
 
 }  // namespace a1_usb_phy
-
-zx_status_t ddk::PDev::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
-                               uint32_t cache_policy) {
-  pdev_mmio_t pdev_mmio;
-  zx_status_t status = GetMmio(index, &pdev_mmio);
-  if (status != ZX_OK) {
-    return status;
-  }
-  auto* src = reinterpret_cast<a1_usb_phy::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(src->mmio());
-  return ZX_OK;
-}

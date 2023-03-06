@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async/default.h>
+#include <lib/mmio/mmio.h>
 
 #include <atomic>
 #include <map>
@@ -23,6 +24,8 @@ struct MmioInfo {
   size_t size;
 };
 
+using Mmio = std::variant<MmioInfo, fdf::MmioBuffer>;
+
 class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
  public:
   struct Config {
@@ -32,7 +35,7 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
     // If true, a smc will be generated lazily if it does not exist.
     bool use_fake_smc = false;
 
-    std::map<uint32_t, MmioInfo> mmios;
+    std::map<uint32_t, Mmio> mmios;
     std::map<uint32_t, zx::interrupt> irqs;
     std::map<uint32_t, zx::bti> btis;
     std::map<uint32_t, zx::resource> smcs;

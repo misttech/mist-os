@@ -86,6 +86,10 @@ class PDev : public PDevProtocolClient {
 //    return ZX_OK;
 //  }
 //
+//  Note that if you are using `//src/devices/testing/fake-pdev`, it provides and implementation of
+//  this functionality for you and you should instead invoke it's
+//  `set_mmio(uint32_t index, fdf::MmioBuffer mmio)` method instead.
+//
 zx_status_t PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
                                    std::optional<fdf::MmioBuffer>* mmio, uint32_t cache_policy);
 

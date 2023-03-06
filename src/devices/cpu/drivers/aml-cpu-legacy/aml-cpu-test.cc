@@ -39,8 +39,6 @@ class FakeMmio {
     (*mmio_)[kCpuVersionOffset].SetReadCallback([]() { return kCpuVersion; });
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
 
  private:
@@ -280,7 +278,7 @@ class AmlCpuBindingTest : public zxtest::Test {
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
 
     fake_pdev::FakePDevFidl::Config config;
-    config.mmios[0] = mmio_.mmio_info();
+    config.mmios[0] = mmio_.mmio();
     zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(outgoing_endpoints);
     incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
@@ -489,11 +487,3 @@ TEST_F(AmlCpuTestFixture, TestGetNumLogicalCores) {
 }
 
 }  // namespace amlogic_cpu
-
-// Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
-zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
-  auto* test_harness = reinterpret_cast<amlogic_cpu::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(test_harness->mmio());
-  return ZX_OK;
-}

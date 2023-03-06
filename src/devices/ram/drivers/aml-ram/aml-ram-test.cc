@@ -33,8 +33,6 @@ class FakeMmio {
     mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), kRegSize);
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
 
   ddk_fake::FakeMmioReg& reg(size_t ix) {
@@ -59,7 +57,7 @@ class AmlRamDeviceTest : public zxtest::Test {
     config.irqs[0] = {};
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     irq_signaller_ = config.irqs[0].borrow();
-    config.mmios[0] = mmio_.mmio_info();
+    config.mmios[0] = mmio_.mmio();
 
     config.device_info = pdev_device_info_t{
         .pid = PDEV_PID_AMLOGIC_T931,
@@ -266,13 +264,3 @@ TEST_F(AmlRamDeviceTest, ValidRequest) {
 }
 
 }  // namespace amlogic_ram
-
-// We replace this method to allow the FakePDev::PDevGetMmio() to work
-// with the driver unmodified. The real implementation tries to map a VMO that
-// we can't properly fake at the moment.
-zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
-  auto* src = reinterpret_cast<amlogic_ram::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(src->mmio());
-  return ZX_OK;
-}

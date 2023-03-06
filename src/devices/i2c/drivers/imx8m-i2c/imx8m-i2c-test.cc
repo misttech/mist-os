@@ -42,8 +42,6 @@ class FakeMmio {
     mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint16_t), kRegSize);
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
 
   ddk_fake::FakeMmioReg& reg(size_t ix) { return regs_[ix >> 1]; }
@@ -79,7 +77,7 @@ class Imx8mI2cTest : public zxtest::Test {
     config.irqs[0] = {};
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     irq_signaller_ = config.irqs[0].borrow();
-    config.mmios[0] = mmio_.mmio_info();
+    config.mmios[0] = mmio_.mmio();
     config.device_info = {
         .vid = PDEV_VID_NXP,
         .pid = PDEV_PID_IMX8MMEVK,
@@ -267,11 +265,3 @@ TEST_F(Imx8mI2cTest, NoBusMetadata) {
 }
 
 }  // namespace imx8m_i2c
-
-// Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
-zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
-  auto* test_harness = reinterpret_cast<imx8m_i2c::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(test_harness->mmio());
-  return ZX_OK;
-}

@@ -4,6 +4,7 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-resource/resource.h>
 
@@ -16,16 +17,19 @@ void FakePDevFidl::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& c
     return;
   }
   fidl::Arena arena;
-  auto builder = fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
-                     .offset(mmio->second.offset)
-                     .size(mmio->second.size);
-  if (mmio->second.vmo.is_valid()) {
+  auto builder = fuchsia_hardware_platform_device::wire::Mmio::Builder(arena);
+  if (auto* mmio_info = std::get_if<MmioInfo>(&mmio->second); mmio_info) {
+    builder.offset(mmio_info->offset).size(mmio_info->size);
     zx::vmo dup;
-    mmio->second.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+    mmio_info->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
     builder.vmo(std::move(dup));
+  } else {
+    auto& mmio_buffer = std::get<fdf::MmioBuffer>(mmio->second);
+    builder.offset(reinterpret_cast<size_t>(&mmio_buffer));
   }
   completer.ReplySuccess(builder.Build());
 }
+
 void FakePDevFidl::GetInterrupt(GetInterruptRequestView request,
                                 GetInterruptCompleter::Sync& completer) {
   auto itr = config_.irqs.find(request->index);
@@ -112,3 +116,15 @@ void FakePDevFidl::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
 }
 
 }  // namespace fake_pdev
+
+zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
+                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
+  if (pdev_mmio.vmo != ZX_HANDLE_INVALID) {
+    return MmioBuffer::Create(pdev_mmio.offset, pdev_mmio.size, zx::vmo(pdev_mmio.vmo),
+                              cache_policy, mmio);
+  }
+
+  auto* mmio_buffer = reinterpret_cast<MmioBuffer*>(pdev_mmio.offset);
+  mmio->emplace(std::move(*mmio_buffer));
+  return ZX_OK;
+}

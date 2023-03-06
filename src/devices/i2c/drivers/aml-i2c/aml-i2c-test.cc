@@ -169,22 +169,6 @@ struct IncomingNamespace {
 };
 
 class AmlI2cTest : public zxtest::Test {
- public:
-  AmlI2cTest() {
-    EXPECT_NULL(instance_);
-    instance_ = this;
-  }
-  ~AmlI2cTest() override {
-    EXPECT_EQ(instance_, this);
-    instance_ = nullptr;
-  }
-
-  static zx_status_t MakeMmioBuffer(const pdev_mmio_t& pdev_mmio,
-                                    std::optional<fdf::MmioBuffer>* mmio) {
-    ZX_ASSERT(instance_ != nullptr);
-    return instance_->MakeFakeMmioBuffer(pdev_mmio, mmio);
-  }
-
  protected:
   static constexpr size_t kMmioSize = sizeof(uint32_t) * 8;
 
@@ -206,10 +190,10 @@ class AmlI2cTest : public zxtest::Test {
 
     fake_pdev::FakePDevFidl::Config config;
     for (uint32_t i = 0; i < bus_count; i++) {
-      config.mmios[i] = {.offset = i, .size = kMmioSize};
       config.irqs[i] = {};
       ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[i]));
       controllers_.emplace_back(config.irqs[i].borrow());
+      config.mmios[i] = controllers_.back().GetMmioBuffer();
     }
     config.device_info = {
         .mmio_count = bus_count,
@@ -250,22 +234,6 @@ class AmlI2cTest : public zxtest::Test {
                                                                    std::in_place};
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   std::vector<FakeAmlI2cController> controllers_;
-
- private:
-  inline static AmlI2cTest* instance_ = nullptr;
-
-  zx_status_t MakeFakeMmioBuffer(const pdev_mmio_t& pdev_mmio,
-                                 std::optional<fdf::MmioBuffer>* mmio) {
-    if (pdev_mmio.offset >= controllers_.size()) {
-      return ZX_ERR_NOT_FOUND;
-    }
-    if (pdev_mmio.size != kMmioSize) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    mmio->emplace(controllers_[pdev_mmio.offset].GetMmioBuffer());
-    return ZX_OK;
-  }
 };
 
 TEST_F(AmlI2cTest, SmallWrite) {
@@ -788,10 +756,10 @@ TEST_F(AmlI2cTest, MetadataTooSmall) {
 
 TEST_F(AmlI2cTest, CanUsePDevFragment) {
   fake_pdev::FakePDevFidl::Config config;
-  config.mmios[0] = {.offset = 0, .size = kMmioSize};
   config.irqs[0] = {};
   ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
   controllers_.emplace_back(config.irqs[0].borrow());
+  config.mmios[0] = controllers_[0].GetMmioBuffer();
   config.device_info = {
       .mmio_count = 1,
       .irq_count = 1,
@@ -982,12 +950,3 @@ TEST_F(AmlI2cTest, BusMetadataIgnoredMultipleBusIds) {
   EXPECT_NOT_OK(i2c.Transact(5, &op, 1));
 }
 }  // namespace aml_i2c
-
-namespace ddk {
-
-zx_status_t PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                   std::optional<fdf::MmioBuffer>* mmio, uint32_t cache_policy) {
-  return aml_i2c::AmlI2cTest::MakeMmioBuffer(pdev_mmio, mmio);
-}
-
-}  // namespace ddk

@@ -99,7 +99,7 @@ TEST(PDevFidlTest, GetMmios) {
   constexpr uint32_t kMmioId = 5;
   constexpr zx_off_t kMmioOffset = 10;
   constexpr size_t kMmioSize = 11;
-  std::map<uint32_t, fake_pdev::MmioInfo> mmios;
+  std::map<uint32_t, fake_pdev::Mmio> mmios;
   {
     fake_pdev::MmioInfo mmio{
         .offset = kMmioOffset,
@@ -124,11 +124,48 @@ TEST(PDevFidlTest, GetMmios) {
   ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio(4, &mmio));
 }
 
+TEST(PDevFidlTest, GetMmioBuffer) {
+  constexpr uint32_t kMmioId = 5;
+  constexpr zx_off_t kMmioOffset = 10;
+  constexpr size_t kMmioSize = 11;
+  std::map<uint32_t, fake_pdev::Mmio> mmios;
+  {
+    fdf::MmioBuffer mmio{mmio_buffer_t{
+        .vaddr = (MMIO_PTR void*)kMmioId,
+        .offset = kMmioOffset,
+        .size = kMmioSize,
+        .vmo = ZX_HANDLE_INVALID,
+    }};
+    mmios[kMmioId] = std::move(mmio);
+  }
+
+  FakePDevFidlWithThread infra;
+  zx::result client_channel = infra.Start({
+      .mmios = std::move(mmios),
+  });
+  ASSERT_OK(client_channel);
+
+  ddk::PDevFidl pdev{std::move(client_channel.value())};
+  pdev_mmio_t mmio = {};
+  ASSERT_OK(pdev.GetMmio(kMmioId, &mmio));
+  ASSERT_NE(kMmioOffset, mmio.offset);
+  ASSERT_EQ(0, mmio.size);
+  ASSERT_EQ(ZX_HANDLE_INVALID, mmio.vmo);
+
+  auto* mmio_buffer = reinterpret_cast<fdf::MmioBuffer*>(mmio.offset);
+  ASSERT_EQ(kMmioOffset, mmio_buffer->get_offset());
+  ASSERT_EQ(kMmioSize, mmio_buffer->get_size());
+  ASSERT_EQ(kMmioId, reinterpret_cast<uintptr_t>(mmio_buffer->get()));
+  ASSERT_EQ(ZX_HANDLE_INVALID, mmio_buffer->get_vmo());
+
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio(4, &mmio));
+}
+
 TEST(PDevFidlTest, InvalidMmioHandle) {
   constexpr uint32_t kMmioId = 5;
   constexpr zx_off_t kMmioOffset = 10;
   constexpr size_t kMmioSize = 11;
-  std::map<uint32_t, fake_pdev::MmioInfo> mmios;
+  std::map<uint32_t, fake_pdev::Mmio> mmios;
   mmios[kMmioId] = fake_pdev::MmioInfo{
       .offset = kMmioOffset,
       .size = kMmioSize,
@@ -142,10 +179,7 @@ TEST(PDevFidlTest, InvalidMmioHandle) {
 
   ddk::PDevFidl pdev{std::move(client_channel.value())};
   pdev_mmio_t mmio = {};
-  ASSERT_OK(pdev.GetMmio(kMmioId, &mmio));
-  ASSERT_EQ(kMmioOffset, mmio.offset);
-  ASSERT_EQ(kMmioSize, mmio.size);
-  ASSERT_EQ(ZX_HANDLE_INVALID, mmio.vmo);
+  ASSERT_NOT_OK(pdev.GetMmio(kMmioId, &mmio));
 }
 
 TEST(PDevFidlTest, GetIrqs) {

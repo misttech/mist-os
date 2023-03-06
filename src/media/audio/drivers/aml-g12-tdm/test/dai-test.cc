@@ -83,8 +83,6 @@ class FakeMmio {
     mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), kRegCount);
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
   ddk_fake::FakeMmioReg& reg(size_t ix) {
     return regs_[ix >> 2];  // AML registers are in virtual address units.
@@ -134,7 +132,7 @@ class AmlG12TdmDaiTest : public zxtest::Test {
     }
 
     fake_pdev::FakePDevFidl::Config config;
-    config.mmios[0] = mmio_.mmio_info();
+    config.mmios[0] = mmio_.mmio();
     config.use_fake_bti = true;
 
     incoming_.SyncCall([config = std::move(config),
@@ -773,11 +771,3 @@ TEST_F(AmlG12TdmDaiTest, GetDelayForMultipleRingBuffers) {
 }
 
 }  // namespace audio::aml_g12
-
-// Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
-zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
-  auto* test_harness = reinterpret_cast<audio::aml_g12::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(test_harness->mmio());
-  return ZX_OK;
-}

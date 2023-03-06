@@ -55,8 +55,6 @@ class FakeMmio {
     mmio_ = std::make_unique<ddk_fake::FakeMmioRegRegion>(regs_.get(), sizeof(uint32_t), kRegSize);
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(mmio_->GetMmioBuffer()); }
 
   ddk_fake::FakeMmioReg& reg(size_t ix) { return regs_[ix >> 2]; }
@@ -94,7 +92,7 @@ class Imx8mSdmmcTest : public zxtest::Test {
     ASSERT_OK(fake_bti_create_with_paddrs(dma_paddrs_.data(), dma_paddrs_.size(),
                                           config.btis[0].reset_and_get_address()));
     bti_ = config.btis[0].borrow();
-    config.mmios[0] = mmio_.mmio_info();
+    config.mmios[0] = mmio_.mmio();
     config.device_info = {
         .vid = PDEV_VID_NXP,
         .pid = PDEV_PID_IMX8MMEVK,
@@ -474,11 +472,3 @@ TEST_F(Imx8mSdmmcTest, DmaNoBoundaries) {
 }
 
 }  // namespace imx8m_sdmmc
-
-// Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.
-zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
-                                        std::optional<MmioBuffer>* mmio, uint32_t cache_policy) {
-  auto* test_harness = reinterpret_cast<imx8m_sdmmc::FakeMmio*>(pdev_mmio.offset);
-  mmio->emplace(test_harness->mmio());
-  return ZX_OK;
-}

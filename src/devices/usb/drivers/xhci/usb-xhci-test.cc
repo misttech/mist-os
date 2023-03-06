@@ -212,8 +212,6 @@ class FakeDevice {
     // Control register
   }
 
-  fake_pdev::MmioInfo mmio_info() { return {.offset = reinterpret_cast<size_t>(this)}; }
-
   fdf::MmioBuffer mmio() { return fdf::MmioBuffer(region_->GetMmioBuffer()); }
 
   void set_irq_signaller(zx::unowned_interrupt signaller) { irq_signaller_ = std::move(signaller); }
@@ -428,7 +426,7 @@ class XhciMmioHarness : public XhciHarness {
  public:
   void SetUp() override {
     fake_pdev::FakePDevFidl::Config config;
-    config.mmios[0] = fake_device_.mmio_info();
+    config.mmios[0] = fake_device_.mmio();
     config.irqs[0] = {};
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     fake_device_.set_irq_signaller(config.irqs[0].borrow());
@@ -973,15 +971,3 @@ TEST_F(XhciMmioHarness, ResetEndpointFailsIfNotStalled) {
 TEST_F(XhciMmioHarness, GetMaxDeviceCount) { ASSERT_EQ(GetMaxDeviceCount(), 34); }
 
 }  // namespace usb_xhci
-
-zx_status_t ddk::PDevFidl::MapMmio(uint32_t index, std::optional<MmioBuffer>* mmio,
-                                   uint32_t cache_policy) {
-  pdev_mmio_t pdev_mmio;
-  zx_status_t status = GetMmio(index, &pdev_mmio);
-  if (status != ZX_OK) {
-    return status;
-  }
-  auto* src = reinterpret_cast<usb_xhci::FakeDevice*>(pdev_mmio.offset);
-  mmio->emplace(src->mmio());
-  return ZX_OK;
-}
