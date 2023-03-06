@@ -122,7 +122,7 @@ impl StreamPermits {
         };
         permit.relabel(self.label_for(&local_id));
         if let Some(_) = self.open_streams.lock().insert(local_id.clone(), permit) {
-            warn!("Started stream {:?} twice somehow, dropping the previous permit", local_id);
+            warn!(id = %self.peer_id, "Started stream {local_id:?} twice, dropping previous permit");
         }
         Some(StreamPermit { local_id, open_streams: self.open_streams.clone() })
     }
@@ -137,7 +137,7 @@ impl StreamPermits {
                 let mut lock = peer.lock();
                 match lock.suspend_local_stream(&local_id) {
                     Ok(remote_id) => drop(lock.peer.suspend(&[remote_id.clone()])),
-                    Err(e) => error!("Couldn't stop local stream {:?}: {:?}", local_id, e),
+                    Err(e) => error!("Couldn't stop local stream {local_id:?}: {e:?}"),
                 }
             }
             let self_revoke_fn = Self::make_revocation_fn(&self, &local_id);
@@ -156,7 +156,7 @@ impl StreamPermits {
                 }
             };
             if let Err(e) = self.sender.unbounded_send(restart_stream_available_fut.boxed()) {
-                warn!(%self.peer_id, %local_id, ?e, "Couldn't queue reservation to finish");
+                warn!(id = %self.peer_id, %local_id, ?e, "Couldn't queue reservation to finish");
             }
         }
         self.open_streams.lock().remove(&local_id).expect("permit revoked but don't have it")
@@ -277,12 +277,7 @@ impl Peer {
                         remote_streams.push(avdtp::StreamEndpoint::from_info(&info, capabilities));
                     }
                     Err(e) => {
-                        info!(
-                            "{}: Stream {} capabilities failed: {:?}, skipping",
-                            peer_id,
-                            info.id(),
-                            e
-                        );
+                        info!(%peer_id, "Stream {} capabilities failed: {:?}, skipping", info.id(), e);
                     }
                 };
             }
@@ -368,7 +363,7 @@ impl Peer {
             }
             avdtp.open(&remote_id).await?;
 
-            info!("{} Connecting transport channel...", peer_id);
+            info!(%peer_id, "Connecting transport channel");
             let channel = profile
                 .connect(
                     &mut peer_id.into(),
@@ -449,13 +444,13 @@ impl Peer {
                     request = request_stream.next().fuse() => {
                         match request {
                             None => break,
-                            Some(Err(e)) => info!("{}: Request stream error: {:?}", id, e),
+                            Some(Err(e)) => info!(peer_id = %id, ?e, "Request stream error"),
                             Some(Ok(request)) => match peer.upgrade() {
                                 None => return,
                                 Some(p) => {
                                     let mut lock = p.lock();
                                     if let Err(e) = lock.handle_request(request).await {
-                                        warn!("{}: Error handling request: {:?}", id, e);
+                                        warn!(peer_id = %id, ?e, "Error handling request");
                                     }
                                 }
                             },
@@ -466,13 +461,13 @@ impl Peer {
                     },
                     permit = stream_reservations.select_next_some() => {
                         if let Err(e) = PeerInner::start_permit(peer.clone(), permit).await {
-                            warn!("{}: Couldn't start stream after unpause: {:?}", id, e);
+                            warn!(peer_id = %id, ?e, "Couldn't start stream after unpause");
                         }
                     }
                     complete => break,
                 }
             }
-            info!("{}: Peer disconnected", id);
+            info!(peer_id = %id, "disconnected");
             if let Some(wakers) = disconnect_wakers.upgrade() {
                 for waker in wakers.lock().take().unwrap_or_else(Vec::new) {
                     waker.wake();
@@ -741,7 +736,7 @@ impl PeerInner {
             None => Ok(None),
             Some(Some(permit)) => Ok(Some(permit)),
             Some(None) => {
-                info!(%self.peer_id, %local_id, "No permit for starting stream, suspending..");
+                info!(peer_id = %self.peer_id, %local_id, "No permit to start stream");
                 Err(avdtp::Error::InvalidState)
             }
         }
@@ -754,13 +749,14 @@ impl PeerInner {
         permit: Option<StreamPermit>,
         local_id: &StreamEndpointId,
     ) -> avdtp::Result<()> {
+        let peer_id = self.peer_id;
         let stream = self.get_mut(&local_id).map_err(|e| avdtp::Error::RequestInvalid(e))?;
-        info!("Starting stream: {:?}", stream);
+        info!(%peer_id, ?stream, "Starting");
         let stream_finished = stream.start().map_err(|c| avdtp::Error::RequestInvalid(c))?;
         // TODO(fxbug.dev/68238): if streaming stops unexpectedly, send a suspend to match to peer
         let watched_stream = WatchedStream::new(permit, stream_finished);
         if self.started.insert(local_id.clone(), watched_stream).is_some() {
-            warn!(%local_id, "Started stream that was already started");
+            warn!(%peer_id, %local_id, "Stream that was already started");
         }
         Ok(())
     }
@@ -774,7 +770,7 @@ impl PeerInner {
         let peer_id = self.peer_id;
         let stream = self.get_mut(&local_id).map_err(|e| avdtp::Error::RequestInvalid(e))?;
         let remote_id = stream.endpoint().remote_id().cloned().ok_or(avdtp::Error::InvalidState)?;
-        info!("{}: Suspend stream local {} <-> {} remote", peer_id, local_id, remote_id);
+        info!(%peer_id, "Suspend stream local {local_id} <-> {remote_id} remote");
         stream.suspend().map_err(|c| avdtp::Error::RequestInvalid(c))?;
         let _ = self.started.remove(local_id);
         Ok(remote_id)
@@ -791,7 +787,7 @@ impl PeerInner {
         if done {
             self.opening = None;
         }
-        info!("{}: Transport connected for stream {}", self.peer_id, stream_id);
+        info!(peer_id = %self.peer_id, %stream_id, "Transport connected");
         Ok(done)
     }
 

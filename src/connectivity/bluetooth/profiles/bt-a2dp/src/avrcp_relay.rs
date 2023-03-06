@@ -87,7 +87,7 @@ impl AvrcpRelay {
             Self::session_relay(avrcp_svc, peer_id, player_request_stream, battery_client);
         Ok(fasync::Task::spawn(async move {
             if let Err(e) = session_fut.await {
-                info!("Session completed with error: {:?}", e);
+                info!(?e, "session completed");
             }
         }))
     }
@@ -176,16 +176,16 @@ impl AvrcpRelay {
                         sessions2::PlayerRequest::BindVolumeControl { .. } => {
                             // Drop incoming channel, we don't support this interface.
                         },
-                        x => info!("Unhandled request from Player: {:?}", x),
+                        x => info!(%peer_id, "unhandled player request {x:?}"),
                     }
                 }
                 event = avrcp_notify_fut => {
                     if event.is_none() {
-                        info!("{} AVRCP relay stop: notification stream gone", peer_id);
+                        info!(%peer_id, "AVRCP relay stop: notification stream end");
                         break;
                     }
                     let avrcp::ControllerEvent::OnNotification { timestamp: _, notification } = event.unwrap()?;
-                    trace!("Got Notification from AVRCP: {:?}", notification);
+                    trace!(%peer_id, ?notification, "Notification from AVRCP");
 
                     let mut player_status_updated = false;
 
@@ -213,7 +213,7 @@ impl AvrcpRelay {
                                     player_status_updated = true;
                                 }
                             }
-                            e => info!("Couldn't get media player items to check for available players: {:?}", e),
+                            e => info!(%peer_id, ?e, "Error checking available players"),
                         }
                     }
 
@@ -222,7 +222,7 @@ impl AvrcpRelay {
                         notification.addressed_player.is_some() {
                         let mut building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
                         if let Err(e) = update_attributes(&controller, &mut building, &mut last_player_status).await {
-                            info!("Couldn't update AVRCP attributes: {:?}", e);
+                            info!(%peer_id, ?e, "Couldn't update AVRCP attributes");
                         }
                         player_status_updated = true;
 
@@ -230,7 +230,7 @@ impl AvrcpRelay {
 
                     if notification.status.is_some() {
                         if let Err(e) = update_status(&controller, &mut last_player_status).await {
-                            info!("Couldn't update AVRCP status: {:?}", e);
+                            info!(%peer_id, ?e, "Error updating AVRCP status (notification)");
                         }
                         player_status_updated = true;
                     }
@@ -238,7 +238,7 @@ impl AvrcpRelay {
                     if player_status_updated {
                         let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
                         building.player_status = Some(last_player_status.clone().into());
-                        debug!("Updated player status {:?}", building);
+                        debug!(%peer_id, ?building, "Updated player status");
                     }
 
                     // Notify that the notification is handled so we can receive another one.
@@ -246,18 +246,18 @@ impl AvrcpRelay {
                 }
                 _event = update_status_fut => {
                     if let Err(e) = update_status(&controller, &mut last_player_status).await {
-                        info!("Couldn't update AVRCP status: {:?}", e);
+                        info!(%peer_id, ?e, "Error updating AVRCP status (interval)");
                     }
                     let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
                     building.player_status = Some(last_player_status.clone().into());
                 }
                 update = battery_client_fut => {
                     match update {
-                        None => info!("BatteryClient stream finished"),
-                        Some(Err(e)) => info!("Error in BatteryClient stream: {:?}", e),
+                        None => debug!(%peer_id, "BatteryClient finished"),
+                        Some(Err(e)) => info!(%peer_id, ?e, "BatteryClient stream error"),
                         Some(Ok(info)) => {
                             if let Err(e) = update_battery_status(&controller, info).await {
-                                info!("Couldn't update AVRCP with battery status: {:?}", e);
+                                info!(%peer_id, ?e, "Error updating AVRCP battery status");
                             }
                         }
                     }
@@ -282,7 +282,7 @@ async fn update_attributes(
     let attributes = controller
         .get_media_attributes()
         .await?
-        .or_else(|e| Err(format_err!("AVRCP error: {:?}", e)))?;
+        .or_else(|e| Err(format_err!("AVRCP error: {e:?}")))?;
     info_delta.metadata = Some(attributes_to_metadata(&attributes));
 
     if let Some(playing_time) = attributes.playing_time {
@@ -297,10 +297,8 @@ async fn update_status(
     controller: &avrcp::ControllerProxy,
     status: &mut ValidPlayerStatus,
 ) -> Result<(), Error> {
-    let avrcp_status = controller
-        .get_play_status()
-        .await?
-        .or_else(|e| Err(format_err!("AVRCP error: {:?}", e)))?;
+    let avrcp_status =
+        controller.get_play_status().await?.or_else(|e| Err(format_err!("AVRCP error: {e:?}")))?;
     let playback_status =
         avrcp_status.playback_status.ok_or(format_err!("PlayStatus must have playback status"))?;
     status.set_state_from_avrcp(playback_status);
@@ -325,7 +323,7 @@ async fn update_battery_status(
     controller
         .inform_battery_status(avrcp_status)
         .await?
-        .or_else(|e| Err(format_err!("AVRCP error: {:?}", e)))
+        .or_else(|e| Err(format_err!("AVRCP error: {e:?}")))
 }
 
 macro_rules! nonempty_to_property {

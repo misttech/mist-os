@@ -33,7 +33,7 @@ async fn handle_battery_client_updates(
                 media_sessions.update_battery_status(status);
             }
             Err(e) => {
-                info!("Received error battery update: {:?}. Ignoring.", e);
+                info!(?e, "Ignoring battery update error");
             }
         }
     }
@@ -45,7 +45,7 @@ async fn handle_battery_client_updates(
 pub(crate) async fn process_battery_client_requests(media_sessions: Arc<MediaSessions>) {
     let battery_client = match BatteryClient::create() {
         Err(e) => {
-            info!("Power integration unavailable: {:?}", e);
+            info!(?e, "Power integration unavailable");
             return;
         }
         Ok(batt) => batt,

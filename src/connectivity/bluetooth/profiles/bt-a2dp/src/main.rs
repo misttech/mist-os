@@ -349,19 +349,14 @@ async fn connect_after_timeout(
     fuchsia_async::Timer::new(initiator_delay.after_now()).await;
 
     trace!(%peer_id, "trying to connect control channel");
-    let connect_fut = peers.lock().try_connect(peer_id.clone(), channel_parameters);
+    let connect_fut = peers.lock().try_connect(peer_id, channel_parameters);
     let channel = match connect_fut.await {
         Err(e) => return warn!(%peer_id, ?e, "Failed to connect control channel"),
         Ok(None) => return warn!(%peer_id, "Control channel already connected"),
         Ok(Some(channel)) => channel,
     };
 
-    info!(
-        "Connected to {}: mode {} max_tx {}",
-        peer_id,
-        channel.channel_mode(),
-        channel.max_tx_size()
-    );
+    info!(%peer_id, mode = %channel.channel_mode(), max_tx = %channel.max_tx_size(), "Connected");
     if let Err(e) = peers.lock().connected(peer_id, channel, Some(zx::Duration::from_nanos(0))) {
         warn!("Problem delivering connection to peer: {}", e);
     }
@@ -405,14 +400,14 @@ fn handle_services_found(
                 .map(|a| format!("{} ({}.{})", a.name, p.major_version, p.minor_version))
         })
         .collect();
-    info!("Audio profile on {peer_id}, classes: {service_names:?}, profiles: {profile_names:?}");
+    info!(%peer_id, "Found audio profile: {service_names:?}, profiles: {profile_names:?}");
 
     let Some(profile) = profiles.first() else {
-        info!("Couldn't find profile in peer {peer_id} search results, ignoring");
+        info!(%peer_id, "Couldn't find profile in results, ignoring");
         return;
     };
 
-    debug!("Marking peer {peer_id} found");
+    debug!(%peer_id, "Marking found");
     peers.lock().found(peer_id.clone(), profile.clone(), peer_preferred_directions);
 
     if let Some(initiator_delay) = initiator_delay {
@@ -446,17 +441,17 @@ fn handle_audio_mode_connection(
         info!("AudioMode Client connected");
         while let Some(request) = stream.next().await {
             match request {
-                Err(e) => info!("AudioMode client connection error: {}", e),
+                Err(e) => info!("AudioMode client error: {e}"),
                 Ok(AudioModeRequest::SetRole { role, responder }) => {
                     // We want to be `role` so we prefer to start streams of the opposite direction.
                     let direction = match role {
                         Role::Source => avdtp::EndpointType::Sink,
                         Role::Sink => avdtp::EndpointType::Source,
                     };
-                    info!("Setting AudioMode to {:?}", role);
+                    info!("Setting AudioMode to {role:?}");
                     peers.lock().set_preferred_direction(direction);
                     if let Err(e) = responder.send() {
-                        warn!("Failed to respond to mode request: {}", e);
+                        warn!("Failed to respond to mode request: {e}");
                     }
                 }
             }
@@ -510,7 +505,6 @@ const ACTIVE_STREAM_LIMIT: usize = 1;
 async fn main() -> Result<(), Error> {
     let config = A2dpConfiguration::load_default()?;
     let init_delay_ms = config.initiator_delay.into_millis();
-    info!("Starting, initiatior_delay {init_delay_ms}ms");
 
     let initiator_delay = (init_delay_ms != 0).then_some(config.initiator_delay);
 
@@ -519,7 +513,7 @@ async fn main() -> Result<(), Error> {
     // Check to see that we can encode SBC audio.
     // This is a requirement of A2DP 1.3: Section 4.2
     if let Err(e) = test_encode_sbc().await {
-        error!("Can't encode SBC Audio: {:?}", e);
+        error!("Can't encode required SBC Audio: {e:?}");
         return Ok(());
     }
 
@@ -534,7 +528,7 @@ async fn main() -> Result<(), Error> {
     let _abs_vol_relay = config.enable_sink.then(|| {
         volume_relay::VolumeRelay::start()
             .or_else(|e| {
-                warn!("Failed to start AbsoluteVolume Relay: {:?}", e);
+                warn!("Failed to start AbsoluteVolume Relay: {e:?}");
                 Err(e)
             })
             .ok()
@@ -544,9 +538,6 @@ async fn main() -> Result<(), Error> {
     let metrics_logger = bt_metrics::MetricsLogger::new();
 
     let stream_builder = StreamsBuilder::system_available(metrics_logger.clone(), &config).await?;
-
-    info!("Enabled streams from system: {stream_builder}");
-
     let profile_svc = fuchsia_component::client::connect_to_protocol::<bredr::ProfileMarker>()
         .context("Failed to connect to Bluetooth Profile service")?;
 
@@ -560,7 +551,7 @@ async fn main() -> Result<(), Error> {
         metrics_logger,
     );
     if let Err(e) = peers.iattach(&inspect.root(), "connected") {
-        warn!("Failed to attach to inspect: {:?}", e);
+        warn!("Failed to attach to inspect: {e:?}");
     }
 
     let peers_connected_stream = peers.connected_stream();
@@ -572,10 +563,9 @@ async fn main() -> Result<(), Error> {
     // The AVRCP Target component is needed if it is requested and A2DP Source is requested.
     if config.source.is_some() && config.enable_avrcp_target {
         fasync::Task::spawn(async {
-            match avrcp_target::start_avrcp_target().await {
-                Err(e) => warn!("Couldn't launch AVRCP target: {e}"),
-                Ok(_) => info!("AVRCP target started"),
-            }
+            if let Err(e) = avrcp_target::start_avrcp_target().await {
+                warn!("Couldn't launch AVRCP target: {e}");
+            };
         })
         .detach();
     }
@@ -592,16 +582,16 @@ async fn main() -> Result<(), Error> {
     add_stream_controller_capability(&mut fs, PermitsManager::from(permits));
 
     if let Err(e) = fs.take_and_serve_directory_handle() {
-        warn!("Unable to serve service directory: {}", e);
+        warn!("Unable to serve service directory: {e}");
     }
 
     let _servicefs_task = fasync::Task::spawn(fs.collect::<()>());
 
     let profile = match setup_profiles(profile_svc.clone(), &config) {
         Err(e) => {
-            let err = format!("Failed to setup profiles: {:?}", e);
-            error!("{}", err);
-            return Err(format_err!("{}", err));
+            let err = format!("Failed to setup profiles: {e:?}");
+            error!("{err}");
+            return Err(format_err!("{err}"));
         }
         Ok(profile) => profile,
     };
@@ -619,18 +609,13 @@ async fn handle_profile_events(
         let Ok(evt) = item else {
             return Err(format_err!("Profile client error: {:?}", item.err()));
         };
-        let peer_id = evt.peer_id().clone();
+        let peer_id = evt.peer_id();
         match evt {
             ProfileEvent::PeerConnected { channel, .. } => {
-                info!(
-                    "Connection from {}: mode {} max_tx {}",
-                    peer_id,
-                    channel.channel_mode(),
-                    channel.max_tx_size()
-                );
+                info!(%peer_id, mode = %channel.channel_mode(), max_tx = %channel.max_tx_size(), "Incoming connection");
                 // Connected, initiate after the delay if not streaming.
                 if let Err(e) = peers.lock().connected(peer_id, channel, initiator_delay) {
-                    warn!("Problem accepting peer connection: {}", e);
+                    warn!("Problem accepting peer connection: {e}");
                 }
             }
             ProfileEvent::SearchResult { attributes, .. } => {

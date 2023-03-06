@@ -19,7 +19,7 @@ use {
         select, FutureExt, StreamExt, TryFutureExt,
     },
     thiserror::Error,
-    tracing::{info, trace, warn},
+    tracing::{debug, info, trace, warn},
 };
 
 use crate::avrcp_relay::AvrcpRelay;
@@ -100,7 +100,7 @@ impl ConfiguredSinkTask {
                 let (player_client, player_requests) = match create_request_stream() {
                     Ok((client, requests)) => (client, requests),
                     Err(e) => {
-                        warn!("{}: Couldn't create player FIDL client: {:?}", peer_id, e);
+                        warn!(%peer_id, ?e, "Couldn't create player FIDL client");
                         return;
                     }
                 };
@@ -112,7 +112,7 @@ impl ConfiguredSinkTask {
 
                 match builder.publisher.publish(player_client, registration).await {
                     Ok(session_id) => {
-                        info!("{}: Published session {}", peer_id, session_id);
+                        info!(%peer_id, %session_id, "Published session");
                         // If the receiver has hung up, this task will be dropped.
                         let _ = sender.send(session_id);
                         // We ignore AVRCP relay errors, they are logged.
@@ -120,7 +120,7 @@ impl ConfiguredSinkTask {
                             relay_task.await;
                         }
                     }
-                    Err(e) => warn!("{}: Couldn't publish session: {:?}", peer_id, e),
+                    Err(e) => warn!(%peer_id, ?e, "Couldn't publish session"),
                 };
             };
             self._session_task = Some(fasync::Task::local(session_fut));
@@ -156,9 +156,11 @@ impl MediaTaskRunner for ConfiguredSinkTask {
         let mut stream_inspect = DataStreamInspect::default();
         let _ = stream_inspect.iattach(&self.inspect, "data_stream");
         let session_id_fut = self.establish_session();
+        let peer_id = self.peer_id;
         let media_player_fut = async move {
             let session_id = session_id_fut.await;
             let err = media_stream_task(
+                peer_id,
                 stream,
                 Box::new(move || {
                     player::Player::new(session_id, codec_config.clone(), audio_factory.clone())
@@ -166,7 +168,7 @@ impl MediaTaskRunner for ConfiguredSinkTask {
                 stream_inspect,
             )
             .await;
-            Err(MediaTaskError::Other(format!("Unrecoverable streaming error: {:?}", err)))
+            Err(MediaTaskError::Other(format!("Unrecoverable streaming error: {err:?}")))
         };
         let codec_type = self.codec_config.codec_type().clone();
         let metrics_logger = self.builder.metrics_logger.clone();
@@ -249,7 +251,7 @@ impl MediaTask for RunningSinkTask {
 
     fn stop(&mut self) -> Result<(), MediaTaskError> {
         if let Some(_task) = self.media_task.take() {
-            info!("Media Task stopped via stop signal");
+            debug!("Media Task stopped via stop signal");
         }
         // Either there was already a result, or we just send Ok(()) by dropping the sender.
         self.result().unwrap_or(Ok(()))
@@ -260,6 +262,7 @@ impl MediaTask for RunningSinkTask {
 /// to recover from errors when possible, ending when there is an unrecoverable streaming or
 /// playback error.  Reports stream progress using `inspect`.
 async fn media_stream_task(
+    peer_id: PeerId,
     mut stream: (impl futures::Stream<Item = avdtp::Result<Vec<u8>>> + std::marker::Unpin),
     player_gen: Box<dyn Fn() -> Result<player::Player, Error> + Send>,
     mut inspect: DataStreamInspect,
@@ -286,7 +289,7 @@ async fn media_stream_task(
                 trace::flow_end!("bluetooth", "ProfilePacket", packet_count.into());
 
                 if player.is_none() {
-                    info!("Starting audio player..");
+                    info!(%peer_id, "starting audio player");
                     let mut new_player = match player_gen() {
                         Ok(player) => player,
                         Err(e) => break StreamingError::PlayerFailedSetup(e),
@@ -300,7 +303,7 @@ async fn media_stream_task(
 
                 inspect.record_transferred(pkt.len(), fasync::Time::now());
                 if let Err(e) = player.as_mut().unwrap().push_payload(&pkt.as_slice()).await {
-                    info!("can't push packet: {:?}", e);
+                    warn!(%peer_id, ?e, "can't play audio packet");
                 }
             },
             player_event = player_event_fut => {
@@ -520,7 +523,7 @@ mod tests {
         let mut empty_stream = futures::stream::empty();
         let player_gen = once_player_gen(player);
 
-        let decode_fut = media_stream_task(&mut empty_stream, player_gen, inspect);
+        let decode_fut = media_stream_task(PeerId(0), &mut empty_stream, player_gen, inspect);
         pin_mut!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
@@ -541,7 +544,7 @@ mod tests {
             });
         let player_gen = once_player_gen(player);
 
-        let decode_fut = media_stream_task(&mut error_stream, player_gen, inspect);
+        let decode_fut = media_stream_task(PeerId(0), &mut error_stream, player_gen, inspect);
         pin_mut!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
@@ -565,7 +568,7 @@ mod tests {
 
         let player_gen = once_player_gen(player);
 
-        let decode_fut = media_stream_task(&mut stream, player_gen, inspect);
+        let decode_fut = media_stream_task(PeerId(0), &mut stream, player_gen, inspect);
         pin_mut!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
@@ -593,7 +596,7 @@ mod tests {
 
         let mut stream = packets_stream();
 
-        let decode_fut = media_stream_task(&mut stream, player_gen, inspect);
+        let decode_fut = media_stream_task(PeerId(0), &mut stream, player_gen, inspect);
         pin_mut!(decode_fut);
 
         match exec.run_until_stalled(&mut decode_fut) {
@@ -619,7 +622,7 @@ mod tests {
 
         let player_gen = once_player_gen(player);
 
-        let decode_fut = media_stream_task(&mut media_receiver, player_gen, inspect);
+        let decode_fut = media_stream_task(PeerId(0), &mut media_receiver, player_gen, inspect);
         pin_mut!(decode_fut);
 
         assert!(exec.run_until_stalled(&mut decode_fut).is_pending());
@@ -694,6 +697,7 @@ mod tests {
         let session_id = 1;
 
         let media_stream_fut = media_stream_task(
+            PeerId(0),
             packets_stream(),
             Box::new(move || {
                 player::Player::new(

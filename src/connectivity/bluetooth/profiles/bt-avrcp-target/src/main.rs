@@ -41,6 +41,6 @@ async fn main() -> Result<(), Error> {
 
     let result =
         try_join!(watch_media_sessions_fut, avrcp_requests_fut, battery_client_fut).map(|_| ());
-    tracing::info!("AVRCP-TG finished with result: {:?}", result);
+    tracing::info!(?result, "finished");
     result
 }

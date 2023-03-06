@@ -5,7 +5,7 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_metrics as metrics;
 use fuchsia_async as fasync;
-use tracing::{info, warn};
+use tracing::warn;
 
 pub use bt_metrics_registry::*;
 
@@ -30,8 +30,7 @@ pub fn create_metrics_logger() -> Result<metrics::MetricEventLoggerProxy, Error>
         match factory_proxy.create_metric_event_logger(project_spec, cobalt_server).await {
             Err(e) => warn!("FIDL failure setting up event logger: {e:?}"),
             Ok(Err(e)) => warn!("CreateMetricEventLogger failure: {e:?}"),
-            // TODO(fxbug.dev/114705): remove "ok" logs
-            Ok(Ok(())) => info!("Metric logger connected"),
+            Ok(Ok(())) => {}
         }
     })
     .detach();
