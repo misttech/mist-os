@@ -112,7 +112,8 @@ class MsiInterruptDispatcherImpl : public MsiInterruptDispatcher {
         has_platform_pvm_(msi_supports_masking()),
         has_cap_pvm_(has_cap_pvm),
         has_64bit_(has_64bit),
-        capability_(reinterpret_cast<MsiCapability*>(this->mapping()->base() + reg_offset)) {}
+        capability_(reinterpret_cast<MsiCapability*>(this->mapping()->base_locked() + reg_offset)) {
+  }
   void MaskInterrupt() final;
   void UnmaskInterrupt() final;
 

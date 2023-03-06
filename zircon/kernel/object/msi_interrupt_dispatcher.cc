@@ -101,8 +101,8 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
     return st;
   }
 
-  LTRACEF("Mapping mapped at %#lx, size %zx, vmo size %lx, vmo_offset = %#lx\n", mapping->base(),
-          mapping->size(), vmo->size(), vmo_offset);
+  LTRACEF("Mapping mapped at %#lx, size %zx, vmo size %lx, vmo_offset = %#lx\n",
+          mapping->base_locked(), mapping->size_locked(), vmo->size(), vmo_offset);
   fbl::AllocChecker ac;
   fbl::RefPtr<MsiInterruptDispatcher> disp;
 
@@ -255,7 +255,8 @@ MsixDispatcherImpl::MsixDispatcherImpl(fbl::RefPtr<MsiAllocation>&& alloc, uint3
                                        zx_off_t table_offset, RegisterIntFn register_int_fn)
     : MsiInterruptDispatcher(ktl::move(alloc), ktl::move(mapping), base_irq_id, msi_id,
                              register_int_fn),
-      table_entries_(reinterpret_cast<MsixTableEntry*>(this->mapping()->base() + table_offset)) {
+      table_entries_(
+          reinterpret_cast<MsixTableEntry*>(this->mapping()->base_locked() + table_offset)) {
   // Disable the vector, set up the address and data registers, then re-enable
   // it for our given msi_id. Per PCI Local Bus Spec v3 section 6.8.2
   // implementation notes, all accesses to these registers must be DWORD or

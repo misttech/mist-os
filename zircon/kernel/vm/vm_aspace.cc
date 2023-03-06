@@ -683,7 +683,11 @@ uintptr_t VmAspace::vdso_base_address() const {
 
 uintptr_t VmAspace::vdso_code_address() const {
   Guard<CriticalMutex> guard{&lock_};
-  return vdso_code_mapping_ ? vdso_code_mapping_->base() : 0;
+  if (vdso_code_mapping_) {
+    AssertHeld(vdso_code_mapping_->lock_ref());
+    return vdso_code_mapping_->base_locked();
+  }
+  return 0;
 }
 
 void VmAspace::DropAllUserPageTables() {

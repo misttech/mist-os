@@ -180,11 +180,13 @@ static bool count_committed_pages(vaddr_t start, vaddr_t end, size_t* committed,
   }
 
   // Ask the VMO how many pages it's allocated within the range.
-  auto start_off = ROUNDDOWN(start, PAGE_SIZE) - mapping->base();
-  auto end_off = ROUNDUP(end, PAGE_SIZE) - mapping->base();
+  vaddr_t start_off;
+  vaddr_t end_off;
   uint64_t mapping_offset;
   {
     Guard<CriticalMutex> guard{mapping->lock()};
+    start_off = ROUNDDOWN(start, PAGE_SIZE) - mapping->base_locked();
+    end_off = ROUNDUP(end, PAGE_SIZE) - mapping->base_locked();
     mapping_offset = mapping->object_offset_locked();
   }
   const VmObject::AttributionCounts page_counts =

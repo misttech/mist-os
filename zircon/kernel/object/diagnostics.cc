@@ -576,11 +576,11 @@ class VmCounter final : public VmEnumerator {
  public:
   bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth)
       TA_REQ(map->lock()) TA_REQ(vmar->lock()) override {
-    usage.mapped_pages += map->size() / PAGE_SIZE;
+    usage.mapped_pages += map->size_locked() / PAGE_SIZE;
 
     auto vmo = map->vmo_locked();
     const VmObject::AttributionCounts page_counts =
-        vmo->AttributedPagesInRange(map->object_offset_locked(), map->size());
+        vmo->AttributedPagesInRange(map->object_offset_locked(), map->size_locked());
     const size_t committed_pages = page_counts.uncompressed;
     uint32_t share_count = vmo->share_count();
     if (share_count == 1) {
@@ -719,7 +719,7 @@ class RestartableVmEnumerator {
               AssertHeld(vmar->lock_ref());
               IMPL::MakeMappingEntry(map, vmar, depth, &parent_->entry_);
             },
-            map->base(), depth);
+            map->base_locked(), depth);
       } else if constexpr (EnumerateMapping == MappingEnumeration::Protection) {
         struct {
           const VmMapping* map;
@@ -727,15 +727,16 @@ class RestartableVmEnumerator {
           uint depth;
         } state{map, vmar, depth};
         zx_status_t result = map->EnumerateProtectionRangesLocked(
-            map->base(), map->size(), [&state, this](vaddr_t base, size_t size, uint flags) {
+            map->base_locked(), map->size_locked(),
+            [&state, this](vaddr_t base, size_t size, uint flags) {
               return parent_->DoEntry(
                          [&state, base, size, flags, this] {
                            // These are true as they are required for calling OnVmMapping, but we
                            // cannot pass the capabilities easily via DoEntry to this callback.
                            AssertHeld(state.map->lock_ref());
                            AssertHeld(state.vmar->lock_ref());
-                           const uint64_t object_offset =
-                               state.map->object_offset_locked() + (base - state.map->base());
+                           const uint64_t object_offset = state.map->object_offset_locked() +
+                                                          (base - state.map->base_locked());
                            IMPL::MakeMappingProtectionEntry(state.map, state.vmar, state.depth,
                                                             base, size, flags, object_offset,
                                                             &parent_->entry_);

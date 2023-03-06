@@ -432,7 +432,8 @@ ktl::optional<vaddr_t> VmAddressRegion::CheckGapLocked(VmAddressRegionOrMapping*
 
   // compute the starting address of the gap
   if (prev != nullptr) {
-    if (add_overflow(prev->base(), prev->size(), &gap_beg) ||
+    AssertHeld(prev->lock_ref());
+    if (add_overflow(prev->base_locked(), prev->size_locked(), &gap_beg) ||
         add_overflow(gap_beg, min_gap, &gap_beg)) {
       return ktl::nullopt;
     }
@@ -442,10 +443,12 @@ ktl::optional<vaddr_t> VmAddressRegion::CheckGapLocked(VmAddressRegionOrMapping*
 
   // compute the ending address of the gap
   if (next != nullptr) {
-    if (gap_beg == next->base()) {
+    AssertHeld(next->lock_ref());
+    if (gap_beg == next->base_locked()) {
       return ktl::nullopt;  // no gap between regions
     }
-    if (sub_overflow(next->base(), 1, &gap_end) || sub_overflow(gap_end, min_gap, &gap_end)) {
+    if (sub_overflow(next->base_locked(), 1, &gap_end) ||
+        sub_overflow(gap_end, min_gap, &gap_end)) {
       return ktl::nullopt;
     }
   } else {
@@ -625,20 +628,20 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
     // It's possible base is less than expected if the first mapping is not precisely aligned
     // to the start of our range. After that base should always be expected, and if it's
     // greater then there is a gap and this is considered an error.
-    if (mapping->base() > expected) {
+    if (mapping->base_locked() > expected) {
       return ZX_ERR_BAD_STATE;
     }
     // We should only have been called if we were at least partially in range.
     DEBUG_ASSERT(mapping->is_in_range(expected, 1));
-    const size_t mapping_offset = expected - mapping->base();
+    const size_t mapping_offset = expected - mapping->base_locked();
     const size_t vmo_offset = mapping->object_offset_locked() + mapping_offset;
 
     // Should only have been called for a non-zero range.
     DEBUG_ASSERT(last_addr > expected);
 
     const size_t total_remain = last_addr - expected;
-    DEBUG_ASSERT(mapping->size() > mapping_offset);
-    const size_t max_in_mapping = mapping->size() - mapping_offset;
+    DEBUG_ASSERT(mapping->size_locked() > mapping_offset);
+    const size_t max_in_mapping = mapping->size_locked() - mapping_offset;
 
     const size_t size = ktl::min(total_remain, max_in_mapping);
 
@@ -781,11 +784,12 @@ zx_status_t VmAddressRegion::UnmapInternalLocked(vaddr_t base, size_t size,
     // destroy regions and are spanning a region, and bail if we are.
     for (auto itr = begin; itr != end; ++itr) {
       vaddr_t itr_end_byte = 0;
-      DEBUG_ASSERT(itr->size() > 0);
-      overflowed = add_overflow(itr->base(), itr->size() - 1, &itr_end_byte);
+      AssertHeld((itr->lock_ref()));
+      DEBUG_ASSERT(itr->size_locked() > 0);
+      overflowed = add_overflow(itr->base_locked(), itr->size_locked() - 1, &itr_end_byte);
       ASSERT(!overflowed);
       if (!itr->is_mapping() &&
-          (!can_destroy_regions || itr->base() < base || itr_end_byte > end_addr_byte)) {
+          (!can_destroy_regions || itr->base_locked() < base || itr_end_byte > end_addr_byte)) {
         return ZX_ERR_INVALID_ARGS;
       }
     }
@@ -800,23 +804,23 @@ zx_status_t VmAddressRegion::UnmapInternalLocked(vaddr_t base, size_t size,
       // destroyed. As such we stash a copy of its base in a variable in our outer scope.
       auto curr = itr++;
       AssertHeld(curr->lock_ref());
-      curr_base = curr->base();
+      curr_base = curr->base_locked();
       // The parent will keep living even if we destroy curr so can place that in the outer scope.
       up = curr->parent_;
 
       if (curr->is_mapping()) {
         AssertHeld(curr->as_vm_mapping()->lock_ref());
         vaddr_t curr_end_byte = 0;
-        DEBUG_ASSERT(curr->size() > 1);
-        overflowed = add_overflow(curr->base(), curr->size() - 1, &curr_end_byte);
+        DEBUG_ASSERT(curr->size_locked() > 1);
+        overflowed = add_overflow(curr->base_locked(), curr->size_locked() - 1, &curr_end_byte);
         ASSERT(!overflowed);
-        const vaddr_t unmap_base = ktl::max(curr->base(), base);
+        const vaddr_t unmap_base = ktl::max(curr->base_locked(), base);
         const vaddr_t unmap_end_byte = ktl::min(curr_end_byte, end_addr_byte);
         size_t unmap_size;
         overflowed = add_overflow(unmap_end_byte - unmap_base, 1, &unmap_size);
         ASSERT(!overflowed);
 
-        if (unmap_base == curr->base() && unmap_size == curr->size()) {
+        if (unmap_base == curr->base_locked() && unmap_size == curr->size_locked()) {
           // If we're unmapping the entire region, just call Destroy
           [[maybe_unused]] zx_status_t status = curr->DestroyLocked();
           DEBUG_ASSERT(status == ZX_OK);
@@ -839,8 +843,8 @@ zx_status_t VmAddressRegion::UnmapInternalLocked(vaddr_t base, size_t size,
       } else {
         vaddr_t unmap_base = 0;
         size_t unmap_size = 0;
-        [[maybe_unused]] bool intersects =
-            GetIntersect(base, size, curr->base(), curr->size(), &unmap_base, &unmap_size);
+        [[maybe_unused]] bool intersects = GetIntersect(
+            base, size, curr->base_locked(), curr->size_locked(), &unmap_base, &unmap_size);
         DEBUG_ASSERT(intersects);
         if (allow_partial_vmar) {
           // If partial VMARs are allowed, we descend into sub-VMARs.
@@ -852,7 +856,7 @@ zx_status_t VmAddressRegion::UnmapInternalLocked(vaddr_t base, size_t size,
             itr = begin;
             at_top = false;
           }
-        } else if (unmap_base == curr->base() && unmap_size == curr->size()) {
+        } else if (unmap_base == curr->base_locked() && unmap_size == curr->size_locked()) {
           [[maybe_unused]] zx_status_t status = curr->DestroyLocked();
           DEBUG_ASSERT(status == ZX_OK);
         }
@@ -917,11 +921,12 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
     vaddr_t expected = base;
     while (auto entry = enumerator.next()) {
       VmMapping* mapping = entry->region_or_mapping;
-      if (mapping->base() > expected) {
+      AssertHeld(mapping->lock_ref());
+      if (mapping->base_locked() > expected) {
         return ZX_ERR_NOT_FOUND;
       }
       vaddr_t end;
-      overflowed = add_overflow(mapping->base(), mapping->size(), &end);
+      overflowed = add_overflow(mapping->base_locked(), mapping->size_locked(), &end);
       ASSERT(!overflowed);
       if (!mapping->is_valid_mapping_flags(new_arch_mmu_flags)) {
         return ZX_ERR_ACCESS_DENIED;
@@ -967,9 +972,10 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
 
     // The last byte of the current region.
     vaddr_t curr_end_byte = 0;
-    overflowed = add_overflow(mapping->base(), mapping->size() - 1, &curr_end_byte);
+    AssertHeld(mapping->lock_ref());
+    overflowed = add_overflow(mapping->base_locked(), mapping->size_locked() - 1, &curr_end_byte);
     ASSERT(!overflowed);
-    const vaddr_t protect_base = ktl::max(mapping->base(), base);
+    const vaddr_t protect_base = ktl::max(mapping->base_locked(), base);
     const vaddr_t protect_end_byte = ktl::min(curr_end_byte, end_addr_byte);
     size_t protect_size;
     overflowed = add_overflow(protect_end_byte - protect_base, 1, &protect_size);

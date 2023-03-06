@@ -85,7 +85,7 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
     return status;
   }
 
-  LTRACEF("%s mapping at %#" PRIxPTR "\n", type.name, kstack_mapping->base());
+  LTRACEF("%s mapping at %#" PRIxPTR "\n", type.name, kstack_mapping->base_locked());
 
   // fault in all the pages so we dont demand fault in the stack
   status = kstack_mapping->MapRange(0, type.size, true);
