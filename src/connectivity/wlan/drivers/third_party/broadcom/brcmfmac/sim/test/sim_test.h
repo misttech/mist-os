@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/common/c/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <zircon/types.h>
 
 #include <map>
@@ -236,6 +237,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   std::map<uint16_t, SimInterface*> ifaces_;
 
   fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
+  fidl::WireSyncClient<fuchsia_factory_wlan::Iovar> factory_device_;
   fdf::Dispatcher client_dispatcher_;
   fdf::Arena test_arena_;
   libsync::Completion completion_;
@@ -244,6 +246,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   // StationIfc methods - by default, do nothing. These can/will be overridden by superclasses.
   void Rx(std::shared_ptr<const simulation::SimFrame> frame,
           std::shared_ptr<const simulation::WlanRxInfo> info) override {}
+  async::Loop loop_;
 };
 
 }  // namespace wlan::brcmfmac

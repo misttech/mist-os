@@ -25,6 +25,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/factory_device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/feature.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/wlan_interface.h"
@@ -49,7 +50,8 @@ Device::Device(zx_device_t* parent)
       brcmf_pub_(std::make_unique<brcmf_pub>()),
       client_interface_(nullptr),
       ap_interface_(nullptr),
-      network_device_(parent, this) {
+      network_device_(parent, this),
+      parent_(parent) {
   brcmf_pub_->device = this;
   for (auto& entry : brcmf_pub_->if2bss) {
     entry = BRCMF_BSSIDX_INVALID;
@@ -70,13 +72,27 @@ Device::Device(zx_device_t* parent)
 
 Device::~Device() { ShutdownDispatcher(); }
 
-void Device::DdkInit(ddk::InitTxn txn) {
-  zx_status_t status = Init();
+zx_status_t Device::Init() {
+  zx_status_t status = DeviceInit();
   if (status == ZX_OK && IsNetworkDeviceBus()) {
     status = network_device_.Init(kNetDevDriverName);
+    if (status != ZX_OK) {
+      BRCMF_ERR("Failed to initialize network device %s", zx_status_get_string(status));
+      return status;
+    }
   }
-  txn.Reply(status);
+
+  // This does not have to be freed since its lifecycle is taken care by FDF.
+  status = FactoryDevice::Create(parent_, brcmf_pub_.get(), &factory_device_);
+  if (status != ZX_OK) {
+    BRCMF_ERR("Failed to create factory device %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return status;
 }
+
+void Device::DdkInit(ddk::InitTxn txn) { txn.Reply(Init()); }
 
 void Device::DdkRelease() {
   Shutdown();
@@ -97,32 +113,6 @@ zx_status_t Device::DdkServiceConnect(const char* service_name, fdf::Channel cha
   fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
   fdf::BindServer(dispatcher_.get(), std::move(server_end), this);
   return ZX_OK;
-}
-
-void Device::Get(GetRequestView request, GetCompleter::Sync& _completer) {
-  BRCMF_DBG(TRACE, "Enter. cmd %d, len %lu", request->cmd, request->request.count());
-  zx_status_t status =
-      brcmf_send_cmd_to_firmware(brcmf_pub_.get(), request->iface_idx, request->cmd,
-                                 (void*)request->request.data(), request->request.count(), false);
-  if (status == ZX_OK) {
-    _completer.ReplySuccess(request->request);
-  } else {
-    _completer.ReplyError(status);
-  }
-  BRCMF_DBG(TRACE, "Exit");
-}
-
-void Device::Set(SetRequestView request, SetCompleter::Sync& _completer) {
-  BRCMF_DBG(TRACE, "Enter. cmd %d, len %lu", request->cmd, request->request.count());
-  zx_status_t status =
-      brcmf_send_cmd_to_firmware(brcmf_pub_.get(), request->iface_idx, request->cmd,
-                                 (void*)request->request.data(), request->request.count(), true);
-  if (status == ZX_OK) {
-    _completer.ReplySuccess();
-  } else {
-    _completer.ReplyError(status);
-  }
-  BRCMF_DBG(TRACE, "Exit");
 }
 
 brcmf_pub* Device::drvr() { return brcmf_pub_.get(); }

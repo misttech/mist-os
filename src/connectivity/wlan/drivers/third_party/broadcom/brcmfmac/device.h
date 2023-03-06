@@ -34,6 +34,7 @@
 #include <wlan/drivers/components/network_device.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/core.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/factory_device.h"
 
 namespace wlan {
 namespace brcmfmac {
@@ -42,18 +43,21 @@ class Device;
 class DeviceInspect;
 class WlanInterface;
 using DeviceType =
-    ::ddk::Device<Device, ddk::Initializable, ddk::Messageable<fuchsia_factory_wlan::Iovar>::Mixin,
-                  ddk::Suspendable, ddk::ServiceConnectable>;
+    ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable, ddk::ServiceConnectable>;
 class Device : public DeviceType,
                public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                public ::wlan::drivers::components::NetworkDevice::Callbacks {
  public:
   virtual ~Device();
 
+  // Device Initialization
+  zx_status_t Init();
+
   // State accessors
   brcmf_pub* drvr();
   const brcmf_pub* drvr() const;
   ::wlan::drivers::components::NetworkDevice& NetDev() { return network_device_; }
+  FactoryDevice* GetFactoryDevice(void) { return factory_device_; }
 
   // Virtual state accessors
   virtual async_dispatcher_t* GetDispatcher() = 0;
@@ -96,15 +100,15 @@ class Device : public DeviceType,
   void NetDevSetSnoopEnabled(bool snoop) override;
 
   // Trampolines for DDK functions, for platforms that support them.
-  virtual zx_status_t Init() = 0;
+  virtual zx_status_t DeviceInit() = 0;
   virtual zx_status_t DeviceAdd(device_add_args_t* args, zx_device_t** out_device) = 0;
   virtual void DeviceAsyncRemove(zx_device_t* dev) = 0;
   virtual zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) = 0;
   virtual zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen,
                                         size_t* actual) = 0;
 
-  // Helper
-  void DestroyAllIfaces(void);
+  // Helper functions
+  void DestroyAllIfaces();
 
  protected:
   // Only derived classes are allowed to create this object.
@@ -133,10 +137,8 @@ class Device : public DeviceType,
   WlanInterface* ap_interface_;
 
   ::wlan::drivers::components::NetworkDevice network_device_;
-
-  // fidl::WireServer<fuchsia_factory_wlan_iovar::Iovar> Implementation
-  void Get(GetRequestView request, GetCompleter::Sync& _completer) override;
-  void Set(SetRequestView request, SetCompleter::Sync& _completer) override;
+  zx_device_t* parent_;
+  FactoryDevice* factory_device_;
 
   // Helpers
   void ShutdownDispatcher();

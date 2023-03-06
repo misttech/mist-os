@@ -121,6 +121,7 @@ source_set("core") {
     "core.cc",
     "d11.cc",
     "device.cc",
+    "factory_device.cc",
     "feature.cc",
     "fweh.cc",
     "fwil.cc",

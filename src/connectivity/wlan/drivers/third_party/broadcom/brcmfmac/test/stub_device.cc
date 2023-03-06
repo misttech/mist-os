@@ -20,7 +20,7 @@ async_dispatcher_t* StubDevice::GetDispatcher() { return nullptr; }
 
 DeviceInspect* StubDevice::GetInspect() { return nullptr; }
 
-zx_status_t StubDevice::Init() { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t StubDevice::DeviceInit() { return ZX_ERR_NOT_SUPPORTED; }
 
 zx_status_t StubDevice::DeviceAdd(device_add_args_t* args, zx_device_t** out_device) {
   return ZX_ERR_NOT_SUPPORTED;

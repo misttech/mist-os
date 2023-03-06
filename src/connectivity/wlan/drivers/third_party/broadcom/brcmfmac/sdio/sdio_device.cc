@@ -79,7 +79,7 @@ async_dispatcher_t* SdioDevice::GetDispatcher() { return async_loop_->dispatcher
 
 DeviceInspect* SdioDevice::GetInspect() { return inspect_.get(); }
 
-zx_status_t SdioDevice::Init() {
+zx_status_t SdioDevice::DeviceInit() {
   zx_status_t status = ZX_OK;
 
   std::unique_ptr<brcmf_bus> bus;

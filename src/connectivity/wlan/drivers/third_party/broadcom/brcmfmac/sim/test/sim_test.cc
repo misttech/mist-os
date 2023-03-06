@@ -8,6 +8,8 @@
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
 
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/factory_device.h"
+
 namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
 
 namespace wlan::brcmfmac {
@@ -371,7 +373,7 @@ zx_status_t SimInterface::SetMulticastPromisc(bool enable) {
   return if_impl_ops_->set_multicast_promisc(if_impl_ctx_, enable);
 }
 
-SimTest::SimTest() : test_arena_(nullptr) {
+SimTest::SimTest() : test_arena_(nullptr), loop_(&kAsyncLoopConfigNeverAttachToThread) {
   env_ = std::make_shared<simulation::Environment>();
   env_->AddStation(this);
 
@@ -379,6 +381,7 @@ SimTest::SimTest() : test_arena_(nullptr) {
   // The sim test is strictly a theoretical observer in the simulation environment thus it should be
   // able to see everything
   rx_sensitivity_ = std::numeric_limits<double>::lowest();
+  loop_.StartThread("factory-device-test");
 }
 
 SimTest::~SimTest() {
@@ -450,6 +453,27 @@ zx_status_t SimTest::Init() {
   client_dispatcher_ = *std::move(dispatcher);
   client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client),
                                                                      client_dispatcher_.get());
+
+  zx::result factory_endpoints = fidl::CreateEndpoints<fuchsia_factory_wlan::Iovar>();
+  if (factory_endpoints.is_error()) {
+    BRCMF_ERR("Failed to create factory dispatcher : %s",
+              zx_status_get_string(factory_endpoints.error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+  auto [client_end, server_end] = std::move(*factory_endpoints);
+  if (!client_end.is_valid()) {
+    BRCMF_ERR("Failed to create client_end");
+    return ZX_ERR_INTERNAL;
+  }
+
+  device_->Init();
+  fidl::BindServer(loop_.dispatcher(), std::move(server_end), device_->GetFactoryDevice());
+
+  factory_device_ = fidl::WireSyncClient(std::move(client_end));
+  if (!factory_device_.is_valid()) {
+    BRCMF_ERR("Failed to create device");
+    return ZX_ERR_INTERNAL;
+  }
 
   device_->DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                              endpoints->server.TakeHandle());

@@ -188,6 +188,16 @@ executable("cc_test") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
+executable("factory_device_test") {
+  output_name = "factory_device_test"
+  testonly = true
+  sources = [ "factory_device_test.cc" ]
+  deps = [
+    ":sim_test",
+    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
+  ]
+}
+
 executable("channel_switch_test") {
   output_name = "channel_switch_test"
   testonly = true
@@ -639,6 +649,7 @@ _tests = [
   "bootloader_mac_addr_test",
   "call_after_del_iface_test",
   "cc_test",
+  "factory_device_test",
   "channel_switch_test",
   "connect_test",
   "crash_recovery_test",

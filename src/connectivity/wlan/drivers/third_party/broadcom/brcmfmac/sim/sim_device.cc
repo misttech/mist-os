@@ -88,7 +88,7 @@ async_dispatcher_t* SimDevice::GetDispatcher() { return sim_environ_->GetDispatc
 
 DeviceInspect* SimDevice::GetInspect() { return inspect_.get(); }
 
-zx_status_t SimDevice::Init() {
+zx_status_t SimDevice::DeviceInit() {
   // Not supported.  Manually invoke SimDevice::BusInit() instead.
   return ZX_ERR_NOT_SUPPORTED;
 }

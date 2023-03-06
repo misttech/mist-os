@@ -182,5 +182,6 @@ DDK_PROTOCOL_DEF(ADB,                     165, "adb", 0)
 // Out-of-order (or added later).
 DDK_PROTOCOL_DEF(USB_INTERFACE_ASSOCIATION, 166, "usb-interface-association", PF_NOPUB)
 DDK_PROTOCOL_DEF(FASTBOOT, 167, "fastboot", 0)
+DDK_PROTOCOL_DEF(WLAN_FACTORY,            168,   "wlan-factory", 0)
 #undef DDK_PROTOCOL_DEF
 #endif

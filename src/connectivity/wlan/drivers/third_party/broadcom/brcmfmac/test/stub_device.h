@@ -29,7 +29,7 @@ class StubDevice : public Device {
   DeviceInspect* GetInspect() override;
   bool IsNetworkDeviceBus() const override { return false; }
 
-  zx_status_t Init() override;
+  zx_status_t DeviceInit() override;
   zx_status_t DeviceAdd(device_add_args_t* args, zx_device_t** out_device) override;
   void DeviceAsyncRemove(zx_device_t* dev) override;
   zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) override;
