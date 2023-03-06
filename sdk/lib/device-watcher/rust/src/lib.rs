@@ -150,6 +150,14 @@ pub async fn recursive_wait_and_open_node(
     recursive_wait_and_open::<fio::NodeMarker>(dir, name).await
 }
 
+/// Wait for `name` to be available in `dir`. This function waits for each directory along
+/// the path and returns once it has waited on the final component in the path. If the path
+/// never appears this function will wait forever.
+pub async fn recursive_wait(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
+    let _proxy = recursive_wait_and_open_node(dir, name).await?;
+    Ok(())
+}
+
 /// Open the path `name` within `dir`. This function waits for each directory to
 /// be available before it opens it. If the path never appears this function
 /// will wait forever.
