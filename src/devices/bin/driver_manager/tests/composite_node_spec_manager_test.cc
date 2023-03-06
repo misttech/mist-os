@@ -251,15 +251,18 @@ TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
       .node_names = {{"node-0", "node-1"}},
   }});
 
+  std::shared_ptr<dfv2::Node> node =
+      std::make_shared<dfv2::Node>("node", std::vector<dfv2::Node*>{}, nullptr, nullptr);
+
   ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
-                                                         std::weak_ptr<dfv2::Node>()));
+                                                         std::weak_ptr<dfv2::Node>(node)));
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
 
   // Bind the same node.
-  ASSERT_EQ(ZX_ERR_NOT_FOUND,
-            composite_node_spec_manager_
-                ->BindParentSpec(fidl::ToWire(allocator, matched_node), std::weak_ptr<dfv2::Node>())
-                .status_value());
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, composite_node_spec_manager_
+                                  ->BindParentSpec(fidl::ToWire(allocator, matched_node),
+                                                   std::weak_ptr<dfv2::Node>(node))
+                                  .status_value());
 }
 
 TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
@@ -351,14 +354,20 @@ TEST_F(CompositeNodeSpecManagerTest, TestMultibindDisabled) {
       .node_names = {{"node-0"}},
   }});
 
+  std::shared_ptr<dfv2::Node> node_1 =
+      std::make_shared<dfv2::Node>("node_1", std::vector<dfv2::Node*>{}, nullptr, nullptr);
+
+  std::shared_ptr<dfv2::Node> node_2 =
+      std::make_shared<dfv2::Node>("node_2", std::vector<dfv2::Node*>{}, nullptr, nullptr);
+
   ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
-                                                         std::weak_ptr<dfv2::Node>(), false));
+                                                         std::weak_ptr<dfv2::Node>(node_1), false));
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
   ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
 
   // Bind the node again. Both composite node specs should now have the bound node.
   ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
-                                                         std::weak_ptr<dfv2::Node>(), false));
+                                                         std::weak_ptr<dfv2::Node>(node_2), false));
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
   ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
 }

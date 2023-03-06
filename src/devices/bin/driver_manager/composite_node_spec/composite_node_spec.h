@@ -38,7 +38,7 @@ class CompositeNodeSpec {
       const DeviceOrNode& device_or_node);
 
   // Exposed for testing.
-  const std::vector<bool>& parent_specs() const { return parent_specs_; }
+  const std::vector<std::optional<DeviceOrNode>>& parent_specs() const { return parent_specs_; }
 
  protected:
   // Subclass implementation for binding the DeviceOrNode to its composite. If the composite is not
@@ -54,7 +54,7 @@ class CompositeNodeSpec {
 
  private:
   std::string name_;
-  std::vector<bool> parent_specs_;
+  std::vector<std::optional<DeviceOrNode>> parent_specs_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_NODE_SPEC_H_
