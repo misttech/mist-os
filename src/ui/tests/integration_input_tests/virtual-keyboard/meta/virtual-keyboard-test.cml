@@ -16,6 +16,7 @@
             // Keep it minimal, describe only what's actually needed.
             // TODO(fxbug.dev/81446): Remove this list.
             protocol: [
+                "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",

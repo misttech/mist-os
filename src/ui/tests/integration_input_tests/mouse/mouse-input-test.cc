@@ -612,9 +612,7 @@ TEST_F(FlutterInputTest, FlutterMouseWheel) {
   EXPECT_EQ(event_wheel_v.wheel_x_physical_pixel(), 0);
 }
 
-// ChromiumInputTest is flaky because of test body not always got enough signal to
-// know Chromium is ready to accept mouse input.
-class DISABLED_ChromiumInputTest : public MouseInputBase {
+class ChromiumInputTest : public MouseInputBase {
  protected:
   std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
     return {
@@ -771,7 +769,7 @@ class DISABLED_ChromiumInputTest : public MouseInputBase {
   static const int kMaxRetry = 10;
 };
 
-TEST_F(DISABLED_ChromiumInputTest, ChromiumMouseMove) {
+TEST_F(ChromiumInputTest, ChromiumMouseMove) {
   LaunchClient();
 
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
@@ -794,7 +792,7 @@ TEST_F(DISABLED_ChromiumInputTest, ChromiumMouseMove) {
       /*component_name=*/"mouse-input-chromium");
 }
 
-TEST_F(DISABLED_ChromiumInputTest, ChromiumMouseDownMoveUp) {
+TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
   LaunchClient();
 
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
@@ -835,7 +833,7 @@ TEST_F(DISABLED_ChromiumInputTest, ChromiumMouseDownMoveUp) {
               /*component_name=*/"mouse-input-chromium");
 }
 
-TEST_F(DISABLED_ChromiumInputTest, ChromiumMouseWheel) {
+TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
   LaunchClient();
 
   auto initial_position = EnsureMouseIsReadyAndGetPosition();

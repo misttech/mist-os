@@ -19,6 +19,7 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
                 "fuchsia.logger.LogSink",
+                "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",
