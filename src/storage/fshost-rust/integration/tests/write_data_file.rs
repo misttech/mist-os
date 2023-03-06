@@ -6,7 +6,7 @@
 //! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
 
 use {
-    super::{data_fs_name, data_fs_spec, data_fs_type, new_builder},
+    super::{data_fs_name, data_fs_spec, data_fs_type, new_builder, VFS_TYPE_BLOBFS},
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fshost::{AdminProxy, AdminWriteDataFileResult},
     fuchsia_zircon::{self as zx, HandleBased as _},
@@ -34,7 +34,19 @@ async fn unformatted() {
         .set_config_value("fvm_ramdisk", true)
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk();
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
+
+    // Wait for the zbi ramdisk filesystems to be exposed.
+    if cfg!(feature = "fshost_rust") {
+        fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+        fixture.check_fs_type("data", data_fs_type()).await;
+    }
 
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
@@ -96,7 +108,19 @@ async fn unformatted_small_disk() {
         .set_config_value("fvm_ramdisk", true)
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().size(SMALL_DISK_SIZE).data_volume_size(SMALL_DISK_SIZE / 2);
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
+
+    // Wait for the zbi ramdisk filesystems to be exposed.
+    if cfg!(feature = "fshost_rust") {
+        fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+        fixture.check_fs_type("data", data_fs_type()).await;
+    }
 
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
@@ -132,7 +156,19 @@ async fn formatted() {
         .set_config_value("fvm_ramdisk", true)
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().format_data(data_fs_spec());
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
+
+    // Wait for the zbi ramdisk filesystems to be exposed.
+    if cfg!(feature = "fshost_rust") {
+        fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+        fixture.check_fs_type("data", data_fs_type()).await;
+    }
 
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
@@ -167,7 +203,19 @@ async fn formatted_file_in_root() {
         .set_config_value("fvm_ramdisk", true)
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().format_data(data_fs_spec());
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
+
+    // Wait for the zbi ramdisk filesystems to be exposed.
+    if cfg!(feature = "fshost_rust") {
+        fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+        fixture.check_fs_type("data", data_fs_type()).await;
+    }
 
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();

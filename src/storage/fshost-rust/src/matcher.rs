@@ -60,7 +60,7 @@ pub struct Matchers {
 impl Matchers {
     /// Create a new set of matchers. This essentially describes the expected partition layout for
     /// a device.
-    pub fn new(config: &fshost_config::Config) -> Self {
+    pub fn new(config: &fshost_config::Config, ramdisk_path: Option<String>) -> Self {
         let mut matchers = Vec::<Box<dyn Matcher>>::new();
 
         if config.bootpart {
@@ -69,45 +69,51 @@ impl Matchers {
         if config.nand {
             matchers.push(Box::new(NandMatcher::new()));
         }
+
         let gpt_matcher =
             Box::new(PartitionMapMatcher::new(DiskFormat::Gpt, false, GPT_DRIVER_PATH, "", None));
-        let mut fvm_matcher = Box::new(PartitionMapMatcher::new(
-            DiskFormat::Fvm,
-            false,
-            FVM_DRIVER_PATH,
-            "/fvm",
-            if config.fvm_ramdisk { Some(config.ramdisk_prefix.clone()) } else { None },
-        ));
-
-        if !config.netboot {
-            if config.blobfs {
-                fvm_matcher.child_matchers.push(Box::new(BlobfsMatcher::new()));
-            }
-            if config.data {
-                fvm_matcher.child_matchers.push(Box::new(DataMatcher::new()));
-            }
-        }
         if config.gpt || !gpt_matcher.child_matchers.is_empty() {
             matchers.push(gpt_matcher);
         }
-        if config.fvm || !fvm_matcher.child_matchers.is_empty() {
-            matchers.push(fvm_matcher);
 
-            if config.fvm_ramdisk {
-                // Add another matcher for the non-ramdisk version of fvm.
-                let mut non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
-                    DiskFormat::Fvm,
-                    false,
-                    FVM_DRIVER_PATH,
-                    "/fvm",
-                    None,
-                ));
-                if config.data_filesystem_format != "fxfs" && !config.no_zxcrypt {
-                    non_ramdisk_fvm_matcher.child_matchers.push(Box::new(ZxcryptMatcher::new()));
+        // If fvm_ramdisk is true but we don't actually have a ramdisk launching, we skip making
+        // the fvm+blobfs+data matcher entirely.
+        if !config.fvm_ramdisk || ramdisk_path.is_some() {
+            let mut fvm_matcher = Box::new(PartitionMapMatcher::new(
+                DiskFormat::Fvm,
+                false,
+                FVM_DRIVER_PATH,
+                "/fvm",
+                if config.fvm_ramdisk { ramdisk_path } else { None },
+            ));
+            if !config.netboot {
+                if config.blobfs {
+                    fvm_matcher.child_matchers.push(Box::new(BlobfsMatcher::new()));
                 }
-                matchers.push(non_ramdisk_fvm_matcher);
+                if config.data {
+                    fvm_matcher.child_matchers.push(Box::new(DataMatcher::new()));
+                }
+            }
+            if config.fvm || !fvm_matcher.child_matchers.is_empty() {
+                matchers.push(fvm_matcher);
             }
         }
+
+        if config.fvm && config.fvm_ramdisk {
+            // Add another matcher for the non-ramdisk version of fvm.
+            let mut non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
+                DiskFormat::Fvm,
+                false,
+                FVM_DRIVER_PATH,
+                "/fvm",
+                None,
+            ));
+            if config.data_filesystem_format != "fxfs" && !config.no_zxcrypt {
+                non_ramdisk_fvm_matcher.child_matchers.push(Box::new(ZxcryptMatcher::new()));
+            }
+            matchers.push(non_ramdisk_fvm_matcher);
+        }
+
         if config.gpt_all {
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Gpt,
@@ -229,9 +235,7 @@ struct PartitionMapMatcher {
     // suffix.
     path_suffix: &'static str,
 
-    // If this partition is required to exist on a ramdisk, then this contains the prefix it should
-    // have.
-    ramdisk_required: Option<String>,
+    ramdisk_path: Option<String>,
 
     // The topological paths of all devices matched so far.
     device_paths: Vec<String>,
@@ -246,14 +250,14 @@ impl PartitionMapMatcher {
         allow_multiple: bool,
         driver_path: &'static str,
         path_suffix: &'static str,
-        ramdisk_required: Option<String>,
+        ramdisk_path: Option<String>,
     ) -> Self {
         Self {
             content_format,
             allow_multiple,
             driver_path,
             path_suffix,
-            ramdisk_required,
+            ramdisk_path,
             device_paths: Vec::new(),
             child_matchers: Vec::new(),
         }
@@ -266,8 +270,10 @@ impl Matcher for PartitionMapMatcher {
         if !self.allow_multiple && !self.device_paths.is_empty() {
             return false;
         }
-        if let Some(ramdisk_prefix) = &self.ramdisk_required {
-            if !device.topological_path().starts_with(ramdisk_prefix) {
+        if let Some(ramdisk_prefix) = &self.ramdisk_path {
+            if device.topological_path().starts_with(ramdisk_prefix) {
+                tracing::info!(path = %device.path(), %ramdisk_prefix, "Found the fvm ramdisk");
+            } else {
                 return false;
             }
         }
@@ -497,7 +503,7 @@ mod tests {
             &self.topological_path
         }
         fn path(&self) -> &str {
-            unreachable!()
+            &self.topological_path
         }
         async fn partition_label(&mut self) -> Result<&str, Error> {
             Ok(self
@@ -616,12 +622,15 @@ mod tests {
         let mut mock_device = MockDevice::new().set_block_flags(Flag::BOOTPART);
 
         // Check no match when disabled in config.
-        assert!(!Matchers::new(&fshost_config::Config { bootpart: false, ..default_config() })
-            .match_device(&mut mock_device, &mut MockEnv::new())
-            .await
-            .expect("match_device failed"));
+        assert!(!Matchers::new(
+            &fshost_config::Config { bootpart: false, ..default_config() },
+            None
+        )
+        .match_device(&mut mock_device, &mut MockEnv::new())
+        .await
+        .expect("match_device failed"));
 
-        assert!(Matchers::new(&default_config())
+        assert!(Matchers::new(&default_config(), None)
             .match_device(
                 &mut mock_device,
                 &mut MockEnv::new().expect_attach_driver(BOOTPART_DRIVER_PATH)
@@ -636,12 +645,12 @@ mod tests {
         let mut env = MockEnv::new().expect_attach_driver(NAND_BROKER_DRIVER_PATH);
 
         // Default shouldn't match.
-        assert!(!Matchers::new(&default_config())
+        assert!(!Matchers::new(&default_config(), None)
             .match_device(&mut device, &mut env)
             .await
             .expect("match_device failed"));
 
-        assert!(Matchers::new(&fshost_config::Config { nand: true, ..default_config() })
+        assert!(Matchers::new(&fshost_config::Config { nand: true, ..default_config() }, None)
             .match_device(&mut device, &mut env)
             .await
             .expect("match_device failed"));
@@ -653,17 +662,15 @@ mod tests {
 
         // Check no match when disabled in config.
         let mut device = MockDevice::new().set_content_format(DiskFormat::Gpt);
-        assert!(!Matchers::new(&fshost_config::Config {
-            blobfs: false,
-            data: false,
-            gpt: false,
-            ..default_config()
-        })
+        assert!(!Matchers::new(
+            &fshost_config::Config { blobfs: false, data: false, gpt: false, ..default_config() },
+            None
+        )
         .match_device(&mut device, &mut env)
         .await
         .expect("match_device failed"));
 
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_config(), None);
         assert!(matchers.match_device(&mut device, &mut env).await.expect("match_device failed"));
 
         // More GPT devices should not get matched.
@@ -671,7 +678,7 @@ mod tests {
 
         // The gpt_all config should allow multiple GPT devices to be matched.
         let mut matchers =
-            Matchers::new(&fshost_config::Config { gpt_all: true, ..default_config() });
+            Matchers::new(&fshost_config::Config { gpt_all: true, ..default_config() }, None);
         let mut env = MockEnv::new().expect_attach_driver(GPT_DRIVER_PATH);
         assert!(matchers.match_device(&mut device, &mut env).await.expect("match_device failed"));
         let mut env = MockEnv::new().expect_attach_driver(GPT_DRIVER_PATH);
@@ -682,12 +689,14 @@ mod tests {
     async fn test_partition_map_matcher_ramdisk_prefix() {
         // If fvm_ramdisk is true and one of the devices matches the ramdisk prefix, we will match
         // two fvm devices, and the third one will fail.
-        let mut matchers = Matchers::new(&fshost_config::Config {
-            fvm_ramdisk: true,
-            ramdisk_prefix: "second_prefix".to_string(),
-            data_filesystem_format: "minfs".to_string(),
-            ..default_config()
-        });
+        let mut matchers = Matchers::new(
+            &fshost_config::Config {
+                fvm_ramdisk: true,
+                data_filesystem_format: "minfs".to_string(),
+                ..default_config()
+            },
+            Some("second_prefix".to_string()),
+        );
         let mut fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
@@ -738,15 +747,59 @@ mod tests {
             .match_device(&mut data_device, &mut env)
             .await
             .expect("match_device failed"));
+    }
 
+    #[fuchsia::test]
+    async fn partition_map_matcher_wrong_prefix_match() {
         // If fvm_ramdisk is true but no devices match the prefix, only the first device will
         // match.
-        let mut matchers = Matchers::new(&fshost_config::Config {
-            fvm_ramdisk: true,
-            ramdisk_prefix: "wrong_prefix".to_string(),
-            data_filesystem_format: "fxfs".to_string(),
-            ..default_config()
-        });
+        let mut matchers = Matchers::new(
+            &fshost_config::Config {
+                fvm_ramdisk: true,
+                data_filesystem_format: "fxfs".to_string(),
+                ..default_config()
+            },
+            Some("wrong_prefix".to_string()),
+        );
+
+        let mut fvm_device = MockDevice::new()
+            .set_content_format(DiskFormat::Fvm)
+            .set_topological_path("first_prefix");
+        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        assert!(matchers
+            .match_device(&mut fvm_device, &mut env)
+            .await
+            .expect("match_device failed"));
+        let mut fvm_device = fvm_device.set_topological_path("second_prefix");
+        assert!(!matchers
+            .match_device(&mut fvm_device, &mut MockEnv::new())
+            .await
+            .expect("match_device failed"));
+
+        // When configured with fxfs as the data format, zxcrypt is not bound.
+        let mut data_device = MockDevice::new()
+            .set_topological_path("first_prefix/fvm/data-p-2/block")
+            .set_partition_label(DATA_PARTITION_LABEL)
+            .set_partition_type(&DATA_TYPE_GUID);
+        assert!(!matchers
+            .match_device(&mut data_device, &mut MockEnv::new())
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn partition_map_matcher_no_prefix_match() {
+        // If fvm_ramdisk is true but no ramdisk path is provided, only the first device will
+        // match.
+        let mut matchers = Matchers::new(
+            &fshost_config::Config {
+                fvm_ramdisk: true,
+                data_filesystem_format: "fxfs".to_string(),
+                ..default_config()
+            },
+            None,
+        );
+
         let mut fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
@@ -784,7 +837,7 @@ mod tests {
         let mut fvm_device = MockDevice::new().set_content_format(DiskFormat::Fvm);
         let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH).expect_mount_blobfs();
 
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_config(), None);
 
         // Attach the first GPT device.
         assert!(matchers
@@ -823,7 +876,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_data_matcher() {
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_config(), None);
 
         // Attach FVM device.
         assert!(matchers
@@ -862,7 +915,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_netboot_flag_true() {
         let mut matchers =
-            Matchers::new(&fshost_config::Config { netboot: true, ..default_config() });
+            Matchers::new(&fshost_config::Config { netboot: true, ..default_config() }, None);
 
         // Attach FVM device.
         assert!(matchers
@@ -902,11 +955,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_zxcrypt_matcher() {
-        let mut matchers = Matchers::new(&fshost_config::Config {
-            fvm_ramdisk: true,
-            data_filesystem_format: "minfs".to_string(),
-            ..default_config()
-        });
+        let mut matchers = Matchers::new(
+            &fshost_config::Config {
+                fvm_ramdisk: true,
+                data_filesystem_format: "minfs".to_string(),
+                ..default_config()
+            },
+            None,
+        );
 
         // Attach FVM device.
         assert!(matchers

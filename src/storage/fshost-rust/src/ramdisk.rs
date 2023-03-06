@@ -9,10 +9,8 @@
 
 use {
     anyhow::{ensure, Context, Error},
-    fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon as zx,
-    futures::TryFutureExt,
     zerocopy::FromBytes,
 };
 
@@ -35,7 +33,7 @@ struct ZbiHeader {
     _crc32: u32,
 }
 
-async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<(), Error> {
+async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<String, Error> {
     let mut header_buf = [0u8; std::mem::size_of::<ZbiHeader>()];
     zbi_vmo.read(&mut header_buf, 0).context("reading zbi item header")?;
     // Expect is fine here - we made the buffer ourselves to the exact size of the header so
@@ -75,23 +73,34 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<(), Error> {
         .await
         .context("building ramdisk from vmo")?;
 
+    let topo_path = ramdisk
+        .as_controller()
+        .ok_or_else(|| anyhow::anyhow!("ramdisk instance missing controller"))?
+        .get_topological_path()
+        .await
+        .context("get_topological_path (fidl failure)")?
+        .map_err(zx::Status::from_raw)
+        .context("get_topological_path returned an error")?;
+
     // Ensure the boot image remains attached for the system lifetime.
     ramdisk.forget().context("detaching/forgetting ramdisk client")?;
 
-    Ok(())
+    Ok(topo_path)
 }
 
-pub async fn set_up_ramdisk() -> Result<(), Error> {
+/// Set up a ramdisk provided by the boot items service as a vmo. If there is no vmo provided, None
+/// is returned. If there is, the ramdisk is decoded and set up, and the topological path is
+/// returned.
+pub async fn set_up_ramdisk() -> Result<Option<String>, Error> {
     let proxy = connect_to_protocol::<fidl_fuchsia_boot::ItemsMarker>()?;
     let (maybe_vmo, _length) = proxy
         .get(ZBI_TYPE_STORAGE_RAMDISK, 0)
         .await
         .context("boot items get failed (fidl failure)")?;
+
     if let Some(vmo) = maybe_vmo {
-        fasync::Task::spawn(create_ramdisk(vmo).unwrap_or_else(|e| {
-            tracing::error!(?e, "failed to create ramdisk filesystems");
-        }))
-        .detach();
+        Ok(Some(create_ramdisk(vmo).await?))
+    } else {
+        Ok(None)
     }
-    Ok(())
 }

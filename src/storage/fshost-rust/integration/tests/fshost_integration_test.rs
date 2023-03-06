@@ -232,7 +232,7 @@ async fn wipe_storage_not_supported() {
 async fn ramdisk_blob_and_data_mounted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
+    builder.with_zbi_ramdisk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
@@ -245,7 +245,9 @@ async fn ramdisk_blob_and_data_mounted() {
 #[fuchsia::test]
 async fn ramdisk_data_ignores_non_ramdisk() {
     let mut builder = new_builder();
-    // Fake out the ramdisk checking by providing a nonsense ramdisk prefix.
+    // Fake out the cpp fshost ramdisk checking by providing a nonsense ramdisk prefix. The rust
+    // fshost has tighter behavior - it only matches on the ramdisk path it created itself (which
+    // is also not this one).
     builder
         .fshost()
         .set_config_value("fvm_ramdisk", true)
@@ -544,13 +546,15 @@ async fn shred_data_volume_from_recovery() {
 
     fixture.tear_down().await;
 
-    // Launch a version of fshost that will behave like recovery: it won't mount the data volume.
+    // Launch a version of fshost that will behave like recovery: it will mount data and blob from
+    // a ramdisk it launches, binding the fvm on the "regular" disk but otherwise leaving it alone.
     let mut builder =
         new_builder().with_disk_from_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap());
     builder
         .fshost()
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch")
         .set_config_value("fvm_ramdisk", true);
+    builder.with_zbi_ramdisk();
     let fixture = builder.build().await;
 
     let admin = fixture

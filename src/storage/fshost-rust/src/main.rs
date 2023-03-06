@@ -61,13 +61,25 @@ async fn main() -> Result<(), Error> {
     let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
     let (watcher, device_stream) = watcher::Watcher::new().await?;
 
-    let mut env = FshostEnvironment::new(config.clone(), boot_args);
+    // Potentially launch the boot items ramdisk. It's not fatal, so if it fails we print an error
+    // and continue.
+    let ramdisk_path = if config.fvm_ramdisk {
+        ramdisk::set_up_ramdisk().await.unwrap_or_else(|error| {
+            tracing::error!(?error, "failed to set up ramdisk filesystems");
+            None
+        })
+    } else {
+        None
+    };
+
+    let mut env = FshostEnvironment::new(config.clone(), boot_args, ramdisk_path.clone());
     let inspector = fuchsia_inspect::component::inspector();
     let export = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
             fshost::AdminMarker::PROTOCOL_NAME =>
                 service::fshost_admin(
                     config.clone(),
+                    ramdisk_path.clone(),
                     env.launcher(),
                     env.data_root()?,
                     watcher.clone()
@@ -103,19 +115,13 @@ async fn main() -> Result<(), Error> {
         directory_request.into(),
     );
 
-    // Potentially launch the boot items ramdisk. It's not fatal, so if it fails we print an error
-    // and continue.
-    ramdisk::set_up_ramdisk().await.unwrap_or_else(|e| {
-        tracing::error!(?e, "failed to set up ramdisk filesystems");
-    });
-
     // TODO(fxbug.dev/118209): //src/tests/oom looks for "fshost: lifecycle handler ready" to
     // indicate the watcher is about to start.
     tracing::info!("fshost: lifecycle handler ready");
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let mut fs_manager = manager::Manager::new(&config, env);
+    let mut fs_manager = manager::Manager::new(&config, ramdisk_path, env);
     let shutdown_responder = if config.disable_block_watcher {
         // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of
         // processing devices.

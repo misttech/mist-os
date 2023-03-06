@@ -15,8 +15,12 @@ pub struct Manager<E> {
 }
 
 impl<E: Environment> Manager<E> {
-    pub fn new(config: &fshost_config::Config, environment: E) -> Self {
-        Manager { matcher: matcher::Matchers::new(config), environment }
+    pub fn new(
+        config: &fshost_config::Config,
+        ramdisk_path: Option<String>,
+        environment: E,
+    ) -> Self {
+        Manager { matcher: matcher::Matchers::new(config, ramdisk_path), environment }
     }
 
     /// The main loop of fshost. Watch for new devices, match them against filesystems we expect,

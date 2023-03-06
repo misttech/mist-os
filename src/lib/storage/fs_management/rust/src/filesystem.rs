@@ -561,15 +561,22 @@ impl ServingVolume {
 
     /// Binds the root directory being served by this filesystem to a path in the local namespace.
     /// The path must be absolute, containing no "." nor ".." entries.  The binding will be dropped
-    /// when self is dropped.  Only one binding is supported.
+    /// when self is dropped, or when unbind_path is called.  Only one binding is supported.
     ///
     /// # Errors
     ///
-    /// Returns [`Err`] if binding failed.
+    /// Returns [`Err`] if binding failed, or if a binding already exists.
     pub fn bind_to_path(&mut self, path: &str) -> Result<(), Error> {
         ensure!(self.binding.is_none(), "Already bound");
         self.binding = Some(NamespaceBinding::create(&self.root_dir, path.to_string())?);
         Ok(())
+    }
+
+    /// Remove the namespace binding to the root directory being served by this volume, if there is
+    /// one. If there is no binding, this function does nothing. After this, it is safe to call
+    /// bind_to_path again.
+    pub fn unbind_path(&mut self) {
+        let _ = self.binding.take();
     }
 
     pub fn bound_path(&self) -> Option<&str> {

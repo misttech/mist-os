@@ -21,7 +21,7 @@ use {
     fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
     fidl_fuchsia_io as fio,
     fs_management::{
-        filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
+        filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume},
         format::DiskFormat,
         Blobfs, ComponentType, F2fs, FSConfig, Fxfs, Minfs,
     },
@@ -77,6 +77,13 @@ impl Filesystem {
         Ok(proxy)
     }
 
+    fn volume(&mut self, volume_name: &str) -> Result<Option<&mut ServingVolume>, Error> {
+        match self {
+            Filesystem::ServingMultiVolume(_, fs, _) => Ok(fs.volume_mut(&volume_name)),
+            _ => Ok(None),
+        }
+    }
+
     fn queue(&mut self) -> Option<&mut Vec<ServerEnd<fio::DirectoryMarker>>> {
         match self {
             Filesystem::Queue(queue) => Some(queue),
@@ -98,18 +105,24 @@ impl Filesystem {
 /// Implements the Environment trait and keeps track of mounted filesystems.
 pub struct FshostEnvironment {
     config: Arc<fshost_config::Config>,
+    ramdisk_prefix: Option<String>,
     blobfs: Filesystem,
     data: Filesystem,
     launcher: Arc<FilesystemLauncher>,
 }
 
 impl FshostEnvironment {
-    pub fn new(config: Arc<fshost_config::Config>, boot_args: BootArgs) -> Self {
+    pub fn new(
+        config: Arc<fshost_config::Config>,
+        boot_args: BootArgs,
+        ramdisk_prefix: Option<String>,
+    ) -> Self {
         Self {
             config: config.clone(),
+            ramdisk_prefix: ramdisk_prefix.clone(),
             blobfs: Filesystem::Queue(Vec::new()),
             data: Filesystem::Queue(Vec::new()),
-            launcher: Arc::new(FilesystemLauncher { config, boot_args }),
+            launcher: Arc::new(FilesystemLauncher { config, boot_args, ramdisk_prefix }),
         }
     }
 
@@ -168,8 +181,10 @@ impl Environment for FshostEnvironment {
         };
 
         // Set the max partition size for data
-        if self.config.apply_limits_to_ramdisk
-            || !device.topological_path().starts_with(&self.config.ramdisk_prefix)
+        if self
+            .ramdisk_prefix
+            .as_ref()
+            .map_or(true, |prefix| !device.topological_path().starts_with(prefix))
         {
             if let Err(e) = set_partition_max_size(device, self.config.data_max_bytes).await {
                 tracing::warn!(?e, "Failed to set max partition size for data");
@@ -277,6 +292,19 @@ impl Environment for FshostEnvironment {
             _ => unreachable!(),
         };
 
+        // TODO(fxbug.dev/122966): shred_volume relies on the unencrypted volume being bound in the
+        // namespace. This should be reevaluated when keybag takes a proxy, but for now this is the
+        // fastest fix.
+        if format == DiskFormat::Fxfs {
+            // If the unencrypted volume doesn't exist, assume we are using legacy crypto, in which
+            // case we skip this step.
+            let _: Option<()> = filesystem.volume("unencrypted")?.map(|volume| {
+                volume.bind_to_path("/main_fxfs_unencrypted_volume").unwrap_or_else(|error| {
+                    tracing::warn!(?error, "failed to bind unencrypted volume to namespace")
+                })
+            });
+        }
+
         let queue = self.data.queue().unwrap();
         let root_dir = filesystem.root()?;
         for server in queue.drain(..) {
@@ -290,6 +318,7 @@ impl Environment for FshostEnvironment {
 pub struct FilesystemLauncher {
     config: Arc<fshost_config::Config>,
     boot_args: BootArgs,
+    ramdisk_prefix: Option<String>,
 }
 
 impl FilesystemLauncher {
@@ -307,12 +336,23 @@ impl FilesystemLauncher {
         zxcrypt::unseal_or_format(device).await
     }
 
+    pub fn get_blobfs_config(&self) -> Blobfs {
+        Blobfs {
+            write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
+            cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
+            sandbox_decompression: self.config.sandbox_decompression,
+            ..Default::default()
+        }
+    }
+
     pub async fn serve_blobfs(&self, device: &mut dyn Device) -> Result<Filesystem, Error> {
         tracing::info!(path = %device.path(), "Mounting /blob");
 
         // Setting max partition size for blobfs
-        if self.config.apply_limits_to_ramdisk
-            || !device.topological_path().starts_with(&self.config.ramdisk_prefix)
+        if self
+            .ramdisk_prefix
+            .as_ref()
+            .map_or(true, |prefix| !device.topological_path().starts_with(prefix))
         {
             if let Err(e) = set_partition_max_size(device, self.config.blobfs_max_bytes).await {
                 tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
@@ -320,16 +360,15 @@ impl FilesystemLauncher {
         }
 
         let config = Blobfs {
-            write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
-            cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
-            sandbox_decompression: self.config.sandbox_decompression,
             component_type: fs_management::ComponentType::StaticChild,
-            ..Default::default()
+            ..self.get_blobfs_config()
         };
         let block = device.client_end()?;
-        let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)?
+        let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)
+            .context("making filesystem instance")?
             .serve()
-            .await?;
+            .await
+            .context("serving blobfs")?;
 
         Ok(Filesystem::Serving(fs))
     }

@@ -13,7 +13,10 @@ use {
     fidl_fuchsia_hardware_block::BlockProxy,
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
     fidl_fuchsia_io as fio,
-    fs_management::Blobfs,
+    fs_management::{
+        partition::{find_partition_in, PartitionMatcher},
+        Blobfs,
+    },
     fshost_test_fixture::TestFixture,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon as zx,
@@ -76,6 +79,12 @@ async fn no_fvm_device() {
         .fshost()
         .set_config_value("fvm_ramdisk", true)
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
@@ -107,6 +116,12 @@ async fn write_blob() {
     // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
     // content sniffing of the FVM magic.
     builder.with_disk().with_gpt();
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
 
@@ -136,23 +151,43 @@ async fn blobfs_formatted() {
         .set_config_value("fvm_ramdisk", true)
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().with_gpt();
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
-    let dev = fixture.dir("dev-topological/class/block");
 
     // Mount Blobfs and write a blob.
     {
-        let controller = device_watcher::wait_for_device_with(&dev, |info| {
-            info.topological_path.ends_with("/fvm/blobfs-p-1/block").then(|| {
-                connect_to_named_protocol_at_dir_root::<fidl_fuchsia_device::ControllerMarker>(
-                    &dev,
-                    info.filename,
-                )
-                .unwrap()
-            })
-        })
+        let test_disk = fixture.ramdisks.first().unwrap();
+        let test_disk_path = test_disk
+            .as_controller()
+            .expect("ramdisk didn't have controller proxy")
+            .get_topological_path()
+            .await
+            .expect("get topo path fidl failed")
+            .expect("get topo path returned error");
+        let matcher = PartitionMatcher {
+            parent_device: Some(test_disk_path),
+            labels: Some(vec!["blobfs".to_string()]),
+            ..Default::default()
+        };
+        let blobfs_path = find_partition_in(
+            &fixture.dir("dev-topological/class/block"),
+            matcher,
+            zx::Duration::INFINITE,
+        )
         .await
         .unwrap();
+        let controller =
+            connect_to_named_protocol_at_dir_root::<fidl_fuchsia_device::ControllerMarker>(
+                &fixture.dir("dev-topological"),
+                &blobfs_path.strip_prefix("/dev").unwrap(),
+            )
+            .unwrap();
         let blobfs = Blobfs::new(controller).serve().await.unwrap();
 
         let blobfs_root = blobfs.root();
@@ -192,20 +227,40 @@ async fn data_unformatted() {
         .set_config_value("fvm_ramdisk", true)
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     builder.with_disk().format_data(data_fs_spec()).with_gpt();
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
-    let dev = fixture.dir("dev-topological/class/block");
+    let test_disk = fixture.ramdisks.first().unwrap();
+    let test_disk_path = test_disk
+        .as_controller()
+        .expect("ramdisk didn't have controller proxy")
+        .get_topological_path()
+        .await
+        .expect("get topo path fidl failed")
+        .expect("get topo path returned error");
+    let dev = fixture.dir("dev-topological");
+    let dev_class = fixture.dir("dev-topological/class/block");
+    let matcher = PartitionMatcher {
+        parent_device: Some(test_disk_path),
+        labels: Some(vec!["data".to_string()]),
+        ..Default::default()
+    };
 
     let orig_instance_guid;
     {
-        let data_partition = device_watcher::wait_for_device_with(&dev, |info| {
-            info.topological_path.ends_with("/fvm/data-p-2/block").then(|| {
-                connect_to_named_protocol_at_dir_root::<PartitionMarker>(&dev, info.filename)
-                    .unwrap()
-            })
-        })
-        .await
+        let data_path =
+            find_partition_in(&dev_class, matcher.clone(), zx::Duration::INFINITE).await.unwrap();
+        let data_partition = connect_to_named_protocol_at_dir_root::<PartitionMarker>(
+            &dev,
+            &data_path.strip_prefix("/dev").unwrap(),
+        )
         .unwrap();
+
         let (status, guid) = data_partition.get_instance_guid().await.unwrap();
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         orig_instance_guid = guid.unwrap();
@@ -228,12 +283,11 @@ async fn data_unformatted() {
     admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
 
     // Ensure the data partition was assigned a new instance GUID.
-    let data_partition = device_watcher::wait_for_device_with(&dev, |info| {
-        info.topological_path.ends_with("/fvm/data-p-2/block").then(|| {
-            connect_to_named_protocol_at_dir_root::<PartitionMarker>(&dev, info.filename).unwrap()
-        })
-    })
-    .await
+    let data_path = find_partition_in(&dev_class, matcher, zx::Duration::INFINITE).await.unwrap();
+    let data_partition = connect_to_named_protocol_at_dir_root::<PartitionMarker>(
+        &dev,
+        &data_path.strip_prefix("/dev").unwrap(),
+    )
     .unwrap();
     let (status, guid) = data_partition.get_instance_guid().await.unwrap();
     assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
@@ -268,6 +322,12 @@ async fn handles_corrupt_fvm() {
         .set_config_value("ramdisk_prefix", "/nada/zip/zilch");
     // Ensure that, while we allocate an FVM partition inside the GPT, we leave it empty.
     builder.with_disk().with_gpt().with_unformatted_fvm();
+
+    // Only the rust fshost can deal with multiple disks.
+    if cfg!(feature = "fshost_rust") {
+        builder.with_zbi_ramdisk();
+    }
+
     let fixture = builder.build().await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ false).await;
 

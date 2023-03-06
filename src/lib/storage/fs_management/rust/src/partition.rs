@@ -11,6 +11,7 @@ use {
         Guid, PartitionAndDeviceMarker, PartitionAndDeviceProxy,
     },
     fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
+    fidl_fuchsia_io as fio,
     fuchsia_async::TimeoutExt,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_fs::directory::{WatchEvent, Watcher},
@@ -42,15 +43,23 @@ pub struct PartitionMatcher {
 
 const BLOCK_DEV_PATH: &str = "/dev/class/block/";
 
-/// Waits for a partition to appear on BLOCK_DEV_PATH that
-/// matches the fields in the PartitionMatcher. Returns the
-/// path of the partition if found. Errors after timeout duration.
+/// Waits for a partition to appear on BLOCK_DEV_PATH that matches the fields in the
+/// PartitionMatcher. Returns the path of the partition if found. Errors after timeout duration.
 pub async fn find_partition(matcher: PartitionMatcher, timeout: Duration) -> Result<String, Error> {
+    let dir =
+        fuchsia_fs::directory::open_in_namespace(BLOCK_DEV_PATH, fuchsia_fs::OpenFlags::empty())?;
+    find_partition_in(&dir, matcher, timeout).await
+}
+
+/// Waits for a partition to appear in [`dir`] that matches the fields in [`matcher`]. Returns the
+/// topological path of the partition if found. Returns an error after the timeout duration
+/// expires.
+pub async fn find_partition_in(
+    dir: &fio::DirectoryProxy,
+    matcher: PartitionMatcher,
+    timeout: Duration,
+) -> Result<String, Error> {
     async {
-        let dir = fuchsia_fs::directory::open_in_namespace(
-            BLOCK_DEV_PATH,
-            fuchsia_fs::OpenFlags::empty(),
-        )?;
         let mut watcher = Watcher::new(&dir).await.context("making watcher")?;
         while let Some(message) = watcher.next().await {
             let message = message.context("watcher channel returned error")?;

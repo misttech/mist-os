@@ -4,14 +4,12 @@
 
 use {
     crate::{
-        crypt::fxfs,
         debug_log,
         device::{constants, BlockDevice},
         environment::FilesystemLauncher,
-        service::fxfs::KEY_BAG_FILE,
         watcher,
     },
-    anyhow::{anyhow, ensure, Context, Error},
+    anyhow::{anyhow, Context, Error},
     fidl::endpoints::{Proxy, RequestStream, ServerEnd},
     fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_fshost as fshost,
@@ -58,15 +56,16 @@ const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(10);
 const DATA_PARTITION_LABEL: &str = "data";
 const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
 pub const SHRED_DATA_VOLUME_MARKER_FILE: &str = "shred_data_volume";
+const KEY_BAG_FILE: &str = "/main_fxfs_unencrypted_volume/keys/fxfs-data";
 
 fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
 }
 
-async fn find_data_partition(config: &fshost_config::Config) -> Result<String, Error> {
+async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<String, Error> {
     let fvm_matcher = PartitionMatcher {
         detected_disk_formats: Some(vec![DiskFormat::Fvm]),
-        ignore_prefix: Some(config.ramdisk_prefix.clone()),
+        ignore_prefix: ramdisk_prefix,
         ..Default::default()
     };
 
@@ -102,16 +101,16 @@ fn initialize_fvm(fvm_slice_size: u64, device: &BlockProxy) -> Result<(), Error>
 
 async fn wipe_storage(
     config: &fshost_config::Config,
+    ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
     mut pauser: watcher::Watcher,
     blobfs_root: ServerEnd<DirectoryMarker>,
 ) -> Result<(), Error> {
-    ensure!(!config.ramdisk_prefix.is_empty());
     tracing::info!("Searching for block device with FVM");
 
     let fvm_matcher = PartitionMatcher {
         type_guids: Some(vec![constants::FVM_TYPE_GUID, constants::FVM_LEGACY_TYPE_GUID]),
-        ignore_prefix: Some(config.ramdisk_prefix.clone()),
+        ignore_prefix: ramdisk_prefix,
         ..Default::default()
     };
 
@@ -183,7 +182,7 @@ async fn wipe_storage(
     tracing::info!("Formatting Blobfs.");
     let mut blobfs_config = Blobfs {
         deprecated_padded_blobfs_format: config.blobfs_use_deprecated_padded_format,
-        ..Default::default()
+        ..launcher.get_blobfs_config()
     };
     if config.blobfs_initial_inodes > 0 {
         blobfs_config.num_inodes = config.blobfs_initial_inodes;
@@ -193,15 +192,8 @@ async fn wipe_storage(
         connect_to_protocol_at_path::<fidl_fuchsia_device::ControllerMarker>(&blobfs_path)?;
     let mut blobfs = filesystem::Filesystem::new(controller, blobfs_config);
     blobfs.format().await.context("Failed to format blobfs")?;
-    let mut blobfs_device =
-        BlockDevice::new(blobfs_path).await.context("Failed to make new device")?;
-    let mut started_blobfs =
-        launcher.serve_blobfs(&mut blobfs_device).await.context("Failed to mount blobfs")?;
-    clone_onto_no_describe(
-        &started_blobfs.root().context("Failed to get blobfs root")?,
-        None,
-        blobfs_root,
-    )?;
+    let started_blobfs = blobfs.serve().await.context("serving blobfs")?;
+    clone_onto_no_describe(started_blobfs.root(), None, blobfs_root)?;
     // We use forget() here to ensure that our Blobfs instance is not dropped, which would cause the
     // filesystem to shutdown.
     std::mem::forget(started_blobfs);
@@ -210,6 +202,7 @@ async fn wipe_storage(
 
 async fn write_data_file(
     config: &fshost_config::Config,
+    ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
     filename: &str,
     payload: zx::Vmo,
@@ -235,9 +228,7 @@ async fn write_data_file(
     let content_size =
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
-    assert_eq!(config.ramdisk_prefix.is_empty(), false);
-
-    let mut partition_path = find_data_partition(config).await?;
+    let mut partition_path = find_data_partition(ramdisk_prefix).await?;
 
     let format = match config.data_filesystem_format.as_ref() {
         "fxfs" => DiskFormat::Fxfs,
@@ -319,6 +310,7 @@ async fn write_data_file(
 
 async fn shred_data_volume(
     config: &fshost_config::Config,
+    ramdisk_prefix: Option<String>,
     data_root: &fio::DirectoryProxy,
 ) -> Result<(), zx::Status> {
     if config.data_filesystem_format != "fxfs" {
@@ -347,7 +339,7 @@ async fn shred_data_volume(
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
         let partition_path =
-            find_data_partition(config).await.map_err(|_| zx::Status::NOT_FOUND)?;
+            find_data_partition(ramdisk_prefix).await.map_err(|_| zx::Status::NOT_FOUND)?;
 
         let block_client = RemoteBlockClient::new(
             connect_to_protocol_at_path::<BlockMarker>(&partition_path)
@@ -373,12 +365,14 @@ async fn shred_data_volume(
 /// Make a new vfs service node that implements fuchsia.fshost.Admin
 pub fn fshost_admin(
     config: Arc<fshost_config::Config>,
+    ramdisk_prefix: Option<String>,
     launcher: Arc<FilesystemLauncher>,
     data_root: fio::DirectoryProxy,
     pauser: watcher::Watcher,
 ) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::AdminRequestStream| {
         let config = config.clone();
+        let ramdisk_prefix = ramdisk_prefix.clone();
         let launcher = launcher.clone();
         let data_root = fuchsia_fs::directory::clone_no_describe(&data_root, None).unwrap();
         let pauser = pauser.clone();
@@ -414,8 +408,14 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         tracing::info!(?filename, "admin write data file called");
-                        let mut res = match write_data_file(&config, &launcher, &filename, payload)
-                            .await
+                        let mut res = match write_data_file(
+                            &config,
+                            ramdisk_prefix.clone(),
+                            &launcher,
+                            &filename,
+                            payload,
+                        )
+                        .await
                         {
                             Ok(()) => Ok(()),
                             Err(e) => {
@@ -440,7 +440,15 @@ pub fn fshost_admin(
                             );
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         } else {
-                            match wipe_storage(&config, &launcher, pauser, blobfs_root).await {
+                            match wipe_storage(
+                                &config,
+                                ramdisk_prefix.clone(),
+                                &launcher,
+                                pauser,
+                                blobfs_root,
+                            )
+                            .await
+                            {
                                 Ok(()) => Ok(()),
                                 Err(e) => {
                                     tracing::error!(?e, "admin service: wipe_storage failed");
@@ -454,16 +462,19 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         tracing::info!("admin shred data volume called");
-                        let mut res = match shred_data_volume(&config, &data_root).await {
-                            Ok(()) => Ok(()),
-                            Err(e) => {
-                                debug_log(&format!(
-                                    "admin service: shred_data_volume failed: {:?}",
-                                    e
-                                ));
-                                Err(zx::Status::INTERNAL.into_raw())
-                            }
-                        };
+                        let mut res =
+                            match shred_data_volume(&config, ramdisk_prefix.clone(), &data_root)
+                                .await
+                            {
+                                Ok(()) => Ok(()),
+                                Err(e) => {
+                                    debug_log(&format!(
+                                        "admin service: shred_data_volume failed: {:?}",
+                                        e
+                                    ));
+                                    Err(zx::Status::INTERNAL.into_raw())
+                                }
+                            };
                         responder.send(&mut res).unwrap_or_else(|e| {
                             tracing::error!(
                                 "failed to send ShredDataVolume response. error: {:?}",
