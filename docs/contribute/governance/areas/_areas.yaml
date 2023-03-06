@@ -341,7 +341,11 @@
 
 - name: 'Software Delivery'
   api_primary: 'kevinwells@google.com'
-  api_secondary: 'jsankey@google.com'
+  api_secondary: 'etryzelaar@google.com'
+  description: |
+    <p>
+      The Software Delivery team manages software packaging and updates for Fuchsia devices.
+    </p>
 
 - name: 'Storage'
   api_primary: 'csuter@google.com'
