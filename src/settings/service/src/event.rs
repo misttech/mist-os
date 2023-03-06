@@ -35,11 +35,6 @@ pub enum Address {
     SettingProxy(SettingType),
 }
 
-#[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
-pub enum Role {
-    Sink,
-}
-
 pub(crate) mod camera_watcher {
     #[derive(PartialEq, Clone, Debug, Eq, Hash)]
     pub enum Event {

@@ -116,14 +116,6 @@ pub(crate) trait TryFromWithClient<T>: Sized {
     fn try_from_with_client(value: T) -> Result<(Self, message::MessageClient), Self::Error>;
 }
 
-/// `Role` defines grouping for responsibilities within the service. Roles allow
-/// for addressing a particular audience space. Similar to the other
-/// enumerations, details about each role should be defined near to the domain.
-#[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
-pub enum Role {
-    Event(event::Role),
-}
-
 /// The payload_convert macro helps convert between the domain-specific payloads
 /// (variants of [`Payload`]) and the [`Payload`] container(to/from) & MessageHub
 /// MessageEvent (from). The first matcher is the [`Payload`] variant name where

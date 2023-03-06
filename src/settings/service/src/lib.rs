@@ -44,7 +44,7 @@ pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
 pub use input::input_device_configuration::InputConfiguration;
 pub use light::light_hardware_configuration::LightHardwareConfiguration;
 use serde::Deserialize;
-pub use service::{Address, Payload, Role};
+pub use service::{Address, Payload};
 use setui_metrics_registry::{CUSTOMER_ID, PROJECT_ID};
 #[cfg(test)]
 use vfs::directory::entry::DirectoryEntry;
