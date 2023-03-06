@@ -658,7 +658,8 @@ async fn log_cmd<W: std::io::Write>(
     if !cmd.select.is_empty() {
         if let Some(log_settings) = log_settings {
             log_settings
-                .register_interest(&mut cmd.select.clone().iter_mut())
+                .set_interest(&mut cmd.select.clone().iter_mut())
+                .await
                 .map_err(|e| anyhow!("failed to register log interest selector: {}", e))?;
         } else {
             ffx_bail!("{}", SELECT_FAILURE_MESSAGE);
@@ -821,9 +822,11 @@ mod test {
         expected_selectors: Vec<LogInterestSelector>,
     ) -> Option<LogSettingsProxy> {
         Some(fho::testing::fake_proxy(move |req| match req {
-            LogSettingsRequest::RegisterInterest { selectors, .. } => {
-                assert_eq!(selectors, expected_selectors)
+            LogSettingsRequest::SetInterest { selectors, responder } => {
+                assert_eq!(selectors, expected_selectors);
+                let _ = responder.send();
             }
+            other => panic!("Got unexpected request: {other:?}"),
         }))
     }
 

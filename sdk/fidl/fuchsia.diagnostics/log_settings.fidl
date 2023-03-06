@@ -20,22 +20,28 @@ type LogInterestSelector = struct {
 /// in the system.
 @discoverable
 protocol LogSettings {
+    @available(deprecated=12)
+    RegisterInterest(struct {
+        selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
+    });
+
     /// Requests a change in interest for the matched components.
     ///
     /// Each component holds a set of requested interests.
     ///
-    /// When a new request on LogSettings#RegisterInterest is received,
+    /// When a new request on LogSettings#SetInterest is received,
     /// the sets for matched components receive the new minimum interest.
     /// If the interest is less than the previous minimum interest, then a
-    /// `RegisterInterest` request is sent with the new minimum interest.
+    /// `SetInterest` request is sent with the new minimum interest.
     ///
-    /// If a connection to `LogSettings` sends another `RegisterInterest`
+    /// If a connection to `LogSettings` sends another `SetInterest`
     /// request, its previous interest request will be undone.
     ///
     /// When the connection to `LogSettings` is finished, the interests are
     /// undone. Each matched component minimum interest is updated with the
     /// new minimum interest in the set.
-    RegisterInterest(struct {
+    @available(added=12)
+    SetInterest(struct {
         selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
-    });
+    }) -> ();
 };

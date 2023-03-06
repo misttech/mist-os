@@ -60,6 +60,10 @@ impl LogSettingsServer {
                 fdiagnostics::LogSettingsRequest::RegisterInterest { selectors, .. } => {
                     logs_repo.update_logs_interest(connection_id, selectors).await;
                 }
+                fdiagnostics::LogSettingsRequest::SetInterest { selectors, responder } => {
+                    logs_repo.update_logs_interest(connection_id, selectors).await;
+                    responder.send().ok();
+                }
             }
         }
         logs_repo.finish_interest_connection(connection_id).await;
