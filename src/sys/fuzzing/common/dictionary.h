@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_SYS_FUZZING_REALMFUZZER_ENGINE_DICTIONARY_H_
-#define SRC_SYS_FUZZING_REALMFUZZER_ENGINE_DICTIONARY_H_
+#ifndef SRC_SYS_FUZZING_COMMON_DICTIONARY_H_
+#define SRC_SYS_FUZZING_COMMON_DICTIONARY_H_
 
 #include <stddef.h>
 #include <stdint.h>
 
 #include <limits>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -56,28 +57,31 @@ class Dictionary final {
  private:
   // Parses |str| as a dictionary level, which is an unsigned number. Returns false if |str| is not
   // a valid number. Otherwise returns true and the parsed level via |out_level|.
-  bool ParseLevel(const std::string& str, uint16_t* out_level);
+  bool ParseLevel(std::string_view str, uint16_t* out_level);
 
   // Parse |str| as a word, which may contain sequences like \\, \", or \xNN where N is a hex digit.
   // Returns false if the value is empty or contains invalid escape sequences (e.g. \x5G).
   // Otherwise, returns true, the parsed word via |out_word|, and the portion of |str| that was not
   // parsed in |out_remaining|.
-  bool ParseWord(const std::string& str, Word* out_word, std::string* out_remaining);
+  bool ParseWord(std::string_view str, Word* out_word, std::string* out_remaining);
 
   // Parses |str| as a number with the given |base|, e.g. 10 or 16. Returns false if |str| is not a
   // number of if it cannot be expressed as a value of type |T|. Otherwise, returns true and the
   // parsed value via |out|.
   template <typename T>
-  bool ParseNumber(const std::string& str, int base, T* out) {
-    const char* c_str = str.c_str();
-    char* endptr;
-    auto u64 = std::strtoul(c_str, &endptr, 10);
-    if (c_str == endptr || *endptr != '\0' || u64 > std::numeric_limits<T>::max()) {
+  bool ParseNumber(std::string_view str, int base, T* out) {
+    uint64_t u64;
+    if (!ParseU64(str, base, std::numeric_limits<T>::max(), &u64)) {
       return false;
     }
     *out = static_cast<T>(u64);
     return true;
   }
+
+  // Parses |str| as an unsigned 64-bit integer with the given |base|, e.g. 10 or 16. Returns false
+  // if |str| is not a number, or if it exceeds |max|. Otherwise, returns true and the parsed value
+  // via |out|.
+  bool ParseU64(std::string_view str, int base, uint64_t max, uint64_t* out);
 
   OptionsPtr options_;
   std::unordered_map<uint16_t, Level> words_by_level_;
@@ -88,4 +92,4 @@ class Dictionary final {
 
 }  // namespace fuzzing
 
-#endif  // SRC_SYS_FUZZING_REALMFUZZER_ENGINE_DICTIONARY_H_
+#endif  // SRC_SYS_FUZZING_COMMON_DICTIONARY_H_

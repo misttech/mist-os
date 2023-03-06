@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/sys/fuzzing/realmfuzzer/engine/dictionary.h"
+#include "src/sys/fuzzing/common/dictionary.h"
 
 #include <unordered_set>
 
@@ -263,6 +263,12 @@ TEST(DictionaryTest, ParseNonASCII) {
   dict.Configure(MakeOptions());
 
   EXPECT_FALSE(dict.Parse(input));
+
+  std::ostringstream oss;
+  oss << "deadbeef=\"\\xde\\xad\\xbe\\xef\"" << std::endl;
+  oss << "feedface=\"\\xFE\\xED\\xFA\\xCE\"" << std::endl;
+  EXPECT_TRUE(dict.Parse(Input(oss.str())));
+  EXPECT_EQ(GetWords(dict), Sort({"\xDE\xAD\xBE\xEF", "\xFE\xED\xFA\xCE"}));
 }
 
 TEST(DictionaryTest, Parse) {

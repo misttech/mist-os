@@ -39,8 +39,6 @@ source_set("engine-lib") {
     "coverage-data-provider-client.h",
     "coverage-data.cc",
     "coverage-data.h",
-    "dictionary.cc",
-    "dictionary.h",
     "module-pool.cc",
     "module-pool.h",
     "module-proxy.cc",
@@ -65,7 +63,6 @@ source_set("engine-lib") {
   deps = [
     "//sdk/lib/syslog/cpp",
     "//third_party/modp_b64",
-    "//third_party/re2",
     "//zircon/system/ulib/inspector",
   ]
 }
@@ -113,7 +110,6 @@ source_set("unittests") {
     "corpus-unittest.cc",
     "coverage-data-provider-client-unittest.cc",
     "coverage-data-unittest.cc",
-    "dictionary-unittest.cc",
     "module-pool-unittest.cc",
     "module-proxy-unittest.cc",
     "mutagen-unittest.cc",

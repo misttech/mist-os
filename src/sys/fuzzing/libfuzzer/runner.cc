@@ -28,6 +28,7 @@
 #include "src/lib/files/eintr_wrapper.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
+#include "src/sys/fuzzing/common/dictionary.h"
 #include "src/sys/fuzzing/common/status.h"
 
 namespace fuzzing {
@@ -186,6 +187,11 @@ void LibFuzzerRunner::ReloadLiveCorpus() {
 // Dictionary-related methods.
 
 zx_status_t LibFuzzerRunner::ParseDictionary(const Input& input) {
+  Dictionary dict;
+  dict.Configure(options());
+  if (!dict.Parse(input)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
   WriteInputToFile(input, kDictionaryPath);
   has_dictionary_ = true;
   return ZX_OK;

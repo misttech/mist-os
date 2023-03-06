@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/sys/fuzzing/realmfuzzer/engine/dictionary.h"
+#include "src/sys/fuzzing/common/dictionary.h"
 
 #include <lib/syslog/cpp/macros.h>
 
@@ -53,7 +53,7 @@ bool Dictionary::Parse(const Input& input) {
   std::string remaining;
   while (std::getline(iss, line)) {
     line_no++;
-    uint16_t level;
+    uint16_t level = 0;
     Word word;
     // Skip blank lines and comment.
     if (re2::RE2::FullMatch(line, blank)) {
@@ -84,7 +84,7 @@ bool Dictionary::Parse(const Input& input) {
   return true;
 }
 
-bool Dictionary::ParseLevel(const std::string& str, uint16_t* out_level) {
+bool Dictionary::ParseLevel(std::string_view str, uint16_t* out_level) {
   if (str.empty()) {
     *out_level = 0;
     return true;
@@ -92,7 +92,7 @@ bool Dictionary::ParseLevel(const std::string& str, uint16_t* out_level) {
   return ParseNumber(str, 10, out_level);
 }
 
-bool Dictionary::ParseWord(const std::string& str, Word* out_word, std::string* out_remaining) {
+bool Dictionary::ParseWord(std::string_view str, Word* out_word, std::string* out_remaining) {
   out_word->clear();
   bool escaped = false;
   uint8_t hex_byte = 0;
@@ -101,23 +101,36 @@ bool Dictionary::ParseWord(const std::string& str, Word* out_word, std::string* 
     if (escaped) {
       switch (c) {
         case '"':
-        case '\\':
+        case '\\': {
           out_word->push_back(static_cast<uint8_t>(c));
           break;
-        case 'x':
-          if (i + 2 >= str.size() || !ParseNumber(str.substr(i, 2), 16, &hex_byte)) {
+        }
+        case 'x': {
+          if (i + 2 >= str.size()) {
+            FX_LOGS(WARNING) << "incomplete hex byte: '" << str << "'";
+            return false;
+          }
+          auto hex = str.substr(i + 1, 2);
+          if (!ParseNumber(hex, 16, &hex_byte)) {
+            FX_LOGS(WARNING) << "failed to parse as hex: '" << hex << "'";
             return false;
           }
           out_word->push_back(hex_byte);
           i += 2;
           break;
-        default:
+        }
+        default: {
+          FX_LOGS(WARNING) << "invalid character in escape sequence: '" << str.substr(i, 1) << "'";
           return false;
+        }
       }
       escaped = false;
+    } else if (c == '"' && out_word->empty()) {
+      FX_LOGS(WARNING) << "empty word";
+      return false;
     } else if (c == '"') {
       *out_remaining = str.substr(i + 1);
-      return !out_word->empty();
+      return true;
     } else if (c == '\\') {
       escaped = true;
     } else if (isprint(c) || isspace(c)) {
@@ -129,6 +142,22 @@ bool Dictionary::ParseWord(const std::string& str, Word* out_word, std::string* 
   }
   FX_LOGS(WARNING) << "missing '\"'";
   return false;
+}
+
+bool Dictionary::ParseU64(std::string_view str, int base, uint64_t max, uint64_t* out) {
+  const char* c_str = str.data();
+  char* endptr;
+  uint64_t u64 = std::strtoull(c_str, &endptr, base);
+  if (static_cast<size_t>(endptr - c_str) != str.size()) {
+    FX_LOGS(WARNING) << "expected a number: '" << str << "'";
+    return false;
+  }
+  if (u64 > max) {
+    FX_LOGS(WARNING) << "exceeds max value: " << u64;
+    return false;
+  }
+  *out = u64;
+  return true;
 }
 
 Input Dictionary::AsInput() const {

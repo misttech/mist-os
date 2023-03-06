@@ -10,9 +10,9 @@
 #include <random>
 
 #include "src/lib/fxl/macros.h"
+#include "src/sys/fuzzing/common/dictionary.h"
 #include "src/sys/fuzzing/common/input.h"
 #include "src/sys/fuzzing/common/options.h"
-#include "src/sys/fuzzing/realmfuzzer/engine/dictionary.h"
 
 namespace fuzzing {
 
