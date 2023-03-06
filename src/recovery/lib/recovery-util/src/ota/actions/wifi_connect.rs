@@ -56,7 +56,6 @@ impl WifiConnectAction {
                     send_report!(crash_reporter, WifiConnectionSuccess());
                 }
                 Result::Err(error) => {
-                    send_report!(crash_reporter, WifiConnectionError(), error);
                     // Let the "Connecting" message stay there for a second so the
                     // user can see that something was tried.
                     // TODO(b/258576788): Confirm sleep details etc. with UX
@@ -64,6 +63,8 @@ impl WifiConnectAction {
                     fuchsia_async::Timer::new(sleep_time.after_now()).await;
                     println!("Failed to connect: {}", error);
                     event_sender.send(Event::Error(error.to_string()));
+
+                    send_report!(crash_reporter, WifiConnectionError(), error);
                 }
             };
         };

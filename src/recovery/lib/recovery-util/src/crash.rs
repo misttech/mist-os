@@ -10,7 +10,9 @@ use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use {
-    fidl_fuchsia_feedback::{Annotation, CrashReport, CrashReporterMarker, CrashReporterProxy},
+    fidl_fuchsia_feedback::{
+        Annotation, CrashReport, CrashReporterMarker, CrashReporterProxy, FileReportResults,
+    },
     fuchsia_component::client::connect_to_protocol,
 };
 
@@ -161,7 +163,7 @@ impl CrashReporter {
                 };
                 match Self::send_crash_report(&proxy_fn, msg.error, ctx_string).await {
                     Err(e) => eprintln!("Failed to send crash report: {:?}", e),
-                    Ok(()) => (),
+                    Ok(_) => (),
                 }
             }
         })
@@ -173,7 +175,7 @@ impl CrashReporter {
         proxy_fn: &ProxyFn,
         error: RecoveryError,
         context: String,
-    ) -> Result<(), Error> {
+    ) -> Result<FileReportResults, Error> {
         let mut signature = error.to_string();
         let mut ctx = context.clone();
         ctx.truncate(ANNOTATION_MAX_LENGTH);
@@ -185,8 +187,9 @@ impl CrashReporter {
             is_fatal: Some(false),
             ..CrashReport::EMPTY
         };
-        let result = proxy_fn()?.file(report).await.map_err(|e| format_err!("IPC error: {}", e))?;
-        result.map_err(|e| format_err!("Service error: {}", e))
+        let result =
+            proxy_fn()?.file_report(report).await.map_err(|e| format_err!("IPC error: {}", e))?;
+        result.map_err(|e| format_err!("Service error: {:?}", e))
     }
 }
 
@@ -230,7 +233,7 @@ mod tests {
             .unwrap();
 
         // Verify the fake service receives the crash report with expected data
-        if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder: _, report })) =
+        if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder: _, report })) =
             stream.try_next().await
         {
             assert_eq!(
@@ -271,7 +274,7 @@ mod tests {
         crash_reporter.file_crash_report(received_error, Some(context)).await.unwrap();
 
         // Verify the fake service receives the crash report with expected data
-        if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder: _, report })) =
+        if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder: _, report })) =
             stream.try_next().await
         {
             assert_eq!(
