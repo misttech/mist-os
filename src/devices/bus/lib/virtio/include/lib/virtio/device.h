@@ -67,7 +67,7 @@ class Device {
   void DriverFeatureAck(uint32_t feature) { backend_->SetFeature(feature); }
   bool DeviceStatusFeaturesOk() { return backend_->ConfirmFeatures(); }
 
-  // Devie lifecycle methods
+  // Device lifecycle methods
   void DeviceReset() { backend_->DeviceReset(); }
   void WaitForDeviceReset() { backend_->WaitForDeviceReset(); }
   void DriverStatusAck() { backend_->DriverStatusAck(); }
