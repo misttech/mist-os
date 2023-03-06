@@ -44,6 +44,7 @@ type Client struct {
 // NewClient creates a new Client.
 func NewClient(
 	ctx context.Context,
+	deviceSshPort int,
 	deviceResolver DeviceResolver,
 	privateKey ssh.Signer,
 	sshConnectBackoff retry.Backoff,
@@ -59,7 +60,7 @@ func NewClient(
 		ctx,
 		&addrResolver{
 			deviceResolver: deviceResolver,
-			port:           "22",
+			port:           strconv.Itoa(deviceSshPort),
 		},
 		sshConfig,
 		sshConnectBackoff,

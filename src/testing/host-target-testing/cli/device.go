@@ -36,6 +36,7 @@ type DeviceConfig struct {
 	deviceName               string
 	deviceHostname           string
 	deviceResolverMode       DeviceResolverMode
+	deviceSshPort            int
 	sshPrivateKey            ssh.Signer
 	SerialSocketPath         string
 	connectTimeout           time.Duration
@@ -50,6 +51,7 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.StringVar(&c.deviceHostname, "device-hostname", os.Getenv(constants.DeviceAddrEnvKey), "device hostname or IPv4/IPv6 address")
 	fs.StringVar(&c.deviceResolverMode, "device-resolver", FfxResolver, "device resolver (default: ffx)")
 	fs.StringVar(&c.ffxPath, "ffx-path", filepath.Join(testDataPath, "ffx"), "ffx tool path")
+	fs.IntVar(&c.deviceSshPort, "device-ssh-port", 22, "device port")
 	fs.StringVar(&c.deviceFinderPath, "device-finder-path", filepath.Join(testDataPath, "device-finder"), "device-finder tool path")
 	fs.StringVar(&c.SerialSocketPath, "device-serial", "", "device serial path")
 	fs.DurationVar(&c.connectTimeout, "device-connect-timeout", 5*time.Second, "device connection timeout (default 5 seconds)")
@@ -146,5 +148,5 @@ func (c *DeviceConfig) NewDeviceClient(ctx context.Context) (*device.Client, err
 		}
 	}
 
-	return device.NewClient(ctx, deviceResolver, sshPrivateKey, connectBackoff, c.WorkaroundBrokenTimeSkip, serialConn)
+	return device.NewClient(ctx, c.deviceSshPort, deviceResolver, sshPrivateKey, connectBackoff, c.WorkaroundBrokenTimeSkip, serialConn)
 }
