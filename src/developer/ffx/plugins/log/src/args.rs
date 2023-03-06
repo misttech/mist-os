@@ -8,8 +8,7 @@ use chrono_english::{parse_date_string, Dialect};
 use diagnostics_data::Severity;
 use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::SessionSpec;
-use fidl_fuchsia_diagnostics::{Interest, LogInterestSelector, Severity as FidlSeverity};
-use selectors::{self, VerboseError};
+use fidl_fuchsia_diagnostics::LogInterestSelector;
 use std::time::Duration;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -166,7 +165,7 @@ pub struct LogCommand {
     /// Specify using the format <component-selector>#<log-level>, with level
     /// as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
     /// May be repeated.
-    #[argh(option, from_str_fn(parse_log_interest_selector))]
+    #[argh(option, from_str_fn(log_interest_selector))]
     pub select: Vec<LogInterestSelector>,
 
     /// if provided, overrides the default log spam list path that's optionally
@@ -273,39 +272,13 @@ pub fn parse_session_spec(value: &str) -> Result<SessionSpec, String> {
     }
 }
 
-pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector, String> {
-    let invalid_selector = format!("Invalid component interest selector: '{}'.", selector);
-    let mut parts = selector.split('#');
-
-    // Split each arg into sub string vectors containing strings
-    // for component [0] and interest [1] respectively.
-    let component = parts.next().ok_or_else(|| invalid_selector.clone())?;
-    let interest = parts.next().ok_or_else(|| invalid_selector.clone())?;
-    if let Some(_extra) = parts.next() {
-        return Err(invalid_selector.clone());
-    }
-    let selector = match selectors::parse_component_selector::<VerboseError>(component) {
-        Ok(s) => s,
-        Err(e) => return Err(format!("{} Error: {}", invalid_selector.clone(), e)),
-    };
-
-    let min_severity = match interest.to_uppercase().as_ref() {
-        "TRACE" => Some(FidlSeverity::Trace),
-        "DEBUG" => Some(FidlSeverity::Debug),
-        "INFO" => Some(FidlSeverity::Info),
-        "WARN" => Some(FidlSeverity::Warn),
-        "ERROR" => Some(FidlSeverity::Error),
-        "FATAL" => Some(FidlSeverity::Fatal),
-        "" => None,
-        _ => return Err(invalid_selector),
-    };
-    Ok(LogInterestSelector { selector, interest: Interest { min_severity, ..Interest::EMPTY } })
+fn log_interest_selector(s: &str) -> Result<LogInterestSelector, String> {
+    selectors::parse_log_interest_selector(s).map_err(|s| s.to_string())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use selectors::parse_component_selector;
 
     #[test]
     fn test_session_spec_non_zero() {
@@ -322,29 +295,5 @@ mod test {
     fn test_session_spec_error() {
         assert!(parse_session_spec("~abc").is_err());
         assert!(parse_session_spec("abc").is_err());
-    }
-
-    #[test]
-    fn test_log_interest_selector() {
-        assert_eq!(
-            parse_log_interest_selector("core/network#FATAL").unwrap(),
-            LogInterestSelector {
-                selector: parse_component_selector::<VerboseError>("core/network").unwrap(),
-                interest: Interest { min_severity: Some(FidlSeverity::Fatal), ..Interest::EMPTY }
-            }
-        );
-        assert_eq!(
-            parse_log_interest_selector("any/component#INFO").unwrap(),
-            LogInterestSelector {
-                selector: parse_component_selector::<VerboseError>("any/component").unwrap(),
-                interest: Interest { min_severity: Some(FidlSeverity::Info), ..Interest::EMPTY }
-            }
-        );
-    }
-    #[test]
-    fn test_log_interest_selector_error() {
-        assert!(parse_log_interest_selector("anything////#FATAL").is_err());
-        assert!(parse_log_interest_selector("core/network").is_err());
-        assert!(parse_log_interest_selector("core/network#FAKE").is_err());
     }
 }

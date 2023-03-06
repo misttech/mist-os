@@ -9,8 +9,9 @@ use crate::{
 };
 use anyhow::{self, format_err};
 use fidl_fuchsia_diagnostics::{
-    self, ComponentSelector, PropertySelector, Selector, SelectorArgument, StringSelector,
-    StringSelectorUnknown, SubtreeSelector, TreeSelector,
+    self, ComponentSelector, Interest, LogInterestSelector, PropertySelector, Selector,
+    SelectorArgument, Severity, StringSelector, StringSelectorUnknown, SubtreeSelector,
+    TreeSelector,
 };
 use std::borrow::{Borrow, Cow};
 use std::fs;
@@ -139,6 +140,48 @@ where
 {
     let result = parser::consuming_component_selector::<E>(&unparsed_component_selector)?;
     Ok(result.into())
+}
+
+/// Parses a log severity selector of the form `component_selector#SEVERITY`. For example:
+/// core/foo#DEBUG.
+pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector, anyhow::Error> {
+    let invalid_selector = format_err!("Invalid component interest selector: '{}'.", selector);
+    let mut parts = selector.split('#');
+
+    // Split each arg into sub string vectors containing strings
+    // for component [0] and interest [1] respectively.
+    let Some(component) = parts.next() else {
+        return Err(invalid_selector);
+    };
+    let Some(interest) = parts.next() else {
+        return Err(invalid_selector);
+    };
+    if parts.next().is_some() {
+        return Err(invalid_selector);
+    }
+    let selector = match parse_component_selector::<VerboseError>(component) {
+        Ok(s) => s,
+        Err(e) => return Err(format_err!("{} Error: {}", invalid_selector, e)),
+    };
+    let Some(min_severity) = parse_severity(interest.to_uppercase().as_ref()) else {
+        return Err(invalid_selector);
+    };
+    Ok(LogInterestSelector {
+        selector,
+        interest: Interest { min_severity: Some(min_severity), ..Interest::EMPTY },
+    })
+}
+
+fn parse_severity(severity: &str) -> Option<Severity> {
+    match severity {
+        "TRACE" => Some(Severity::Trace),
+        "DEBUG" => Some(Severity::Debug),
+        "INFO" => Some(Severity::Info),
+        "WARN" => Some(Severity::Warn),
+        "ERROR" => Some(Severity::Error),
+        "FATAL" => Some(Severity::Fatal),
+        _ => None,
+    }
 }
 
 /// Converts an unparsed Inspect selector into a ComponentSelector and TreeSelector.
@@ -831,5 +874,29 @@ a:b:c
             &StringSelector::StringPattern("foo*bar*baz*qux".into()),
             "foobarbaazqux"
         ));
+    }
+
+    #[fuchsia::test]
+    fn test_log_interest_selector() {
+        assert_eq!(
+            parse_log_interest_selector("core/network#FATAL").unwrap(),
+            LogInterestSelector {
+                selector: parse_component_selector::<VerboseError>("core/network").unwrap(),
+                interest: Interest { min_severity: Some(Severity::Fatal), ..Interest::EMPTY }
+            }
+        );
+        assert_eq!(
+            parse_log_interest_selector("any/component#INFO").unwrap(),
+            LogInterestSelector {
+                selector: parse_component_selector::<VerboseError>("any/component").unwrap(),
+                interest: Interest { min_severity: Some(Severity::Info), ..Interest::EMPTY }
+            }
+        );
+    }
+    #[test]
+    fn test_log_interest_selector_error() {
+        assert!(parse_log_interest_selector("anything////#FATAL").is_err());
+        assert!(parse_log_interest_selector("core/network").is_err());
+        assert!(parse_log_interest_selector("core/network#FAKE").is_err());
     }
 }
