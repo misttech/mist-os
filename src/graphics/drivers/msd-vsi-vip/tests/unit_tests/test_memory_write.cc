@@ -194,11 +194,11 @@ class TestMsdVsiDevice : public drm_test_info {
     magma::PlatformBusMapper* bus_mapper_;
   };
 
-  EtnaDevice device_;  // Device should be destroyed last.
+  std::unique_ptr<AddressSpaceOwner> address_space_owner_;
+  EtnaDevice device_;
   EtnaCommandStream command_stream_;
 
   std::shared_ptr<MsdVsiContext> context_;
-  std::unique_ptr<AddressSpaceOwner> address_space_owner_;
   std::shared_ptr<AddressSpace> address_space_;
   uint32_t next_gpu_addr_ = 0x10000;
 };

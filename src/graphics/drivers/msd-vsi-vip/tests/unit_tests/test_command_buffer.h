@@ -31,8 +31,8 @@ class TestCommandBuffer : public ::testing::Test {
 
   void Release() {
     client_.reset();
-    address_space_owner_.reset();
     device_.reset();
+    address_space_owner_.reset();
   }
 
  protected:
@@ -177,7 +177,7 @@ class TestCommandBuffer : public ::testing::Test {
   std::shared_ptr<MsdVsiContext> default_context() { return client_->context; }
   std::shared_ptr<AddressSpace> default_address_space() { return client_->address_space; }
 
-  std::unique_ptr<MsdVsiDevice> device_;  // Device should be destroyed last.
   std::unique_ptr<AddressSpaceOwner> address_space_owner_;
+  std::unique_ptr<MsdVsiDevice> device_;
   std::unique_ptr<Client> client_;
 };
