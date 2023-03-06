@@ -43,7 +43,6 @@ impl OutputOrTask {
 
 /// A Stream that produces audio frames.
 /// Usually acquired via SoftPcmOutput::take_frame_stream().
-// TODO: return the time that the first frame is meant to be presented?
 pub struct AudioFrameStream {
     /// Handle to the VMO that is receiving the frames.
     frame_vmo: Arc<Mutex<frame_vmo::FrameVmo>>,
@@ -51,6 +50,9 @@ pub struct AudioFrameStream {
     next_frame_index: usize,
     /// Number of frames to return in a packet.
     packet_frames: usize,
+    /// Vector that will be filled with a packet.
+    /// Replaced when stream produces a packet.
+    next_packet: std::cell::RefCell<Vec<u8>>,
     /// SoftPcmOutput this is attached to, or the task currently processing the FIDL requests.
     output: OutputOrTask,
     /// Inspect node
@@ -63,6 +65,7 @@ impl AudioFrameStream {
             frame_vmo: output.frame_vmo.clone(),
             next_frame_index: 0,
             packet_frames: output.packet_frames,
+            next_packet: Vec::new().into(),
             output: OutputOrTask::Output(output),
             inspect: Default::default(),
         }
@@ -89,19 +92,29 @@ impl Stream for AudioFrameStream {
             self.output = OutputOrTask::Complete;
             return Poll::Ready(r.err().map(Result::Err));
         }
+        if self.next_packet.borrow().len() == 0 {
+            if let Some(new_len) = self.frame_vmo.lock().bytecount_frames(self.packet_frames) {
+                self.next_packet.borrow_mut().resize(new_len, 0);
+            }
+        }
         let result = {
             let mut lock = self.frame_vmo.lock();
-            futures::ready!(lock.poll_frames(self.next_frame_index, self.packet_frames, cx))
+            futures::ready!(lock.poll_frames(
+                self.next_frame_index,
+                self.next_packet.borrow_mut().as_mut_slice(),
+                cx
+            ))
         };
 
         match result {
-            Ok((frames, latest, missed)) => {
+            Ok((latest, missed)) => {
                 if missed > 0 {
                     info!("Missed {} frames due to slow polling", missed);
                 }
-                if frames.len() > 0 {
-                    self.next_frame_index = latest + 1;
-                }
+                self.next_frame_index = latest + 1;
+                let vec_mut = self.next_packet.get_mut();
+                let bytes = vec_mut.len();
+                let frames = std::mem::replace(vec_mut, vec![0; bytes]);
                 Poll::Ready(Some(Ok(frames)))
             }
             Err(e) => Poll::Ready(Some(Err(e))),
@@ -223,7 +236,8 @@ impl SoftPcmOutput {
     /// Spawns a task to handle messages from the Audio Core and setup of internal VMO buffers
     /// required for audio output.  See AudioFrameStream for more information on timing
     /// requirements for audio output.
-    /// `packet_duration`: the duration of an audio packet returned by the stream.
+    /// `packet_duration`: desired duration of an audio packet returned by the stream. Rounded down to
+    /// end on a audio frame boundary.
     /// `initial_external_delay`: delay that is added after packets have been returned from the stream
     pub fn build(
         unique_id: &[u8; 16],

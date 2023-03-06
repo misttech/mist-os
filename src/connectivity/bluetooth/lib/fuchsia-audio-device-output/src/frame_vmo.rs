@@ -151,22 +151,32 @@ impl FrameVmo {
         Poll::Pending
     }
 
-    /// Retrieve `count` audio frames available starting at `next_frame`.
-    /// `next_frame` is a frame index, starting at zero when the buffer is started.
-    /// Returns a vector of bytes containing the frames, the index of the last frame returned,
-    /// and a count of frames that were missed due to buffer overwrite (slow polling).
-    /// If less than `count` frames are available, Poll::Pending is returned and the waker
-    /// associated with `cx` will be woken at a time when enough frames are expected to be
+    /// Calculate the number of bytes that `num` frames will occupy given the current set format.
+    /// Returns None if no format has been set.
+    pub(crate) fn bytecount_frames(&self, num: usize) -> Option<usize> {
+        (self.bytes_per_frame != 0).then_some(self.bytes_per_frame * num)
+    }
+
+    /// Retrieve audio frames available starting at `next_frame`.
+    /// `next_frame` is a frame index, starting at zero when the buffer timer was started.
+    /// Fills `buf` with as many frames as will fill the slice.
+    /// Returns the index of the last frame returned, and a count of frames that were missed
+    /// due to buffer overwrite (slow polling).
+    /// If the buffer cannot be filled, Poll::Pending is returned and the waker
+    /// associated with `cx` will be woken at a time when enough data is expected to be
     /// available.
-    /// If polled before start, it will be woken when started.
-    /// Returns Err(Error::InvalidArgs) if `count` is larger than the size of the frames in the
-    /// buffer, or if `count` is zero.
+    /// If polled before start, the waker associate with `cx` will be woken when started.
+    /// Returns Err(Error::InvalidArgs) if the buffer size is not a multiple of a positive number
+    /// of frames, or the buffer is larger than the possible available frames in the buffer.
+    /// See `bytecount_frames` to calculate buffer sizes for a count of frames.
+    ///
+    /// Calling poll_frames with buffers of varying size is not expected, but should be supported.
     pub(crate) fn poll_frames(
         &mut self,
         mut next_frame: usize,
-        count: usize,
+        buf: &mut [u8],
         cx: &mut Context<'_>,
-    ) -> Poll<Result<(Vec<u8>, usize, usize)>> {
+    ) -> Poll<Result<(usize, usize)>> {
         let start_time = match self.start_time.as_ref() {
             None => {
                 self.waker = Some(cx.waker().clone());
@@ -174,6 +184,11 @@ impl FrameVmo {
             }
             Some(time) => *time,
         };
+        assert!(self.bytes_per_frame != 0, "bytes per frame not set before start");
+        if buf.len() == 0 || (buf.len() % self.bytes_per_frame) != 0 {
+            return Poll::Ready(Err(Error::InvalidArgs));
+        }
+        let count = buf.len() / self.bytes_per_frame;
         let vmo_frames = self.size / self.bytes_per_frame;
         if count > vmo_frames || count == 0 {
             return Poll::Ready(Err(Error::InvalidArgs));
@@ -198,15 +213,10 @@ impl FrameVmo {
         if frames_available < count {
             // Set the timer to wake when enough frames will be available
             let deadline = now + self.duration_from_frames(count - frames_available);
-            return match self.reset_frame_timer(deadline, cx) {
-                Poll::Pending => Poll::Pending,
-                // Somehow raced to a time where they are available, try again.
-                Poll::Ready(()) => self.poll_frames(next_frame, count, cx),
-            };
+            let () = futures::ready!(self.reset_frame_timer(deadline, cx));
+            // Somehow raced to a time where they are available, try again.
+            return self.poll_frames(next_frame, buf, cx);
         }
-
-        let bytes = count * self.bytes_per_frame;
-        let mut out_vec = vec![0; bytes];
 
         let mut frame_from_idx = next_frame % vmo_frames;
         let frame_until = next_frame + count;
@@ -225,7 +235,7 @@ impl FrameVmo {
             let bytes_to_read = frames_to_read * self.bytes_per_frame;
             let byte_start = frame_from_idx * self.bytes_per_frame;
             self.vmo
-                .read(&mut out_vec[0..bytes_to_read], byte_start as u64)
+                .read(&mut buf[0..bytes_to_read], byte_start as u64)
                 .map_err(|e| Error::IOError(e))?;
             frame_from_idx = 0;
             frame_until_idx -= vmo_frames;
@@ -237,7 +247,7 @@ impl FrameVmo {
         let byte_start = frame_from_idx * self.bytes_per_frame;
 
         self.vmo
-            .read(&mut out_vec[ndx..ndx + bytes_to_read], byte_start as u64)
+            .read(&mut buf[ndx..ndx + bytes_to_read], byte_start as u64)
             .map_err(|e| Error::IOError(e))?;
 
         // We're returning frames from just after the `next_frame` up to `frame_until`
@@ -255,7 +265,7 @@ impl FrameVmo {
             }
         }
         // Index of the last frame returned is -1 because we index from zero.
-        Poll::Ready(Ok((out_vec, frame_until - 1, missing_frames)))
+        Poll::Ready(Ok((frame_until - 1, missing_frames)))
     }
 
     /// Count of the number of frames that have ended before `time`.
@@ -322,7 +332,7 @@ mod tests {
 
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
-    fn test_duration_from_frames(vmo: FrameVmo) {
+    fn duration_from_frames(vmo: FrameVmo) {
         assert_eq!(ONE_FRAME_NANOS.nanos(), vmo.duration_from_frames(1));
         assert_eq!(TWO_FRAME_NANOS.nanos(), vmo.duration_from_frames(2));
         assert_eq!(THREE_FRAME_NANOS.nanos(), vmo.duration_from_frames(3));
@@ -334,7 +344,7 @@ mod tests {
 
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
-    fn test_frames_from_duration(vmo: FrameVmo) {
+    fn frames_from_duration(vmo: FrameVmo) {
         assert_eq!(0, vmo.frames_from_duration(0.nanos()));
 
         assert_eq!(0, vmo.frames_from_duration((ONE_FRAME_NANOS - 1).nanos()));
@@ -352,7 +362,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_start_stop() {
+    fn start_stop() {
         let _exec = fasync::TestExecutor::new();
 
         let mut vmo = FrameVmo::new().expect("can't make a framevmo");
@@ -378,7 +388,7 @@ mod tests {
         vmo.start(start_time).unwrap();
     }
 
-    fn test_frames_before_exact(
+    fn frames_before_exact(
         vmo: &mut FrameVmo,
         time_nanos: i64,
         duration: zx::Duration,
@@ -392,7 +402,7 @@ mod tests {
 
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
-    fn test_frames_before(mut vmo: FrameVmo) {
+    fn frames_before(mut vmo: FrameVmo) {
         let _exec = fasync::TestExecutor::new();
 
         let start_time = fasync::Time::now();
@@ -411,13 +421,13 @@ mod tests {
 
         assert_eq!(10521, vmo.frames_before(start_time + 219188000.nanos()));
 
-        test_frames_before_exact(&mut vmo, 273533747037, 219188000.nanos(), 10521);
-        test_frames_before_exact(&mut vmo, 714329925362, 219292000.nanos(), 10526);
+        frames_before_exact(&mut vmo, 273533747037, 219188000.nanos(), 10521);
+        frames_before_exact(&mut vmo, 714329925362, 219292000.nanos(), 10526);
     }
 
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
-    fn test_poll_frames(mut vmo: FrameVmo) {
+    fn poll_frames(mut vmo: FrameVmo) {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
@@ -425,28 +435,28 @@ mod tests {
         vmo.start(start_time).unwrap();
 
         let half_dur = TEST_VMO_DURATION / 2;
-        let quart_frames = TEST_FRAMES / 4;
+        const QUART_FRAMES: usize = TEST_FRAMES / 4;
+        let mut quart_frames_buf = [0; QUART_FRAMES];
         exec.set_fake_time(fasync::Time::after(half_dur));
 
         let mut no_wake_cx = Context::from_waker(futures_test::task::panic_waker_ref());
 
-        let res = vmo.poll_frames(0, quart_frames, &mut no_wake_cx);
-        let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
+        let res = vmo.poll_frames(0, &mut quart_frames_buf, &mut no_wake_cx);
+        let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
-        assert_eq!(quart_frames, bytes.len());
         // index returned should be equal to the number of frames returned minus 1 - zero is the
         // first frame
-        assert_eq!(frame_idx, quart_frames - 1);
+        assert_eq!(frame_idx, QUART_FRAMES - 1);
 
         // After another half_dur, we should be able to read the whole buffer from start to finish.
         exec.set_fake_time(fasync::Time::after(half_dur));
 
-        let res = vmo.poll_frames(0, TEST_FRAMES, &mut no_wake_cx);
-        let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
+        let mut full_buf = [0; TEST_FRAMES];
+        let res = vmo.poll_frames(0, &mut full_buf, &mut no_wake_cx);
+        let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
-        assert_eq!(TEST_FRAMES, bytes.len());
         // index returned should be equal to the number of frames returned minus 1 (zero indexing)
         assert_eq!(frame_idx, TEST_FRAMES - 1);
 
@@ -458,40 +468,40 @@ mod tests {
         // Should be able to get frames that span from the middle of the buffer to the middle of the
         // buffer (from index 12000 to index 11999).  This should be 24000 frames.
         // TODO(fxbug.dev/90313): should mark the buffer somehow to confirm that the data is correct
-        let res = vmo.poll_frames(TEST_FRAMES / 2, TEST_FRAMES, &mut no_wake_cx);
-        let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
+        let res = vmo.poll_frames(TEST_FRAMES / 2, &mut full_buf, &mut no_wake_cx);
+        let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
-        assert_eq!(TEST_FRAMES, bytes.len());
         assert_eq!(frame_idx, TEST_FRAMES + TEST_FRAMES / 2 - 1);
 
         // Should be able to get a set of frames that is all located before the oldest point in the
         // VMO, which is currently in the middle of the VMO.
         // This should be from about a quarter in to halfway in (now)
         // Should be able to get exactly the min_duration amount of frames.
-        let res = vmo.poll_frames(frame_idx + 1 - quart_frames, quart_frames, &mut no_wake_cx);
-        let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
+        let res =
+            vmo.poll_frames(frame_idx + 1 - QUART_FRAMES, &mut quart_frames_buf, &mut no_wake_cx);
+        let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
-        assert_eq!(TEST_FRAMES / 4, bytes.len());
         assert_eq!(frame_idx, TEST_FRAMES + TEST_FRAMES / 2 - 1);
     }
 
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
-    fn test_poll_frames_waking(mut vmo: FrameVmo) {
+    fn poll_frames_waking(mut vmo: FrameVmo) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
 
         let half_dur = TEST_VMO_DURATION / 2;
-        let quart_frames = TEST_FRAMES / 4;
+        const QUART_FRAMES: usize = TEST_FRAMES / 4;
+        let mut quart_frames_buf = [0; QUART_FRAMES];
         exec.set_fake_time(fasync::Time::after(half_dur));
 
         let (waker, count) = futures_test::task::new_count_waker();
         let mut counting_wake_cx = Context::from_waker(&waker);
 
         // Polled before start, should wake the waker when started.
-        let res = vmo.poll_frames(0, quart_frames, &mut counting_wake_cx);
+        let res = vmo.poll_frames(0, &mut quart_frames_buf[..], &mut counting_wake_cx);
         res.expect_pending("should be pending before start");
 
         let start_time = fasync::Time::now();
@@ -501,7 +511,7 @@ mod tests {
         assert_eq!(count, 1);
 
         // Polling before frames are ready should return pending, and set a timer.
-        let res = vmo.poll_frames(0, quart_frames, &mut counting_wake_cx);
+        let res = vmo.poll_frames(0, &mut quart_frames_buf[..], &mut counting_wake_cx);
         res.expect_pending("should be pending before start");
 
         // Each `half_dur` period should pseudo-fill half the vmo.
@@ -513,27 +523,31 @@ mod tests {
         assert_eq!(count, 2);
 
         // Should be ready now, with half the duration in frames available.
-        let res = vmo.poll_frames(0, quart_frames, &mut counting_wake_cx);
-        let (bytes, frame_idx, missed) = res.expect("frames should be ready").expect("no error");
+        let res = vmo.poll_frames(0, &mut quart_frames_buf[..], &mut counting_wake_cx);
+        let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
         assert_eq!(0, missed);
-        assert_eq!(quart_frames, bytes.len());
-        assert_eq!(frame_idx, quart_frames - 1);
+        assert_eq!(frame_idx, QUART_FRAMES - 1);
 
         // Polling again with more frames than we have should return pending because there
         // isn't enough data available.
-        let res = vmo.poll_frames(frame_idx + 1, quart_frames * 2, &mut counting_wake_cx);
+        let mut half_frames_buf = [0; TEST_FRAMES / 2];
+        let res = vmo.poll_frames(frame_idx + 1, &mut half_frames_buf, &mut counting_wake_cx);
         res.expect_pending("should be pending because not enough data");
 
         assert_eq!(count, 2);
     }
 
     #[fuchsia::test]
-    fn test_multibyte_poll_frames() {
+    fn multibyte_poll_frames() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
         let mut vmo = FrameVmo::new().expect("can't make a framevmo");
         let format = AudioSampleFormat::Sixteen { unsigned: false, invert_endian: false };
         let frames = TEST_FPS as usize / 2;
+
+        // No byte count can be determined before the format is set.
+        assert!(vmo.bytecount_frames(10).is_none());
+
         let _handle = vmo.set_format(TEST_FPS, format, 2, frames, 0).unwrap();
 
         let half_dur = 250.millis();
@@ -542,18 +556,22 @@ mod tests {
         let start_time = fasync::Time::now() - half_dur;
         vmo.start(start_time).unwrap();
 
+        let bytecount =
+            vmo.bytecount_frames(frames / 2).expect("a bytecount should exist after format");
+        let mut half_frames_buf = vec![0; bytecount];
+
         let mut no_wake_cx = Context::from_waker(futures_test::task::panic_waker_ref());
-        let res = vmo.poll_frames(0, frames / 2, &mut no_wake_cx);
-        let (bytes, _idx, missed) = res.expect("frames should be ready").expect("no error");
+        let res = vmo.poll_frames(0, half_frames_buf.as_mut_slice(), &mut no_wake_cx);
+        let (idx, missed) = res.expect("frames should be ready").expect("no error");
 
         assert_eq!(0, missed);
-        // There should be frames / 2 frames here, with 4 bytes per frame.
-        assert_eq!(frames / 2 * 4, bytes.len())
+        // Still frames are in frame counts, not byte counts.
+        assert_eq!(idx, frames / 2 - 1);
     }
 
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
-    fn test_poll_frames_boundaries(mut vmo: FrameVmo) {
+    fn poll_frames_boundaries(mut vmo: FrameVmo) {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
         let mut no_wake_cx = Context::from_waker(futures_test::task::panic_waker_ref());
@@ -564,14 +582,15 @@ mod tests {
 
         // Just before the frame finishes, we shouldn't be able to get it.
         exec.set_fake_time(start_time + THREE_FRAME_NANOS.nanos() - 1.nanos());
-        vmo.poll_frames(2, 1, &mut no_wake_cx).expect_pending("third frame shouldn't be ready");
+        let mut one_frame_buf = [0; 1];
+        vmo.poll_frames(2, &mut one_frame_buf, &mut no_wake_cx)
+            .expect_pending("third frame shouldn't be ready");
         // Exactly when the frame finishes, should be able to get the frame.
         exec.set_fake_time(start_time + THREE_FRAME_NANOS.nanos());
-        let res = vmo.poll_frames(2, 1, &mut no_wake_cx);
-        let (bytes, idx, missed) = res.expect("third frame should be ready").expect("no error");
+        let res = vmo.poll_frames(2, &mut one_frame_buf, &mut no_wake_cx);
+        let (idx, missed) = res.expect("third frame should be ready").expect("no error");
 
         assert_eq!(0, missed);
-        assert_eq!(1, bytes.len());
         // index is the index of the last frame returned, which should just be the one frame
         // index we requested.
         assert_eq!(2, idx);
@@ -580,10 +599,9 @@ mod tests {
         let much_later_ns = 3999 * THREE_FRAME_NANOS;
         let next_frame_idx = 3998 * 3 + 2;
         exec.set_fake_time(start_time + much_later_ns.nanos());
-        let res = vmo.poll_frames(next_frame_idx, 1, &mut no_wake_cx);
-        let (bytes, idx, missed) = res.expect("frame should be ready").expect("no error");
+        let res = vmo.poll_frames(next_frame_idx, &mut one_frame_buf, &mut no_wake_cx);
+        let (idx, missed) = res.expect("frame should be ready").expect("no error");
         assert_eq!(0, missed);
-        assert_eq!(1, bytes.len());
         // index is the index of the last frame returned.
         assert_eq!(next_frame_idx, idx);
 
@@ -596,17 +614,19 @@ mod tests {
         let mut moment_end = moment_start;
         let mut next_index = 0;
 
+        let mut ten_frames_buf = [0; 10];
+
         while total_duration < 250.millis() {
             moment_end += moment_length;
             exec.set_fake_time(moment_end);
             total_duration += moment_length;
             // the cx here will never be woken since we never wake timers
-            let Poll::Ready(res) = vmo.poll_frames(next_index, 10, &mut no_wake_cx) else {
+            let Poll::Ready(res) = vmo.poll_frames(next_index, &mut ten_frames_buf, &mut no_wake_cx) else {
                 continue;
             };
-            let (bytes, last_idx, missed) = res.expect("no error");
+            let (last_idx, missed) = res.expect("no error");
             assert_eq!(0, missed);
-            all_frames_len += bytes.len();
+            all_frames_len += ten_frames_buf.len();
             assert_eq!(
                 all_frames_len,
                 vmo.frames_before(moment_end + 1.nanos()),
@@ -615,9 +635,7 @@ mod tests {
                 moment_end
             );
             moment_start = moment_end;
-            if bytes.len() > 0 {
-                next_index = last_idx + 1;
-            }
+            next_index = last_idx + 1;
         }
 
         assert_eq!(TEST_FRAMES / 2, all_frames_len, "should be a quarter second worth of frames");
