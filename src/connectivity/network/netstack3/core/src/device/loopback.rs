@@ -22,9 +22,11 @@ use crate::{
     device::Mtu,
     device::{
         queue::{
-            BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequeueState, ReceiveQueue,
-            ReceiveQueueContext, ReceiveQueueFullError, ReceiveQueueNonSyncContext,
-            ReceiveQueueState, ReceiveQueueTypes,
+            rx::{
+                BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveQueue, ReceiveQueueContext,
+                ReceiveQueueNonSyncContext, ReceiveQueueState, ReceiveQueueTypes,
+            },
+            DequeueState, ReceiveQueueFullError,
         },
         state::IpLinkDeviceState,
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
@@ -132,7 +134,7 @@ impl<I: Instant> LockFor<crate::lock_ordering::LoopbackRxQueue>
 impl<I: Instant> LockFor<crate::lock_ordering::LoopbackRxDequeue>
     for IpLinkDeviceState<I, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, ReceiveDequeueState<IpVersion, Buf<Vec<u8>>>>
+    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<IpVersion, Buf<Vec<u8>>>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Data<'_> {
@@ -260,10 +262,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
 
     fn with_dequed_packets_and_rx_queue_ctx<
         O,
-        F: FnOnce(
-            &mut ReceiveDequeueState<IpVersion, Buf<Vec<u8>>>,
-            &mut Self::ReceiveQueueCtx<'_>,
-        ) -> O,
+        F: FnOnce(&mut DequeueState<IpVersion, Buf<Vec<u8>>>, &mut Self::ReceiveQueueCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &LoopbackDeviceId<C::Instant>,

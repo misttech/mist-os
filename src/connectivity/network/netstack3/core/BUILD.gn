@@ -28,6 +28,7 @@ lib_sources = [
   "src/device/ndp.rs",
   "src/device/queue/fifo.rs",
   "src/device/queue/mod.rs",
+  "src/device/queue/rx.rs",
   "src/device/state.rs",
   "src/error.rs",
   "src/fuzz.rs",

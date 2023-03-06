@@ -10,7 +10,7 @@ use derivative::Derivative;
 use packet::ParseBuffer;
 
 use crate::device::queue::{
-    DequeuedRxQueueResult, EnqueuedRxQueueResult, ReceiveQueueFullError, MAX_RX_QUEUED_PACKETS,
+    DequeueResult, EnqueueResult, ReceiveQueueFullError, MAX_RX_QUEUED_PACKETS,
 };
 
 /// A FiFo (First In, First Out) queue of packets.
@@ -19,11 +19,11 @@ use crate::device::queue::{
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(super) struct Fifo<Meta, Buffer> {
+pub(super) struct Queue<Meta, Buffer> {
     packets: VecDeque<(Meta, Buffer)>,
 }
 
-impl<Meta, Buffer> Fifo<Meta, Buffer> {
+impl<Meta, Buffer> Queue<Meta, Buffer> {
     /// Dequeues packets from this queue and pushes them to the back of the
     /// sink.
     ///
@@ -35,7 +35,7 @@ impl<Meta, Buffer> Fifo<Meta, Buffer> {
         &mut self,
         sink: &mut VecDeque<(Meta, Buffer)>,
         max_batch_size: usize,
-    ) -> DequeuedRxQueueResult {
+    ) -> DequeueResult {
         for _ in 0..max_batch_size {
             match self.packets.pop_front() {
                 Some(p) => sink.push_back(p),
@@ -45,20 +45,20 @@ impl<Meta, Buffer> Fifo<Meta, Buffer> {
         }
 
         if self.packets.is_empty() {
-            DequeuedRxQueueResult::NoMorePacketsLeft
+            DequeueResult::NoMorePacketsLeft
         } else {
-            DequeuedRxQueueResult::MorePacketsStillQueued
+            DequeueResult::MorePacketsStillQueued
         }
     }
 }
 
-impl<Meta, Buffer: ParseBuffer> Fifo<Meta, Buffer> {
+impl<Meta, Buffer: ParseBuffer> Queue<Meta, Buffer> {
     /// Attempts to add the RX packet to the queue.
     pub(super) fn queue_rx_packet(
         &mut self,
         meta: Meta,
         body: Buffer,
-    ) -> Result<EnqueuedRxQueueResult, ReceiveQueueFullError<(Meta, Buffer)>> {
+    ) -> Result<EnqueueResult, ReceiveQueueFullError<(Meta, Buffer)>> {
         let Self { packets } = self;
 
         let len = packets.len();
@@ -69,9 +69,9 @@ impl<Meta, Buffer: ParseBuffer> Fifo<Meta, Buffer> {
         packets.push_back((meta, body));
 
         Ok(if len == 0 {
-            EnqueuedRxQueueResult::QueueWasPreviouslyEmpty
+            EnqueueResult::QueueWasPreviouslyEmpty
         } else {
-            EnqueuedRxQueueResult::QueuePreviouslyHadPackets
+            EnqueueResult::QueuePreviouslyHadPackets
         })
     }
 }
@@ -84,15 +84,15 @@ mod tests {
 
     #[test]
     fn max_mackets() {
-        let mut fifo = Fifo::default();
+        let mut fifo = Queue::default();
 
-        let mut res = Ok(EnqueuedRxQueueResult::QueueWasPreviouslyEmpty);
+        let mut res = Ok(EnqueueResult::QueueWasPreviouslyEmpty);
         for i in 0..MAX_RX_QUEUED_PACKETS {
             let body = Buf::new([i as u8], ..);
             assert_eq!(fifo.queue_rx_packet((), body), res);
 
             // The result we expect after the first packet is enqueued.
-            res = Ok(EnqueuedRxQueueResult::QueuePreviouslyHadPackets);
+            res = Ok(EnqueueResult::QueuePreviouslyHadPackets);
         }
 
         let packets = (0..MAX_RX_QUEUED_PACKETS)

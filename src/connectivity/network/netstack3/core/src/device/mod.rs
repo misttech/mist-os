@@ -46,7 +46,7 @@ use crate::{
             EthernetLinkDevice, EthernetTimerId,
         },
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackWeakDeviceId},
-        queue::ReceiveQueueHandler,
+        queue::rx::ReceiveQueueHandler,
         state::IpLinkDeviceState,
     },
     error::{ExistsError, NotFoundError, NotSupportedError},
