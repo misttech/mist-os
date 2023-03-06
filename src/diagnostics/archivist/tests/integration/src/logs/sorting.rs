@@ -104,7 +104,7 @@ async fn timestamp_sorting_for_batches() {
         assert_eq!(&middle_listener.next().await.unwrap(), &hare_expected2);
         assert_eq!(&dump_from_archivist(&instance).await, &expected_dump);
 
-        // listening after all messages were seen by archivist-for-embedding.cmx should be time-ordered
+        // listening after all messages were seen by archivist-for-embedding should be time-ordered
         let mut final_listener = listen_to_archivist(&instance);
         assert_eq!(&final_listener.next().await.unwrap(), &hare_expected);
         assert_eq!(&final_listener.next().await.unwrap(), &tort_expected);

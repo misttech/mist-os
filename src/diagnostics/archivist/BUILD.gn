@@ -197,12 +197,6 @@ fuchsia_component_manifest("archivist-without-attribution-manifest") {
   component_name = "archivist-without-attribution"
 }
 
-fuchsia_component("archivist-for-embedding-v1") {
-  component_name = "archivist-for-embedding"
-  manifest = "meta/archivist-for-embedding.cmx"
-  deps = [ ":bin" ]
-}
-
 fuchsia_component("archivist-for-embedding-v2-component") {
   cm_label = ":archivist-for-embedding-v2-manifest"
   deps = [ ":bin" ]
@@ -251,10 +245,7 @@ fuchsia_package("archivist-for-embedding") {
     "//bundles/buildbot/*",
     "//sdk/bundles:core-tools",
   ]
-  deps = [
-    ":archivist-for-embedding-v1",
-    ":archivist-for-embedding-v2",
-  ]
+  deps = [ ":archivist-for-embedding-v2" ]
 }
 
 rustc_fuzzer("convert_debuglog_to_log_message_fuzzer") {

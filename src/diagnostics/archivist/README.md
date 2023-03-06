@@ -16,9 +16,9 @@ The production Archivist is "mounted" in the component topology in the [bootstra
 Tests run by `run-test-component` have an Archivist embedded in the test realm when either
 `fuchsia.logger/LogSink` or `fuchsia.logger/Log` is requested.
 
-Realms can run their own Archivist by running `meta/archivist-for-embedding.cmx` from the
-`archivist` package. This has a number of sharp edges today and the Diagnostics team recommends
-consulting with us in the process of writing a new integration.
+Realms can run their own Archivist by running `archivist-for-embedding.cm` from the
+`archivist-for-embedding` package. This has a number of sharp edges today and the Diagnostics team
+recommends consulting with us in the process of writing a new integration.
 
 ## Testing
 
