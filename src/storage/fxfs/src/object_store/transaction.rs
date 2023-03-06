@@ -617,6 +617,18 @@ impl<'a> Transaction<'a> {
         } = mutation
         {
             match &key.data {
+                ObjectKeyData::Attribute(..) => {
+                    // TODO(fxbug.dev/122977): Check lock requirements.
+                }
+                ObjectKeyData::Child { .. } => {
+                    // TODO(fxbug.dev/122973): Check lock requirements.
+                }
+                ObjectKeyData::GraveyardEntry { .. } => {
+                    // TODO(fxbug.dev/122974): Check lock requirements.
+                }
+                ObjectKeyData::Keys => {
+                    // TODO(fxbug.dev/122975): Check lock requirements.
+                }
                 ObjectKeyData::Object => match op {
                     // Insert implies the caller expects no object with which to race
                     Operation::Insert => {
@@ -639,16 +651,6 @@ impl<'a> Transaction<'a> {
                         }
                     }
                 },
-                ObjectKeyData::ProjectUsage { .. } => match op {
-                    Operation::Insert | Operation::ReplaceOrInsert => {
-                        panic!(
-                            "Project usage is all handled by merging deltas, no inserts or \
-                            replacements should be used"
-                        );
-                    }
-                    // Merges are all handled like atomic +/- and serialized by the tree locks.
-                    Operation::Merge => {}
-                },
                 ObjectKeyData::ProjectLimit { project_id } => {
                     if !self.txn_locks.contains(&LockKey::ProjectId {
                         store_object_id: *store_object_id,
@@ -665,7 +667,19 @@ impl<'a> Transaction<'a> {
                         )
                     }
                 }
-                _ => {}
+                ObjectKeyData::ProjectUsage { .. } => match op {
+                    Operation::Insert | Operation::ReplaceOrInsert => {
+                        panic!(
+                            "Project usage is all handled by merging deltas, no inserts or \
+                                replacements should be used"
+                        );
+                    }
+                    // Merges are all handled like atomic +/- and serialized by the tree locks.
+                    Operation::Merge => {}
+                },
+                ObjectKeyData::Symlink => {
+                    // TODO(fxbug.dev/122976): Check lock requirements.
+                }
             }
         }
     }
