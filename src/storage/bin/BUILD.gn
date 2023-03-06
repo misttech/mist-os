@@ -18,5 +18,6 @@ fuchsia_shell_package("fs_realm_tools") {
   deps = [
     "fsck",
     "mkfs",
+    "mount",
   ]
 }

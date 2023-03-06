@@ -13,7 +13,6 @@ group("debugging") {
   deps = [
     "//src/storage/bin/dd",
     "//src/storage/bin/df",
-    "//src/storage/bin/mount",
     "//src/storage/bin/storage-metrics",
     "//src/storage/bin/umount",
   ]

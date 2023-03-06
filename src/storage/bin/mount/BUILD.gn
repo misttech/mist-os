@@ -2,21 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("fs-mount") {
-  deps = [ ":mount" ]
-}
+import("//build/rust/rustc_binary.gni")
 
-executable("mount") {
-  sources = [ "main.cc" ]
+rustc_binary("mount") {
+  sources = [ "src/main.rs" ]
+  edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
-    "//src/storage/fshost:admin-client",
-    "//src/storage/fshost:headers",
-    "//zircon/system/ulib/fbl",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//sdk/lib/fdio",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/storage/fs_management",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/fidl/fuchsia.fs.realm:fuchsia.fs.realm_rust",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
+    "//zircon/third_party/ulib/safemath",
   ]
-
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
