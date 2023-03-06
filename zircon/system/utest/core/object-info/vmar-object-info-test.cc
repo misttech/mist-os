@@ -66,18 +66,18 @@ TEST(VmarGetInfoTest, InfoHandleBasicNullActualAndAvailSucceeds) {
 }
 
 TEST(VmarGetInfoTest, InfoHandleBasicInvalidBufferPointerFails) {
-  ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
+  ASSERT_NO_FATAL_FAILURE((
+      CheckInvalidBufferPointerFails<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, vmar_provider)));
 }
 
-TEST(VmarGetInfoTest, InfoHandleBasicBadActualgIsInvalidArg) {
+TEST(VmarGetInfoTest, InfoHandleBasicBadActualIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
+      (BadActualIsInvalidArgs<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoHandleBasicBadAvailIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
+      (BadAvailIsInvalidArgs<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoHandleBasicZeroSizedBufferFails) {
@@ -108,15 +108,16 @@ TEST(VmarGetInfoTest, InfoVmarNullActualAndAvailSucceeds) {
 }
 
 TEST(VmarGetInfoTest, InfoVmarInvalidBufferPointerFails) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
+  ASSERT_NO_FATAL_FAILURE(
+      (CheckInvalidBufferPointerFails<zx_info_vmar_t>(ZX_INFO_VMAR, vmar_provider)));
 }
 
-TEST(VmarGetInfoTest, InfoVmarBadActualgIsInvalidArg) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
+TEST(VmarGetInfoTest, InfoVmarBadActualIsInvalidArg) {
+  ASSERT_NO_FATAL_FAILURE((BadActualIsInvalidArgs<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoVmarBadAvailIsInvalidArg) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
+  ASSERT_NO_FATAL_FAILURE((BadAvailIsInvalidArgs<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoVmarZeroSizedBufferFails) {

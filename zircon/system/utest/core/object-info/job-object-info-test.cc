@@ -193,17 +193,17 @@ TEST_F(JobGetInfoTest, InfoJobProcessesNullActualAndAvailSucceeds) {
 
 TEST_F(JobGetInfoTest, InfoJobProcessesInvalidBufferPointerFails) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_koid_t>(ZX_INFO_JOB_PROCESSES, 1, GetHandleProvider())));
+      (CheckInvalidBufferPointerFails<zx_koid_t>(ZX_INFO_JOB_PROCESSES, GetHandleProvider())));
 }
 
-TEST_F(JobGetInfoTest, InfoJobProcessesBadActualgIsInvalidArg) {
+TEST_F(JobGetInfoTest, InfoJobProcessesBadActualIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_koid_t>(ZX_INFO_JOB_PROCESSES, 1, GetHandleProvider())));
+      (BadActualIsInvalidArgs<zx_koid_t>(ZX_INFO_JOB_PROCESSES, 1, GetHandleProvider())));
 }
 
 TEST_F(JobGetInfoTest, InfoJobProcessesBadAvailIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_koid_t>(ZX_INFO_JOB_PROCESSES, 1, GetHandleProvider())));
+      (BadAvailIsInvalidArgs<zx_koid_t>(ZX_INFO_JOB_PROCESSES, 1, GetHandleProvider())));
 }
 
 TEST_F(JobGetInfoTest, InfoJobProcessesZeroSizedBufferIsOk) {
@@ -265,17 +265,17 @@ TEST_F(JobGetInfoTest, InfoJobChildrenNullActualAndAvailSucceeds) {
 
 TEST_F(JobGetInfoTest, InfoJobChildrenInvalidBufferPointerFails) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_koid_t>(ZX_INFO_JOB_CHILDREN, 1, GetHandleProvider())));
+      (CheckInvalidBufferPointerFails<zx_koid_t>(ZX_INFO_JOB_CHILDREN, GetHandleProvider())));
 }
 
-TEST_F(JobGetInfoTest, InfoJobChildrenBadActualgIsInvalidArg) {
+TEST_F(JobGetInfoTest, InfoJobChildrenBadActualIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_koid_t>(ZX_INFO_JOB_CHILDREN, 1, GetHandleProvider())));
+      (BadActualIsInvalidArgs<zx_koid_t>(ZX_INFO_JOB_CHILDREN, 1, GetHandleProvider())));
 }
 
 TEST_F(JobGetInfoTest, InfoJobChildrenBadAvailIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_koid_t>(ZX_INFO_JOB_CHILDREN, 1, GetHandleProvider())));
+      (BadAvailIsInvalidArgs<zx_koid_t>(ZX_INFO_JOB_CHILDREN, 1, GetHandleProvider())));
 }
 
 TEST_F(JobGetInfoTest, InfoJobChildrenZeroSizedBufferIsOk) {
@@ -336,18 +336,18 @@ TEST_F(JobGetInfoTest, InfoHandleBasicNullActualAndAvailSucceeds) {
 }
 
 TEST_F(JobGetInfoTest, InfoHandleBasicInvalidBufferPointerFails) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1,
-                                                                          GetHandleProvider())));
+  ASSERT_NO_FATAL_FAILURE((CheckInvalidBufferPointerFails<zx_info_handle_basic_t>(
+      ZX_INFO_HANDLE_BASIC, GetHandleProvider())));
 }
 
-TEST_F(JobGetInfoTest, InfoHandleBasicBadActualgIsInvalidArg) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1,
+TEST_F(JobGetInfoTest, InfoHandleBasicBadActualIsInvalidArg) {
+  ASSERT_NO_FATAL_FAILURE((BadActualIsInvalidArgs<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1,
                                                                           GetHandleProvider())));
 }
 
 TEST_F(JobGetInfoTest, InfoHandleBasicBadAvailIsInvalidArg) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1,
-                                                                          GetHandleProvider())));
+  ASSERT_NO_FATAL_FAILURE((
+      BadAvailIsInvalidArgs<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, GetHandleProvider())));
 }
 
 TEST_F(JobGetInfoTest, InfoHandleBasicZeroSizedBufferFails) {

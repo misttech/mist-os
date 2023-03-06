@@ -70,17 +70,17 @@ TEST(TaskGetInfoTest, InfoTaskStatsNullActualAndAvailSucceeds) {
 
 TEST(TaskGetInfoTest, InfoTaskStatsInvalidBufferPointerFails) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
+      (CheckInvalidBufferPointerFails<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, handle_provider)));
 }
 
-TEST(TaskGetInfoTest, InfoTaskStatsBadActualgIsInvalidArg) {
+TEST(TaskGetInfoTest, InfoTaskStatsBadActualIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
+      (BadActualIsInvalidArgs<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
 }
 
 TEST(TaskGetInfoTest, InfoTaskStatsBadAvailIsInvalidArg) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
+      (BadAvailIsInvalidArgs<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
 }
 
 TEST(TaskGetInfoTest, InfoTaskStatsZeroSizedBufferIsTooSmall) {
