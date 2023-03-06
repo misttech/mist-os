@@ -20,6 +20,7 @@ source_set("cpp") {
   sources = [
     "driver_lifecycle.cc",
     "driver_lifecycle.h",
+    "driver_runtime_env.h",
     "environment_variables.cc",
     "start_args.cc",
     "start_args.h",

@@ -41,7 +41,19 @@ zx::result<T> WaitFor(std::future<T> future) {
 // A wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
 class TestSynchronizedDispatcher {
  public:
+  // Arguments for starting the underlying fdf::SynchronizedDispatcher.
+  struct DispatcherStartArgs {
+    bool is_default_dispatcher;
+    fdf::SynchronizedDispatcher::Options options;
+    std::string dispatcher_name;
+  };
+  // This does not start the dispatcher. The |Start| or |StartAsDefault| must be called before
+  // there is an underlying dispatcher to access.
   TestSynchronizedDispatcher() = default;
+
+  // This will start the underlying dispatcher with the given parameters. If the underlying
+  // dispatcher fails to start, this constructor will throw an assert.
+  explicit TestSynchronizedDispatcher(const DispatcherStartArgs& args);
 
   // If |Stop| hasn't been called, it will get called here.
   ~TestSynchronizedDispatcher();
@@ -82,6 +94,10 @@ class TestSynchronizedDispatcher {
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;
 };
+
+extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault;
+extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefault;
+extern const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefaultAllowSync;
 
 }  // namespace fdf
 

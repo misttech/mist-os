@@ -32,6 +32,18 @@ zx::result<> WaitFor(libsync::Completion& completion) {
   return zx::ok();
 }
 
+TestSynchronizedDispatcher::TestSynchronizedDispatcher(const DispatcherStartArgs& args) {
+  if (args.is_default_dispatcher) {
+    zx::result result = StartAsDefault(args.options, args.dispatcher_name);
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to start dispatcher '%s' as default: %s",
+                  args.dispatcher_name.c_str(), result.status_string());
+  } else {
+    zx::result result = Start(args.options, args.dispatcher_name);
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to start dispatcher '%s': %s",
+                  args.dispatcher_name.c_str(), result.status_string());
+  }
+}
+
 TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {
   // Stop is safe to call multiple times. It returns immediately if Stop has already happened.
   zx::result stop_result = Stop();
@@ -68,5 +80,23 @@ zx::result<> TestSynchronizedDispatcher::Stop() {
   dispatcher_.ShutdownAsync();
   return WaitFor(dispatcher_shutdown_);
 }
+
+const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault = {
+    .is_default_dispatcher = true,
+    .options = {},
+    .dispatcher_name = "test-fdf-dispatcher-default",
+};
+
+const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefault = {
+    .is_default_dispatcher = false,
+    .options = {},
+    .dispatcher_name = "test-fdf-dispatcher",
+};
+
+const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherNoDefaultAllowSync = {
+    .is_default_dispatcher = false,
+    .options = fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+    .dispatcher_name = "test-fdf-dispatcher-allow-sync",
+};
 
 }  // namespace fdf
