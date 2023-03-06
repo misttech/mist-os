@@ -10,7 +10,7 @@ from typing import Optional
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import component
-from honeydew.utils import ffx_cli
+from honeydew.utils import ffx_cli, properties
 
 DEFAULT_SSH_USER = "fuchsia"
 DEFAULT_SSH_PKEY = os.environ.get("SSH_PRIVATE_KEY_FILE")
@@ -54,8 +54,8 @@ class FuchsiaDevice(abc.ABC):
         self._ip_address = device_ip_address or ffx_cli.get_target_address(
             self.name)
 
-    # List all the static properties in alphabetical order
-    @property
+    # List all the persistent properties in alphabetical order
+    @properties.PersistentProperty
     @abc.abstractmethod
     def device_type(self) -> str:
         """Returns the device type.
@@ -64,7 +64,7 @@ class FuchsiaDevice(abc.ABC):
             Device type.
         """
 
-    @property
+    @properties.PersistentProperty
     @abc.abstractmethod
     def manufacturer(self) -> str:
         """Returns the manufacturer of the device.
@@ -73,7 +73,7 @@ class FuchsiaDevice(abc.ABC):
             Manufacturer of device.
         """
 
-    @property
+    @properties.PersistentProperty
     @abc.abstractmethod
     def model(self) -> str:
         """Returns the model of the device.
@@ -82,7 +82,7 @@ class FuchsiaDevice(abc.ABC):
             Model of device.
         """
 
-    @property
+    @properties.PersistentProperty
     @abc.abstractmethod
     def product_name(self) -> str:
         """Returns the product name of the device.
@@ -91,7 +91,7 @@ class FuchsiaDevice(abc.ABC):
             Product name of the device.
         """
 
-    @property
+    @properties.PersistentProperty
     @abc.abstractmethod
     def serial_number(self) -> str:
         """Returns the serial number of the device.
@@ -101,7 +101,7 @@ class FuchsiaDevice(abc.ABC):
         """
 
     # List all the dynamic properties in alphabetical order
-    @property
+    @properties.DynamicProperty
     @abc.abstractmethod
     def firmware_version(self) -> str:
         """Returns the firmware version of the device.

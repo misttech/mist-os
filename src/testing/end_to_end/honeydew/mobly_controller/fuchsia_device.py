@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 import honeydew
 from honeydew.interfaces.device_classes.fuchsia_device import (
     DEFAULT_SSH_PKEY, DEFAULT_SSH_USER, FuchsiaDevice)
+from honeydew.utils.properties import DynamicProperty, PersistentProperty
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
 
@@ -81,10 +82,20 @@ def _get_fuchsia_device_info(fuchsia_device: FuchsiaDevice) -> Dict[str, Any]:
     Returns:
         Dict containing information of a fuchsia device.
     """
-    get_attrs = (
-        "device_type", "firmware_version", "manufacturer", "model", "name",
-        "serial_number")
-    device_info = {attr: getattr(fuchsia_device, attr) for attr in get_attrs}
+    device_info: Dict[str, Any] = {
+        "device_class": fuchsia_device.__class__.__name__,
+        "persistent": {},
+        "dynamic": {},
+    }
 
-    device_info["device_class"] = fuchsia_device.__class__.__name__
+    for attr in dir(fuchsia_device):
+        if attr.startswith("_"):
+            continue
+
+        attr_type = getattr(type(fuchsia_device), attr, None)
+        if isinstance(attr_type, DynamicProperty):
+            device_info["dynamic"][attr] = getattr(fuchsia_device, attr)
+        elif isinstance(attr_type, PersistentProperty):
+            device_info["persistent"][attr] = getattr(fuchsia_device, attr)
+
     return device_info

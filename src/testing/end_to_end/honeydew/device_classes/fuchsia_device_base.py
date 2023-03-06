@@ -20,7 +20,7 @@ from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.device_classes import (
     component_capable_device, fuchsia_device)
 from honeydew.interfaces.transports import sl4f
-from honeydew.utils import ffx_cli, host_utils, http_utils
+from honeydew.utils import ffx_cli, host_utils, http_utils, properties
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,8 +92,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         super().__init__(device_name, ssh_pkey, ssh_user, device_ip_address)
         self._start_sl4f_server()
 
-    # List all the static properties in alphabetical order
-    @property
+    # List all the persistent properties in alphabetical order
+    @properties.PersistentProperty
     def device_type(self) -> str:
         """Returns the device type.
 
@@ -105,7 +105,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         """
         return self._device_type
 
-    @property
+    @properties.PersistentProperty
     def manufacturer(self) -> str:
         """Returns the manufacturer of the device.
 
@@ -117,7 +117,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         """
         return self._product_info["manufacturer"]
 
-    @property
+    @properties.PersistentProperty
     def model(self) -> str:
         """Returns the model of the device.
 
@@ -129,7 +129,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         """
         return self._product_info["model"]
 
-    @property
+    @properties.PersistentProperty
     def product_name(self) -> str:
         """Returns the product name of the device.
 
@@ -141,7 +141,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         """
         return self._product_info["name"]
 
-    @property
+    @properties.PersistentProperty
     def serial_number(self) -> str:
         """Returns the serial number of the device.
 
@@ -154,7 +154,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         return self._serial_number
 
     # List all the dynamic properties in alphabetical order
-    @property
+    @properties.DynamicProperty
     def firmware_version(self) -> str:
         """Returns the firmware version of the device.
 
@@ -375,7 +375,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         return component_default.ComponentDefault(
             device_name=self.name, sl4f=self)
 
-    @property
+    @properties.PersistentProperty
     @lru_cache
     def _device_type(self) -> str:
         """Returns the device type.
@@ -435,7 +435,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                 f"'{self.name}' failed to become pingable in {timeout}sec.")
         _LOGGER.info("%s now pingable.", self.name)
 
-    @property
+    @properties.PersistentProperty
     @lru_cache
     def _product_info(self) -> Dict[str, Any]:
         """Returns the product information of the device.
@@ -478,7 +478,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             ssh_command.split(), timeout=timeout).decode()
         return output
 
-    @property
+    @properties.PersistentProperty
     @lru_cache
     def _serial_number(self) -> str:
         """Returns the serial number of the device.
