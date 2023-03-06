@@ -274,21 +274,6 @@ class TestConnection {
     EXPECT_EQ(false, more_data);
   }
 
-  void BufferOld() {
-    ASSERT_TRUE(connection_);
-
-    uint64_t size = page_size() + 16;
-    uint64_t actual_size = 0;
-    magma_buffer_t buffer = 0;
-
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
-    EXPECT_GE(actual_size, size);
-    EXPECT_NE(buffer, 0u);
-
-    magma_connection_release_buffer(connection_, buffer);
-  }
-
   void Buffer() {
     ASSERT_TRUE(connection_);
 
@@ -525,19 +510,7 @@ class TestConnection {
     uint64_t size;
     magma_buffer_id_t id;
     ASSERT_EQ(kExpectedStatus,
-              magma_connection_import_buffer(connection_, kInvalidHandle, &buffer));
-    ASSERT_EQ(kExpectedStatus,
               magma_connection_import_buffer2(connection_, kInvalidHandle, &size, &buffer, &id));
-  }
-
-  void BufferImportOld(uint32_t handle, uint64_t exported_id) {
-    ASSERT_TRUE(connection_);
-
-    magma_buffer_t buffer;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer(connection_, handle, &buffer));
-    EXPECT_NE(magma_buffer_get_id(buffer), exported_id);
-
-    magma_connection_release_buffer(connection_, buffer);
   }
 
   void BufferImport(uint32_t handle, uint64_t exported_id) {
@@ -1345,11 +1318,6 @@ TEST_F(Magma, TracingInitFake) {
   test.TracingInitFake();
 }
 
-TEST_F(Magma, BufferOld) {
-  TestConnection test;
-  test.BufferOld();
-}
-
 TEST_F(Magma, Buffer) {
   TestConnection test;
   test.Buffer();
@@ -1396,19 +1364,6 @@ TEST_F(Magma, BufferMapDuplicates) {
 }
 
 TEST_F(Magma, BufferImportInvalid) { TestConnection().BufferImportInvalid(); }
-
-TEST_F(Magma, BufferImportExportOld) {
-  TestConnection test1;
-  TestConnection test2;
-
-  if (test1.is_virtmagma())
-    GTEST_SKIP();  // TODO(fxbug.dev/13278)
-
-  uint32_t handle;
-  uint64_t exported_id;
-  test1.BufferExport(&handle, &exported_id);
-  test2.BufferImportOld(handle, exported_id);
-}
 
 TEST_F(Magma, BufferImportExport) {
   TestConnection test1;

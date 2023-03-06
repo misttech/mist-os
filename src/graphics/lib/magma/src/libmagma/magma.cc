@@ -96,12 +96,6 @@ void magma_connection_release_context(magma_connection_t connection, uint32_t co
   magma::PlatformConnectionClient::cast(connection)->DestroyContext(context_id);
 }
 
-magma_status_t magma_connection_create_buffer(magma_connection_t connection, uint64_t size,
-                                              uint64_t* size_out, magma_buffer_t* buffer_out) {
-  magma_buffer_id_t buffer_id;
-  return magma_connection_create_buffer2(connection, size, size_out, buffer_out, &buffer_id);
-}
-
 magma_status_t magma_connection_create_buffer2(magma_connection_t connection, uint64_t size,
                                                uint64_t* size_out, magma_buffer_t* buffer_out,
                                                magma_buffer_id_t* buffer_id_out) {
@@ -140,14 +134,6 @@ magma_status_t magma_buffer_set_cache_policy(magma_buffer_t buffer, magma_cache_
   return result ? MAGMA_STATUS_OK : MAGMA_STATUS_INTERNAL_ERROR;
 }
 
-uint64_t magma_buffer_get_id(magma_buffer_t buffer) {
-  return reinterpret_cast<magma::PlatformBuffer*>(buffer)->id();
-}
-
-uint64_t magma_buffer_get_size(magma_buffer_t buffer) {
-  return reinterpret_cast<magma::PlatformBuffer*>(buffer)->size();
-}
-
 uint32_t magma_connection_get_notification_channel_handle(magma_connection_t connection) {
   return magma::PlatformConnectionClient::cast(connection)->GetNotificationChannelHandle();
 }
@@ -177,13 +163,6 @@ magma_status_t magma_buffer_clean_cache(magma_buffer_t buffer, uint64_t offset, 
 
   bool result = platform_buffer->CleanCache(offset, size, invalidate);
   return result ? MAGMA_STATUS_OK : MAGMA_STATUS_INTERNAL_ERROR;
-}
-
-magma_status_t magma_connection_import_buffer(magma_connection_t connection, uint32_t buffer_handle,
-                                              magma_buffer_t* buffer_out) {
-  uint64_t size;
-  magma_buffer_id_t buffer_id;
-  return magma_connection_import_buffer2(connection, buffer_handle, &size, buffer_out, &buffer_id);
 }
 
 magma_status_t magma_connection_import_buffer2(magma_connection_t connection,
@@ -618,12 +597,6 @@ magma_status_t magma_buffer_get_handle(magma_buffer_t buffer, magma_handle_t* ha
   if (!reinterpret_cast<magma::PlatformBuffer*>(buffer)->duplicate_handle(handle_out))
     return DRET(MAGMA_STATUS_INVALID_ARGS);
   return MAGMA_STATUS_OK;
-}
-
-magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
-                                                  magma_image_create_info_t* create_info,
-                                                  magma_buffer_t* image_out) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
 magma_status_t magma_virt_connection_create_image2(magma_connection_t connection,

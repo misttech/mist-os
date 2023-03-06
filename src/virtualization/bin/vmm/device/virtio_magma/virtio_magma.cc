@@ -500,22 +500,6 @@ zx_status_t VirtioMagma::Handle_buffer_export(const virtio_magma_buffer_export_c
   return ZX_OK;
 }
 
-zx_status_t VirtioMagma::Handle_connection_import_buffer(
-    const virtio_magma_connection_import_buffer_ctrl_t* request,
-    virtio_magma_connection_import_buffer_resp_t* response) {
-  virtio_magma_connection_import_buffer2_ctrl_t request_copy;
-  request_copy.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_BUFFER2;
-  request_copy.connection = request->connection;
-  request_copy.buffer_handle = request->buffer_handle;
-  virtio_magma_connection_import_buffer2_resp_t response_copy{};
-
-  response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER;
-  zx_status_t status = Handle_connection_import_buffer2(&request_copy, &response_copy);
-  response->result_return = response_copy.result_return;
-  response->buffer_out = response_copy.buffer_out;
-  return status;
-}
-
 zx_status_t VirtioMagma::Handle_connection_import_buffer2(
     const virtio_magma_connection_import_buffer2_ctrl_t* request,
     virtio_magma_connection_import_buffer2_resp_t* response) {
@@ -633,58 +617,6 @@ zx_status_t VirtioMagma::Handle_connection_execute_command(VirtioDescriptor* req
   }
 
   return status;
-}
-
-// Image create info comes after the request struct.
-zx_status_t VirtioMagma::Handle_virt_connection_create_image(VirtioDescriptor* request_desc,
-                                                             VirtioDescriptor* response_desc,
-                                                             uint32_t* used_out) {
-  magma_connection_t connection{};
-  magma_image_create_info_t image_create_info{};
-  {
-    auto request =
-        reinterpret_cast<virtio_magma_virt_connection_create_image_ctrl_t*>(request_desc->addr);
-
-    connection = reinterpret_cast<magma_connection_t>(request->connection);
-    image_create_info = *reinterpret_cast<magma_image_create_info_t*>(request + 1);
-
-    if (request_desc->len < sizeof(*request) + sizeof(magma_image_create_info_t)) {
-      FX_LOGS(ERROR) << "VIRTIO_MAGMA_CMD_VIRT_CREATE_IMAGE: request descriptor too small";
-      return ZX_ERR_INVALID_ARGS;
-    }
-  }
-
-  ImageInfoWithToken image_info;
-  zx::vmo vmo;
-
-  virtio_magma_virt_connection_create_image_resp_t response = {
-      .hdr = {.type = VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE}};
-
-  // Assuming the current connection is on the one and only physical device.
-  uint32_t physical_device_index = 0;
-  response.result_return = magma_image::CreateDrmImage(physical_device_index, &image_create_info,
-                                                       &image_info.info, &vmo, &image_info.token);
-
-  if (response.result_return == MAGMA_STATUS_OK) {
-    magma_buffer_t image;
-    uint64_t size;
-    magma_buffer_id_t buffer_id;
-    response.result_return =
-        magma_connection_import_buffer2(connection, vmo.release(), &size, &image, &buffer_id);
-
-    if (response.result_return == MAGMA_STATUS_OK) {
-      response.image_out = image;
-
-      auto& map = connection_image_map_[connection];
-
-      map[response.image_out] = std::move(image_info);
-    }
-  }
-
-  memcpy(response_desc->addr, &response, sizeof(response));
-  *used_out = sizeof(response);
-
-  return ZX_OK;
 }
 
 // Image create info comes after the request struct.

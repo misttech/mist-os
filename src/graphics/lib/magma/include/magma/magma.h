@@ -118,20 +118,6 @@ MAGMA_EXPORT void magma_connection_release_context(
     uint32_t context_id);
 
 ///
-/// \brief DEPRECATED. TODO(fxbug.dev/121902): Remove. Creates a memory buffer of at least the given
-///        size.
-/// \param connection An open connection.
-/// \param size Requested buffer size.
-/// \param size_out The returned buffer's actual size.
-/// \param buffer_out The returned buffer.
-///
-MAGMA_EXPORT magma_status_t magma_connection_create_buffer(
-    magma_connection_t connection,
-    uint64_t size,
-    uint64_t* size_out,
-    magma_buffer_t* buffer_out);
-
-///
 /// \brief Creates a memory buffer of at least the given size.
 /// \param connection An open connection.
 /// \param size Requested buffer size.
@@ -154,18 +140,6 @@ MAGMA_EXPORT magma_status_t magma_connection_create_buffer2(
 MAGMA_EXPORT void magma_connection_release_buffer(
     magma_connection_t connection,
     magma_buffer_t buffer);
-
-///
-/// \brief DEPRECATED. TODO(fxbug.dev/121902): Remove. Imports and takes ownership of the buffer
-///        referred to by the given handle.
-/// \param connection An open connection.
-/// \param buffer_handle A valid handle.
-/// \param buffer_out The returned buffer.
-///
-MAGMA_EXPORT magma_status_t magma_connection_import_buffer(
-    magma_connection_t connection,
-    magma_handle_t buffer_handle,
-    magma_buffer_t* buffer_out);
 
 ///
 /// \brief Imports and takes ownership of the buffer referred to by the given handle.
@@ -315,21 +289,6 @@ MAGMA_EXPORT magma_status_t magma_connection_read_notification_channel(
     uint64_t buffer_size,
     uint64_t* buffer_size_out,
     magma_bool_t* more_data_out);
-
-///
-/// \brief DEPRECATED. TODO(fxbug.dev/121902): Remove. Returns a unique id for the given buffer. For
-///        performance reasons it's recommended to cache the id rather than call this repeatedly.
-/// \param buffer A valid buffer.
-///
-MAGMA_EXPORT uint64_t magma_buffer_get_id(
-    magma_buffer_t buffer);
-
-///
-/// \brief DEPRECATED. TODO(fxbug.dev/121902): Remove. Returns the actual size of the given buffer.
-/// \param buffer A valid buffer.
-///
-MAGMA_EXPORT uint64_t magma_buffer_get_size(
-    magma_buffer_t buffer);
 
 ///
 /// \brief Cleans, and optionally invalidates, the cache for the region of memory specified by the
@@ -592,18 +551,6 @@ MAGMA_EXPORT magma_status_t magma_connection_read_performance_counter_completion
     uint32_t* buffer_offset_out,
     uint64_t* time_out,
     uint32_t* result_flags_out);
-
-///
-/// \brief DEPRECATED. TODO(fxbug.dev/121902): Remove. Creates an image buffer backed by a buffer
-///        collection given a DRM format and optional modifier, as specified in the create info.
-/// \param connection An open connection.
-/// \param create_info Input parameters describing the image.
-/// \param image_out The image buffer.
-///
-MAGMA_EXPORT magma_status_t magma_virt_connection_create_image(
-    magma_connection_t connection,
-    magma_image_create_info_t* create_info,
-    magma_buffer_t* image_out);
 
 ///
 /// \brief Creates an image buffer backed by a buffer collection given a DRM format and optional

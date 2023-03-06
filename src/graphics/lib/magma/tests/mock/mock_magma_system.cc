@@ -72,14 +72,6 @@ magma_status_t magma_connection_create_context(magma_connection_t connection,
 
 void magma_connection_release_context(magma_connection_t connection, uint32_t context_id) {}
 
-magma_status_t magma_connection_create_buffer(magma_connection_t connection, uint64_t size,
-                                              uint64_t* size_out, magma_buffer_t* buffer_out) {
-  auto buffer = magma::PlatformBuffer::Create(size, "magma-alloc");
-  *buffer_out = reinterpret_cast<magma_buffer_t>(buffer.release());
-  *size_out = size;
-  return MAGMA_STATUS_OK;
-}
-
 magma_status_t magma_connection_create_buffer2(magma_connection_t connection, uint64_t size,
                                                uint64_t* size_out, magma_buffer_t* buffer_out,
                                                magma_buffer_id_t* id_out) {
@@ -92,14 +84,6 @@ magma_status_t magma_connection_create_buffer2(magma_connection_t connection, ui
 
 void magma_connection_release_buffer(magma_connection_t connection, magma_buffer_t buffer) {
   delete reinterpret_cast<magma::PlatformBuffer*>(buffer);
-}
-
-uint64_t magma_buffer_get_id(magma_buffer_t buffer) {
-  return reinterpret_cast<magma::PlatformBuffer*>(buffer)->id();
-}
-
-uint64_t magma_buffer_get_size(magma_buffer_t buffer) {
-  return reinterpret_cast<magma::PlatformBuffer*>(buffer)->size();
 }
 
 magma_status_t magma_buffer_set_cache_policy(magma_buffer_t buffer, magma_cache_policy_t policy) {
@@ -116,13 +100,6 @@ magma_status_t magma_connection_execute_immediate_commands(
     magma_connection_t connection, uint32_t context_id, uint64_t command_count,
     struct magma_inline_command_buffer* command_buffers) {
   DLOG("magma_execute_immediate_commands2 - STUB");
-  return MAGMA_STATUS_OK;
-}
-
-magma_status_t magma_connection_import_buffer(magma_connection_t connection, uint32_t buffer_handle,
-                                              magma_buffer_t* buffer_out) {
-  *buffer_out = reinterpret_cast<magma_buffer_t>(exported_buffers[buffer_handle]);
-  exported_buffers.erase(buffer_handle);
   return MAGMA_STATUS_OK;
 }
 
@@ -368,12 +345,6 @@ magma_status_t magma_buffer_get_handle(magma_buffer_t buffer, magma_handle_t* ha
   if (!reinterpret_cast<magma::PlatformBuffer*>(buffer)->duplicate_handle(handle_out))
     return DRET(MAGMA_STATUS_INVALID_ARGS);
   return MAGMA_STATUS_OK;
-}
-
-magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
-                                                  magma_image_create_info_t* create_info,
-                                                  magma_buffer_t* image_out) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
 magma_status_t magma_virt_connection_get_image_info(magma_connection_t connection,

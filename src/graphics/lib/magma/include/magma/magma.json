@@ -142,34 +142,6 @@
                 ]
             },
             {
-                "ordinal": 8,
-                "name": "magma_connection_create_buffer",
-                "type": "magma_status_t",
-                "description": "DEPRECATED. TODO(fxbug.dev/121902): Remove. Creates a memory buffer of at least the given size.",
-                "arguments": [
-                    {
-                        "name": "connection",
-                        "type": "magma_connection_t",
-                        "description": "An open connection."
-                    },
-                    {
-                        "name": "size",
-                        "type": "uint64_t",
-                        "description": "Requested buffer size."
-                    },
-                    {
-                        "name": "size_out",
-                        "type": "uint64_t*",
-                        "description": "The returned buffer's actual size."
-                    },
-                    {
-                        "name": "buffer_out",
-                        "type": "magma_buffer_t*",
-                        "description": "The returned buffer."
-                    }
-                ]
-            },
-            {
                 "ordinal": 85,
                 "name": "magma_connection_create_buffer2",
                 "type": "magma_status_t",
@@ -217,29 +189,6 @@
                         "name": "buffer",
                         "type": "magma_buffer_t",
                         "description": "A valid buffer."
-                    }
-                ]
-            },
-            {
-                "ordinal": 27,
-                "name": "magma_connection_import_buffer",
-                "type": "magma_status_t",
-                "description": "DEPRECATED. TODO(fxbug.dev/121902): Remove. Imports and takes ownership of the buffer referred to by the given handle.",
-                "arguments": [
-                    {
-                        "name": "connection",
-                        "type": "magma_connection_t",
-                        "description": "An open connection."
-                    },
-                    {
-                        "name": "buffer_handle",
-                        "type": "magma_handle_t",
-                        "description": "A valid handle."
-                    },
-                    {
-                        "name": "buffer_out",
-                        "type": "magma_buffer_t*",
-                        "description": "The returned buffer."
                     }
                 ]
             },
@@ -536,32 +485,6 @@
                         "name": "more_data_out",
                         "type": "magma_bool_t*",
                         "description": "True if there is more notification data waiting."
-                    }
-                ]
-            },
-            {
-                "ordinal": 12,
-                "name": "magma_buffer_get_id",
-                "type": "uint64_t",
-                "description": "DEPRECATED. TODO(fxbug.dev/121902): Remove. Returns a unique id for the given buffer. For performance reasons it's recommended to cache the id rather than call this repeatedly.",
-                "arguments": [
-                    {
-                        "name": "buffer",
-                        "type": "magma_buffer_t",
-                        "description": "A valid buffer."
-                    }
-                ]
-            },
-            {
-                "ordinal": 13,
-                "name": "magma_buffer_get_size",
-                "type": "uint64_t",
-                "description": "DEPRECATED. TODO(fxbug.dev/121902): Remove. Returns the actual size of the given buffer.",
-                "arguments": [
-                    {
-                        "name": "buffer",
-                        "type": "magma_buffer_t",
-                        "description": "A valid buffer."
                     }
                 ]
             },
@@ -1026,29 +949,6 @@
                         "name": "result_flags_out",
                         "type": "uint32_t*",
                         "description": "A set of flags giving more information about this event."
-                    }
-                ]
-            },
-            {
-                "ordinal": 71,
-                "name": "magma_virt_connection_create_image",
-                "type": "magma_status_t",
-                "description": "DEPRECATED. TODO(fxbug.dev/121902): Remove. Creates an image buffer backed by a buffer collection given a DRM format and optional modifier, as specified in the create info.",
-                "arguments": [
-                    {
-                        "name": "connection",
-                        "type": "magma_connection_t",
-                        "description": "An open connection."
-                    },
-                    {
-                        "name": "create_info",
-                        "type": "magma_image_create_info_t*",
-                        "description": "Input parameters describing the image."
-                    },
-                    {
-                        "name": "image_out",
-                        "type": "magma_buffer_t*",
-                        "description": "The image buffer."
                     }
                 ]
             },

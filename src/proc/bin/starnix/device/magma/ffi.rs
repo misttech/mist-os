@@ -81,51 +81,6 @@ pub fn create_connection(
 ///
 /// SAFETY: Makes an FFI call which takes ownership of a raw VMO handle. Invalid parameters are
 /// dealt with by magma.
-pub fn create_image(
-    current_task: &CurrentTask,
-    control: virtio_magma_virt_connection_create_image_ctrl_t,
-    response: &mut virtio_magma_virt_connection_create_image_resp_t,
-) -> Result<BufferInfo, Errno> {
-    let create_info_address = UserAddress::from(control.create_info);
-    let create_info_ptr = current_task.mm.read_object(UserRef::new(create_info_address))?;
-
-    let create_info_address = UserAddress::from(create_info_ptr);
-    let create_info = current_task.mm.read_object(UserRef::new(create_info_address))?;
-
-    let (vmo, token, info) = create_drm_image(0, &create_info).map_err(|e| {
-        log_warn!(current_task, "Error creating drm image: {:?}", e);
-        errno!(EINVAL)
-    })?;
-
-    let mut buffer_out = magma_buffer_t::default();
-    let mut buffer_id_out = magma_buffer_id_t::default();
-    let mut size_out = 0u64;
-    response.result_return = unsafe {
-        magma_connection_import_buffer2(
-            control.connection as magma_connection_t,
-            vmo.into_raw(),
-            &mut size_out,
-            &mut buffer_out,
-            &mut buffer_id_out,
-        ) as u64
-    };
-
-    response.image_out = buffer_out;
-    response.hdr.type_ =
-        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE as u32;
-
-    Ok(BufferInfo::Image(ImageInfo { info, token }))
-}
-
-/// Creates a DRM image VMO and imports it to magma.
-///
-/// Returns a `BufferInfo` containing the associated `BufferCollectionImportToken` and the magma
-/// image info.
-///
-/// Upon successful completion, `response.image_out` will contain the handle to the magma buffer.
-///
-/// SAFETY: Makes an FFI call which takes ownership of a raw VMO handle. Invalid parameters are
-/// dealt with by magma.
 pub fn create_image2(
     current_task: &CurrentTask,
     control: virtio_magma_virt_connection_create_image2_ctrl_t,
@@ -413,18 +368,6 @@ pub fn get_buffer_handle(
     response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_HANDLE as u32;
 
     Ok(())
-}
-
-/// Writes the size of the provided buffer to `response`.
-///
-/// SAFETY: Makes an FFI call to magma. The buffer in `control` is expected to be valid, although
-/// handling invalid buffer handles is left to magma.
-pub fn get_buffer_size(
-    control: virtio_magma_buffer_get_size_ctrl_t,
-    response: &mut virtio_magma_buffer_get_size_resp_t,
-) {
-    response.result_return = unsafe { magma_buffer_get_size(control.buffer) };
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_SIZE as u32;
 }
 
 /// Runs a magma query.

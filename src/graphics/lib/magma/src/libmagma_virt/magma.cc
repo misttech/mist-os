@@ -152,50 +152,6 @@ magma_status_t magma_initialize_tracing(magma_handle_t channel) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
-                                                  magma_image_create_info_t* create_info,
-                                                  magma_buffer_t* image_out) {
-  auto connection_wrapped = virtmagma_connection_t::Get(connection);
-
-#if VIRTMAGMA_DEBUG
-  printf("%s\n", __PRETTY_FUNCTION__);
-  printf("connection %lu\n", reinterpret_cast<uint64_t>(connection_wrapped->Object()));
-  printf("create_info %p\n", create_info);
-  printf("image_out %p\n", image_out);
-#endif
-
-  // Ensure host compatibility with 32bit guest
-  static_assert(sizeof(magma_image_create_info_t) % 8 == 0);
-
-  struct virtmagma_create_image_wrapper wrapper {
-    .create_info = reinterpret_cast<uintptr_t>(create_info),
-    .create_info_size = sizeof(magma_image_create_info_t),
-  };
-
-  virtio_magma_virt_connection_create_image_ctrl_t request{
-      .hdr = {.type = VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE},
-      .connection = reinterpret_cast<uint64_t>(connection_wrapped->Object()),
-      .create_info = reinterpret_cast<uintptr_t>(&wrapper),
-  };
-  virtio_magma_virt_connection_create_image_resp_t response{};
-
-  if (!virtmagma_send_command(connection_wrapped->Parent().fd(), &request, sizeof(request),
-                              &response, sizeof(response))) {
-    assert(false);
-    return DRET(MAGMA_STATUS_INTERNAL_ERROR);
-  }
-  if (response.hdr.type != VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE)
-    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Wrong response header: %u", response.hdr.type);
-
-  magma_status_t result_return = static_cast<decltype(result_return)>(response.result_return);
-  if (result_return != MAGMA_STATUS_OK)
-    return DRET(result_return);
-
-  *image_out = virtmagma_buffer_t::Create(response.image_out, connection)->Wrap();
-
-  return MAGMA_STATUS_OK;
-}
-
 magma_status_t magma_virt_connection_create_image2(magma_connection_t connection,
                                                    magma_image_create_info_t* create_info,
                                                    uint64_t* size_out, magma_buffer_t* image_out,
