@@ -20,11 +20,7 @@ StartupService::StartupService(async_dispatcher_t* dispatcher, ConfigureCallback
       configure_(std::move(cb)) {}
 
 void StartupService::Start(StartRequestView request, StartCompleter::Sync& completer) {
-  // Use a closure to ensure that any sessions created are destroyed before we respond to the
-  // request.
-  //
-  // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
-  zx::result<> result = [&]() -> zx::result<> {
+  completer.Reply([&]() -> zx::result<> {
     auto bc_or = f2fs::CreateBcache(std::move(request->device));
     if (bc_or.is_error()) {
       return bc_or.take_error();
@@ -32,16 +28,11 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
 
     // TODO: parse option from request->options.
     return configure_(std::move(*bc_or), MountOptions{});
-  }();
-  completer.Reply(result);
+  }());
 }
 
 void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& completer) {
-  // Use a closure to ensure that any sessions created are destroyed before we respond to the
-  // request.
-  //
-  // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
-  zx::result<> result = [&]() -> zx::result<> {
+  completer.Reply([&]() -> zx::result<> {
     auto bc_or = f2fs::CreateBcache(std::move(request->device));
     if (bc_or.is_error()) {
       return bc_or.take_error();
@@ -54,16 +45,11 @@ void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& co
       return status.take_error();
     }
     return zx::ok();
-  }();
-  completer.Reply(result);
+  }());
 }
 
 void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& completer) {
-  // Use a closure to ensure that any sessions created are destroyed before we respond to the
-  // request.
-  //
-  // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
-  zx::result<> result = [&]() -> zx::result<> {
+  completer.Reply([&]() -> zx::result<> {
     bool readonly_device = false;
     auto bc_or = f2fs::CreateBcache(std::move(request->device), &readonly_device);
     if (bc_or.is_error()) {
@@ -79,8 +65,7 @@ void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& compl
       return zx::error(status);
     }
     return zx::ok();
-  }();
-  completer.Reply(result);
+  }());
 }
 
 }  // namespace f2fs

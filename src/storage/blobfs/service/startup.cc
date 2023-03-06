@@ -88,11 +88,7 @@ StartupService::StartupService(async_dispatcher_t* dispatcher, const ComponentOp
       configure_(std::move(cb)) {}
 
 void StartupService::Start(StartRequestView request, StartCompleter::Sync& completer) {
-  // Use a closure to ensure that any sessions created are destroyed before we respond to the
-  // request.
-  //
-  // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
-  zx::result<> result = [&]() -> zx::result<> {
+  completer.Reply([&]() -> zx::result<> {
     zx::result device = block_client::RemoteBlockDevice::Create(
         fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
     if (device.is_error()) {
@@ -102,16 +98,11 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
     return configure_(std::move(device.value()),
                       MergeComponentConfigIntoMountOptions(component_config_,
                                                            ParseMountOptions(request->options)));
-  }();
-  completer.Reply(result);
+  }());
 }
 
 void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& completer) {
-  // Use a closure to ensure that any sessions created are destroyed before we respond to the
-  // request.
-  //
-  // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
-  zx::result<> result = [&]() -> zx::result<> {
+  completer.Reply([&]() -> zx::result<> {
     zx::result device = block_client::RemoteBlockDevice::Create(
         fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
     if (device.is_error()) {
@@ -125,16 +116,11 @@ void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& co
       return zx::error(status);
     }
     return zx::ok();
-  }();
-  completer.Reply(result);
+  }());
 }
 
 void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& completer) {
-  // Use a closure to ensure that any sessions created are destroyed before we respond to the
-  // request.
-  //
-  // TODO(https://fxbug.dev/97783): Consider removing this when multiple sessions are permitted.
-  zx::result<> result = [&]() -> zx::result<> {
+  completer.Reply([&]() -> zx::result<> {
     zx::result device = block_client::RemoteBlockDevice::Create(
         fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(request->device.TakeChannel()));
     if (device.is_error()) {
@@ -149,8 +135,7 @@ void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& compl
       return zx::error(status);
     }
     return zx::ok();
-  }();
-  completer.Reply(result);
+  }());
 }
 
 }  // namespace blobfs
