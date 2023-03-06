@@ -19,5 +19,6 @@ fuchsia_shell_package("fs_realm_tools") {
     "fsck",
     "mkfs",
     "mount",
+    "umount",
   ]
 }
