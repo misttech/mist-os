@@ -7,15 +7,13 @@
 #![warn(clippy::all)]
 #![warn(missing_docs)]
 
-use anyhow::{format_err, Context, Error};
+use anyhow::{Context, Error};
 use archivist_config::Config;
-use archivist_lib::{archivist::Archivist, constants, events::router::RouterOptions};
-use argh::FromArgs;
+use archivist_lib::{archivist::Archivist, events::router::RouterOptions};
 use fuchsia_async as fasync;
 use fuchsia_component::server::MissingStartupHandle;
 use fuchsia_inspect::{component, health::Reporter};
 use fuchsia_zircon as zx;
-use std::str::FromStr;
 use tracing::{debug, info, warn, Level, Subscriber};
 use tracing_subscriber::{
     fmt::{
@@ -27,72 +25,8 @@ use tracing_subscriber::{
 
 const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
 
-/// The archivist.
-#[derive(Debug, Default, FromArgs)]
-struct Args {
-    /// must be passed when running the archivist in CFv1.
-    #[argh(option)]
-    v1: Vec<ArchivistOptionV1>,
-}
-
-/// Available options for the V1 archivist.
-#[derive(Debug)]
-enum ArchivistOptionV1 {
-    /// Default mode for v1.
-    Default,
-    /// Don't connect to the LogConnector.
-    NoLogConnector,
-}
-
-impl FromStr for ArchivistOptionV1 {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "default" => Ok(ArchivistOptionV1::Default),
-            "no-log-connector" => Ok(ArchivistOptionV1::NoLogConnector),
-            s => Err(format_err!("Invalid V1 flavor {}", s)),
-        }
-    }
-}
-
-fn load_v1_config(options: Vec<ArchivistOptionV1>) -> Config {
-    let mut config = Config {
-        // All v1 flavors include the event provider
-        enable_component_event_provider: true,
-        enable_klog: false,
-        enable_event_source: false,
-        // All v1 flavors use the log connector unless turned off.
-        enable_log_connector: true,
-        // All v1 flavors include the controller.
-        install_controller: true,
-        listen_to_lifecycle: false,
-        log_to_debuglog: false,
-        logs_max_cached_original_bytes: constants::LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
-        maximum_concurrent_snapshots_per_reader: 4,
-        num_threads: 1,
-        pipelines_path: constants::DEFAULT_PIPELINES_PATH.into(),
-        serve_unattributed_logs: true,
-        bind_services: vec![],
-    };
-    for option in options {
-        match option {
-            ArchivistOptionV1::Default => {}
-            ArchivistOptionV1::NoLogConnector => {
-                config.enable_log_connector = false;
-            }
-        }
-    }
-    config
-}
-
 fn main() -> Result<(), Error> {
-    let args: Args = argh::from_env();
-    let config = if args.v1.is_empty() {
-        Config::take_from_startup_handle()
-    } else {
-        load_v1_config(args.v1)
-    };
+    let config = Config::take_from_startup_handle();
     let num_threads = config.num_threads;
     debug!("Running executor with {} threads.", num_threads);
     if num_threads == 1 {
