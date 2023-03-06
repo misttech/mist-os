@@ -18,8 +18,18 @@ readonly DHCP_CONFIG_FILE="/etc/default/isc-dhcp-server"
 # that it runs.
 systemctl mask NetworkManager.service
 systemctl stop NetworkManager.service
-# Without the following stop, it's possible for this script's attempt to start
-# the service to race with the one started when the guest is booted.
+
+# Wait for on-boot systemd services to start, in particular this ensures that
+# the instance of isc-dhcp-server started at boot has finished starting so that
+# this script can successfully restart it while applying the desired
+# configuration.
+#
+# Ignore the return code because some systemd services might fail to start
+# and result in a non-zero exit code.
+systemctl is-system-running --wait >/dev/null || true
+
+# Stop the DHCP server so that we can restart it later with our own
+# configuration.
 systemctl stop isc-dhcp-server.service
 
 declare -a ip
@@ -81,7 +91,6 @@ done
 
 ip link set "${iface_name}" up
 
-# Restart isc-dhcp-server because it was started at boot.
 if ! systemctl restart isc-dhcp-server; then
   # If restarting fails, print out the logs to aid in troubleshooting.
   journalctl -b --no-pager -u isc-dhcp-server >&2
