@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"syscall/zx"
 	"syscall/zx/fidl"
+	"time"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
@@ -116,6 +117,38 @@ func (dir *inspectDirectory) Get(name string) (component.Node, bool) {
 
 func (dir *inspectDirectory) ForEach(fn func(string, component.Node) error) error {
 	return fn(inspect.InspectName, dir.asService())
+}
+
+var _ inspectInner = (*configInspectImpl)(nil)
+
+type configInspectImpl struct {
+	name                   string
+	logPackets             *atomicBool
+	logLevel               syslog.LogLevel
+	socketStatsTimerPeriod time.Duration
+	noOpaqueIID            bool
+	fastUDP                bool
+}
+
+func (impl *configInspectImpl) ReadData() inspect.Object {
+	return inspect.Object{
+		Name: impl.name,
+		Properties: []inspect.Property{
+			{Key: "log-packets", Value: inspect.PropertyValueWithStr(impl.logPackets.String())},
+			{Key: "verbosity", Value: inspect.PropertyValueWithStr(impl.logLevel.String())},
+			{Key: "socket-stats-sampling-interval", Value: inspect.PropertyValueWithStr(fmt.Sprintf("%s", impl.socketStatsTimerPeriod))},
+			{Key: "no-opaque-iids", Value: inspect.PropertyValueWithStr(strconv.FormatBool(impl.noOpaqueIID))},
+			{Key: "fast-udp", Value: inspect.PropertyValueWithStr(strconv.FormatBool(impl.fastUDP))},
+		},
+	}
+}
+
+func (_ *configInspectImpl) ListChildren() []string {
+	return nil
+}
+
+func (_ *configInspectImpl) GetChild(_ string) inspectInner {
+	return nil
 }
 
 // statCounter enables *tcpip.StatCounters and other types in this

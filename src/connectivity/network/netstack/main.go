@@ -276,10 +276,12 @@ func Main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logLevel := syslog.InfoLevel
-
 	flags := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	flags.Var(&atomicBool{v: &sniffer.LogPackets}, "log-packets", "enable packet logging")
+
+	logPackets := atomicBool{v: &sniffer.LogPackets}
+	flags.Var(&logPackets, "log-packets", "enable packet logging")
+
+	logLevel := syslog.InfoLevel
 	flags.Var(&logLevel, "verbosity", "set the logging verbosity")
 
 	var socketStatsTimerPeriod time.Duration
@@ -448,6 +450,11 @@ func Main() {
 		featureFlags:       featureFlags{enableFastUDP: fastUDP},
 	}
 
+	fastUDPStatus := "disabled"
+	if fastUDP {
+		fastUDPStatus = "enabled"
+	}
+	_ = syslog.Infof("fast UDP is %s", fastUDPStatus)
 	ns.resetDestinationCache()
 
 	nudDisp.ns = ns
@@ -490,6 +497,20 @@ func Main() {
 		// Trace manager can not be running, or not available in the namespace. We can continue.
 	}
 
+	componentCtx.OutgoingService.AddDiagnostics("configuration", &component.DirectoryWrapper{
+		Directory: &inspectDirectory{
+			asService: (&inspectImpl{
+				inner: &configInspectImpl{
+					name:                   "Runtime Configuration Flags",
+					logPackets:             &logPackets,
+					logLevel:               logLevel,
+					socketStatsTimerPeriod: socketStatsTimerPeriod,
+					noOpaqueIID:            noOpaqueIID,
+					fastUDP:                fastUDP,
+				},
+			}).asService,
+		},
+	})
 	componentCtx.OutgoingService.AddDiagnostics("counters", &component.DirectoryWrapper{
 		Directory: &inspectDirectory{
 			asService: (&inspectImpl{

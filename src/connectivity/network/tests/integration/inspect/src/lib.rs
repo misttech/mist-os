@@ -16,7 +16,7 @@ use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
 use netstack_testing_common::{
     constants, get_inspect_data,
-    realms::{Netstack, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Netstack, Netstack2, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -947,4 +947,55 @@ async fn inspect_for_sampler<N: Netstack>(name: &str) {
             }
         }
     }
+}
+
+#[netstack_test]
+#[test_case(true, "DEBUG", "1m0s", false, false; "default debug config")]
+#[test_case(false, "INFO", "2m0s", true, true; "non-default config")]
+async fn inspect_config(
+    name: &str,
+    log_packets: bool,
+    verbosity: &str,
+    socket_stats_sampling_interval: &str,
+    no_opaque_iids: bool,
+    fast_udp: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = {
+        let mut netstack = fidl_fuchsia_netemul::ChildDef::from(&KnownServiceProvider::Netstack(
+            Netstack2::VERSION,
+        ));
+        let fidl_fuchsia_netemul::ChildDef { program_args, .. } = &mut netstack;
+        assert_eq!(
+            std::mem::replace(
+                program_args,
+                Some(vec![
+                    format!("--log-packets={log_packets}"),
+                    format!("--verbosity={verbosity}"),
+                    format!("--socket-stats-sampling-interval={socket_stats_sampling_interval}"),
+                    format!("--no-opaque-iids={no_opaque_iids}"),
+                    format!("--fast-udp={fast_udp}"),
+                ])
+            ),
+            None,
+        );
+        sandbox.create_realm(name, [netstack]).expect("create realm")
+    };
+
+    // Connect to a protocol exposed by netstack so that it starts up.
+    let _ = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+
+    let data =
+        get_inspect_data(&realm, "netstack", r#"Runtime\ Configuration\ Flags"#, "configuration")
+            .await
+            .expect("get inspect data");
+    fuchsia_inspect::assert_data_tree!(data, "Runtime Configuration Flags": {
+        "log-packets": format!("{log_packets}"),
+        "verbosity": verbosity.to_string(),
+        "socket-stats-sampling-interval": socket_stats_sampling_interval.to_string(),
+        "no-opaque-iids": format!("{no_opaque_iids}"),
+        "fast-udp": format!("{fast_udp}"),
+    });
 }
