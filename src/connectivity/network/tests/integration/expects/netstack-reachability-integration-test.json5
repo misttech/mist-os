@@ -31,5 +31,13 @@
                 "test_state_ns3*",
             ],
         },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                // TODO(https://fxbug.dev/122989): Reachability crashes when
+                // `set_options` is called twice with NS3.
+                "test_cannot_call_set_options_twice_ns3*",
+            ]
+        }
     ],
 }
