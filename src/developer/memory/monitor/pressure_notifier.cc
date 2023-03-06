@@ -236,8 +236,8 @@ void PressureNotifier::FileCrashReport(CrashReportType type) {
   report.set_program_uptime(zx_clock_get_monotonic());
   report.set_is_fatal(false);
 
-  crash_reporter->File(std::move(report),
-                       [](fuchsia::feedback::CrashReporter_File_Result unused) {});
+  crash_reporter->FileReport(std::move(report),
+                             [](fuchsia::feedback::CrashReporter_FileReport_Result unused) {});
 
   // Logic to control rate of Critical crash report generation.
   if (type == CrashReportType::kCritical) {

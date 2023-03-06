@@ -24,9 +24,9 @@ class CrashReporterForTest : public fuchsia::feedback::testing::CrashReporter_Te
  public:
   CrashReporterForTest() : binding_(this) {}
 
-  void File(fuchsia::feedback::CrashReport report, FileCallback callback) override {
+  void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override {
     num_crash_reports_++;
-    fuchsia::feedback::CrashReporter_File_Result result;
+    fuchsia::feedback::CrashReporter_FileReport_Result result;
     result.set_response({});
     callback(std::move(result));
   }
