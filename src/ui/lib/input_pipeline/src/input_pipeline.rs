@@ -18,6 +18,7 @@ use {
     futures::channel::mpsc::{self, Receiver, Sender, UnboundedReceiver, UnboundedSender},
     futures::lock::Mutex,
     futures::{StreamExt, TryStreamExt},
+    itertools::Itertools,
     std::collections::HashMap,
     std::path::PathBuf,
     std::rc::Rc,
@@ -263,6 +264,9 @@ impl InputPipeline {
         inspect_node: fuchsia_inspect::Node,
     ) -> Self {
         let (pipeline_sender, receiver, tasks) = assembly.into_components();
+
+        // Add property to inspect node that exposes supported devices for this pipeline.
+        inspect_node.record_string("supported_input_devices", input_device_types.iter().join(", "));
 
         // Add a stage that catches events which drop all the way down through the pipeline
         // and logs them.
@@ -1107,5 +1111,23 @@ mod tests {
             input_config_features_receiver.next().await.unwrap(),
             InputConfigFeaturesRequest::SetTouchpadMode { enable: true, .. }
         );
+    }
+
+    // Tests that correct properties are added to inspect node when InputPipeline is created.
+    #[fasync::run_singlethreaded(test)]
+    async fn check_inspect_node_has_correct_properties() {
+        let device_types = vec![
+            input_device::InputDeviceType::Touch,
+            input_device::InputDeviceType::ConsumerControls,
+        ];
+        let inspector = fuchsia_inspect::Inspector::default();
+        let test_node = inspector.root().create_child("input_pipeline");
+        let _test_input_pipeline =
+            InputPipeline::new_common(device_types, InputPipelineAssembly::new(), test_node);
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_pipeline: {
+                supported_input_devices: "Touch, ConsumerControls"
+            }
+        });
     }
 }

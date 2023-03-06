@@ -53,6 +53,12 @@ impl InputDeviceType {
     }
 }
 
+impl std::fmt::Display for InputDeviceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
