@@ -21,57 +21,15 @@ load(
     _fuchsia_product_image = "fuchsia_product_image",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_platform_input_configuration.bzl",
-    _INPUT_DEVICE_TYPE = "INPUT_DEVICE_TYPE",
-    _fuchsia_platform_input_configuration = "fuchsia_platform_input_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_connectivity_configuration.bzl",
-    _fuchsia_platform_connectivity_configuration = "fuchsia_platform_connectivity_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_connectivity_wlan_configuration.bzl",
-    _fuchsia_platform_connectivity_wlan_configuration = "fuchsia_platform_connectivity_wlan_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_development_support_configuration.bzl",
-    _fuchsia_platform_development_support_configuration = "fuchsia_platform_development_support_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_driver_framework_configuration.bzl",
-    _fuchsia_platform_driver_framework_configuration = "fuchsia_platform_driver_framework_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_starnix_configuration.bzl",
-    _fuchsia_platform_starnix_configuration = "fuchsia_platform_starnix_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_storage_configuration.bzl",
-    _fuchsia_platform_storage_configuration = "fuchsia_platform_storage_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_identity_configuration.bzl",
-    _FEATURE_CONTROL = "FEATURE_CONTROL",
-    _fuchsia_platform_identity_configuration = "fuchsia_platform_identity_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_virtualization_configuration.bzl",
-    _fuchsia_platform_virtualization_configuration = "fuchsia_platform_virtualization_configuration",
-)
-load(
     "//fuchsia/private/assembly:fuchsia_product_configuration.bzl",
-    _BUILD_TYPES = "BUILD_TYPES",
     _fuchsia_product_configuration = "fuchsia_product_configuration",
+    _INPUT_DEVICE_TYPE = "INPUT_DEVICE_TYPE",
+    _BUILD_TYPES = "BUILD_TYPES"
 )
 load(
     "//fuchsia/private/assembly:fuchsia_virtual_device.bzl",
     _ARCH = "ARCH",
     _fuchsia_virtual_device = "fuchsia_virtual_device",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_platform_diagnostics_configuration.bzl",
-    _ARCHIVIST_TYPES = "ARCHIVIST_TYPES",
-    _fuchsia_platform_diagnostics_configuration = "fuchsia_platform_diagnostics_configuration",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
@@ -170,16 +128,6 @@ assembly_bundle = _assembly_bundle
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package
 fuchsia_assemble_package = _fuchsia_assemble_package
 fuchsia_images_configuration = _fuchsia_images_configuration
-fuchsia_platform_input_configuration = _fuchsia_platform_input_configuration
-fuchsia_platform_identity_configuration = _fuchsia_platform_identity_configuration
-fuchsia_platform_connectivity_configuration = _fuchsia_platform_connectivity_configuration
-fuchsia_platform_connectivity_wlan_configuration = _fuchsia_platform_connectivity_wlan_configuration
-fuchsia_platform_diagnostics_configuration = _fuchsia_platform_diagnostics_configuration
-fuchsia_platform_development_support_configuration = _fuchsia_platform_development_support_configuration
-fuchsia_platform_driver_framework_configuration = _fuchsia_platform_driver_framework_configuration
-fuchsia_platform_starnix_configuration = _fuchsia_platform_starnix_configuration
-fuchsia_platform_storage_configuration = _fuchsia_platform_storage_configuration
-fuchsia_platform_virtualization_configuration = _fuchsia_platform_virtualization_configuration
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
@@ -212,11 +160,9 @@ FuchsiaScrutinyConfigInfo = _FuchsiaScrutinyConfigInfo
 
 # constants
 BUILD_TYPES = _BUILD_TYPES
-ARCHIVIST_TYPES = _ARCHIVIST_TYPES
-INPUT_DEVICE_TYPE = _INPUT_DEVICE_TYPE
-FEATURE_CONTROL = _FEATURE_CONTROL
 ZBI_COMPRESSION = _ZBI_COMPRESSION
 BLOBFS_LAYOUT = _BLOBFS_LAYOUT
 PARTITION_TYPE = _PARTITION_TYPE
 SLOT = _SLOT
 ARCH = _ARCH
+INPUT_DEVICE_TYPE = _INPUT_DEVICE_TYPE

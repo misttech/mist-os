@@ -40,12 +40,6 @@ py_binary(
 )
 
 py_binary(
-    name = "add_parameters",
-    srcs = ["add_parameters.py"],
-    python_version = "PY3",
-)
-
-py_binary(
     name = "rebase_package_manifest",
     srcs = ["rebase_package_manifest.py"],
     python_version = "PY3",

@@ -7,11 +7,7 @@ load(":fuchsia_images_configuration_test.bzl", "fuchsia_images_configuration_tes
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
-    "ARCHIVIST_TYPES",
     "BLOBFS_LAYOUT",
-    "BUILD_TYPES",
-    "FEATURE_CONTROL",
-    "INPUT_DEVICE_TYPE",
     "PARTITION_TYPE",
     "SLOT",
     "ZBI_COMPRESSION",
@@ -28,12 +24,6 @@ load(
     "fuchsia_images_configuration",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
-    "fuchsia_platform_connectivity_configuration",
-    "fuchsia_platform_connectivity_wlan_configuration",
-    "fuchsia_platform_development_support_configuration",
-    "fuchsia_platform_diagnostics_configuration",
-    "fuchsia_platform_identity_configuration",
-    "fuchsia_platform_input_configuration",
     "fuchsia_prebuilt_package",
     "fuchsia_product_configuration",
     "fuchsia_vbmeta",
@@ -61,38 +51,6 @@ fuchsia_assemble_package(
     package = ":prebuilt_ams_light",
 )
 
-fuchsia_platform_input_configuration(
-    name = "testing_input_config",
-    supported_input_devices = [
-        INPUT_DEVICE_TYPE.BUTTON,
-        INPUT_DEVICE_TYPE.KEYBOARD,
-    ],
-)
-
-fuchsia_platform_identity_configuration(
-    name = "testing_identity_config",
-    password_pinweaver = FEATURE_CONTROL.REQUIRED,
-)
-
-fuchsia_platform_connectivity_wlan_configuration(
-    name = "testing_wlan",
-    legacy_privacy_support = True,
-)
-
-fuchsia_platform_connectivity_configuration(
-    name = "testing_connectivity",
-    wlan = ":testing_wlan",
-)
-
-fuchsia_platform_development_support_configuration(
-    name = "testing_development_support",
-    enabled = True,
-)
-
-fuchsia_platform_diagnostics_configuration(
-    name = "testing_diagnostics_config",
-    archivist = ARCHIVIST_TYPES.DEFAULT_SERVICE,
-)
 
 # buildifier: leave-alone
 fuchsia_product_configuration(
@@ -108,56 +66,9 @@ fuchsia_product_configuration(
     driver_packages = [
         ":prebuilt_driver",
     ],
-    session_url = "fuchsia-pkg://fuchsia.com/workstation_session#meta/workstation_routing.cm",
-
-    # Platform configuration items
-    build_type = BUILD_TYPES.USER,
-    additional_serial_log_tags = [
-        "session-manager",
-        "session:session",
-    ],
-    identity = ":testing_identity_config",
-    input = ":testing_input_config",
-    connectivity = ":testing_connectivity",
-    development_support = ":testing_development_support",
-    diagnostics = ":testing_diagnostics_config",
-    additional_platform_flags_bool = {
-        "some.random.path1": "true",
-        "another.random.path1": "false",
-    },
-    additional_platform_flags_string = {
-        "some.random.string1": "I have a string",
-        "another.random.string2": "false",
-    },
-    additional_platform_flags_int = {
-        "some.random.int1": "3234234324231434134141234",
-        "another.random.int": "0",
-    },
-)
-
-fuchsia_product_configuration_test(
-    name = "product_config_golden_test",
-    golden_file = ":test_data/product_config_golden_file.json",
-    product_config = ":testing_product_config",
-)
-
-# buildifier: leave-alone
-fuchsia_product_configuration(
-    name = "testing_product_config_raw_config",
-
-    # Product configuration items
-    base_packages = [
-        ":assembled_ams_light",
-    ],
-    cache_packages = [
-        ":prebuilt_ams_light",
-    ],
-    driver_packages = [
-        ":prebuilt_driver",
-    ],
     json_config = {
         "platform": {
-            "build_type": BUILD_TYPES.USER,
+            "build_type": "user",
             "additional_serial_log_tags": [
                 "session-manager",
                 "session:session",
@@ -190,13 +101,13 @@ fuchsia_product_configuration(
 )
 
 fuchsia_product_configuration_test(
-    name = "product_config_raw_config_golden_test",
+    name = "product_config_golden_test",
     golden_file = ":test_data/product_config_golden_file.json",
-    product_config = ":testing_product_config_raw_config",
+    product_config = ":testing_product_config",
 )
 
 fuchsia_product_configuration(
-    name = "testing_product_config_raw_config_with_labels",
+    name = "testing_product_config_with_labels",
     json_config = {
         "platform": {
             "foo": "LABEL(test_data/foo.txt)",
@@ -208,9 +119,9 @@ fuchsia_product_configuration(
 )
 
 fuchsia_product_configuration_test(
-    name = "product_config_raw_config_with_labels_golden_test",
+    name = "product_config_with_labels_golden_test",
     golden_file = ":test_data/product_config_with_labels_golden_file.json",
-    product_config = ":testing_product_config_raw_config_with_labels",
+    product_config = ":testing_product_config_with_labels",
 )
 
 fuchsia_zbi(

@@ -6,17 +6,7 @@
 load(
     ":providers.bzl",
     "FuchsiaAssembledPackageInfo",
-    "FuchsiaConnectivityConfigInfo",
-    "FuchsiaConnectivityWlanConfigInfo",
-    "FuchsiaDevelopmentSupportConfigInfo",
-    "FuchsiaDiagnosticsConfigInfo",
-    "FuchsiaDriverFrameworkConfigInfo",
-    "FuchsiaIdentityConfigInfo",
-    "FuchsiaInputConfigInfo",
     "FuchsiaProductConfigInfo",
-    "FuchsiaStarnixConfigInfo",
-    "FuchsiaStorageConfigInfo",
-    "FuchsiaVirtualizationConfigInfo",
 )
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
@@ -25,6 +15,14 @@ BUILD_TYPES = struct(
     ENG = "eng",
     USER = "user",
     USER_DEBUG = "userdebug",
+)
+
+# Define input device types option
+INPUT_DEVICE_TYPE = struct(
+    BUTTON = "button",
+    KEYBOARD = "keyboard",
+    MOUSE = "mouse",
+    TOUCHSCREEN = "touchscreen",
 )
 
 def _create_pkg_detail(dep):
@@ -49,37 +47,6 @@ def _collect_file_deps(dep):
 
     return dep[FuchsiaAssembledPackageInfo].files
 
-def _create_platform_config(ctx, initial_value):
-    platform = initial_value
-    if "build_type" not in platform and ctx.attr.build_type:
-        platform["build_type"] = ctx.attr.build_type
-    if len(ctx.attr.additional_serial_log_tags) > 0:
-        platform["additional_serial_log_tags"] = ctx.attr.additional_serial_log_tags
-    if ctx.attr.identity != None:
-        platform["identity"] = ctx.attr.identity[FuchsiaIdentityConfigInfo]
-    if ctx.attr.input != None:
-        platform["input"] = ctx.attr.input[FuchsiaInputConfigInfo]
-    if ctx.attr.connectivity != None:
-        connectivity_config = ctx.attr.connectivity[FuchsiaConnectivityConfigInfo]
-        platform["connectivity"] = {
-            "wlan": connectivity_config.wlan[FuchsiaConnectivityWlanConfigInfo],
-        }
-    if ctx.attr.development_support != None:
-        platform["development_support"] = ctx.attr.development_support[FuchsiaDevelopmentSupportConfigInfo]
-    if ctx.attr.driver_framework != None:
-        platform["driver_framework"] = ctx.attr.driver_framework[FuchsiaDriverFrameworkConfigInfo]
-    if ctx.attr.starnix != None:
-        platform["starnix"] = ctx.attr.starnix[FuchsiaStarnixConfigInfo]
-    if ctx.attr.storage != None:
-        platform["storage"] = ctx.attr.storage[FuchsiaStorageConfigInfo]
-    if ctx.attr.diagnostics != None:
-        diagnostics_config = ctx.attr.diagnostics[FuchsiaDiagnosticsConfigInfo]
-        platform["diagnostics"] = diagnostics_config
-    if ctx.attr.virtualization != None:
-        platform["virtualization"] = ctx.attr.virtualization[FuchsiaVirtualizationConfigInfo]
-
-    return platform
-
 def _fuchsia_product_configuration_impl(ctx):
     product_config = json.decode(ctx.attr.raw_config)
 
@@ -96,14 +63,7 @@ def _fuchsia_product_configuration_impl(ctx):
 
     _walk_json(product_config, _replace_labels_visitor)
 
-    product_config["platform"] = _create_platform_config(
-        ctx,
-        product_config.get("platform", {}),
-    )
-
     product = product_config.get("product", {})
-    if ctx.attr.session_url:
-        product["session_url"] = ctx.attr.session_url
     packages = {}
 
     pkg_files = []
@@ -132,28 +92,9 @@ def _fuchsia_product_configuration_impl(ctx):
     product["drivers"] = driver_details
     product_config["product"] = product
 
-    product_config_file_rebased = ctx.actions.declare_file(ctx.label.name + "_product_config_rebased.json")
-    content = json.encode_indent(product_config, indent = "  ")
-    ctx.actions.write(product_config_file_rebased, content)
-
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
-    ctx.actions.run(
-        inputs = [product_config_file_rebased],
-        outputs = [product_config_file],
-        executable = ctx.executable._add_parameters,
-        arguments = [
-            "--product-config-path",
-            product_config_file_rebased.path,
-            "--additional-bool",
-            str(ctx.attr.additional_platform_flags_bool),
-            "--additional-string",
-            str(ctx.attr.additional_platform_flags_string),
-            "--additional-int",
-            str(ctx.attr.additional_platform_flags_int),
-            "--output",
-            product_config_file.path,
-        ],
-    )
+    content = json.encode_indent(product_config, indent = "  ")
+    ctx.actions.write(product_config_file, content)
 
     return [
         DefaultInfo(files = depset(direct = [product_config_file] + pkg_files + ctx.files.raw_config_labels)),
@@ -170,55 +111,6 @@ _fuchsia_product_configuration = rule(
         "raw_config": attr.string(
             doc = "Raw json config. Used as a base template for the config",
             default = "{}",
-        ),
-        "build_type": attr.string(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Build type of this product.",
-            values = [BUILD_TYPES.ENG, BUILD_TYPES.USER, BUILD_TYPES.USER_DEBUG],
-        ),
-        "identity": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Identity configuration.",
-            providers = [FuchsiaIdentityConfigInfo],
-            default = None,
-        ),
-        "input": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Input Configuration.",
-            providers = [FuchsiaInputConfigInfo],
-            default = None,
-        ),
-        "connectivity": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Connectivity Configuration.",
-            providers = [FuchsiaConnectivityConfigInfo],
-            default = None,
-        ),
-        "diagnostics": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Diagnostics Configuration.",
-            providers = [FuchsiaDiagnosticsConfigInfo],
-            default = None,
-        ),
-        "development_support": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Developement Support Configuration.",
-            providers = [FuchsiaDevelopmentSupportConfigInfo],
-            default = None,
-        ),
-        "driver_framework": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Driver Framework Configuration.",
-            providers = [FuchsiaDriverFrameworkConfigInfo],
-            default = None,
-        ),
-        "starnix": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Starnix Configuration.",
-            providers = [FuchsiaStarnixConfigInfo],
-            default = None,
-        ),
-        "storage": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Storage Configuration.",
-            providers = [FuchsiaStorageConfigInfo],
-            default = None,
-        ),
-        "virtualization": attr.label(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Virtualization Configuration.",
-            providers = [FuchsiaVirtualizationConfigInfo],
-            default = None,
         ),
         "base_packages": attr.label_list(
             doc = "Fuchsia packages to be included in base.",
@@ -241,35 +133,11 @@ _fuchsia_product_configuration = rule(
             providers = [FuchsiaPackageInfo],
             default = [],
         ),
-        "session_url": attr.string(
-            doc = "(Deprecated: Will be removed as part of fxb/122897) Session url string that will be included in product_config.json.",
-        ),
-        "additional_serial_log_tags": attr.string_list(
-            doc = """(Deprecated: Will be removed as part of fxb/122897) A list of logging tags to forward to the serial console.""",
-            default = [],
-        ),
-        "additional_platform_flags_bool": attr.string_dict(
-            doc = """(Deprecated: Will be removed as part of fxb/122897) This is a dictionary map from json path of platform config
-to a bool value. The values are passed in as string formed true/false.""",
-        ),
-        "additional_platform_flags_string": attr.string_dict(
-            doc = """(Deprecated: Will be removed as part of fxb/122897) This is a dictionary map from json path of platform config
-to a string value. """,
-        ),
-        "additional_platform_flags_int": attr.string_dict(
-            doc = """(Deprecated: Will be removed as part of fxb/122897) This is a dictionary map from json path of platform config
-to a int value. The values are passed in as an int string""",
-        ),
         "raw_config_labels": attr.label_keyed_string_dict(
             doc = """Used internally by fuchsia_product_configuration.
 Do not use otherwise""",
             allow_files = True,
             default = {},
-        ),
-        "_add_parameters": attr.label(
-            default = "//fuchsia/tools:add_parameters",
-            executable = True,
-            cfg = "exec",
         ),
     },
 )
@@ -316,8 +184,7 @@ def fuchsia_product_configuration(
         json_config = None,
         base_packages = None,
         cache_packages = None,
-        driver_packages = None,
-        **kargs):
+        driver_packages = None):
     """A new implementation of fuchsia_product_configuration that takes raw a json config.
 
     Args:
@@ -344,9 +211,6 @@ def fuchsia_product_configuration(
         base_packages: Fuchsia packages to be included in base.
         cache_packages: Fuchsia packages to be included in cache.
         driver_packages: Driver packages to include in product.
-        TODO(fxb/122897): Remove post migration
-        **kargs: Additional attributes propagated into
-        _fuchsia_product_configuration rule.
     """
 
     if not json_config:
@@ -371,6 +235,5 @@ def fuchsia_product_configuration(
         raw_config_labels = extracted_raw_config_labels,
         base_packages = base_packages,
         cache_packages = cache_packages,
-        driver_packages = driver_packages,
-        **kargs
+        driver_packages = driver_packages
     )
