@@ -27,6 +27,13 @@ pub struct PortMapping {
     pub host: Option<u16>,
 }
 
+/// Used when reading the instance data as a return value.
+#[derive(Debug)]
+pub enum EngineOption {
+    DoesExist(EmulatorInstanceData),
+    DoesNotExist(String),
+}
+
 pub trait EmulatorInstanceInfo {
     fn get_name(&self) -> &str;
     fn is_running(&self) -> bool;

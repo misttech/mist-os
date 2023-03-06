@@ -17,6 +17,12 @@ if (is_host) {
     ]
     args_sources = [ "src/args.rs" ]
     sources = [ "src/lib.rs" ]
+
+    test_deps = [
+      "//src/developer/ffx/config:lib",
+      "//src/lib/fidl/rust/fidl",
+      "//src/lib/fuchsia-async",
+    ]
   }
 
   group("tests") {

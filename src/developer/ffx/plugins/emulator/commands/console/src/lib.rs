@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Result};
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_commands::{get_engine_by_name, EngineOption};
+use ffx_emulator_commands::get_engine_by_name;
 use ffx_emulator_config::EngineConsoleType;
 use ffx_emulator_console_args::ConsoleCommand;
 
@@ -45,9 +45,14 @@ pub async fn console(mut cmd: ConsoleCommand) -> Result<()> {
         Err(e) => ffx_bail!("{:?}", e),
     };
     match get_engine_by_name(&mut cmd.name).await {
-        Ok(EngineOption::DoesExist(engine)) => engine.attach(console),
-        Ok(EngineOption::DoesNotExist(message)) => {
-            println!("{}", message);
+        Ok(Some(engine)) => engine.attach(console),
+        Ok(None) => {
+            if let Some(name) = cmd.name {
+                println!("Instance {name} not found.");
+            } else {
+                println!("No instances found");
+            }
+
             Ok(())
         }
         Err(e) => ffx_bail!("{:?}", e),

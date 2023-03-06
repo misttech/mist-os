@@ -14,8 +14,8 @@ use anyhow::{bail, Context, Result};
 use arg_templates::process_flag_template;
 use emulator_instance::{
     get_instance_dir, read_from_disk, DeviceConfig, EmulatorConfiguration, EmulatorInstanceData,
-    EmulatorInstanceInfo, EngineState, EngineType, FlagData, GuestConfig, HostConfig, LogLevel,
-    RuntimeConfig,
+    EmulatorInstanceInfo, EngineOption, EngineState, EngineType, FlagData, GuestConfig, HostConfig,
+    LogLevel, RuntimeConfig,
 };
 use ffx_emulator_config::EmulatorEngine;
 use port_picker::{is_free_tcp_port, pick_unused_port};
@@ -100,6 +100,17 @@ impl EngineBuilder {
         self
     }
 
+    /// Create from an existing EmulatorInstanceData,
+    /// Does not validate or perform any configuration steps. Call
+    /// |build| for those steps to be performed.
+    pub fn from_data(data: EmulatorInstanceData) -> Result<Box<dyn EmulatorEngine>> {
+        let engine: Box<dyn EmulatorEngine> = match data.get_engine_type() {
+            EngineType::Femu => Box::new(FemuEngine::new(data)),
+            EngineType::Qemu => Box::new(QemuEngine::new(data)),
+        };
+        Ok(engine)
+    }
+
     /// Finalize and validate the configuration, set up the engine's instance directory,
     /// and return the built engine.
     pub async fn build(mut self) -> Result<Box<dyn EmulatorEngine>> {
@@ -110,7 +121,7 @@ impl EngineBuilder {
             get_instance_dir(name, true).await?;
 
         // Make sure we don't overwrite an existing instance.
-        if let Ok(instance_data) = read_from_disk(name).await {
+        if let Ok(EngineOption::DoesExist(instance_data)) = read_from_disk(name).await {
             if instance_data.is_running() {
                 bail!(
                     "An emulator named {} is already running. \
@@ -129,10 +140,7 @@ impl EngineBuilder {
             EngineState::Configured,
         );
 
-        let mut engine: Box<dyn EmulatorEngine> = match self.engine_type {
-            EngineType::Femu => Box::new(FemuEngine::new(instance_data)),
-            EngineType::Qemu => Box::new(QemuEngine::new(instance_data)),
-        };
+        let mut engine: Box<dyn EmulatorEngine> = Self::from_data(instance_data)?;
         engine.configure()?;
 
         engine.load_emulator_binary().await.with_context(|| {

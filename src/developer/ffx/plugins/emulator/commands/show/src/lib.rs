@@ -5,7 +5,7 @@
 use anyhow::Result;
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_commands::{get_engine_by_name, EngineOption};
+use ffx_emulator_commands::get_engine_by_name;
 use ffx_emulator_config::ShowDetail;
 use ffx_emulator_show_args::ShowCommand;
 
@@ -36,9 +36,45 @@ fn which_details(cmd: ShowCommand) -> Vec<ShowDetail> {
 #[ffx_plugin()]
 pub async fn show(mut cmd: ShowCommand) -> Result<()> {
     match get_engine_by_name(&mut cmd.name).await {
-        Ok(EngineOption::DoesExist(engine)) => engine.show(which_details(cmd)),
-        Ok(EngineOption::DoesNotExist(message)) => println!("{}", message),
+        Ok(Some(engine)) => {
+            engine.show(which_details(cmd));
+        }
+        Ok(None) => {
+            if let Some(name) = cmd.name {
+                println!("Instance {name} not found.");
+            } else {
+                println!("No instances found");
+            }
+        }
         Err(e) => ffx_bail!("{:?}", e),
     };
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use emulator_instance::{get_instance_dir, write_to_disk, EmulatorInstanceData, EngineState};
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_show() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let mut cmd = ShowCommand::default();
+
+        let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
+        let instance_dir = get_instance_dir("one_instance", true).await?;
+        write_to_disk(&data, &instance_dir)?;
+        cmd.name = Some("one_instance".to_string());
+        show(cmd).await?;
+        Ok(())
+    }
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_show_unknown() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let mut cmd = ShowCommand::default();
+        cmd.name = Some("unknown_instance".to_string());
+
+        show(cmd).await?;
+        Ok(())
+    }
 }

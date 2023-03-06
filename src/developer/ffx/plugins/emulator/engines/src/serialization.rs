@@ -2,28 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{FemuEngine, QemuEngine};
-use anyhow::{Context, Result};
+use crate::EngineBuilder;
+use anyhow::{bail, Result};
+use emulator_instance::{read_from_disk, EngineOption};
 use ffx_emulator_config::EmulatorEngine;
 
-use emulator_instance::{read_from_disk, EmulatorInstanceInfo, EngineType};
-
 pub async fn read_engine_from_disk(name: &str) -> Result<Box<dyn EmulatorEngine>> {
-    let data =
-        read_from_disk(name).await.context("Failed to read engine configuration from disk.")?;
+    match read_from_disk(name).await {
+        Ok(EngineOption::DoesExist(data)) => {
+            let engine: Box<dyn EmulatorEngine> = EngineBuilder::from_data(data)?;
 
-    let engine: Box<dyn EmulatorEngine> = match data.get_engine_type() {
-        EngineType::Femu => Box::new(FemuEngine::new(data)),
-        EngineType::Qemu => Box::new(QemuEngine::new(data)),
-    };
-
-    Ok(engine)
+            Ok(engine)
+        }
+        Ok(EngineOption::DoesNotExist(_)) => bail!("{name} instance does not exist"),
+        Err(e) => bail!("Could not read engine from disk: {e:?}"),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::qemu_based::qemu::QemuEngine;
+    use crate::FemuEngine;
     use emulator_instance::{get_instance_dir, EmulatorInstanceData, EngineState, EngineType};
     use ffx_config::{query, ConfigLevel};
     use ffx_emulator_common::config::EMU_INSTANCE_ROOT_DIR;

@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{EmulatorInstanceData, EngineState};
+use crate::{EmulatorInstanceData, EngineOption, EngineState};
 use anyhow::{anyhow, Context, Result};
 use std::{
     fs::{create_dir_all, File},
@@ -66,7 +66,10 @@ pub async fn get_all_instances() -> Result<Vec<EmulatorInstanceData>> {
                     if let Some(name_as_os_str) = entry.path().file_name() {
                         if let Some(name) = name_as_os_str.to_str() {
                             match read_from_disk(name).await {
-                                Ok(data) => result.push(data),
+                                Ok(EngineOption::DoesExist(data)) => result.push(data),
+                                Ok(EngineOption::DoesNotExist(name)) => result.push(
+                                    EmulatorInstanceData::new_with_state(&name, EngineState::Error),
+                                ),
                                 Err(e) => {
                                     tracing::error!(
                                         "Cannot read emulator instance data for {}: {:?}",
@@ -88,7 +91,7 @@ pub async fn get_all_instances() -> Result<Vec<EmulatorInstanceData>> {
     return Ok(result);
 }
 
-pub async fn read_from_disk(instance_name: &str) -> Result<EmulatorInstanceData> {
+pub async fn read_from_disk(instance_name: &str) -> Result<EngineOption> {
     let filepath = get_instance_dir(instance_name, false).await?.join(SERIALIZE_FILE_NAME);
 
     // Read the engine.json file and deserialize it from disk into a new TypedEngine instance
@@ -97,9 +100,9 @@ pub async fn read_from_disk(instance_name: &str) -> Result<EmulatorInstanceData>
             .context(format!("Unable to open file {:?} for deserialization", filepath))?;
         let value: EmulatorInstanceData = serde_json::from_reader(file)
             .context(format!("Invalid JSON syntax in {:?}", filepath))?;
-        Ok(value)
+        Ok(EngineOption::DoesExist(value))
     } else {
-        Err(anyhow!("Engine file doesn't exist at {:?}", filepath))
+        Ok(EngineOption::DoesNotExist(instance_name.to_string()))
     }
 }
 
@@ -364,7 +367,10 @@ mod tests {
         write!(file, "{}", &valid_femu)?;
         let box_engine = read_from_disk(name).await;
         assert!(box_engine.is_ok(), "{:?}", box_engine.err());
-        assert_eq!(box_engine.unwrap().get_engine_type(), EngineType::Femu);
+        match box_engine? {
+            EngineOption::DoesExist(data) => assert_eq!(data.get_engine_type(), EngineType::Femu),
+            other => panic!("Expected DoesExist, got {other:?}"),
+        }
 
         Ok(())
     }

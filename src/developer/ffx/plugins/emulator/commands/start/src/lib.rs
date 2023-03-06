@@ -8,7 +8,6 @@ use cfg_if::cfg_if;
 use emulator_instance::{EmulatorConfiguration, EngineType};
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_commands::EngineOption;
 use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_start_args::StartCommand;
@@ -26,7 +25,9 @@ use mockall::{automock, predicate::*};
 mod modules {
     use super::*;
 
-    pub(super) async fn get_engine_by_name(name: &mut Option<String>) -> Result<EngineOption> {
+    pub(super) async fn get_engine_by_name(
+        name: &mut Option<String>,
+    ) -> Result<Option<Box<dyn EmulatorEngine>>> {
         ffx_emulator_commands::get_engine_by_name(name).await
     }
     pub(super) fn edit_configuration(emu_config: &mut EmulatorConfiguration) -> Result<()> {
@@ -134,30 +135,29 @@ pub async fn start(mut cmd: StartCommand, proxy: TargetCollectionProxy) -> Resul
 }
 
 async fn get_engine(cmd: &mut StartCommand) -> Result<Box<dyn EmulatorEngine>> {
-    Ok(if cmd.reuse && cmd.config.is_none() {
+    if cmd.reuse && cmd.config.is_none() {
         let mut name = Some(cmd.name.clone());
-        match get_engine_by_name(&mut name)
+        let engine_result = get_engine_by_name(&mut name)
             .await
-            .or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?
-        {
-            EngineOption::DoesExist(engine) => {
-                cmd.name = name.unwrap();
-                engine
-            }
-            EngineOption::DoesNotExist(warning) => {
-                tracing::debug!("{}", warning);
-                println!(
-                    "Instance '{name}' not found with --reuse flag. \
-                    Creating a new emulator named '{name}'.",
-                    name = name.unwrap()
-                );
-                cmd.reuse = false;
-                new_engine(&cmd).await.or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?
-            }
+            .or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?;
+
+        if let Some(engine) = engine_result {
+            // Set the cmd name to the engine name.
+            cmd.name = name.unwrap();
+            return Ok(engine);
+        } else {
+            let message = format!(
+                "Instance '{name}' not found with --reuse flag. \
+                Creating a new emulator named '{name}'.",
+                name = name.unwrap()
+            );
+            tracing::debug!("{message}");
+            println!("{message}");
+            cmd.reuse = false;
+            return new_engine(&cmd).await.or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e));
         }
-    } else {
-        new_engine(&cmd).await.or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))?
-    })
+    }
+    new_engine(&cmd).await.or_else::<anyhow::Error, _>(|e| ffx_bail!("{:?}", e))
 }
 
 #[cfg(test)]
@@ -301,11 +301,7 @@ mod tests {
         new_engine_ctx.expect().times(0);
         get_engine_by_name_ctx
             .expect()
-            .returning(|_| {
-                Ok(EngineOption::DoesExist(
-                    Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>
-                ))
-            })
+            .returning(|_| Ok(Some(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>)))
             .times(1);
 
         let _ = get_engine(&mut cmd).await?;
@@ -327,10 +323,7 @@ mod tests {
             .expect()
             .returning(|_| Ok(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
             .times(1);
-        get_engine_by_name_ctx
-            .expect()
-            .returning(|_| Ok(EngineOption::DoesNotExist("Warning message".to_string())))
-            .times(1);
+        get_engine_by_name_ctx.expect().returning(|_| Ok(None)).times(1);
 
         let _ = get_engine(&mut cmd).await?;
         Ok(())
@@ -353,9 +346,7 @@ mod tests {
             .expect()
             .returning(|name| {
                 *name = Some("NewName".to_string());
-                Ok(EngineOption::DoesExist(
-                    Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>
-                ))
+                Ok(Some(Box::new(TestEngine::default()) as Box<dyn EmulatorEngine>))
             })
             .times(1);
 
@@ -476,7 +467,7 @@ mod tests {
         get_engine_by_name_ctx
             .expect()
             .returning(|_| {
-                Ok(EngineOption::DoesExist(Box::new(TestEngine {
+                Ok(Some(Box::new(TestEngine {
                     do_stage: false,
                     do_start: true,
                     config: EmulatorConfiguration::default(),

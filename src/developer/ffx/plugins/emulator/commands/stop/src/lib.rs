@@ -6,7 +6,7 @@ use anyhow::Result;
 use emulator_instance::{clean_up_instance_dir, get_all_instances, EmulatorInstanceInfo};
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
-use ffx_emulator_commands::{get_engine_by_name, EngineOption};
+use ffx_emulator_commands::get_engine_by_name;
 use ffx_emulator_stop_args::StopCommand;
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 
@@ -38,10 +38,10 @@ pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> 
                     name
                 ))
             ),
-            Ok(EngineOption::DoesNotExist(message)) => {
-                eprintln!("{}", message);
+            Ok(None) => {
+                eprintln!("{} does not exist.", name);
             }
-            Ok(EngineOption::DoesExist(mut engine)) => {
+            Ok(Some(mut engine)) => {
                 println!("Stopping emulator '{}'...", name);
                 if let Err(e) = engine.stop(&proxy).await {
                     eprintln!("Failed with the following error: {:?}", e);
@@ -61,4 +61,57 @@ pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> 
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use emulator_instance::{get_instance_dir, write_to_disk, EmulatorInstanceData, EngineState};
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_stop_existing() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let mut cmd = StopCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
+        let instance_dir = get_instance_dir("one_instance", true).await?;
+        write_to_disk(&data, &instance_dir)?;
+        cmd.name = Some("one_instance".to_string());
+        stop(cmd, proxy).await?;
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_stop_unknown() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let mut cmd = StopCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+        cmd.name = Some("unknown_instance".to_string());
+        stop(cmd, proxy).await?;
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_stop_not_running() -> Result<()> {
+        let _env = ffx_config::test_init().await.unwrap();
+        let mut cmd = StopCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
+
+        let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Staged);
+        let instance_dir = get_instance_dir("one_instance", true).await?;
+        write_to_disk(&data, &instance_dir)?;
+        cmd.name = Some("one_instance".to_string());
+        stop(cmd, proxy).await?;
+        Ok(())
+    }
 }
