@@ -1434,7 +1434,7 @@ pub trait BufferDeviceLayerEventDispatcher<B: BufferMut>: DeviceLayerEventDispat
 /// RX packets may be handled. See [`DeviceLayerEventDispatcher::wake_rx_task`]
 /// for more details.
 pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx::Instant>,
 ) {
@@ -1444,7 +1444,7 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
         }
         DeviceIdInner::Loopback(id) => {
             ReceiveQueueHandler::<LoopbackDevice, _>::handle_queued_rx_packets(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 ctx,
                 id,
             )

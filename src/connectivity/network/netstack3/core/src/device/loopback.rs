@@ -200,36 +200,6 @@ impl<C: NonSyncContext> ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDevic
     }
 }
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<C: NonSyncContext> ReceiveQueueTypes<LoopbackDevice, C> for &'_ SyncCtx<C> {
-    type Meta = IpVersion;
-    type Buffer = Buf<Vec<u8>>;
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C> {
-    fn with_receive_queue_mut<
-        O,
-        F: FnOnce(&mut ReceiveQueueState<Self::Meta, Self::Buffer>) -> O,
-    >(
-        &mut self,
-        device_id: &LoopbackDeviceId<C::Instant>,
-        cb: F,
-    ) -> O {
-        Locked::new(*self).with_receive_queue_mut(device_id, cb)
-    }
-
-    fn handle_packet(
-        &mut self,
-        ctx: &mut C,
-        device_id: &LoopbackDeviceId<C::Instant>,
-        meta: IpVersion,
-        buf: Buf<Vec<u8>>,
-    ) {
-        Locked::new(*self).handle_packet(ctx, device_id, meta, buf)
-    }
-}
-
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     ReceiveQueueTypes<LoopbackDevice, C> for Locked<'_, SyncCtx<C>, L>
 {
@@ -280,28 +250,6 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
                 buf,
             ),
         }
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<C: NonSyncContext> ReceiveDequeContext<LoopbackDevice, C> for &'_ SyncCtx<C> {
-    type ReceiveQueueCtx<'a> = Self;
-
-    fn with_dequed_packets_and_rx_queue_ctx<
-        O,
-        F: FnOnce(
-            &mut ReceiveDequeueState<IpVersion, Buf<Vec<u8>>>,
-            &mut Self::ReceiveQueueCtx<'_>,
-        ) -> O,
-    >(
-        &mut self,
-        device_id: &LoopbackDeviceId<C::Instant>,
-        cb: F,
-    ) -> O {
-        with_loopback_state(&mut Locked::new(self), device_id, |mut state| {
-            let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
-            cb(&mut x, self)
-        })
     }
 }
 
