@@ -4,6 +4,7 @@
 
 #include <byteswap.h>
 #include <lib/zx/clock.h>
+
 #include <thread>
 
 #include <zxtest/zxtest.h>
@@ -55,30 +56,28 @@ void AhciTestFixture::BusAndPortEnable(Port* port) {
   fake_bus_ = std::move(bus);
 }
 
-void string_fix(uint16_t* buf, size_t size);
-
-TEST(SataTest, StringFixTest) {
+TEST(SataTest, SataStringFixTest) {
   // Nothing to do.
-  string_fix(nullptr, 0);
+  SataStringFix(nullptr, 0);
 
   // Zero length, no swapping happens.
   uint16_t a = 0x1234;
-  string_fix(&a, 0);
+  SataStringFix(&a, 0);
   ASSERT_EQ(a, 0x1234, "unexpected string result");
 
   // One character, only swap to even lengths.
   a = 0x1234;
-  string_fix(&a, 1);
+  SataStringFix(&a, 1);
   ASSERT_EQ(a, 0x1234, "unexpected string result");
 
   // Swap A.
   a = 0x1234;
-  string_fix(&a, sizeof(a));
+  SataStringFix(&a, sizeof(a));
   ASSERT_EQ(a, 0x3412, "unexpected string result");
 
   // Swap a group of values.
   uint16_t b[] = {0x0102, 0x0304, 0x0506};
-  string_fix(b, sizeof(b));
+  SataStringFix(b, sizeof(b));
   const uint16_t b_rev[] = {0x0201, 0x0403, 0x0605};
   ASSERT_EQ(memcmp(b, b_rev, sizeof(b)), 0, "unexpected string result");
 
@@ -93,7 +92,7 @@ TEST(SataTest, StringFixTest) {
   } str;
 
   memcpy(str.byte, qemu_model_id, qsize);
-  string_fix(str.word, qsize);
+  SataStringFix(str.word, qsize);
   ASSERT_EQ(memcmp(str.byte, qemu_rev, qsize), 0, "unexpected string result");
 
   const char* sin = "abcdefghijklmnoprstu";  // 20 chars
@@ -107,7 +106,7 @@ TEST(SataTest, StringFixTest) {
   // Verify swapping the length of every pair from 0 to 20 chars, inclusive.
   for (size_t i = 0; i <= slen; i += 2) {
     memcpy(str.byte, sin, slen);
-    string_fix(str.word, i);
+    SataStringFix(str.word, i);
     ASSERT_EQ(memcmp(str.byte, sout, slen), 0, "unexpected string result");
     ASSERT_EQ(sout[slen], 0, "buffer overrun");
     char c = sout[i];
@@ -120,8 +119,8 @@ TEST(AhciTest, Create) {
   zx_device_t* fake_parent = nullptr;
   std::unique_ptr<FakeBus> bus(new FakeBus());
 
-  std::unique_ptr<Controller> con;
-  EXPECT_OK(Controller::CreateWithBus(fake_parent, std::move(bus), &con));
+  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
+  ASSERT_TRUE(con.is_ok());
 }
 
 TEST(AhciTest, CreateBusConfigFailure) {
@@ -129,17 +128,17 @@ TEST(AhciTest, CreateBusConfigFailure) {
   std::unique_ptr<FakeBus> bus(new FakeBus());
   bus->DoFailConfigure();
 
-  std::unique_ptr<Controller> con;
   // Expected to fail during bus configure.
-  EXPECT_NOT_OK(Controller::CreateWithBus(fake_parent, std::move(bus), &con));
+  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
+  ASSERT_TRUE(con.is_error());
 }
 
 TEST(AhciTest, LaunchIrqAndWorkerThreads) {
   zx_device_t* fake_parent = nullptr;
   std::unique_ptr<FakeBus> bus(new FakeBus());
 
-  std::unique_ptr<Controller> con;
-  EXPECT_OK(Controller::CreateWithBus(fake_parent, std::move(bus), &con));
+  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
+  ASSERT_TRUE(con.is_ok());
 
   EXPECT_OK(con->LaunchIrqAndWorkerThreads());
   con->Shutdown();
@@ -148,8 +147,8 @@ TEST(AhciTest, LaunchIrqAndWorkerThreads) {
 TEST(AhciTest, HbaReset) {
   zx_device_t* fake_parent = nullptr;
   std::unique_ptr<FakeBus> bus(new FakeBus());
-  std::unique_ptr<Controller> con;
-  EXPECT_OK(Controller::CreateWithBus(fake_parent, std::move(bus), &con));
+  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
+  ASSERT_TRUE(con.is_ok());
 
   // Test reset function.
   EXPECT_OK(con->HbaReset());
@@ -183,7 +182,7 @@ TEST_F(AhciTestFixture, PortCompleteRunning) {
 
   // Complete with running transaction. No completion should occur, cb_assert should not fire.
 
-  sata_txn_t txn = {};
+  SataTransaction txn = {};
   txn.timeout = zx::clock::get_monotonic() + zx::sec(5);
   txn.completion_cb = cb_assert;
 
@@ -212,7 +211,7 @@ TEST_F(AhciTestFixture, PortCompleteSuccess) {
 
   zx_status_t status = 100;  // Bogus value to be overwritten by callback.
 
-  sata_txn_t txn = {};
+  SataTransaction txn = {};
   txn.timeout = zx::clock::get_monotonic() + zx::sec(5);
   txn.completion_cb = cb_status;
   txn.cookie = &status;
@@ -243,7 +242,7 @@ TEST_F(AhciTestFixture, PortCompleteTimeout) {
 
   zx_status_t status = ZX_OK;  // Value to be overwritten by callback.
 
-  sata_txn_t txn = {};
+  SataTransaction txn = {};
   // Set timeout in the past.
   txn.timeout = zx::clock::get_monotonic() - zx::sec(1);
   txn.completion_cb = cb_status;
@@ -272,8 +271,8 @@ TEST_F(AhciTestFixture, ShutdownWaitsForTransactionsInFlight) {
   std::unique_ptr<FakeBus> bus(new FakeBus());
   FakeBus* bus_ptr = bus.get();
 
-  std::unique_ptr<Controller> con;
-  EXPECT_OK(Controller::CreateWithBus(fake_parent, std::move(bus), &con));
+  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
+  ASSERT_TRUE(con.is_ok());
 
   Port& port = *con->port(0);
   PortEnable(bus_ptr, &port);
@@ -282,7 +281,7 @@ TEST_F(AhciTestFixture, ShutdownWaitsForTransactionsInFlight) {
 
   zx_status_t status = ZX_OK;  // Value to be overwritten by callback.
 
-  sata_txn_t txn = {};
+  SataTransaction txn = {};
   txn.timeout = zx::clock::get_monotonic() + zx::sec(5);
   txn.completion_cb = cb_status;
   txn.cookie = &status;

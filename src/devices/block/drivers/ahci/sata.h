@@ -5,10 +5,14 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_SATA_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_SATA_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <byteswap.h>
+#include <fuchsia/hardware/block/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/zx/time.h>
 #include <zircon/listnode.h>
+
+#include <ddktl/device.h>
+#include <fbl/string_printf.h>
 
 #include "ahci.h"
 
@@ -36,19 +40,17 @@
 
 namespace ahci {
 
-class Controller;
-
 // SATA disk identifier. Response to SATA_CMD_IDENTIFY_DEVICE command.
 // Generated from ATA Command Set spec (ACS-4).
-struct sata_devinfo_response_t {  // 16-bit word offset
-  uint16_t general_config;        // 0
-  uint16_t _obsolete_1;           // 1
-  uint16_t specific_config;       // 2
-  uint16_t _obsolete_3;           // 3
-  uint16_t _retired_4[2];         // 4-5
-  uint16_t _obsolete_6;           // 6
-  uint16_t cfa_reserved[2];       // 7-8
-  uint16_t _retired_9;            // 9
+struct SataIdentifyDeviceResponse {  // 16-bit word offset
+  uint16_t general_config;           // 0
+  uint16_t _obsolete_1;              // 1
+  uint16_t specific_config;          // 2
+  uint16_t _obsolete_3;              // 3
+  uint16_t _retired_4[2];            // 4-5
+  uint16_t _obsolete_6;              // 6
+  uint16_t cfa_reserved[2];          // 7-8
+  uint16_t _retired_9;               // 9
   union {
     uint16_t word[SATA_DEVINFO_SERIAL_LEN / 2];  // 10-19
     char string[SATA_DEVINFO_SERIAL_LEN];
@@ -147,11 +149,14 @@ struct sata_devinfo_response_t {  // 16-bit word offset
   uint16_t checksum;                   // 255
 } __attribute__((packed));
 
-static_assert(sizeof(sata_devinfo_response_t) == 512);
+static_assert(sizeof(SataIdentifyDeviceResponse) == 512);
 
-struct sata_txn_t {
+struct SataTransaction {
+  void Complete(zx_status_t status) { completion_cb(cookie, status, &bop); }
+
   block_op_t bop;
-  list_node_t node;
+  block_impl_queue_callback completion_cb;
+  void* cookie;
 
   zx::time timeout;
 
@@ -160,20 +165,55 @@ struct sata_txn_t {
 
   zx_status_t status;
   zx_handle_t pmt;
-  block_impl_queue_callback completion_cb;
-  void* cookie;
+
+  list_node_t node;
 };
 
-struct sata_devinfo_t {
+struct SataDeviceInfo {
   uint32_t block_size;
   uint32_t max_cmd;
 };
 
-zx_status_t sata_bind(Controller* controller, zx_device_t* parent, uint32_t port);
-
-static inline void block_complete(sata_txn_t* txn, zx_status_t status) {
-  txn->completion_cb(txn->cookie, status, &txn->bop);
+// Strings are byte-flipped in pairs.
+inline void SataStringFix(uint16_t* buf, size_t size) {
+  for (size_t i = 0; i < (size / 2); i++) {
+    buf[i] = bswap_16(buf[i]);
+  }
 }
+
+class Controller;
+
+class SataDevice;
+using SataDeviceType = ddk::Device<SataDevice, ddk::Initializable>;
+class SataDevice : public SataDeviceType,
+                   public ddk::BlockImplProtocol<SataDevice, ddk::base_protocol> {
+ public:
+  SataDevice(zx_device_t* parent, Controller* controller, uint32_t port)
+      : SataDeviceType(parent), controller_(controller), port_(port) {}
+
+  // Create a SATA device on |controller| at |port|.
+  static zx_status_t Bind(Controller* controller, uint32_t port);
+  fbl::String DriverName() const { return fbl::StringPrintf("sata%u", port_); }
+
+  void DdkInit(ddk::InitTxn txn);
+  void DdkRelease();
+
+  // ddk::BlockImplProtocol implementations.
+  void BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_size);
+  void BlockImplQueue(block_op_t* op, block_impl_queue_callback callback, void* cookie);
+
+ private:
+  // Invokes DdkAdd().
+  zx_status_t AddDriver();
+
+  // Main driver initialization.
+  zx_status_t Init();
+
+  Controller* const controller_;
+  const uint32_t port_;
+
+  block_info_t info_{};
+};
 
 }  // namespace ahci
 

@@ -75,7 +75,7 @@ zx_status_t Controller::HbaReset() {
   return status;
 }
 
-zx_status_t Controller::SetDevInfo(uint32_t portnr, sata_devinfo_t* devinfo) {
+zx_status_t Controller::SetDevInfo(uint32_t portnr, SataDeviceInfo* devinfo) {
   if (portnr >= AHCI_MAX_PORTS) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -83,27 +83,25 @@ zx_status_t Controller::SetDevInfo(uint32_t portnr, sata_devinfo_t* devinfo) {
   return ZX_OK;
 }
 
-void Controller::Queue(uint32_t portnr, sata_txn_t* txn) {
+void Controller::Queue(uint32_t portnr, SataTransaction* txn) {
   ZX_DEBUG_ASSERT(portnr < AHCI_MAX_PORTS);
   Port* port = &ports_[portnr];
   zx_status_t status = port->Queue(txn);
   if (status == ZX_OK) {
-    zxlogf(TRACE, "ahci.%u: queue txn %p offset_dev 0x%" PRIx64 " length 0x%x", port->num(), txn,
+    zxlogf(TRACE, "ahci.%u: Queue txn %p offset_dev 0x%" PRIx64 " length 0x%x", port->num(), txn,
            txn->bop.rw.offset_dev, txn->bop.rw.length);
     // hit the worker thread
     sync_completion_signal(&worker_completion_);
   } else {
-    zxlogf(INFO, "ahci.%u: failed to queue txn %p: %d", port->num(), txn, status);
+    zxlogf(INFO, "ahci.%u: Failed to queue txn %p: %s", port->num(), txn,
+           zx_status_get_string(status));
     // TODO: close transaction.
   }
 }
 
-Controller::~Controller() {}
-
-void Controller::Release(void* ctx) {
-  Controller* controller = static_cast<Controller*>(ctx);
-  controller->Shutdown();
-  delete controller;
+void Controller::DdkRelease() {
+  Shutdown();
+  delete this;
 }
 
 bool Controller::ShouldExit() {
@@ -146,7 +144,7 @@ int Controller::IrqLoop() {
     zx_status_t status = bus_->InterruptWait();
     if (status != ZX_OK) {
       if (!ShouldExit()) {
-        zxlogf(ERROR, "ahci: error %d waiting for interrupt", status);
+        zxlogf(ERROR, "ahci: Error waiting for interrupt: %s", zx_status_get_string(status));
       }
       return 0;
     }
@@ -176,14 +174,24 @@ int Controller::IrqLoop() {
 
 // implement device protocol:
 
-zx_protocol_device_t ahci_device_proto = []() {
-  zx_protocol_device_t device = {};
-  device.version = DEVICE_OPS_VERSION;
-  device.release = Controller::Release;
-  return device;
-}();
+void Controller::DdkInit(ddk::InitTxn txn) {
+  // The drive initialization has numerous error conditions. Wrap the initialization here to ensure
+  // we always call txn.Reply() in any outcome.
+  zx_status_t status = Init();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "ahci: Driver initialization failed: %s", zx_status_get_string(status));
+  }
+  txn.Reply(status);
+}
 
-int Controller::InitScan() {
+zx_status_t Controller::Init() {
+  zx_status_t status;
+  if ((status = LaunchIrqAndWorkerThreads()) != ZX_OK) {
+    zxlogf(ERROR, "ahci: Failed to start controller irq and worker threads: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
   // reset
   HbaReset();
 
@@ -196,12 +204,12 @@ int Controller::InitScan() {
   uint32_t port_map = RegRead(kHbaPortsImplemented);
 
   // initialize ports
-  zx_status_t status;
   for (uint32_t i = 0; i < AHCI_MAX_PORTS; i++) {
     if (!(port_map & (1u << i)))
       continue;  // port not implemented
     status = ports_[i].Configure(i, bus_.get(), kHbaPorts, cap_);
     if (status != ZX_OK) {
+      zxlogf(ERROR, "ahci: Failed to configure port %u: %s", i, zx_status_get_string(status));
       return status;
     }
   }
@@ -233,7 +241,12 @@ int Controller::InitScan() {
     if (port->RegRead(kPortSataStatus) & AHCI_PORT_SSTS_DET_PRESENT) {
       port->set_present(true);
       if (port->RegRead(kPortSignature) == AHCI_PORT_SIG_SATA) {
-        sata_bind(this, zxdev_, port->num());
+        zx_status_t status = SataDevice::Bind(this, port->num());
+        if (status != ZX_OK) {
+          zxlogf(ERROR, "ahci: Failed to add SATA device at port %u: %s", port->num(),
+                 zx_status_get_string(status));
+          return status;
+        }
       }
     }
   }
@@ -241,52 +254,32 @@ int Controller::InitScan() {
   return ZX_OK;
 }
 
-zx_status_t Controller::Create(zx_device_t* parent, std::unique_ptr<Controller>* con_out) {
+zx::result<std::unique_ptr<Controller>> Controller::CreateWithBus(zx_device_t* parent,
+                                                                  std::unique_ptr<Bus> bus) {
   fbl::AllocChecker ac;
-  std::unique_ptr<Bus> bus(new (&ac) PciBus(parent));
+  std::unique_ptr<Controller> controller(new (&ac) Controller(parent));
   if (!ac.check()) {
     zxlogf(ERROR, "ahci: out of memory");
-    return ZX_ERR_NO_MEMORY;
-  }
-  return CreateWithBus(parent, std::move(bus), con_out);
-}
-
-zx_status_t Controller::CreateWithBus(zx_device_t* parent, std::unique_ptr<Bus> bus,
-                                      std::unique_ptr<Controller>* con_out) {
-  fbl::AllocChecker ac;
-  std::unique_ptr<Controller> controller(new (&ac) Controller());
-  if (!ac.check()) {
-    zxlogf(ERROR, "ahci: out of memory");
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
   zx_status_t status = bus->Configure(parent);
   if (status != ZX_OK) {
     zxlogf(ERROR, "ahci: failed to configure host bus");
-    return status;
+    return zx::error(status);
   }
   controller->bus_ = std::move(bus);
-  *con_out = std::move(controller);
-  return ZX_OK;
+  return zx::ok(std::move(controller));
 }
 
 zx_status_t Controller::LaunchIrqAndWorkerThreads() {
   zx_status_t status = irq_thread_.CreateWithName(IrqThread, this, "ahci-irq");
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d creating irq thread", status);
+    zxlogf(ERROR, "ahci: Error creating irq thread: %s", zx_status_get_string(status));
     return status;
   }
   status = worker_thread_.CreateWithName(WorkerThread, this, "ahci-worker");
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d creating worker thread", status);
-    return status;
-  }
-  return ZX_OK;
-}
-
-zx_status_t Controller::LaunchInitThread() {
-  zx_status_t status = init_thread_.CreateWithName(InitThread, this, "ahci-init");
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d creating init thread", status);
+    zxlogf(ERROR, "ahci: Error creating worker thread: %s", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
@@ -297,9 +290,6 @@ void Controller::Shutdown() {
     fbl::AutoLock lock(&lock_);
     threads_should_exit_ = true;
   }
-
-  // Wait for the init thread to finish in case it hasn't already done so.
-  init_thread_.Join();
 
   // Signal the worker thread.
   sync_completion_signal(&worker_completion_);
@@ -312,48 +302,39 @@ void Controller::Shutdown() {
 
 // implement driver object:
 
-zx_status_t ahci_bind(void* ctx, zx_device_t* parent) {
+zx_status_t Controller::Bind(void* ctx, zx_device_t* parent) {
   if (AHCI_PAGE_SIZE != zx_system_get_page_size()) {
     zxlogf(ERROR, "ahci: System page size of %u does not match expected page size of %u\n",
            zx_system_get_page_size(), AHCI_PAGE_SIZE);
     return ZX_ERR_INTERNAL;
   }
+
   std::unique_ptr<Controller> controller;
-  zx_status_t status = Controller::Create(parent, &controller);
+  {
+    fbl::AllocChecker ac;
+    std::unique_ptr<Bus> bus(new (&ac) PciBus(parent));
+    if (!ac.check()) {
+      zxlogf(ERROR, "ahci: Failed to allocate memory for PciBus.");
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    zx::result result = Controller::CreateWithBus(parent, std::move(bus));
+    if (result.is_error()) {
+      zxlogf(ERROR, "ahci: Failed to create AHCI controller: %s",
+             zx_status_get_string(result.status_value()));
+      return result.status_value();
+    }
+    controller = std::move(result.value());
+  }
+
+  zx_status_t status =
+      controller->DdkAdd(ddk::DeviceAddArgs(kDriverName).set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: failed to create ahci controller (%d)", status);
+    zxlogf(ERROR, "ahci: Error in DdkAdd: %s", zx_status_get_string(status));
     return status;
   }
 
-  if ((status = controller->LaunchIrqAndWorkerThreads()) != ZX_OK) {
-    zxlogf(ERROR, "ahci: failed to start controller irq and worker threads (%d)", status);
-    return status;
-  }
-
-  // add the device for the controller
-  device_add_args_t args = {};
-  args.version = DEVICE_ADD_ARGS_VERSION;
-  args.name = "ahci";
-  args.ctx = controller.get();
-  args.ops = &ahci_device_proto;
-  args.flags = DEVICE_ADD_NON_BINDABLE;
-
-  status = device_add(parent, &args, controller->zxdev_ptr());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d in device_add", status);
-    controller->Shutdown();
-    return status;
-  }
-
-  // initialize controller and detect devices
-  if ((status = controller->LaunchInitThread()) != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d in init thread create", status);
-    // This is an error in that no devices will be found, but the AHCI controller is enabled.
-    // Not returning an error, but the controller should be removed.
-    // TODO: handle this better in upcoming init cleanup CL.
-  }
-
-  // Controller is retained by device_add().
+  // The DriverFramework now owns driver.
   controller.release();
   return ZX_OK;
 }
@@ -361,7 +342,7 @@ zx_status_t ahci_bind(void* ctx, zx_device_t* parent) {
 constexpr zx_driver_ops_t ahci_driver_ops = []() {
   zx_driver_ops_t driver = {};
   driver.version = DRIVER_OPS_VERSION;
-  driver.bind = ahci_bind;
+  driver.bind = Controller::Bind;
   return driver;
 }();
 

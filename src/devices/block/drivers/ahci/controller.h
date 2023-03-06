@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
-#define SRC_STORAGE_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
 
 #include <lib/sync/completion.h>
 #include <lib/zx/time.h>
@@ -43,38 +43,32 @@ struct ThreadWrapper {
   }
 };
 
-class Controller {
+class Controller;
+using ControllerDeviceType = ddk::Device<Controller, ddk::Initializable>;
+class Controller : public ControllerDeviceType {
  public:
-  Controller() {}
-  ~Controller();
+  static constexpr char kDriverName[] = "ahci";
+
+  // Test function: Create a new AHCI Controller with a caller-provided host bus interface.
+  static zx::result<std::unique_ptr<Controller>> CreateWithBus(zx_device_t* parent,
+                                                               std::unique_ptr<Bus> bus);
+
+  explicit Controller(zx_device_t* parent) : ControllerDeviceType(parent) {}
+  ~Controller() = default;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Controller);
 
-  // Create a new AHCI Controller.
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<Controller>* con_out);
+  static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
-  // Test function: Create a new Controller with a caller-provided host bus interface.
-  static zx_status_t CreateWithBus(zx_device_t* parent, std::unique_ptr<Bus> bus,
-                                   std::unique_ptr<Controller>* con_out);
-
-  // Release call for device protocol. Calls Shutdown and deletes this Controller.
-  static void Release(void* ctx);
+  void DdkInit(ddk::InitTxn txn);
+  void DdkRelease();
 
   // Read or write a 32-bit AHCI controller reg. Endinaness is corrected.
   uint32_t RegRead(size_t offset);
   zx_status_t RegWrite(size_t offset, uint32_t val);
 
-  static int WorkerThread(void* arg) { return static_cast<Controller*>(arg)->WorkerLoop(); }
-
-  static int IrqThread(void* arg) { return static_cast<Controller*>(arg)->IrqLoop(); }
-
-  static int InitThread(void* arg) { return static_cast<Controller*>(arg)->InitScan(); }
-
   // Create irq and worker threads.
   zx_status_t LaunchIrqAndWorkerThreads();
-
-  // Create thread for device initialization and discovery.
-  zx_status_t LaunchInitThread();
 
   // Release all resources.
   // Not used in DDK lifecycle where Release() is called.
@@ -83,23 +77,25 @@ class Controller {
   zx_status_t HbaReset();
   void AhciEnable();
 
-  zx_status_t SetDevInfo(uint32_t portnr, sata_devinfo_t* devinfo);
-  void Queue(uint32_t portnr, sata_txn_t* txn);
+  zx_status_t SetDevInfo(uint32_t portnr, SataDeviceInfo* devinfo);
+  void Queue(uint32_t portnr, SataTransaction* txn);
 
   void SignalWorker() { sync_completion_signal(&worker_completion_); }
 
   Bus* bus() { return bus_.get(); }
   Port* port(uint32_t portnr) { return &ports_[portnr]; }
-  zx_device_t** zxdev_ptr() { return &zxdev_; }
 
  private:
+  static int WorkerThread(void* arg) { return static_cast<Controller*>(arg)->WorkerLoop(); }
+  static int IrqThread(void* arg) { return static_cast<Controller*>(arg)->IrqLoop(); }
   int WorkerLoop();
   int IrqLoop();
-  int InitScan();
+
+  // Initialize controller and detect devices.
+  zx_status_t Init();
 
   bool ShouldExit() __TA_EXCLUDES(lock_);
 
-  zx_device_t* zxdev_ = nullptr;
   uint32_t cap_ = 0;
 
   fbl::Mutex lock_;
@@ -107,7 +103,6 @@ class Controller {
 
   ThreadWrapper irq_thread_;
   ThreadWrapper worker_thread_;
-  ThreadWrapper init_thread_;
 
   sync_completion_t worker_completion_;
 
@@ -117,4 +112,4 @@ class Controller {
 
 }  // namespace ahci
 
-#endif  // SRC_STORAGE_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_AHCI_CONTROLLER_H_

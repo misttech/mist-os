@@ -209,12 +209,12 @@ void Port::Reset() {
   RegWrite(kPortSataError, RegRead(kPortSataError));
 }
 
-void Port::SetDevInfo(const sata_devinfo_t* devinfo) {
+void Port::SetDevInfo(const SataDeviceInfo* devinfo) {
   fbl::AutoLock lock(&lock_);
   memcpy(&devinfo_, devinfo, sizeof(devinfo_));
 }
 
-zx_status_t Port::Queue(sata_txn_t* txn) {
+zx_status_t Port::Queue(SataTransaction* txn) {
   fbl::AutoLock lock(&lock_);
   if (!is_valid()) {
     return ZX_ERR_BAD_STATE;
@@ -235,12 +235,12 @@ bool Port::Complete() {
     return false;
   }
 
-  sata_txn_t* txn_complete[AHCI_MAX_COMMANDS];
+  SataTransaction* txn_complete[AHCI_MAX_COMMANDS];
   size_t complete_count = 0;
   bool active_txns = false;
 
   for (uint32_t slot = 0; slot < AHCI_MAX_COMMANDS; slot++) {
-    sata_txn_t* txn = commands_[slot];
+    SataTransaction* txn = commands_[slot];
     if (txn == nullptr) {
       continue;  // No transaction in this slot.
     }
@@ -265,7 +265,7 @@ bool Port::Complete() {
     complete_count++;
   }
 
-  sata_txn_t* sync_op = nullptr;
+  SataTransaction* sync_op = nullptr;
   // resume the port if paused for sync and no outstanding transactions
   if ((is_paused()) && !running_) {
     flags_ &= ~kPortFlagSyncPaused;
@@ -277,20 +277,20 @@ bool Port::Complete() {
   lock.release();
 
   for (size_t i = 0; i < complete_count; i++) {
-    sata_txn_t* txn = txn_complete[i];
+    SataTransaction* txn = txn_complete[i];
     if (txn->pmt != ZX_HANDLE_INVALID) {
       zx_pmt_unpin(txn->pmt);
     }
     if (txn->timeout == zx::time::infinite_past()) {
-      block_complete(txn, ZX_ERR_TIMED_OUT);
+      txn->Complete(ZX_ERR_TIMED_OUT);
     } else {
       zxlogf(TRACE, "ahci.%u: complete txn %p", num_, txn);
-      block_complete(txn, ZX_OK);
+      txn->Complete(ZX_OK);
     }
   }
 
   if (sync_op != nullptr) {
-    block_complete(sync_op, ZX_OK);
+    sync_op->Complete(ZX_OK);
   }
   return active_txns;
 }
@@ -304,7 +304,7 @@ bool Port::ProcessQueued() {
 
   bool added_txns = false;
   for (;;) {
-    sata_txn_t* txn = list_peek_head_type(&txn_list_, sata_txn_t, node);
+    SataTransaction* txn = list_peek_head_type(&txn_list_, SataTransaction, node);
     if (!txn) {
       break;
     }
@@ -332,7 +332,7 @@ bool Port::ProcessQueued() {
       } else {
         // complete immediately if nothing in flight
         lock_.Release();
-        block_complete(txn, ZX_OK);
+        txn->Complete(ZX_OK);
         lock_.Acquire();
       }
     } else {
@@ -341,7 +341,7 @@ bool Port::ProcessQueued() {
       // complete the transaction with if it failed during processing
       if (st != ZX_OK) {
         lock_.Release();
-        block_complete(txn, st);
+        txn->Complete(st);
         lock_.Acquire();
         continue;
       }
@@ -368,7 +368,7 @@ void Port::TxnComplete(zx_status_t status) {
   completed_ |= done;
 }
 
-zx_status_t Port::TxnBeginLocked(uint32_t slot, sata_txn_t* txn) {
+zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
   ZX_DEBUG_ASSERT(slot < AHCI_MAX_COMMANDS);
   ZX_DEBUG_ASSERT(!SlotBusyLocked(slot));
 
@@ -528,7 +528,7 @@ bool Port::HandleIrq() {
 }
 
 // Set up the running state for testing Complete()
-void Port::TestSetRunning(sata_txn_t* txn, uint32_t slot) {
+void Port::TestSetRunning(SataTransaction* txn, uint32_t slot) {
   ZX_DEBUG_ASSERT(slot < AHCI_MAX_COMMANDS);
   commands_[slot] = txn;
   running_ |= (1u << slot);

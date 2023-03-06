@@ -59,9 +59,9 @@ class Port {
   void Disable();
   void Reset();
 
-  void SetDevInfo(const sata_devinfo_t* devinfo);
+  void SetDevInfo(const SataDeviceInfo* devinfo);
 
-  zx_status_t Queue(sata_txn_t* txn);
+  zx_status_t Queue(SataTransaction* txn);
 
   // Complete in-progress transactions.
   // Returns true if there remain transactions in progress.
@@ -105,11 +105,11 @@ class Port {
 
   // Mark transaction as running without going through the Queue path.
   // Does not modify bus registers.
-  void TestSetRunning(sata_txn_t* txn, uint32_t slot);
+  void TestSetRunning(SataTransaction* txn, uint32_t slot);
 
  private:
   bool SlotBusyLocked(uint32_t slot);
-  zx_status_t TxnBeginLocked(uint32_t slot, sata_txn_t* txn);
+  zx_status_t TxnBeginLocked(uint32_t slot, SataTransaction* txn);
   void TxnComplete(zx_status_t status);
 
   uint32_t num_ = 0;  // 0-based
@@ -120,16 +120,16 @@ class Port {
   fbl::Mutex lock_;
   uint32_t flags_ = 0;
   list_node_t txn_list_{};
-  uint32_t running_ = 0;        // bitmask of running commands
-  uint32_t completed_ = 0;      // bitmask of completed commands
-  sata_txn_t* sync_ = nullptr;  // FLUSH command in flight
+  uint32_t running_ = 0;             // bitmask of running commands
+  uint32_t completed_ = 0;           // bitmask of completed commands
+  SataTransaction* sync_ = nullptr;  // FLUSH command in flight
 
   ddk::IoBuffer buffer_{};
   size_t reg_base_ = 0;
   ahci_port_mem_t* mem_ = nullptr;
 
-  sata_devinfo_t devinfo_{};
-  sata_txn_t* commands_[AHCI_MAX_COMMANDS] = {};  // commands in flight
+  SataDeviceInfo devinfo_{};
+  SataTransaction* commands_[AHCI_MAX_COMMANDS] = {};  // commands in flight
 };
 
 }  // namespace ahci

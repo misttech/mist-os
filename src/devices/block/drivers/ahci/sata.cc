@@ -4,7 +4,6 @@
 
 #include "sata.h"
 
-#include <byteswap.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -25,43 +24,35 @@
 
 namespace ahci {
 
-struct sata_device_t {
-  zx_device_t* zxdev = nullptr;
-  Controller* controller = nullptr;
+constexpr size_t kQemuMaxTransferBlocks = 1024;  // Linux kernel limit
 
-  block_info_t info{};
-
-  uint32_t port = 0;
-  uint32_t max_cmd = 0;  // inclusive
-};
-
-// Strings are byte-flipped in pairs.
-void string_fix(uint16_t* buf, size_t size) {
-  for (size_t i = 0; i < (size / 2); i++) {
-    buf[i] = bswap_16(buf[i]);
-  }
-}
-
-static void sata_device_identify_complete(void* cookie, zx_status_t status, block_op_t* op) {
-  sata_txn_t* txn = containerof(op, sata_txn_t, bop);
+static void SataIdentifyDeviceComplete(void* cookie, zx_status_t status, block_op_t* op) {
+  SataTransaction* txn = containerof(op, SataTransaction, bop);
   txn->status = status;
   sync_completion_signal(static_cast<sync_completion_t*>(cookie));
 }
 
-#define QEMU_MODEL_ID "QEMU HARDDISK"
-#define QEMU_SG_MAX 1024  // Linux kernel limit
-
-static bool model_id_is_qemu(char* model_id) {
-  return !memcmp(model_id, QEMU_MODEL_ID, sizeof(QEMU_MODEL_ID) - 1);
+static bool IsModelIdQemu(char* model_id) {
+  constexpr char kQemuModelId[] = "QEMU HARDDISK";
+  return !memcmp(model_id, kQemuModelId, sizeof(kQemuModelId) - 1);
 }
 
-static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controller,
-                                        const char* name) {
+void SataDevice::DdkInit(ddk::InitTxn txn) {
+  // The driver initialization has numerous error conditions. Wrap the initialization here to ensure
+  // we always call txn.Reply() in any outcome.
+  zx_status_t status = Init();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "sata: Driver initialization failed: %s", zx_status_get_string(status));
+  }
+  txn.Reply(status);
+}
+
+zx_status_t SataDevice::Init() {
   // Set default devinfo
-  sata_devinfo_t di;
+  SataDeviceInfo di;
   di.block_size = 512;
   di.max_cmd = 1;
-  controller->SetDevInfo(dev->port, &di);
+  controller_->SetDevInfo(port_, &di);
 
   // send IDENTIFY DEVICE
   zx::vmo vmo;
@@ -72,26 +63,26 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
   }
 
   sync_completion_t completion;
-  sata_txn_t txn = {};
+  SataTransaction txn = {};
   txn.bop.rw.vmo = vmo.get();
   txn.bop.rw.length = 1;
   txn.bop.rw.offset_dev = 0;
   txn.bop.rw.offset_vmo = 0;
   txn.cmd = SATA_CMD_IDENTIFY_DEVICE;
   txn.device = 0;
-  txn.completion_cb = sata_device_identify_complete;
+  txn.completion_cb = SataIdentifyDeviceComplete;
   txn.cookie = &completion;
 
-  controller->Queue(dev->port, &txn);
+  controller_->Queue(port_, &txn);
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
 
   if (txn.status != ZX_OK) {
-    zxlogf(ERROR, "%s: error %d in device identify", name, txn.status);
+    zxlogf(ERROR, "%s: error %d in device identify", DriverName().c_str(), txn.status);
     return txn.status;
   }
 
   // parse results
-  sata_devinfo_response_t devinfo;
+  SataIdentifyDeviceResponse devinfo;
   status = vmo.read(&devinfo, 0, sizeof(devinfo));
   if (status != ZX_OK) {
     zxlogf(ERROR, "sata: error %d in vmo_read", status);
@@ -101,16 +92,16 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
 
   // Strings are 16-bit byte-flipped. Fix in place.
   // Strings are NOT null-terminated.
-  string_fix(devinfo.serial.word, sizeof(devinfo.serial.word));
-  string_fix(devinfo.firmware_rev.word, sizeof(devinfo.firmware_rev.word));
-  string_fix(devinfo.model_id.word, sizeof(devinfo.model_id.word));
+  SataStringFix(devinfo.serial.word, sizeof(devinfo.serial.word));
+  SataStringFix(devinfo.firmware_rev.word, sizeof(devinfo.firmware_rev.word));
+  SataStringFix(devinfo.model_id.word, sizeof(devinfo.model_id.word));
 
-  zxlogf(INFO, "%s: dev info", name);
+  zxlogf(INFO, "%s: dev info", DriverName().c_str());
   zxlogf(INFO, "  serial=%.*s", SATA_DEVINFO_SERIAL_LEN, devinfo.serial.string);
   zxlogf(INFO, "  firmware rev=%.*s", SATA_DEVINFO_FW_REV_LEN, devinfo.firmware_rev.string);
   zxlogf(INFO, "  model id=%.*s", SATA_DEVINFO_MODEL_ID_LEN, devinfo.model_id.string);
 
-  bool is_qemu = model_id_is_qemu(devinfo.model_id.string);
+  bool is_qemu = IsModelIdQemu(devinfo.model_id.string);
 
   uint16_t major = devinfo.major_version;
   zxlogf(INFO, "  major=0x%x ", major);
@@ -143,8 +134,8 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
   } else {
     zxlogf(INFO, " PIO");
   }
-  dev->max_cmd = devinfo.queue_depth;
-  zxlogf(INFO, " %u commands", dev->max_cmd + 1);
+  uint32_t max_cmd = devinfo.queue_depth;
+  zxlogf(INFO, " %u commands", max_cmd + 1);
 
   uint32_t block_size = 512;  // default
   uint64_t block_count = 0;
@@ -164,9 +155,8 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
     zxlogf(INFO, "  CHS unsupported!");
   }
 
-  memset(&dev->info, 0, sizeof(dev->info));
-  dev->info.block_size = block_size;
-  dev->info.block_count = block_count;
+  info_.block_size = block_size;
+  info_.block_count = block_count;
 
   if (devinfo.command_set2_0 & SATA_DEVINFO_CMD_SET2_0_VOLATILE_WRITE_CACHE_ENABLED) {
     zxlogf(DEBUG, " Volatile write cache enabled");
@@ -176,56 +166,43 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
   }
   if (devinfo.command_set1_2 & SATA_DEVINFO_CMD_SET1_2_WRITE_DMA_FUA_EXT_SUPPORTED) {
     zxlogf(DEBUG, " FUA command supported");
-    dev->info.flags |= BLOCK_FLAG_FUA_SUPPORT;
+    info_.flags |= BLOCK_FLAG_FUA_SUPPORT;
   }
 
   uint32_t max_sg_size = SATA_MAX_BLOCK_COUNT * block_size;  // SATA cmd limit
   if (is_qemu) {
-    max_sg_size = MIN(max_sg_size, QEMU_SG_MAX * block_size);
+    max_sg_size = MIN(max_sg_size, kQemuMaxTransferBlocks * block_size);
   }
-  dev->info.max_transfer_size = MIN(AHCI_MAX_BYTES, max_sg_size);
+  info_.max_transfer_size = MIN(AHCI_MAX_BYTES, max_sg_size);
 
   // set devinfo on controller
-  di.block_size = block_size, di.max_cmd = dev->max_cmd,
-
-  controller->SetDevInfo(dev->port, &di);
+  di.block_size = block_size;
+  di.max_cmd = max_cmd;
+  controller_->SetDevInfo(port_, &di);
 
   return ZX_OK;
 }
 
 // implement device protocol:
 
-static void sata_release(void* ctx) {
-  sata_device_t* device = static_cast<sata_device_t*>(ctx);
-  delete device;
+void SataDevice::DdkRelease() { delete this; }
+
+void SataDevice::BlockImplQuery(block_info_t* info_out, uint64_t* block_op_size_out) {
+  *info_out = info_;
+  *block_op_size_out = sizeof(SataTransaction);
 }
 
-static zx_protocol_device_t sata_device_proto = []() {
-  zx_protocol_device_t device = {};
-  device.version = DEVICE_OPS_VERSION;
-  device.release = sata_release;
-  return device;
-}();
-
-static void sata_query(void* ctx, block_info_t* info_out, size_t* block_op_size_out) {
-  sata_device_t* dev = static_cast<sata_device_t*>(ctx);
-  memcpy(info_out, &dev->info, sizeof(*info_out));
-  *block_op_size_out = sizeof(sata_txn_t);
-}
-
-static void sata_queue(void* ctx, block_op_t* bop, block_impl_queue_callback completion_cb,
-                       void* cookie) {
-  sata_device_t* dev = static_cast<sata_device_t*>(ctx);
-  sata_txn_t* txn = containerof(bop, sata_txn_t, bop);
+void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completion_cb,
+                                void* cookie) {
+  SataTransaction* txn = containerof(bop, SataTransaction, bop);
   txn->completion_cb = completion_cb;
   txn->cookie = cookie;
 
   switch (BLOCK_OP(bop->command)) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE:
-      if (zx_status_t status = block::CheckIoRange(bop->rw, dev->info.block_count);
-          status != ZX_OK) {
-        block_complete(txn, status);
+      if (zx_status_t status = block::CheckIoRange(bop->rw, info_.block_count); status != ZX_OK) {
+        txn->Complete(status);
         return;
       }
 
@@ -243,53 +220,32 @@ static void sata_queue(void* ctx, block_op_t* bop, block_impl_queue_callback com
       zxlogf(DEBUG, "sata: queue FLUSH txn %p", txn);
       break;
     default:
-      block_complete(txn, ZX_ERR_NOT_SUPPORTED);
+      txn->Complete(ZX_ERR_NOT_SUPPORTED);
       return;
   }
 
-  dev->controller->Queue(dev->port, txn);
+  controller_->Queue(port_, txn);
 }
 
-static block_impl_protocol_ops_t sata_block_proto = {
-    .query = sata_query,
-    .queue = sata_queue,
-};
-
-zx_status_t sata_bind(Controller* controller, zx_device_t* parent, uint32_t port) {
+zx_status_t SataDevice::Bind(Controller* controller, uint32_t port) {
   // initialize the device
   fbl::AllocChecker ac;
-  std::unique_ptr<sata_device_t> device(new (&ac) sata_device_t);
+  auto device = fbl::make_unique_checked<SataDevice>(&ac, controller->zxdev(), controller, port);
   if (!ac.check()) {
-    zxlogf(ERROR, "sata: out of memory");
+    zxlogf(ERROR, "sata: Failed to allocate memory for SATA device at port %u.", port);
     return ZX_ERR_NO_MEMORY;
   }
-  device->controller = controller;
-  device->port = port;
 
-  char name[8];
-  snprintf(name, sizeof(name), "sata%u", port);
-
-  // send device identify
-  zx_status_t status = sata_device_identify(device.get(), controller, name);
-  if (status < 0) {
+  zx_status_t status = device->AddDriver();
+  if (status != ZX_OK) {
     return status;
   }
 
-  // add the device
-  device_add_args_t args = {};
-  args.version = DEVICE_ADD_ARGS_VERSION;
-  args.name = name;
-  args.ctx = device.get();
-  args.ops = &sata_device_proto;
-  args.proto_id = ZX_PROTOCOL_BLOCK_IMPL;
-  args.proto_ops = &sata_block_proto;
-
-  status = device_add(parent, &args, &device->zxdev);
-  if (status < 0) {
-    return status;
-  }
-  device.release();  // Device has been retained by device_add().
+  // The DriverFramework now owns driver.
+  device.release();
   return ZX_OK;
 }
+
+zx_status_t SataDevice::AddDriver() { return DdkAdd(DriverName().c_str()); }
 
 }  // namespace ahci
