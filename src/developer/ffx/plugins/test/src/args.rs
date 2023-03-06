@@ -138,7 +138,9 @@ pub struct RunCommand {
     pub filter_ansi: bool,
 
     /// set the minimum log severity printed. Must be one of
-    /// FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
+    /// FATAL|ERROR|WARN|INFO|DEBUG|TRACE. This will also instruct all components under the test
+    /// (including the test component itself) to not emit logs with lower severities as long as
+    /// they are components using libraries that support setting log severity at runtime.
     #[argh(option)]
     pub min_severity_logs: Option<Severity>,
 

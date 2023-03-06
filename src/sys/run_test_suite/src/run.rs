@@ -14,6 +14,7 @@ use {
         running_suite::{run_suite_and_collect_logs, RunningSuite},
         trace::duration,
     },
+    fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_test_manager::{self as ftest_manager, RunBuilderProxy},
     fuchsia_async as fasync,
     futures::{future::Either, prelude::*, stream::FuturesUnordered, StreamExt},
@@ -131,6 +132,20 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             run_disabled_tests: Some(params.also_run_disabled_tests),
             case_filters_to_run: params.test_filters,
             log_iterator: Some(run_params.log_protocol.unwrap_or_else(diagnostics::get_type)),
+            log_interest: run_params.min_severity_logs.map(|severity| {
+                vec![fdiagnostics::LogInterestSelector {
+                    selector: fdiagnostics::ComponentSelector {
+                        moniker_segments: Some(vec![fdiagnostics::StringSelector::StringPattern(
+                            "**".to_string(),
+                        )]),
+                        ..fdiagnostics::ComponentSelector::EMPTY
+                    },
+                    interest: fdiagnostics::Interest {
+                        min_severity: Some(severity.into()),
+                        ..fdiagnostics::Interest::EMPTY
+                    },
+                }]
+            }),
             ..fidl_fuchsia_test_manager::RunOptions::EMPTY
         };
         let suite = run_reporter.new_suite(&params.test_url, &suite_id)?;

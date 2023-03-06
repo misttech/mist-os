@@ -6,7 +6,8 @@ use {
     anyhow::{format_err, Context as _, Error},
     fidl::endpoints,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager,
+    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_io as fio,
+    fidl_fuchsia_test_manager as ftest_manager,
     ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
     fuchsia_async as fasync,
     fuchsia_component::client,
@@ -63,6 +64,24 @@ async fn run_single_test(
     let ret = collect_suite_events(suite_instance).await;
     builder_run.await.context("builder execution failed")?;
     ret
+}
+
+fn log_interest_selector(
+    selector: &str,
+    severity: fdiagnostics::Severity,
+) -> fdiagnostics::LogInterestSelector {
+    fdiagnostics::LogInterestSelector {
+        selector: fdiagnostics::ComponentSelector {
+            moniker_segments: Some(vec![fdiagnostics::StringSelector::StringPattern(
+                selector.to_string(),
+            )]),
+            ..fdiagnostics::ComponentSelector::EMPTY
+        },
+        interest: fdiagnostics::Interest {
+            min_severity: Some(severity.into()),
+            ..fdiagnostics::Interest::EMPTY
+        },
+    }
 }
 
 #[fuchsia::test]
@@ -546,13 +565,57 @@ async fn collect_isolated_logs_using_batch() {
 #[fuchsia::test]
 async fn collect_isolated_logs_using_archive_iterator() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
-    let mut options = default_run_option();
-    options.log_iterator = Some(ftest_manager::LogsIteratorOption::ArchiveIterator);
+    let options = RunOptions {
+        log_iterator: Some(ftest_manager::LogsIteratorOption::ArchiveIterator),
+        ..default_run_option()
+    };
     let (_events, logs) = run_single_test(test_url, options).await.unwrap();
 
     assert_eq!(
         logs,
         vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+    );
+}
+
+#[fuchsia::test]
+async fn update_log_severity_for_all_components() {
+    let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
+    let options = RunOptions {
+        log_iterator: Some(ftest_manager::LogsIteratorOption::ArchiveIterator),
+        log_interest: Some(vec![log_interest_selector("**", fdiagnostics::Severity::Debug)]),
+        ..default_run_option()
+    };
+    let (_events, logs) = run_single_test(test_url, options).await.unwrap();
+    assert_eq!(
+        logs,
+        vec![
+            "Logging initialized".to_owned(),
+            "I'm a debug log from a test".to_owned(),
+            "Logging initialized".to_owned(),
+            "Started diagnostics publisher".to_owned(),
+            "I'm a debug log from the publisher!".to_owned(),
+            "Finishing through Stop".to_owned(),
+        ]
+    );
+}
+
+#[fuchsia::test]
+async fn update_log_severity_for_the_test() {
+    let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
+    let options = RunOptions {
+        log_iterator: Some(ftest_manager::LogsIteratorOption::ArchiveIterator),
+        log_interest: Some(vec![log_interest_selector("<root>", fdiagnostics::Severity::Debug)]),
+        ..default_run_option()
+    };
+    let (_events, logs) = run_single_test(test_url, options).await.unwrap();
+    assert_eq!(
+        logs,
+        vec![
+            "Logging initialized".to_owned(),
+            "I'm a debug log from a test".to_owned(),
+            "Started diagnostics publisher".to_owned(),
+            "Finishing through Stop".to_owned(),
+        ]
     );
 }
 

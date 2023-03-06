@@ -390,6 +390,19 @@ impl From<FidlSeverity> for Severity {
     }
 }
 
+impl From<Severity> for FidlSeverity {
+    fn from(severity: Severity) -> Self {
+        match severity {
+            Severity::Trace => FidlSeverity::Trace,
+            Severity::Debug => FidlSeverity::Debug,
+            Severity::Info => FidlSeverity::Info,
+            Severity::Warn => FidlSeverity::Warn,
+            Severity::Error => FidlSeverity::Error,
+            Severity::Fatal => FidlSeverity::Fatal,
+        }
+    }
+}
+
 /// An instance of diagnostics data with typed metadata and an optional nested payload.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Data<D: DiagnosticsData> {
@@ -861,6 +874,11 @@ impl Data<Logs> {
                 Severity::Fatal => LegacySeverity::Fatal,
             }
         }
+    }
+
+    /// Returns the severity level of this log.
+    pub fn severity(&self) -> Severity {
+        self.metadata.severity
     }
 
     /// Returns number of dropped logs if reported in the message.

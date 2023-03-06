@@ -69,6 +69,9 @@ pub(crate) struct RunningSuite {
     archivist_ready_task: Option<fasync::Task<()>>,
     mock_ready_task: Option<fasync::Task<()>>,
     logs_iterator_task: Option<fasync::Task<Result<(), Error>>>,
+    /// A connection to the embedded archivist LogSettings protocol. This connection must be kept
+    /// alive for the duration of the test execution for the configured settings to be persisted.
+    log_settings: Option<fdiagnostics::LogSettingsProxy>,
     /// Server ends of event pairs used to track if a client is accessing a component's
     /// custom storage. Used to defer destruction of the realm until clients have completed
     /// reading the storage.
@@ -134,6 +137,7 @@ impl RunningSuite {
                 mock_ready_event.wait_or_dropped().map(|_| ()),
             )),
             logs_iterator_task: None,
+            log_settings: None,
             instance,
             test_realm_proxy,
             test_collection: facets.collection,
@@ -143,7 +147,7 @@ impl RunningSuite {
     pub(crate) async fn run_tests(
         &mut self,
         test_url: &str,
-        options: ftest_manager::RunOptions,
+        mut options: ftest_manager::RunOptions,
         mut sender: mpsc::Sender<Result<FidlSuiteEvent, LaunchError>>,
         mut stop_recv: oneshot::Receiver<()>,
     ) {
@@ -164,6 +168,33 @@ impl RunningSuite {
         };
 
         sender.send(Ok(SuiteEvents::suite_syslog(syslog).into())).await.unwrap();
+
+        if let Some(mut log_interest) = options.log_interest.take() {
+            let log_settings = match self
+                .instance
+                .root
+                .connect_to_protocol_at_exposed_dir::<fdiagnostics::LogSettingsMarker>()
+            {
+                Ok(proxy) => proxy,
+                Err(e) => {
+                    warn!("Error connecting to LogSettings");
+                    sender
+                        .send(Err(LaunchTestError::ConnectToLogSettings(e.into()).into()))
+                        .await
+                        .unwrap();
+                    return;
+                }
+            };
+
+            info!("SETTING LOG INTEREST: {:?}", log_interest);
+            let fut = log_settings.set_interest(&mut log_interest.iter_mut());
+            if let Err(e) = fut.await {
+                warn!("Error setting log interest");
+                sender.send(Err(LaunchTestError::SetLogInterest(e.into()).into())).await.unwrap();
+                return;
+            }
+            self.log_settings = Some(log_settings);
+        }
 
         let archive_accessor = match self
             .instance
@@ -740,6 +771,14 @@ async fn get_realm(
                 .to(test_root.clone()),
         )
         .await?;
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
+                .from(&archivist)
+                .to(Ref::parent()),
+        )
+        .await?;
 
     let enclosing_env = wrapper_realm
         .add_local_child(
@@ -822,6 +861,7 @@ async fn get_realm(
             Route::new()
                 // from archivist
                 .capability(Capability::protocol::<fdiagnostics::ArchiveAccessorMarker>())
+                .capability(Capability::protocol::<fdiagnostics::LogSettingsMarker>())
                 // from test root
                 .capability(Capability::protocol::<ftest::SuiteMarker>())
                 .capability(Capability::protocol::<fcomponent::RealmMarker>())

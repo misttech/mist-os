@@ -162,6 +162,10 @@ type RunOptions = table {
     /// Defines what kind of log iterator the client supports. Default value is
     /// Batch iterator.
     6: log_iterator LogsIteratorOption;
+
+    /// Configures the minimum severity for the components under test.
+    7: log_interest
+            vector<fuchsia.diagnostics.LogInterestSelector>:fuchsia.diagnostics.MAX_LOG_SELECTORS;
 };
 
 /// Option which specifies which kind of iterator the client supports

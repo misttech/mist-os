@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect, Logs},
+    diagnostics_reader::{assert_data_tree, AnyProperty, ArchiveReader, Inspect, Logs, Severity},
     fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
     fuchsia_component_test::ScopedInstance,
-    futures::StreamExt,
+    futures::{future, StreamExt},
+    tracing::debug,
 };
 
 const URL: &'static str =
@@ -14,6 +15,7 @@ const URL: &'static str =
 
 #[fuchsia::test]
 async fn test_isolated_diagnostics_can_be_read_by_the_test() {
+    debug!("I'm a debug log from a test");
     let mut instance =
         ScopedInstance::new("coll".into(), URL.into()).await.expect("Created instance");
 
@@ -46,7 +48,11 @@ async fn test_isolated_diagnostics_can_be_read_by_the_test() {
     })
     .detach();
     let logs_fut = async move {
-        let logs = subscription.take(2).collect::<Vec<_>>().await;
+        let logs = subscription
+            .filter(|log| future::ready(log.severity() == Severity::Info))
+            .take(2)
+            .collect::<Vec<_>>()
+            .await;
         let messages =
             logs.into_iter().map(|log| log.msg().unwrap().to_owned()).collect::<Vec<_>>();
         assert_eq!(

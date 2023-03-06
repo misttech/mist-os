@@ -38,6 +38,12 @@ pub enum LaunchTestError {
     #[error("Failed to connect to embedded ArchiveAccessor: {0:?}")]
     ConnectToArchiveAccessor(#[source] anyhow::Error),
 
+    #[error("Failed to connect to embedded LogSettings: {0:?}")]
+    ConnectToLogSettings(#[source] anyhow::Error),
+
+    #[error("Failed to set log interest with the embedded LogSettings: {0:?}")]
+    SetLogInterest(#[source] anyhow::Error),
+
     #[error("Failed to connect to TestSuite: {0:?}")]
     ConnectToTestSuite(#[source] anyhow::Error),
 
@@ -85,6 +91,8 @@ impl From<LaunchTestError> for LaunchError {
             LaunchTestError::InitializeTestRealm(_)
             | LaunchTestError::ValidateTestRealm(_)
             | LaunchTestError::ConnectToArchiveAccessor(_)
+            | LaunchTestError::ConnectToLogSettings(_)
+            | LaunchTestError::SetLogInterest(_)
             | LaunchTestError::CreateTestFidl(_)
             | LaunchTestError::CreateTest(_)
             | LaunchTestError::StreamIsolatedLogs(_) => Self::InternalError,

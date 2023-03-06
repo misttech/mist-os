@@ -1360,6 +1360,7 @@ async fn test_logging_component(subcase: &'static str, iterator_option: LogsIter
             test_params.timeout_seconds = std::num::NonZeroU32::new(600);
             let mut run_params = new_run_params();
             run_params.log_protocol = Some(iterator_option);
+            run_params.min_severity_logs = Some(Severity::Debug);
             let outcome = run_test_suite_lib::run_tests_and_get_outcome(
                 run_test_suite_lib::SingleRunConnector::new(
                     fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()

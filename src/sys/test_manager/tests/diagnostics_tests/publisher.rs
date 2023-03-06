@@ -13,12 +13,13 @@ use {
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zircon as zx,
     futures::{StreamExt, TryStreamExt},
-    tracing::info,
+    tracing::{debug, info},
 };
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     info!("Started diagnostics publisher");
+    debug!("I'm a debug log from the publisher!");
     let mut fs = ServiceFs::new();
     inspect_runtime::serve(component::inspector(), &mut fs)?;
     component::health().set_ok();
