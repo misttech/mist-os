@@ -67,7 +67,7 @@ impl StreamVolumeControl {
     ) -> Result<Self, ControllerError> {
         // Stream input should be valid. Input comes from restore should be valid
         // and from set request has the validation.
-        assert!(stream.has_finite_volume_level());
+        assert!(stream.has_valid_volume_level());
 
         trace!(id, "StreamVolumeControl ctor");
         let mut control = StreamVolumeControl {
@@ -91,7 +91,7 @@ impl StreamVolumeControl {
         assert_eq!(self.stored_stream.stream_type, stream.stream_type);
         // Stream input should be valid. Input comes from restore should be valid
         // and from set request has the validation.
-        assert!(stream.has_finite_volume_level());
+        assert!(stream.has_valid_volume_level());
 
         // Try to create and bind a new VolumeControl.
         if self.proxy.is_none() {

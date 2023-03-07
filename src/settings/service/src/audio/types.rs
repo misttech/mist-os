@@ -4,9 +4,12 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::ops::RangeInclusive;
 
 use crate::audio::{create_default_modified_counters, default_audio_info, ModifiedCounters};
 use settings_storage::device_storage::DeviceStorageCompatible;
+
+const RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum AudioSettingSource {
@@ -33,8 +36,8 @@ pub struct AudioStream {
 }
 
 impl AudioStream {
-    pub(crate) fn has_finite_volume_level(&self) -> bool {
-        self.user_volume_level.is_finite()
+    pub(crate) fn has_valid_volume_level(&self) -> bool {
+        RANGE.contains(&self.user_volume_level)
     }
 }
 
@@ -47,8 +50,8 @@ pub struct SetAudioStream {
 }
 
 impl SetAudioStream {
-    pub(crate) fn has_finite_volume_level(&self) -> bool {
-        self.user_volume_level.map(|v| v.is_finite()).unwrap_or(true)
+    pub(crate) fn has_valid_volume_level(&self) -> bool {
+        self.user_volume_level.map(|v| RANGE.contains(&v)).unwrap_or(true)
     }
 
     pub(crate) fn is_valid_payload(&self) -> bool {
@@ -153,5 +156,38 @@ impl From<AudioInfoV1> for AudioInfoV2 {
             input: v1.input,
             modified_counters: Some(create_default_modified_counters()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const VALID_AUDIO_STREAM: AudioStream = AudioStream {
+        stream_type: AudioStreamType::Background,
+        source: AudioSettingSource::User,
+        user_volume_level: 0.5,
+        user_volume_muted: false,
+    };
+    const INVALID_NEGATIVE_AUDIO_STREAM: AudioStream =
+        AudioStream { user_volume_level: -0.1, ..VALID_AUDIO_STREAM };
+    const INVALID_GREATER_THAN_ONE_AUDIO_STREAM: AudioStream =
+        AudioStream { user_volume_level: 1.1, ..VALID_AUDIO_STREAM };
+
+    #[fuchsia::test]
+    fn test_volume_level_validation() {
+        assert!(VALID_AUDIO_STREAM.has_valid_volume_level());
+        assert!(!INVALID_NEGATIVE_AUDIO_STREAM.has_valid_volume_level());
+        assert!(!INVALID_GREATER_THAN_ONE_AUDIO_STREAM.has_valid_volume_level());
+    }
+
+    #[fuchsia::test]
+    fn test_set_audio_stream_validation() {
+        let valid_set_audio_stream = SetAudioStream::from(VALID_AUDIO_STREAM);
+        assert!(valid_set_audio_stream.has_valid_volume_level());
+        let invalid_set_audio_stream = SetAudioStream::from(INVALID_NEGATIVE_AUDIO_STREAM);
+        assert!(!invalid_set_audio_stream.has_valid_volume_level());
+        let invalid_set_audio_stream = SetAudioStream::from(INVALID_GREATER_THAN_ONE_AUDIO_STREAM);
+        assert!(!invalid_set_audio_stream.has_valid_volume_level());
     }
 }

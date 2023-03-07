@@ -300,7 +300,7 @@ impl controller::Handle for AudioController {
                 trace!(id, "controller set");
                 // Validate volume contains valid volume level numbers.
                 for audio_stream in &volume {
-                    if !audio_stream.has_finite_volume_level() {
+                    if !audio_stream.has_valid_volume_level() {
                         return Some(Err(ControllerError::InvalidArgument(
                             SettingType::Audio,
                             "stream".into(),
