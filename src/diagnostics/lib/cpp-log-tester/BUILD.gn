@@ -1,0 +1,65 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/cpp/sdk_source_set.gni")
+import("//build/rust/rustc_staticlib.gni")
+import("//build/test.gni")
+
+executable("cpp-log-tester-unittest") {
+  testonly = true
+  sources = [ "test.cc" ]
+  deps = [
+    ":cpp_log_tester",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+    "//third_party/rapidjson",
+  ]
+}
+
+source_set("cpp_log_tester") {
+  sources = [
+    "log_tester.cc",
+    "log_tester.h",
+  ]
+
+  testonly = true
+
+  visibility =
+      [ "//src/diagnostics/lib/cpp-log-tester:cpp-log-tester-unittest" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_cpp",
+    "//sdk/lib/fdio",
+    "//sdk/lib/stdcompat",
+    "//sdk/lib/syslog/streams/cpp:streams-encoder",
+    "//src/diagnostics/lib/cpp-log-decoder:lib",
+    "//src/lib/diagnostics/accessor2logger",
+    "//src/lib/fsl",
+    "//src/lib/uuid",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/sync",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//src/lib/diagnostics/accessor2logger",
+  ]
+}
+
+fuchsia_unittest_package("cpp-log-tester-tests") {
+  deps = [ ":cpp-log-tester-unittest" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":cpp-log-tester-tests" ]
+}
