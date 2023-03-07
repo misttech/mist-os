@@ -189,11 +189,245 @@ bool VmPageList::HasNoPageOrRef() const {
     if (p->IsPageOrRef()) {
       no_pages = false;
       return ZX_ERR_STOP;
-    } else {
-      return ZX_ERR_NEXT;
     }
+    return ZX_ERR_NEXT;
   });
   return no_pages;
+}
+
+bool VmPageList::IsOffsetInInterval(uint64_t offset) const {
+  // Find the node that would contain this offset.
+  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+  // If the node containing offset is populated, the lower bound will return that node. If not
+  // populated, it will return the next populated node.
+  auto pln = list_.lower_bound(node_offset);
+
+  // Could not find a valid node >= node_offset. So offset cannot be part of an interval, an
+  // interval would have an end slot.
+  if (!pln.IsValid()) {
+    return false;
+  }
+  // The page list shouldn't have any empty nodes.
+  DEBUG_ASSERT(!pln->IsEmpty());
+  return IfOffsetInIntervalHelper(offset, *pln);
+}
+
+bool VmPageList::IfOffsetInIntervalHelper(uint64_t offset, const VmPageListNode& lower_bound,
+                                          const VmPageOrMarker** interval_out) const {
+  DEBUG_ASSERT(!lower_bound.IsEmpty());
+  if (interval_out) {
+    *interval_out = nullptr;
+  }
+
+  // Helper to return success if an interval sentinel is found.
+  auto found_interval = [&interval_out](const VmPageOrMarker* interval) {
+    if (interval_out) {
+      *interval_out = interval;
+    }
+    return true;
+  };
+
+  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+  const size_t node_index = offset_to_node_index(offset, list_skew_);
+
+  // For the offset to lie in an interval, it is going to have an interval end so we should have
+  // found some valid node if the offset falls in an interval. See if offset falls in an interval.
+
+  // We found the node containing offset.
+  if (lower_bound.offset() == node_offset) {
+    auto& slot = lower_bound.Lookup(node_index);
+    // Check if the slot is an interval sentinel.
+    if (slot.IsInterval()) {
+      return found_interval(&slot);
+    }
+    if (!slot.IsEmpty()) {
+      // For any other non-empty slot, we know this is not an interval.
+      return false;
+    }
+    // The slot is empty. Walk to the left and right and lookup the closest populated
+    // slots. We should find either an interval start to the left or an end to the right. Try to
+    // find a start to the left first.
+    DEBUG_ASSERT(slot.IsEmpty());
+    for (size_t i = node_index; i > 0; i--) {
+      auto& p = lower_bound.Lookup(i - 1);
+      // Found the first populated slot to the left.
+      if (!p.IsEmpty()) {
+        if (p.IsIntervalStart()) {
+          return found_interval(&p);
+        }
+        // Found a non-empty slot to the left that wasn't a start. We cannot be in an interval.
+        return false;
+      }
+    }
+  }
+
+  // We could end up here under two conditions.
+  //  1. The lower_bound node contained offset, offset was empty, and we could not find a non-empty
+  //  slot to the left. So we have to walk right to try to find an interval end.
+  //  2. The lower_bound node contained offsets larger than offset. For this case too we have to
+  //  walk right and see if the first populated slot is an interval end.
+  // Only the start index for the traversal is different for the two cases.
+  size_t index;
+  if (lower_bound.offset() == node_offset) {
+    index = node_index + 1;
+  } else {
+    DEBUG_ASSERT(lower_bound.offset() > node_offset);
+    index = 0;
+  }
+
+  for (; index < VmPageListNode::kPageFanOut; index++) {
+    auto& p = lower_bound.Lookup(index);
+    // Found the first populated slot to the right.
+    if (!p.IsEmpty()) {
+      if (p.IsIntervalEnd()) {
+        return found_interval(&p);
+      }
+      // Found a non-empty slot to the right that wasn't an end. We cannot be in an interval.
+      return false;
+    }
+  }
+
+  return false;
+}
+
+zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offset,
+                                        VmPageOrMarker::IntervalDirtyState dirty_state) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
+  DEBUG_ASSERT(start_offset < end_offset);
+  DEBUG_ASSERT(!AnyPagesOrIntervalsInRange(start_offset, end_offset));
+
+  const uint64_t interval_start = start_offset;
+  const uint64_t interval_end = end_offset - PAGE_SIZE;
+  const uint64_t prev_offset = interval_start - PAGE_SIZE;
+  const uint64_t next_offset = interval_end + PAGE_SIZE;
+
+  // Helper to look up a slot at an offset and return a mutable VmPageOrMarker*. Only finds an
+  // existing slot and does not perform any allocations.
+  auto lookup_slot = [this](uint64_t offset) -> VmPageOrMarker* {
+    const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+    const size_t index = offset_to_node_index(offset, list_skew_);
+    auto pln = list_.find(node_offset);
+    if (!pln.IsValid()) {
+      return nullptr;
+    }
+    return &pln->Lookup(index);
+  };
+
+  // Check if we can merge this zero interval with a preceding one.
+  bool merge_with_prev = false;
+  VmPageOrMarker* prev_slot = nullptr;
+  if (interval_start > 0) {
+    prev_slot = lookup_slot(prev_offset);
+    // We can merge to the left if we find a zero interval end or slot, and the dirty state matches.
+    if (prev_slot && prev_slot->IsIntervalZero() &&
+        (prev_slot->IsIntervalEnd() || prev_slot->IsIntervalSlot()) &&
+        prev_slot->GetZeroIntervalDirtyState() == dirty_state) {
+      merge_with_prev = true;
+    }
+  }
+
+  // Check if we can merge this zero interval with a following one.
+  bool merge_with_next = false;
+  VmPageOrMarker* next_slot = nullptr;
+  next_slot = lookup_slot(next_offset);
+  // We can merge to the right if we find a zero interval start or slot, and the dirty state
+  // matches.
+  if (next_slot && next_slot->IsIntervalZero() &&
+      (next_slot->IsIntervalStart() || next_slot->IsIntervalSlot()) &&
+      next_slot->GetZeroIntervalDirtyState() == dirty_state) {
+    merge_with_next = true;
+  }
+
+  // First allocate any slots that might be needed to insert the interval.
+  VmPageOrMarker* new_start = nullptr;
+  VmPageOrMarker* new_end = nullptr;
+  // If we could not merge with an interval to the left, we're going to need a new start sentinel.
+  if (!merge_with_prev) {
+    new_start = LookupOrAllocate(interval_start);
+    if (!new_start) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    DEBUG_ASSERT(new_start->IsEmpty());
+  }
+  // If we could not merge with an interval to the right, we're going to need a new end sentinel.
+  if (!merge_with_next) {
+    new_end = LookupOrAllocate(interval_end);
+    if (!new_end) {
+      // Clean up any slot we allocated for new_start before returning.
+      if (new_start) {
+        DEBUG_ASSERT(new_start->IsEmpty());
+        ReturnEmptySlot(interval_start);
+      }
+      return ZX_ERR_NO_MEMORY;
+    }
+    DEBUG_ASSERT(new_end->IsEmpty());
+  }
+
+  // Now that we've checked for all error conditions perform the actual update.
+  if (merge_with_prev) {
+    DEBUG_ASSERT(prev_slot);
+    if (prev_slot->IsIntervalEnd()) {
+      // If the prev_slot was an interval end, we can simply extend that interval to include the new
+      // interval. Free up the old interval end.
+      *prev_slot = VmPageOrMarker::Empty();
+    } else {
+      // If the prev_slot was interval slot, we can extend the interval in that case too. Change the
+      // old interval slot into an interval start.
+      DEBUG_ASSERT(prev_slot->IsIntervalSlot());
+      DEBUG_ASSERT(prev_slot->GetZeroIntervalDirtyState() == dirty_state);
+      prev_slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+    }
+  } else {
+    // We could not merge with an interval to the left. Start a new interval.
+    DEBUG_ASSERT(new_start);
+    DEBUG_ASSERT(new_start->IsEmpty());
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, dirty_state);
+  }
+
+  if (merge_with_next) {
+    DEBUG_ASSERT(next_slot);
+    if (next_slot->IsIntervalStart()) {
+      // If the next_slot was an interval start, we can move back the start to include the new
+      // interval. Free up the old start.
+      *next_slot = VmPageOrMarker::Empty();
+    } else {
+      // If the next_slot was an interval slot, we can move back the start in that case too. Change
+      // the old interval slot into an interval end.
+      DEBUG_ASSERT(next_slot->IsIntervalSlot());
+      DEBUG_ASSERT(next_slot->GetZeroIntervalDirtyState() == dirty_state);
+      next_slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+    }
+  } else {
+    // We could not merge with an interval to the right. Install an interval end sentinel.
+    DEBUG_ASSERT(new_end);
+    // If the new zero interval spans a single page, we will already have installed a start above,
+    // so change it to a slot sentinel.
+    if (new_end->IsIntervalStart()) {
+      DEBUG_ASSERT(new_end->GetZeroIntervalDirtyState() == dirty_state);
+      new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    } else {
+      DEBUG_ASSERT(new_end->IsEmpty());
+      *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End, dirty_state);
+    }
+  }
+
+  // If we ended up removing the prev_slot or next_slot, return the now empty slots.
+  bool returned_prev_slot = false;
+  if (merge_with_prev && prev_slot->IsEmpty()) {
+    ReturnEmptySlot(prev_offset);
+    returned_prev_slot = true;
+  }
+  if (merge_with_next && next_slot->IsEmpty()) {
+    // next_slot and prev_slot could have come from the same node, in which case we've already
+    // freed up the node when returning prev_slot.
+    if (!returned_prev_slot || offset_to_node_offset(prev_offset, list_skew_) !=
+                                   offset_to_node_offset(next_offset, list_skew_)) {
+      ReturnEmptySlot(next_offset);
+    }
+  }
+
+  return ZX_OK;
 }
 
 void VmPageList::MergeFrom(

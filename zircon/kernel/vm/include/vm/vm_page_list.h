@@ -22,7 +22,7 @@
 #include <vm/pmm.h>
 #include <vm/vm.h>
 
-// RAII helper for representing content in a page list node. This supports being in one of three
+// RAII helper for representing content in a page list node. This supports being in one of five
 // states
 //  * Empty       - Contains nothing
 //  * Page p      - Contains a vm_page 'p'. This 'p' is considered owned by this wrapper and
@@ -32,6 +32,11 @@
 //  * Marker      - Indicates that whilst not a page, it is also not empty. Markers can be used to
 //                  separate the distinction between "there's no page because we've deduped to the
 //                  zero page" and "there's no page because our parent contains the content".
+//  * Interval    - Indicates that this page is part of a sparse page interval. An interval will
+//                  have a Start sentinel, and an End sentinel, and all offsets that lie between the
+//                  two will be empty. If the interval spans a single page, it will be represented
+//                  as a Slot sentinel, which is conceptually the same as both a Start and an End
+//                  sentinel.
 class VmPageOrMarker {
  public:
   // A PageType that otherwise holds a null pointer is considered to be Empty.
@@ -305,6 +310,26 @@ class VmPageOrMarker {
   }
   bool IsIntervalZero() const { return IsInterval() && GetIntervalType() == IntervalType::Zero; }
 
+  // Change the interval sentinel type for an existing interval, while preserving the rest of the
+  // original state. Only valid to call on an existing interval type. The only permissible
+  // transitions are from Slot to Start/End and vice versa, as these are the only valid transitions
+  // when extending or clipping intervals.
+  void ChangeIntervalSentinel(IntervalSentinel new_sentinel) {
+#if ZX_DEBUG_ASSERT_IMPLEMENTED
+    DEBUG_ASSERT(IsInterval());
+    auto old_sentinel = GetIntervalSentinel();
+    DEBUG_ASSERT(old_sentinel != new_sentinel);
+    if (old_sentinel == IntervalSentinel::Start || old_sentinel == IntervalSentinel::End) {
+      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Slot);
+    } else {
+      DEBUG_ASSERT(old_sentinel == IntervalSentinel::Slot);
+      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Start ||
+                   new_sentinel == IntervalSentinel::End);
+    }
+#endif
+    SetIntervalSentinel(new_sentinel);
+  }
+
   // Getters and setter for the zero interval type.
   bool IsZeroIntervalClean() const {
     DEBUG_ASSERT(IsIntervalZero());
@@ -370,6 +395,12 @@ class VmPageOrMarker {
     return static_cast<IntervalSentinel>(
         (raw_ & (BIT_MASK(kIntervalSentinelBits) << kIntervalSentinelShift)) >>
         kIntervalSentinelShift);
+  }
+  void SetIntervalSentinel(IntervalSentinel sentinel) {
+    // Clear the old sentinel type.
+    raw_ &= ~(BIT_MASK(kIntervalSentinelBits) << kIntervalSentinelShift);
+    // Set the new sentinel type.
+    raw_ |= static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
   }
   // Next we also need to store the type of interval being represented; reserve a couple of bits for
   // this. Currently we only support one type of interval: a range of zero pages, but reserving 2
@@ -513,7 +544,7 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
     return pages_[index];
   }
 
-  // A node is empty if it contains no pages, references or markers.
+  // A node is empty if it contains no pages, page interval sentinels, references, or markers.
   bool IsEmpty() const {
     for (const auto& p : pages_) {
       if (!p.IsEmpty()) {
@@ -523,7 +554,8 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
     return true;
   }
 
-  // Returns true if there are still any pages or references owned by this node.
+  // Returns true if there are no pages or references owned by this node. Meant to check whether the
+  // node has any resource that needs to be returned.
   bool HasNoPageOrRef() const {
     for (const auto& p : pages_) {
       if (p.IsPageOrRef()) {
@@ -674,8 +706,9 @@ class VmPageList final {
         this, compare_func, per_page_func, contiguous_run_func, start_offset, end_offset);
   }
 
-  // Returns true if any pages or markers are in the given range.
-  bool AnyPagesInRange(uint64_t start_offset, uint64_t end_offset) const {
+  // Returns true if any pages (actual pages, references, or markers) are in the given range, or if
+  // the range forms a part of a sparse page interval.
+  bool AnyPagesOrIntervalsInRange(uint64_t start_offset, uint64_t end_offset) const {
     bool found_page = false;
     ForEveryPageInRange(
         [&found_page](const VmPageOrMarker* page, uint64_t offset) {
@@ -683,7 +716,12 @@ class VmPageList final {
           return ZX_ERR_STOP;
         },
         start_offset, end_offset);
-    return found_page;
+    // It is possible that the range forms a part of an interval even if no nodes in the range have
+    // populated slots. We can determine that by checking to see if the start offset in the range
+    // falls in an interval (we could technically perform this check for any inclusive offset in the
+    // range since the range is entirely unpopulated and hence would only fall in the same interval
+    // if applicable).
+    return found_page ? true : IsOffsetInInterval(start_offset);
   }
 
   // Attempts to return a reference to the VmPageOrMarker at the specified offset. The returned
@@ -763,10 +801,11 @@ class VmPageList final {
         this, per_page_fn, per_gap_fn, start_offset, end_offset);
   }
 
-  // Returns true if there are no pages, references or markers in the page list.
+  // Returns true if there are no pages, references, markers, or intervals in the page list.
   bool IsEmpty() const;
 
-  // Returns true if the page list does not own any pages or references.
+  // Returns true if the page list does not own any pages or references. Meant to check whether the
+  // page list has any resource that needs to be returned.
   bool HasNoPageOrRef() const;
 
   // Merges the pages in |other| in the range [|offset|, |end_offset|) into |this|
@@ -806,7 +845,26 @@ class VmPageList final {
   static constexpr uint64_t MAX_SIZE =
       ROUNDDOWN(UINT64_MAX, 2 * VmPageListNode::kPageFanOut * PAGE_SIZE);
 
+  // Add a sparse zero interval spanning the range [start_offset, end_offset) with the specified
+  // dirty_state. The specified range must be previously unpopulated. This will try to merge the new
+  // zero interval with existing intervals to the left and/or right, if the dirty_state allows it.
+  zx_status_t AddZeroInterval(uint64_t start_offset, uint64_t end_offset,
+                              VmPageOrMarker::IntervalDirtyState dirty_state);
+
  private:
+  // Returns true if the specified offset falls in a sparse page interval.
+  bool IsOffsetInInterval(uint64_t offset) const;
+
+  // Internal helper used when checking whether the offset falls in an interval.
+  // lower_bound is the node that was queried with a lower_bound() lookup on the list using the
+  // offset. This node is passed in here so that we can reuse the node the callsite has looked up
+  // and avoid an extra lookup. The interval sentinel found in lower_bound which is used to
+  // conclude that offset lies is an interval is optionally returned. If this function returns true,
+  // interval_out (if not null) returns the start/end/slot sentinel of the interval that the offset
+  // lies in.
+  bool IfOffsetInIntervalHelper(uint64_t offset, const VmPageListNode& lower_bound,
+                                const VmPageOrMarker** interval_out = nullptr) const;
+
   template <typename PTR_TYPE, typename S, typename F>
   static zx_status_t ForEveryPage(S self, F per_page_func) {
     for (auto& pl : self->list_) {
@@ -901,13 +959,28 @@ class VmPageList final {
                                                GAP_FUNC per_gap_func, uint64_t start_offset,
                                                uint64_t end_offset) {
     uint64_t expected_next_off = start_offset;
-    auto per_page_wrapper_fn = [&expected_next_off, end_offset, per_page_func, &per_gap_func](
-                                   auto* p, uint64_t off) {
+    // Set to true when we encounter an interval start but haven't yet encountered the end.
+    bool in_interval = false;
+    auto per_page_wrapper_fn = [&expected_next_off, &in_interval, start_offset, end_offset,
+                                per_page_func, &per_gap_func](auto* p, uint64_t off) {
       zx_status_t status = ZX_ERR_NEXT;
-      if (expected_next_off != off) {
+      // We can move ahead of expected_next_off in the case of an interval too, which represents a
+      // run of pages. Make sure this is not an interval before calling the per_gap_func.
+      if (expected_next_off != off && !p->IsIntervalEnd()) {
         status = per_gap_func(expected_next_off, off);
       }
       if (status == ZX_ERR_NEXT) {
+        if (p->IsIntervalStart()) {
+          // We should not already have been tracking an interval.
+          DEBUG_ASSERT(!in_interval);
+          in_interval = true;
+        } else if (p->IsIntervalEnd()) {
+          // If this is not the first populated slot we encountered, we should have been tracking a
+          // valid interval.
+          DEBUG_ASSERT(in_interval || expected_next_off == start_offset);
+          // Reset interval tracking.
+          in_interval = false;
+        }
         status = per_page_func(p, off);
       }
       expected_next_off = off + PAGE_SIZE;
@@ -924,10 +997,26 @@ class VmPageList final {
       return status;
     }
 
+    // Handle the last gap after checking that we are not in an interval. Note that simply checking
+    // for in_interval is not sufficient, as it is possible to have started the traversal partway
+    // into an interval, in which case we would not have seen the interval start and in_interval
+    // would be false. So we perform a quick check for in_interval first and if that fails perform
+    // the more expensive IsOffsetInInterval() check. The IsOffsetInInterval() call is further gated
+    // by whether we encountered any page at all in the traversal above. If we saw at least one
+    // page in the traversal, we know that we could not be in an interval without in_interval being
+    // true because we would have seen the interval start.
     if (expected_next_off != end_offset) {
-      status = per_gap_func(expected_next_off, end_offset);
-      if (status != ZX_ERR_NEXT && status != ZX_ERR_STOP) {
-        return status;
+      // Traversal ended in an interval if in_interval was true, OR if the traversal did not see any
+      // page at all and the start_offset is in an interval (Note that in this latter case all
+      // offsets in the range [start_offset, end_offset) would lie in the same interval, so we can
+      // just check one of them).
+      bool ended_in_interval = in_interval || (expected_next_off == start_offset &&
+                                               self->IsOffsetInInterval(start_offset));
+      if (!ended_in_interval) {
+        status = per_gap_func(expected_next_off, end_offset);
+        if (status != ZX_ERR_NEXT && status != ZX_ERR_STOP) {
+          return status;
+        }
       }
     }
 

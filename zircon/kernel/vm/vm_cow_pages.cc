@@ -793,7 +793,7 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       // There's a parent, check if there are any pages in the current range. Unless we've moved
       // outside the range of our parent, in which case we can just walk up.
       if (child_parent_limit > 0 &&
-          cur->page_list_.AnyPagesInRange(offset, offset + child_parent_limit)) {
+          cur->page_list_.AnyPagesOrIntervalsInRange(offset, offset + child_parent_limit)) {
         break;
       }
       // To move to the parent we need to translate our window into |cur|.
