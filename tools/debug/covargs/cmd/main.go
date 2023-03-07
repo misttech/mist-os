@@ -39,34 +39,36 @@ const (
 	cloudFetchMaxAttempts  = 2
 	cloudFetchRetryBackoff = 500 * time.Millisecond
 	cloudFetchTimeout      = 60 * time.Second
+	// TODO(fxbug.dev/121303): Remove this when debuginfod is supported in Rust toolchain.
+	debuginfodSupportedVersion = "clang"
 )
 
 var (
-	colors                           color.EnableColor
-	level                            logger.LogLevel
-	summaryFile                      flagmisc.StringsValue
-	buildIDDirPaths                  flagmisc.StringsValue
-	symbolServers                    flagmisc.StringsValue
-	debuginfodServers                flagmisc.StringsValue
-	debuginfodServerSupportedVersion string
-	symbolCache                      string
-	coverageReport                   bool
-	dryRun                           bool
-	skipFunctions                    bool
-	outputDir                        string
-	llvmCov                          string
-	llvmProfdata                     flagmisc.StringsValue
-	outputFormat                     string
-	jsonOutput                       string
-	reportDir                        string
-	saveTemps                        string
-	basePath                         string
-	diffMappingFile                  string
-	compilationDir                   string
-	pathRemapping                    flagmisc.StringsValue
-	srcFiles                         flagmisc.StringsValue
-	numThreads                       int
-	jobs                             int
+	colors            color.EnableColor
+	level             logger.LogLevel
+	summaryFile       flagmisc.StringsValue
+	buildIDDirPaths   flagmisc.StringsValue
+	debuginfodServers flagmisc.StringsValue
+	debuginfodCache   string
+	symbolServers     flagmisc.StringsValue
+	symbolCache       string
+	coverageReport    bool
+	dryRun            bool
+	skipFunctions     bool
+	outputDir         string
+	llvmCov           string
+	llvmProfdata      flagmisc.StringsValue
+	outputFormat      string
+	jsonOutput        string
+	reportDir         string
+	saveTemps         string
+	basePath          string
+	diffMappingFile   string
+	compilationDir    string
+	pathRemapping     flagmisc.StringsValue
+	srcFiles          flagmisc.StringsValue
+	numThreads        int
+	jobs              int
 )
 
 func init() {
@@ -79,7 +81,7 @@ func init() {
 		"to the llvm-profdata required to run with the profiles from this summary.json")
 	flag.Var(&buildIDDirPaths, "build-id-dir", "path to .build-id directory")
 	flag.Var(&debuginfodServers, "debuginfod-server", "path to the debuginfod server")
-	flag.StringVar(&debuginfodServerSupportedVersion, "debuginfod-server-supported-version", "", "path to directory to store cached debug binaries in")
+	flag.StringVar(&debuginfodCache, "debuginfod-cache", "", "path to directory to store fetched debug binaries from debuginfodserver")
 	flag.Var(&symbolServers, "symbol-server", "a GCS URL or bucket name that contains debug binaries indexed by build ID")
 	flag.StringVar(&symbolCache, "symbol-cache", "", "path to directory to store cached debug binaries in")
 	flag.BoolVar(&coverageReport, "coverage-report", true, "if set, generate a coverage report")
@@ -310,7 +312,7 @@ func createEntries(ctx context.Context, profiles map[string]string, llvmProfData
 		profile := profile // capture range variable.
 		version := version
 		// Do not add the profiles that have debuginfod support because there is no need to fetch the associated binaries from symbol server for them.
-		if len(debuginfodServers) > 0 && version == debuginfodServerSupportedVersion {
+		if len(debuginfodServers) > 0 && version == debuginfodSupportedVersion {
 			continue
 		}
 		sems <- struct{}{}
@@ -477,12 +479,30 @@ func createLLVMCovResponseFile(tempDir string, modules *[]symbolize.FileCloser) 
 			fmt.Fprintf(covFile, "-object %s\n", module.String())
 		}
 	}
-	for _, srcFile := range srcFiles {
-		fmt.Fprintf(covFile, "%s\n", srcFile)
+
+	if len(srcFiles) > 0 {
+		fmt.Fprintf(covFile, "-sources\n")
+		for _, srcFile := range srcFiles {
+			fmt.Fprintf(covFile, "%s\n", srcFile)
+		}
 	}
 
 	covFile.Close()
 	return covFile.Name(), nil
+}
+
+// setDebugInfodEnvironmentVariables sets the necessary environment variables for debuginfod.
+func setDebugInfodEnvironmentVariables(cmd *exec.Cmd) {
+	// When debuginfod server is provided, set the DEBUGINFOD_URLS environment variable that is a string of a space-separated URLs.
+	if len(debuginfodServers) > 0 {
+		debuginfodUrls := strings.Join(debuginfodServers, " ")
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, "DEBUGINFOD_URLS="+debuginfodUrls)
+
+		if debuginfodCache != "" {
+			cmd.Env = append(cmd.Env, "DEBUGINFOD_CACHE_PATH="+debuginfodCache)
+		}
+	}
 }
 
 // showCoverageData shows coverage data by invoking llvm-cov show command.
@@ -508,8 +528,10 @@ func showCoverageData(ctx context.Context, mergedProfileFile string, covFile str
 	}
 
 	args = append(args, "@"+covFile)
-	showCmd := Action{Path: llvmCov, Args: args}
-	data, err := showCmd.Run(ctx)
+	showCmd := exec.Command(llvmCov, args...)
+	logger.Debugf(ctx, "%s\n", showCmd)
+	setDebugInfodEnvironmentVariables(showCmd)
+	data, err := showCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v:\n%s", err, string(data))
 	}
@@ -548,10 +570,12 @@ func exportCoverageData(ctx context.Context, mergedProfileFile string, covFile s
 	}
 
 	args = append(args, "@"+covFile)
-	cmd := exec.Command(llvmCov, args...)
-	cmd.Stdout = &b
-	cmd.Stderr = stderrFile
-	if err := cmd.Run(); err != nil {
+	exportCmd := exec.Command(llvmCov, args...)
+	exportCmd.Stdout = &b
+	exportCmd.Stderr = stderrFile
+	setDebugInfodEnvironmentVariables(exportCmd)
+
+	if err := exportCmd.Run(); err != nil {
 		return fmt.Errorf("failed to export: %w", err)
 	}
 
@@ -646,12 +670,6 @@ func process(ctx context.Context) error {
 	covFile, err := createLLVMCovResponseFile(tempDir, &modules)
 	if err != nil {
 		return fmt.Errorf("failed to create llvm-cov response file: %w", err)
-	}
-
-	// When debuginfod server is provided, set the DEBUGINFOD_URLS environment variable that is a string of a space-separated URLs.
-	if len(debuginfodServers) > 0 {
-		debuginfodUrls := strings.Join(debuginfodServers, " ")
-		os.Setenv("DEBUGINFOD_URLS", debuginfodUrls)
 	}
 
 	if outputDir != "" {
