@@ -30,10 +30,6 @@ static_library("blobfs") {
   visibility = [
     "//src/security/lib/scrutiny/utils/*",
     "//src/storage/*",
-    "//zircon/system/ulib/fvm-host",
-    "//zircon/system/utest/blobfs-bench",
-    "//zircon/system/utest/fvm",
-    "//zircon/tools/blobfs:*",
   ]
   public = [
     "blob_layout.h",
