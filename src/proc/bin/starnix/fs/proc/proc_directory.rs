@@ -57,6 +57,7 @@ impl ProcDirectory {
             &b"cgroups"[..] => fs.create_node(BytesFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
             &b"sys"[..] => sysctl_directory(fs),
             &b"pressure"[..] => pressure_directory(fs),
+            &b"net"[..] => net_directory(fs),
         };
 
         Arc::new(ProcDirectory { kernel, nodes })

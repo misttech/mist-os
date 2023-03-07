@@ -21,7 +21,10 @@ pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
             dir.entry(b"bpf_jit_kallsyms", StubSysctl::new_node(), mode);
         });
     });
-    dir.subdir(b"vm", 0o555, |dir| dir.entry(b"mmap_rnd_bits", StubSysctl::new_node(), mode));
+    dir.subdir(b"vm", 0o555, |dir| {
+        dir.entry(b"mmap_rnd_bits", StubSysctl::new_node(), mode);
+        dir.entry(b"mmap_rnd_compat_bits", StubSysctl::new_node(), mode);
+    });
     dir.build()
 }
 
@@ -43,4 +46,12 @@ impl BytesFileOps for StubSysctl {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(self.data.lock().clone().into())
     }
+}
+
+pub fn net_directory(fs: &FileSystemHandle) -> FsNodeHandle {
+    let mut dir = StaticDirectoryBuilder::new(fs);
+    dir.subdir(b"xt_quota", 0o555, |dir| {
+        dir.entry(b"globalAlert", StubSysctl::new_node(), mode!(IFREG, 0o444));
+    });
+    dir.build()
 }
