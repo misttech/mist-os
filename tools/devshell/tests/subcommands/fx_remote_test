@@ -5,8 +5,17 @@
 
 ### Test fx remote scripts
 
+# Source platform.sh so that we can point to jq and include it as a runtime dependency. We need to
+# do it in a subfunction since platform.sh defines readonly variables, and it gets re-sourced to
+# avoid conflicts.
+function read_host_platform() {
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/../../lib/platform.sh" || exit $?
+  echo "$HOST_PLATFORM"
+}
+
 BT_FILE_DEPS=(
   "scripts/fx"
+  "prebuilt/third_party/jq/$(read_host_platform)/bin/jq"
   "tools/devshell/flash-remote"
   "tools/devshell/serve-remote"
   "tools/devshell/pave-remote"
@@ -19,6 +28,7 @@ BT_FILE_DEPS=(
   "tools/devshell/lib/vars.sh"
   "tools/devshell/lib/verify-default-keys.sh"
   "tools/devshell/lib/updates.sh"
+  "tools/devshell/jq.fx"
 )
 
 declare fx ssh_mock scp_mock local_gensshkeys_mock remote_gensshkeys_mock compare_remote_and_local_mock
@@ -53,6 +63,12 @@ if [[ "$@" == "config get repository.server.mode" ]]; then
   echo "\"ffx\""
 elif [[ "$@" == "config get repository.server.listen" ]]; then
   echo "\"[::]:8083\""
+elif [[ "\$@" == "--config ffx_repository=true --machine json repository server status" ]]; then
+  if [ -e "${started_server}" ]; then
+    echo "{\"state\": \"running\", \"address\": \"[::]:${serve_updates_port}\"}"
+  else
+    echo "{\"state\": \"stopped\"}"
+  fi
 else
   echo "127.0.0.1"
 fi

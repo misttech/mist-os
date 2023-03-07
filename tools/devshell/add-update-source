@@ -168,10 +168,11 @@ function main {
       exit 1
     fi
 
-    ffx-repository-check-server-address "" "$port"
+    # Error out if we can't start a package server.
+    check-if-we-can-start-package-server "${server_mode}" "" "${port}"
     err=$?
-    if [[ $err -ne 0 ]]; then
-      exit "$err"
+    if [[ "${err}" -ne 0 ]]; then
+      exit 1
     fi
 
     # Use the build directory's name by default. Note that package URLs are not
@@ -186,7 +187,7 @@ function main {
       register_args+=( --storage-type persistent )
     fi
 
-    ffx-register-repository "$source_name" "${register_args[@]}" || return $?
+    ffx-register-repository "$source_name" "" "$port" "${register_args[@]}" || return $?
   fi
 
   fx-command-run shell update channel set "${source_name}"

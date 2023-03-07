@@ -19,6 +19,7 @@
 ##  --tunnel-ports=NNN1,NNN2,NNN3 comma-separated list of additional ports to
 ##                                tunnel. This is used for e2e tests running on
 ##                                remote host that needs to reach the local device.
+##   --repo-port port             port that the repository server will listen on.
 ##
 ## HOST and DIR are persisted in the file //.fx-remote-config and are reused as
 ## defaults in future invocations of any 'fx *-remote' tools.
@@ -108,6 +109,30 @@ fi
 if [[ -z "${host}" ]]; then
   fx-error "HOSTNAME must be specified"
   fx-command-help
+  exit 1
+fi
+
+# Error out if something else is listening on the package server port.
+if is-listening-on-port "${package_server_port}"; then
+  ffx_repo_port=$(ffx-repository-server-running-port)
+  err=$?
+  if [[ "${err}" -ne 0 ]]; then
+    return "${err}"
+  fi
+
+  if [[ "${ffx_repo_port}" == "${package_server_port}" ]]; then
+    fx-error "The local ffx repository server is running on port ${package_server_port}."
+    fx-error "To use this port, run this on the local device:"
+    fx-error ""
+    fx-error "$ ffx repository server stop"
+    fx-error ""
+    fx-error "Then re-run this command."
+  else
+    fx-error "Another process is listening on ${package_server_port} on the"
+    fx-error "local device. To use this port, shut down that process, then"
+    fx-error "re-run this command."
+  fi
+
   exit 1
 fi
 
@@ -252,68 +277,41 @@ if "${serve}"; then
       ssh "${ssh_base_args[@]}" "${host}" 'pkill -x -u $USER pm' || true
     fi
   else
-    # FIXME(http://fxbug.dev/82788): Currently ffx will log, but otherwise
-    # ignore, when both a local ffx and a remote ffx are both trying to serve
-    # repositories over the same tunnel port. The first setup will win, even if
-    # that's not what the user expects.
-    #
-    # To work around this, we will error out if both the local and remote ffx
-    # repository servers are trying to use the same port.
-    local_addr=$(fx-command-run ffx config get repository.server.listen) || err=$?
-    if [[ "${err}" -ne 0 ]]; then
-      fx-error "Unable to get the local configured repository server address."
-      exit "${err}"
-    fi
-
-    remote_addr=$(ssh "${host}" "${ssh_base_args[@]}" "cd ${dir} && ./.jiri_root/bin/ffx config get repository.server.listen") || err=$?
+    # Check if the remote repository server is running on a different port.
+    # FIXME(http://fxbug.dev/120327): Remove the `ffx_repository=true` once this command is stable.
+    remote_server_status=$(ssh "${host}" "${ssh_base_args[@]}" "cd ${dir} && ./.jiri_root/bin/ffx --config ffx_repository=true repository server status") || err=$?
     if [[ "${err}" -ne 0 ]]; then
       fx-error "Unable to get the remote configured repository server address."
       exit "${err}"
     fi
 
-    # If the local server is running, error out if we're using the same port as the remote server.
-    if [[ "${local_addr}" != "null" && "${local_addr}" = "${remote_addr}" ]]; then
-      fx-error "The local and remote ffx repository servers cannot both be $local_addr."
-      fx-error ""
-      fx-error "ffx currently does not currently have a way to communicate if an ssh"
-      fx-error "tunnel errored out with a port conflict. To avoid 'fx serve-remote' silently"
-      fx-error "failing in the background, we require that both the local and remote ffx"
-      fx-error "package repository servers to listen on different addresses to reduce the"
-      fx-error "change you will experience confusing errors."
-      fx-error ""
-      fx-error "To fix this, we suggest you change the local ffx package repository server"
-      fx-error "to run on a different port to avoid the conflict. It is much easier for"
-      fx-error "our tooling to handle errors without having to pass through the ssh tunnel."
-      fx-error "This can be done by running the following command on the local workstation:"
-      fx-error ""
-      fx-error "$ ffx config set repository.server.listen \"[::]:\$SOME_OTHER_PORT\""
-      fx-error ""
-      fx-error "Users do not usually serve packages from the local and the remote"
-      fx-error "repository, and so it is typically fine to leave the local repository"
-      fx-error "stopped. However, if you do need to serve packages from the local"
-      fx-error "repository, you can start it with:"
-      fx-error ""
-      fx-error "$ ffx repository server stop"
-      fx-error "$ ffx repository server start"
-      fx-error ""
-      fx-error "If you decide to change the listening address on the remote workstation, in"
-      fx-error "addition to running the above commands on the remote workstation, you will"
-      fx-error "also need to use 'fx-serve-remote --repo-port \$SOME_OTHER_PORT' to make"
-      fx-error "sure the port is tunneled correctly."
-      fx-error ""
-      fx-error "Or, you could disable the ffx package repository server from running on the"
-      fx-error "local workstation by running:"
-      fx-error ""
-      fx-error "$ ffx config set repository.server.mode pm"
-      fx-error "$ ffx repository server stop"
-      fx-error ""
-      fx-error "See http://fxbug.dev/82788 for more details."
+    remote_addr=$(echo "${remote_server_status}" | fx-command-run jq '. | select(.state == "running") | .address')
+    if [[ "${err}" -ne 0 ]]; then
+      fx-error "Unable to parse remote repository server status: ${remote_server_status}"
       exit 1
     fi
-  fi
-fi
 
-if "${serve}"; then
+    if [[ ! -z "${remote_addr}" ]]; then
+      if [[ ${remote_addr} =~ .*:([0-9]+) ]]; then
+        remote_port="${BASH_REMATCH[1]}"
+      else
+        fx-error "Unable to parse port from remote ffx repository server address: $remote_addr"
+        exit 1
+      fi
+
+      if [[ "${package_server_port}" != "${remote_port}" ]]; then
+        fx-error "The remote repository server is already on ${remote_addr}."
+        fx-error "If you want to use port ${package_server_port}, run the following on the"
+        fx-error "remote workstation:"
+        fx-error ""
+        fx-error "$ ffx repository server stop"
+        fx-error ""
+        fx-error "Then re-run this command."
+        exit 1
+      fi
+    fi
+  fi
+
   # Ctrl-C will exit the ssh remote command and this ssh session. Then script exit will trigger
   # `trap_exit` to close the ssh connection.
   echo -e "Press Ctrl-C to stop remote serving and tunneling.\n"
@@ -329,7 +327,7 @@ if "${serve}"; then
   fi
   ssh_serve_args=(
     "-tt" # explicitly force a pty, for HUP'ing on the remote
-    "cd ${dir} && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx set-device '${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}' && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx serve-updates ${serve_verbose_arg} ${serve_persist_arg}"
+    "cd ${dir} && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx set-device '${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}' && FX_REMOTE_INVOCATION=1 ${experimental_vars} ./.jiri_root/bin/fx serve-updates -l \":${package_server_port}\" ${serve_verbose_arg} ${serve_persist_arg}"
   )
   ssh "${host}" "${ssh_base_args[@]}" "${ssh_serve_args[@]}"
 else

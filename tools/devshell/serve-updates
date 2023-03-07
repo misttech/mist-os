@@ -40,7 +40,7 @@ fx-standard-switches "$@"
 set -- "${FX_ARGV[@]}"
 
 port=""
-serve_flags=()
+pm_serve_flags=()
 verbose=false
 auto_config=true
 clean_first=false
@@ -52,7 +52,7 @@ while (($#)); do
     -l)
       shift
       port="${1##*:}"
-      serve_flags+=(-l "$1")
+      pm_serve_flags+=(-l "$1")
       ;;
     -c)
       config_format=("$2")
@@ -84,7 +84,7 @@ while (($#)); do
   esac
   shift
 done
-serve_flags+=("-c" "${config_format}")
+pm_serve_flags+=("-c" "${config_format}")
 
 if fx-is-bringup; then
   fx-error "$0 is not supported in the bringup build configuration, as there are no package features in bringup."
@@ -92,7 +92,7 @@ if fx-is-bringup; then
 fi
 
 if [[ "${verbose}" != true ]]; then
-  serve_flags+=("-q")
+  pm_serve_flags+=("-q")
 fi
 
 # Determine which server we are using.
@@ -183,7 +183,7 @@ if is_feature_enabled "incremental" || is_feature_enabled "incremental_new" || i
 
   if [[ "${server_mode}" = "pm" ]]; then
     fx-info "Incremental package auto-publishing is enabled for pm."
-    serve_flags+=( -p "all_package_manifests.list" )
+    pm_serve_flags+=( -p "all_package_manifests.list" )
   fi
   # macOS in particular has a low default for number of open file descriptors
   # per process, which is prohibitive for higher job counts. Here we raise
@@ -222,7 +222,7 @@ if [[ "${server_mode}" = "pm" ]]; then
     port="8083"
   fi
 
-  pm_serve_args=( serve -vt -repo "${repo_dir}" "${serve_flags[@]}" )
+  pm_serve_args=( serve -vt -repo "${repo_dir}" "${pm_serve_flags[@]}" )
 
   # the manifest list file has relative paths and "pm serve" looks for them
   # from PWD, so pm command needs to be executed in "$FUCHSIA_BUILD_DIR"
@@ -278,7 +278,7 @@ if [[ "${server_mode}" = "pm" ]]; then
     exit $err
   fi
 else
-  ffx-start-server
+  ffx-start-server "" "${port}"
   err=$?
   if [[ "${err}" -ne 0 ]]; then
     exit "${err}"

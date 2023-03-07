@@ -3,8 +3,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Source platform.sh so that we can point to jq and include it as a runtime dependency. We need to
+# do it in a subfunction since platform.sh defines readonly variables, and it gets re-sourced to
+# avoid conflicts.
+function read_host_platform() {
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/../../lib/platform.sh" || exit $?
+  echo "$HOST_PLATFORM"
+}
+
 BT_FILE_DEPS=(
   "out/default/host_x64/pm"
+  "prebuilt/third_party/jq/$(read_host_platform)/bin/jq"
   "scripts/fx"
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/fx-optional-features.sh"
@@ -12,6 +21,7 @@ BT_FILE_DEPS=(
   "tools/devshell/lib/vars.sh"
   "tools/devshell/lib/platform.sh"
   "tools/devshell/serve-updates"
+  "tools/devshell/jq.fx"
   "tools/devshell/tests/subcommands/data/fx_serve_update_test/testpackage.json"
   "tools/devshell/tests/subcommands/data/fx_serve_update_test/testpackage.manifest"
 )
@@ -324,12 +334,18 @@ if [[ "\$@" == "config get repository.server.mode" ]]; then
   echo "\"ffx\""
 elif [[ "\$@" == "config get repository.server.listen" ]]; then
   echo "\"[::]:${serve_updates_port}\""
-elif [[ "\$@" == "repository server start" ]]; then
+elif [[ "\$@" == "repository server start --address [::]:${serve_updates_port}" ]]; then
   touch "${started_server}"
   exit 0
 elif [[ "\$@" == "repository server stop" ]]; then
   touch "${stopped_server}"
   exit 0
+elif [[ "\$@" == "--config ffx_repository=true --machine json repository server status" ]]; then
+  if [ -e "${started_server}" ]; then
+    echo "{\"state\": \"running\", \"address\": \"[::]:${serve_updates_port}\"}"
+  else
+    echo "{\"state\": \"stopped\"}"
+  fi
 else
   echo "127.0.0.1"
 fi
@@ -389,12 +405,18 @@ if [[ "\$@" == "config get repository.server.mode" ]]; then
   echo "\"ffx\""
 elif [[ "\$@" == "config get repository.server.listen" ]]; then
   echo "\"[::]:${serve_updates_port}\""
-elif [[ "\$@" == "repository server start" ]]; then
+elif [[ "\$@" == "repository server start --address [::]:${serve_updates_port}" ]]; then
   touch "${started_server}"
   exit 0
 elif [[ "\$@" == "repository server stop" ]]; then
   touch "${stopped_server}"
   exit 0
+elif [[ "\$@" == "--config ffx_repository=true --machine json repository server status" ]]; then
+  if [ -e "${started_server}" ]; then
+    echo "{\"state\": \"running\", \"address\": \"[::]:${serve_updates_port}\"}"
+  else
+    echo "{\"state\": \"stopped\"}"
+  fi
 else
   echo "127.0.0.1"
 fi

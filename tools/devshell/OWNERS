@@ -3,7 +3,10 @@ olivernewman@google.com
 per-file             add-update-source,build-push,lib/updates.sh = file: /src/sys/pkg/OWNERS
 # per-file-COMPONENT add-update-source,build-push,lib/updates.sh = Packages
 per-file             push-package,ota,serve,serve-remote,serve-updates,update = file: /src/sys/pkg/OWNERS
-# per-file-COMPONENT push-package,ota,serve,serve-remote,serve-updates,update = Packages
+# per-file-COMPONENT tests/subcommands/fx_remote_test = Packages
+per-file             tests/subcommands/fx_remote_test = file: /src/sys/pkg/OWNERS
+# per-file-COMPONENT tests/subcommands/fx_serve_update_test = Packages
+per-file             tests/subcommands/fx_serve_update_test = file: /src/sys/pkg/OWNERS
 
 per-file             flash,flash-migration,flash-remote                = file: /src/firmware/OWNERS
 # per-file-COMPONENT flash,flash-migration,flash-remote                = Firmware
