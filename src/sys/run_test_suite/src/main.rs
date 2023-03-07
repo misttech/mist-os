@@ -5,10 +5,11 @@
 use {
     argh::FromArgs,
     diagnostics_data::Severity,
+    fidl_fuchsia_diagnostics::LogInterestSelector,
     fidl_fuchsia_test_manager::{LogsIteratorOption, RunBuilderMarker},
 };
 
-#[derive(FromArgs, Default, PartialEq, Eq, Debug)]
+#[derive(FromArgs, Default, PartialEq, Debug)]
 /// Entry point for executing tests.
 struct Args {
     /// test timeout. Exits with -`ZX_ERR_TIMED_OUT` if the test times out.
@@ -55,9 +56,18 @@ struct Args {
     #[argh(option)]
     count: Option<u32>,
 
-    /// when set, only logs with a severity equal to the given one or higher will be printed.
-    #[argh(option)]
-    min_severity_logs: Option<Severity>,
+    /// when set, only logs with a severity equal to the given one or higher will be printed for
+    /// the associated component.
+    ///
+    /// This modifies the minimum log severity level emitted by components during the test
+    /// execution.
+    ///
+    /// Specify using the format <component-selector>#<log-level>, or just <log-level> (in which
+    /// case the severity will apply to all components under the test, including the test component
+    /// itself) with level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
+    /// May be repeated.
+    #[argh(option, from_str_fn(log_interest_selector_or_severity))]
+    min_severity_logs: Vec<LogInterestSelector>,
 
     /// when set, the test will fail if any log with a higher severity is emitted.
     #[argh(option)]
@@ -73,6 +83,10 @@ struct Args {
     #[argh(positional)]
     /// arguments passed to tests following `--`.
     test_args: Vec<String>,
+}
+
+fn log_interest_selector_or_severity(input: &str) -> Result<LogInterestSelector, String> {
+    selectors::parse_log_interest_selector_or_severity(input).map_err(|s| s.to_string())
 }
 
 #[fuchsia::main]

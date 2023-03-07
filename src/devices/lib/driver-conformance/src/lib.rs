@@ -104,7 +104,7 @@ async fn run_tests(
             experimental_parallel_execution: None,
             accumulate_debug_data: false,
             log_protocol: None,
-            min_severity_logs: None,
+            min_severity_logs: vec![],
             show_full_moniker: false,
         },
         run_test_suite_lib::create_reporter(false, reporter_options, writer)?,

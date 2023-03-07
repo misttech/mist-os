@@ -407,7 +407,7 @@ impl LogsArtifactsContainer {
         let mut remove_interest = FidlInterest::EMPTY;
         for selector in interest_selectors {
             if selectors::match_moniker_against_component_selector(
-                &self.identity.relative_moniker,
+                self.identity.relative_moniker.iter(),
                 &selector.selector,
             )
             .unwrap_or_default()
@@ -420,7 +420,7 @@ impl LogsArtifactsContainer {
 
         if let Some(previous_selector) = previous_selectors.iter().find(|s| {
             selectors::match_moniker_against_component_selector(
-                &self.identity.relative_moniker,
+                self.identity.relative_moniker.iter(),
                 &s.selector,
             )
             .unwrap_or_default()
@@ -472,7 +472,7 @@ impl LogsArtifactsContainer {
     pub async fn reset_interest(&self, interest_selectors: &[LogInterestSelector]) {
         for selector in interest_selectors {
             if selectors::match_moniker_against_component_selector(
-                &self.identity.relative_moniker,
+                self.identity.relative_moniker.iter(),
                 &selector.selector,
             )
             .unwrap_or_default()

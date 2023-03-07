@@ -5,6 +5,7 @@
 use argh::FromArgs;
 use diagnostics_data::Severity;
 use ffx_core::ffx_command;
+use fidl_fuchsia_diagnostics::LogInterestSelector;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
@@ -137,12 +138,17 @@ pub struct RunCommand {
     #[argh(switch)]
     pub filter_ansi: bool,
 
-    /// set the minimum log severity printed. Must be one of
-    /// FATAL|ERROR|WARN|INFO|DEBUG|TRACE. This will also instruct all components under the test
-    /// (including the test component itself) to not emit logs with lower severities as long as
-    /// they are components using libraries that support setting log severity at runtime.
-    #[argh(option)]
-    pub min_severity_logs: Option<Severity>,
+    /// set the minimum log severity printed.
+    ///
+    /// This modifies the minimum log severity level emitted by components during the test
+    /// execution.
+    ///
+    /// Specify using the format <component-selector>#<log-level>, or just <log-level> (in which
+    /// case the severity will apply to all components under the test, including the test component
+    /// itself) with level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
+    /// May be repeated.
+    #[argh(option, from_str_fn(log_interest_selector_or_severity))]
+    pub min_severity_logs: Vec<LogInterestSelector>,
 
     /// show the full moniker in unstructured log output.
     #[argh(switch)]
@@ -173,4 +179,8 @@ pub struct ListCommand {
     /// test url
     #[argh(positional)]
     pub test_url: String,
+}
+
+fn log_interest_selector_or_severity(input: &str) -> Result<LogInterestSelector, String> {
+    selectors::parse_log_interest_selector_or_severity(input).map_err(|s| s.to_string())
 }

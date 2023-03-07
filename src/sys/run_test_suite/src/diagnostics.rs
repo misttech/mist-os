@@ -6,6 +6,7 @@ use {
     crate::trace::duration,
     anyhow::Error,
     diagnostics_data::{LogTextDisplayOptions, LogTextPresenter, LogsData, Severity},
+    fidl_fuchsia_diagnostics::LogInterestSelector,
     fidl_fuchsia_test_manager::LogsIteratorOption,
     futures::{Stream, TryStreamExt},
     std::io::Write,
@@ -19,7 +20,7 @@ pub(crate) struct LogDisplayConfiguration {
     pub show_full_moniker: bool,
 
     /// The minimum severity log to display.
-    pub min_severity: Option<Severity>,
+    pub interest: Vec<LogInterestSelector>,
 }
 
 // TODO(fxbug.dev/54198, fxbug.dev/70581): deprecate this when implementing metadata selectors for
@@ -41,9 +42,28 @@ impl LogCollectionOptions {
     }
 
     fn should_display(&self, log: &LogsData) -> bool {
-        let severity = log.metadata.severity;
-        matches!(self.format.min_severity, None)
-            || matches!(self.format.min_severity, Some(min) if severity >= min)
+        if self.format.interest.is_empty() {
+            return true;
+        }
+        let mut found_matching_selector = false;
+        for LogInterestSelector { interest, selector } in &self.format.interest {
+            let Some(min_severity) = interest.min_severity.as_ref() else {
+                    continue;
+            };
+            if selectors::match_moniker_against_component_selector(
+                log.moniker.split('/'),
+                &selector,
+            )
+            // The selector should already be validated so in practice this will never happen.
+            .unwrap_or(false)
+            {
+                found_matching_selector = true;
+                if log.severity() >= *min_severity {
+                    return true;
+                }
+            }
+        }
+        !found_matching_selector
     }
 }
 
@@ -158,7 +178,151 @@ mod test {
                     max_severity: None,
                     format: LogDisplayConfiguration {
                         show_full_moniker: true,
-                        min_severity: Severity::Warn.into(),
+                        interest: vec![
+                            selectors::parse_log_interest_selector_or_severity("WARN").unwrap()
+                        ],
+                    }
+                },
+            )
+            .await
+            .unwrap(),
+            LogCollectionOutcome::Passed
+        );
+        assert_eq!(
+            String::from_utf8(log_artifact).unwrap(),
+            displayed_logs.iter().map(|log| format!("{}\n", log)).collect::<Vec<_>>().concat()
+        );
+    }
+
+    #[fuchsia::test]
+    async fn filter_log_severity_by_component() {
+        let a_info_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "a".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Info,
+        })
+        .set_message("A's info log")
+        .build();
+        let a_warn_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "a".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Warn,
+        })
+        .set_message("A's warn log")
+        .build();
+        let b_info_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "b".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Info,
+        })
+        .set_message("B's info log")
+        .build();
+        let b_warn_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "b".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Warn,
+        })
+        .set_message("B's warn log")
+        .build();
+        let c_info_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "c".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Info,
+        })
+        .set_message("C's info log")
+        .build();
+
+        let input_logs = vec![
+            a_info_log,
+            a_warn_log.clone(),
+            b_info_log,
+            b_warn_log.clone(),
+            c_info_log.clone(),
+        ];
+        let displayed_logs = vec![a_warn_log, b_warn_log, c_info_log];
+
+        let mut log_artifact = vec![];
+        assert_eq!(
+            collect_logs(
+                futures::stream::iter(input_logs.into_iter().map(Ok)),
+                &mut log_artifact,
+                LogCollectionOptions {
+                    max_severity: None,
+                    format: LogDisplayConfiguration {
+                        show_full_moniker: true,
+                        interest: vec![
+                            selectors::parse_log_interest_selector_or_severity("a#WARN").unwrap(),
+                            selectors::parse_log_interest_selector_or_severity("b#WARN").unwrap(),
+                        ],
+                    }
+                },
+            )
+            .await
+            .unwrap(),
+            LogCollectionOutcome::Passed
+        );
+        assert_eq!(
+            String::from_utf8(log_artifact).unwrap(),
+            displayed_logs.iter().map(|log| format!("{}\n", log)).collect::<Vec<_>>().concat()
+        );
+    }
+
+    #[fuchsia::test]
+    async fn filter_log_severity_by_component_multiple_matches() {
+        let a_info_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "a".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Info,
+        })
+        .set_message("A's info log")
+        .build();
+        let a_warn_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "a".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Warn,
+        })
+        .set_message("A's warn log")
+        .build();
+        let b_info_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "b".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Info,
+        })
+        .set_message("B's info log")
+        .build();
+        let b_fatal_log = LogsDataBuilder::new(BuilderArgs {
+            moniker: "b".into(),
+            timestamp_nanos: 0i64.into(),
+            component_url: "test-root-url".to_string().into(),
+            severity: Severity::Fatal,
+        })
+        .set_message("B's fatal log")
+        .build();
+
+        let input_logs = vec![a_info_log, a_warn_log.clone(), b_info_log, b_fatal_log.clone()];
+        let displayed_logs = vec![a_warn_log, b_fatal_log];
+
+        let mut log_artifact = vec![];
+        assert_eq!(
+            collect_logs(
+                futures::stream::iter(input_logs.into_iter().map(Ok)),
+                &mut log_artifact,
+                LogCollectionOptions {
+                    max_severity: None,
+                    format: LogDisplayConfiguration {
+                        show_full_moniker: true,
+                        interest: vec![
+                            selectors::parse_log_interest_selector_or_severity("**#FATAL").unwrap(),
+                            selectors::parse_log_interest_selector_or_severity("a#WARN").unwrap(),
+                        ],
                     }
                 },
             )
@@ -218,10 +382,7 @@ mod test {
                 &mut log_artifact,
                 LogCollectionOptions {
                     max_severity: None,
-                    format: LogDisplayConfiguration {
-                        show_full_moniker: false,
-                        min_severity: None,
-                    }
+                    format: LogDisplayConfiguration { show_full_moniker: false, interest: vec![] }
                 }
             )
             .await
@@ -287,7 +448,7 @@ mod test {
                 &mut log_artifact,
                 LogCollectionOptions {
                     max_severity: None,
-                    format: LogDisplayConfiguration { show_full_moniker: true, min_severity: None }
+                    format: LogDisplayConfiguration { show_full_moniker: true, interest: vec![] }
                 }
             )
             .await
@@ -350,7 +511,7 @@ mod test {
                 &mut log_artifact,
                 LogCollectionOptions {
                     max_severity: Severity::Warn.into(),
-                    format: LogDisplayConfiguration { show_full_moniker: true, min_severity: None }
+                    format: LogDisplayConfiguration { show_full_moniker: true, interest: vec![] }
                 }
             )
             .await

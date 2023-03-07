@@ -388,7 +388,7 @@ void main() {
         rawArgs: ['--min-severity-logs=WARN'],
         fxEnv: FakeFxEnv.shared,
       );
-      expect(testsConfig.flags.minSeverityLogs, 'WARN');
+      expect(testsConfig.flags.minSeverityLogs, ['WARN']);
       expect(testsConfig.runnerTokens[TestType.suite],
           contains('--min-severity-logs'));
       expect(testsConfig.runnerTokens[TestType.suite], contains('WARN'));

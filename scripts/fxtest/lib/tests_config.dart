@@ -23,7 +23,7 @@ class Flags {
   /// The maximum number of tests to run. If 0, all tests will be executed.
   final int limit;
 
-  final String? minSeverityLogs;
+  final List<String>? minSeverityLogs;
   final bool allOutput;
   final bool shouldRebuild;
 
@@ -291,9 +291,11 @@ class TestsConfig {
       v2runnerTokens.add('--run-disabled');
     }
     if (flags.minSeverityLogs != null) {
-      v2runnerTokens
-        ..add('--min-severity-logs')
-        ..add(flags.minSeverityLogs.toString());
+      for (final minSeverity in flags.minSeverityLogs!) {
+        v2runnerTokens
+          ..add('--min-severity-logs')
+          ..add(minSeverity);
+      }
     }
     var ffxOutputDirectory = flags.ffxOutputDirectory;
     if (ffxOutputDirectory != null && !flags.fallbackUseRunTestSuite) {

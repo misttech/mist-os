@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {diagnostics_data::Severity, fidl_fuchsia_test_manager as ftest_manager, test_list::TestTag};
+use {
+    diagnostics_data::Severity, fidl_fuchsia_diagnostics::LogInterestSelector,
+    fidl_fuchsia_test_manager as ftest_manager, test_list::TestTag,
+};
 
 /// Parameters that specify how a single test suite should be executed.
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -57,7 +60,7 @@ pub struct RunParams {
 
     /// If set, specifies the minimum log severity to report. As it is an
     /// option for output, it will likely soon be moved to a reporter.
-    pub min_severity_logs: Option<Severity>,
+    pub min_severity_logs: Vec<LogInterestSelector>,
 
     /// If true, shows the full moniker in logs.
     pub show_full_moniker: bool,

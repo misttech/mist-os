@@ -116,11 +116,13 @@ Note: The -s flag used to be an abbreviation for --simple.''')
       defaultsTo: null,
       help: '''unused. This flag was relevant for components v1 tests and is
 now a no-op. It will soon be removed.''')
-  ..addOption('min-severity-logs',
-      help: '''filter log output to only messages with this for device tests.
-Valid severities: TRACE, DEBUG, INFO, WARN, ERROR, FATAL.  This will also instruct all components
-under the test (including the test component itself) to not emit logs with lower severities as long
-as they are components using libraries that support setting log severity at runtime.''')
+  ..addMultiOption('min-severity-logs',
+      help: '''set the minimum log severity printed.
+This modifies the minimum log severity level emitted by components during the test execution.
+Specify using the format <component-selector>#<log-level>, or just <log-level> (in which case the
+severity will apply to all components under the test, including the test component itself) with
+level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE. May be repeated.
+      ''')
   ..addFlag('exact',
       defaultsTo: false, help: 'do not perform any fuzzy-matching on tests')
   ..addFlag('e2e',

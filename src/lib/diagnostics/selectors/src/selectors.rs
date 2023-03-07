@@ -172,6 +172,23 @@ pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector
     })
 }
 
+/// Parses a log severity selector of the form `component_selector#SEVERITY` or just `SEVERITY`.
+/// For example: `core/foo#DEBUG` or `INFO`.
+pub fn parse_log_interest_selector_or_severity(
+    selector: &str,
+) -> Result<LogInterestSelector, anyhow::Error> {
+    if let Some(min_severity) = parse_severity(selector.to_uppercase().as_ref()) {
+        return Ok(LogInterestSelector {
+            selector: ComponentSelector {
+                moniker_segments: Some(vec![StringSelector::StringPattern("**".into())]),
+                ..ComponentSelector::EMPTY
+            },
+            interest: Interest { min_severity: Some(min_severity), ..Interest::EMPTY },
+        });
+    }
+    parse_log_interest_selector(selector)
+}
+
 fn parse_severity(severity: &str) -> Option<Severity> {
     match severity {
         "TRACE" => Some(Severity::Trace),
@@ -273,16 +290,19 @@ pub fn sanitize_moniker_for_selectors(moniker: &str) -> String {
     moniker.replace(":", "\\:")
 }
 
-pub fn match_moniker_against_component_selector(
-    moniker: &[impl AsRef<str>],
+pub fn match_moniker_against_component_selector<I, S>(
+    mut moniker_segments: I,
     component_selector: &ComponentSelector,
-) -> Result<bool, anyhow::Error> {
+) -> Result<bool, anyhow::Error>
+where
+    I: Iterator<Item = S>,
+    S: AsRef<str>,
+{
     let selector_segments = match &component_selector.moniker_segments {
         Some(ref path_vec) => path_vec,
         None => return Err(format_err!("Component selectors require moniker segments.")),
     };
 
-    let mut moniker_segments = moniker.iter();
     for (i, selector_segment) in selector_segments.iter().enumerate() {
         // If the selector is longer than the moniker, then there's no match.
         let Some(moniker_segment) = moniker_segments.next() else {
@@ -332,7 +352,7 @@ where
     // Unwrap is safe because the validator ensures there is a component selector.
     let component_selector = selector.component_selector.as_ref().unwrap();
 
-    match_moniker_against_component_selector(moniker, component_selector)
+    match_moniker_against_component_selector(moniker.iter(), component_selector)
 }
 
 /// Evaluates a component moniker against a list of selectors, returning
@@ -404,7 +424,7 @@ where
     component_selectors?
         .iter()
         .filter_map(|selector| {
-            match_moniker_against_component_selector(moniker, selector)
+            match_moniker_against_component_selector(moniker.iter(), selector)
                 .map(|is_match| if is_match { Some(*selector) } else { None })
                 .transpose()
         })
@@ -804,7 +824,7 @@ a:b:c
         // Parse the resultant selector, and check that it matches a moniker it is supposed to.
         let parsed = parse_selector::<VerboseError>(&selector_string).unwrap();
         assert!(match_moniker_against_component_selector(
-            &["a"],
+            ["a"].into_iter(),
             parsed.component_selector.as_ref().unwrap()
         )
         .unwrap());
@@ -819,7 +839,9 @@ a:b:c
         .unwrap();
         let component_selector = selector.component_selector.as_ref().unwrap();
         let moniker = vec!["foo".to_string(), "coll:bar".to_string(), "baz".to_string()];
-        assert!(match_moniker_against_component_selector(&moniker, &component_selector).unwrap());
+        assert!(
+            match_moniker_against_component_selector(moniker.iter(), &component_selector).unwrap()
+        );
     }
 
     #[fuchsia::test]
@@ -898,5 +920,36 @@ a:b:c
         assert!(parse_log_interest_selector("anything////#FATAL").is_err());
         assert!(parse_log_interest_selector("core/network").is_err());
         assert!(parse_log_interest_selector("core/network#FAKE").is_err());
+    }
+
+    #[test]
+    fn test_parse_log_interest_or_severity() {
+        for (severity_str, severity) in [
+            ("TRACE", Severity::Trace),
+            ("DEBUG", Severity::Debug),
+            ("INFO", Severity::Info),
+            ("WARN", Severity::Warn),
+            ("ERROR", Severity::Error),
+            ("FATAL", Severity::Fatal),
+        ] {
+            assert_eq!(
+                parse_log_interest_selector_or_severity(severity_str).unwrap(),
+                LogInterestSelector {
+                    selector: parse_component_selector::<VerboseError>("**").unwrap(),
+                    interest: Interest { min_severity: Some(severity), ..Interest::EMPTY }
+                }
+            );
+        }
+
+        assert_eq!(
+            parse_log_interest_selector_or_severity("foo/bar#DEBUG").unwrap(),
+            LogInterestSelector {
+                selector: parse_component_selector::<VerboseError>("foo/bar").unwrap(),
+                interest: Interest { min_severity: Some(Severity::Debug), ..Interest::EMPTY }
+            }
+        );
+
+        assert!(parse_log_interest_selector_or_severity("RANDOM").is_err());
+        assert!(parse_log_interest_selector_or_severity("core/foo#NO#YES").is_err());
     }
 }

@@ -98,7 +98,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
 ) -> Result<()> {
     let experiments = Experiments::from_env().await;
 
-    let min_log_severity = cmd.min_severity_logs;
+    let min_log_severity = cmd.min_severity_logs.clone();
 
     let output_directory = match (cmd.disable_output_directory, &cmd.output_directory) {
         (true, maybe_dir) => {
@@ -360,7 +360,7 @@ mod test {
                     filter_ansi: false,
                     parallel: None,
                     count: None,
-                    min_severity_logs: None,
+                    min_severity_logs: vec![],
                     show_full_moniker_in_logs: false,
                     max_severity_logs: None,
                     output_directory: None,
@@ -390,7 +390,7 @@ mod test {
                     filter_ansi: false,
                     parallel: None,
                     count: Some(10),
-                    min_severity_logs: None,
+                    min_severity_logs: vec![],
                     show_full_moniker_in_logs: false,
                     max_severity_logs: Some(diagnostics_data::Severity::Warn),
                     output_directory: None,
@@ -424,7 +424,7 @@ mod test {
                     parallel: Some(20),
                     count: None,
                     show_full_moniker_in_logs: false,
-                    min_severity_logs: None,
+                    min_severity_logs: vec![],
                     max_severity_logs: None,
                     output_directory: None,
                     disable_output_directory: false,
@@ -455,7 +455,7 @@ mod test {
                     filter_ansi: false,
                     parallel: None,
                     count: None,
-                    min_severity_logs: None,
+                    min_severity_logs: vec![],
                     show_full_moniker_in_logs: false,
                     max_severity_logs: None,
                     output_directory: None,
@@ -530,7 +530,7 @@ mod test {
                 run_disabled: false,
                 filter_ansi: false,
                 parallel: None,
-                min_severity_logs: None,
+                min_severity_logs: vec![],
                 show_full_moniker_in_logs: false,
                 max_severity_logs: Some(diagnostics_data::Severity::Warn),
                 output_directory: None,
@@ -564,7 +564,7 @@ mod test {
                     filter_ansi: false,
                     parallel: None,
                     count: None,
-                    min_severity_logs: None,
+                    min_severity_logs: vec![],
                     show_full_moniker_in_logs: false,
                     max_severity_logs: None,
                     output_directory: None,
@@ -587,7 +587,7 @@ mod test {
                     filter_ansi: false,
                     parallel: None,
                     count: None,
-                    min_severity_logs: None,
+                    min_severity_logs: vec![],
                     show_full_moniker_in_logs: false,
                     max_severity_logs: None,
                     output_directory: None,
@@ -610,7 +610,7 @@ mod test {
                     filter_ansi: false,
                     parallel: None,
                     count: None,
-                    min_severity_logs: None,
+                    min_severity_logs: vec![],
                     show_full_moniker_in_logs: false,
                     max_severity_logs: None,
                     output_directory: None,

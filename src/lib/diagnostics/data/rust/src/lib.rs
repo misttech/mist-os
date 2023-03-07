@@ -403,6 +403,26 @@ impl From<Severity> for FidlSeverity {
     }
 }
 
+impl PartialEq<FidlSeverity> for Severity {
+    fn eq(&self, other: &FidlSeverity) -> bool {
+        match (self, other) {
+            (Severity::Trace, FidlSeverity::Trace)
+            | (Severity::Debug, FidlSeverity::Debug)
+            | (Severity::Info, FidlSeverity::Info)
+            | (Severity::Warn, FidlSeverity::Warn)
+            | (Severity::Error, FidlSeverity::Error)
+            | (Severity::Fatal, FidlSeverity::Fatal) => true,
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd<FidlSeverity> for Severity {
+    fn partial_cmp(&self, other: &FidlSeverity) -> Option<Ordering> {
+        PartialOrd::<Severity>::partial_cmp(self, &Severity::from(*other))
+    }
+}
+
 /// An instance of diagnostics data with typed metadata and an optional nested payload.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Data<D: DiagnosticsData> {

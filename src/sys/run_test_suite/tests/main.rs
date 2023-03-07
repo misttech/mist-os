@@ -74,7 +74,7 @@ fn new_run_params() -> run_test_suite_lib::RunParams {
         experimental_parallel_execution: None,
         accumulate_debug_data: false,
         log_protocol: None,
-        min_severity_logs: None,
+        min_severity_logs: vec![],
         show_full_moniker: true,
     }
 }
@@ -136,10 +136,7 @@ where
 async fn run_test_once(
     reporter: impl 'static + run_test_suite_lib::output::Reporter + Send + Sync,
     test_params: TestParams,
-    min_log_severity: Option<Severity>,
 ) -> Result<Outcome, RunTestSuiteError> {
-    let mut run_options = new_run_params();
-    run_options.min_severity_logs = min_log_severity;
     let run_reporter = run_test_suite_lib::output::RunReporter::new(reporter);
     Ok(run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
@@ -190,7 +187,6 @@ async fn launch_and_test_no_clean_exit(
         new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/no-onfinished-after-test-example.cm",
             ),
-        None,
     )
     .await
     .expect("Running test should not fail");
@@ -570,8 +566,7 @@ async fn launch_and_test_with_filter(
     );
 
     test_params.test_filters = Some(vec!["*Test3".to_string()]);
-    let outcome =
-        run_test_once(reporter, test_params, None).await.expect("Running test should not fail");
+    let outcome = run_test_once(reporter, test_params).await.expect("Running test should not fail");
 
     let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm'
 [RUNNING]	Example.Test3
@@ -613,8 +608,7 @@ async fn launch_and_test_with_multiple_filter(
     );
 
     test_params.test_filters = Some(vec!["*Test3".to_string(), "*Test1".to_string()]);
-    let outcome =
-        run_test_once(reporter, test_params, None).await.expect("Running test should not fail");
+    let outcome = run_test_once(reporter, test_params).await.expect("Running test should not fail");
 
     let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm'
 [RUNNING]	Example.Test1
@@ -656,7 +650,7 @@ async fn launch_with_filter_no_matching_cases() {
     );
 
     test_params.test_filters = Some(vec!["matches-nothing".to_string()]);
-    let outcome = run_test_once(output::NoopReporter, test_params, None).await.unwrap();
+    let outcome = run_test_once(output::NoopReporter, test_params).await.unwrap();
 
     match outcome {
         Outcome::Error { origin } => {
@@ -682,7 +676,6 @@ async fn launch_and_test_empty_test(
         new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/no-test-example.cm",
         ),
-        None,
     )
     .await
     .unwrap();
@@ -714,7 +707,6 @@ async fn launch_and_test_huge_test(
         new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/huge-test-example.cm",
         ),
-        None,
     )
     .await
     .unwrap();
@@ -796,7 +788,6 @@ async fn launch_and_test_disabled_test_exclude_disabled(
             new_test_params(
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/disabled-test-example.cm",
             ),
-            None,
         )
     .await
     .expect("Running test should not fail");
@@ -846,8 +837,7 @@ async fn launch_and_test_disabled_test_include_disabled(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/disabled-test-example.cm",
     );
     test_params.also_run_disabled_tests = true;
-    let outcome =
-        run_test_once(reporter, test_params, None).await.expect("Running test should not fail");
+    let outcome = run_test_once(reporter, test_params).await.expect("Running test should not fail");
 
     let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/disabled-test-example.cm'
 [RUNNING]	Example.Test1
@@ -901,8 +891,7 @@ async fn launch_and_test_failing_test(
             reporter,
             new_test_params(
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/failing-test-example.cm",
-            ),
-            None,
+            )
         )
     .await
     .expect("Running test should not fail");
@@ -997,7 +986,6 @@ async fn launch_and_test_incomplete_test(
             new_test_params(
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/incomplete-test-example.cm",
             ),
-            None,
         )
     .await
     .expect("Running test should not fail");
@@ -1032,7 +1020,6 @@ async fn launch_and_test_invalid_test(
             new_test_params(
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/invalid-test-example.cm",
             ),
-            None,
         )
     .await
     .expect("Running test should not fail");
@@ -1070,7 +1057,6 @@ async fn launch_and_run_echo_test(
         new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_realm.cm",
         ),
-        None,
     )
     .await
     .expect("Running test should not fail");
@@ -1098,8 +1084,7 @@ async fn test_timeout(reporter: TestMuxMuxReporter, output: TestOutputView, _: t
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/long_running_test.cm",
     );
     test_params.timeout_seconds = TIMEOUT_SECONDS;
-    let outcome =
-        run_test_once(reporter, test_params, None).await.expect("Running test should not fail");
+    let outcome = run_test_once(reporter, test_params).await.expect("Running test should not fail");
     assert_eq!(outcome, Outcome::Timedout);
     let expected_output =
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/long_running_test.cm completed with result: TIMED_OUT";
@@ -1199,7 +1184,7 @@ async fn test_continue_on_timeout(test_chunk_size: usize) {
             experimental_parallel_execution: None,
             accumulate_debug_data: false,
             log_protocol: None,
-            min_severity_logs: None,
+            min_severity_logs: vec![],
             show_full_moniker: false,
         },
         reporter,
@@ -1271,8 +1256,8 @@ async fn test_stop_after_n_failures(test_chunk_size: usize) {
                     experimental_parallel_execution: None,
                     accumulate_debug_data: false,
                     log_protocol: None,
-                    min_severity_logs: None,
-            show_full_moniker: false,
+                    min_severity_logs: vec![],
+                    show_full_moniker: false,
                 },
                 reporter, futures::future::pending(),
         )
@@ -1332,8 +1317,7 @@ async fn test_passes_with_large_timeout(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_realm.cm",
     );
     test_params.timeout_seconds = std::num::NonZeroU32::new(600);
-    let outcome =
-        run_test_once(reporter, test_params, None).await.expect("Running test should not fail");
+    let outcome = run_test_once(reporter, test_params).await.expect("Running test should not fail");
 
     let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_realm.cm'
 [RUNNING]	EchoTest
@@ -1358,9 +1342,13 @@ async fn test_logging_component(subcase: &'static str, iterator_option: LogsIter
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm",
             );
             test_params.timeout_seconds = std::num::NonZeroU32::new(600);
-            let mut run_params = new_run_params();
-            run_params.log_protocol = Some(iterator_option);
-            run_params.min_severity_logs = Some(Severity::Debug);
+    let run_params = run_test_suite_lib::RunParams {
+        log_protocol: Some(iterator_option),
+        min_severity_logs: vec![
+            selectors::parse_log_interest_selector_or_severity("DEBUG").unwrap()
+        ],
+        ..new_run_params()
+    };
             let outcome = run_test_suite_lib::run_tests_and_get_outcome(
                 run_test_suite_lib::SingleRunConnector::new(
                     fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
@@ -1427,9 +1415,63 @@ async fn test_logging_component_min_severity(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm",
         );
         test_params.timeout_seconds = std::num::NonZeroU32::new(600);
-        let mut run_params = new_run_params();
-        run_params.log_protocol = Some(iterator_option);
-        run_params.min_severity_logs = Some(Severity::Info);
+        let run_params = run_test_suite_lib::RunParams {
+        log_protocol: Some(iterator_option),
+        min_severity_logs: vec![selectors::parse_log_interest_selector_or_severity(
+            "INFO",
+        )
+        .unwrap()],
+        ..new_run_params()
+    };
+        let outcome = run_test_suite_lib::run_tests_and_get_outcome(
+            run_test_suite_lib::SingleRunConnector::new(
+                fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
+                        .expect("connecting to RunBuilderProxy")
+            ),
+            vec![test_params],
+            run_params,
+            run_test_suite_lib::output::RunReporter::new(reporter),
+            futures::future::pending(),
+        )
+        .await;
+
+        let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm'
+[RUNNING]	log_and_exit
+[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] INFO: my info message\n\
+[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] WARN: my warn message\n\
+[PASSED]	log_and_exit
+
+1 out of 1 tests passed...
+fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm completed with result: PASSED
+";
+        assert_output!(output.lock().as_slice(), expected_output);
+        assert_eq!(outcome, Outcome::Passed);
+    }).await;
+}
+
+#[test_case("batch", LogsIteratorOption::BatchIterator ; "batch")]
+#[test_case("archive", LogsIteratorOption::ArchiveIterator ; "archive")]
+#[fuchsia::test]
+async fn test_per_component_min_severity(
+    subcase: &'static str,
+    iterator_option: LogsIteratorOption,
+) {
+    run_with_reporter(
+        &format!("test_logging_component_{}", subcase),
+        |reporter: TestMuxMuxReporter, output: TestOutputView, _output_dir: tempfile::TempDir| async move {
+
+        let mut test_params = new_test_params(
+            "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm",
+        );
+        test_params.timeout_seconds = std::num::NonZeroU32::new(600);
+        let run_params = run_test_suite_lib::RunParams {
+        log_protocol: Some(iterator_option),
+        min_severity_logs: vec![selectors::parse_log_interest_selector_or_severity(
+            "<root>#INFO",
+        )
+        .unwrap()],
+        ..new_run_params()
+    };
         let outcome = run_test_suite_lib::run_tests_and_get_outcome(
             run_test_suite_lib::SingleRunConnector::new(
                 fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
@@ -1467,9 +1509,7 @@ async fn test_stdout_and_log_ansi(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/stdout_ansi_test.cm",
     );
     test_params.timeout_seconds = std::num::NonZeroU32::new(600);
-    let outcome = run_test_once(reporter, test_params, Some(Severity::Info))
-        .await
-        .expect("Running test should not fail");
+    let outcome = run_test_once(reporter, test_params).await.expect("Running test should not fail");
 
     let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/stdout_ansi_test.cm'
 [RUNNING]	log_ansi_test
@@ -1498,8 +1538,10 @@ async fn test_stdout_and_log_filter_ansi(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/stdout_ansi_test.cm",
     );
     test_params.timeout_seconds = std::num::NonZeroU32::new(600);
-    let mut run_params = new_run_params();
-    run_params.min_severity_logs = Some(Severity::Info);
+    let run_params = run_test_suite_lib::RunParams {
+        min_severity_logs: vec![selectors::parse_log_interest_selector_or_severity("INFO").unwrap()],
+        ..new_run_params()
+    };
 
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
@@ -1623,8 +1665,7 @@ async fn test_does_not_resolve() {
     let test_params = new_test_params(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/nonexistant_test.cm",
     );
-    let log_opts = None;
-    let outcome = run_test_once(output::NoopReporter, test_params, log_opts).await.unwrap();
+    let outcome = run_test_once(output::NoopReporter, test_params).await.unwrap();
     let origin_error = match outcome {
         Outcome::Error { origin } => origin,
         other => panic!("Expected an error outcome but got {:?}", other),
