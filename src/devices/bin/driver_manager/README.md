@@ -16,3 +16,14 @@ If you're looking for running an isolated Driver Manager for testing, please see
 The behavior of Driver Manager can also be changed by several kernel commandline options.
 Please look at the list of [kernel commandline options](/docs/reference/kernel/kernel_cmdline.md)
 and look for the options that start with `devmgr.*`
+
+## Package Sources
+
+Driver Manager has two sources of drivers identified by `fuchsia-pkg://` URLs:
+  1. the base resolver
+  2. the full resolver, if ephemeral drivers are enabled
+
+Both the base resolver and full resolver provide package directories using the
+`fuchsia.pkg/PackageResolver` FIDL interface. To disambiguate these sources, Driver Manager
+consumes the base resolver capability as `fuchsia.pkg/PackageResolver-base` and the full resolver
+capability as `fuchsia.pkg/PackageResolver-full`.

@@ -15,10 +15,12 @@
 
 // Get the package relative path after the `#` character.
 zx::result<std::string> GetResourcePath(std::string_view url);
-// Get the path to the base directory of a package.
+
+// Get the path in the namespace to the base directory of a package for
+// fuchsia-boot:// and relative package URLs.
 zx::result<std::string> GetBasePathFromUrl(const std::string& url);
 
-// Get the full path to a file within a package.
+// Get the path in the namespace to a file within a package.
 // E.g: fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so
 //      will return the full path to the my-driver.so file.
 zx::result<std::string> GetPathFromUrl(const std::string& url);

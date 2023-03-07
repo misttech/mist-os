@@ -114,6 +114,7 @@ zx::result<zx::vmo> DriverToVmo(const Driver& driver) {
   zx_rights_t rights =
       ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_EXECUTE | ZX_RIGHT_MAP;
   if (zx_status_t status = driver.dso_vmo.duplicate(rights, &vmo); status != ZX_OK) {
+    LOGF(ERROR, "Failed to duplicate driver vmo %s", zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok(std::move(vmo));
@@ -178,6 +179,8 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
   fidl::Arena arena;
   zx::result vmo_result = LibnameToVmo(dev->coordinator->driver_loader(), dev->libname());
   if (vmo_result.is_error()) {
+    LOGF(ERROR, "Failed to get VMO for libname '%s' %s", dev->libname().c_str(),
+         vmo_result.status_string());
     return vmo_result.error_value();
   }
   zx::vmo vmo = std::move(vmo_result.value());

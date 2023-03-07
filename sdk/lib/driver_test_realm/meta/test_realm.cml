@@ -128,22 +128,15 @@
             to: [ "#driver_manager" ],
         },
         {
-            protocol: [ "fuchsia.pkg.PackageResolver" ],
+            protocol: [
+                "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.PackageResolver-full",
+            ],
             from: "parent",
             to: [
                 "#driver-index",
                 "#driver_manager",
             ],
-        },
-        {
-            directory: "pkgfs",
-            from: "parent",
-            to: [ "#driver_manager" ],
-        },
-        {
-            directory: "pkgfs-packages",
-            from: "parent",
-            to: [ "#driver-index" ],
         },
         {
             directory: "boot",

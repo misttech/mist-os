@@ -62,14 +62,12 @@
             to: "#driver-index",
         },
         {
-            directory: "pkgfs-packages",
+            protocol: "fuchsia.pkg.PackageResolver-base",
             from: "parent",
-            to: [ "#driver-index" ],
-        },
-        {
-            directory: "pkgfs",
-            from: "parent",
-            to: [ "#driver-manager" ],
+            to: [
+                "#driver-index",
+                "#driver-manager",
+            ],
         },
         {
             directory: "system",

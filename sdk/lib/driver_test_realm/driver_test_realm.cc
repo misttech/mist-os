@@ -211,7 +211,68 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
   }
 };
 
-class FakePackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageResolver> {
+class FakeBasePackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageResolver> {
+ public:
+  FakeBasePackageResolver(fs::SynchronousVfs* vfs) : vfs_(vfs) {}
+
+ private:
+  void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
+    if (request->package_url.get() != "fuchsia-pkg://fuchsia.com/driver-manager-base-config" &&
+        request->package_url.get() != "fuchsia-pkg://fuchsia.com/driver-manager-base-config/0") {
+      FX_SLOG(ERROR, "FakeBasePackageResolver asked to resolve unknown package",
+              KV("url", request->package_url.get()));
+      completer.ReplyError(fuchsia_pkg::wire::ResolveError::kPackageNotFound);
+      return;
+    }
+
+    auto driver_manager_base_config = fbl::MakeRefCounted<fs::PseudoDir>();
+    // Create the driver-manager-base-config package.
+    // It has entry /config/base-driver-manifest.json
+    {
+      auto config = fbl::MakeRefCounted<fs::PseudoDir>();
+      auto base_driver_manifest = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(
+          [](fbl::String* output) {
+            // Return an empty JSON array.
+            *output = fbl::String("[]");
+            return ZX_OK;
+          },
+          [](std::string_view input) { return ZX_ERR_NOT_SUPPORTED; });
+
+      config->AddEntry("base-driver-manifest.json", std::move(base_driver_manifest));
+      driver_manager_base_config->AddEntry("config", std::move(config));
+    }
+
+    if (zx_status_t status =
+            vfs_->Serve(std::move(driver_manager_base_config), request->dir.TakeChannel(),
+                        fs::VnodeConnectionOptions::ReadExec());
+        status != ZX_OK) {
+      FX_SLOG(ERROR, "FakeBasePackageResolver failed to serve driver-manager-base-config",
+              KV("status", status));
+      completer.ReplyError(fuchsia_pkg::wire::ResolveError::kInternal);
+    }
+
+    auto resolution_context = fuchsia_pkg::wire::ResolutionContext({});
+    completer.ReplySuccess(resolution_context);
+  }
+
+  void ResolveWithContext(ResolveWithContextRequestView request,
+                          ResolveWithContextCompleter::Sync& completer) override {
+    FX_SLOG(ERROR, "ResolveWithContext is not yet implemented in FakeBasePackageResolver");
+    completer.ReplyError(fuchsia_pkg::wire::ResolveError::kInternal);
+  }
+
+  void GetHash(GetHashRequestView request, GetHashCompleter::Sync& completer) override {
+    // Even given the same URL, GetHash is not guaranteed to return the hash of the previously
+    // resolved package (e.g. the package repository could have been updated in between calls).
+    // Clients should obtain the package's hash by reading the package's meta entry as a file.
+    FX_SLOG(ERROR, "GetHash is not implemented in FakeBasePackageResolver");
+    completer.ReplyError(ZX_ERR_INTERNAL);
+  }
+
+  fs::SynchronousVfs* vfs_;
+};
+
+class FakeFullPackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageResolver> {
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
     auto status = fdio_open("/pkg",
                             static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
@@ -229,43 +290,16 @@ class FakePackageResolver final : public fidl::WireServer<fuchsia_pkg::PackageRe
 
   void ResolveWithContext(ResolveWithContextRequestView request,
                           ResolveWithContextCompleter::Sync& completer) override {
-    FX_SLOG(ERROR, "ResolveWithContext is not yet implemented in FakePackageResolver");
+    FX_SLOG(ERROR, "ResolveWithContext is not yet implemented in FakeFullPackageResolver");
     completer.ReplyError(fuchsia_pkg::wire::ResolveError::kInternal);
   }
 
   void GetHash(GetHashRequestView request, GetHashCompleter::Sync& completer) override {
-    constexpr size_t kHexadecimalBase = 16;
-    constexpr size_t kNumBytesInMerkleRoot = 32;
-    constexpr size_t kNumBytesInMerkleRootString = 64;
-
-    std::ifstream meta_file("/pkg/meta");
-    if (!meta_file.is_open()) {
-      FX_SLOG(ERROR, "Failed to open \"/pkg/meta\"");
-      completer.ReplyError(ZX_ERR_INTERNAL);
-    }
-    std::stringstream buffer;
-    buffer << meta_file.rdbuf();
-    auto meta_contents = buffer.str();
-    if (meta_contents.length() != kNumBytesInMerkleRootString) {
-      FX_SLOG(ERROR, "Mismatch in \"pkg_meta\" contents bytes",
-              KV("expected", kNumBytesInMerkleRootString), KV("actual", meta_contents.length()));
-      completer.ReplyError(ZX_ERR_INTERNAL);
-    }
-
-    fidl::Array<uint8_t, kNumBytesInMerkleRoot> merkle_root;
-    for (unsigned int i = 0; i < kNumBytesInMerkleRoot; ++i) {
-      auto byte_str = meta_contents.substr(i * 2, 2);
-      uint8_t byte;
-      auto result = std::from_chars(byte_str.data(), byte_str.data() + byte_str.size(), byte,
-                                    kHexadecimalBase);
-      if (result.ec == std::errc::invalid_argument) {
-        FX_SLOG(ERROR, "Failed to convert contents \"/pkg/meta\" into a merkleroot");
-        completer.ReplyError(ZX_ERR_INTERNAL);
-      }
-      merkle_root[i] = byte;
-    }
-
-    completer.ReplySuccess(fuchsia_pkg::wire::BlobId{merkle_root});
+    // Even given the same URL, GetHash is not guaranteed to return the hash of the previously
+    // resolved package (e.g. the package repository could have been updated in between calls).
+    // Clients should obtain the package's hash by reading the package's meta entry as a file.
+    FX_SLOG(ERROR, "GetHash is not implemented in FakeFullPackageResolver");
+    completer.ReplyError(ZX_ERR_INTERNAL);
   }
 };
 
@@ -316,8 +350,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
   zx::result<> Init() {
     // We must connect capabilities up early as not all users wait for Start to complete before
-    // trying to access the capabilities. The lack of synchonrization with simple variants of DTR
-    // in particular cause issues.
+    // trying to access the capabilities. The lack of synchronization with simple variants of DTR
+    // in particular causes issues.
     for (auto& [dir, _, server_end] : directories_) {
       auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
       if (endpoints.is_error()) {
@@ -368,12 +402,6 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     if (result.is_error()) {
       FX_SLOG(ERROR, "Failed to add protocol to outgoing directory",
               KV("protocol", "fuchsia.driver.test/Realm"));
-      return result.take_error();
-    }
-
-    result = InitializeDirectories();
-    if (result.is_error()) {
-      FX_SLOG(ERROR, "Failed to initialize directories", KV("status", result.status_string()));
       return result.take_error();
     }
 
@@ -443,7 +471,14 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     }
 
     result = outgoing_->AddProtocol<fuchsia_pkg::PackageResolver>(
-        std::make_unique<FakePackageResolver>());
+        std::make_unique<FakeBasePackageResolver>(&vfs_), "fuchsia.pkg.PackageResolver-base");
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
+
+    result = outgoing_->AddProtocol<fuchsia_pkg::PackageResolver>(
+        std::make_unique<FakeFullPackageResolver>(), "fuchsia.pkg.PackageResolver-full");
     if (result.is_error()) {
       completer.Reply(result.take_error());
       return;
@@ -571,49 +606,6 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   }
 
  private:
-  zx::result<> InitializeDirectories() {
-    auto pkgfs = fbl::MakeRefCounted<fs::PseudoDir>();
-    // Add the necessary empty base driver manifest.
-    // It's added to /pkgfs/packages/driver-manager-base-config/0/config/base-driver-manifest.json
-    {
-      auto packages = fbl::MakeRefCounted<fs::PseudoDir>();
-      auto driver_manager_base_config = fbl::MakeRefCounted<fs::PseudoDir>();
-      auto zero = fbl::MakeRefCounted<fs::PseudoDir>();
-      auto config = fbl::MakeRefCounted<fs::PseudoDir>();
-      auto base_driver_manifest = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(
-          [](fbl::String* output) {
-            // Return an empty JSON array.
-            *output = fbl::String("[]");
-            return ZX_OK;
-          },
-          [](std::string_view input) { return ZX_ERR_NOT_SUPPORTED; });
-
-      config->AddEntry("base-driver-manifest.json", std::move(base_driver_manifest));
-      zero->AddEntry("config", std::move(config));
-      driver_manager_base_config->AddEntry("0", std::move(zero));
-      packages->AddEntry("driver-manager-base-config", std::move(driver_manager_base_config));
-      pkgfs->AddEntry("packages", std::move(packages));
-    }
-
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-
-    zx_status_t status = vfs_.Serve(std::move(pkgfs), endpoints->server.TakeChannel(),
-                                    fs::VnodeConnectionOptions::ReadExec());
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-
-    zx::result result = outgoing_->AddDirectory(std::move(endpoints->client), "pkgfs");
-    if (result.is_error()) {
-      return result.take_error();
-    }
-
-    return zx::ok();
-  }
-
   bool is_started_ = false;
   component::OutgoingDirectory* outgoing_;
   async_dispatcher_t* dispatcher_;

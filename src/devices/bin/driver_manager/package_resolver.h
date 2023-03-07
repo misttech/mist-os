@@ -48,8 +48,6 @@ class PackageResolver : public PackageResolverInterface {
 
   zx::result<zx::vmo> LoadDriver(const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
                                  const component::FuchsiaPkgUrl& package_url);
-  zx::result<zx::vmo> LoadManifest(const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
-                                   const component::FuchsiaPkgUrl& package_url);
 
   fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args_;
   fidl::WireSyncClient<fuchsia_pkg::PackageResolver> resolver_client_;

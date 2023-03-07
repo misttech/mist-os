@@ -5,59 +5,61 @@
 #include "src/devices/bin/driver_manager/base_package_resolver.h"
 
 #include <fcntl.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/fd.h>
 
 #include "src/devices/bin/driver_manager/manifest_parser.h"
 #include "src/devices/lib/log/log.h"
 #include "src/zircon/lib/zircon/include/zircon/status.h"
 
+namespace fio = fuchsia_io;
+
 namespace internal {
 
 zx::result<std::unique_ptr<Driver>> BasePackageResolver::FetchDriver(
     const std::string& manifest_url) {
-  zx::result url_result = GetPathFromUrl(manifest_url);
-  if (url_result.is_error()) {
-    LOGF(ERROR, "Failed to get path from '%s' %s", manifest_url.c_str(),
-         url_result.status_string());
-    return url_result.take_error();
+  zx::result package_dir_result = GetPackageDir(manifest_url);
+  if (package_dir_result.is_error()) {
+    LOGF(ERROR, "Failed to get package dir for url '%s' %s", manifest_url.c_str(),
+         package_dir_result.status_string());
+    return package_dir_result.take_error();
   }
-  std::string url = std::move(url_result.value());
+  fidl::WireSyncClient<fio::Directory> package_dir = std::move(package_dir_result.value());
 
-  zx::result vmo_result = load_manifest_vmo(url);
-  if (vmo_result.is_error()) {
-    LOGF(ERROR, "Failed to load driver vmo: %s", vmo_result.status_string());
+  zx::result manifest_resource_path_result = GetResourcePath(manifest_url);
+  if (manifest_resource_path_result.is_error()) {
+    LOGF(ERROR, "Failed to get resource path for url: '%s' %s", manifest_url.c_str(),
+         manifest_resource_path_result.status_string());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  zx::vmo manifest_vmo = std::move(vmo_result.value());
+  std::string manifest_resource_path = manifest_resource_path_result.value();
+
+  zx::result manifest_vmo_result = load_manifest_vmo(package_dir, manifest_resource_path);
+  if (manifest_vmo_result.is_error()) {
+    LOGF(ERROR, "Failed to load manifest vmo: %s", manifest_vmo_result.status_string());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
 
   // Parse manifest for driver_url
-  zx::result manifest = ParseComponentManifest(std::move(manifest_vmo));
+  zx::result manifest = ParseComponentManifest(std::move(manifest_vmo_result.value()));
   if (manifest.is_error()) {
     LOGF(ERROR, "Failed to parse manifest: %s", manifest.status_string());
     return manifest.take_error();
   }
 
-  zx::result base_path_result = GetBasePathFromUrl(manifest_url);
-  if (base_path_result.is_error()) {
-    LOGF(ERROR, "Failed to get base path from '%s' %s", manifest_url.c_str(),
-         base_path_result.status_string());
-    return base_path_result.take_error();
-  }
-  std::string base_path = std::move(base_path_result.value());
-
-  zx::result resource_path = GetResourcePath(manifest->driver_url);
-  if (resource_path.is_error()) {
-    LOGF(ERROR, "Failed to get resource path from '%s' %s", manifest->driver_url.c_str(),
-         resource_path.status_string());
-    return resource_path.take_error();
-  }
-
-  url = base_path + "/" + resource_path.value();
-  vmo_result = load_driver_vmo(url);
-  if (vmo_result.is_error()) {
-    LOGF(ERROR, "Failed to load driver vmo: %s", zx_status_get_string(vmo_result.error_value()));
+  zx::result driver_resource_path_result = GetResourcePath(manifest->driver_url);
+  if (driver_resource_path_result.is_error()) {
+    LOGF(ERROR, "Failed to get resource path for url: '%s' %s", manifest->driver_url.c_str(),
+         driver_resource_path_result.status_string());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  zx::vmo driver_vmo = std::move(vmo_result.value());
+  std::string driver_resource_path = driver_resource_path_result.value();
+
+  zx::result driver_vmo_result = load_driver_vmo(package_dir, driver_resource_path);
+  if (driver_vmo_result.status_value()) {
+    return driver_vmo_result.take_error();
+  }
+  zx::vmo driver_vmo = std::move(driver_vmo_result.value());
 
   Driver* driver = nullptr;
   DriverLoadCallback callback = [&driver](Driver* d, const char* version) mutable { driver = d; };
@@ -72,14 +74,105 @@ zx::result<std::unique_ptr<Driver>> BasePackageResolver::FetchDriver(
     return zx::ok(nullptr);
   }
 
+  fbl::unique_fd package_dir_fd;
+  if (zx_status_t status = fdio_fd_create(package_dir.TakeClientEnd().TakeChannel().release(),
+                                          package_dir_fd.reset_and_get_address());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to create package_dir_fd: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  driver->package_dir = std::move(package_dir_fd);
+  return zx::ok(std::unique_ptr<Driver>(driver));
+}
+
+zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::GetPackageDir(
+    const std::string& url) {
+  if (component::FuchsiaPkgUrl::IsFuchsiaPkgScheme(url)) {
+    component::FuchsiaPkgUrl parsed_url;
+    if (!parsed_url.Parse(url)) {
+      LOGF(ERROR, "Failed to parse fuchsia url: %s", url.c_str());
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    return Resolve(parsed_url);
+  }
+
+  zx::result base_path_result = GetBasePathFromUrl(url);
+  if (base_path_result.is_error()) {
+    LOGF(ERROR, "Failed to get base path of url: '%s'", url.c_str());
+    return base_path_result.take_error();
+  }
+  std::string base_path = std::move(base_path_result.value());
+
   int fd;
   if ((fd = open(base_path.c_str(), O_RDONLY, O_DIRECTORY)) < 0) {
-    LOGF(ERROR, "Failed to open package dir: '%s'", base_path_result.value().c_str());
+    LOGF(ERROR, "Failed to open package dir: '%s'", base_path.c_str());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  driver->package_dir = fbl::unique_fd(fd);
 
-  return zx::ok(std::unique_ptr<Driver>(driver));
+  fidl::ClientEnd<fio::Directory> client_end;
+  if (auto status = fdio_fd_transfer(fd, client_end.channel().reset_and_get_address());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to transfer fd from: '%s'", base_path.c_str());
+    return zx::error_result(status);
+  }
+  return zx::ok(fidl::WireSyncClient<fio::Directory>{std::move(client_end)});
+}
+
+zx::result<fidl::WireSyncClient<fio::Directory>> BasePackageResolver::Resolve(
+    const component::FuchsiaPkgUrl& package_url) {
+  if (!resolver_client_.is_valid()) {
+    if (zx_status_t status = ConnectToResolverService(); status != ZX_OK) {
+      LOGF(ERROR, "Failed to connect to base package resolver service %s",
+           zx_status_get_string(status));
+      return zx::error(status);
+    }
+  }
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+
+  // TODO(fxbug.dev/123042) This is synchronous for now so we can get the proof of concept working.
+  // Eventually we will want to do this asynchronously.
+  auto result = resolver_client_->Resolve(
+      fidl::StringView(fidl::StringView::FromExternal(package_url.package_path())),
+      std::move(endpoints->server));
+  if (!result.ok() || result->is_error()) {
+    LOGF(ERROR, "Failed to resolve base package");
+    if (!result.ok()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    } else {
+      switch (result->error_value()) {
+        case fuchsia_pkg::wire::ResolveError::kIo:
+          return zx::error(ZX_ERR_IO);
+        case fuchsia_pkg::wire::ResolveError::kAccessDenied:
+          return zx::error(ZX_ERR_ACCESS_DENIED);
+        case fuchsia_pkg::wire::ResolveError::kRepoNotFound:
+          return zx::error(ZX_ERR_NOT_FOUND);
+        case fuchsia_pkg::wire::ResolveError::kPackageNotFound:
+          return zx::error(ZX_ERR_NOT_FOUND);
+        case fuchsia_pkg::wire::ResolveError::kUnavailableBlob:
+          return zx::error(ZX_ERR_UNAVAILABLE);
+        case fuchsia_pkg::wire::ResolveError::kInvalidUrl:
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        case fuchsia_pkg::wire::ResolveError::kNoSpace:
+          return zx::error(ZX_ERR_NO_SPACE);
+        default:
+          return zx::error(ZX_ERR_INTERNAL);
+      }
+    }
+  }
+  return zx::ok(fidl::WireSyncClient(std::move(endpoints->client)));
+}
+
+zx_status_t BasePackageResolver::ConnectToResolverService() {
+  auto client_end =
+      component::Connect<fuchsia_pkg::PackageResolver>("/svc/fuchsia.pkg.PackageResolver-base");
+  if (client_end.is_error()) {
+    return client_end.error_value();
+  }
+  resolver_client_ = fidl::WireSyncClient(std::move(*client_end));
+  return ZX_OK;
 }
 
 }  // namespace internal

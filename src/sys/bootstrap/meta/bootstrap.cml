@@ -116,7 +116,7 @@
         },
 
         // TODO(fxb/98535): Remove need for separate full_resolver component here.
-        // Full resolver clone to be used by the universe-pkg-drivers collection
+        // Full resolver clone to be used by the full-pkg-drivers collection
         {
             name: "full_resolver",
             url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
@@ -149,8 +149,8 @@
             allow_long_names: true,
         },
         {
-            name: "universe-pkg-drivers",
-            environment: "#universe-pkg-driver-env",
+            name: "full-pkg-drivers",
+            environment: "#full-pkg-driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
             allow_long_names: true,
@@ -183,11 +183,11 @@
                 "#driver-hosts",
                 "#driver_manager",
                 "#fshost",
+                "#full-pkg-drivers",
                 "#netsvc",
                 "#pkg-cache",
                 "#pkg-drivers",
                 "#power_manager",
-                "#universe-pkg-drivers",
                 "#virtual_console",
             ],
             availability: "optional",
@@ -284,14 +284,27 @@
             to: "#console-launcher",
         },
         {
-            protocol: [
-                // This is only used when the #driver-index |enable_ephemeral_drivers| config
-                // is set, which enables loading drivers ephemerally. This is intended for
-                // eng builds only and is set through product assembly.
-                "fuchsia.pkg.PackageResolver",
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "#base_resolver",
+            as: "fuchsia.pkg.PackageResolver-base",
+            to: [
+                "#driver_index",
+                "#driver_manager",
             ],
+
+            // base_resolver depends on fshost for blobfs and fshost depends transitively on
+            // driver_index and driver_manager, but driver_index and driver_manager don't need base
+            // packages to provide fshost's (transitive) dependencies.
+            dependency: "weak",
+        },
+        {
+            // This is only used when the #driver_index |enable_ephemeral_drivers| config
+            // is set, which enables loading drivers ephemerally. This is intended for
+            // eng builds only and is set through product assembly.
+            protocol: "fuchsia.pkg.PackageResolver",
             from: "parent",
-            to: [ "#driver_index" ],
+            as: "fuchsia.pkg.PackageResolver-full",
+            to: "#driver_index",
         },
         {
             directory: "boot",
@@ -339,14 +352,15 @@
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.PowerResource",
                 "fuchsia.kernel.RootJob",
-
-                // This is only used when the kernel commandline flag devmgr.enable-ephemeral
-                // is set, which enables loading drivers ephemerally. This is intended for
-                // eng builds only.
-                "fuchsia.pkg.PackageResolver",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
+            to: "#driver_manager",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "parent",
+            as: "fuchsia.pkg.PackageResolver-full",
             to: "#driver_manager",
         },
         {
@@ -396,8 +410,8 @@
             from: "parent",
             to: [
                 "#boot-drivers",
+                "#full-pkg-drivers",
                 "#pkg-drivers",
-                "#universe-pkg-drivers",
             ],
         },
         {
@@ -497,8 +511,8 @@
             from: "#svchost",
             to: [
                 "#fshost",
+                "#full-pkg-drivers",
                 "#pkg-drivers",
-                "#universe-pkg-drivers",
             ],
         },
         {
@@ -550,8 +564,8 @@
             from: "#driver_manager",
             to: [
                 "#boot-drivers",
+                "#full-pkg-drivers",
                 "#pkg-drivers",
-                "#universe-pkg-drivers",
             ],
         },
         {
@@ -604,8 +618,8 @@
             protocol: [ "fuchsia.sysmem.Allocator" ],
             from: "#svchost",
             to: [
+                "#full-pkg-drivers",
                 "#pkg-drivers",
-                "#universe-pkg-drivers",
             ],
         },
         {
@@ -875,6 +889,7 @@
                 "#driver_manager",
                 "#flashmap",
                 "#fshost",
+                "#full-pkg-drivers",
                 "#live_usb",
                 "#miscsvc",
                 "#netsvc",
@@ -885,7 +900,6 @@
                 "#shutdown_shim",
                 "#svchost",
                 "#sysinfo",
-                "#universe-pkg-drivers",
                 "#vboot-fwparam",
                 "#virtual_console",
             ],
@@ -951,12 +965,6 @@
             protocol: [ "fuchsia.fshost.BlockWatcher" ],
             from: "#fshost",
             to: "#live_usb",
-        },
-        {
-            directory: "pkgfs",
-            from: "#pkg-cache",
-            to: "#driver_manager",
-            dependency: "weak_for_migration",
         },
 
         // -- Archivist offers below here --
@@ -1054,12 +1062,6 @@
             from: "parent",
             to: "#pkg-cache",
             dependency: "weak",
-        },
-        {
-            directory: "pkgfs-packages",
-            from: "#pkg-cache",
-            to: "#driver_index",
-            dependency: "weak_for_migration",
         },
 
         // Full resolver dependencies
@@ -1308,7 +1310,7 @@
             __stop_timeout_ms: 1000,
         },
         {
-            name: "universe-pkg-driver-env",
+            name: "full-pkg-driver-env",
             extends: "none",
             runners: [
                 {

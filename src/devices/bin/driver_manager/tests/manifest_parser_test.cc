@@ -4,9 +4,33 @@
 
 #include "src/devices/bin/driver_manager/manifest_parser.h"
 
+#include <fcntl.h>
+#include <lib/fdio/fd.h>
+
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bin/driver_manager/driver.h"
+
+namespace {
+
+zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> GetCurrentPackageDirectory() {
+  int fd;
+  if ((fd = open("/pkg", O_RDONLY, O_DIRECTORY)) < 0) {
+    LOGF(ERROR, "Failed to open /pkg");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> client_end;
+  if (zx_status_t status = fdio_fd_transfer(fd, client_end.channel().reset_and_get_address());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to transfer fd from /pkg");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  return zx::ok(fidl::WireSyncClient<fuchsia_io::Directory>{std::move(client_end)});
+}
+
+}  // namespace
 
 TEST(ManifestParserTest, FuchsiaUrlToPath) {
   auto result = GetPathFromUrl("fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so");
@@ -20,12 +44,6 @@ TEST(ManifestParserTest, BootUrlToPath) {
   ASSERT_EQ(result.value(), "/boot/driver/my-driver.so");
 }
 
-TEST(ManifestParserTest, FuchsiaUrlToBasePath) {
-  auto result = GetBasePathFromUrl("fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so");
-  ASSERT_EQ(result.status_value(), ZX_OK);
-  ASSERT_EQ(result.value(), "/pkgfs/packages/my-package/0");
-}
-
 TEST(ManifestParserTest, BootUrlToBasePath) {
   auto result = GetBasePathFromUrl("fuchsia-boot:///#driver/my-driver.so");
   ASSERT_EQ(result.status_value(), ZX_OK);
@@ -33,8 +51,11 @@ TEST(ManifestParserTest, BootUrlToBasePath) {
 }
 
 TEST(ManifestParserTest, ParseComponentManifest) {
-  constexpr const char kDriverManifestPath[] = "/pkg/meta/manifest-test.cm";
-  zx::result manifest_vmo = load_manifest_vmo(kDriverManifestPath);
+  constexpr const char kDriverManifestPath[] = "meta/manifest-test.cm";
+  zx::result pkg_dir_result = GetCurrentPackageDirectory();
+  ASSERT_OK(pkg_dir_result.status_value());
+
+  zx::result manifest_vmo = load_manifest_vmo(pkg_dir_result.value(), kDriverManifestPath);
   ASSERT_OK(manifest_vmo.status_value());
 
   zx::result manifest = ParseComponentManifest(std::move(manifest_vmo.value()));
@@ -53,8 +74,11 @@ TEST(ManifestParserTest, ParseComponentManifest_InvalidVmo) {
 }
 
 TEST(ManifestParserTest, ParseComponentManifest_MissingDriver) {
-  constexpr const char kDriverManifestPath[] = "/pkg/meta/manifest-missing-driver.cm";
-  zx::result manifest_vmo = load_manifest_vmo(kDriverManifestPath);
+  constexpr const char kDriverManifestPath[] = "meta/manifest-missing-driver.cm";
+  zx::result pkg_dir_result = GetCurrentPackageDirectory();
+  ASSERT_OK(pkg_dir_result.status_value());
+
+  zx::result manifest_vmo = load_manifest_vmo(pkg_dir_result.value(), kDriverManifestPath);
   ASSERT_OK(manifest_vmo.status_value());
 
   zx::result manifest = ParseComponentManifest(std::move(manifest_vmo.value()));
@@ -62,8 +86,11 @@ TEST(ManifestParserTest, ParseComponentManifest_MissingDriver) {
 }
 
 TEST(ManifestParserTest, ParseComponentManifest_NoServices) {
-  constexpr const char kDriverManifestPath[] = "/pkg/meta/manifest-no-services.cm";
-  zx::result manifest_vmo = load_manifest_vmo(kDriverManifestPath);
+  constexpr const char kDriverManifestPath[] = "meta/manifest-no-services.cm";
+  zx::result pkg_dir_result = GetCurrentPackageDirectory();
+  ASSERT_OK(pkg_dir_result.status_value());
+
+  zx::result manifest_vmo = load_manifest_vmo(pkg_dir_result.value(), kDriverManifestPath);
   ASSERT_OK(manifest_vmo.status_value());
 
   zx::result manifest = ParseComponentManifest(std::move(manifest_vmo.value()));

@@ -418,6 +418,18 @@
                 ],
             },
             {
+                // We restrict access to PackageResolver because it gives direct access to
+                // executable package handles.
+                source_moniker: "/bootstrap/base_resolver",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageResolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap/driver_index",
+                    "/bootstrap/driver_manager",
+                ],
+            },
+            {
                 // We restrict access to PackageCache because it gives direct access to package
                 // handles which provide executability which bypass VX security policy.
                 source_moniker: "/bootstrap/pkg-cache",
@@ -494,7 +506,6 @@
                 capability: "directory",
                 target_monikers: [
                     "/bootstrap/console-launcher",
-                    "/bootstrap/driver_manager",
                     "/core",
                     "/core/appmgr",
                     "/core/sshd-host",
@@ -518,10 +529,7 @@
                 source: "component",
                 source_name: "pkgfs-packages",
                 capability: "directory",
-                target_monikers: [
-                    "/bootstrap/base_resolver",
-                    "/bootstrap/driver_index",
-                ],
+                target_monikers: [],
             },
             {
                 // We restrict access to pkgfs-versions because it gives direct access to
@@ -729,6 +737,7 @@
                     "/core/sl4f",
                     "/core/sshd-host",
                     "/core/termina-guest-manager",
+
                     // TODO(fxbug.dev/121700): Is Chromium still using this?
                     "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",

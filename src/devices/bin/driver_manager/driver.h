@@ -76,7 +76,9 @@ using DriverLoadCallback = fit::function<void(Driver* driver, const char* versio
 zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                         std::string_view libname, zx::vmo driver_vmo,
                         const std::vector<std::string>& service_uses, DriverLoadCallback func);
-zx::result<zx::vmo> load_driver_vmo(std::string_view libname);
-zx::result<zx::vmo> load_manifest_vmo(std::string_view path);
+zx::result<zx::vmo> load_manifest_vmo(
+    const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir, std::string_view resource_path);
+zx::result<zx::vmo> load_driver_vmo(const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
+                                    const std::string& resource_path);
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DRIVER_H_

@@ -31,7 +31,6 @@ use {
 
 mod composite_node_spec_manager;
 mod match_common;
-mod package_resolver;
 mod resolved_driver;
 
 #[derive(Deserialize)]
@@ -507,7 +506,7 @@ async fn run_driver_development_server(
 async fn run_driver_registrar_server(
     indexer: Rc<Indexer>,
     stream: fdr::DriverRegistrarRequestStream,
-    universe_resolver: &Option<fidl_fuchsia_pkg::PackageResolverProxy>,
+    full_resolver: &Option<fidl_fuchsia_pkg::PackageResolverProxy>,
 ) -> Result<(), anyhow::Error> {
     stream
         .map(|result| result.context("failed request"))
@@ -515,7 +514,7 @@ async fn run_driver_registrar_server(
             let indexer = indexer.clone();
             match request {
                 fdr::DriverRegistrarRequest::Register { package_url, responder } => {
-                    match universe_resolver {
+                    match full_resolver {
                         None => {
                             responder
                                 .send(&mut Err(Status::PROTOCOL_NOT_SUPPORTED.into_raw()))
@@ -651,17 +650,15 @@ async fn main() -> Result<(), anyhow::Error> {
     service_fs.dir("svc").add_fidl_service(IncomingRequest::DriverRegistrarProtocol);
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
 
-    let (pkgfs_resolver, pkgfs_resolver_stream) =
-        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
-            .unwrap();
-
     let config = Config::take_from_startup_handle();
 
-    let universe_resolver = if config.enable_ephemeral_drivers {
-        let package_resolver_client =
-            client::connect_to_protocol::<fidl_fuchsia_pkg::PackageResolverMarker>()
-                .context("Failed to connect to universe package resolver")?;
-        Some(package_resolver_client)
+    let full_resolver = if config.enable_ephemeral_drivers {
+        Some(
+            client::connect_to_protocol_at_path::<fidl_fuchsia_pkg::PackageResolverMarker>(
+                "/svc/fuchsia.pkg.PackageResolver-full",
+            )
+            .context("Failed to connect to full package resolver")?,
+        )
     } else {
         None
     };
@@ -706,16 +703,14 @@ async fn main() -> Result<(), anyhow::Error> {
         BaseRepo::NotResolved(std::vec![]),
         config.delay_fallback_until_base_drivers_indexed,
     ));
-    let (res1, res2, _) = futures::future::join3(
-        async {
-            package_resolver::serve(pkgfs_resolver_stream)
-                .await
-                .context("Error running package resolver")
-                .map_err(log_error)
-        },
+    let (res1, _) = futures::future::join(
         async {
             if should_load_base_drivers {
-                load_base_drivers(index.clone(), &pkgfs_resolver, &eager_drivers, &disabled_drivers)
+                let base_resolver = client::connect_to_protocol_at_path::<
+                    fidl_fuchsia_pkg::PackageResolverMarker,
+                >("/svc/fuchsia.pkg.PackageResolver-base")
+                .context("Failed to connect to base package resolver")?;
+                load_base_drivers(index.clone(), &base_resolver, &eager_drivers, &disabled_drivers)
                     .await
                     .context("Error loading base packages")
                     .map_err(log_error)
@@ -735,8 +730,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             run_driver_development_server(index.clone(), stream).await
                         }
                         IncomingRequest::DriverRegistrarProtocol(stream) => {
-                            run_driver_registrar_server(index.clone(), stream, &universe_resolver)
-                                .await
+                            run_driver_registrar_server(index.clone(), stream, &full_resolver).await
                         }
                     }
                     .unwrap_or_else(|e| log::error!("Error running index_server: {:?}", e))
@@ -747,7 +741,6 @@ async fn main() -> Result<(), anyhow::Error> {
     .await;
 
     res1?;
-    res2?;
 
     Ok(())
 }
@@ -3757,7 +3750,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .unwrap();
 
-        let universe_resolver = Some(resolver);
+        let full_resolver = Some(resolver);
 
         let base_repo = BaseRepo::Resolved(std::vec![]);
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
@@ -3765,7 +3758,7 @@ mod tests {
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         let index_task = run_index_server(index.clone(), stream).fuse();
         let registrar_task =
-            run_driver_registrar_server(index.clone(), registrar_stream, &universe_resolver).fuse();
+            run_driver_registrar_server(index.clone(), registrar_stream, &full_resolver).fuse();
 
         let test_task = async {
             // Short delay since the resolver server is starting up at the same time.
@@ -3845,7 +3838,7 @@ mod tests {
         let (development_proxy, development_stream) =
             fidl::endpoints::create_proxy_and_stream::<fdd::DriverIndexMarker>().unwrap();
 
-        let universe_resolver = Some(resolver);
+        let full_resolver = Some(resolver);
 
         let base_repo = BaseRepo::Resolved(std::vec![]);
         let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
@@ -3854,7 +3847,7 @@ mod tests {
         let development_task =
             run_driver_development_server(index.clone(), development_stream).fuse();
         let registrar_task =
-            run_driver_registrar_server(index.clone(), registrar_stream, &universe_resolver).fuse();
+            run_driver_registrar_server(index.clone(), registrar_stream, &full_resolver).fuse();
         let test_task = async move {
             // We should not find this before registering it.
             let driver_infos =
@@ -3915,7 +3908,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .unwrap();
 
-        let universe_resolver = Some(resolver);
+        let full_resolver = Some(resolver);
 
         let boot_repo = std::vec![];
         let base_repo = BaseRepo::Resolved(vec![ResolvedDriver {
@@ -3934,7 +3927,7 @@ mod tests {
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         let registrar_task =
-            run_driver_registrar_server(index.clone(), registrar_stream, &universe_resolver).fuse();
+            run_driver_registrar_server(index.clone(), registrar_stream, &full_resolver).fuse();
         let test_task = async move {
             // Try to register the driver.
             let mut pkg_url =
@@ -3981,7 +3974,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .unwrap();
 
-        let universe_resolver = Some(resolver);
+        let full_resolver = Some(resolver);
 
         let boot_repo = vec![ResolvedDriver {
             component_url: url::Url::parse(component_manifest_url).unwrap(),
@@ -4000,7 +3993,7 @@ mod tests {
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         let registrar_task =
-            run_driver_registrar_server(index.clone(), registrar_stream, &universe_resolver).fuse();
+            run_driver_registrar_server(index.clone(), registrar_stream, &full_resolver).fuse();
         let test_task = async move {
             // Try to register the driver.
             let mut pkg_url =

@@ -77,24 +77,23 @@ impl ResolvedDriver {
             log::warn!("{}: Failed to resolve package: {:?}", component_url.as_str(), e);
             map_resolve_err_to_zx_status(e)
         })?;
-        let package_hash = resolver
-            .get_hash(&mut fpkg::PackageUrl { url: base_url.into() })
-            .map_err(|e| {
-                log::warn!("Failed to send GetHash request: {}", e);
-                fuchsia_zircon::Status::INTERNAL
-            })
-            .await?
-            .map_err(|e| {
-                log::warn!("GetHash call failed: {}", e);
-                fuchsia_zircon::Status::INTERNAL
-            })?;
-
-        let driver = load_driver(&dir, component_url.clone(), package_type, Some(package_hash))
-            .map_err(|e| {
-                log::warn!("Could not load driver: {}", e);
-                fuchsia_zircon::Status::INTERNAL
-            })
-            .await?;
+        let dir = fuchsia_pkg::PackageDirectory::from_proxy(dir);
+        let package_hash = dir.merkle_root().await.map_err(|e| {
+            log::warn!("Failed to read package directory's hash: {}", e);
+            fuchsia_zircon::Status::INTERNAL
+        })?;
+        let dir = dir.into_proxy();
+        let driver = load_driver(
+            &dir,
+            component_url.clone(),
+            package_type,
+            Some(fpkg::BlobId { merkle_root: package_hash.into() }),
+        )
+        .map_err(|e| {
+            log::warn!("Could not load driver: {}", e);
+            fuchsia_zircon::Status::INTERNAL
+        })
+        .await?;
         return driver.ok_or_else(|| {
             log::warn!("{}: Component was not a driver-component", component_url.as_str());
             fuchsia_zircon::Status::INTERNAL

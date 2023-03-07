@@ -203,12 +203,13 @@ zx::result<zx::vmo> SetVmoName(zx::vmo vmo, const std::string& path) {
   const char* vmo_name = path.c_str();
   size_t last_slash = path.rfind('/');
   if (last_slash != std::string::npos) {
-    vmo_name = &path[last_slash + 1];
+    vmo_name = &vmo_name[last_slash + 1];
   }
 
   if (zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name, strlen(vmo_name));
       status != ZX_OK) {
-    LOGF(ERROR, "Cannot set name on driver VMO to '%s'", path.c_str());
+    LOGF(ERROR, "Cannot set name on driver VMO '%s' to '%s' %s", path.c_str(), vmo_name,
+         zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok(std::move(vmo));
@@ -235,43 +236,68 @@ zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args
   return status;
 }
 
-zx::result<zx::vmo> load_driver_vmo(std::string_view libname_view) {
-  std::string libname(libname_view);
-  fbl::unique_fd fd;
-  constexpr uint32_t file_rights = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
-                                                         fio::wire::OpenFlags::kRightExecutable);
-  if (zx_status_t status = fdio_open_fd(libname.c_str(), file_rights, fd.reset_and_get_address());
-      status != ZX_OK) {
-    LOGF(ERROR, "Cannot open driver '%s': %d", libname.c_str(), status);
-    return zx::error(ZX_ERR_IO);
+zx::result<zx::vmo> load_manifest_vmo(
+    const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
+    std::string_view resource_path) {
+  const fio::wire::OpenFlags kFileRights = fio::wire::OpenFlags::kRightReadable;
+  const fio::wire::VmoFlags kManifestVmoFlags = fio::wire::VmoFlags::kRead;
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  fidl::OneWayStatus file_open_result =
+      package_dir->Open(kFileRights, {} /* mode */, fidl::StringView::FromExternal(resource_path),
+                        fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+  if (!file_open_result.ok()) {
+    LOGF(ERROR, "Failed to open manifest file: %.*s", static_cast<int>(resource_path.size()),
+         resource_path.data());
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
-  zx::vmo vmo;
-  if (zx_status_t status = fdio_get_vmo_exec(fd.get(), vmo.reset_and_get_address());
-      status != ZX_OK) {
-    LOGF(ERROR, "Cannot get driver VMO '%s'", libname.c_str());
-    return zx::error(status);
+  fidl::WireSyncClient file_client{std::move(endpoints->client)};
+  fidl::WireResult file_res = file_client->GetBackingMemory(kManifestVmoFlags);
+  if (!file_res.ok()) {
+    LOGF(ERROR, "Failed to get manifest vmo: %s", file_res.FormatDescription().c_str());
+    return zx::error(ZX_ERR_INTERNAL);
   }
-
-  return SetVmoName(std::move(vmo), libname);
+  if (file_res->is_error()) {
+    LOGF(ERROR, "Failed to get manifest vmo: %s", zx_status_get_string(file_res->error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(std::move(file_res->value()->vmo));
 }
 
-zx::result<zx::vmo> load_manifest_vmo(std::string_view path_view) {
-  std::string path(path_view);
-  fbl::unique_fd fd;
-  constexpr uint32_t file_rights = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable);
-  if (zx_status_t status = fdio_open_fd(path.c_str(), file_rights, fd.reset_and_get_address());
-      status != ZX_OK) {
-    LOGF(ERROR, "Cannot open manifest '%s': %d", path.c_str(), status);
-    return zx::error(ZX_ERR_IO);
+zx::result<zx::vmo> load_driver_vmo(const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir,
+                                    const std::string& resource_path) {
+  const fio::wire::OpenFlags kFileRights =
+      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable;
+  const fio::wire::VmoFlags kDriverVmoFlags = fio::wire::VmoFlags::kRead |
+                                              fio::wire::VmoFlags::kExecute |
+                                              fio::wire::VmoFlags::kPrivateClone;
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  fidl::OneWayStatus file_open_result =
+      package_dir->Open(kFileRights, {} /* mode */, fidl::StringView::FromExternal(resource_path),
+                        fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+  if (!file_open_result.ok()) {
+    LOGF(ERROR, "Failed to open driver file: %.*s", static_cast<int>(resource_path.size()),
+         resource_path.data());
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
-  zx::vmo vmo;
-  if (zx_status_t status = fdio_get_vmo_clone(fd.get(), vmo.reset_and_get_address());
-      status != ZX_OK) {
-    LOGF(ERROR, "Cannot get manifest VMO '%s'", path.c_str());
-    return zx::error(status);
+  fidl::WireSyncClient file_client{std::move(endpoints->client)};
+  fidl::WireResult file_res = file_client->GetBackingMemory(kDriverVmoFlags);
+  if (!file_res.ok()) {
+    LOGF(ERROR, "Failed to get driver vmo: %s", file_res.FormatDescription().c_str());
+    return zx::error(ZX_ERR_INTERNAL);
   }
-
-  return SetVmoName(std::move(vmo), path);
+  if (file_res->is_error()) {
+    LOGF(ERROR, "Failed to get driver vmo: %s", zx_status_get_string(file_res->error_value()));
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return SetVmoName(std::move(file_res->value()->vmo), resource_path);
 }

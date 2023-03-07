@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 {
     include: [
-        "syslog/client.shard.cml",
-        "sys/component/realm_builder.shard.cml",
         "//sdk/lib/driver_test_realm/meta/realm_builder.shard.cml",
+        "sys/component/realm_builder.shard.cml",
+        "syslog/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -48,23 +48,38 @@
                 "fuchsia.boot.Items",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.kernel.RootJob",
-                "fuchsia.pkg.PackageResolver",
+                "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.PackageResolver-full",
             ],
-        },
-        {
-            directory: "pkgfs",
-            rights: [ "rx*" ],
-            path: "/pkgfs",
-        },
-        {
-            directory: "pkgfs-packages",
-            rights: [ "r*" ],
-            path: "/pkgfs/packages",
         },
         {
             directory: "boot",
             rights: [ "rx*" ],
             path: "/boot",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.boot.RootResource" ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.Items",
+                "fuchsia.device.manager.SystemStateTransition",
+                "fuchsia.kernel.RootJob",
+                "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.PackageResolver-full",
+            ],
+            from: "self",
+            to: "#realm_builder",
+        },
+        {
+            directory: "boot",
+            from: "self",
+            to: "#realm_builder",
         },
     ],
     expose: [
@@ -89,39 +104,6 @@
                 "fuchsia.hardware.usb.DeviceWatcher",
             ],
             from: "self",
-        },
-    ],
-    offer: [
-        {
-            protocol: [ "fuchsia.boot.RootResource" ],
-            from: "parent",
-            to: "#realm_builder",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.Arguments",
-                "fuchsia.boot.Items",
-                "fuchsia.device.manager.SystemStateTransition",
-                "fuchsia.kernel.RootJob",
-                "fuchsia.pkg.PackageResolver",
-            ],
-            from: "self",
-            to: "#realm_builder",
-        },
-        {
-            directory: "pkgfs",
-            from: "self",
-            to: "#realm_builder",
-        },
-        {
-            directory: "pkgfs-packages",
-            from: "self",
-            to: "#realm_builder",
-        },
-        {
-            directory: "boot",
-            from: "self",
-            to: "#realm_builder",
         },
     ],
 }

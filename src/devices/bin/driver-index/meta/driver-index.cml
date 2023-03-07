@@ -20,21 +20,18 @@
     ],
     use: [
         {
-            directory: "pkgfs-packages",
-            rights: [ "r*" ],
-            path: "/pkgfs/packages",
-        },
-        {
             directory: "boot",
             rights: [ "r*" ],
             path: "/boot",
         },
         {
             protocol: [
+                "fuchsia.pkg.PackageResolver-base",
+
                 // This is only used when the |enable_ephemeral_drivers| configuration option
                 // is set, which enables loading drivers ephemerally. This is intended for
                 // eng builds only.
-                "fuchsia.pkg.PackageResolver",
+                "fuchsia.pkg.PackageResolver-full",
             ],
         },
     ],
@@ -51,9 +48,11 @@
     config: {
         // Whether or not ephemeral drivers should be allowed to be registered dynamically.
         enable_ephemeral_drivers: { type: "bool" },
+
         // Whether or not fallback drivers should wait until base drivers have been indexed
         // before bound.
         delay_fallback_until_base_drivers_indexed: { type: "bool" },
+
         // Specify drivers to bind 'eagerly'. This turns a driver that normally
         // binds as a fallback driver into a driver that will be bound normally.
         bind_eager: {
@@ -62,8 +61,9 @@
             element: {
                 type: "string",
                 max_size: 100,
-            }
+            },
         },
+
         // Disable specific drivers by URL. These drivers will not be bound or loaded.
         disabled_drivers: {
             type: "vector",
@@ -71,7 +71,7 @@
             element: {
                 type: "string",
                 max_size: 100,
-            }
-        }
+            },
+        },
     },
 }

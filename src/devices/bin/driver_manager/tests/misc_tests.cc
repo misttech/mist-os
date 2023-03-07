@@ -29,7 +29,7 @@
 #include "src/devices/bin/driver_manager/tests/coordinator_test_utils.h"
 #include "src/devices/bin/driver_manager/tests/fake_driver_index.h"
 
-constexpr char kDriverPath[] = "/pkg/driver/mock-device.so";
+constexpr char kDriverPath[] = "driver/mock-device.so";
 constexpr char kDriverUrl[] = "#meta/mock-device.cml";
 
 static CoordinatorConfig NullConfig() { return DefaultConfig(nullptr, nullptr, nullptr); }
@@ -38,7 +38,19 @@ namespace {
 
 zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
                         DriverLoadCallback func) {
-  zx::result vmo_result = load_driver_vmo(kDriverPath);
+  int fd;
+  if ((fd = open("/pkg", O_RDONLY, O_DIRECTORY)) < 0) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> client_end;
+  if (zx_status_t status = fdio_fd_transfer(fd, client_end.channel().reset_and_get_address());
+      status != ZX_OK) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  zx::result vmo_result = load_driver_vmo(
+      fidl::WireSyncClient<fuchsia_io::Directory>{std::move(client_end)}, kDriverPath);
   if (vmo_result.is_error()) {
     return vmo_result.status_value();
   }
