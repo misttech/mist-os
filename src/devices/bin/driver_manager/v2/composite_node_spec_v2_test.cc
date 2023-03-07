@@ -12,11 +12,6 @@ class FakeNodeManager : public dfv2::NodeManager {
   void Bind(dfv2::Node& node, std::shared_ptr<dfv2::BindResultTracker> result_tracker) override {}
 
   zx::result<dfv2::DriverHost*> CreateDriverHost() override { return zx::ok(nullptr); }
-
-  void DestroyDriverComponent(
-      dfv2::Node& node,
-      fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>
-          callback) override {}
 };
 
 class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {};
