@@ -8,10 +8,10 @@
 #define ZIRCON_KERNEL_ARCH_ARM64_HYPERVISOR_EL2_CPU_STATE_PRIV_H_
 
 #include <lib/arch/arm64/system.h>
+#include <lib/id_allocator.h>
 
 #include <arch/aspace.h>
 #include <fbl/array.h>
-#include <hypervisor/id_allocator.h>
 #include <hypervisor/page.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
@@ -59,7 +59,7 @@ class El2CpuState {
   arch::ArmVtcrEl2 vtcr_;
 
   cpu_mask_t cpu_mask_ = 0;
-  hypervisor::IdAllocator<uint16_t, UINT16_MAX> vmid_allocator_;
+  id_allocator::IdAllocator<uint16_t, UINT16_MAX> vmid_allocator_;
 
   El2CpuState() = default;
 

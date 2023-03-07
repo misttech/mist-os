@@ -7,13 +7,13 @@
 #ifndef ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_HYPERVISOR_H_
 #define ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_HYPERVISOR_H_
 
+#include <lib/id_allocator.h>
 #include <zircon/syscalls/hypervisor.h>
 #include <zircon/types.h>
 
 #include <arch/arm64/hypervisor/el2_state.h>
 #include <fbl/ref_ptr.h>
 #include <hypervisor/aspace.h>
-#include <hypervisor/id_allocator.h>
 #include <hypervisor/interrupt_tracker.h>
 #include <hypervisor/page.h>
 #include <hypervisor/trap_map.h>
@@ -61,7 +61,7 @@ class Guest {
   uint16_t vmid_;
   hypervisor::GuestPhysicalAspace gpa_;
   hypervisor::TrapMap traps_;
-  hypervisor::IdAllocator<uint16_t, kMaxGuestVcpus> vpid_allocator_;
+  id_allocator::IdAllocator<uint16_t, kMaxGuestVcpus> vpid_allocator_;
 
   explicit Guest(uint16_t vmid);
 };

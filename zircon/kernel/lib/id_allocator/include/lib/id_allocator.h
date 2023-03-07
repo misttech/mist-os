@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_HYPERVISOR_INCLUDE_HYPERVISOR_ID_ALLOCATOR_H_
-#define ZIRCON_KERNEL_HYPERVISOR_INCLUDE_HYPERVISOR_ID_ALLOCATOR_H_
+#ifndef ZIRCON_KERNEL_LIB_ID_ALLOCATOR_INCLUDE_LIB_ID_ALLOCATOR_H_
+#define ZIRCON_KERNEL_LIB_ID_ALLOCATOR_INCLUDE_LIB_ID_ALLOCATOR_H_
 
 #include <lib/zx/result.h>
 
@@ -14,7 +14,7 @@
 #include <kernel/mutex.h>
 #include <ktl/type_traits.h>
 
-namespace hypervisor {
+namespace id_allocator {
 
 // Allocates architecture-specific resource IDs.
 //
@@ -92,6 +92,6 @@ class IdAllocator {
   bitmap::RawBitmapGeneric<bitmap::FixedStorage<MaxId>> bitmap_ TA_GUARDED(mutex_);
 };
 
-}  // namespace hypervisor
+}  // namespace id_allocator
 
-#endif  // ZIRCON_KERNEL_HYPERVISOR_INCLUDE_HYPERVISOR_ID_ALLOCATOR_H_
+#endif  // ZIRCON_KERNEL_LIB_ID_ALLOCATOR_INCLUDE_LIB_ID_ALLOCATOR_H_
