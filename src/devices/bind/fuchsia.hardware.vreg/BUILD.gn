@@ -4,6 +4,6 @@
 
 import("//build/bind/bind.gni")
 
-bind_library("fuchsia.vreg") {
-  source = "fuchsia.vreg.bind"
+bind_library("fuchsia.hardware.vreg") {
+  source = "fuchsia.hardware.vreg.bind"
 }
