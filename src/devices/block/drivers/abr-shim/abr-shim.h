@@ -45,7 +45,7 @@ class AbrShim : public AbrShimType,
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
 
   void BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_size);
-  void BlockImplQueue(block_op_t* txn, block_queue_callback callback, void* cookie);
+  void BlockImplQueue(block_op_t* txn, block_impl_queue_callback callback, void* cookie);
 
   zx_status_t BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_guid);
   zx_status_t BlockPartitionGetName(char* out_name, size_t name_capacity);

@@ -27,7 +27,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
     *out_block_op_size = sizeof(block_op_t);
   }
 
-  void BlockImplQueue(block_op_t* txn, block_queue_callback callback, void* cookie) {
+  void BlockImplQueue(block_op_t* txn, block_impl_queue_callback callback, void* cookie) {
     zx_status_t status = ZX_ERR_NOT_SUPPORTED;
     switch (txn->command) {
       case BLOCK_OP_READ: {

@@ -118,7 +118,7 @@ void AbrShim::BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_size
   block_impl_client_.Query(out_info, out_block_op_size);
 }
 
-void AbrShim::BlockImplQueue(block_op_t* txn, block_queue_callback callback, void* cookie) {
+void AbrShim::BlockImplQueue(block_op_t* txn, block_impl_queue_callback callback, void* cookie) {
   {
     fbl::AutoLock lock(&io_lock_);
     if (!rebooting_to_recovery_) {
