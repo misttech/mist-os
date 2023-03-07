@@ -303,7 +303,9 @@ class ServerTest : private ::loop_fixture::RealLoop, public ::testing::Test {
 
     // Ensure the process hasn't crashed unexpectedly.
     auto result = runner_->CheckAlive();
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    ASSERT_TRUE(result.is_ok()) << "CheckAlive failed! The server_suite runner may have crashed "
+                                   "due to a bug in the binding under test. More details: "
+                                << result.error_value();
   }
 
   const TargetReporter<TARGET_TYPE>& reporter() { return reporter_; }
