@@ -122,3 +122,21 @@ constexpr auto append(std::index_sequence<Ints...> seq) {
 TEST(PthreadGetSetNameTest, SetNameManySizes) {
   runTests(append<10000>(std::make_index_sequence<ZX_MAX_NAME_LEN + 5>{}));
 }
+
+extern "C" zx_handle_t thrd_get_zx_handle(thrd_t);
+
+TEST(PthreadGetSetNameTest, InvalidHandle) {
+  thrd_t thrd;
+  int (*fn)(void *) = +[](void *) {
+    zx_thread_exit();
+    return 0;
+  };
+  EXPECT_EQ(thrd_create(&thrd, fn, nullptr), thrd_success);
+
+  zx_object_wait_one(thrd_get_zx_handle(thrd), ZX_THREAD_SUSPENDED | ZX_THREAD_TERMINATED,
+                     ZX_TIME_INFINITE, nullptr);
+
+  EXPECT_EQ(pthread_setname_np(thrd, ""), ESRCH);
+
+  // We can't join the thread because it called zx_thread_exit, so the threads data will leak here.
+}
