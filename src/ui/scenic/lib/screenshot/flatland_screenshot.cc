@@ -227,8 +227,13 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
   uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
   uint32_t valid_bytes_per_row = display_size_.width * kBytesPerPixel;
 
+  // SL4Fs requires vmo to be readable for transfer, so we need to copy into a new one.
+  std::vector<uint8_t> buf(4, 0);
+  const bool vmo_is_readable =
+      (buffer_collection_info_.buffers[kBufferIndex].vmo.read(buf.data(), 0, 1) == ZX_OK);
+
   zx::vmo response_vmo;
-  if (bytes_per_row == valid_bytes_per_row) {
+  if (vmo_is_readable && bytes_per_row == valid_bytes_per_row) {
     zx_status_t status = buffer_collection_info_.buffers[kBufferIndex].vmo.duplicate(
         ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER | ZX_RIGHT_GET_PROPERTY, &response_vmo);
     FX_DCHECK(status == ZX_OK);
