@@ -1163,11 +1163,6 @@
                 // truncate_test
                 "FixtureTruncateTest.Truncate",
                 "FixtureTruncateTest.Ftruncate",
-                "TruncateTest.TruncateDir",
-                "TruncateTest.FtruncateNonWriteable",
-                "TruncateTest.FtruncateWithoutWritePermission",
-                "TruncateTest.FtruncateVirtualTmp",
-                "TruncateTest.FtruncateWithOpath",
 
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",

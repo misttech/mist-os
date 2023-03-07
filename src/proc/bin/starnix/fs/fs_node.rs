@@ -703,7 +703,39 @@ impl FsNode {
     }
 
     pub fn truncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
+        if self.is_dir() {
+            return error!(EISDIR);
+        }
+
         self.check_access(current_task, Access::WRITE)?;
+        self.ops().truncate(self, length)
+    }
+
+    /// Avoid calling this method directly. You probably want to call `FileObject::ftruncate()`
+    /// which will also perform all file-descriptor based verifications.
+    pub fn ftruncate(&self, length: u64) -> Result<(), Errno> {
+        if self.is_dir() {
+            // When truncating a file descriptor, if the descriptor references a directory,
+            // return EINVAL. This is different from the truncate() syscall which returns EISDIR.
+            //
+            // See https://man7.org/linux/man-pages/man2/ftruncate.2.html#ERRORS
+            return error!(EINVAL);
+        }
+
+        // For ftruncate, we do not need to check that the file node is writable.
+        //
+        // The file object that calls this method must verify that the file was opened
+        // with write permissions.
+        //
+        // This matters because a file could be opened with O_CREAT + O_RDWR + 0444 mode.
+        // The file descriptor returned from such an operation can be truncated, even
+        // though the file was created with a read-only mode.
+        //
+        // See https://man7.org/linux/man-pages/man2/ftruncate.2.html#DESCRIPTION
+        // which says:
+        //
+        // "With ftruncate(), the file must be open for writing; with truncate(),
+        // the file must be writable."
         self.ops().truncate(self, length)
     }
 

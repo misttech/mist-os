@@ -822,6 +822,16 @@ impl FileObject {
         self.ops().fcntl(self, current_task, cmd, arg)
     }
 
+    pub fn ftruncate(&self, length: u64) -> Result<(), Errno> {
+        // The file must be opened with write permissions. Otherwise
+        // truncating it is forbidden.
+        if !self.can_write() {
+            return error!(EINVAL);
+        }
+
+        self.node().ftruncate(length)
+    }
+
     pub fn to_handle(self: &Arc<Self>, kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
         self.ops().to_handle(self, kernel)
     }
