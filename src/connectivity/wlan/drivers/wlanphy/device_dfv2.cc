@@ -28,6 +28,26 @@ namespace wlanphy {
 namespace wlan_common = ::fuchsia::wlan::common;
 namespace wlan_internal = ::fuchsia::wlan::internal;
 
+Device::Device(zx_device_t* parent)
+    : ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
+                    ::ddk::Unbindable>(parent),
+      server_dispatcher_(wlanphy_async_t()) {
+  ltrace_fn();
+  ZX_ASSERT_MSG(parent != nullptr, "No parent device assigned for wlanphy device.");
+
+  auto client_dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "wlanphy", [&](fdf_dispatcher_t*) {
+        if (unbind_txn_)
+          unbind_txn_->Reply();
+      });
+
+  ZX_ASSERT_MSG(!client_dispatcher.is_error(), "Creating dispatcher error: %s",
+                zx_status_get_string(client_dispatcher.status_value()));
+
+  client_dispatcher_ = std::move(*client_dispatcher);
+}
+
+// Reserve this version of constructor for testing purpose.
 Device::Device(zx_device_t* parent, fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client)
     : ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
                     ::ddk::Unbindable>(parent),
@@ -73,15 +93,15 @@ void Device::Connect(fidl::ServerEnd<fuchsia_wlan_device::Phy> server_end) {
   fidl::BindServer<fuchsia_wlan_device::Phy>(server_dispatcher_, std::move(server_end), this);
 }
 
-zx_status_t Device::ConnectToWlanPhyImpl(fdf::Channel server_channel) {
-  zx_status_t status = ZX_OK;
-  status = DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
-                             std::move(server_channel));
-  if (status != ZX_OK) {
-    lerror("DdkServiceConnect to phyimpl device Failed =: %s", zx_status_get_string(status));
-    return status;
+zx_status_t Device::ConnectToWlanPhyImpl() {
+  auto client_end = DdkConnectRuntimeProtocol<fuchsia_wlan_phyimpl::Service::WlanPhyImpl>();
+  if (client_end.is_error()) {
+    lerror("DdkConnectRuntimeProtocol to wlanphyimpl device Failed =: %s",
+           client_end.status_string());
+    return client_end.status_value();
   }
-  return status;
+  client_.Bind(std::move(*client_end), client_dispatcher_.get());
+  return ZX_OK;
 }
 
 // Implement DdkRelease for satisfying Ddk's requirement, but this function is not called now.

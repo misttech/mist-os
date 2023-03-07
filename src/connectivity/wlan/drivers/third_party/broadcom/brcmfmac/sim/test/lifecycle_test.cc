@@ -16,11 +16,13 @@
 
 #include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
+#include <lib/fdio/directory.h>
 #include <zircon/errors.h>
 
 #include <algorithm>
 #include <memory>
 
+#include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
 #include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
@@ -54,32 +56,59 @@ TEST(LifecycleTest, StartStop) {
 TEST(LifecycleTest, StartWithSmeChannel) {
   auto env = std::make_shared<simulation::Environment>();
   auto dev_mgr = std::make_unique<simulation::FakeDevMgr>();
+  zx_status_t status;
 
+  // For dispatcher shutdown.
   libsync::Completion completion_;
+
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, __func__,
+      [&](fdf_dispatcher_t*) { completion_.Signal(); });
+
+  ASSERT_FALSE(dispatcher.is_error());
+  auto driver_dispatcher = *std::move(dispatcher);
 
   // Create PHY.
   SimDevice* device;
-  zx_status_t status = SimDevice::Create(dev_mgr->GetRootDevice(), dev_mgr.get(), env, &device);
-  ASSERT_EQ(status, ZX_OK);
+  libsync::Completion device_created;
+  async::PostTask(driver_dispatcher.async_dispatcher(), [&]() {
+    status = SimDevice::Create(dev_mgr->GetRootDevice(), dev_mgr.get(), env, &device);
+    ASSERT_EQ(status, ZX_OK);
+    device_created.Signal();
+  });
+  device_created.Wait();
+
   status = device->BusInit();
   ASSERT_EQ(status, ZX_OK);
   EXPECT_EQ(dev_mgr->DeviceCountByProtocolId(ZX_PROTOCOL_WLANPHY_IMPL), 1u);
 
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
-  ASSERT_FALSE(endpoints.is_error());
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      {}, __func__, [&](fdf_dispatcher_t*) { completion_.Signal(); });
+  // Connect to device.
+  auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  EXPECT_FALSE(outgoing_dir_endpoints.is_error());
 
-  ASSERT_FALSE(dispatcher.is_error());
-  auto client_dispatcher_ = *std::move(dispatcher);
+  libsync::Completion served;
+  async::PostTask(driver_dispatcher.async_dispatcher(), [&]() {
+    ASSERT_EQ(ZX_OK, device->ServeWlanPhyImplProtocol(std::move(outgoing_dir_endpoints->server)));
+    served.Signal();
+  });
+  served.Wait();
 
-  auto client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(
-      std::move(endpoints->client), client_dispatcher_.get());
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ProtocolType>();
+  EXPECT_FALSE(endpoints.is_error());
+  zx::channel client_token, server_token;
+  EXPECT_EQ(ZX_OK, zx::channel::create(0, &client_token, &server_token));
+  EXPECT_EQ(ZX_OK, fdf::ProtocolConnect(std::move(client_token),
+                                        fdf::Channel(endpoints->server.TakeChannel().release())));
+  fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
+  path.AppendPrintf("svc/%s/default/%s", fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ServiceName,
+                    fuchsia_wlan_phyimpl::Service::WlanPhyImpl::Name);
+  EXPECT_EQ(ZX_OK, fdio_service_connect_at(outgoing_dir_endpoints->client.channel().get(),
+                                           path.c_str(), server_token.release()));
 
-  device->DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
-                            endpoints->server.TakeHandle());
+  auto client =
+      fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client));
+
   constexpr uint32_t kTag = 'TEST';
-
   fdf::Arena test_arena_(kTag);
 
   // Create iface.
@@ -90,8 +119,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   fidl::Arena create_fail_arena;
   auto builder_create_fail =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_fail_arena);
-  auto result_create_fail =
-      client_.sync().buffer(test_arena_)->CreateIface(builder_create_fail.Build());
+  auto result_create_fail = client.buffer(test_arena_)->CreateIface(builder_create_fail.Build());
   EXPECT_TRUE(result_create_fail.ok());
   ASSERT_TRUE(result_create_fail->is_error());
   ASSERT_EQ(result_create_fail->error_value(), ZX_ERR_INVALID_ARGS);
@@ -102,7 +130,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
       fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena);
   builder_create.role(fuchsia_wlan_common::wire::WlanMacRole::kClient);
   builder_create.mlme_channel(std::move(local));
-  auto result_create = client_.sync().buffer(test_arena_)->CreateIface(builder_create.Build());
+  auto result_create = client.buffer(test_arena_)->CreateIface(builder_create.Build());
   EXPECT_TRUE(result_create.ok());
   ASSERT_FALSE(result_create->is_error());
   uint16_t iface_id = result_create->value()->iface_id();
@@ -115,8 +143,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
       fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(create_arena_again);
   builder_create_again.role(fuchsia_wlan_common::wire::WlanMacRole::kClient);
   builder_create_again.mlme_channel(std::move(local_again));
-  auto result_create_again =
-      client_.sync().buffer(test_arena_)->CreateIface(builder_create_again.Build());
+  auto result_create_again = client.buffer(test_arena_)->CreateIface(builder_create_again.Build());
   EXPECT_TRUE(result_create_again.ok());
   ASSERT_TRUE(result_create_again->is_error());
   ASSERT_EQ(result_create_again->error_value(), ZX_ERR_NO_RESOURCES);
@@ -143,8 +170,7 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   fidl::Arena destroy_fail_arena;
   auto builder_destroy_fail =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(destroy_fail_arena);
-  auto result_destroy_fail =
-      client_.sync().buffer(test_arena_)->DestroyIface(builder_destroy_fail.Build());
+  auto result_destroy_fail = client.buffer(test_arena_)->DestroyIface(builder_destroy_fail.Build());
   EXPECT_TRUE(result_destroy_fail.ok());
   ASSERT_TRUE(result_destroy_fail->is_error());
   ASSERT_EQ(result_destroy_fail->error_value(), ZX_ERR_INVALID_ARGS);
@@ -154,12 +180,18 @@ TEST(LifecycleTest, StartWithSmeChannel) {
   auto builder_destroy =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(destroy_arena);
   builder_destroy.iface_id(iface_id);
-  auto result_destroy = client_.sync().buffer(test_arena_)->DestroyIface(builder_destroy.Build());
+  auto result_destroy = client.buffer(test_arena_)->DestroyIface(builder_destroy.Build());
   EXPECT_TRUE(result_destroy.ok());
   ASSERT_FALSE(result_destroy->is_error());
   EXPECT_EQ(dev_mgr->DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 
-  client_dispatcher_.ShutdownAsync();
+  libsync::Completion host_destroyed;
+  async::PostTask(driver_dispatcher.async_dispatcher(), [&]() {
+    dev_mgr.reset();
+    host_destroyed.Signal();
+  });
+  host_destroyed.Wait();
+  driver_dispatcher.ShutdownAsync();
   completion_.Wait();
 }
 

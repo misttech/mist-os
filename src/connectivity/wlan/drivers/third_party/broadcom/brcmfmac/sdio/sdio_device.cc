@@ -63,10 +63,25 @@ zx_status_t SdioDevice::Create(zx_device_t* parent_device) {
   device->async_loop_ = std::move(async_loop);
   device->inspect_ = std::move(inspect);
 
-  if ((status = device->DdkAdd(
-           ddk::DeviceAddArgs("brcmfmac-wlanphy")
-               .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
-               .set_inspect_vmo(device->inspect_->inspector().DuplicateVmo()))) != ZX_OK) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  status = device->ServeWlanPhyImplProtocol(std::move(endpoints->server));
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  std::array<const char*, 1> offers{
+      fuchsia_wlan_phyimpl::Service::Name,
+  };
+
+  if ((status = device->DdkAdd(ddk::DeviceAddArgs("brcmfmac-wlanphy")
+                                   .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
+                                   .set_inspect_vmo(device->inspect_->inspector().DuplicateVmo())
+                                   .set_runtime_service_offers(offers)
+                                   .set_outgoing_dir(endpoints->client.TakeChannel()))) != ZX_OK) {
     return status;
   }
   device.release();  // This now has its lifecycle managed by the devhost.

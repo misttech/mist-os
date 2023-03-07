@@ -49,18 +49,13 @@ zx_status_t wlanphy_bind(void* ctx, zx_device_t* device) {
   ltrace_fn();
   zx_status_t status;
 
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
-  if (endpoints.is_error()) {
-    lerror("Creating end point error: %s", zx_status_get_string(endpoints.status_value()));
-    return endpoints.status_value();
-  }
+  auto wlanphy_dev = std::make_unique<wlanphy::Device>(device);
 
-  auto wlanphy_dev = std::make_unique<wlanphy::Device>(device, std::move(endpoints->client));
   if ((status = wlanphy_dev->DeviceAdd()) != ZX_OK) {
     lerror("failed adding wlanphy device: %s", zx_status_get_string(status));
   }
 
-  if ((status = wlanphy_dev->ConnectToWlanPhyImpl(endpoints->server.TakeHandle()))) {
+  if ((status = wlanphy_dev->ConnectToWlanPhyImpl())) {
     lerror("failed connecting to wlanphyimpl device: %s", zx_status_get_string(status));
   }
 

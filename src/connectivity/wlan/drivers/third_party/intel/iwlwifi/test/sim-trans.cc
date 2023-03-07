@@ -63,6 +63,14 @@ class SimTransDevice : public ::wlan::iwlwifi::WlanPhyImplDevice {
       iwl_drv_stop(trans->drv);
     }
     free(trans);
+
+    zx::result res =
+        outgoing_dir_.RemoveService<fuchsia_wlan_phyimpl::Service>(fdf::kDefaultInstance);
+    if (res.is_error()) {
+      zxlogf(ERROR, "Failed to remove WlanPhyImpl service from outgoing directory: %s\n",
+             res.status_string());
+    }
+
     server_dispatcher_.ShutdownAsync();
   }
 
@@ -179,9 +187,7 @@ static zx_status_t iwl_sim_trans_sw_reset(struct iwl_trans* trans, bool retake_o
   return ZX_OK;
 }
 
-static bool iwl_sim_trans_grab_nic_access(struct iwl_trans* trans) {
-  return false;
-}
+static bool iwl_sim_trans_grab_nic_access(struct iwl_trans* trans) { return false; }
 
 static void iwl_sim_trans_release_nic_access(struct iwl_trans* trans, unsigned long* flags) {}
 
@@ -351,12 +357,12 @@ SimTransport::SimTransport(zx_device_t* parent) : device_{}, iwl_trans_(nullptr)
 }
 
 SimTransport::~SimTransport() {
-  sim_driver_dispatcher_.ShutdownAsync();
-  completion_.Wait();
   if (sim_device_) {
     sim_device_->DdkAsyncRemove();
-    mock_ddk::ReleaseFlaggedDevices(sim_device_->zxdev());
+    mock_ddk::ReleaseFlaggedDevices(sim_device_->zxdev(), async_driver_dispatcher());
   }
+  sim_driver_dispatcher_.ShutdownAsync();
+  completion_.Wait();
   zx_handle_close(device_.bti);
 }
 

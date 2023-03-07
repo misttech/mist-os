@@ -15,8 +15,10 @@
 
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
+#include <lib/fdio/directory.h>
 #include <lib/mock-function/mock-function.h>
 
+#include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device_context.h"
@@ -102,7 +104,33 @@ struct TestDevice : public Device {
 struct DeviceTest : public zxtest::Test {
   void SetUp() override {
     parent_ = MockDevice::FakeRootParent();
-    ASSERT_OK(TestDevice::Create(parent_.get(), device_destructed_, &device_));
+
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "TestDriverDispatcher",
+        [&](fdf_dispatcher_t*) { sync_completion_signal(&dispatcher_completion_); });
+
+    ASSERT_FALSE(dispatcher.is_error());
+    driver_dispatcher_ = std::move(*dispatcher);
+    // Create the device on driver dispatcher because the outgoing directory is required to be
+    // accessed by a single dispatcher.
+    libsync::Completion created;
+    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+      ASSERT_OK(TestDevice::Create(parent_.get(), device_destructed_, &device_));
+      created.Signal();
+    });
+    created.Wait();
+
+    auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_FALSE(outgoing_dir_endpoints.is_error());
+
+    // Serve WlanPhyImplProtocol to the device's outgoing directory on the driver dispatcher.
+    libsync::Completion served;
+    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+      ASSERT_EQ(ZX_OK,
+                device_->ServeWlanPhyImplProtocol(std::move(outgoing_dir_endpoints->server)));
+      served.Signal();
+    });
+    served.Wait();
 
     wlan::nxpfmac::set_mlan_register_mock_adapter(&mlan_mocks_);
     ddk::InitTxn txn(parent_->GetLatestChild());
@@ -113,41 +141,58 @@ struct DeviceTest : public zxtest::Test {
     device->WaitUntilInitReplyCalled();
     ASSERT_OK(device->InitReplyCallStatus());
 
-    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
-    ASSERT_OK(endpoints.status_value());
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        {}, "TestDispatcher",
-        [&](fdf_dispatcher_t*) { sync_completion_signal(&dispatcher_completion_); });
-
-    ASSERT_OK(dispatcher.status_value());
-    fidl_dispatcher_ = *std::move(dispatcher);
-
-    wlanphy_client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(
-        std::move(endpoints->client), fidl_dispatcher_.get());
-
-    ASSERT_OK(device_->DdkServiceConnect(
-        fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
-        endpoints->server.TakeHandle()));
+    // Connect WlanPhyImpl protocol from this class, this operation mimics the implementation of
+    // DdkConnectRuntimeProtocol().
+    auto endpoints =
+        fdf::CreateEndpoints<fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ProtocolType>();
+    ASSERT_FALSE(endpoints.is_error());
+    zx::channel client_token, server_token;
+    ASSERT_EQ(ZX_OK, zx::channel::create(0, &client_token, &server_token));
+    ASSERT_EQ(ZX_OK, fdf::ProtocolConnect(std::move(client_token),
+                                          fdf::Channel(endpoints->server.TakeChannel().release())));
+    fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
+    path.AppendPrintf("svc/%s/default/%s", fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ServiceName,
+                      fuchsia_wlan_phyimpl::Service::WlanPhyImpl::Name);
+    // Serve the WlanPhyImpl protocol on `server_token` found at `path` within
+    // the outgoing directory.
+    ASSERT_EQ(ZX_OK, fdio_service_connect_at(outgoing_dir_endpoints->client.channel().get(),
+                                             path.c_str(), server_token.release()));
+    wlanphy_client_ =
+        fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client));
   }
 
   void TearDown() override {
     // Remove and release the net device zx_device first, the mock device implementation won't call
     // release after device_async_remove so we have to compensate for that by manually removing it.
     std::shared_ptr<MockDevice> net_device;
+    std::shared_ptr<MockDevice> phy_device;
+
     for (auto child : parent_->children()) {
       network_device_impl_protocol_t proto;
       if (device_get_protocol(child.get(), ZX_PROTOCOL_NETWORK_DEVICE_IMPL, &proto) == ZX_OK) {
         net_device = child;
+      } else {
+        phy_device = child;
       }
     }
+
+    // Make sure net_device is released first, otherwise it will block the release of phy_device.
     ASSERT_NOT_NULL(net_device.get());
     device_async_remove(net_device.get());
-    mock_ddk::ReleaseFlaggedDevices(net_device.get());
+    mock_ddk::ReleaseFlaggedDevices(net_device.get(), driver_dispatcher_.async_dispatcher());
     net_device.reset();
 
+    // Explicitly release phy_device on driver_dispatcher_to ensure the OutgoingDirectory is only
+    // accessed from a single dispatcher.
+    ASSERT_NOT_NULL(phy_device.get());
+    device_async_remove(phy_device.get());
+    mock_ddk::ReleaseFlaggedDevices(phy_device.get(), driver_dispatcher_.async_dispatcher());
+    phy_device.reset();
+
     parent_.reset();
+
     sync_completion_wait(&device_destructed_, ZX_TIME_INFINITE);
-    fidl_dispatcher_.ShutdownAsync();
+    driver_dispatcher_.ShutdownAsync();
     sync_completion_wait(&dispatcher_completion_, ZX_TIME_INFINITE);
   }
 
@@ -155,9 +200,9 @@ struct DeviceTest : public zxtest::Test {
   sync_completion_t device_destructed_;
   TestDevice* device_ = nullptr;
   sync_completion_t dispatcher_completion_;
-  fdf::Dispatcher fidl_dispatcher_;
+  fdf::Dispatcher driver_dispatcher_;
   wlan::nxpfmac::MlanMockAdapter mlan_mocks_;
-  fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl> wlanphy_client_;
+  fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl> wlanphy_client_;
 };
 
 // Since we use a zero byte vmo for the files, none of the power file related ioctls will be
@@ -179,7 +224,7 @@ TEST_F(DeviceTest, SetCountry) {
     return MLAN_STATUS_SUCCESS;
   });
 
-  auto result = wlanphy_client_.sync().buffer(arena)->SetCountry(request);
+  auto result = wlanphy_client_.buffer(arena)->SetCountry(request);
   ASSERT_OK(result.status());
   ASSERT_TRUE(result.value().is_ok());
   ASSERT_TRUE(ioctl_called);
@@ -200,7 +245,7 @@ TEST_F(DeviceTest, SetCountryCodeFails) {
     return MLAN_STATUS_FAILURE;
   });
 
-  auto result = wlanphy_client_.sync().buffer(arena)->SetCountry(request);
+  auto result = wlanphy_client_.buffer(arena)->SetCountry(request);
   ASSERT_OK(result.status());
   ASSERT_TRUE(result.value().is_error());
   ASSERT_EQ(ZX_ERR_IO, result.value().error_value());
@@ -235,12 +280,12 @@ TEST_F(DeviceTest, GetCountry) {
   });
 
   fdf::Arena arena_for_set(kArenaTag);
-  auto set_result = wlanphy_client_.sync().buffer(arena_for_set)->SetCountry(set_request);
+  auto set_result = wlanphy_client_.buffer(arena_for_set)->SetCountry(set_request);
   ASSERT_OK(set_result.status());
   ASSERT_TRUE(set_result.value().is_ok());
 
   fdf::Arena arena_for_get(kArenaTag + 1);
-  auto get_result = wlanphy_client_.sync().buffer(arena_for_get)->GetCountry();
+  auto get_result = wlanphy_client_.buffer(arena_for_get)->GetCountry();
   ASSERT_OK(get_result.status());
   ASSERT_TRUE(get_result.value().is_ok());
 
@@ -278,13 +323,13 @@ TEST_F(DeviceTest, ClearCountry) {
 
   // Set country code to US
   fdf::Arena arena_for_set(kArenaTag);
-  auto set_result = wlanphy_client_.sync().buffer(arena_for_set)->SetCountry(set_request);
+  auto set_result = wlanphy_client_.buffer(arena_for_set)->SetCountry(set_request);
   ASSERT_OK(set_result.status());
   ASSERT_TRUE(set_result.value().is_ok());
 
   // Get country should return US
   fdf::Arena arena_for_get(kArenaTag + 1);
-  auto get_result = wlanphy_client_.sync().buffer(arena_for_get)->GetCountry();
+  auto get_result = wlanphy_client_.buffer(arena_for_get)->GetCountry();
   ASSERT_OK(get_result.status());
   ASSERT_TRUE(get_result.value().is_ok());
 
@@ -293,12 +338,12 @@ TEST_F(DeviceTest, ClearCountry) {
                   set_request.alpha2().size());
   // Clear country should reset it to WW
   fdf::Arena arena_for_clear(kArenaTag + 2);
-  auto clear_result = wlanphy_client_.sync().buffer(arena_for_clear)->ClearCountry();
+  auto clear_result = wlanphy_client_.buffer(arena_for_clear)->ClearCountry();
   ASSERT_OK(clear_result.status());
   ASSERT_TRUE(clear_result.value().is_ok());
 
   // Get should return WW
-  get_result = wlanphy_client_.sync().buffer(arena_for_get)->GetCountry();
+  get_result = wlanphy_client_.buffer(arena_for_get)->GetCountry();
   ASSERT_OK(get_result.status());
   ASSERT_TRUE(get_result->value()->is_alpha2());
   EXPECT_BYTES_EQ("WW", get_result->value()->alpha2().data(), 2);

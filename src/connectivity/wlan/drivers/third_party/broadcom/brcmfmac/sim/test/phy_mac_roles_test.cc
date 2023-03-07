@@ -22,7 +22,7 @@ void PhyMacRolesTest::Init() { ASSERT_EQ(SimTest::Init(), ZX_OK); }
 
 TEST_F(PhyMacRolesTest, VerifyMacRoles) {
   Init();
-  auto result = client_.sync().buffer(test_arena_)->GetSupportedMacRoles();
+  auto result = client_.buffer(test_arena_)->GetSupportedMacRoles();
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
   ASSERT_TRUE(result->value()->has_supported_mac_roles());

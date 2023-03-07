@@ -54,7 +54,7 @@ zx_status_t PhyPsModeTest::SetPowerSaveMode(
   auto builder =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
   builder.ps_mode(*ps_mode);
-  auto result = client_.sync().buffer(test_arena_)->SetPowerSaveMode(builder.Build());
+  auto result = client_.buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
     return result->error_value();
@@ -94,7 +94,7 @@ TEST_F(PhyPsModeTest, SetPowerSaveModeIncorrect) {
   fidl::Arena fidl_arena;
   auto builder =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
-  auto result = client_.sync().buffer(test_arena_)->SetPowerSaveMode(builder.Build());
+  auto result = client_.buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   EXPECT_TRUE(result.ok());
   zx_status_t status = result->is_error() ? result->error_value() : ZX_OK;
 
@@ -181,7 +181,7 @@ TEST_F(PhyPsModeTest, GetPowerSaveMode) {
     const auto valid_ps_mode = fuchsia_wlan_common::wire::PowerSaveType::kPsModeBalanced;
     const wlan_phy_ps_mode_t valid_ps_mode_banjo = {.ps_mode = POWER_SAVE_TYPE_PS_MODE_BALANCED};
     ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(&valid_ps_mode_banjo));
-    auto result = client_.sync().buffer(test_arena_)->GetPowerSaveMode();
+    auto result = client_.buffer(test_arena_)->GetPowerSaveMode();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
     EXPECT_EQ(result->value()->ps_mode(), valid_ps_mode);
@@ -192,7 +192,7 @@ TEST_F(PhyPsModeTest, GetPowerSaveMode) {
     const auto valid_ps_mode = fuchsia_wlan_common::wire::PowerSaveType::kPsModePerformance;
     const wlan_phy_ps_mode_t valid_ps_mode_banjo = {.ps_mode = POWER_SAVE_TYPE_PS_MODE_PERFORMANCE};
     ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(&valid_ps_mode_banjo));
-    auto result = client_.sync().buffer(test_arena_)->GetPowerSaveMode();
+    auto result = client_.buffer(test_arena_)->GetPowerSaveMode();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
     EXPECT_EQ(result->value()->ps_mode(), valid_ps_mode);

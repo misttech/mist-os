@@ -51,7 +51,7 @@ uint32_t CountryCodeTest::DeviceCountByProtocolId(uint32_t proto_id) {
 
 zx_status_t CountryCodeTest::SetCountryCode(
     const fuchsia_wlan_phyimpl::wire::WlanPhyCountry* country) {
-  auto result = client_.sync().buffer(test_arena_)->SetCountry(*country);
+  auto result = client_.buffer(test_arena_)->SetCountry(*country);
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
     return result->error_value();
@@ -60,7 +60,7 @@ zx_status_t CountryCodeTest::SetCountryCode(
 }
 
 zx_status_t CountryCodeTest::ClearCountryCode() {
-  auto result = client_.sync().buffer(test_arena_)->ClearCountry();
+  auto result = client_.buffer(test_arena_)->ClearCountry();
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
     return result->error_value();
@@ -130,7 +130,7 @@ TEST_F(CountryCodeTest, GetCCode) {
   {
     const wlan_phy_country_t country = {{'W', 'W'}};
     ASSERT_EQ(ZX_OK, SetCountryCodeInFirmware(&country));
-    auto result = client_.sync().buffer(test_arena_)->GetCountry();
+    auto result = client_.buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
     auto& get_country_result = result->value();
@@ -142,7 +142,7 @@ TEST_F(CountryCodeTest, GetCCode) {
   {
     const wlan_phy_country_t country = {{'U', 'S'}};
     ASSERT_EQ(ZX_OK, SetCountryCodeInFirmware(&country));
-    auto result = client_.sync().buffer(test_arena_)->GetCountry();
+    auto result = client_.buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
     auto& get_country_result = result->value();
