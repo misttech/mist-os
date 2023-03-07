@@ -33,7 +33,7 @@ class X86PageTableMmu final : public X86PageTableBase {
   // This X86PageTable will be special in that its mappings will all have
   // the G (global) bit set, and are expected to be aliased across all page
   // tables used in the normal MMU.  See |AliasKernelMappings|.
-  zx_status_t InitKernel(void* ctx, ArchVmAspaceInterface::page_alloc_fn_t test_paf = nullptr);
+  zx_status_t InitKernel(void* ctx, page_alloc_fn_t test_paf);
 
   // Used for normal MMU page tables so they can share the high kernel mapping
   zx_status_t AliasKernelMappings();
@@ -122,7 +122,7 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   paddr_t pt_phys() const { return pt_->phys(); }
   size_t pt_pages() const { return pt_->pages(); }
 
-  int active_cpus() { return active_cpus_.load(); }
+  cpu_mask_t active_cpus() const { return active_cpus_.load(); }
 
   IoBitmap& io_bitmap() { return io_bitmap_; }
 
@@ -139,7 +139,7 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
 
  private:
   // Test the vaddr against the address space's range.
-  bool IsValidVaddr(vaddr_t vaddr) { return (vaddr >= base_ && vaddr <= base_ + size_ - 1); }
+  bool IsValidVaddr(vaddr_t vaddr) const { return (vaddr >= base_ && vaddr <= base_ + size_ - 1); }
 
   // Helper method to mark this aspace active.
   // This exists for clarity of call sites so that the comment explaining why this is done can be in
@@ -176,8 +176,7 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   const size_t size_ = 0;
 
   // CPUs that are currently executing in this aspace.
-  // Actually an mp_cpu_mask_t, but header dependencies.
-  ktl::atomic<int> active_cpus_{0};
+  ktl::atomic<cpu_mask_t> active_cpus_{0};
 
   // Whether not this has been active since |ActiveSinceLastCheck| was called.
   ktl::atomic<bool> active_since_last_check_ = false;

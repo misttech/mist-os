@@ -38,12 +38,16 @@ KCOUNTER(tlb_invalidations_sent, "mmu.tlb_invalidation_batches_sent")
 // Count of the number of batches of TLB invalidation requests received on each CPU
 // Includes tlb_invalidations_full_global_received and tlb_invalidations_full_nonglobal_received
 KCOUNTER(tlb_invalidations_received, "mmu.tlb_invalidation_batches_received")
+// Count of the number of invalidate TLB invalidation requests received on each cpu
+KCOUNTER(tlb_invalidations_received_invalid, "mmu.tlb_invalidation_batches_received_invalid")
 // Count of the number of TLB invalidation requests for all entries on each CPU
 KCOUNTER(tlb_invalidations_full_global_received, "mmu.tlb_invalidation_full_global_received")
 // Count of the number of TLB invalidation requests for all non-global entries on each CPU
 KCOUNTER(tlb_invalidations_full_nonglobal_received, "mmu.tlb_invalidation_full_nonglobal_received")
 // Count of the number of times an EPT TLB invalidation got performed.
 KCOUNTER(ept_tlb_invalidations, "mmu.ept_tlb_invalidations")
+// Count the total number of context switches on the cpu
+KCOUNTER(context_switches, "mmu.context_switches")
 
 /* Default address width including virtual/physical address.
  * newer versions fetched below */
@@ -94,7 +98,7 @@ uint64_t kernel_relocated_base = 0xffffffff00000000;
 static const paddr_t kernel_pt_phys =
     (vaddr_t)KERNEL_PT - (vaddr_t)__code_start + KERNEL_LOAD_OFFSET;
 
-paddr_t x86_kernel_cr3(void) { return kernel_pt_phys; }
+paddr_t x86_kernel_cr3() { return kernel_pt_phys; }
 
 /**
  * @brief  check if the virtual address is canonical
@@ -161,108 +165,7 @@ static void maybe_invvpid(InvVpid invalidation, uint16_t vpid, zx_vaddr_t addres
   }
 }
 
-/* Task used for invalidating a TLB entry on each CPU */
-struct TlbInvalidatePage_context {
-  ulong target_cr3;
-  const PendingTlbInvalidation* pending;
-  uint16_t vpid;
-};
-static void TlbInvalidatePage_task(void* raw_context) {
-  DEBUG_ASSERT(arch_ints_disabled());
-  TlbInvalidatePage_context* context = (TlbInvalidatePage_context*)raw_context;
-
-  kcounter_add(tlb_invalidations_received, 1);
-
-  if (context->target_cr3 != arch::X86Cr3::Read().base() && !context->pending->contains_global) {
-    /* This invalidation doesn't apply to this CPU, ignore it */
-    return;
-  }
-
-  if (context->pending->full_shootdown) {
-    if (context->pending->contains_global) {
-      kcounter_add(tlb_invalidations_full_global_received, 1);
-      x86_tlb_global_invalidate();
-      maybe_invvpid(InvVpid::SINGLE_CONTEXT, context->vpid, 0);
-    } else {
-      kcounter_add(tlb_invalidations_full_nonglobal_received, 1);
-      x86_tlb_nonglobal_invalidate();
-      maybe_invvpid(InvVpid::SINGLE_CONTEXT_RETAIN_GLOBALS, context->vpid, 0);
-    }
-    return;
-  }
-
-  for (uint i = 0; i < context->pending->count; ++i) {
-    const auto& item = context->pending->item[i];
-    switch (static_cast<PageTableLevel>(item.page_level())) {
-      case PageTableLevel::PML4_L:
-        panic("PML4_L invld found; should not be here\n");
-      case PageTableLevel::PDP_L:
-      case PageTableLevel::PD_L:
-      case PageTableLevel::PT_L:
-        __asm__ volatile("invlpg %0" ::"m"(*(uint8_t*)item.addr()));
-        maybe_invvpid(InvVpid::INDIVIDUAL_ADDRESS, context->vpid, item.addr());
-        break;
-    }
-  }
-}
-
-/**
- * @brief Execute a queued TLB invalidation
- *
- * @param pt The page table we're invalidating for (if nullptr, assume for current one)
- * @param pending The planned invalidation
- */
-static void x86_tlb_invalidate_page(const X86PageTableBase* pt, PendingTlbInvalidation* pending) {
-  if (pending->count == 0 && !pending->full_shootdown) {
-    return;
-  }
-
-  kcounter_add(tlb_invalidations_sent, 1);
-
-  auto aspace = static_cast<X86ArchVmAspace*>(pt->ctx());
-  ulong cr3 = pt ? pt->phys() : x86_get_cr3();
-  uint16_t vpid = aspace->arch_vpid();
-  struct TlbInvalidatePage_context task_context = {
-      .target_cr3 = cr3,
-      .pending = pending,
-      .vpid = vpid,
-  };
-
-  // TODO(fxbug.dev/95763): Consider whether it is better to invalidate a VPID
-  // on context switch, or whether it is better to target all CPUs here.
-  if (vpid != MMU_X86_UNUSED_VPID) {
-    pending->contains_global = true;
-  }
-
-  /* Target only CPUs this aspace is active on.  It may be the case that some
-   * other CPU will become active in it after this load, or will have left it
-   * just before this load.  In the former case, it is becoming active after
-   * the write to the page table, so it will see the change.  In the latter
-   * case, it will get a spurious request to flush. */
-  mp_ipi_target_t target;
-  cpu_mask_t target_mask = 0;
-  if (pending->contains_global || pt == nullptr) {
-    target = MP_IPI_TARGET_ALL;
-  } else {
-    target = MP_IPI_TARGET_MASK;
-    target_mask = aspace->active_cpus();
-  }
-
-  mp_sync_exec(target, target_mask, TlbInvalidatePage_task, &task_context);
-  pending->clear();
-}
-
-#if 0  // TODO(mcgrathr): remove this if it isn't going to be used
-bool x86_enable_pcid() {
-  DEBUG_ASSERT(arch_ints_disabled());
-  if (!g_x86_feature_pcid_good) {
-    return false;
-  }
-
-  arch::X86Cr4::Read().set_pcide(true).Write();
-  return true;
-}
-#endif
+// X86PageTableMmu
 
 bool X86PageTableMmu::check_paddr(paddr_t paddr) { return x86_mmu_check_paddr(paddr); }
 
@@ -354,7 +257,94 @@ PtFlags X86PageTableMmu::split_flags(PageTableLevel level, PtFlags flags) {
 }
 
 void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
-  x86_tlb_invalidate_page(this, pending);
+  if (pending->count == 0 && !pending->full_shootdown) {
+    return;
+  }
+
+  kcounter_add(tlb_invalidations_sent, 1);
+
+  const auto aspace = static_cast<X86ArchVmAspace*>(ctx());
+  const ulong cr3 = phys();
+  const uint16_t vpid = aspace->arch_vpid();
+
+  struct TlbInvalidatePage_context {
+    ulong target_cr3;
+    const PendingTlbInvalidation* pending;
+    uint16_t vpid;
+  };
+  struct TlbInvalidatePage_context task_context = {
+      .target_cr3 = cr3,
+      .pending = pending,
+      .vpid = vpid,
+  };
+
+  // TODO(fxbug.dev/95763): Consider whether it is better to invalidate a VPID
+  // on context switch, or whether it is better to target all CPUs here.
+  if (vpid != MMU_X86_UNUSED_VPID) {
+    pending->contains_global = true;
+  }
+
+  /* Target only CPUs this aspace is active on.  It may be the case that some
+   * other CPU will become active in it after this load, or will have left it
+   * just before this load.  In the former case, it is becoming active after
+   * the write to the page table, so it will see the change.  In the latter
+   * case, it will get a spurious request to flush. */
+  mp_ipi_target_t target;
+  cpu_mask_t target_mask = 0;
+  if (pending->contains_global) {
+    target = MP_IPI_TARGET_ALL;
+  } else {
+    target = MP_IPI_TARGET_MASK;
+    target_mask = aspace->active_cpus();
+  }
+
+  /* Task used for invalidating a TLB entry on each CPU */
+  auto tlb_invalidate_page_task = [](void* raw_context) -> void {
+    DEBUG_ASSERT(arch_ints_disabled());
+    const TlbInvalidatePage_context* context = static_cast<TlbInvalidatePage_context*>(raw_context);
+
+    kcounter_add(tlb_invalidations_received, 1);
+
+    if (context->target_cr3 != arch::X86Cr3::Read().base() && !context->pending->contains_global) {
+      /* This invalidation doesn't apply to this CPU, ignore it */
+      tlb_invalidations_received_invalid.Add(1);
+      return;
+    }
+
+    /* Full TLB shootdowns handled here */
+    if (context->pending->full_shootdown) {
+      if (context->pending->contains_global) {
+        kcounter_add(tlb_invalidations_full_global_received, 1);
+        x86_tlb_global_invalidate();
+        maybe_invvpid(InvVpid::SINGLE_CONTEXT, context->vpid, 0);
+      } else {
+        kcounter_add(tlb_invalidations_full_nonglobal_received, 1);
+        x86_tlb_nonglobal_invalidate();
+        maybe_invvpid(InvVpid::SINGLE_CONTEXT_RETAIN_GLOBALS, context->vpid, 0);
+      }
+      return;
+    }
+
+    /* If not a full shootdown, then iterate through a list of pages and handle
+     * them individually.
+     */
+    for (uint i = 0; i < context->pending->count; ++i) {
+      const auto& item = context->pending->item[i];
+      switch (static_cast<PageTableLevel>(item.page_level())) {
+        case PageTableLevel::PML4_L:
+          panic("PML4_L invld found; should not be here\n");
+        case PageTableLevel::PDP_L:
+        case PageTableLevel::PD_L:
+        case PageTableLevel::PT_L:
+          __asm__ volatile("invlpg %0" ::"m"(*(uint8_t*)item.addr()));
+          maybe_invvpid(InvVpid::INDIVIDUAL_ADDRESS, context->vpid, item.addr());
+          break;
+      }
+    }
+  };
+
+  mp_sync_exec(target, target_mask, tlb_invalidate_page_task, &task_context);
+  pending->clear();
 }
 
 uint X86PageTableMmu::pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level) {
@@ -401,6 +391,8 @@ uint X86PageTableMmu::pt_flags_to_mmu_flags(PtFlags flags, PageTableLevel level)
   }
   return mmu_flags;
 }
+
+// X86PageTableEpt
 
 bool X86PageTableEpt::allowed_flags(uint flags) {
   if (!(flags & ARCH_MMU_FLAG_PERM_READ)) {
@@ -545,7 +537,6 @@ X86ArchVmAspace::X86ArchVmAspace(vaddr_t base, size_t size, uint mmu_flags,
  * Fill in the high level x86 arch aspace structure and allocating a top level page table.
  */
 zx_status_t X86ArchVmAspace::Init() {
-  static_assert(sizeof(cpu_mask_t) == sizeof(active_cpus_), "err");
   canary_.Assert();
 
   LTRACEF("aspace %p, base %#" PRIxPTR ", size 0x%zx, mmu_flags 0x%x\n", this, base_, size_,
@@ -585,7 +576,6 @@ zx_status_t X86ArchVmAspace::Init() {
 
     LTRACEF("user aspace: pt phys %#" PRIxPTR ", virt %p\n", pt_->phys(), pt_->virt());
   }
-  ktl::atomic_init(&active_cpus_, 0);
 
   return ZX_OK;
 }
@@ -649,9 +639,16 @@ zx_status_t X86ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
 }
 
 void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace* aspace) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
   cpu_mask_t cpu_bit = cpu_num_to_mask(arch_curr_cpu_num());
+
+  context_switches.Add(1);
+
   if (aspace != nullptr) {
+    // Switching to another user aspace
     aspace->canary_.Assert();
+
     paddr_t phys = aspace->pt_phys();
     LTRACEF_LEVEL(3, "switching to aspace %p, pt %#" PRIXPTR "\n", aspace, phys);
     arch::X86Cr3::Write(phys);
@@ -663,9 +660,12 @@ void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace
     [[maybe_unused]] uint32_t prev = aspace->active_cpus_.fetch_or(cpu_bit);
     // Should not already be running on this CPU.
     DEBUG_ASSERT(!(prev & cpu_bit));
+
     aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
   } else {
+    // Switching to the kernel aspace
     LTRACEF_LEVEL(3, "switching to kernel aspace, pt %#" PRIxPTR "\n", kernel_pt_phys);
+
     arch::X86Cr3::Write(kernel_pt_phys);
     if (old_aspace != nullptr) {
       [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
@@ -771,14 +771,12 @@ void x86_mmu_percpu_init() {
       .set_cd(false)  // Clear cache-disable.
       .Write();
 
-  // Set the SMEP & SMAP bits in CR4.
+  // Set or clear the SMEP & SMAP bits in CR4 based on features we've detected.
+  // Make sure global pages are enabled.
   arch::X86Cr4 cr4 = arch::X86Cr4::Read();
-  if (x86_feature_test(X86_FEATURE_SMEP)) {
-    cr4.set_smep(true);
-  }
-  if (g_x86_feature_has_smap) {
-    cr4.set_smap(true);
-  }
+  cr4.set_smep(x86_feature_test(X86_FEATURE_SMEP));
+  cr4.set_smap(g_x86_feature_has_smap);
+  cr4.set_pge(true);
   cr4.Write();
 
   // Set NXE bit in X86_MSR_IA32_EFER.

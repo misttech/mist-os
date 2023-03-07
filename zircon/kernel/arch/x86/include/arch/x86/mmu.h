@@ -9,8 +9,6 @@
 #ifndef ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_X86_MMU_H_
 #define ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_X86_MMU_H_
 
-#include <zircon/compiler.h>
-
 #include <arch/x86/page_tables/constants.h>
 
 /* top level defines for the x86 mmu */
@@ -103,7 +101,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <zircon/compiler.h>
 
 #include <arch/x86/page_tables/page_tables.h>
 
