@@ -866,9 +866,12 @@ void Device::ScheduleUnbindChildren(ScheduleUnbindChildrenCompleter::Sync& compl
 
 void Device::ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
                                  ConnectFidlProtocolCompleter::Sync& completer) {
-  fbl::RefPtr<Device> parent = nullptr;
+  fbl::RefPtr<Device> device = nullptr;
   if (request->fragment_name.is_null()) {
-    parent = this->parent();
+    device = fbl::RefPtr(this);
+    if (device->flags & DEV_CTX_PROXY) {
+      device = device->parent();
+    }
   } else {
     if (!is_composite()) {
       completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -877,13 +880,19 @@ void Device::ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
 
     for (auto& fragment : composite()->get().fragments()) {
       if (fragment.name() == request->fragment_name.get()) {
-        parent = fragment.bound_device();
+        device = fragment.bound_device();
         break;
       }
     }
   }
-  if (parent == nullptr) {
+  if (device == nullptr) {
     completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+  if (!device->has_outgoing_directory()) {
+    LOGF(ERROR, "`%s` attempted to ConnectFidlProtocol but there is no outgoing directory",
+         name().c_str());
+    completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
 
@@ -907,7 +916,7 @@ void Device::ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
     path.Append("/default/");
   }
   path.Append(request->protocol_name.get());
-  zx_status_t status = fdio_service_connect_at(parent->outgoing_dir_.channel().get(), path.c_str(),
+  zx_status_t status = fdio_service_connect_at(device->outgoing_dir_.channel().get(), path.c_str(),
                                                request->server.release());
   completer.Reply(zx::make_result(status));
 }
