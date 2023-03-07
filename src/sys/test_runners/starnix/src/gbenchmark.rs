@@ -10,6 +10,7 @@ use {
     fidl_fuchsia_test::{self as ftest},
     fuchsiaperf::FuchsiaPerfBenchmarkResult,
     gtest_runner_lib::parser::read_file,
+    heck::CamelCase,
     serde::{Deserialize, Serialize},
 };
 
@@ -151,8 +152,14 @@ fn gbenchmark_to_fuchsiaperf(
         //
         // gVisor benchmark names look like:
         // BM_GetdentsSameFD/8/real_time or BM_Sched_yield/real_time/threads:32.
-        // They should end up like: GetdentsSameFd/8 or Sched_yield/threads:32.
-        let label = benchmark.name.trim_start_matches("BM_").replace("/real_time", "").to_string();
+        // They should end up like: GetdentsSameFd/8 or SchedYield/Threads/32.
+        let label_trimmed =
+            benchmark.name.trim_start_matches("BM_").replace("/real_time", "").replace(":", "/");
+        let mut segments = vec![];
+        for segment in label_trimmed.split("/") {
+            segments.push(segment.to_camel_case());
+        }
+        let label = segments.join("/");
         if label.starts_with(&previous_benchmark_name) {
             if benchmark_count >= MAX_BENCHMARK_COUNT {
                 continue;
@@ -297,37 +304,37 @@ mod tests {
 
         let expected_perfs = vec![
             FuchsiaPerfBenchmarkResult {
-                label: "MetricName1/category/1".to_string(),
+                label: "MetricName1/Category/1".to_string(),
                 test_suite: TEST_SUITE.to_owned(),
                 unit: "ns".to_string(),
                 values: vec![21959.886533832538],
             },
             FuchsiaPerfBenchmarkResult {
-                label: "MetricName1/category/2".to_string(),
+                label: "MetricName1/Category/2".to_string(),
                 test_suite: TEST_SUITE.to_owned(),
                 unit: "ns".to_string(),
                 values: vec![1277058.9649314955],
             },
             FuchsiaPerfBenchmarkResult {
-                label: "MetricName1/category/64".to_string(),
+                label: "MetricName1/Category/64".to_string(),
                 test_suite: TEST_SUITE.to_owned(),
                 unit: "ns".to_string(),
                 values: vec![31623.006774103047],
             },
             FuchsiaPerfBenchmarkResult {
-                label: "MetricName1/category/128".to_string(),
+                label: "MetricName1/Category/128".to_string(),
                 test_suite: TEST_SUITE.to_owned(),
                 unit: "ns".to_string(),
                 values: vec![8297648.7720006844],
             },
             FuchsiaPerfBenchmarkResult {
-                label: "MetricName1/category/512".to_string(),
+                label: "MetricName1/Category/512".to_string(),
                 test_suite: TEST_SUITE.to_owned(),
                 unit: "ns".to_string(),
                 values: vec![54292.060699663125],
             },
             FuchsiaPerfBenchmarkResult {
-                label: "MetricName2/category:1".to_string(),
+                label: "MetricName2/Category/1".to_string(),
                 test_suite: TEST_SUITE.to_owned(),
                 unit: "ns".to_string(),
                 values: vec![64292.060699663125],
