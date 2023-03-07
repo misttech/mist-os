@@ -12,3 +12,5 @@ toc:
   path: /docs/development/drivers/testing/mock_ddk.md
 - title: "Driver Test Realm"
   path: /docs/development/drivers/testing/driver_test_realm.md
+- title: "Threading tips in tests"
+  path: /docs/development/drivers/testing/threading-tips-in-tests.md
