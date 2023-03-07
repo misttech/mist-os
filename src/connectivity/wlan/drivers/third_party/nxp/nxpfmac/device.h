@@ -17,7 +17,6 @@
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/device.h>
-#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -39,7 +38,8 @@ class Device;
 struct DeviceContext;
 class DeviceInspect;
 
-using DeviceType = ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable>;
+using DeviceType =
+    ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable, ddk::ServiceConnectable>;
 
 class Device : public DeviceType,
                public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
@@ -52,8 +52,7 @@ class Device : public DeviceType,
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkSuspend(ddk::SuspendTxn txn);
-
-  zx_status_t ServeWlanPhyImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel);
 
   // WlanPhyImpl interface implementation.
   void GetSupportedMacRoles(fdf::Arena& arena,
@@ -129,9 +128,6 @@ class Device : public DeviceType,
   EventRegistration defer_rx_work_event_;
   EventRegistration flush_rx_work_event_;
   EventRegistration defer_handling_event_;
-
-  // Serves fuchsia_wlan_phyimpl::Service.
-  fdf::OutgoingDirectory outgoing_dir_;
 };
 
 }  // namespace wlan::nxpfmac

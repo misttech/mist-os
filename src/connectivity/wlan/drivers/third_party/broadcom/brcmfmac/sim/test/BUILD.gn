@@ -23,7 +23,6 @@ source_set("sim_test") {
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
-    "//sdk/lib/fdio",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
@@ -448,7 +447,6 @@ executable("lifecycle_test") {
   deps = [
     "//sdk/banjo/fuchsia.hardware.wlan.fullmac:fuchsia.hardware.wlan.fullmac_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.wlanphyimpl:fuchsia.hardware.wlanphyimpl_banjo_cpp",
-    "//sdk/lib/fdio",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim",

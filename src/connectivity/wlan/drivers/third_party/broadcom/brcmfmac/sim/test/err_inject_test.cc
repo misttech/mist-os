@@ -44,7 +44,7 @@ void ErrInjTest::RunCountryTest(const std::vector<uint8_t>& input,
   sim->sim_fw->err_inj_.AddErrInjIovar("country", ZX_OK, BCME_OK, std::nullopt, &alt_cc_data);
 
   // Get the results and verify that the country code matches the first two characters of our input
-  auto result = client_.buffer(test_arena_)->GetCountry();
+  auto result = client_.sync().buffer(test_arena_)->GetCountry();
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
   auto& actual_country = result->value();

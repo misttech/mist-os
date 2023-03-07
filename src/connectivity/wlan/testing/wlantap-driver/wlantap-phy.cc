@@ -10,7 +10,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
-#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/assert.h>
@@ -398,15 +397,15 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
   size_t report_tx_status_count_ = 0;
 };
 
-class WlanPhyImplDevice
-    : public ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable>,
-      public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
+class WlanPhyImplDevice : public ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable,
+                                               ::ddk::Unbindable, ::ddk::ServiceConnectable>,
+                          public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
  public:
   WlanPhyImplDevice(zx_device_t* parent, zx::channel user_channel,
                     std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config)
-      : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable>(parent),
+      : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable,
+                      ::ddk::ServiceConnectable>(parent),
         phy_config_(std::move(phy_config)),
-        outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
         user_channel_(std::move(user_channel)) {
     auto dispatcher =
         fdf::SynchronizedDispatcher::Create({}, "wlanphy-impl-server", [&](fdf_dispatcher_t*) {
@@ -434,31 +433,14 @@ class WlanPhyImplDevice
     delete this;
   }
 
-  zx_status_t ServeWlanPhyImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-    // This callback will be invoked when this service is being connected.
-    auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) mutable {
-      fdf::BindServer(server_dispatcher_.get(), std::move(server_end), this);
-    };
-
-    // Register the callback to handler.
-    fuchsia_wlan_phyimpl::Service::InstanceHandler handler({.wlan_phy_impl = std::move(protocol)});
-
-    // Add this service to the outgoing directory so that the child driver can connect to by calling
-    // DdkConnectRuntimeProtocol().
-    auto status = outgoing_dir_.AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
-    if (status.is_error()) {
-      zxlogf(ERROR, "Failed to add service to outgoing directory: %s\n", status.status_string());
-      return status.error_value();
+  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel) {
+    if (std::string_view(service_name) !=
+        fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>) {
+      zxlogf(INFO, "Service name doesn't match. Connection request from a wrong device.");
+      return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
     }
-
-    // Serve the outgoing directory to the entity that intends to open it, which is DFv1 in this
-    // case.
-    auto result = outgoing_dir_.Serve(std::move(server_end));
-    if (result.is_error()) {
-      zxlogf(ERROR, "Failed to serve outgoing directory: %s\n", result.status_string());
-      return result.error_value();
-    }
-
+    fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
+    fdf::BindServer(server_dispatcher_.get(), std::move(server_end), this);
     return ZX_OK;
   }
 
@@ -613,9 +595,6 @@ class WlanPhyImplDevice
   // All of the overridden FIDL functions run on this dispatcher.
   fdf::SynchronizedDispatcher server_dispatcher_;
 
-  // Serves fuchsia_wlan_phyimpl::Service.
-  fdf::OutgoingDirectory outgoing_dir_;
-
   // The pointer of the default driver dispatcher in form of async_dispatcher_t.
   // This is needed because calls to CreateIface need to create new drivers, which need to be on
   // the default driver dispatcher.
@@ -641,29 +620,11 @@ zx_status_t CreatePhy(zx_device_t* wlantapctl, zx::channel user_channel,
   zxlogf(INFO, "Creating phy");
   auto phy = std::make_unique<WlanPhyImplDevice>(wlantapctl, std::move(user_channel), phy_config);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-
-  zx_status_t status = phy->ServeWlanPhyImplProtocol(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to serve protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  std::array<const char*, 1> offers{
-      fuchsia_wlan_phyimpl::Service::Name,
-  };
-
-  status = phy->DdkAdd(::ddk::DeviceAddArgs(phy_config->name.get().data())
-                           .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
-                           .set_runtime_service_offers(offers)
-                           .set_outgoing_dir(endpoints->client.TakeChannel()));
+  zx_status_t status = phy->DdkAdd(
+      ::ddk::DeviceAddArgs(phy_config->name.get().data()).set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL));
 
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "%s: could not add device: %d", __func__, status);
     return status;
   }
 

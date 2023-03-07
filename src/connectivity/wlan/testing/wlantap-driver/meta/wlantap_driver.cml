@@ -9,17 +9,11 @@
     ],
     program: {
         runner: "driver",
-        compat: "driver/nxpfmac.so",
-        bind: "meta/bind/nxpfmac_sdio.bindbc",
+        bind: "meta/bind/wlantapctl_bind.bindbc",
         colocate: "true",
+        compat: "driver/wlantap.so",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
+        fallback: "false",
     },
-    capabilities: [
-        { service: "fuchsia.wlan.phyimpl.Service" },
-    ],
-    expose: [
-        {
-            service: "fuchsia.wlan.phyimpl.Service",
-            from: "self",
-        },
-    ],
+    use: [],
 }

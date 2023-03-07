@@ -42,9 +42,7 @@ constexpr char kTxPwrWWPath[] = "nxpfmac/txpower_WW.bin";
 // constexpr char kTxPwrUSPath[] = "nxpfmac/txpower_US.bin";
 constexpr char kWlanCalDataPath[] = "nxpfmac/WlanCalData_sd8987.conf";
 
-Device::Device(zx_device_t *parent)
-    : DeviceType(parent),
-      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
+Device::Device(zx_device_t *parent) : DeviceType(parent) {
   defer_rx_work_event_ =
       event_handler_.RegisterForEvent(MLAN_EVENT_ID_DRV_DEFER_RX_WORK, [this](pmlan_event event) {
         if (data_plane_) {
@@ -167,30 +165,15 @@ void Device::DdkSuspend(ddk::SuspendTxn txn) {
   txn.Reply(ZX_OK, txn.requested_state());
 }
 
-zx_status_t Device::ServeWlanPhyImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  // This callback will be invoked when this service is being connected.
-  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) mutable {
-    fdf::BindServer(fidl_dispatcher_.get(), std::move(server_end), this);
-  };
-
-  // Register the callback to handler.
-  fuchsia_wlan_phyimpl::Service::InstanceHandler handler({.wlan_phy_impl = std::move(protocol)});
-
-  // Add this service to the outgoing directory so that the child driver can connect to by calling
-  // DdkConnectRuntimeProtocol().
-  auto status = outgoing_dir_.AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
-  if (status.is_error()) {
-    NXPF_ERR("%s(): Failed to add service to outgoing directory: %s\n", status.status_string());
-    return status.error_value();
+zx_status_t Device::DdkServiceConnect(const char *service_name, fdf::Channel channel) {
+  if (std::string_view(service_name) !=
+      fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>) {
+    NXPF_ERR("Service name doesn't match, expected '%s' but got '%s'",
+             fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>, service_name);
+    return ZX_ERR_NOT_SUPPORTED;
   }
-
-  // Serve the outgoing directory to the entity that intends to open it, which is DFv1 in this case.
-  auto result = outgoing_dir_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    NXPF_ERR("%s(): Failed to serve outgoing directory: %s\n", result.status_string());
-    return result.error_value();
-  }
-
+  fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
+  fdf::BindServer(fidl_dispatcher_.get(), std::move(server_end), this);
   return ZX_OK;
 }
 

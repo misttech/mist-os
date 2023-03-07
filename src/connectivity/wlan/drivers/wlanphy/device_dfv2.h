@@ -28,8 +28,6 @@ class Device
       public ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
                            ::ddk::Unbindable> {
  public:
-  Device(zx_device_t* device);
-  // Reserve this version of constructor for testing purpose.
   Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client);
   ~Device();
 
@@ -58,7 +56,7 @@ class Device
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
   void Connect(fidl::ServerEnd<fuchsia_wlan_device::Phy> server_end);
 
-  zx_status_t ConnectToWlanPhyImpl();
+  zx_status_t ConnectToWlanPhyImpl(fdf::Channel server_channel);
 
   // Add the device to the devhost.
   zx_status_t DeviceAdd();

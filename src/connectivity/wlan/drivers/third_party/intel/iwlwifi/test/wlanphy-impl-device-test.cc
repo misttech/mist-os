@@ -5,14 +5,12 @@
 // To test PHY device callback functions.
 
 #include <lib/async/cpp/task.h>
-#include <lib/fdio/directory.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/listnode.h>
 #include <zircon/syscalls.h>
 
 #include <iterator>
 
-#include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
 #include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"
@@ -48,36 +46,20 @@ class WlanPhyImplDeviceTest : public FakeUcodeTest {
         test_arena_(nullptr) {
     device_ = sim_trans_.sim_device();
 
-    auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_FALSE(outgoing_dir_endpoints.is_error());
-
-    // Serve WlanPhyImplProtocol to the device's outgoing directory on the driver dispatcher.
-    libsync::Completion served;
-    async::PostTask(sim_trans_.async_driver_dispatcher(), [&]() {
-      ASSERT_EQ(ZX_OK,
-                device_->ServeWlanPhyImplProtocol(std::move(outgoing_dir_endpoints->server)));
-      served.Signal();
-    });
-    served.Wait();
-
-    // Connect WlanPhyImpl protocol from this class, this operation mimics the implementation of
-    // DdkConnectRuntimeProtocol().
-    auto endpoints =
-        fdf::CreateEndpoints<fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ProtocolType>();
-    EXPECT_FALSE(endpoints.is_error());
-    zx::channel client_token, server_token;
-    EXPECT_EQ(ZX_OK, zx::channel::create(0, &client_token, &server_token));
-    EXPECT_EQ(ZX_OK, fdf::ProtocolConnect(std::move(client_token),
-                                          fdf::Channel(endpoints->server.TakeChannel().release())));
-    fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
-    path.AppendPrintf("svc/%s/default/%s", fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ServiceName,
-                      fuchsia_wlan_phyimpl::Service::WlanPhyImpl::Name);
-    // Serve the WlanPhyImpl protocol on `server_token` found at `path` within
-    // the outgoing directory.
-    EXPECT_EQ(ZX_OK, fdio_service_connect_at(outgoing_dir_endpoints->client.channel().get(),
-                                             path.c_str(), server_token.release()));
+    // Create the FIDL endpoints, bind the client end to the test class, and the server end to
+    // wlan::iwlwifi::WlanPhyImplDevice class.
+    auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
+    ASSERT_FALSE(endpoints.is_error());
 
     client_ = fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client));
+
+    // `DdkServiceConnect` starts a FIDL server that bounds to the dispatcher of
+    // the caller. The FIDL protocol that is being served uses driver transport
+    // and so it must be bound to an fdf dispatcher.
+    ASSERT_EQ(device_->DdkServiceConnect(
+                  fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
+                  endpoints->server.TakeHandle()),
+              ZX_OK);
 
     // Create test arena.
     constexpr uint32_t kTag = 'TEST';

@@ -15,13 +15,5 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    capabilities: [
-        { service: "fuchsia.wlan.phyimpl.Service" },
-    ],
-    expose: [
-        {
-            service: "fuchsia.wlan.phyimpl.Service",
-            from: "self",
-        },
-    ],
+    use: [],
 }

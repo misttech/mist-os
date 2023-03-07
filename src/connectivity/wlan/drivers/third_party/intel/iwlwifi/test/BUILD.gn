@@ -307,6 +307,7 @@ executable("wlan_softmac_device_test") {
     ":sim_library",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp_wire",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/lib/fdio",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/mvm",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform:fuchsia_device",
