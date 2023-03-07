@@ -9,7 +9,7 @@
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::mm::PAGE_SIZE;
-use crate::types::UserAddress;
+use crate::types::{SigSet, UserAddress};
 
 use linux_uapi as uapi;
 
@@ -139,7 +139,7 @@ pub struct sigaction_t {
     pub sa_handler: UserAddress,
     pub sa_flags: uapi::c_ulong,
     pub sa_restorer: UserAddress,
-    pub sa_mask: sigset_t,
+    pub sa_mask: SigSet,
 }
 
 pub use uapi::__SIGRTMIN as SIGRTMIN;

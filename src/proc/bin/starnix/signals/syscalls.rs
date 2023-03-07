@@ -1081,7 +1081,8 @@ mod tests {
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
-        let original_action = sigaction_t { sa_mask: 3, ..sigaction_t::default() };
+        let org_mask = SigSet::from(SIGHUP).with_signal_added(SIGINT);
+        let original_action = sigaction_t { sa_mask: org_mask, ..sigaction_t::default() };
 
         {
             current_task.thread_group.signal_actions.set(SIGHUP, original_action);
@@ -1113,7 +1114,8 @@ mod tests {
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
-        let original_action = sigaction_t { sa_mask: 3, ..sigaction_t::default() };
+        let org_mask = SigSet::from(SIGHUP).with_signal_added(SIGINT);
+        let original_action = sigaction_t { sa_mask: org_mask, ..sigaction_t::default() };
         let set_action_ref = UserRef::<sigaction_t>::new(addr);
         current_task
             .mm

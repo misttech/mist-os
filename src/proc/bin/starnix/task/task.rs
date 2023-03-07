@@ -1156,7 +1156,7 @@ impl From<&Task> for FsCred {
 
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`] that also stores
-/// a copy of `rax` in `orig_rax`.
+/// a copy of `rax` in `orig_rax` on x64.
 ///
 /// Implements [`std::ops::Deref`] and [`std::ops::DerefMut`] as a way to get at the underlying
 /// [`zx::sys::zx_thread_state_general_regs_t`] that this type wraps.
@@ -1167,8 +1167,43 @@ pub struct RegisterState {
     /// A copy of the x64 `rax` register at the time of the `syscall` instruction. This is important
     /// to store, as the return value of a syscall overwrites `rax`, making it impossible to recover
     /// the original syscall number in the case of syscall restart and strace output.
+    ///
+    /// On ARM the syscall number is in r8 which is not overwritten so this is not needed.
     #[cfg(target_arch = "x86_64")]
     pub orig_rax: u64,
+}
+
+impl RegisterState {
+    /// Sets the register on this task that indicates the single-machine-word return value from a
+    /// function call.
+    #[cfg(target_arch = "x86_64")]
+    pub fn set_return_register(&mut self, return_value: u64) {
+        self.real_registers.rax = return_value;
+    }
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_return_register(&mut self, return_value: u64) {
+        self.real_registers.r[0] = return_value;
+    }
+
+    /// Sets the register on this task that indicates the current stack pointer.
+    #[cfg(target_arch = "x86_64")]
+    pub fn set_stack_pointer_register(&mut self, sp: u64) {
+        self.real_registers.rsp = sp;
+    }
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_stack_pointer_register(&mut self, sp: u64) {
+        self.real_registers.sp = sp;
+    }
+
+    /// Sets the register on this task that indicates the TLS.
+    #[cfg(target_arch = "x86_64")]
+    pub fn set_thread_pointer_register(&mut self, tp: u64) {
+        self.real_registers.fs_base = tp;
+    }
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_thread_pointer_register(&mut self, tp: u64) {
+        self.real_registers.tpidr = tp;
+    }
 }
 
 impl std::ops::Deref for RegisterState {

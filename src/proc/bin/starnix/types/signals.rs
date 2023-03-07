@@ -178,7 +178,7 @@ impl fmt::Display for Signal {
 /// The layout of this object is designed to be identical to the layout of the current
 /// architecture's sigset_t type so UserRef<SigSet> can be used for system calls.
 #[repr(transparent)]
-#[derive(Debug, Copy, Clone, Default, AsBytes, FromBytes, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, AsBytes, Eq, FromBytes, PartialEq)]
 pub struct SigSet(std::os::raw::c_ulong);
 assert_eq_size!(SigSet, sigset_t);
 

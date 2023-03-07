@@ -8,6 +8,7 @@ use fuchsia_inspect as inspect;
 use lazy_static::lazy_static;
 use paste::paste;
 
+use crate::task::*;
 use crate::types::*;
 
 /// Helper for for_each_syscall! that adds any architecture-specific syscalls.
@@ -429,6 +430,36 @@ pub struct Syscall {
     pub arg3: u64,
     pub arg4: u64,
     pub arg5: u64,
+}
+
+impl Syscall {
+    /// Populates the syscall parameters from the x64 registers.
+    #[cfg(target_arch = "x86_64")]
+    pub fn new(syscall_decl: &'static SyscallDecl, current_task: &CurrentTask) -> Syscall {
+        Syscall {
+            decl: syscall_decl,
+            arg0: current_task.registers.rdi,
+            arg1: current_task.registers.rsi,
+            arg2: current_task.registers.rdx,
+            arg3: current_task.registers.r10,
+            arg4: current_task.registers.r8,
+            arg5: current_task.registers.r9,
+        }
+    }
+
+    /// Populates the syscall parameters from the ARM64 registers.
+    #[cfg(target_arch = "aarch64")]
+    pub fn new(syscall_decl: &'static SyscallDecl, current_task: &CurrentTask) -> Syscall {
+        Syscall {
+            decl: syscall_decl,
+            arg0: current_task.registers.r[0],
+            arg1: current_task.registers.r[1],
+            arg2: current_task.registers.r[2],
+            arg3: current_task.registers.r[3],
+            arg4: current_task.registers.r[4],
+            arg5: current_task.registers.r[5],
+        }
+    }
 }
 
 impl std::fmt::Debug for Syscall {

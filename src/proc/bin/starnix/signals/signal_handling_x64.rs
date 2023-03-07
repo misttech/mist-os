@@ -157,7 +157,7 @@ pub fn dispatch_signal_handler(
     // Write the signal stack frame at the updated stack pointer.
     task.mm.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes()).unwrap();
 
-    signal_state.set_mask(SigSet::from(action.sa_mask));
+    signal_state.set_mask(action.sa_mask);
 
     registers.rsp = stack_pointer;
     registers.rdi = siginfo.signal.number() as u64;

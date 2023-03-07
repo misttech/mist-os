@@ -14,6 +14,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use process_builder::elf_parse;
 use std::convert::TryFrom;
 use std::sync::Arc;
+#[cfg(target_arch = "x86_64")]
 use zerocopy::AsBytes;
 
 use crate::fs::ext4::ExtFilesystem;
@@ -70,33 +71,28 @@ pub fn execute_syscall(
         trace_arg_name!() => syscall_decl.name
     );
 
-    let syscall = Syscall {
-        decl: syscall_decl,
-        arg0: current_task.registers.rdi,
-        arg1: current_task.registers.rsi,
-        arg2: current_task.registers.rdx,
-        arg3: current_task.registers.r10,
-        arg4: current_task.registers.r8,
-        arg5: current_task.registers.r9,
-    };
+    let syscall = Syscall::new(syscall_decl, current_task);
 
-    // The `rax` register read from the thread's state is clobbered by zircon with
-    // ZX_ERR_BAD_SYSCALL, but it really should be the syscall number.
-    current_task.registers.rax = syscall.decl.number;
+    #[cfg(target_arch = "x86_64")]
+    {
+        // The `rax` register read from the thread's state is clobbered by zircon with
+        // ZX_ERR_BAD_SYSCALL, but it really should be the syscall number.
+        current_task.registers.rax = syscall.decl.number;
 
-    // `orig_rax` should hold the original value loaded into `rax` by the userspace process.
-    current_task.registers.orig_rax = syscall.decl.number;
+        // `orig_rax` should hold the original value loaded into `rax` by the userspace process.
+        current_task.registers.orig_rax = syscall.decl.number;
+    }
 
     log_trace!(current_task, "{:?}", syscall);
     match dispatch_syscall(current_task, &syscall) {
         Ok(return_value) => {
             log_trace!(current_task, "-> {:#x}", return_value.value(),);
-            current_task.registers.rax = return_value.value();
+            current_task.registers.set_return_register(return_value.value());
             None
         }
         Err(errno) => {
             log_trace!(current_task, "!-> {:?}", errno,);
-            current_task.registers.rax = errno.return_value();
+            current_task.registers.set_return_register(errno.return_value());
             Some(ErrorContext { error: errno, syscall })
         }
     }
@@ -203,24 +199,30 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
     //   2. Jumps back to the current instruction pointer of the thread executed by an indirect
     //      jump to the 64-bit address immediately following the jump instruction.
     #[cfg(target_arch = "x86_64")]
-    const INTERRUPT_AND_JUMP: [u8; 7] = [
-        0xcc, // int 3
-        0xff, 0x25, 0x00, 0x00, 0x00, 0x00, // jmp *0x0(%rip)
-    ];
+    let instructions = {
+        const INTERRUPT_AND_JUMP: [u8; 7] = [
+            0xcc, // int 3
+            0xff, 0x25, 0x00, 0x00, 0x00, 0x00, // jmp *0x0(%rip)
+        ];
+        let mut instruction_pointer = current_task.registers.rip.as_bytes().to_owned();
+        let mut instructions = INTERRUPT_AND_JUMP.to_vec();
+        instructions.append(&mut instruction_pointer);
+        instructions
+    };
     #[cfg(target_arch = "aarch64")]
-    const INTERRUPT_AND_JUMP: [u8; 8] = [
-        0x00, 0x00, 0x20, 0xd4, // 0xd4200000 = brk 0 (the argument is ignored by us).
-        // TODO Write this code. This issues an undefined instruction so it's obvious something
-        // is not implemented. As of this writing, ARM doesn't compile so this code can't be tested
-        // so I didn't want to write something that looked correct but was wrong.
-        //
-        // I believe ARM lacks a single indirect-from-memory jump instruction like x86 so this will
-        // need some research on what registers we can clobber.
-        0x00, 0x00, 0x00, 0x00, // udf = "Undefined instruction"
-    ];
-    let mut instruction_pointer = current_task.registers.rip.as_bytes().to_owned();
-    let mut instructions = INTERRUPT_AND_JUMP.to_vec();
-    instructions.append(&mut instruction_pointer);
+    let instructions = {
+        const INTERRUPT_AND_JUMP: [u8; 8] = [
+            0x00, 0x00, 0x20, 0xd4, // 0xd4200000 = brk 0 (the argument is ignored by us).
+            // TODO Write this code. This issues an undefined instruction so it's obvious something
+            // is not implemented. As of this writing, ARM doesn't compile so this code can't be
+            // tested so I didn't want to write something that looked correct but was wrong.
+            //
+            // I believe ARM lacks a single indirect-from-memory jump instruction like x86 so this
+            // will need some research on what registers we can clobber.
+            0x00, 0x00, 0x00, 0x00, // udf = "Undefined instruction"
+        ];
+        INTERRUPT_AND_JUMP.to_vec()
+    };
 
     let vmo = Arc::new(
         zx::Vmo::create(*PAGE_SIZE)

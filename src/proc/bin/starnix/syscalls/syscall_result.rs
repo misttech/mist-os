@@ -12,8 +12,14 @@ pub const SUCCESS: SyscallResult = SyscallResult(0);
 
 impl SyscallResult {
     /// TODO document
+    #[cfg(target_arch = "x86_64")]
     pub fn keep_regs(current_task: &CurrentTask) -> Self {
         SyscallResult(current_task.registers.rax)
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn keep_regs(current_task: &CurrentTask) -> Self {
+        SyscallResult(current_task.registers.r[0])
     }
 
     pub fn value(&self) -> u64 {
