@@ -1,0 +1,80 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.memory.sampler;
+
+using zx;
+
+/// A build ID is a 20 bytes long sequence.
+const BUILD_ID_BYTES uint32 = 20;
+
+/// Information necessary for the symbolization of a module.
+/// Represents the subset of an ELF module relevant for the purposes of
+/// the profiler. The main use case for this map is the symbolization of stack traces.
+type ModuleMap = table {
+    /// Build ID, a string which uniquely identifies a module build.
+    1: build_id vector<uint8>:BUILD_ID_BYTES;
+    /// Collection of executable segments.
+    2: executable_segments vector<ExecutableSegment>:MAX;
+};
+
+/// Address region that corresponds to an executable segment in an ELF module.
+type ExecutableSegment = table {
+    /// Start of the region as mapped in memory.
+    1: start_address uint64;
+    /// Size of the range of addresses that are part of the region.
+    2: size uint64;
+    /// Offset of the region in the ELF binary before loading.
+    3: relative_address uint64;
+};
+
+/// A stack trace, as a collection of stack frames.
+type StackTrace = table {
+    /// Ordered vector of frame pointers, from the narrower to the wider location.
+    1: stack_frames vector<uint64>:MAX;
+};
+
+/// Interface used to exfiltrate process allocation information.
+@discoverable
+protocol Sampler {
+    /// Record an allocation.
+    RecordAllocation(struct {
+        /// Address of the allocation, to uniquely identify it.
+        address uint64;
+        /// Stack frames collected at the allocation point.
+        ///
+        /// A client is free to truncate their stack traces to a size below the
+        /// maximum size of a message that can be sent over the channel. If a
+        /// client sends a StackTrace that causes to exceed the maximum size of
+        /// the message, then the record will be dropped until RFC-0196 is
+        /// implemented.
+        stack_trace StackTrace;
+        /// Size (in bytes) of this allocation.
+        size uint64;
+    });
+    /// Record a deallocation.
+    RecordDeallocation(struct {
+        /// Address of the deallocation, to uniquely identify it.
+        address uint64;
+        /// Stack frames collected at the deallocation point.
+        ///
+        /// A client is free to truncate their stack traces to a size below the
+        /// maximum size of a message that can be sent over the channel. If a
+        /// client sends a StackTrace that causes to exceed the maximum size of
+        /// the message, then the record will be dropped until RFC-0196 is
+        /// implemented.
+        stack_trace StackTrace;
+    });
+    /// Communicate relevant process information to facilitate symbolization.
+    ///
+    /// If called several times, the last `process_name` prevails, but the
+    /// `module_map` is added to the existing map for the process. If a client
+    /// needs to send a `module_map` that does not fit in a single message, they
+    /// can split it and send it across several messages.
+    SetProcessInfo(table {
+        /// Name of the instrumented process.
+        1: process_name string:zx.MAX_NAME_LEN;
+        /// Current module layout, for symbolization.
+        2: module_map vector<ModuleMap>:MAX;
+    });
+};
