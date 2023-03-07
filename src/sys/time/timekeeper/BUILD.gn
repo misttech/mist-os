@@ -102,6 +102,10 @@ fuchsia_component("service") {
   deps = [ ":bin" ]
 }
 
+group("timekeeper_pkg_for_transition") {
+  public_deps = [ ":timekeeper" ]
+}
+
 fuchsia_package("timekeeper") {
   deps = [
     ":service",

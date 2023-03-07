@@ -77,17 +77,55 @@ if (is_fuchsia) {
     ]
   }
 
-  _core_realm_deps = [
-    "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
-    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
-    "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
-    "//src/developer/forensics:core_shard",
-    "//src/diagnostics/realm:core_shard",
-    "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
-    "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
-    "//src/recovery/factory_reset:factory_reset_core_shard",
-    "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
+  # These are to temporarily switch back to using the bootstrap level so that the
+  # vendor assemblies can be moved to utility with it being the same as
+  # bootstrap
+  # TODO(122863) Remove use of transitional labels
+  core_realm_aib_pkgs = [
+    # The required SWD stack artifacts to enable packages in an FVM.
+    "//src/sys/pkg/bin/pkg-cache",
+    "//src/sys/pkg/bin/pkg-resolver",
+
+    # This is a required dependency of pkg-cache
+    "//src/sys/pkg/bin/system-update-committer",
+
+    # Build-Information
+    "//src/developer/build_info:build-info-service",
+
+    # Hardware Information
+    "//src/hwinfo:hwinfo",
+
+    # System Time
+    "//src/sys/time/timekeeper",
+    "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
+
+    # Other
+    "//src/sys/stash:pkg",
   ]
+  core_realm_aib_shards = [ "//src/developer/build_info:build_info_core_shard" ]
+  core_realm_eng_aib_pkgs = [
+    # Dash launcher should be available in every engineering-mode product.
+    "//src/sys/tools/debug-dash-launcher",
+
+    # The fs_realm component should be available in every engineering-mode product.
+    "//src/storage/fs_realm",
+  ]
+  core_realm_eng_aib_shards = [
+    "//src/sys/tools/debug-dash-launcher:core-shard",
+    "//src/storage/fs_realm:fs_realm_core_shard",
+  ]
+
+  _core_realm_deps = core_realm_aib_shards + [
+                       "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
+                       "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
+                       "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
+                       "//src/developer/forensics:core_shard",
+                       "//src/diagnostics/realm:core_shard",
+                       "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
+                       "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
+                       "//src/recovery/factory_reset:factory_reset_core_shard",
+                       "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
+                     ]
 
   core_realm_definition("core") {
     restrict_persistent_storage = false
@@ -100,7 +138,7 @@ if (is_fuchsia) {
 
     # TODO(fxbug.dev/102390): deprecate appmgr from this product config
     deps =
-        _core_realm_deps + appmgr_core_shards + [
+        _core_realm_deps + appmgr_core_shards + core_realm_eng_aib_shards + [
           # required for SL4F
           "//src/developer:default-laboratory-env-core-shard",
           "//src/developer/memory/monitor:memory_monitor_core_shard",
@@ -121,7 +159,7 @@ if (is_fuchsia) {
            ]
   }
 
-  recovery_packages = board_recovery_package_labels + [
+  recovery_packages = board_recovery_package_labels + core_realm_aib_pkgs + [
                         ":build-info-recovery",
                         "//src/connectivity/location/regulatory_region:regulatory_region",
                         "//src/connectivity/network",
@@ -149,7 +187,7 @@ if (is_fuchsia) {
                       ]
 
   recovery_eng_packages =
-      recovery_packages + [
+      recovery_packages + core_realm_eng_aib_pkgs + [
         "//src/cobalt/bin/app:build_type_eng",
         "//src/cobalt/bin/app:cobalt",
         "//src/cobalt/bin/app:cobalt_registry",
@@ -231,7 +269,7 @@ if (is_fuchsia) {
   product_assembly_configuration("for-eng") {
     platform = {
       build_type = "eng"
-      feature_set_level = "utility"
+      feature_set_level = "bootstrap"
     }
     product = {
     }
@@ -249,7 +287,7 @@ if (is_fuchsia) {
   product_assembly_configuration("for-fastboot") {
     platform = {
       build_type = "eng"
-      feature_set_level = "utility"
+      feature_set_level = "bootstrap"
     }
     product = {
     }
@@ -264,20 +302,20 @@ if (is_fuchsia) {
 
     product_assembly_config_label = ":for-fastboot"
 
-    base_packages = [
-      "//build/info:build-info",
-      "//src/connectivity/network",
-      "//src/connectivity/network/netcfg:config-default",
-      "//src/devices/sysmem/bin/sysmem_connector",
-      "//src/sys/appmgr",
-      "//src/sys/appmgr:appmgr_scheme_config",
-      "//src/sys/appmgr:component_id_index_no_restrict_storage",
-      "//src/sys/sysmgr",
-      "//src/firmware/fastboot-tcp",
-      "//src/connectivity/network/mdns/bundles:services",
-      "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
-      "//src/firmware/fastboot-usb",
-    ]
+    base_packages = core_realm_aib_pkgs + core_realm_eng_aib_pkgs + [
+                      "//build/info:build-info",
+                      "//src/connectivity/network",
+                      "//src/connectivity/network/netcfg:config-default",
+                      "//src/devices/sysmem/bin/sysmem_connector",
+                      "//src/sys/appmgr",
+                      "//src/sys/appmgr:appmgr_scheme_config",
+                      "//src/sys/appmgr:component_id_index_no_restrict_storage",
+                      "//src/sys/sysmgr",
+                      "//src/firmware/fastboot-tcp",
+                      "//src/connectivity/network/mdns/bundles:services",
+                      "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
+                      "//src/firmware/fastboot-usb",
+                    ]
 
     bootfs_labels = []
     bootfs_labels = [
@@ -326,7 +364,7 @@ if (is_fuchsia) {
   product_assembly_configuration("for-fdr") {
     platform = {
       build_type = "user"
-      feature_set_level = "utility"
+      feature_set_level = "bootstrap"
     }
     product = {
     }
@@ -370,7 +408,7 @@ if (is_fuchsia) {
   product_assembly_configuration("for-installer") {
     platform = {
       build_type = "eng"
-      feature_set_level = "utility"
+      feature_set_level = "bootstrap"
     }
     product = {
     }

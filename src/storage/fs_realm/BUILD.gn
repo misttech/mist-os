@@ -50,8 +50,9 @@ fuchsia_component("component") {
 
 fuchsia_package("fs_realm") {
   deps = [ ":component" ]
-
   # This package is added by product assembly into eng builds only.
   # It should not be added manually anywhere else.
-  visibility = [ "//bundles/assembly/*" ]
+  #
+  # This is temporarily relaxed for a transition
+  # visibility = [ "//bundles/assembly/*" ]
 }

@@ -76,10 +76,11 @@ fuchsia_package("debug-dash-launcher") {
     "//third_party/sbase:bins",
     "//zircon/third_party/uapp/dash",
   ]
-
   # This package is added by product assembly into non-eng builds only.
   # It should not be added manually anywhere else.
-  visibility = [ "//bundles/assembly/*" ]
+  #
+  # This is temporarily relaxed for a transition
+  # visibility = [ "//bundles/assembly/*" ]
 }
 
 group("tests") {
