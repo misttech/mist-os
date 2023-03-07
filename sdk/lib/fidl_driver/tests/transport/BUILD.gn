@@ -92,6 +92,7 @@ test("fidl_driver_api_test_bin") {
   deps = [
     ":fidl_driver_transport_testing_lib",
     ":test.transport_cpp_driver",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime:testing",
     "//sdk/lib/fidl_driver",
     "//sdk/lib/fidl_driver:fidl_driver_natural",

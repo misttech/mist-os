@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/test.transport/cpp/driver/wire.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
@@ -24,52 +25,59 @@ TEST(ServerBindingGroup, Control) {
   struct Server : public fdf::WireServer<test_transport::TwoWayTest> {
     void TwoWay(TwoWayRequestView request, fdf::Arena& arena,
                 TwoWayCompleter::Sync& completer) override {
-      call_count++;
+      call_count_++;
       completer.buffer(arena).Reply(request->payload);
     }
 
-    size_t call_count = 0;
+    void Bind(fdf::ServerEnd<test_transport::TwoWayTest> server_end) {
+      bindings.emplace();
+      bindings->AddBinding(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this,
+                           std::mem_fn(&Server::OnClosed));
+    }
+
+    void DestroyBinding() { bindings.reset(); }
+
+    size_t call_count() const { return call_count_; }
+
+    bool close_handler_called() const { return close_handler_called_; }
+
+   private:
+    void OnClosed(fidl::UnbindInfo) { close_handler_called_ = true; }
+
+    size_t call_count_ = 0;
+    bool close_handler_called_ = false;
+    std::optional<fdf::ServerBindingGroup<test_transport::TwoWayTest>> bindings;
   };
-  Server server;
 
   auto endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto [client_end, server_end] = std::move(*endpoints);
 
-  bool close_handler_called = false;
+  async_patterns::TestDispatcherBound<Server> server{dispatcher.async_dispatcher(), std::in_place};
+  server.AsyncCall(&Server::Bind, std::move(server_end));
 
-  async::PostTask(dispatcher.async_dispatcher(), [&, &dispatcher = dispatcher,
-                                                  &server_end = server_end,
-                                                  &client_end = client_end] {
-    fdf::ServerBindingGroup<test_transport::TwoWayTest> bindings;
+  fdf::Arena arena('TEST');
+  constexpr uint32_t kPayload = 42;
+  EXPECT_EQ(0u, server.SyncCall(&Server::call_count));
+  {
+    auto result = fdf::WireCall(client_end).buffer(arena)->TwoWay(kPayload);
+    ASSERT_TRUE(result.ok()) << result.error();
+    EXPECT_EQ(kPayload, result->payload);
+  }
+  EXPECT_EQ(1u, server.SyncCall(&Server::call_count));
+  {
+    auto result = fdf::WireCall(client_end).buffer(arena)->TwoWay(kPayload);
+    ASSERT_TRUE(result.ok()) << result.error();
+    EXPECT_EQ(kPayload, result->payload);
+  }
+  EXPECT_EQ(2u, server.SyncCall(&Server::call_count));
 
-    bindings.AddBinding(dispatcher.get(), std::move(server_end), &server,
-                        [&close_handler_called](fidl::UnbindInfo) { close_handler_called = true; });
-
-    fdf::Arena arena('TEST');
-    constexpr uint32_t kPayload = 42;
-    EXPECT_EQ(0u, server.call_count);
-    {
-      auto result = fdf::WireCall(client_end).buffer(arena)->TwoWay(kPayload);
-      ASSERT_TRUE(result.ok()) << result.error();
-      EXPECT_EQ(kPayload, result->payload);
-    }
-    EXPECT_EQ(1u, server.call_count);
-    {
-      auto result = fdf::WireCall(client_end).buffer(arena)->TwoWay(kPayload);
-      ASSERT_TRUE(result.ok()) << result.error();
-      EXPECT_EQ(kPayload, result->payload);
-    }
-    EXPECT_EQ(2u, server.call_count);
-
-    // Unbind at end of scope. |bindings| is destroyed here.
-  });
+  // Unbind does not call CloseHandler.
+  server.SyncCall(&Server::DestroyBinding);
+  EXPECT_FALSE(server.SyncCall(&Server::close_handler_called));
 
   dispatcher.ShutdownAsync();
   dispatcher_shutdown->Wait();
-
-  // Unbind does not call CloseHandler.
-  EXPECT_FALSE(close_handler_called);
 }
 
 TEST(ServerBindingGroup, CloseHandler) {
