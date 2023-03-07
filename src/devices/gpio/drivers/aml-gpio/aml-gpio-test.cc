@@ -4,6 +4,9 @@
 
 #include "aml-gpio.h"
 
+#include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 
 #include <fbl/alloc_checker.h>
@@ -12,6 +15,7 @@
 #include "a113-blocks.h"
 #include "lib/device-protocol/pdev-fidl.h"
 #include "s905d2-blocks.h"
+#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 
 namespace {
 
@@ -19,31 +23,17 @@ constexpr size_t kGpioRegSize = 0x100;
 constexpr size_t kInterruptRegSize = 0x30;
 constexpr size_t kInterruptRegOffset = 0x3c00;
 
-// Fake functions
-zx_status_t mmio_fn(void *ctx, uint32_t index, pdev_mmio_t *out_mmio) { return ZX_OK; }
-zx_status_t interrupt_fn(void *ctx, uint32_t index, uint32_t flags, zx_handle_t *out_irq) {
-  return ZX_OK;
-}
-zx_status_t bti_fn(void *ctx, uint32_t index, zx_handle_t *out_bti) { return ZX_OK; }
-zx_status_t smc_fn(void *ctx, uint32_t index, zx_handle_t *out_smc) { return ZX_OK; }
-zx_status_t device_info_fn(void *ctx, pdev_device_info_t *out_info) { return ZX_OK; }
-zx_status_t board_info_fn(void *ctx, pdev_board_info_t *out_info) { return ZX_OK; }
-
-pdev_protocol_ops_t fake_ops{.get_mmio = &mmio_fn,
-                             .get_interrupt = &interrupt_fn,
-                             .get_bti = &bti_fn,
-                             .get_smc = &smc_fn,
-                             .get_device_info = &device_info_fn,
-                             .get_board_info = &board_info_fn};
-pdev_protocol_t fake_proto{.ops = &fake_ops, .ctx = nullptr};
-
 }  // namespace
 
 namespace gpio {
 
+struct IncomingNamespace {
+  fake_pdev::FakePDevFidl pdev_server;
+};
+
 class FakeAmlGpio : public AmlGpio {
  public:
-  static std::unique_ptr<FakeAmlGpio> Create(pdev_device_info info,
+  static std::unique_ptr<FakeAmlGpio> Create(ddk::PDevFidl pdev, pdev_device_info info,
                                              ddk_mock::MockMmioRegRegion *mock_mmio_gpio,
                                              ddk_mock::MockMmioRegRegion *mock_mmio_gpio_a0,
                                              ddk_mock::MockMmioRegRegion *mock_mmio_interrupt) {
@@ -85,8 +75,8 @@ class FakeAmlGpio : public AmlGpio {
     fdf::MmioBuffer mmio_interrupt(mock_mmio_interrupt->GetMmioBuffer());
 
     FakeAmlGpio *device(new (&ac) FakeAmlGpio(
-        std::move(mmio_gpio), std::move(mmio_gpio_a0), std::move(mmio_interrupt), gpio_blocks,
-        gpio_interrupt, block_count, std::move(info), std::move(irq_info)));
+        std::move(pdev), std::move(mmio_gpio), std::move(mmio_gpio_a0), std::move(mmio_interrupt),
+        gpio_blocks, gpio_interrupt, block_count, std::move(info), std::move(irq_info)));
     if (!ac.check()) {
       zxlogf(ERROR, "FakeAmlGpio::Create: device object alloc failed");
       return nullptr;
@@ -96,14 +86,35 @@ class FakeAmlGpio : public AmlGpio {
   }
 
  private:
-  explicit FakeAmlGpio(fdf::MmioBuffer mock_mmio_gpio, fdf::MmioBuffer mock_mmio_gpio_a0,
-                       fdf::MmioBuffer mock_mmio_interrupt, const AmlGpioBlock *gpio_blocks,
-                       const AmlGpioInterrupt *gpio_interrupt, size_t block_count,
-                       pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
-      : AmlGpio(&fake_proto, std::move(mock_mmio_gpio), std::move(mock_mmio_gpio_a0),
+  explicit FakeAmlGpio(ddk::PDevFidl pdev, fdf::MmioBuffer mock_mmio_gpio,
+                       fdf::MmioBuffer mock_mmio_gpio_a0, fdf::MmioBuffer mock_mmio_interrupt,
+                       const AmlGpioBlock *gpio_blocks, const AmlGpioInterrupt *gpio_interrupt,
+                       size_t block_count, pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
+      : AmlGpio(std::move(pdev), std::move(mock_mmio_gpio), std::move(mock_mmio_gpio_a0),
                 std::move(mock_mmio_interrupt), gpio_blocks, gpio_interrupt, block_count,
                 std::move(info), std::move(irq_info)) {}
 };
+
+zx::result<ddk::PDevFidl> StartPDev(
+    async::Loop &incoming_loop, async_patterns::TestDispatcherBound<IncomingNamespace> &incoming) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_platform_device::Device>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+
+  zx_status_t status = incoming_loop.StartThread("incoming-ns-thread");
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  incoming.SyncCall([server = std::move(endpoints->server)](IncomingNamespace *infra) mutable {
+    infra->pdev_server.SetConfig(fake_pdev::FakePDevFidl::Config{
+        .use_fake_irq = true,
+    });
+    infra->pdev_server.Connect(std::move(server));
+  });
+  return zx::ok(ddk::PDevFidl(std::move(endpoints->client)));
+}
 
 class A113AmlGpioTest : public zxtest::Test {
  public:
@@ -111,7 +122,10 @@ class A113AmlGpioTest : public zxtest::Test {
     // make-up info, pid and irq_count needed for Create
     auto info = pdev_device_info{0, PDEV_PID_AMLOGIC_A113, 0, 2, 3, 0, 0, 0, {0}, "fake_info"};
 
-    gpio_ = FakeAmlGpio::Create(info, &mock_mmio_gpio_, &mock_mmio_gpio_a0_, &mock_mmio_interrupt_);
+    zx::result pdev_result = StartPDev(incoming_loop_, incoming_);
+    ASSERT_OK(pdev_result);
+    gpio_ = FakeAmlGpio::Create(std::move(pdev_result.value()), info, &mock_mmio_gpio_,
+                                &mock_mmio_gpio_a0_, &mock_mmio_interrupt_);
   }
 
  protected:
@@ -124,6 +138,9 @@ class A113AmlGpioTest : public zxtest::Test {
                                                  kGpioRegSize};
   ddk_mock::MockMmioRegRegion mock_mmio_interrupt_{interrupt_regs_.data(), sizeof(uint32_t),
                                                    kInterruptRegSize, kInterruptRegOffset};
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
 };
 
 class S905d2AmlGpioTest : public zxtest::Test {
@@ -131,8 +148,10 @@ class S905d2AmlGpioTest : public zxtest::Test {
   void SetUp() override {
     // make-up info, pid and irq_count needed for Create
     auto info = pdev_device_info{0, PDEV_PID_AMLOGIC_S905D2, 0, 2, 3, 0, 0, 0, {0}, "fake_info"};
-
-    gpio_ = FakeAmlGpio::Create(info, &mock_mmio_gpio_, &mock_mmio_gpio_a0_, &mock_mmio_interrupt_);
+    zx::result pdev_result = StartPDev(incoming_loop_, incoming_);
+    ASSERT_OK(pdev_result);
+    gpio_ = FakeAmlGpio::Create(std::move(pdev_result.value()), info, &mock_mmio_gpio_,
+                                &mock_mmio_gpio_a0_, &mock_mmio_interrupt_);
   }
 
  protected:
@@ -145,6 +164,10 @@ class S905d2AmlGpioTest : public zxtest::Test {
                                                  kGpioRegSize};
   ddk_mock::MockMmioRegRegion mock_mmio_interrupt_{interrupt_regs_.data(), sizeof(uint32_t),
                                                    kInterruptRegSize, kInterruptRegOffset};
+
+  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
+                                                                   std::in_place};
 };
 
 // GpioImplSetAltFunction Tests

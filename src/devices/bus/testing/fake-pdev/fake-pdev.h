@@ -35,6 +35,9 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
     // If true, a smc will be generated lazily if it does not exist.
     bool use_fake_smc = false;
 
+    // If true, an irq will be generated lazily if it does not exist.
+    bool use_fake_irq = false;
+
     std::map<uint32_t, Mmio> mmios;
     std::map<uint32_t, zx::interrupt> irqs;
     std::map<uint32_t, zx::bti> btis;

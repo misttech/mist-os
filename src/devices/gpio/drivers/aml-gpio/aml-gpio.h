@@ -65,12 +65,12 @@ class AmlGpio : public DeviceType, public ddk::GpioImplProtocol<AmlGpio, ddk::ba
 
  protected:
   // for AmlGpioTest
-  explicit AmlGpio(pdev_protocol_t* proto, fdf::MmioBuffer mmio_gpio, fdf::MmioBuffer mmio_gpio_a0,
+  explicit AmlGpio(ddk::PDevFidl pdev, fdf::MmioBuffer mmio_gpio, fdf::MmioBuffer mmio_gpio_a0,
                    fdf::MmioBuffer mmio_interrupt, const AmlGpioBlock* gpio_blocks,
                    const AmlGpioInterrupt* gpio_interrupt, size_t block_count,
                    pdev_device_info_t info, fbl::Array<uint16_t> irq_info)
       : DeviceType(nullptr),
-        pdev_(proto),
+        pdev_(std::move(pdev)),
         mmios_{std::move(mmio_gpio), std::move(mmio_gpio_a0)},
         mmio_interrupt_(std::move(mmio_interrupt)),
         gpio_blocks_(gpio_blocks),
@@ -101,7 +101,7 @@ class AmlGpio : public DeviceType, public ddk::GpioImplProtocol<AmlGpio, ddk::ba
 
   void Bind(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus);
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   fbl::Mutex mmio_lock_;
   std::array<fdf::MmioBuffer, 2> mmios_ TA_GUARDED(mmio_lock_);  // separate MMIO for AO domain
   fdf::MmioBuffer mmio_interrupt_ TA_GUARDED(mmio_lock_);

@@ -34,8 +34,17 @@ void FakePDevFidl::GetInterrupt(GetInterruptRequestView request,
                                 GetInterruptCompleter::Sync& completer) {
   auto itr = config_.irqs.find(request->index);
   if (itr == config_.irqs.end()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
+    if (!config_.use_fake_irq) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
+      return;
+    }
+    zx::interrupt irq;
+    if (zx_status_t status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
+        status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    return completer.ReplySuccess(std::move(irq));
   }
   zx::interrupt irq;
   itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq);
