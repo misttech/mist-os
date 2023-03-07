@@ -7,7 +7,6 @@
 #include <lib/driver/component/cpp/tests/test_driver.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime_env.h>
-#include <lib/driver/testing/cpp/start_args.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/env.h>
@@ -22,7 +21,7 @@ class TestDefaultDispatcher : public ::testing::Test {
     node_server_.emplace(driver_dispatcher(), "root");
 
     // Create start args
-    zx::result start_args = fdf_testing::CreateStartArgs(node_server_.value());
+    zx::result start_args = node_server_.value().CreateStartArgsAndServe();
     EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment
@@ -71,14 +70,13 @@ TEST_F(TestDefaultDispatcher, CreateChildNodeAsync) {
 class TestDefaultDispatcherSeparateEnv : public ::testing::Test {
  public:
   void SetUp() override {
-    // fdf::Node
-    zx::result result = fdf::RunOnDispatcherSync(
-        env_dispatcher(), [this] { node_server_.emplace(env_dispatcher(), "root"); });
+    // fdf::Node and create start args
+    zx::result<fdf_testing::TestNode::CreateStartArgsResult> start_args;
+    zx::result result = fdf::RunOnDispatcherSync(env_dispatcher(), [this, &start_args]() mutable {
+      node_server_.emplace(env_dispatcher(), "root");
+      start_args = node_server_.value().CreateStartArgsAndServe();
+    });
     EXPECT_EQ(ZX_OK, result.status_value());
-
-    // Create start args
-    zx::result start_args = fdf_testing::CreateStartArgs(node_server_.value());
-    EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment
     test_environment_.emplace(env_dispatcher(), std::in_place);
@@ -142,14 +140,13 @@ TEST_F(TestDefaultDispatcherSeparateEnv, CreateChildNodeAsync) {
 class TestAllowSyncDriverDispatcherSeparateEnv : public ::testing::Test {
  public:
   void SetUp() override {
-    // fdf::Node
-    zx::result result = fdf::RunOnDispatcherSync(
-        env_dispatcher(), [this] { node_server_.emplace(env_dispatcher(), "root"); });
+    // fdf::Node and create start args
+    zx::result<fdf_testing::TestNode::CreateStartArgsResult> start_args;
+    zx::result result = fdf::RunOnDispatcherSync(env_dispatcher(), [this, &start_args]() mutable {
+      node_server_.emplace(env_dispatcher(), "root");
+      start_args = node_server_.value().CreateStartArgsAndServe();
+    });
     EXPECT_EQ(ZX_OK, result.status_value());
-
-    // Create start args
-    zx::result start_args = fdf_testing::CreateStartArgs(node_server_.value());
-    EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment
     result = fdf::RunOnDispatcherSync(

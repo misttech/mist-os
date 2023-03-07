@@ -14,6 +14,12 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
  public:
   using ChildrenMap = std::unordered_map<std::string, TestNode>;
 
+  struct CreateStartArgsResult {
+    fuchsia_driver_framework::DriverStartArgs start_args;
+    fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server;
+    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
+  };
+
   TestNode(async_dispatcher_t* dispatcher, std::string name);
 
   ~TestNode() override;
@@ -28,6 +34,9 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   // Serve the given server end.
   // This method is thread-unsafe. Must be called from the same context as the dispatcher.
   zx::result<> Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> server_end);
+
+  // Creates the start args for a driver, and serve the fdf::Node in it.
+  zx::result<CreateStartArgsResult> CreateStartArgsAndServe();
 
   bool HasNode() {
     std::lock_guard guard(checker_);
