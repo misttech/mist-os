@@ -17,9 +17,14 @@ group("tests") {
   ]
 }
 
-# Run with `ffx test run fuchsia-pkg://fuchsia.com/service-examples-cpp#meta/default.cm`
-fuchsia_test_package_with_default_component("service-examples-rust") {
+fuchsia_test_component("service-examples-component") {
+  component_name = "default"
   manifest = "meta/services.cml"
+}
+
+# Run with `ffx test run fuchsia-pkg://fuchsia.com/service-examples-cpp#meta/default.cm`
+fuchsia_test_package("service-examples-rust") {
+  test_components = [ ":service-examples-component" ]
   subpackages = [
     "rust:branch",
     "rust:provider-a",
@@ -28,8 +33,8 @@ fuchsia_test_package_with_default_component("service-examples-rust") {
 }
 
 # Run with `ffx test run fuchsia-pkg://fuchsia.com/service-examples-rust#meta/default.cm`
-fuchsia_test_package_with_default_component("service-examples-cpp") {
-  manifest = "meta/services.cml"
+fuchsia_test_package("service-examples-cpp") {
+  test_components = [ ":service-examples-component" ]
   subpackages = [
     "cpp:branch",
     "cpp:provider-a",

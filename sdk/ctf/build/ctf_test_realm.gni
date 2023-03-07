@@ -18,12 +18,13 @@ import("//build/components.gni")
 template("ctf_test_realm") {
   assert(defined(invoker.manifest), "A component manifest is required")
 
-  fuchsia_package_with_default_component(target_name) {
+  fuchsia_package_with_single_component(target_name) {
     forward_variables_from(invoker,
                            [
                              "deps",
                              "manifest",
                            ])
     testonly = true
+    component_name = "default"
   }
 }

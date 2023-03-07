@@ -37,10 +37,11 @@ executable("lifecycle_manager") {
   ]
 }
 
-fuchsia_package_with_default_component("lifecycle") {
+fuchsia_package_with_single_component("lifecycle") {
   # Since `//examples/components/lifecycle/README.md` includes instructions to
   # use `ffx component run` to launch one of two versions of `lifecycle`, the
   # two versions need unique package names (`lifecycle_cpp` in this case).
+  component_name = "default"
   package_name = "lifecycle_cpp"
   manifest = "meta/lifecycle.cml"
   deps = [ ":lifecycle_example" ]

@@ -34,7 +34,8 @@ fuchsia_component("echo_server_cmp") {
 # [END component]
 
 # Subpackaged component "echo_server#meta/default.cm"
-fuchsia_package_with_default_component("echo_server") {
+fuchsia_package_with_single_component("echo_server") {
+  component_name = "default"
   manifest = "meta/echo_server.cml"
   deps = [ ":bin" ]
 }

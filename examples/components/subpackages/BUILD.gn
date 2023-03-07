@@ -24,20 +24,25 @@ rustc_test("bin") {
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_package_with_default_component("echo_client_with_subpackaged_server") {
+fuchsia_package_with_single_component("echo_client_with_subpackaged_server") {
+  component_name = "default"
   testonly = true
   manifest = "meta/echo_client_with_subpackaged_server.cml"
   deps = [ "//examples/components/routing/rust/echo_client:bin" ]
   subpackages = [ "//examples/components/routing/rust/echo_server" ]
 }
 
+fuchsia_test_component("subpackage-examples-component") {
+  component_name = "default"
+  manifest = "meta/parent_realm.cml"
+  deps = [ ":bin" ]
+}
+
 # Run with `fx test subpackage-examples` or
 # `ffx test run fuchsia-pkg://fuchsia.com/subpackage-examples#meta/default.cm`
 # [START declare_subpackages]
-fuchsia_test_package_with_default_component("subpackage-examples") {
-  testonly = true
-  manifest = "meta/parent_realm.cml"
-  deps = [ ":bin" ]
+fuchsia_test_package("subpackage-examples") {
+  test_components = [ ":subpackage-examples-component" ]
   subpackages = [
     "//examples/components/routing/rust/echo_client",
     ":echo_client_with_subpackaged_server",

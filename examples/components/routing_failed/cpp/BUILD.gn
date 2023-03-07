@@ -19,7 +19,8 @@ executable("bin") {
   ]
 }
 
-fuchsia_package_with_default_component("echo_client") {
+fuchsia_package_with_single_component("echo_client") {
   deps = [ ":bin" ]
+  component_name = "default"
   manifest = "meta/echo_client.cml"
 }

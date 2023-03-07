@@ -45,10 +45,14 @@ fuchsia_test_package("echo_integration_test_cpp") {
 # [END test_package]
 # [END example_snippet]
 
-fuchsia_test_package_with_default_component(
-    "subpackaged_echo_integration_test_cpp") {
+fuchsia_test_component("subpackaged_echo_integration_test_cpp_component") {
   manifest = "meta/subpackaged_echo_integration_test.cml"
+  component_name = "default"
   deps = [ ":bin" ]
+}
+
+fuchsia_test_package("subpackaged_echo_integration_test_cpp") {
+  test_components = [ ":subpackaged_echo_integration_test_cpp_component" ]
   subpackages = [ "//examples/components/routing/cpp/echo_server" ]
 }
 
