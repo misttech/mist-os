@@ -28,12 +28,9 @@ using CorpusType = ::fuchsia::fuzzer::Corpus;
 
 class ControllerImpl : public Controller {
  public:
-  explicit ControllerImpl(ExecutorPtr executor);
+  explicit ControllerImpl(RunnerPtr runner);
 
   const RunnerPtr& runner() const { return runner_; }
-
-  // Sets and configures the runner used to perform tasks.
-  void SetRunner(RunnerPtr runner);
 
   // Binds the FIDL interface request to this object.
   void Bind(fidl::InterfaceRequest<Controller> request);
@@ -70,7 +67,6 @@ class ControllerImpl : public Controller {
   fidl::Binding<Controller> binding_;
   ExecutorPtr executor_;
   RunnerPtr runner_;
-  bool initialized_ = false;
   Artifact artifact_;
   Scope scope_;
 

@@ -10,8 +10,8 @@ namespace fuzzing {
 
 using ::fuchsia::fuzzer::RegistrySyncPtr;
 
-ControllerProviderImpl::ControllerProviderImpl(ExecutorPtr executor)
-    : binding_(this), controller_(std::move(executor)) {
+ControllerProviderImpl::ControllerProviderImpl(RunnerPtr runner)
+    : binding_(this), controller_(std::move(runner)) {
   binding_.set_error_handler([](zx_status_t status) {
     // The registry signals the provider should exit by closing its channel.
     exit(0);
@@ -32,15 +32,12 @@ void ControllerProviderImpl::Stop() { controller_.Stop(); }
 ///////////////////////////////////////////////////////////////
 // Run-related methods
 
-Promise<> ControllerProviderImpl::Serve(RunnerPtr runner, const std::string& url,
-                                        zx::channel channel) {
-  FX_CHECK(runner);
+Promise<> ControllerProviderImpl::Serve(const std::string& url, zx::channel channel) {
   FX_CHECK(channel);
   Bridge<> bridge;
-  return fpromise::make_promise([this, runner, url = std::string(url), channel = std::move(channel),
+  return fpromise::make_promise([this, url = std::string(url), channel = std::move(channel),
                                  completer = std::move(bridge.completer)]() mutable -> Result<> {
            auto provider = binding_.NewBinding();
-           controller_.SetRunner(std::move(runner));
            registrar_.Bind(std::move(channel));
            registrar_->Register(url, std::move(provider), completer.bind());
            return fpromise::ok();

@@ -25,13 +25,13 @@ class ControllerProviderTest : public AsyncTest {
   void SetUp() override {
     AsyncTest::SetUp();
     registrar_ = std::make_unique<FakeRegistrar>(executor());
-    provider_ = std::make_unique<ControllerProviderImpl>(executor());
     runner_ = FakeRunner::MakePtr(executor());
+    provider_ = std::make_unique<ControllerProviderImpl>(runner_);
   }
 
   ControllerProviderPtr GetProvider() {
     ControllerProviderPtr provider;
-    auto task = provider_->Serve(runner_, kFakeFuzzerUrl, registrar_->NewBinding().TakeChannel())
+    auto task = provider_->Serve(kFakeFuzzerUrl, registrar_->NewBinding().TakeChannel())
                     .or_else([] { return fpromise::error(ZX_ERR_CANCELED); })
                     .and_then(registrar_->TakeProvider())
                     .and_then([this, &provider](ControllerProviderHandle& handle) -> ZxResult<> {

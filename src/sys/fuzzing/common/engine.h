@@ -32,7 +32,7 @@ class Engine {
   // Parses the command line and extracts recognized arguments from it.
   __WARN_UNUSED_RESULT zx_status_t Initialize(int* pargc, char*** pargv);
 
-  // Runs the engine.
+  // Runs the engine. The given `context` and `runner` must not be null.
   __WARN_UNUSED_RESULT zx_status_t Run(ComponentContextPtr context, RunnerPtr runner);
 
  private:

@@ -25,16 +25,16 @@ using ::fuchsia::fuzzer::RegistrarPtr;
 
 class ControllerProviderImpl final : public ControllerProvider {
  public:
-  explicit ControllerProviderImpl(ExecutorPtr executor);
+  explicit ControllerProviderImpl(RunnerPtr runner);
   ~ControllerProviderImpl() override = default;
 
   // FIDL methods.
   void Connect(fidl::InterfaceRequest<Controller> request, ConnectCallback callback) override;
   void Stop() override;
 
-  // Returns a promise to register a controller for the given `runner` under the given `url`, using
-  // the given `channel` to the fuzz-registry.
-  Promise<> Serve(RunnerPtr runner, const std::string& url, zx::channel channel);
+  // Returns a promise to register a controller for the given `url`, using the given `channel` to
+  // the fuzz-registry.
+  Promise<> Serve(const std::string& url, zx::channel channel);
 
  private:
   fidl::Binding<ControllerProvider> binding_;

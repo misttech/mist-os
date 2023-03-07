@@ -19,25 +19,18 @@ namespace fuzzing {
 
 using ::fuchsia::fuzzer::DONE_MARKER;
 
-ControllerImpl::ControllerImpl(ExecutorPtr executor)
-    : binding_(this), executor_(std::move(executor)) {}
+ControllerImpl::ControllerImpl(RunnerPtr runner)
+    : binding_(this), executor_(runner->executor()), runner_(runner) {}
 
 void ControllerImpl::Bind(fidl::InterfaceRequest<Controller> request) {
   FX_DCHECK(runner_);
   binding_.Bind(std::move(request));
 }
 
-void ControllerImpl::SetRunner(RunnerPtr runner) {
-  runner_ = std::move(runner);
-  initialized_ = false;
-}
-
 ZxPromise<> ControllerImpl::Initialize() {
-  FX_CHECK(runner_);
   return runner_->Configure()
       .and_then([this]() -> ZxResult<> {
         artifact_ = Artifact();
-        initialized_ = true;
         return fpromise::ok();
       })
       .wrap_with(scope_);
@@ -60,9 +53,8 @@ void ControllerImpl::Configure(Options options, ConfigureCallback callback) {
         return fpromise::ok();
       })
           .and_then(runner_->Configure())
-          .then([this, callback = std::move(callback)](const ZxResult<>& result) {
+          .then([callback = std::move(callback)](const ZxResult<>& result) {
             callback(result.is_ok() ? ZX_OK : result.error());
-            initialized_ = true;
           })
           .wrap_with(scope_);
   executor_->schedule_task(std::move(task));

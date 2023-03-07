@@ -32,8 +32,7 @@ class ControllerTest : public AsyncTest {
   // Implicitly tests |Controller::SetRunner| and |Controller::Bind|.
   void Bind(fidl::InterfaceRequest<Controller> request) {
     runner_ = FakeRunner::MakePtr(executor());
-    controller_ = std::make_unique<ControllerImpl>(executor());
-    controller_->SetRunner(runner_);
+    controller_ = std::make_unique<ControllerImpl>(runner_);
     controller_->Bind(std::move(request));
   }
 

@@ -131,6 +131,8 @@ zx_status_t Engine::Initialize(int* pargc, char*** pargv) {
 }
 
 zx_status_t Engine::Run(ComponentContextPtr context, RunnerPtr runner) {
+  FX_CHECK(context);
+  FX_CHECK(runner);
   if (!url_) {
     FX_LOGS(WARNING) << "Not initialized.";
     return ZX_ERR_BAD_STATE;
@@ -158,8 +160,8 @@ zx_status_t Engine::RunFuzzer(ComponentContextPtr context, RunnerPtr runner,
       return status;
     }
   }
-  ControllerProviderImpl provider(context->executor());
-  auto task = provider.Serve(std::move(runner), url, context->TakeChannel(0));
+  ControllerProviderImpl provider(std::move(runner));
+  auto task = provider.Serve(url, context->TakeChannel(0));
   context->ScheduleTask(std::move(task));
   return context->Run();
 }
