@@ -394,8 +394,19 @@ pub fn sys_exit_group(current_task: &CurrentTask, code: i32) -> Result<(), Errno
     Ok(())
 }
 
-pub fn sys_sched_getscheduler(_ctx: &CurrentTask, _pid: i32) -> Result<u32, Errno> {
+pub fn sys_sched_getscheduler(current_task: &CurrentTask, pid: i32) -> Result<u32, Errno> {
+    not_implemented!(current_task, "sched_getscheduler {}", pid);
     Ok(SCHED_NORMAL)
+}
+
+pub fn sys_sched_setscheduler(
+    current_task: &CurrentTask,
+    pid: i32,
+    policy: i32,
+    sched_param: UserAddress,
+) -> Result<(), Errno> {
+    not_implemented!(current_task, "sched_setscheduler {:?} {:?} {:?}", pid, policy, sched_param);
+    Ok(())
 }
 
 pub fn sys_sched_getaffinity(
