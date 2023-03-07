@@ -20,7 +20,7 @@ import("//build/info/info.gni")
 #     [string] Target to analyze. Defaults to "//:default".
 #
 #   run_analysis (optional)
-#     [bool] Whether to analyze license texts and run tests. Default == false.
+#     [bool] Whether to analyze license texts and run tests. Default == true.
 #
 #   produce_spdx (optional)
 #     [bool] Whether to also produce an SPDX output. Default == false.
@@ -40,7 +40,7 @@ template("license_data") {
     emit_metadata = invoker.emit_metadata
   }
 
-  run_analysis = false
+  run_analysis = true
   if (defined(invoker.run_analysis)) {
     run_analysis = invoker.run_analysis
   }
