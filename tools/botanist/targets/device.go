@@ -412,6 +412,15 @@ func (t *DeviceTarget) flash(ctx context.Context, images []bootserver.Image) err
 		defer os.Remove(pubkey)
 	}
 
+	// Print logs to avoid hitting the I/O timeout.
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+	go func() {
+		for range ticker.C {
+			logger.Debugf(ctx, "still flashing...")
+		}
+	}()
+
 	// TODO(fxbug.dev/91040): Remove experimental condition once stable.
 	if pubkey != "" && t.UseFFXExperimental(1) {
 		flashManifest := getImageByName(images, "manifest_flash-manifest")
