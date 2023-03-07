@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::base::SettingType;
-use crate::handler::base::{Payload as HandlerPayload, Request};
 use crate::ingress::fidl::Interface;
 use crate::input::common::MediaButtonsEventBuilder;
 use crate::input::input_device_configuration::{
@@ -13,7 +12,6 @@ use crate::input::monitor_media_buttons;
 use crate::input::types::{
     DeviceState, DeviceStateSource, InputCategory, InputDeviceType, InputInfoSources, InputState,
 };
-use crate::message::base::{Attribution, Message, MessageType, MessengerType};
 use crate::message::receptor::Receptor;
 use crate::service::message::Delegate;
 use crate::service::Payload;
@@ -238,14 +236,7 @@ async fn get_and_check_camera_disable(
 
 // Creates a broker to listen in on media buttons events.
 fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor {
-    let message_hub_future = delegate.create(MessengerType::Broker(Arc::new(move |message| {
-        // The first condition indicates that it is a response to a set request.
-        if let Payload::Setting(HandlerPayload::Response(Ok(None))) = message.payload() {
-            is_attr_onbutton(message)
-        } else {
-            false
-        }
-    })));
+    let message_hub_future = delegate.create_sink();
     pin_mut!(message_hub_future);
     match executor.run_until_stalled(&mut message_hub_future) {
         Poll::Ready(Ok((_, receptor))) => receptor,
@@ -257,21 +248,16 @@ fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor {
 // following code can be sure that the media buttons event was handled
 // before continuing.
 async fn wait_for_media_button_event(media_buttons_receptor: &mut Receptor) {
-    let _ = media_buttons_receptor.next_payload().await.expect("payload should exist");
-}
-
-// Returns true if the given attribution `message`'s payload is an OnButton event.
-fn is_attr_onbutton(message: &Message) -> bool {
-    // Find the corresponding message from the message's attribution.
-    let attr_msg =
-        if let Attribution::Source(MessageType::Reply(message)) = message.get_attribution() {
-            message
-        } else {
-            return false;
-        };
-
-    // Filter by the attribution message's payload. It should be an OnButton request.
-    matches!(attr_msg.payload(), Payload::Setting(HandlerPayload::Request(Request::OnButton(_))))
+    use crate::event;
+    use crate::event::media_buttons;
+    while let Ok((payload, _)) = media_buttons_receptor.next_payload().await {
+        if let Payload::Event(event::Payload::Event(event::Event::MediaButtons(
+            media_buttons::Event::OnButton(_),
+        ))) = payload
+        {
+            return;
+        }
+    }
 }
 
 // Perform a watch and check that the mic mute state matches [expected_mic_mute_state]
