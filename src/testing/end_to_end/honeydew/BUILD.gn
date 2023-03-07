@@ -31,5 +31,6 @@ python_library("honeydew") {
     "utils/ffx_cli.py",
     "utils/host_utils.py",
     "utils/http_utils.py",
+    "utils/properties.py",
   ]
 }

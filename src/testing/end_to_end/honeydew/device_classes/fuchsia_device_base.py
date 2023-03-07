@@ -103,7 +103,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        return self._device_type
+        return ffx_cli.get_target_type(self.name)
 
     @properties.PersistentProperty
     def manufacturer(self) -> str:
@@ -151,7 +151,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        return self._serial_number
+        get_device_info_resp = self.send_sl4f_command(
+            method=_SL4F_METHODS["GetDeviceInfo"])
+        return get_device_info_resp["result"]["serial_number"]
 
     # List all the dynamic properties in alphabetical order
     @properties.DynamicProperty
@@ -375,23 +377,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         return component_default.ComponentDefault(
             device_name=self.name, sl4f=self)
 
-    @properties.PersistentProperty
-    @lru_cache
-    def _device_type(self) -> str:
-        """Returns the device type.
-
-        Returns:
-            Device type.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
-
-        Note:
-            Created this method instead of directly calling this method's
-            implementation in `device_type` to address type hinting error.
-        """
-        return ffx_cli.get_target_type(self.name)
-
     def _get_device_ip_address(self, timeout: float):
         """Returns the device IP(V4|V6) address used for SSHing from host.
 
@@ -436,7 +421,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         _LOGGER.info("%s now pingable.", self.name)
 
     @properties.PersistentProperty
-    @lru_cache
     def _product_info(self) -> Dict[str, Any]:
         """Returns the product information of the device.
 
@@ -477,25 +461,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         output = subprocess.check_output(
             ssh_command.split(), timeout=timeout).decode()
         return output
-
-    @properties.PersistentProperty
-    @lru_cache
-    def _serial_number(self) -> str:
-        """Returns the serial number of the device.
-
-        Returns:
-            Serial number of device.
-
-        Raises:
-            errors.FuchsiaDeviceError: On failure.
-
-        Note:
-            Created this method instead of directly calling this method's
-            implementation in `device_type` to address type hinting error.
-        """
-        get_device_info_resp = self.send_sl4f_command(
-            method=_SL4F_METHODS["GetDeviceInfo"])
-        return get_device_info_resp["result"]["serial_number"]
 
     def _start_sl4f_server(self) -> None:
         """Starts the SL4F server on fuchsia device.

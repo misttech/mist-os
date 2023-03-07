@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Utility module for different type of property decorators supported by HoneyDew."""
 
+from functools import lru_cache
 from typing import Any, Callable, Optional
 
 
@@ -23,8 +24,11 @@ class DynamicProperty(property):
 
 
 class PersistentProperty(property):
-    """A property that is persistent throughout device interaction."""
+    """A property that is persistent throughout device interaction.
+
+    Value is queried only once and cached.
+    """
 
     def __init__(self, fget: Callable[[Any], Any]):
-        super().__init__(fget, doc=fget.__doc__)
+        super().__init__(lru_cache()(fget), doc=fget.__doc__)
         self.name = fget.__name__
