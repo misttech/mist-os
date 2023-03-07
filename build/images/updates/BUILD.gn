@@ -188,6 +188,31 @@ if (use_bringup_assembly) {
     outputs = [ files.cache_package_manifests ]
   }
 
+  action("universe_package_manifests.list") {
+    testonly = true
+    script = "create-universe-package-manifests-list.py"
+    depfile = "$root_build_dir/$target_name.d"
+    outputs = [ files.universe_package_manifests ]
+    deps = [
+      ":base_package_manifests.list",
+      ":cache_package_manifests.list",
+      ":package_manifests_from_metadata.list",
+    ]
+    args = [
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+      "-o",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+    sources = []
+    foreach(_dep, deps) {
+      _dep_outputs = []  # tell gn its ok to rewrite each iteration
+      _dep_outputs = get_target_outputs(_dep)
+      args += [ rebase_path(_dep_outputs[0], root_build_dir) ]
+      sources += [ _dep_outputs[0] ]
+    }
+  }
+
   action("all_package_manifests.list") {
     testonly = true
     script = "//build/cat.sh"
@@ -195,7 +220,7 @@ if (use_bringup_assembly) {
     deps = [
       ":base_package_manifests.list",
       ":cache_package_manifests.list",
-      ":package_manifests_from_metadata.list",
+      ":universe_package_manifests.list",
     ]
     args = rebase_path(outputs, root_build_dir)
     sources = []

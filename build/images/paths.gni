@@ -79,6 +79,8 @@ files = {
     # TODO(https://fxbug.dev/98480) move these to image-relative paths along with tools' usages
     base_package_manifests = "$root_build_dir/base_package_manifests.list"
     cache_package_manifests = "$root_build_dir/cache_package_manifests.list"
+    universe_package_manifests =
+        "$root_build_dir/universe_package_manifests.list"
   }
 
   _image_suffix = "zbi"
