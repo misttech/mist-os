@@ -41,11 +41,6 @@ core_realm_shards += [
   "//src/sys/test_manager:test_manager_core_shard",
   "//src/sys/fuzzing:fuzzing-core-shard",
   "//src/developer/sshd-host:core_shard",
-
-  # TODO(fxbug.dev/103301): consider moving virtualization to another product
-  "//src/virtualization/bin/guest_manager:debian_core_shard",
-  "//src/virtualization/bin/guest_manager:termina_core_shard",
-  "//src/virtualization/bin/guest_manager:zircon_core_shard",
   "//src/sys/cache_manager:core_shard",
 ]
 core_realm_restrict_persistent_storage = false

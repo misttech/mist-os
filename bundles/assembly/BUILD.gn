@@ -521,6 +521,18 @@ assembly_input_bundle("virtualization_support") {
         core = [ rebase_path(
                 "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
                 root_build_dir) ]
+
+        core += [
+          rebase_path(
+              "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
+              root_build_dir),
+          rebase_path(
+              "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",
+              root_build_dir),
+          rebase_path(
+              "//src/virtualization/bin/guest_manager/meta/zircon_guest_manager.core_shard.cml",
+              root_build_dir),
+        ]
       }
     },
   ]

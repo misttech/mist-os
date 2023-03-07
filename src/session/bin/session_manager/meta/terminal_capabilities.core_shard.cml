@@ -61,21 +61,25 @@
             protocol: "fuchsia.virtualization.LinuxManager",
             from: "#termina-guest-manager",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.virtualization.DebianGuestManager",
             from: "#debian-guest-manager",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.virtualization.TerminaGuestManager",
             from: "#termina-guest-manager",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.virtualization.ZirconGuestManager",
             from: "#zircon-guest-manager",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.starnix.developer.Manager",
