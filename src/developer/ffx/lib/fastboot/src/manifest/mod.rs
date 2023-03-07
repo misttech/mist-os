@@ -447,18 +447,24 @@ pub async fn from_sdk<W: Write>(
 }
 
 pub async fn from_in_tree<W: Write>(
+    sdk: &ffx_config::Sdk,
     writer: &mut W,
     path: PathBuf,
     fastboot_proxy: FastbootProxy,
     cmd: ManifestParams,
 ) -> Result<()> {
     tracing::debug!("fastboot manifest from_in_tree");
-    FlashManifest {
-        resolver: Resolver::new(path.clone())?,
-        version: FlashManifestVersion::from_in_tree(path.clone())?,
+    if cmd.product_bundle.is_some() {
+        tracing::debug!("in tree, but product bundle specified, use in-tree sdk");
+        from_sdk(sdk, writer, fastboot_proxy, cmd).await
+    } else {
+        FlashManifest {
+            resolver: Resolver::new(path.clone())?,
+            version: FlashManifestVersion::from_in_tree(path.clone())?,
+        }
+        .flash(writer, fastboot_proxy, cmd)
+        .await
     }
-    .flash(writer, fastboot_proxy, cmd)
-    .await
 }
 
 pub async fn from_path<W: Write>(

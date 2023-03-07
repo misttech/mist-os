@@ -653,7 +653,7 @@ where
             writeln!(writer, "No manifest path was given, using SDK from {}.", path.display())?;
             path.push("flash.json"); // Not actually used, placeholder value needed.
             match sdk.get_version() {
-                SdkVersion::InTree => from_in_tree(writer, path, fastboot_proxy, cmd).await,
+                SdkVersion::InTree => from_in_tree(&sdk, writer, path, fastboot_proxy, cmd).await,
                 SdkVersion::Version(_) => from_sdk(&sdk, writer, fastboot_proxy, cmd).await,
                 _ => ffx_bail!("Unknown SDK type"),
             }
