@@ -28,6 +28,8 @@ source_set("cpp") {
     "test_environment.h",
   ]
 
+  deps = [ "//zircon/system/ulib/async-default" ]
+
   public_deps = [
     ":test_node",
     "//sdk/lib/driver/component/cpp",

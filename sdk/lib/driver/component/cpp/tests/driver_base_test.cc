@@ -26,7 +26,7 @@ class TestDefaultDispatcher : public ::testing::Test {
     EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment
-    test_environment_.emplace(driver_dispatcher());
+    test_environment_.emplace(test_driver_dispatcher_.driver_dispatcher().get());
     zx::result result =
         test_environment_->Initialize(std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, result.status_value());
@@ -155,7 +155,7 @@ class TestAllowSyncDriverDispatcherSeparateEnv : public ::testing::Test {
     result = fdf::RunOnDispatcherSync(
         env_dispatcher(),
         [this, server = std::move(start_args->incoming_directory_server)]() mutable {
-          test_environment_.emplace(env_dispatcher());
+          test_environment_.emplace(test_env_dispatcher_.driver_dispatcher().get());
           zx::result result = test_environment_->Initialize(std::move(server));
           EXPECT_EQ(ZX_OK, result.status_value());
         });
