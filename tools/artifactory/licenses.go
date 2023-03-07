@@ -24,7 +24,7 @@ func licenseUploads(mods licModules, namespace string) ([]Upload, error) {
 		// Compliance file
 		files = append(files, Upload{
 			Source:      path.Join(mods.BuildDir(), lic.ComplianceFile),
-			Destination: path.Join(namespace, lic.ComplianceFile),
+			Destination: path.Join(namespace, "compliance.csv"),
 		})
 
 		if lic.LicenseFilesDir != "" {
