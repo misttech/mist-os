@@ -458,7 +458,11 @@ class Reporter::ThermalStateTracker {
  private:
   using CobaltStateTransition = AudioThermalStateTransitionsMigratedMetricDimensionStateTransition;
   static constexpr std::array kCobaltStateTransitions = {
-      CobaltStateTransition::Normal, CobaltStateTransition::State1, CobaltStateTransition::State2};
+      CobaltStateTransition::Normal,
+      CobaltStateTransition::State1,
+      CobaltStateTransition::State2,
+      CobaltStateTransition::State3,
+  };
   // Ideally we'd record final cobalt metrics when the component exits, however we can't
   // be notified of component exit until we've switched to Components v2. In the interim,
   // we automatically restart sessions every 5 min.
@@ -1327,6 +1331,9 @@ Reporter::ThermalStateTracker::ThermalStateTracker(Reporter::Impl& impl)
       active_state_(0),
       last_transition_(thermal_state_transitions_.New(new ThermalStateTransition(
           transitions_node_, std::to_string(++next_thermal_transition_name_), active_state_))) {
+  if (active_state_ >= kCobaltStateTransitions.size()) {
+    FX_LOGS(ERROR) << "active_state_ is out of range: kCobaltStateTransitions must be updated.";
+  }
   states_[active_state_] = State({.node = root_.CreateChild("normal")});
   states_[active_state_].Activate();
   LogCobaltStateTransition(states_[active_state_], kCobaltStateTransitions[active_state_]);
@@ -1341,6 +1348,9 @@ void Reporter::ThermalStateTracker::SetThermalState(uint32_t state) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (active_state_ == state) {
     return;
+  }
+  if (state >= kCobaltStateTransitions.size()) {
+    FX_LOGS(ERROR) << "new state is out of range: kCobaltStateTransitions must be updated.";
   }
   states_[active_state_].Deactivate();
 
