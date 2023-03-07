@@ -17,12 +17,6 @@
         // Ingest attributed log connections coming from CFv1.
         enable_log_connector: { type: "bool" },
 
-        // Install the test controller to stop the archviist in v1 tests.
-        install_controller: { type: "bool" },
-
-        // Serve the Lifecycle protocol used to stop the archivist in v2.
-        listen_to_lifecycle: { type: "bool" },
-
         // Send archivist logs to klog.
         log_to_debuglog: { type: "bool" },
 

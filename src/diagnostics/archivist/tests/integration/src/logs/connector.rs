@@ -4,15 +4,13 @@
 
 #![warn(clippy::all)]
 
-use crate::{constants, logs::utils::Listener, test_topology, utils};
-use component_events::{events::*, matcher::*};
+use crate::{constants, logs::utils::Listener, test_topology};
 use diagnostics_message::fx_log_packet_t;
 use fidl::{
     endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
     Socket,
 };
 use fidl_fuchsia_diagnostics as fdiagnostics;
-use fidl_fuchsia_diagnostics_test::ControllerMarker;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogSinkMarker};
 use fidl_fuchsia_sys_internal::{
     LogConnection, LogConnectionListenerMarker, LogConnectorMarker, LogConnectorRequest,
@@ -77,23 +75,11 @@ async fn same_log_sink_simultaneously_via_connector() {
     })
     .detach();
 
-    let mut event_stream = EventStream::open().await.unwrap();
-
-    let controller =
-        instance.root.connect_to_protocol_at_exposed_dir::<ControllerMarker>().unwrap();
-    controller.stop().unwrap();
+    // this will trigger Lifecycle.Stop.
+    drop(instance);
 
     // collect all logs
     let logs = recv_logs.map(|message| (message.severity, message.msg)).collect::<Vec<_>>().await;
-
-    // recv_logs returned, means archivist_for_test must be dead. check.
-    utils::wait_for_component_stopped_event(
-        instance.root.child_name(),
-        "archivist",
-        ExitStatusMatcher::Clean,
-        &mut event_stream,
-    )
-    .await;
 
     assert_eq!(
         logs,

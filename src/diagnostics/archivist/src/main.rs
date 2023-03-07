@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Error};
 use archivist_config::Config;
-use archivist_lib::{archivist::Archivist, events::router::RouterOptions};
+use archivist_lib::{archivist::Archivist, component_lifecycle, events::router::RouterOptions};
 use fuchsia_async as fasync;
 use fuchsia_component::server::MissingStartupHandle;
 use fuchsia_inspect::{component, health::Reporter};
@@ -46,7 +46,8 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .root()
         .record_child("config", |config_node| config.record_inspect(config_node));
 
-    let archivist = Archivist::new(&config).await;
+    let mut archivist = Archivist::new(&config).await;
+    archivist.set_lifecycle_request_stream(component_lifecycle::take_lifecycle_request_stream());
     debug!("Archivist initialized from configuration.");
 
     let startup_handle =

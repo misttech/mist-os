@@ -6,7 +6,6 @@ import("//src/diagnostics/archivist/configs.gni")
 
 archivist_for_integration_config = {
   forward_variables_from(embedded_config, "*")
-  listen_to_lifecycle = false
   pipelines_path = "/pkg/data/config/pipelines"
 }
 
@@ -43,5 +42,4 @@ with_feedback_filtering_disabled = {
 for_v1_config = {
   forward_variables_from(archivist_for_integration_config, "*")
   enable_log_connector = true
-  install_controller = true
 }

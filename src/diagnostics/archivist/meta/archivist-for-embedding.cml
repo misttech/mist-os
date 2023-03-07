@@ -8,6 +8,5 @@
     ],
     program: {
         binary: "bin/archivist",
-        lifecycle: { stop_event: "notify" },
     },
 }

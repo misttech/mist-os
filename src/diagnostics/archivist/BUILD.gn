@@ -31,7 +31,6 @@ rustc_library("lib") {
   deps = [
     ":archivist-config",
     ":logmessage_measure_tape",
-    "fidl:controller_rust",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",

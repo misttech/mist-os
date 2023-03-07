@@ -4,7 +4,7 @@
 
 use crate::{
     accessor::ArchiveAccessorServer,
-    component_lifecycle::{self, TestControllerServer},
+    component_lifecycle,
     error::Error,
     events::{
         router::{ConsumerConfig, EventRouter, ProducerConfig, RouterOptions},
@@ -17,6 +17,7 @@ use crate::{
 };
 use archivist_config::Config;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fidl_fuchsia_sys_internal as fsys_internal;
 use fuchsia_async as fasync;
 use fuchsia_component::{
@@ -43,7 +44,7 @@ pub struct Archivist {
     stop_recv: Option<oneshot::Receiver<()>>,
 
     /// Listens for lifecycle requests, to handle Stop requests.
-    _lifecycle_task: Option<fasync::Task<()>>,
+    lifecycle_task: Option<fasync::Task<()>>,
 
     /// Tasks that drains klog.
     _drain_klog_task: Option<fasync::Task<()>>,
@@ -68,9 +69,6 @@ pub struct Archivist {
 
     /// The server handling fuchsia.diagnostics.LogSettings
     log_settings_server: Arc<LogSettingsServer>,
-
-    /// The server handling fuchsia.diagnostics.test.Controller
-    test_controller_server: Option<TestControllerServer>,
 
     /// The source that takes care of routing unattributed log sink request streams.
     unattributed_log_sink_source: Option<UnattributedLogSinkSource>,
@@ -100,24 +98,6 @@ impl Archivist {
         ));
         let log_server = Arc::new(LogServer::new(Arc::clone(&logs_repo)));
         let log_settings_server = Arc::new(LogSettingsServer::new(Arc::clone(&logs_repo)));
-
-        // Initialize the respective v1 and v2 protocols in charge of telling the archivist to
-        // shutdown gracefully while draining existing log sinks and ensuring existing readers get
-        // all the logs.
-        assert!(
-            !(config.install_controller && config.listen_to_lifecycle),
-            "only one shutdown mechanism can be specified."
-        );
-        let (test_controller_server, _lifecycle_task, stop_recv) = if config.install_controller {
-            let (s, r) = TestControllerServer::new();
-            (Some(s), None, Some(r))
-        } else if config.listen_to_lifecycle {
-            debug!("Lifecycle listener initialized.");
-            let (t, r) = component_lifecycle::serve_v2();
-            (None, Some(t), Some(r))
-        } else {
-            (None, None, None)
-        };
 
         // Initialize the core event router and the external event providers containing incoming
         // diagnostics directories and log sink connections.
@@ -167,13 +147,12 @@ impl Archivist {
         }
 
         Self {
-            test_controller_server,
             accessor_server,
             log_server,
             log_settings_server,
             event_router,
-            stop_recv,
-            _lifecycle_task,
+            stop_recv: None,
+            lifecycle_task: None,
             _drain_klog_task: None,
             incoming_external_event_producers,
             pipelines,
@@ -181,6 +160,15 @@ impl Archivist {
             logs_repository: logs_repo,
             unattributed_log_sink_source,
         }
+    }
+
+    /// Sets the request stream from which Lifecycle/Stop requests will come instructing the
+    /// Archivist to stop ingesting new data and drain current data to clients.
+    pub fn set_lifecycle_request_stream(&mut self, request_stream: LifecycleRequestStream) {
+        debug!("Lifecycle listener initialized.");
+        let (t, r) = component_lifecycle::serve_v2(request_stream);
+        self.lifecycle_task = Some(t);
+        self.stop_recv = Some(r);
     }
 
     fn init_pipelines(config: &Config) -> Vec<Arc<Pipeline>> {
@@ -372,13 +360,6 @@ impl Archivist {
             });
         }
 
-        // Serevr fuchsia.diagnostics.test.Controller.
-        if let Some(mut server) = self.test_controller_server.take() {
-            svc_dir.add_fidl_service(move |stream| {
-                server.spawn(stream);
-            });
-        }
-
         // Ingest unattributed fuchsia.logger.LogSink connections.
         if let Some(mut unattributed_log_sink_source) = self.unattributed_log_sink_source.take() {
             svc_dir.add_fidl_service(move |stream| {
@@ -412,10 +393,9 @@ mod tests {
         logs::testing::*,
     };
     use fidl::endpoints::create_proxy;
-    use fidl_fuchsia_diagnostics_test::ControllerMarker;
     use fidl_fuchsia_io as fio;
+    use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use fuchsia_async as fasync;
-    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::channel::oneshot;
 
     async fn init_archivist() -> Archivist {
@@ -424,8 +404,6 @@ mod tests {
             enable_klog: false,
             enable_event_source: false,
             enable_log_connector: false,
-            install_controller: true,
-            listen_to_lifecycle: false,
             log_to_debuglog: false,
             maximum_concurrent_snapshots_per_reader: 4,
             serve_unattributed_logs: true,
@@ -454,9 +432,13 @@ mod tests {
     }
 
     // run archivist and send signal when it dies.
-    async fn run_archivist_and_signal_on_exit() -> (fio::DirectoryProxy, oneshot::Receiver<()>) {
+    async fn run_archivist_and_signal_on_exit(
+    ) -> (fio::DirectoryProxy, LifecycleProxy, oneshot::Receiver<()>) {
         let (directory, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        let archivist = init_archivist().await;
+        let mut archivist = init_archivist().await;
+        let (lifecycle_proxy, request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<LifecycleMarker>().unwrap();
+        archivist.set_lifecycle_request_stream(request_stream);
         let (signal_send, signal_recv) = oneshot::channel();
         fasync::Task::spawn(async move {
             archivist
@@ -466,7 +448,7 @@ mod tests {
             signal_send.send(()).unwrap();
         })
         .detach();
-        (directory, signal_recv)
+        (directory, lifecycle_proxy, signal_recv)
     }
 
     // runs archivist and returns its directory.
@@ -573,7 +555,7 @@ mod tests {
     /// Stop API works
     #[fuchsia::test]
     async fn stop_works() {
-        let (directory, signal_recv) = run_archivist_and_signal_on_exit().await;
+        let (directory, lifecycle_proxy, signal_recv) = run_archivist_and_signal_on_exit().await;
         let mut recv_logs = start_listener(&directory);
 
         {
@@ -596,9 +578,7 @@ mod tests {
             log_sink_helper1.write_log("msg 2");
             let log_sink_helper2 = LogSinkHelper::new(&directory);
 
-            let controller = connect_to_protocol_at_dir_svc::<ControllerMarker>(&directory)
-                .expect("cannot connect to log proxy");
-            controller.stop().unwrap();
+            lifecycle_proxy.stop().unwrap();
 
             // make more socket connections and write to them and old ones.
             let sock3 = log_sink_helper2.connect();

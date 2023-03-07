@@ -11,7 +11,6 @@ use diagnostics_data::{Inspect, Severity};
 use diagnostics_reader::{ArchiveReader, Data, Logs};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_diagnostics as fdiagnostics;
-use fidl_fuchsia_diagnostics_test::ControllerMarker;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage};
 use fuchsia_async as fasync;
 use fuchsia_component_test::RealmInstance;
@@ -54,21 +53,11 @@ async fn embedding_stop_api_for_log_listener() {
     wait_until_archivist_sees_capability_requested(&instance, &format!("coll:{LOGGING_COMPONENT}"))
         .await;
 
-    // connect to controller and call stop
-    let controller =
-        instance.root.connect_to_protocol_at_exposed_dir::<ControllerMarker>().unwrap();
-    controller.stop().unwrap();
+    // this will trigger Lifecycle.Stop.
+    drop(instance);
 
     // collect all logs
     let logs = recv_logs.map(|l| (l.severity as i8, l.msg)).collect::<Vec<_>>().await;
-
-    utils::wait_for_component_stopped_event(
-        instance.root.child_name(),
-        "archivist",
-        ExitStatusMatcher::Clean,
-        &mut event_stream,
-    )
-    .await;
 
     assert_eq!(
         logs,
@@ -104,10 +93,8 @@ async fn embedding_stop_api_works_for_batch_iterator() {
     wait_until_archivist_sees_capability_requested(&instance, &format!("coll:{LOGGING_COMPONENT}"))
         .await;
 
-    // connect to controller and call stop
-    let controller =
-        instance.root.connect_to_protocol_at_exposed_dir::<ControllerMarker>().unwrap();
-    controller.stop().unwrap();
+    // this will trigger Lifecycle.Stop.
+    drop(instance);
 
     // collect all logs
     let logs = subscription
@@ -117,14 +104,6 @@ async fn embedding_stop_api_works_for_batch_iterator() {
         })
         .collect::<Vec<_>>()
         .await;
-
-    utils::wait_for_component_stopped_event(
-        instance.root.child_name(),
-        "archivist",
-        ExitStatusMatcher::Clean,
-        &mut event_stream,
-    )
-    .await;
 
     assert_eq!(
         logs,

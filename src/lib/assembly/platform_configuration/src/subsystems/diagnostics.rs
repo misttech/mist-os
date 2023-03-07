@@ -55,8 +55,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             .field("enable_event_source", true)?
             .field("enable_klog", true)?
             .field("enable_log_connector", true)?
-            .field("install_controller", false)?
-            .field("listen_to_lifecycle", true)?
             .field("log_to_debuglog", true)?
             .field("logs_max_cached_original_bytes", logs_max_cached_original_bytes)?
             .field(
@@ -120,8 +118,6 @@ mod tests {
         assert_eq!(archivist_fields.get("enable_event_source"), Some(&Value::Bool(true)));
         assert_eq!(archivist_fields.get("enable_klog"), Some(&Value::Bool(true)));
         assert_eq!(archivist_fields.get("enable_log_connector"), Some(&Value::Bool(true)));
-        assert_eq!(archivist_fields.get("install_controller"), Some(&Value::Bool(false)));
-        assert_eq!(archivist_fields.get("listen_to_lifecycle"), Some(&Value::Bool(true)));
         assert_eq!(archivist_fields.get("log_to_debuglog"), Some(&Value::Bool(true)));
         assert_eq!(
             archivist_fields.get("logs_max_cached_original_bytes"),
