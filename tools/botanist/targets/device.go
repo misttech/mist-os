@@ -94,6 +94,8 @@ type DeviceTarget struct {
 	stopping uint32
 }
 
+var _ Target = (*DeviceTarget)(nil)
+
 // NewDeviceTarget returns a new device target with a given configuration.
 func NewDeviceTarget(ctx context.Context, config DeviceConfig, opts Options) (*DeviceTarget, error) {
 	// If an SSH key is specified in the options, prepend it the configs list so that it

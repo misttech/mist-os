@@ -48,8 +48,21 @@ type FFXInstance struct {
 	ExperimentLevel int
 }
 
-// Target represents a generic fuchsia instance.
+// BaseTarget represents a device used during testing.
+type BaseTarget interface {
+	// TestConfig returns fields describing the target to be provided to tests
+	// during runtime.
+	//
+	// This information will be provided as part of the testbed config. The path
+	// to the testbed config will be available during test runtime via the
+	// FUCHSIA_TESTBED_CONFIG environment variable.
+	TestConfig(netboot bool) (any, error)
+}
+
+// Target is implemented for Fuchsia targets.
 type Target interface {
+	BaseTarget
+
 	// AddPackageRepository adds a given package repository to the target.
 	AddPackageRepository(client *sshutil.Client, repoURL, blobURL string) error
 
@@ -113,14 +126,6 @@ type Target interface {
 
 	// SetImageOverrides sets the images to override the defaults in images.json.
 	SetImageOverrides(build.ImageOverrides)
-
-	// TestConfig returns fields describing the target to be provided to tests
-	// during runtime.
-	//
-	// This information will be provided as part of the testbed config. The path
-	// to the testbed config will be available during test runtime via the
-	// FUCHSIA_TESTBED_CONFIG environment variable.
-	TestConfig(netboot bool) (any, error)
 }
 
 // target is a generic Fuchsia instance.
@@ -539,39 +544,38 @@ type Options struct {
 	SSHKey string
 }
 
-// DeriveTarget returns a Target based on the obj json and opts.
-func DeriveTarget(ctx context.Context, obj []byte, opts Options) (Target, error) {
+// FromJSON parses a BaseTarget from JSON config.
+func FromJSON(ctx context.Context, config json.RawMessage, opts Options) (BaseTarget, error) {
 	type typed struct {
 		Type string `json:"type"`
 	}
 	var x typed
 
-	if err := json.Unmarshal(obj, &x); err != nil {
+	if err := json.Unmarshal(config, &x); err != nil {
 		return nil, fmt.Errorf("object in list has no \"type\" field: %w", err)
 	}
 	switch x.Type {
 	case "aemu":
 		var cfg QEMUConfig
-		if err := json.Unmarshal(obj, &cfg); err != nil {
+		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid QEMU config found: %w", err)
 		}
 		return NewAEMUTarget(ctx, cfg, opts)
 	case "qemu":
 		var cfg QEMUConfig
-		if err := json.Unmarshal(obj, &cfg); err != nil {
+		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid QEMU config found: %w", err)
 		}
 		return NewQEMUTarget(ctx, cfg, opts)
 	case "device":
 		var cfg DeviceConfig
-		if err := json.Unmarshal(obj, &cfg); err != nil {
+		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid device config found: %w", err)
 		}
-		t, err := NewDeviceTarget(ctx, cfg, opts)
-		return t, err
+		return NewDeviceTarget(ctx, cfg, opts)
 	case "gce":
 		var cfg GCEConfig
-		if err := json.Unmarshal(obj, &cfg); err != nil {
+		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid GCE config found: %w", err)
 		}
 		return NewGCETarget(ctx, cfg, opts)
@@ -592,8 +596,8 @@ type StartOptions struct {
 	ZirconArgs []string
 }
 
-// StartTargets starts all the targets in targetSlice given the opts.
-func StartTargets(ctx context.Context, opts StartOptions, targetSlice []Target) error {
+// StartTargets starts all the targets in fuchsiaTargets given the opts.
+func StartTargets(ctx context.Context, opts StartOptions, fuchsiaTargets []Target) error {
 	bootMode := bootserver.ModePave
 	if opts.Netboot {
 		bootMode = bootserver.ModeNetboot
@@ -601,8 +605,8 @@ func StartTargets(ctx context.Context, opts StartOptions, targetSlice []Target) 
 
 	// Check the first target to see if ffx is enabled. All targets share the same ffx daemon,
 	// so we can use the ffx associated with the first target to set config values.
-	if len(targetSlice) > 0 && targetSlice[0].UseFFXExperimental(1) {
-		ffx := targetSlice[0].GetFFX()
+	if len(fuchsiaTargets) > 0 && fuchsiaTargets[0].UseFFXExperimental(1) {
+		ffx := fuchsiaTargets[0].GetFFX()
 		if err := ffx.ConfigSet(ctx, "ffx.fastboot.inline_target", "true"); err != nil {
 			return err
 		}
@@ -618,7 +622,7 @@ func StartTargets(ctx context.Context, opts StartOptions, targetSlice []Target) 
 
 	// We wait until targets have started before running testrunner against the zeroth one.
 	eg, startCtx := errgroup.WithContext(ctx)
-	for _, t := range targetSlice {
+	for _, t := range fuchsiaTargets {
 		t := t
 		eg.Go(func() error {
 			imgs, closeFunc, err := bootserver.GetImages(startCtx, opts.ImageManifest, bootMode)
@@ -633,11 +637,11 @@ func StartTargets(ctx context.Context, opts StartOptions, targetSlice []Target) 
 	return eg.Wait()
 }
 
-// StopTargets stop all the targets in targetSlice
-func StopTargets(ctx context.Context, targetSlice []Target) {
+// StopTargets stop all the targets in fuchsiaTargets
+func StopTargets(ctx context.Context, fuchsiaTargets []Target) {
 	// Stop the targets in parallel.
 	var eg errgroup.Group
-	for _, t := range targetSlice {
+	for _, t := range fuchsiaTargets {
 		t := t
 		eg.Go(func() error {
 			return t.Stop()

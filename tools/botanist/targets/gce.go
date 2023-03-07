@@ -174,6 +174,8 @@ type GCETarget struct {
 	serial      io.ReadWriteCloser
 }
 
+var _ Target = (*GCETarget)(nil)
+
 // createInstanceRes is returned by the gcem_client's create-instance
 // subcommand. Its schema is determined by the CreateInstanceRes proto
 // message in http://google3/turquoise/infra/gce_mediator/proto/mediator.proto.

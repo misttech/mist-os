@@ -135,6 +135,8 @@ type QEMUTarget struct {
 	isQEMU bool
 }
 
+var _ Target = (*QEMUTarget)(nil)
+
 // EMUCommandBuilder defines the common set of functions used to build up an
 // EMU command-line.
 type EMUCommandBuilder interface {
@@ -655,7 +657,7 @@ func extendStorageFull(ctx context.Context, storageFull *bootserver.Image, fvmTo
 func getImageByNameAndCPU(imgs []bootserver.Image, name, cpu string) *bootserver.Image {
 	for _, img := range imgs {
 		if img.Name == name && img.CPU == cpu {
- 			return &img
+			return &img
 		}
 	}
 	return nil

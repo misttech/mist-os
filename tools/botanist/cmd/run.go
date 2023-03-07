@@ -160,7 +160,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.testrunnerOptions.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
 }
 
-func (r *RunCommand) setupFFX(ctx context.Context, targetSlice []targets.Target, primaryTarget targets.Target, removeFFXOutputsDir *bool) (func(), error) {
+func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Target, primaryTarget targets.Target, removeFFXOutputsDir *bool) (func(), error) {
 	var cleanup func()
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
 
@@ -235,7 +235,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, targetSlice []targets.Target,
 		}
 	}
 
-	for _, t := range targetSlice {
+	for _, t := range fuchsiaTargets {
 		// Start serial servers for all targets. Will no-op for targets that
 		// already have serial servers.
 		if err := t.StartSerialServer(); err != nil {
@@ -253,7 +253,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, targetSlice []targets.Target,
 	return cleanup, nil
 }
 
-func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, targetSlice []targets.Target) error {
+func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuchsiaTargets []targets.Target) error {
 	if r.serialLogDir == "" {
 		return nil
 	}
@@ -262,7 +262,7 @@ func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, tar
 		return err
 	}
 
-	for _, t := range targetSlice {
+	for _, t := range fuchsiaTargets {
 		t := t
 		eg.Go(func() error {
 			logger.Debugf(ctx, "starting serial collection for target %s", t.Nodename())
@@ -270,7 +270,7 @@ func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, tar
 			// Create a new file to capture the serial log for this nodename.
 			serialLogName := fmt.Sprintf("%s_serial_log.txt", t.Nodename())
 			// TODO(fxbug.dev/71529): Remove once there are no dependencies on this filename.
-			if len(targetSlice) == 1 {
+			if len(fuchsiaTargets) == 1 {
 				serialLogName = "serial_log.txt"
 			}
 			serialLogPath := filepath.Join(r.serialLogDir, serialLogName)
@@ -315,7 +315,7 @@ func (r *RunCommand) setupPackageServer(ctx context.Context) (*botanist.PackageS
 	return pkgSrv, nil
 }
 
-func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, targetSlice []targets.Target, primaryTarget targets.Target, testsPath string) {
+func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, baseTargets []targets.BaseTarget, fuchsiaTargets []targets.Target, primaryTarget targets.Target, testsPath string) {
 	// Disable usb mass storage to determine if it affects NUC stability.
 	// TODO(rudymathu): Remove this once stability is achieved.
 	r.zirconArgs = append(r.zirconArgs, "driver.usb_mass_storage.disable")
@@ -325,7 +325,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 	r.zirconArgs = append(r.zirconArgs, "driver.usb_cdc.log=debug")
 
 	// Log any failures after running tests.
-	for _, t := range targetSlice {
+	for _, t := range fuchsiaTargets {
 		t := t
 		eg.Go(func() error {
 			if err := t.Wait(ctx); err != nil && err != targets.ErrUnimplemented && ctx.Err() == nil {
@@ -346,7 +346,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 			ZirconArgs:    r.zirconArgs,
 		}
 
-		if err := targets.StartTargets(ctx, startOpts, targetSlice); err != nil {
+		if err := targets.StartTargets(ctx, startOpts, fuchsiaTargets); err != nil {
 			return fmt.Errorf("%s: %w", constants.FailedToStartTargetMsg, err)
 		}
 		logger.Debugf(ctx, "successfully started all targets")
@@ -354,19 +354,19 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
-			targets.StopTargets(ctx, targetSlice)
+			targets.StopTargets(ctx, fuchsiaTargets)
 		}()
 
 		// Create a testbed config file. We have to do this after starting the
 		// targets so that we can get their IP addresses.
-		testbedConfig, err := r.createTestbedConfig(targetSlice)
+		testbedConfig, err := r.createTestbedConfig(baseTargets)
 		if err != nil {
 			return err
 		}
 		defer os.Remove(testbedConfig)
 
 		if !r.netboot {
-			for _, t := range targetSlice {
+			for _, t := range fuchsiaTargets {
 				t := t
 				client, err := t.SSHClient()
 				if err != nil {
@@ -390,7 +390,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 					go func() {
 						syslogName := fmt.Sprintf("%s_syslog.txt", t.Nodename())
 						// TODO(fxbug.dev/71529): Remove when there are no dependencies on this filename.
-						if len(targetSlice) == 1 {
+						if len(fuchsiaTargets) == 1 {
 							syslogName = "syslog.txt"
 						}
 						syslogPath := filepath.Join(r.syslogDir, syslogName)
@@ -436,16 +436,16 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	}
 
 	// Parse targets out from the target configuration file.
-	targetSlice, err := r.deriveTargetsFromFile(ctx)
+	baseTargets, fuchsiaTargets, err := r.deriveTargetsFromFile(ctx)
 	if err != nil {
 		return err
 	}
 	// Determine the target that a command will be run against and logs will be
 	// streamed from.
-	primaryTarget := targetSlice[0]
+	primaryTarget := fuchsiaTargets[0]
 
 	removeFFXOutputsDir := false
-	cleanup, err := r.setupFFX(ctx, targetSlice, primaryTarget, &removeFFXOutputsDir)
+	cleanup, err := r.setupFFX(ctx, fuchsiaTargets, primaryTarget, &removeFFXOutputsDir)
 	if cleanup != nil {
 		defer cleanup()
 	}
@@ -455,7 +455,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	if err := r.setupSerialLog(ctx, eg, targetSlice); err != nil {
+	if err := r.setupSerialLog(ctx, eg, fuchsiaTargets); err != nil {
 		return err
 	}
 
@@ -472,7 +472,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		return err
 	}
 
-	r.dispatchTests(ctx, cancel, eg, targetSlice, primaryTarget, testsPath)
+	r.dispatchTests(ctx, cancel, eg, baseTargets, fuchsiaTargets, primaryTarget, testsPath)
 
 	if err := eg.Wait(); err != nil {
 		return err
@@ -524,9 +524,9 @@ func (r *RunCommand) runPreflights(ctx context.Context) error {
 
 // createTestbedConfig creates a configuration file that describes the targets
 // attached and returns the path to the file.
-func (r *RunCommand) createTestbedConfig(targetSlice []targets.Target) (string, error) {
+func (r *RunCommand) createTestbedConfig(baseTargets []targets.BaseTarget) (string, error) {
 	var testbedConfig []any
-	for _, t := range targetSlice {
+	for _, t := range baseTargets {
 		c, err := t.TestConfig(r.netboot)
 		if err != nil {
 			return "", err
@@ -685,31 +685,36 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 	return subcommands.ExitSuccess
 }
 
-func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.Target, error) {
-	opts := targets.Options{
-		Netboot: r.netboot,
-		SSHKey:  r.sshKey,
-	}
-
+func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.BaseTarget, []targets.Target, error) {
 	data, err := os.ReadFile(r.configFile)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", constants.ReadConfigFileErrorMsg, err)
+		return nil, nil, fmt.Errorf("%s: %w", constants.ReadConfigFileErrorMsg, err)
 	}
-	var objs []json.RawMessage
-	if err := json.Unmarshal(data, &objs); err != nil {
-		return nil, fmt.Errorf("could not unmarshal config file as a JSON list: %w", err)
+	var configs []json.RawMessage
+	if err := json.Unmarshal(data, &configs); err != nil {
+		return nil, nil, fmt.Errorf("could not unmarshal config file as a JSON list: %w", err)
 	}
 
-	var targetSlice []targets.Target
-	for _, obj := range objs {
-		t, err := targets.DeriveTarget(ctx, obj, opts)
+	var baseTargets []targets.BaseTarget
+	var fuchsiaTargets []targets.Target
+
+	for _, config := range configs {
+		t, err := targets.FromJSON(ctx, config, targets.Options{
+			Netboot: r.netboot,
+			SSHKey:  r.sshKey,
+		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		targetSlice = append(targetSlice, t)
+		baseTargets = append(baseTargets, t)
+		if f, ok := t.(targets.Target); ok {
+			fuchsiaTargets = append(fuchsiaTargets, f)
+		}
 	}
-	if len(targetSlice) == 0 {
-		return nil, fmt.Errorf("no targets found")
+
+	if len(fuchsiaTargets) == 0 {
+		return nil, nil, fmt.Errorf("no Fuchsia targets found")
 	}
-	return targetSlice, nil
+
+	return baseTargets, fuchsiaTargets, nil
 }

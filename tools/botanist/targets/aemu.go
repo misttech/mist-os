@@ -20,6 +20,8 @@ type AEMUTarget struct {
 	QEMUTarget
 }
 
+var _ Target = (*AEMUTarget)(nil)
+
 // NewAEMUTarget returns a new AEMU target with a given configuration.
 func NewAEMUTarget(ctx context.Context, config QEMUConfig, opts Options) (*AEMUTarget, error) {
 	target, err := NewQEMUTarget(ctx, config, opts)
