@@ -266,6 +266,11 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		// unlocked, if the task attempts to make use of those secrets and can't, we'll see
 		// this message in the log, and then an infra engineer should go re-lock the device.
 		&stringInLogCheck{String: "Please re-lock the device", Type: serialLogType},
+		// Certain types of requests on certain devices may be impossible to fulfill when the
+		// device has the microphone hardware-muted.  If a device is somehow running tasks
+		// with the mute switch in the wrong position, the task may fail and we'll see this
+		// message in the log, and then an infra engineer should go flip the mute switch.
+		&stringInLogCheck{String: "Mic is muted!  (This would cause all subsequent queries to fail!)", Type: swarmingOutputType},
 	}
 
 	oopsExceptBlocks := []*logBlock{
