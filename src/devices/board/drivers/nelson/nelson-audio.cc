@@ -30,38 +30,22 @@
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
-static const zx_bind_inst_t ref_out_i2c_match[] = {
+static const zx_bind_inst_t out_i2c_match[] = {
     BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C),
     BI_ABORT_IF(NE, BIND_I2C_BUS_ID, NELSON_I2C_3),
     BI_MATCH_IF(EQ, BIND_I2C_ADDRESS, I2C_AUDIO_CODEC_ADDR),
 };
-static const zx_bind_inst_t p2_out_i2c_match[] = {
-    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C),
-    BI_ABORT_IF(NE, BIND_I2C_BUS_ID, NELSON_I2C_3),
-    BI_MATCH_IF(EQ, BIND_I2C_ADDRESS, I2C_AUDIO_CODEC_ADDR_P2),
-};
-static const zx_bind_inst_t ref_out_codec_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-    BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_MAXIM),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_MAXIM_MAX98373),  // For Nelson P1.
-};
-static const zx_bind_inst_t p2_out_codec_match[] = {
+static const zx_bind_inst_t out_codec_match[] = {
     BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
     BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS58xx),  // For Nelson P2.
+    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS58xx),
 };
 
-static const device_fragment_part_t ref_out_i2c_fragment[] = {
-    {std::size(ref_out_i2c_match), ref_out_i2c_match},
+static const device_fragment_part_t out_i2c_fragment[] = {
+    {std::size(out_i2c_match), out_i2c_match},
 };
-static const device_fragment_part_t p2_out_i2c_fragment[] = {
-    {std::size(p2_out_i2c_match), p2_out_i2c_match},
-};
-static const device_fragment_part_t ref_out_codec_fragment[] = {
-    {std::size(ref_out_codec_match), ref_out_codec_match},
-};
-static const device_fragment_part_t p2_out_codec_fragment[] = {
-    {std::size(p2_out_codec_match), p2_out_codec_match},
+static const device_fragment_part_t out_codec_fragment[] = {
+    {std::size(out_codec_match), out_codec_match},
 };
 
 static const zx_bind_inst_t out_enable_gpio_match[] = {
@@ -79,22 +63,13 @@ static const device_fragment_part_t out_fault_gpio_fragment[] = {
     {std::size(out_fault_gpio_match), out_fault_gpio_match},
 };
 
-static const device_fragment_t ref_codec_fragments[] = {
-    {"i2c", std::size(ref_out_i2c_fragment), ref_out_i2c_fragment},
-    {"gpio-enable", std::size(out_enable_gpio_fragment), out_enable_gpio_fragment},
+static const device_fragment_t codec_fragments[] = {
+    {"i2c", std::size(out_i2c_fragment), out_i2c_fragment},
     {"gpio-fault", std::size(out_fault_gpio_fragment), out_fault_gpio_fragment},
 };
-static const device_fragment_t p2_codec_fragments[] = {
-    {"i2c", std::size(p2_out_i2c_fragment), p2_out_i2c_fragment},
-    {"gpio-fault", std::size(out_fault_gpio_fragment), out_fault_gpio_fragment},
-};
-static const device_fragment_t ref_controller_fragments[] = {
+static const device_fragment_t controller_fragments[] = {
     {"gpio-enable", std::size(out_enable_gpio_fragment), out_enable_gpio_fragment},
-    {"codec-01", std::size(ref_out_codec_fragment), ref_out_codec_fragment},
-};
-static const device_fragment_t p2_controller_fragments[] = {
-    {"gpio-enable", std::size(out_enable_gpio_fragment), out_enable_gpio_fragment},
-    {"codec-01", std::size(p2_out_codec_fragment), p2_out_codec_fragment},
+    {"codec-01", std::size(out_codec_fragment), out_codec_fragment},
 };
 
 zx_status_t Nelson::AudioInit() {
@@ -102,19 +77,19 @@ zx_status_t Nelson::AudioInit() {
 
   status = clk_impl_.Disable(sm1_clk::CLK_HIFI_PLL);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Disable(CLK_HIFI_PLL) failed, st = %d", __func__, status);
+    zxlogf(ERROR, "Disable(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
     return status;
   }
 
   status = clk_impl_.SetRate(sm1_clk::CLK_HIFI_PLL, 768000000);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: SetRate(CLK_HIFI_PLL) failed, st = %d", __func__, status);
+    zxlogf(ERROR, "SetRate(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
     return status;
   }
 
   status = clk_impl_.Enable(sm1_clk::CLK_HIFI_PLL);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Enable(CLK_HIFI_PLL) failed, st = %d", __func__, status);
+    zxlogf(ERROR, "Enable(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -193,48 +168,46 @@ zx_status_t Nelson::AudioInit() {
   fdf::Arena arena('AUDI');
   auto result = pbus_.buffer(arena)->GetBoardInfo();
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Audio(dev_in) request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "NodeAdd Audio(dev_in) request failed: %s", result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Audio(dev_in) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "NodeAdd Audio(dev_in) failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   auto board_info = fidl::ToNatural(result->value()->info);
 
   // Output devices.
-  metadata::AmlConfig metadata = {};
-  snprintf(metadata.manufacturer, sizeof(metadata.manufacturer), "Spacely Sprockets");
-  snprintf(metadata.product_name, sizeof(metadata.product_name), "nelson");
-  metadata.is_input = false;
-  metadata.mClockDivFactor = 10;
-  metadata.sClockDivFactor = 25;
-  metadata.unique_id = AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS;
-  metadata.bus = metadata::AmlBus::TDM_B;
-  metadata.version = metadata::AmlVersion::kS905D3G;
-  metadata.dai.type = metadata::DaiType::I2s;
-  metadata.dai.bits_per_sample = 16;
-  metadata.dai.bits_per_slot = 32;
+  metadata::AmlConfig aml_metadata = {};
+  snprintf(aml_metadata.manufacturer, sizeof(aml_metadata.manufacturer), "Spacely Sprockets");
+  snprintf(aml_metadata.product_name, sizeof(aml_metadata.product_name), "nelson");
+  aml_metadata.is_input = false;
+  aml_metadata.mClockDivFactor = 10;
+  aml_metadata.sClockDivFactor = 25;
+  aml_metadata.unique_id = AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS;
+  aml_metadata.bus = metadata::AmlBus::TDM_B;
+  aml_metadata.version = metadata::AmlVersion::kS905D3G;
+  aml_metadata.dai.type = metadata::DaiType::I2s;
+  aml_metadata.dai.bits_per_sample = 16;
+  aml_metadata.dai.bits_per_slot = 32;
 
   // We expose a mono ring buffer to clients. However we still use a 2 channels DAI to the codec
   // so we configure the audio engine to only take the one channel and put it in the left slot
   // going out to the codec via I2S.
-  metadata.ring_buffer.number_of_channels = 1;
-  metadata.swaps = 0x10;              // One ring buffer channel goes into the left I2S slot.
-  metadata.lanes_enable_mask[0] = 2;  // One ring buffer channel goes into the left I2S slot.
-  metadata.codecs.number_of_codecs = 1;
-  metadata.codecs.types[0] = metadata::CodecType::Tas58xx;
-  metadata.codecs.channels_to_use_bitmask[0] = 1;  // Codec must use the left I2S slot.
-  metadata.codecs.ring_buffer_channels_to_use_bitmask[0] = 0x1;  // Single speaker uses index 0.
+  aml_metadata.ring_buffer.number_of_channels = 1;
+  aml_metadata.swaps = 0x10;              // One ring buffer channel goes into the left I2S slot.
+  aml_metadata.lanes_enable_mask[0] = 2;  // One ring buffer channel goes into the left I2S slot.
+  aml_metadata.codecs.number_of_codecs = 1;
+  aml_metadata.codecs.types[0] = metadata::CodecType::Tas58xx;
+  aml_metadata.codecs.channels_to_use_bitmask[0] = 1;  // Codec must use the left I2S slot.
+  aml_metadata.codecs.ring_buffer_channels_to_use_bitmask[0] = 0x1;  // Single speaker uses index 0.
 
   std::vector<fpbus::Metadata> tdm_metadata{
       {{
           .type = DEVICE_METADATA_PRIVATE,
-          .data =
-              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&metadata),
-                                   reinterpret_cast<const uint8_t*>(&metadata) + sizeof(metadata)),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&aml_metadata),
+              reinterpret_cast<const uint8_t*>(&aml_metadata) + sizeof(aml_metadata)),
       }},
   };
 
@@ -248,118 +221,78 @@ zx_status_t Nelson::AudioInit() {
   controller_out.irq() = frddr_b_irqs;
   controller_out.metadata() = tdm_metadata;
 
-  if (board_info.board_revision() == BOARD_REV_P2) {
-    // CODEC pin assignments.
-    gpio_impl_.SetAltFunction(GPIO_SOC_AUDIO_EN, 0);  // GPIO
-    gpio_impl_.ConfigOut(GPIO_SOC_AUDIO_EN, 0);
+  // CODEC pin assignments.
+  gpio_impl_.SetAltFunction(GPIO_INRUSH_EN_SOC, 0);  // BOOST_EN_SOC as GPIO.
+  gpio_impl_.ConfigOut(GPIO_INRUSH_EN_SOC, 1);       // BOOST_EN_SOC to high.
+  // From the TAS5805m codec reference manual:
+  // "9.5.3.1 Startup Procedures
+  // 1. Configure ADR/FAULT pin with proper settings for I2C device address.
+  // 2. Bring up power supplies (it does not matter if PVDD or DVDD comes up first).
+  // 3. Once power supplies are stable, bring up PDN to High and wait 5ms at least, then
+  // start SCLK, LRCLK.
+  // 4. Once I2S clocks are stable, set the device into HiZ state and enable DSP via the I2C
+  // control port.
+  // 5. Wait 5ms at least. Then initialize the DSP Coefficient, then set the device to Play
+  // state.
+  // 6. The device is now in normal operation."
+  // Step 3 PDN setup and 5ms delay is executed below.
+  gpio_impl_.ConfigOut(GPIO_SOC_AUDIO_EN, 1);  // Set PDN_N to high.
+  zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
+  // I2S clocks are configured by the controller and the rest of the initialization is done
+  // in the codec itself.
 
-    constexpr zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_MAXIM},
-                                          {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_MAXIM_MAX98373}};
-    composite_device_desc_t codec_desc = {};
-    codec_desc.props = props;
-    codec_desc.props_count = std::size(props);
-    codec_desc.spawn_colocated = false;
-    codec_desc.fragments = ref_codec_fragments;
-    codec_desc.fragments_count = std::size(ref_codec_fragments);
-    codec_desc.primary_fragment = "i2c";
-    status = DdkAddComposite("audio-max98373", &codec_desc);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s DdkAddComposite failed %d", __FILE__, status);
-      return status;
-    }
-    {
-      auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-          fidl::ToWire(fidl_arena, controller_out),
-          platform_bus_composite::MakeFidlFragment(fidl_arena, ref_controller_fragments,
-                                                   std::size(ref_controller_fragments)),
-          {});
-      if (!result.ok()) {
-        zxlogf(ERROR,
-               "%s: AddCompositeImplicitPbusFragment Audio(controller_out) request failed: %s",
-               __func__, result.FormatDescription().data());
-        return result.status();
-      }
-      if (result->is_error()) {
-        zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(controller_out) failed: %s",
-               __func__, zx_status_get_string(result->error_value()));
-        return result->error_value();
-      }
-    }
-  } else {
-    // CODEC pin assignments.
-    gpio_impl_.SetAltFunction(GPIO_INRUSH_EN_SOC, 0);  // BOOST_EN_SOC as GPIO.
-    gpio_impl_.ConfigOut(GPIO_INRUSH_EN_SOC, 1);       // BOOST_EN_SOC to high.
-    // From the TAS5805m codec reference manual:
-    // "9.5.3.1 Startup Procedures
-    // 1. Configure ADR/FAULT pin with proper settings for I2C device address.
-    // 2. Bring up power supplies (it does not matter if PVDD or DVDD comes up first).
-    // 3. Once power supplies are stable, bring up PDN to High and wait 5ms at least, then
-    // start SCLK, LRCLK.
-    // 4. Once I2S clocks are stable, set the device into HiZ state and enable DSP via the I2C
-    // control port.
-    // 5. Wait 5ms at least. Then initialize the DSP Coefficient, then set the device to Play
-    // state.
-    // 6. The device is now in normal operation."
-    // Step 3 PDN setup and 5ms delay is executed below.
-    gpio_impl_.ConfigOut(GPIO_SOC_AUDIO_EN, 1);  // Set PDN_N to high.
-    zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
-    // I2S clocks are configured by the controller and the rest of the initialization is done
-    // in the codec itself.
-
-    constexpr zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
-                                          {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS58xx}};
-    metadata::ti::TasConfig metadata = {};
-    metadata.bridged = true;
+  constexpr zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
+                                        {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS58xx}};
+  metadata::ti::TasConfig tas_metadata = {};
+  tas_metadata.bridged = true;
 #ifdef TAS5805M_CONFIG_PATH
-    metadata.number_of_writes1 = sizeof(tas5805m_init_sequence1) / sizeof(cfg_reg);
-    for (size_t i = 0; i < metadata.number_of_writes1; ++i) {
-      metadata.init_sequence1[i].address = tas5805m_init_sequence1[i].offset;
-      metadata.init_sequence1[i].value = tas5805m_init_sequence1[i].value;
-    }
-    metadata.number_of_writes2 = sizeof(tas5805m_init_sequence2) / sizeof(cfg_reg);
-    for (size_t i = 0; i < metadata.number_of_writes2; ++i) {
-      metadata.init_sequence2[i].address = tas5805m_init_sequence2[i].offset;
-      metadata.init_sequence2[i].value = tas5805m_init_sequence2[i].value;
-    }
+  tas_metadata.number_of_writes1 = sizeof(tas5805m_init_sequence1) / sizeof(cfg_reg);
+  for (size_t i = 0; i < tas_metadata.number_of_writes1; ++i) {
+    tas_metadata.init_sequence1[i].address = tas5805m_init_sequence1[i].offset;
+    tas_metadata.init_sequence1[i].value = tas5805m_init_sequence1[i].value;
+  }
+  tas_metadata.number_of_writes2 = sizeof(tas5805m_init_sequence2) / sizeof(cfg_reg);
+  for (size_t i = 0; i < tas_metadata.number_of_writes2; ++i) {
+    tas_metadata.init_sequence2[i].address = tas5805m_init_sequence2[i].offset;
+    tas_metadata.init_sequence2[i].value = tas5805m_init_sequence2[i].value;
+  }
 #endif
-    const device_metadata_t codec_metadata[] = {
-        {
-            .type = DEVICE_METADATA_PRIVATE,
-            .data = reinterpret_cast<uint8_t*>(&metadata),
-            .length = sizeof(metadata),
-        },
-    };
-    composite_device_desc_t codec_desc = {};
-    codec_desc.props = props;
-    codec_desc.props_count = std::size(props);
-    codec_desc.spawn_colocated = false;
-    codec_desc.fragments = p2_codec_fragments;
-    codec_desc.fragments_count = std::size(p2_codec_fragments);
-    codec_desc.primary_fragment = "i2c";
-    codec_desc.metadata_list = codec_metadata;
-    codec_desc.metadata_count = std::size(codec_metadata);
-    status = DdkAddComposite("audio-tas58xx", &codec_desc);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s DdkAddComposite failed %d", __FILE__, status);
-      return status;
+  const device_metadata_t codec_metadata[] = {
+      {
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = reinterpret_cast<uint8_t*>(&tas_metadata),
+          .length = sizeof(tas_metadata),
+      },
+  };
+  composite_device_desc_t codec_desc = {};
+  codec_desc.props = props;
+  codec_desc.props_count = std::size(props);
+  codec_desc.spawn_colocated = false;
+  codec_desc.fragments = codec_fragments;
+  codec_desc.fragments_count = std::size(codec_fragments);
+  codec_desc.primary_fragment = "i2c";
+  codec_desc.metadata_list = codec_metadata;
+  codec_desc.metadata_count = std::size(codec_metadata);
+  status = DdkAddComposite("audio-tas58xx", &codec_desc);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "DdkAddComposite failed: %s", zx_status_get_string(status));
+    return status;
+  }
+  {
+    auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+        fidl::ToWire(fidl_arena, controller_out),
+        platform_bus_composite::MakeFidlFragment(fidl_arena, controller_fragments,
+                                                 std::size(controller_fragments)),
+        {});
+    if (!result.ok()) {
+      zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(controller_out) request failed: %s",
+             result.FormatDescription().data());
+      return result.status();
     }
-    {
-      auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-          fidl::ToWire(fidl_arena, controller_out),
-          platform_bus_composite::MakeFidlFragment(fidl_arena, p2_controller_fragments,
-                                                   std::size(p2_controller_fragments)),
-          {});
-      if (!result.ok()) {
-        zxlogf(ERROR,
-               "%s: AddCompositeImplicitPbusFragment Audio(controller_out) request failed: %s",
-               __func__, result.FormatDescription().data());
-        return result.status();
-      }
-      if (result->is_error()) {
-        zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(controller_out) failed: %s",
-               __func__, zx_status_get_string(result->error_value()));
-        return result->error_value();
-      }
+    if (result->is_error()) {
+      zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(controller_out) failed: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
 
@@ -409,12 +342,11 @@ zx_status_t Nelson::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd request failed: %s", __func__, result.FormatDescription().data());
+      zxlogf(ERROR, "NodeAdd request failed: %s", result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
+      zxlogf(ERROR, "NodeAdd failed: %s", zx_status_get_string(result->error_value()));
       return result->error_value();
     }
   }
@@ -467,12 +399,11 @@ zx_status_t Nelson::AudioInit() {
 
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd request failed: %s", __func__, result.FormatDescription().data());
+      zxlogf(ERROR, "NodeAdd request failed: %s", result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
+      zxlogf(ERROR, "NodeAdd failed: %s", zx_status_get_string(result->error_value()));
       return result->error_value();
     }
   }
@@ -508,12 +439,11 @@ zx_status_t Nelson::AudioInit() {
 
     auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, dev_in));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd Audio(dev_in) request failed: %s", __func__,
-             result.FormatDescription().data());
+      zxlogf(ERROR, "NodeAdd Audio(dev_in) request failed: %s", result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd Audio(dev_in) failed: %s", __func__,
+      zxlogf(ERROR, "NodeAdd Audio(dev_in) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }

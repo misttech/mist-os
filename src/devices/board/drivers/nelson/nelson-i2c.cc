@@ -81,19 +81,18 @@ constexpr i2c_channel_t i2c_3_channels[]{
         .did = 0,
         .name = "backlight",
     },
-    // Audio output
+    // Unused
     {
-        // binds as composite device
-        .address = I2C_AUDIO_CODEC_ADDR,
+        .address = 0,
         .vid = 0,
         .pid = 0,
         .did = 0,
-        .name = "codec",
+        .name = "unused",
     },
     // Audio output
     {
         // binds as composite device
-        .address = I2C_AUDIO_CODEC_ADDR_P2,
+        .address = I2C_AUDIO_CODEC_ADDR,
         .vid = 0,
         .pid = 0,
         .did = 0,
