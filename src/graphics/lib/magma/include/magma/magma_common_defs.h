@@ -225,6 +225,8 @@ typedef uint32_t magma_handle_t;
 // within a single connection.
 typedef uint64_t magma_buffer_id_t;
 
+typedef uint64_t magma_semaphore_id_t;
+
 typedef struct magma_poll_item {
   union {
     magma_semaphore_t semaphore;

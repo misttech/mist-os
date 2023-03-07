@@ -1,6 +1,6 @@
 {
     "magma-interface": {
-        "next-free-ordinal": 89,
+        "next-free-ordinal": 91,
         "exports": [
             {
                 "ordinal": 46,
@@ -229,6 +229,24 @@
                 "ordinal": 34,
                 "name": "magma_connection_create_semaphore",
                 "type": "magma_status_t",
+                "description": "DEPRECATED. Creates a semaphore.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "semaphore_out",
+                        "type": "magma_semaphore_t*",
+                        "description": "The returned semaphore."
+                    }
+                ]
+            },
+            {
+                "ordinal": 89,
+                "name": "magma_connection_create_semaphore2",
+                "type": "magma_status_t",
                 "description": "Creates a semaphore.",
                 "arguments": [
                     {
@@ -240,6 +258,11 @@
                         "name": "semaphore_out",
                         "type": "magma_semaphore_t*",
                         "description": "The returned semaphore."
+                    },
+                    {
+                        "name": "id_out",
+                        "type": "magma_semaphore_id_t*",
+                        "description": "The id of the semaphore."
                     }
                 ]
             },
@@ -265,6 +288,29 @@
                 "ordinal": 41,
                 "name": "magma_connection_import_semaphore",
                 "type": "magma_status_t",
+                "description": "DEPRECATED. Imports and takes ownership of the semaphore referred to by the given handle.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "semaphore_handle",
+                        "type": "magma_handle_t",
+                        "description": "A valid semaphore handle."
+                    },
+                    {
+                        "name": "semaphore_out",
+                        "type": "magma_semaphore_t*",
+                        "description": "The returned semaphore."
+                    }
+                ]
+            },
+            {
+                "ordinal": 90,
+                "name": "magma_connection_import_semaphore2",
+                "type": "magma_status_t",
                 "description": "Imports and takes ownership of the semaphore referred to by the given handle.",
                 "arguments": [
                     {
@@ -281,6 +327,11 @@
                         "name": "semaphore_out",
                         "type": "magma_semaphore_t*",
                         "description": "The returned semaphore."
+                    },
+                    {
+                        "name": "id_out",
+                        "type": "magma_semaphore_id_t*",
+                        "description": "The id of the semaphore."
                     }
                 ]
             },
@@ -628,7 +679,7 @@
                 "ordinal": 36,
                 "name": "magma_semaphore_get_id",
                 "type": "uint64_t",
-                "description": "Returns a unique id for the given semaphore.",
+                "description": "DEPRECATED. Returns a unique id for the given semaphore.",
                 "arguments": [
                     {
                         "name": "semaphore",

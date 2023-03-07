@@ -546,7 +546,7 @@ class TestConnection {
     return MAGMA_STATUS_OK;
   }
 
-  void Semaphore(uint32_t count) {
+  void SemaphoreOld(uint32_t count) {
     ASSERT_TRUE(connection_);
 
     std::vector<magma_poll_item_t> items(count);
@@ -608,6 +608,69 @@ class TestConnection {
     }
   }
 
+  void Semaphore(uint32_t count) {
+    ASSERT_TRUE(connection_);
+
+    std::vector<magma_poll_item_t> items(count);
+
+    for (uint32_t i = 0; i < count; i++) {
+      items[i] = {.type = MAGMA_POLL_TYPE_SEMAPHORE, .condition = MAGMA_POLL_CONDITION_SIGNALED};
+      magma_semaphore_id_t id;
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_connection_create_semaphore2(connection_, &items[i].semaphore, &id));
+      EXPECT_NE(0u, id);
+    }
+
+    magma_semaphore_signal(items[0].semaphore);
+
+    constexpr uint32_t kTimeoutMs = 100;
+    constexpr uint64_t kNsPerMs = 1000000;
+
+    auto start = std::chrono::steady_clock::now();
+    EXPECT_EQ(count == 1 ? MAGMA_STATUS_OK : MAGMA_STATUS_TIMED_OUT,
+              wait_all(items, kNsPerMs * kTimeoutMs));
+    if (count > 1) {
+      // Subtract to allow for rounding errors in magma_wait_semaphores time calculations
+      EXPECT_LE(kTimeoutMs - count, std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        std::chrono::steady_clock::now() - start)
+                                        .count());
+    }
+
+    for (uint32_t i = 1; i < items.size(); i++) {
+      magma_semaphore_signal(items[i].semaphore);
+    }
+
+    EXPECT_EQ(MAGMA_STATUS_OK, wait_all(items, 0));
+
+    for (uint32_t i = 0; i < items.size(); i++) {
+      magma_semaphore_reset(items[i].semaphore);
+    }
+
+    EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, wait_all(items, 0));
+
+    // Wait for one
+    start = std::chrono::steady_clock::now();
+    EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
+              magma_poll(items.data(), to_uint32(items.size()), kNsPerMs * kTimeoutMs));
+
+    // Subtract to allow for rounding errors in magma_wait_semaphores time calculations
+    EXPECT_LE(kTimeoutMs - count, std::chrono::duration_cast<std::chrono::milliseconds>(
+                                      std::chrono::steady_clock::now() - start)
+                                      .count());
+
+    magma_semaphore_signal(items.back().semaphore);
+
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), to_uint32(items.size()), 0));
+
+    magma_semaphore_reset(items.back().semaphore);
+
+    EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, magma_poll(items.data(), to_uint32(items.size()), 0));
+
+    for (auto& item : items) {
+      magma_connection_release_semaphore(connection_, item.semaphore);
+    }
+  }
+
   void PollWithNotificationChannel(uint32_t semaphore_count) {
     ASSERT_TRUE(connection_);
 
@@ -615,7 +678,8 @@ class TestConnection {
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
       magma_semaphore_t semaphore;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore));
+      magma_semaphore_id_t id;
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore2(connection_, &semaphore, &id));
 
       items.push_back({.semaphore = semaphore,
                        .type = MAGMA_POLL_TYPE_SEMAPHORE,
@@ -682,7 +746,8 @@ class TestConnection {
     ASSERT_EQ(ZX_OK, zx::channel::create(0 /* flags */, &local, &remote));
 
     magma_semaphore_t semaphore;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore));
+    magma_semaphore_id_t id;
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore2(connection_, &semaphore, &id));
 
     std::vector<magma_poll_item_t> items;
     items.push_back({.semaphore = semaphore,
@@ -762,7 +827,7 @@ class TestConnection {
 #endif
   }
 
-  void SemaphoreExport(magma_handle_t* handle_out, uint64_t* id_out) {
+  void SemaphoreExportOld(magma_handle_t* handle_out, uint64_t* id_out) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
@@ -772,7 +837,7 @@ class TestConnection {
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
-  void SemaphoreImport(magma_handle_t handle, uint64_t exported_id) {
+  void SemaphoreImportOld(magma_handle_t handle, uint64_t exported_id) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
@@ -782,9 +847,37 @@ class TestConnection {
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
-  static void SemaphoreImportExport(TestConnection* test1, TestConnection* test2) {
+  void SemaphoreExport(magma_handle_t* handle_out, magma_semaphore_id_t* id_out) {
+    ASSERT_TRUE(connection_);
+
+    magma_semaphore_t semaphore;
+    ASSERT_EQ(magma_connection_create_semaphore2(connection_, &semaphore, id_out), MAGMA_STATUS_OK);
+    EXPECT_EQ(magma_semaphore_export(semaphore, handle_out), MAGMA_STATUS_OK);
+    magma_connection_release_semaphore(connection_, semaphore);
+  }
+
+  void SemaphoreImport(magma_handle_t handle, magma_semaphore_id_t exported_id) {
+    ASSERT_TRUE(connection_);
+
+    magma_semaphore_t semaphore;
+    magma_semaphore_id_t id;
+    ASSERT_EQ(magma_connection_import_semaphore2(connection_, handle, &semaphore, &id),
+              MAGMA_STATUS_OK);
+    EXPECT_NE(id, exported_id);
+
+    magma_connection_release_semaphore(connection_, semaphore);
+  }
+
+  static void SemaphoreImportExportOld(TestConnection* test1, TestConnection* test2) {
     magma_handle_t handle;
     uint64_t exported_id;
+    test1->SemaphoreExportOld(&handle, &exported_id);
+    test2->SemaphoreImport(handle, exported_id);
+  }
+
+  static void SemaphoreImportExport(TestConnection* test1, TestConnection* test2) {
+    magma_handle_t handle;
+    magma_semaphore_id_t exported_id;
     test1->SemaphoreExport(&handle, &exported_id);
     test2->SemaphoreImport(handle, exported_id);
   }
@@ -1378,11 +1471,24 @@ TEST_F(Magma, BufferImportExport) {
   test2.BufferImport(handle, exported_id);
 }
 
+TEST_F(Magma, SemaphoreOld) {
+  TestConnection test;
+  test.SemaphoreOld(1);
+  test.SemaphoreOld(2);
+  test.SemaphoreOld(3);
+}
+
 TEST_F(Magma, Semaphore) {
   TestConnection test;
   test.Semaphore(1);
   test.Semaphore(2);
   test.Semaphore(3);
+}
+
+TEST_F(Magma, SemaphoreImportExportOld) {
+  TestConnection test1;
+  TestConnection test2;
+  TestConnection::SemaphoreImportExportOld(&test1, &test2);
 }
 
 TEST_F(Magma, SemaphoreImportExport) {
