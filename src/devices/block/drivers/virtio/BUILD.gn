@@ -49,6 +49,7 @@ source_set("block_lib") {
   sources = [ "block.cc" ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//src/devices/block/lib/common",
     "//src/devices/bus/lib/virtio",
     "//src/lib/ddktl",
     "//src/lib/listnode",

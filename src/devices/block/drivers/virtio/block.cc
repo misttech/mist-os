@@ -21,6 +21,7 @@
 #include <fbl/auto_lock.h>
 #include <pretty/hexdump.h>
 
+#include "src/devices/block/lib/common/include/common.h"
 #include "src/devices/bus/lib/virtio/trace.h"
 
 #define LOCAL_TRACE 0
@@ -365,21 +366,8 @@ void BlockDevice::SignalWorker(block_txn_t* txn) {
   switch (txn->op.command & BLOCK_OP_MASK) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE:
-      if (txn->op.rw.length == 0) {
-        txn_complete(txn, ZX_ERR_INVALID_ARGS);
-        LTRACEF("invalid length: 0\n");
-      }
-
-      // Transaction must fit within device.
-      if ((txn->op.rw.offset_dev >= config_.capacity) ||
-          (config_.capacity - txn->op.rw.offset_dev < txn->op.rw.length)) {
-        LTRACEF("request beyond the end of the device!\n");
-        txn_complete(txn, ZX_ERR_OUT_OF_RANGE);
-        return;
-      }
-
-      if (txn->op.rw.length == 0) {
-        txn_complete(txn, ZX_OK);
+      if (zx_status_t status = block::CheckIoRange(txn->op.rw, config_.capacity); status != ZX_OK) {
+        txn_complete(txn, status);
         return;
       }
       LTRACEF("txn %p, command %#x\n", txn, txn->op.command);
