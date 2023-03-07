@@ -10,6 +10,11 @@ source_set("test_node") {
     "test_node.h",
   ]
 
+  deps = [
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//zircon/system/ulib/async-default",
+  ]
+
   public_deps =
       [ "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp" ]
 }

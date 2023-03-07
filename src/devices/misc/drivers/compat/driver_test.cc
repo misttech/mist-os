@@ -290,7 +290,7 @@ class DriverTest : public testing::Test {
     arguments["clock.backstop"] = "0";
     boot_args_ = mock_boot_arguments::Server(std::move(arguments));
 
-    node_.emplace(dispatcher(), "root");
+    node_.emplace("root", dispatcher());
   }
 
   void TearDown() override {

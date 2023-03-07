@@ -2,14 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async/default.h>
 #include <lib/driver/testing/cpp/test_node.h>
+#include <lib/fdf/cpp/dispatcher.h>
 
 namespace fdf_testing {
 
-TestNode::TestNode(async_dispatcher_t* dispatcher, std::string name)
-    : dispatcher_(dispatcher),
+namespace {
+
+async_dispatcher_t* GetDefaultDispatcher() {
+  async_dispatcher_t* current_fdf_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  if (current_fdf_dispatcher) {
+    return current_fdf_dispatcher;
+  }
+
+  return async_get_default_dispatcher();
+}
+
+}  // namespace
+
+TestNode::TestNode(std::string name, async_dispatcher_t* dispatcher)
+    : dispatcher_(dispatcher ? dispatcher : GetDefaultDispatcher()),
       name_(std::move(name)),
-      checker_(dispatcher, "|fdf_testing::TestNode| is thread-unsafe.") {}
+      checker_(dispatcher_, "|fdf_testing::TestNode| is thread-unsafe.") {}
 
 TestNode::~TestNode() { std::lock_guard guard(checker_); }
 
@@ -81,7 +96,7 @@ zx::result<TestNode::CreateStartArgsResult> TestNode::CreateStartArgsAndServe() 
 void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
   std::lock_guard guard(checker_);
   std::string name{request->args.name().get()};
-  auto [it, inserted] = children_.try_emplace(name, dispatcher_, name);
+  auto [it, inserted] = children_.try_emplace(name, name, dispatcher_);
   if (!inserted) {
     completer.ReplyError(fuchsia_driver_framework::NodeError::kNameAlreadyExists);
     return;

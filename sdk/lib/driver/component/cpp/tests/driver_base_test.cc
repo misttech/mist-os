@@ -18,7 +18,7 @@ class TestDefaultDispatcher : public ::testing::Test {
  public:
   void SetUp() override {
     // fdf::Node
-    node_server_.emplace(driver_dispatcher(), "root");
+    node_server_.emplace("root", driver_dispatcher());
 
     // Create start args
     zx::result start_args = node_server_.value().CreateStartArgsAndServe();
@@ -73,7 +73,7 @@ class TestDefaultDispatcherSeparateEnv : public ::testing::Test {
     // fdf::Node and create start args
     zx::result<fdf_testing::TestNode::CreateStartArgsResult> start_args;
     zx::result result = fdf::RunOnDispatcherSync(env_dispatcher(), [this, &start_args]() mutable {
-      node_server_.emplace(env_dispatcher(), "root");
+      node_server_.emplace("root", env_dispatcher());
       start_args = node_server_.value().CreateStartArgsAndServe();
     });
     EXPECT_EQ(ZX_OK, result.status_value());
@@ -143,7 +143,7 @@ class TestAllowSyncDriverDispatcherSeparateEnv : public ::testing::Test {
     // fdf::Node and create start args
     zx::result<fdf_testing::TestNode::CreateStartArgsResult> start_args;
     zx::result result = fdf::RunOnDispatcherSync(env_dispatcher(), [this, &start_args]() mutable {
-      node_server_.emplace(env_dispatcher(), "root");
+      node_server_.emplace("root", env_dispatcher());
       start_args = node_server_.value().CreateStartArgsAndServe();
     });
     EXPECT_EQ(ZX_OK, result.status_value());

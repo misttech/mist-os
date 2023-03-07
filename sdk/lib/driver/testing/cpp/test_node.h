@@ -20,7 +20,9 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
     fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
   };
 
-  TestNode(async_dispatcher_t* dispatcher, std::string name);
+  // If no dispatcher is provided, this will try to use the current fdf_dispatcher. If there
+  // is also no fdf_dispatcher, it will try to use the thread's default async_dispatcher.
+  explicit TestNode(std::string name, async_dispatcher_t* dispatcher = nullptr);
 
   ~TestNode() override;
 
