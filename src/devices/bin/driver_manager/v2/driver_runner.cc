@@ -344,6 +344,16 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
   return zx::ok();
 }
 
+void DriverRunner::DestroyDriverComponent(dfv2::Node& node,
+                                          DestroyDriverComponentCallback callback) {
+  auto name = node.MakeComponentMoniker();
+  fdecl::wire::ChildRef child_ref{
+      .name = fidl::StringView::FromExternal(name),
+      .collection = CollectionName(node.collection()),
+  };
+  realm_->DestroyChild(child_ref).Then(std::move(callback));
+}
+
 void DriverRunner::Start(StartRequestView request, StartCompleter::Sync& completer) {
   auto url = request->start_info.resolved_url().get();
 
@@ -383,9 +393,9 @@ void DriverRunner::Start(StartRequestView request, StartCompleter::Sync& complet
   auto& [_, node] = *it;
   driver_args_.erase(it);
 
-  auto start_status = node.StartDriver(request->start_info, std::move(request->controller));
-  if (start_status.is_error()) {
-    completer.Close(start_status.error_value());
+  if (zx::result status = node.StartDriver(request->start_info, std::move(request->controller));
+      status.is_error()) {
+    completer.Close(status.error_value());
   }
 }
 
