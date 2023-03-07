@@ -1278,7 +1278,12 @@ TEST_F(FlatlandTouchIntegrationTest, SetHitRegion_CapturesTouch) {
 
   Inject(x_1q, y_1q, fupi_EventPhase::ADD);     // quadrant A
   Inject(x_1q, y_1q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
-  RunLoopUntilIdle();
+
+  // Drive loop until all expected events come in.
+  RunLoopUntil([&parent_events, &child_events] {
+    return parent_events.size() >= 3u && child_events.size() >= 3u;
+  });
+
   // One tap, both parent and child get two coordinate samples, plus a final interaction result that
   // occurs only on gesture competition. We ignore the interaction result, as this test focuses on
   // coordinates.
