@@ -726,12 +726,9 @@ impl LookupContext {
         }
     }
 
-    pub fn update_for_path<'a>(&mut self, path: &'a FsStr) -> &'a FsStr {
+    pub fn update_for_path(&mut self, path: &FsStr) {
         if path.last() == Some(&b'/') {
             self.must_be_directory = true;
-            trim_trailing_slashes(path)
-        } else {
-            path
         }
     }
 }
@@ -740,10 +737,6 @@ impl Default for LookupContext {
     fn default() -> Self {
         LookupContext::new(SymlinkMode::Follow)
     }
-}
-
-fn trim_trailing_slashes(path: &FsStr) -> &FsStr {
-    path.iter().rposition(|c| *c != b'/').map(|last| &path[..(last + 1)]).unwrap_or(b"")
 }
 
 /// A node in a mount namespace.
@@ -818,6 +811,7 @@ impl NamespaceNode {
         current_task: &CurrentTask,
         name: &FsStr,
         kind: UnlinkKind,
+        must_be_directory: bool,
     ) -> Result<(), Errno> {
         if DirEntry::is_reserved_name(name) {
             match kind {
@@ -834,7 +828,7 @@ impl NamespaceNode {
                 UnlinkKind::NonDirectory => error!(ENOTDIR),
             }
         } else {
-            self.entry.unlink(current_task, name, kind)
+            self.entry.unlink(current_task, name, kind, must_be_directory)
         }
     }
 
@@ -846,15 +840,18 @@ impl NamespaceNode {
         basename: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
         if !self.entry.node.is_dir() {
-            error!(ENOTDIR)
-        } else if basename == b"." || basename == b"" {
-            Ok(self.clone())
+            return error!(ENOTDIR);
+        }
+
+        let child = if basename == b"." || basename == b"" {
+            self.clone()
         } else if basename == b".." {
             // Make sure this can't escape a chroot
             if *self == current_task.fs().root() {
-                return Ok(self.clone());
+                self.clone()
+            } else {
+                self.parent().unwrap_or_else(|| self.clone())
             }
-            Ok(self.parent().unwrap_or_else(|| self.clone()))
         } else {
             let mut child =
                 self.with_new_entry(self.entry.component_lookup(current_task, basename)?);
@@ -883,8 +880,14 @@ impl NamespaceNode {
                 };
             }
 
-            Ok(child.enter_mount())
+            child.enter_mount()
+        };
+
+        if context.must_be_directory && !child.entry.node.is_dir() {
+            return error!(ENOTDIR);
         }
+
+        Ok(child)
     }
 
     /// Traverse up a child-to-parent link in the namespace.
@@ -1191,22 +1194,9 @@ mod test {
 
         assert_eq!(
             errno!(EBUSY),
-            ns2.root().unlink(&current_task, b"foo", UnlinkKind::Directory).unwrap_err()
+            ns2.root().unlink(&current_task, b"foo", UnlinkKind::Directory, false).unwrap_err()
         );
 
         Ok(())
-    }
-
-    #[::fuchsia::test]
-    fn test_trim_trailing_slashes() {
-        assert_eq!(b"", trim_trailing_slashes(b""));
-        assert_eq!(b"", trim_trailing_slashes(b"/"));
-        assert_eq!(b"", trim_trailing_slashes(b"/////"));
-        assert_eq!(b"abc", trim_trailing_slashes(b"abc"));
-        assert_eq!(b"abc", trim_trailing_slashes(b"abc/"));
-        assert_eq!(b"abc", trim_trailing_slashes(b"abc/////"));
-        assert_eq!(b"abc///xyz", trim_trailing_slashes(b"abc///xyz//"));
-        assert_eq!(b"abc///xyz", trim_trailing_slashes(b"abc///xyz/"));
-        assert_eq!(b"////abc///xyz", trim_trailing_slashes(b"////abc///xyz/"));
     }
 }

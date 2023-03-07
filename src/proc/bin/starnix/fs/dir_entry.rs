@@ -342,6 +342,7 @@ impl DirEntry {
         current_task: &CurrentTask,
         name: &FsStr,
         kind: UnlinkKind,
+        must_be_directory: bool,
     ) -> Result<(), Errno> {
         assert!(!DirEntry::is_reserved_name(name));
         let mut self_children = self.lock_children();
@@ -351,6 +352,16 @@ impl DirEntry {
 
         if child.state.read().mount_count > 0 {
             return error!(EBUSY);
+        }
+
+        // Check that this filesystem entry must be a directory. This can
+        // happen if the path terminates with a trailing slash.
+        //
+        // Example: If we're unlinking a symlink `/foo/bar/`, this would
+        // result in `ENOTDIR` because of the trailing slash, even if
+        // `UnlinkKind::NonDirectory` was used.
+        if must_be_directory && !child.node.is_dir() {
+            return error!(ENOTDIR);
         }
 
         match kind {

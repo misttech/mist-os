@@ -267,8 +267,11 @@ pub fn sys_bpf(
             let mut pathname = vec![0u8; PATH_MAX as usize];
             let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
             let pathname = current_task.mm.read_c_string(path_addr, &mut pathname)?.to_owned();
-            let (parent, basename) =
-                current_task.lookup_parent_at(FdNumber::AT_FDCWD, &pathname)?;
+            let (parent, basename) = current_task.lookup_parent_at(
+                &mut LookupContext::default(),
+                FdNumber::AT_FDCWD,
+                &pathname,
+            )?;
             parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
             parent.entry.add_node_ops(
                 current_task,

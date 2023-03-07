@@ -822,14 +822,17 @@ impl CurrentTask {
         mode: FileMode,
         flags: OpenFlags,
     ) -> Result<(NamespaceNode, bool), Errno> {
-        let path = context.update_for_path(path);
+        context.update_for_path(path);
         let mut parent_content = context.with(SymlinkMode::Follow);
         let (parent, basename) = self.lookup_parent(&mut parent_content, dir, path)?;
         context.remaining_follows = parent_content.remaining_follows;
 
         let must_create = flags.contains(OpenFlags::CREAT) && flags.contains(OpenFlags::EXCL);
 
+        // Lookup the child, without following a symlink or expecting it to be a directory.
         let mut child_context = context.with(SymlinkMode::NoFollow);
+        child_context.must_be_directory = false;
+
         match parent.lookup_child(self, &mut child_context, basename) {
             Ok(name) => {
                 if name.entry.node.is_lnk() {
@@ -978,12 +981,12 @@ impl CurrentTask {
     /// dir_fd.
     pub fn lookup_parent_at<'a>(
         &self,
+        context: &mut LookupContext,
         dir_fd: FdNumber,
         path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
         let (dir, path) = self.resolve_dir_fd(dir_fd, path)?;
-        let mut context = LookupContext::default();
-        self.lookup_parent(&mut context, dir, path)
+        self.lookup_parent(context, dir, path)
     }
 
     /// Lookup the parent of a namespace node.
@@ -1006,8 +1009,10 @@ impl CurrentTask {
         dir: NamespaceNode,
         path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
+        context.update_for_path(path);
+
         let mut current_node = dir;
-        let mut it = path.split(|c| *c == b'/');
+        let mut it = path.split(|c| *c == b'/').filter(|p| !p.is_empty());
         let mut current_path_component = it.next().unwrap_or(b"");
         for next_path_component in it {
             current_node = current_node.lookup_child(self, context, current_path_component)?;
@@ -1029,6 +1034,14 @@ impl CurrentTask {
         path: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
         let (parent, basename) = self.lookup_parent(context, dir, path)?;
+
+        // The child must resolve to a directory. This is because a trailing slash
+        // was found in the path. If the child is a symlink, we should follow it.
+        // See https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
+        if context.must_be_directory {
+            *context = context.with(SymlinkMode::Follow);
+        }
+
         parent.lookup_child(self, context, basename)
     }
 

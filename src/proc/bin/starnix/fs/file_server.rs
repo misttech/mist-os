@@ -337,7 +337,7 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         must_be_directory: bool,
     ) -> Result<(), zx::Status> {
         let kind = if must_be_directory { UnlinkKind::Directory } else { UnlinkKind::NonDirectory };
-        self.file.name.entry.unlink(&self.task, name.as_bytes(), kind)?;
+        self.file.name.entry.unlink(&self.task, name.as_bytes(), kind, false)?;
         Ok(())
     }
     async fn sync(&self) -> Result<(), zx::Status> {

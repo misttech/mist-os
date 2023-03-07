@@ -261,7 +261,7 @@ fn lookup_parent_at<T, F>(
     callback: F,
 ) -> Result<T, Errno>
 where
-    F: Fn(NamespaceNode, &FsStr) -> Result<T, Errno>,
+    F: Fn(LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
     let mut buf = [0u8; PATH_MAX as usize];
     let path = current_task.mm.read_c_string(user_path, &mut buf)?;
@@ -274,8 +274,9 @@ where
     if path.is_empty() {
         return error!(ENOENT);
     }
-    let (parent, basename) = current_task.lookup_parent_at(dir_fd, path)?;
-    callback(parent, basename)
+    let mut context = LookupContext::default();
+    let (parent, basename) = current_task.lookup_parent_at(&mut context, dir_fd, path)?;
+    callback(context, parent, basename)
 }
 
 /// Options for lookup_at.
@@ -335,9 +336,20 @@ fn lookup_at(
         }
         return error!(ENOENT);
     }
-    let (parent, basename) = current_task.lookup_parent_at(dir_fd, path)?;
-    let mut context = LookupContext::new(options.symlink_mode);
-    parent.lookup_child(current_task, &mut context, basename)
+
+    let mut parent_context = LookupContext::default();
+    let (parent, basename) = current_task.lookup_parent_at(&mut parent_context, dir_fd, path)?;
+
+    let mut child_context = if parent_context.must_be_directory {
+        // The child must resolve to a directory. This is because a trailing slash
+        // was found in the path. If the child is a symlink, we should follow it.
+        // See https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
+        parent_context.with(SymlinkMode::Follow)
+    } else {
+        parent_context.with(options.symlink_mode)
+    };
+
+    parent.lookup_child(current_task, &mut child_context, basename)
 }
 
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
@@ -518,10 +530,7 @@ pub fn sys_readlinkat(
     buffer: UserAddress,
     buffer_size: usize,
 ) -> Result<usize, Errno> {
-    let entry = lookup_parent_at(current_task, dir_fd, user_path, |parent, basename| {
-        let mut context = LookupContext::new(SymlinkMode::NoFollow);
-        Ok(parent.lookup_child(current_task, &mut context, basename)?.entry)
-    })?;
+    let entry = lookup_at(current_task, dir_fd, user_path, LookupFlags::no_follow())?.entry;
 
     let target = match entry.node.readlink(current_task)? {
         SymlinkTarget::Path(path) => path,
@@ -576,24 +585,13 @@ pub fn sys_mkdirat(
     mode: FileMode,
 ) -> Result<(), Errno> {
     let mut buf = [0u8; PATH_MAX as usize];
-    let mut path = current_task.mm.read_c_string(user_path, &mut buf)?;
-
-    // Strip trailing slashes to make mkdir("foo/") valid even if "foo/" doesn't exist. This is a
-    // special case for mkdir. Every other fs operation (including O_CREAT) will handle "foo/" by
-    // attempt to traverse into foo/ and failing if it doesn't exist.
-    while let Some(one_slash_removed) = path.strip_suffix(b"/") {
-        path = one_slash_removed;
-    }
-    let mut end = path.len();
-    while end > 0 && path[end - 1] == b'/' {
-        end -= 1;
-    }
-    let path = &path[..end];
+    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
 
     if path.is_empty() {
         return error!(ENOENT);
     }
-    let (parent, basename) = current_task.lookup_parent_at(dir_fd, path)?;
+    let (parent, basename) =
+        current_task.lookup_parent_at(&mut LookupContext::default(), dir_fd, path)?;
     parent.create_node(
         current_task,
         basename,
@@ -619,7 +617,7 @@ pub fn sys_mknodat(
         FileMode::EMPTY => FileMode::IFREG,
         _ => return error!(EINVAL),
     };
-    lookup_parent_at(current_task, dir_fd, user_path, |parent, basename| {
+    lookup_parent_at(current_task, dir_fd, user_path, |_, parent, basename| {
         parent.create_node(current_task, basename, mode.with_type(file_type), dev)
     })?;
     Ok(())
@@ -644,7 +642,13 @@ pub fn sys_linkat(
     if target.entry.node.is_dir() {
         return error!(EPERM);
     }
-    lookup_parent_at(current_task, new_dir_fd, new_user_path, |parent, basename| {
+
+    lookup_parent_at(current_task, new_dir_fd, new_user_path, |context, parent, basename| {
+        // The path to a new link cannot end in `/`. That would imply that we are dereferencing
+        // the link to a directory.
+        if context.must_be_directory {
+            return error!(ENOENT);
+        }
         if !NamespaceNode::mount_eq(&target, &parent) {
             return error!(EXDEV);
         }
@@ -673,8 +677,8 @@ pub fn sys_unlinkat(
     }
     let kind =
         if flags & AT_REMOVEDIR != 0 { UnlinkKind::Directory } else { UnlinkKind::NonDirectory };
-    lookup_parent_at(current_task, dir_fd, user_path, |parent, basename| {
-        parent.unlink(current_task, basename, kind)
+    lookup_parent_at(current_task, dir_fd, user_path, |context, parent, basename| {
+        parent.unlink(current_task, basename, kind, context.must_be_directory)
     })?;
     Ok(())
 }
@@ -711,7 +715,7 @@ pub fn sys_renameat2(
     }
 
     let lookup = |dir_fd, user_path| {
-        lookup_parent_at(current_task, dir_fd, user_path, |parent, basename| {
+        lookup_parent_at(current_task, dir_fd, user_path, |_, parent, basename| {
             Ok((parent, basename.to_vec()))
         })
     };
@@ -1136,7 +1140,14 @@ pub fn sys_symlinkat(
         return error!(ENOENT);
     }
 
-    let res = lookup_parent_at(current_task, new_dir_fd, user_path, |parent, basename| {
+    let res = lookup_parent_at(current_task, new_dir_fd, user_path, |context, parent, basename| {
+        // The path to a new symlink cannot end in `/`. That would imply that we are dereferencing
+        // the symlink to a directory.
+        //
+        // See https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
+        if context.must_be_directory {
+            return error!(ENOENT);
+        }
         parent.symlink(current_task, basename, target)
     });
     res?;
@@ -2110,5 +2121,42 @@ mod tests {
 
         let returned_stat = current_task.mm.read_object(user_stat).expect("failed to read struct");
         assert_eq!(returned_stat, statfs::default(u32::from_be_bytes(*b"f.io")));
+    }
+
+    #[::fuchsia::test]
+    fn test_unlinkat_dir() {
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        // Create the dir that we will attempt to unlink later.
+        let no_slash_path = b"testdir";
+        let no_slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        current_task
+            .mm
+            .write_memory(no_slash_path_addr, no_slash_path)
+            .expect("failed to write path");
+        let no_slash_user_path = UserCString::new(no_slash_path_addr);
+        sys_mkdir(
+            &current_task,
+            no_slash_user_path,
+            FileMode::ALLOW_ALL.with_type(FileMode::IFDIR),
+        )
+        .unwrap();
+
+        let slash_path = b"testdir/";
+        let slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        current_task.mm.write_memory(slash_path_addr, slash_path).expect("failed to write path");
+        let slash_user_path = UserCString::new(slash_path_addr);
+
+        // Try to remove a directory without specifying AT_REMOVEDIR.
+        // This should fail with EISDIR, irrespective of the terminating slash.
+        let error =
+            sys_unlinkat(&current_task, FdNumber::AT_FDCWD, slash_user_path, 0).unwrap_err();
+        assert_eq!(error, errno!(EISDIR));
+        let error =
+            sys_unlinkat(&current_task, FdNumber::AT_FDCWD, no_slash_user_path, 0).unwrap_err();
+        assert_eq!(error, errno!(EISDIR));
+
+        // Success with AT_REMOVEDIR.
+        sys_unlinkat(&current_task, FdNumber::AT_FDCWD, slash_user_path, AT_REMOVEDIR).unwrap();
     }
 }

@@ -398,7 +398,7 @@ mod test {
             .expect("failed to open /usr/bin");
         usr_bin
             .name
-            .unlink(&current_task, b"test.txt", UnlinkKind::NonDirectory)
+            .unlink(&current_task, b"test.txt", UnlinkKind::NonDirectory, false)
             .expect("failed to unlink test.text");
         assert_eq!(
             errno!(ENOENT),
@@ -406,7 +406,10 @@ mod test {
         );
         assert_eq!(
             errno!(ENOENT),
-            usr_bin.name.unlink(&current_task, b"test.txt", UnlinkKind::NonDirectory).unwrap_err()
+            usr_bin
+                .name
+                .unlink(&current_task, b"test.txt", UnlinkKind::NonDirectory, false)
+                .unwrap_err()
         );
 
         assert_eq!(
@@ -426,7 +429,7 @@ mod test {
             current_task.open_file(b"/usr/foo", OpenFlags::RDONLY).unwrap_err()
         );
         usr.name
-            .unlink(&current_task, b"bin", UnlinkKind::Directory)
+            .unlink(&current_task, b"bin", UnlinkKind::Directory, false)
             .expect("failed to unlink /usr/bin");
     }
 

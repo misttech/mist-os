@@ -6,6 +6,7 @@ use crate::device::wayland::DmaBufNode;
 use crate::fs::socket::*;
 use crate::fs::FdNumber;
 use crate::fs::FsString;
+use crate::fs::LookupContext;
 use crate::task::CurrentTask;
 use crate::types::*;
 
@@ -21,8 +22,11 @@ pub fn create_display_socket(
         SocketProtocol::default(),
     )?;
 
-    let (socket_parent, socket_basename) =
-        current_task.lookup_parent_at(FdNumber::AT_FDCWD, &display_path)?;
+    let (socket_parent, socket_basename) = current_task.lookup_parent_at(
+        &mut LookupContext::default(),
+        FdNumber::AT_FDCWD,
+        &display_path,
+    )?;
 
     let _socket_dir_entry = socket_parent.entry.bind_socket(
         current_task,
@@ -39,8 +43,11 @@ pub fn create_display_socket(
 
 /// Creates a memory allocation device file at the provided path.
 pub fn create_device_file(current_task: &CurrentTask, device_path: FsString) -> Result<(), Errno> {
-    let (device_parent, device_basename) =
-        current_task.lookup_parent_at(FdNumber::AT_FDCWD, &device_path)?;
+    let (device_parent, device_basename) = current_task.lookup_parent_at(
+        &mut LookupContext::default(),
+        FdNumber::AT_FDCWD,
+        &device_path,
+    )?;
     let mode = current_task.fs().apply_umask(mode!(IFREG, 0o777));
     let _device_entry =
         device_parent.entry.add_node_ops(current_task, device_basename, mode, DmaBufNode {})?;

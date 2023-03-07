@@ -1177,9 +1177,6 @@
                 "UnameTest.SetNames",
                 "UnameTest.UnshareUTS",
 
-                // unlink_test
-                "RmdirTest.CanRemoveWithTrailingSlashes",
-
                 // vfork_test: Unknown why this fails, this is theoretically implemented.
                 "VforkTest.ParentStopsUntilChildExecves",
 

@@ -144,8 +144,11 @@ pub fn sys_bind(
             } else {
                 let mode = file.node().info().mode;
                 let mode = current_task.fs().apply_umask(mode).with_type(FileMode::IFSOCK);
-                let (parent, basename) =
-                    current_task.lookup_parent_at(FdNumber::AT_FDCWD, &name)?;
+                let (parent, basename) = current_task.lookup_parent_at(
+                    &mut LookupContext::default(),
+                    FdNumber::AT_FDCWD,
+                    &name,
+                )?;
 
                 let _dir_entry = parent
                     .entry
@@ -243,9 +246,11 @@ pub fn sys_connect(
             if name[0] == b'\0' {
                 SocketPeer::Handle(current_task.abstract_socket_namespace.lookup(name)?)
             } else {
-                let (parent, basename) = current_task.lookup_parent_at(FdNumber::AT_FDCWD, name)?;
+                let mut context = LookupContext::default();
+                let (parent, basename) =
+                    current_task.lookup_parent_at(&mut context, FdNumber::AT_FDCWD, name)?;
                 let name = parent
-                    .lookup_child(current_task, &mut LookupContext::default(), basename)
+                    .lookup_child(current_task, &mut context, basename)
                     .map_err(translate_fs_error)?;
                 SocketPeer::Handle(
                     name.entry.node.socket().ok_or_else(|| errno!(ECONNREFUSED))?.clone(),
