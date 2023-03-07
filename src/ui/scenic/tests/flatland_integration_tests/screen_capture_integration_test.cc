@@ -138,9 +138,12 @@ class ScreenCaptureIntegrationTest : public gtest::RealLoopFixture {
   void BlockingPresent(fuchsia::ui::composition::FlatlandPtr& flatland) {
     bool presented = false;
     flatland.events().OnFramePresented = [&presented](auto) { presented = true; };
+    bool credit_received = false;
+    flatland.events().OnNextFrameBegin = [&credit_received](auto) { credit_received = true; };
     flatland->Present({});
-    RunLoopUntil([&presented] { return presented; });
+    RunLoopUntil([&presented, &credit_received] { return presented && credit_received; });
     flatland.events().OnFramePresented = nullptr;
+    flatland.events().OnNextFrameBegin = nullptr;
   }
 
   // This function calls GetNextFrame().
