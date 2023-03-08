@@ -4,6 +4,7 @@
 library fuchsia.hardware.display.controller;
 
 using fuchsia.hardware.audiotypes;
+using fuchsia.hardware.i2cimpl;
 using zx;
 
 alias ZxPixelFormat = uint32;
@@ -65,23 +66,26 @@ type CursorInfo = struct {
     format ZxPixelFormat;
 };
 
-type Panel = strict union {
+// TODO(fxbug.dev/120971): Change this back to `strict resource union` after finishing the
+// transition from `i2c_bus_id` to `i2c`.
+type Panel = resource struct {
     /// The bus_id to use to read this display's edid from the device's i2c protocol.
-    1: i2c_bus_id uint32;
+    i2c_bus_id uint32;
+    // The i2c bus to use to read this display's edid.
+    i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
     /// The display's parameters if an edid is not present.
-    2: params DisplayParams;
+    params DisplayParams;
 };
 
 /// A structure containing information a connected display.
-type AddedDisplayArgs = struct {
+type AddedDisplayArgs = resource struct {
     display_id uint64;
 
     /// A flag indicating whether or not the display has a valid edid.
     ///
-    /// If true, the device should expose an ZX_PROTOCOL_I2C_IMPL device through get_protocol, in
-    /// addition to the ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL protocol. Note that the i2c device
-    /// will be called from the on_displays_changed callback, so care should be taken to avoid
-    /// deadlocks or double-locking.
+    /// If true, the device should provide a fuchsia.hardware.i2cimpl.I2cImpl client in the `Panel`
+    /// union. Note that the i2c device will be called from the on_displays_changed callback, so
+    /// care should be taken to avoid deadlocks or double-locking.
     ///
     /// If no edid is present, then the meaning of display_config's mode structure is
     /// undefined, and drivers should ignore it in check_configuration and apply_configuration.
@@ -137,7 +141,7 @@ protocol DisplayControllerInterface {
     ///
     /// The driver should call this function when the callback is registered if any displays
     /// are present.
-    OnDisplaysChanged(struct {
+    OnDisplaysChanged(resource struct {
         added_display vector<AddedDisplayArgs>:MAX;
         removed_display vector<uint64>:MAX;
     }) -> (struct {

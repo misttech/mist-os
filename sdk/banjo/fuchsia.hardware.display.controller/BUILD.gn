@@ -8,6 +8,7 @@ fidl("fuchsia.hardware.display.controller") {
   sources = [ "display-controller.fidl" ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.audiotypes",
+    "//sdk/banjo/fuchsia.hardware.i2cimpl",
     "//zircon/vdso/zx",
   ]
   enable_banjo = true
