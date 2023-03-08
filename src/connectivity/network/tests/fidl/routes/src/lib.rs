@@ -372,20 +372,12 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
             ])
         },
         |IpInvariant(loopback_id)| {
-            RoutesHolder(vec![
-                new_installed_route(
-                    net_subnet_v6!("::1/128"),
-                    loopback_id,
-                    DEFAULT_INTERFACE_METRIC,
-                    true,
-                ),
-                new_installed_route(
-                    net_subnet_v6!("fe80::/64"),
-                    loopback_id,
-                    DEFAULT_INTERFACE_METRIC,
-                    true,
-                ),
-            ])
+            RoutesHolder(vec![new_installed_route(
+                net_subnet_v6!("::1/128"),
+                loopback_id,
+                DEFAULT_INTERFACE_METRIC,
+                true,
+            )])
         },
     );
 

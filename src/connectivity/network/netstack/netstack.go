@@ -912,18 +912,21 @@ func (ifs *ifState) stateChangeLocked(name string, adminUp, linkOnline bool) boo
 				ifs.mu.dhcp.cancelLocked()
 				ifs.runDHCPLocked(name)
 			}
-
-			// Add an on-link route for the IPv6 link-local subnet. The route is added
-			// as a 'static' route because Netstack will remove dynamic routes on DHCPv4
-			// changes. See staticRouteAvoidingLifeCycleHooks for more details.
-			ifs.ns.routeTable.AddRoute(
-				ipv6LinkLocalOnLinkRoute(ifs.nicid),
-				routes.MediumPreference,
-				ifs.metric,
-				true, /* metricTracksInterface */
-				staticRouteAvoidingLifeCycleHooks,
-				true, /* enabled */
-			)
+			if ifs.endpoint.Capabilities()&stack.CapabilityLoopback == 0 {
+				// Add an on-link route for the IPv6 link-local subnet to
+				// non-loopback interfaces. The route is added as a 'static'
+				// route because Netstack will remove dynamic routes on DHCPv4
+				// changes. See staticRouteAvoidingLifeCycleHooks for more
+				// details.
+				ifs.ns.routeTable.AddRoute(
+					ipv6LinkLocalOnLinkRoute(ifs.nicid),
+					routes.MediumPreference,
+					ifs.metric,
+					true, /* metricTracksInterface */
+					staticRouteAvoidingLifeCycleHooks,
+					true, /* enabled */
+				)
+			}
 			ifs.ns.routeTable.UpdateStack(ifs.ns.stack, ifs.ns.resetDestinationCache)
 		} else {
 			ifs.onDownLocked(name, false /* closed */)
