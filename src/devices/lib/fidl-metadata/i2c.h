@@ -17,7 +17,6 @@ constexpr size_t kMaxI2cNameLength = 64;
 
 namespace fidl_metadata::i2c {
 struct Channel {
-  uint32_t bus_id;
   uint16_t address;
 
   uint32_t vid;
@@ -26,11 +25,6 @@ struct Channel {
 
   char name[kMaxI2cNameLength];
 };
-
-// Convert an array of i2c_channel to fuchsia.hardware.i2c.I2CBusMetadata encoded
-// in a FIDL bytestream.
-// TODO(fxbug.dev/120971): Remove after all users have switched to the version below.
-zx::result<std::vector<uint8_t>> I2CChannelsToFidl(cpp20::span<const Channel> channels);
 
 zx::result<std::vector<uint8_t>> I2CChannelsToFidl(uint32_t bus_id,
                                                    cpp20::span<const Channel> channels);
