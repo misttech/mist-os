@@ -122,6 +122,11 @@ impl FramedStreamWriter {
         Self { inner: FramedStreamWriterInner::Circuit(writer, id, conn), peer_node_id }
     }
 
+    #[cfg(not(target_os = "fuchsia"))]
+    pub fn is_circuit(&self) -> bool {
+        matches!(self.inner, FramedStreamWriterInner::Circuit(_, _, _))
+    }
+
     pub async fn abandon(&mut self) {
         match &mut self.inner {
             FramedStreamWriterInner::Quic(quic) => quic.abandon().await,

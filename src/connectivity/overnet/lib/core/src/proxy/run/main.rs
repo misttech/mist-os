@@ -18,6 +18,9 @@ use fuchsia_zircon_status as zx_status;
 use futures::{future::Either, prelude::*};
 use std::sync::Arc;
 
+#[cfg(not(target_os = "fuchsia"))]
+use fuchsia_async::emulated_handle::ChannelProxyProtocol;
+
 // We run two tasks to proxy a handle - one to handle handle->stream, the other to handle
 // stream->handle. When we want to perform a transfer operation we end up wanting to think about
 // just one task, so we provide a join operation here.
@@ -105,11 +108,19 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     initial_stream_reader: Option<FramedStreamReader>,
     stream_reader: FramedStreamReader,
 ) -> Result<(), Error> {
+    #[cfg(not(target_os = "fuchsia"))]
+    if stream_writer.is_circuit() {
+        proxy.set_channel_proxy_protocol(ChannelProxyProtocol::Cso);
+    } else {
+        proxy.set_channel_proxy_protocol(ChannelProxyProtocol::Legacy);
+    }
+
     let (tx_join, rx_join) = new_task_joiner();
     let hdl = proxy.hdl();
     let mut stream_writer = stream_writer.bind(hdl);
     let initial_stream_reader = initial_stream_reader.map(|s| s.bind(hdl));
     let mut stream_reader = stream_reader.bind(hdl);
+
     // TODO: don't detach
     futures::future::try_join(
         async {
