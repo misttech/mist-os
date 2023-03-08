@@ -13,8 +13,8 @@
     },
     use: [
         {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
+            protocol: "fuchsia.test.manager.RunBuilder",
+            from: "#test_manager",
         },
     ],
     offer: [

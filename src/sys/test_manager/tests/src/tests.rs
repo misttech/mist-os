@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{format_err, Context as _, Error},
+    anyhow::{Context as _, Error},
     fidl::endpoints,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager,
+    fidl_fuchsia_test_manager as ftest_manager,
     ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
     fuchsia_async as fasync,
     fuchsia_component::client,
@@ -18,45 +17,25 @@ use {
     },
 };
 
-async fn connect_test_manager() -> Result<ftest_manager::RunBuilderProxy, Error> {
-    let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
-        .context("could not connect to Realm service")?;
-
-    let mut child_ref = fdecl::ChildRef { name: "test_manager".to_owned(), collection: None };
-    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    realm
-        .open_exposed_dir(&mut child_ref, server_end)
-        .await
-        .context("open_exposed_dir fidl call failed for test manager")?
-        .map_err(|e| format_err!("failed to create test manager: {:?}", e))?;
-
-    client::connect_to_protocol_at_dir_root::<ftest_manager::RunBuilderMarker>(&dir)
-        .context("failed to open test suite service")
+macro_rules! connect_run_builder {
+    () => {
+        client::connect_to_protocol::<ftest_manager::RunBuilderMarker>()
+            .context("cannot connect to run builder proxy")
+    };
 }
 
-async fn connect_query_server() -> Result<ftest_manager::QueryProxy, Error> {
-    let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
-        .context("could not connect to Realm service")?;
-
-    let mut child_ref = fdecl::ChildRef { name: "test_manager".to_owned(), collection: None };
-    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    realm
-        .open_exposed_dir(&mut child_ref, server_end)
-        .await
-        .context("open_exposed_dir fidl call failed for test manager")?
-        .map_err(|e| format_err!("failed to create test manager: {:?}", e))?;
-
-    client::connect_to_protocol_at_dir_root::<ftest_manager::QueryMarker>(&dir)
-        .context("failed to open test suite service")
+macro_rules! connect_query_server {
+    () => {
+        client::connect_to_protocol::<ftest_manager::QueryMarker>()
+            .context("cannot connect to query proxy")
+    };
 }
 
 async fn run_single_test(
     test_url: &str,
     run_options: RunOptions,
 ) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
-    let builder = TestBuilder::new(
-        connect_test_manager().await.context("cannot connect to run builder proxy")?,
-    );
+    let builder = TestBuilder::new(connect_run_builder!()?);
     let suite_instance =
         builder.add_suite(test_url, run_options).await.context("Cannot create suite instance")?;
     let builder_run = fasync::Task::spawn(async move { builder.run().await });
@@ -67,7 +46,7 @@ async fn run_single_test(
 
 #[fuchsia::test]
 async fn calling_kill_should_kill_test() {
-    let proxy = connect_test_manager().await.unwrap();
+    let proxy = connect_run_builder!().unwrap();
     let builder = TestBuilder::new(proxy);
     let suite = builder
         .add_suite(
@@ -107,7 +86,7 @@ async fn calling_kill_should_kill_test() {
 
 #[fuchsia::test]
 async fn closing_suite_controller_should_kill_test() {
-    let proxy = connect_test_manager().await.unwrap();
+    let proxy = connect_run_builder!().unwrap();
     let builder = TestBuilder::new(proxy);
     let suite = builder
         .add_suite(
@@ -132,7 +111,7 @@ async fn closing_suite_controller_should_kill_test() {
 
 #[fuchsia::test]
 async fn calling_builder_kill_should_kill_test() {
-    let proxy = connect_test_manager().await.unwrap();
+    let proxy = connect_run_builder!().unwrap();
     let builder = TestBuilder::new(proxy);
     let suite = builder
         .add_suite(
@@ -173,7 +152,7 @@ async fn calling_builder_kill_should_kill_test() {
 
 #[fuchsia::test]
 async fn calling_stop_should_stop_test() {
-    let proxy = connect_test_manager().await.unwrap();
+    let proxy = connect_run_builder!().unwrap();
     let builder = TestBuilder::new(proxy);
     // can't use hanging test here as stop will only return once current running test completes.
     let suite = builder
@@ -441,9 +420,7 @@ async fn multiple_test() {
     let gtest_test_url =
         "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/sample_tests.cm";
 
-    let builder = TestBuilder::new(
-        connect_test_manager().await.expect("cannot connect to run builder proxy"),
-    );
+    let builder = TestBuilder::new(connect_run_builder!().unwrap());
     let gtest_suite_instance1 = builder
         .add_suite(gtest_test_url, default_run_option())
         .await
@@ -478,7 +455,7 @@ async fn multiple_test() {
 
 #[fuchsia::test]
 async fn no_suite_service_test() {
-    let proxy = connect_test_manager().await.unwrap();
+    let proxy = connect_run_builder!().unwrap();
     let builder = TestBuilder::new(proxy);
     let suite = builder
         .add_suite(
@@ -500,7 +477,7 @@ async fn no_suite_service_test() {
 
 #[fuchsia::test]
 async fn test_not_resolved() {
-    let proxy = connect_test_manager().await.unwrap();
+    let proxy = connect_run_builder!().unwrap();
     let builder = TestBuilder::new(proxy);
     let suite = builder
         .add_suite(
@@ -631,9 +608,7 @@ async fn custom_artifact_test() {
 async fn debug_data_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";
 
-    let builder = TestBuilder::new(
-        connect_test_manager().await.expect("cannot connect to run builder proxy"),
-    );
+    let builder = TestBuilder::new(connect_run_builder!().unwrap());
     let suite_instance = builder
         .add_suite(test_url, default_run_option())
         .await
@@ -673,9 +648,7 @@ async fn debug_data_accumulate_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";
 
     for iteration in 1usize..3 {
-        let builder = TestBuilder::new(
-            connect_test_manager().await.expect("cannot connect to run builder proxy"),
-        );
+        let builder = TestBuilder::new(connect_run_builder!().unwrap());
         builder.set_scheduling_options(true).expect("set scheduling options");
         let suite_instance = builder
             .add_suite(test_url, default_run_option())
@@ -704,9 +677,7 @@ async fn debug_data_isolated_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";
     // By default, when I run the same test twice, debug data is not accumulated.
     for _ in 0..2 {
-        let builder = TestBuilder::new(
-            connect_test_manager().await.expect("cannot connect to run builder proxy"),
-        );
+        let builder = TestBuilder::new(connect_run_builder!().unwrap());
         let suite_instance = builder
             .add_suite(test_url, default_run_option())
             .await
@@ -751,7 +722,7 @@ async fn custom_artifact_realm_test() {
 
 #[fuchsia::test]
 async fn enumerate_invalid_test() {
-    let proxy = connect_query_server().await.unwrap();
+    let proxy = connect_query_server!().unwrap();
     let (_iterator, server_end) = endpoints::create_proxy().unwrap();
     let err = proxy
         .enumerate("fuchsia-pkg://fuchsia.com/test_manager_test#meta/invalid_cml.cm", server_end)
@@ -763,7 +734,7 @@ async fn enumerate_invalid_test() {
 
 #[fuchsia::test]
 async fn enumerate_echo_test() {
-    let proxy = connect_query_server().await.unwrap();
+    let proxy = connect_query_server!().unwrap();
     let (iterator, server_end) = endpoints::create_proxy().unwrap();
     proxy
         .enumerate(
@@ -790,7 +761,7 @@ async fn enumerate_echo_test() {
 
 #[fuchsia::test]
 async fn enumerate_huge_test() {
-    let proxy = connect_query_server().await.unwrap();
+    let proxy = connect_query_server!().unwrap();
     let (iterator, server_end) = endpoints::create_proxy().unwrap();
     proxy
         .enumerate(

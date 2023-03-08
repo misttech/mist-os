@@ -10,9 +10,6 @@ rustc_test("test_manager_test_bin") {
   name = "test_manager_test"
   source_root = "src/tests.rs"
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
@@ -38,16 +35,11 @@ rustc_test("test_manager_stress_test_bin") {
   name = "test_manager_stress_test"
   source_root = "src/stress_tests.rs"
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/sys/test_manager:test_lib",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:pretty_assertions",
   ]
@@ -60,11 +52,7 @@ rustc_test("test_manager_legacy_test_bin") {
   name = "test_manager_legacy_test"
   source_root = "src/legacy_tests.rs"
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

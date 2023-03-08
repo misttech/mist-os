@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager,
+    anyhow::{Context as _, Error},
+    fidl_fuchsia_test_manager as ftest_manager,
     ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
     fuchsia_async as fasync,
     fuchsia_component::client,
@@ -16,28 +14,13 @@ use {
     },
 };
 
-async fn connect_test_manager() -> Result<ftest_manager::RunBuilderProxy, Error> {
-    let realm = client::connect_to_protocol::<fcomponent::RealmMarker>()
-        .context("could not connect to Realm service")?;
-
-    let mut child_ref = fdecl::ChildRef { name: "test_manager".to_owned(), collection: None };
-    let (dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    realm
-        .open_exposed_dir(&mut child_ref, server_end)
-        .await
-        .context("open_exposed_dir fidl call failed for test manager")?
-        .map_err(|e| format_err!("failed to create test manager: {:?}", e))?;
-
-    client::connect_to_protocol_at_dir_root::<ftest_manager::RunBuilderMarker>(&dir)
-        .context("failed to open test suite service")
-}
-
 async fn run_single_test(
     test_url: &str,
     run_options: RunOptions,
 ) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
     let builder = TestBuilder::new(
-        connect_test_manager().await.context("cannot connect to run builder proxy")?,
+        client::connect_to_protocol::<ftest_manager::RunBuilderMarker>()
+            .context("cannot connect to run builder proxy")?,
     );
     let suite_instance =
         builder.add_suite(test_url, run_options).await.context("Cannot create suite instance")?;

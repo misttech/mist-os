@@ -13,8 +13,12 @@
     },
     use: [
         {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
+            protocol: "fuchsia.test.manager.Query",
+            from: "#test_manager",
+        },
+        {
+            protocol: "fuchsia.test.manager.RunBuilder",
+            from: "#test_manager",
         },
     ],
 }
