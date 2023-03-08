@@ -1,0 +1,35 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_library.gni")
+import("//build/python/python_mobly_test.gni")
+
+if (is_host) {
+  python_library("test_fuchsia_device_base_lib") {
+    library_name = "test_fuchsia_device_base"
+    source_root = "."
+    sources = [
+      "__init__.py",
+      "test_fuchsia_device_base.py",
+    ]
+  }
+
+  python_mobly_test("fuchsia_device_base_test") {
+    main_source = "test_fuchsia_device_base.py"
+
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+
+    params_source = "params.yaml"
+    local_config_source = "../../testbeds/One-FEmu.yaml"
+
+    # Used for infra Swarming bot allocation.
+    environments = [
+      {
+        dimensions = {
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}

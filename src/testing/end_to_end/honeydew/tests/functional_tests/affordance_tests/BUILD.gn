@@ -1,0 +1,11 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+if (is_host) {
+  group("tests") {
+    testonly = true
+    public_deps =
+        [ "test_component_default:component_default_test($host_toolchain)" ]
+  }
+}
