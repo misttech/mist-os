@@ -31,6 +31,16 @@ static constexpr uint32_t kNumDisplayFramebuffers = 2;
 
 namespace flatland {
 
+namespace {
+
+void SignalAll(const std::vector<zx::event>& events) {
+  for (auto& e : events) {
+    e.signal(0u, ZX_EVENT_SIGNALED);
+  }
+}
+
+}  // namespace
+
 Engine::Engine(std::shared_ptr<DisplayCompositor> flatland_compositor,
                std::shared_ptr<FlatlandPresenterImpl> flatland_presenter,
                std::shared_ptr<UberStructSystem> uber_struct_system,
@@ -134,6 +144,7 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   // invoke |callback| to continue the render loop.
   if (!first_frame_with_image_is_rendered_) {
     if (scene_state.images.empty()) {
+      SignalAll(flatland_presenter_->TakeReleaseFences());
       const auto now = async::Now(async_get_default_dispatcher());
       callback({now, now});
       return;
