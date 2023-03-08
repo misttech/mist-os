@@ -17,7 +17,9 @@
     capabilities: [
         { service: 'fuchsia.hardware.dsp.Service' },
     ],
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.mailbox.Service" },
+    ],
     expose: [
         {
             service: 'fuchsia.hardware.dsp.Service',

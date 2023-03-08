@@ -116,19 +116,14 @@ zx_status_t AmlDsp::Init() {
     return ZX_ERR_INTERNAL;
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_mailbox::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create endpoints");
-    return endpoints.status_value();
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_mailbox::Service::Device>("dsp-mailbox");
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol: %s", client.status_string());
+    return client.status_value();
   }
 
-  status = DdkConnectFragmentFidlProtocol("dsp-mailbox", std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect fidl protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  dsp_mailbox_ = fidl::WireSyncClient(std::move(endpoints->client));
+  dsp_mailbox_ = fidl::WireSyncClient(std::move(client.value()));
 
   return status;
 }

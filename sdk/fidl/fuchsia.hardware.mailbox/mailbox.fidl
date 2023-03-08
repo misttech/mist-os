@@ -32,3 +32,7 @@ protocol Device {
         mdata MboxRx;
     }) error zx.status;
 };
+
+service Service {
+    device client_end:Device;
+};

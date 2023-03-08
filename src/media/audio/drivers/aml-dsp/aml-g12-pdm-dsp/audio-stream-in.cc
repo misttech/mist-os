@@ -60,20 +60,14 @@ int AudioStreamInDsp::Thread() {
 }
 
 int AudioStreamInDsp::MailboxBind() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_mailbox::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create endpoints");
-    return endpoints.status_value();
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_mailbox::Service::Device>("audio-mailbox");
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol: %s", client.status_string());
+    return client.status_value();
   }
 
-  auto status = DdkConnectFragmentFidlProtocol("audio-mailbox", std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect fidl protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_mailbox::Device> audio_mailbox =
-      fidl::WireSyncClient(std::move(endpoints->client));
+  auto audio_mailbox = fidl::WireSyncClient(std::move(client.value()));
 
   audio_mailbox_ = std::make_unique<AmlMailboxDevice>(std::move(audio_mailbox));
   if (audio_mailbox_ == nullptr) {

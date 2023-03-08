@@ -196,22 +196,24 @@ AmlPlMailbox::~AmlPlMailbox() {
 }
 
 zx_status_t AmlPlMailbox::Bind() {
-  zx::result status = outgoing_.AddUnmanagedProtocol<fuchsia_hardware_mailbox::Device>(
-      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+  zx::result status = outgoing_.AddService<fuchsia_hardware_mailbox::Service>(
+      fuchsia_hardware_mailbox::Service::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
   if (status.is_error()) {
     zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory: %s",
            status.status_string());
     return status.status_value();
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
   status = outgoing_.Serve(std::move(endpoints->server));
   std::array offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_mailbox::Device>,
+      fuchsia_hardware_mailbox::Service::Name,
   };
 
   char device_name[32] = {};
@@ -224,7 +226,7 @@ zx_status_t AmlPlMailbox::Bind() {
   zx_status_t add_status = DdkAdd(ddk::DeviceAddArgs(device_name)
                                       .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                       .set_props(props)
-                                      .set_fidl_protocol_offers(offers)
+                                      .set_fidl_service_offers(offers)
                                       .set_outgoing_dir(endpoints->client.TakeChannel())
                                       .set_proto_id(ZX_PROTOCOL_AML_MAILBOX));
 

@@ -17,5 +17,6 @@
     },
     use: [
         { service: "fuchsia.hardware.dsp.Service" },
+        { service: "fuchsia.hardware.mailbox.Service" },
     ],
 }
