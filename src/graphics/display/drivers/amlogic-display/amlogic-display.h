@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/debug.h>
@@ -68,8 +67,7 @@ using DeviceType = ddk::Device<AmlogicDisplay, ddk::GetProtocolable, ddk::Suspen
 class AmlogicDisplay
     : public DeviceType,
       public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol>,
-      public ddk::DisplayClampRgbImplProtocol<AmlogicDisplay>,
-      public ddk::I2cImplProtocol<AmlogicDisplay> {
+      public ddk::DisplayClampRgbImplProtocol<AmlogicDisplay> {
  public:
   AmlogicDisplay(zx_device_t* parent) : DeviceType(parent) {}
 
@@ -126,18 +124,6 @@ class AmlogicDisplay
 
   zx_status_t DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb);
 
-  // Required functions for I2cImpl
-  uint32_t I2cImplGetBusBase() { return 0; }
-  uint32_t I2cImplGetBusCount() { return 1; }
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
-    *out_size = UINT32_MAX;
-    return ZX_OK;
-  }
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) { return ZX_OK; }  // no-op
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count) {
-    return vout_->EdidTransfer(bus_id, op_list, op_count);
-  }
-
   // Required functions for DeviceType
   void DdkSuspend(ddk::SuspendTxn txn);
   void DdkResume(ddk::ResumeTxn txn);
@@ -179,11 +165,6 @@ class AmlogicDisplay
 
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }
-
-  ddk::I2cImplProtocolClient i2c() {
-    const i2c_impl_protocol_t i2c{.ops = &i2c_impl_protocol_ops_, .ctx = this};
-    return ddk::I2cImplProtocolClient(&i2c);
-  }
 
   // Zircon handles
   zx::bti bti_;

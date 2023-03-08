@@ -139,7 +139,7 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
   fbl::AutoLock lock(&display_lock_);
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
   added_display_args_t args;
-  vout_->PopulateAddedDisplayArgs(&args, display_id_, i2c());
+  vout_->PopulateAddedDisplayArgs(&args, display_id_);
   dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
 }
 
@@ -526,12 +526,6 @@ zx_status_t AmlogicDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol
     case ZX_PROTOCOL_DISPLAY_CLAMP_RGB_IMPL:
       proto->ops = &display_clamp_rgb_impl_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_I2C_IMPL:
-      if (!vout_->supports_hpd()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      proto->ops = &i2c_impl_protocol_ops_;
-      return ZX_OK;
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
@@ -543,7 +537,7 @@ zx_status_t AmlogicDisplay::SetupDisplayInterface() {
   added_display_info_t info{.is_standard_srgb_out = false};  // Random default
   if (dc_intf_.is_valid()) {
     added_display_args_t args;
-    vout_->PopulateAddedDisplayArgs(&args, display_id_, i2c());
+    vout_->PopulateAddedDisplayArgs(&args, display_id_);
     dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, &info, 1, nullptr);
   }
 
@@ -893,7 +887,7 @@ int AmlogicDisplay::HpdThread() {
 
       display_attached_ = true;
       vout_->DisplayConnected();
-      vout_->PopulateAddedDisplayArgs(&args, display_id_, i2c());
+      vout_->PopulateAddedDisplayArgs(&args, display_id_);
       display_added = true;
       hpd_gpio_.SetPolarity(GPIO_POLARITY_LOW);
     } else if (!hpd && display_attached_) {

@@ -106,7 +106,7 @@ class HdmiHost {
   zx_status_t HostOn();
   void HostOff();
   zx_status_t ModeSet(const display_mode_t& mode);
-  zx_status_t EdidTransfer(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count);
+  zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count);
 
   void UpdateOutputColorFormat(ColorFormat output_color_format) {
     color_.output_color_format = output_color_format;

@@ -194,7 +194,7 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
   return ZX_OK;
 }
 
-zx_status_t HdmiHost::EdidTransfer(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count) {
+zx_status_t HdmiHost::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) {
   auto ops = std::make_unique<EdidOp[]>(op_count);
   auto writes = std::make_unique<fidl::VectorView<uint8_t>[]>(op_count);
   auto reads = std::make_unique<uint16_t[]>(op_count);
