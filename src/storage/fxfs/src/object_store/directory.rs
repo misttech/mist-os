@@ -216,6 +216,7 @@ impl<S: HandleOwner> Directory<S> {
             }
         })
         .await?;
+        self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
         Ok(handle)
     }
 
@@ -237,6 +238,52 @@ impl<S: HandleOwner> Directory<S> {
         Ok(())
     }
 
+    // This applies the project id of this directory (if nonzero) to an object. The method assumes
+    // both this and child objects are already present in the mutations of the provided
+    // transactions and that the child is of of zero size. This is meant for use inside
+    // `create_child_file()` and `create_child_dir()` only, where such assumptions are safe.
+    fn copy_project_id_to_object_in_txn<'a>(
+        &self,
+        transaction: &mut Transaction<'a>,
+        object_id: u64,
+    ) -> Result<(), Error> {
+        let store_id = self.store().store_object_id();
+        // This mutation must already be in here as we've just modified the mtime.
+        let ObjectValue::Object{ attributes: ObjectAttributes{ project_id, .. }, .. } =
+            transaction.get_object_mutation(
+                store_id,
+                ObjectKey::object(self.object_id)
+        ).unwrap().item.value else {
+            return Err(anyhow!(FxfsError::Inconsistent));
+        };
+        if project_id > 0 {
+            // This mutation must be present as well since we've just created the object. So this
+            // replaces it.
+            let mut mutation = transaction
+                .get_object_mutation(store_id, ObjectKey::object(object_id))
+                .unwrap()
+                .clone();
+            if let ObjectValue::Object {
+                attributes: ObjectAttributes { project_id: child_project_id, .. },
+                ..
+            } = &mut mutation.item.value
+            {
+                *child_project_id = project_id;
+            } else {
+                return Err(anyhow!(FxfsError::Inconsistent));
+            }
+            transaction.add(store_id, Mutation::ObjectStore(mutation));
+            transaction.add(
+                store_id,
+                Mutation::merge_object(
+                    ObjectKey::project_usage(self.store().root_directory_object_id(), project_id),
+                    ObjectValue::BytesAndNodes { bytes: 0, nodes: 1 },
+                ),
+            );
+        }
+        Ok(())
+    }
+
     pub async fn create_child_file<'a>(
         &self,
         transaction: &mut Transaction<'a>,
@@ -247,6 +294,7 @@ impl<S: HandleOwner> Directory<S> {
             ObjectStore::create_object(&self.owner, transaction, HandleOptions::default(), None)
                 .await?;
         self.add_child_file(transaction, name, &handle).await?;
+        self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
         Ok(handle)
     }
 

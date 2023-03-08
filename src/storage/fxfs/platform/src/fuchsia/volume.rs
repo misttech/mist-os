@@ -1837,6 +1837,153 @@ mod tests {
         filesystem.close().await.expect("close filesystem failed");
     }
 
+    #[fasync::run_singlethreaded(test)]
+    async fn test_project_node_inheritence() {
+        const BYTES_LIMIT: u64 = 123456;
+        const NODES_LIMIT: u64 = 4321;
+        const VOLUME_NAME: &str = "A";
+        const DIR_NAME: &str = "B";
+        const SUBDIR_NAME: &str = "C";
+        const FILE_NAME: &str = "D";
+        const PROJECT_ID: u64 = 42;
+        let volume_store_id;
+        let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        {
+            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
+            .await
+            .unwrap();
+
+            let volume_and_root = volumes_directory
+                .create_volume(VOLUME_NAME, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .expect("create unencrypted volume failed");
+            volume_store_id = volume_and_root.volume().store().store_object_id();
+
+            let (volume_proxy, volume_server_end) =
+                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            volumes_directory.directory_node().clone().open(
+                ExecutionScope::new(),
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                Path::validate_and_split(VOLUME_NAME).unwrap(),
+                volume_server_end.into_channel().into(),
+            );
+
+            let (volume_dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+            volumes_directory
+                .serve_volume(&volume_and_root, dir_server_end)
+                .await
+                .expect("serve_volume failed");
+
+            let project_proxy =
+                connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
+                    .expect("Unable to connect to project id service");
+
+            project_proxy
+                .set_limit(PROJECT_ID, BYTES_LIMIT, NODES_LIMIT)
+                .await
+                .unwrap()
+                .expect("To set limits");
+
+            let dir_proxy = {
+                let (root_proxy, root_server_end) =
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                        .expect("Create dir proxy to succeed");
+                volume_dir_proxy
+                    .open(
+                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                        fio::ModeType::empty(),
+                        "root",
+                        ServerEnd::new(root_server_end.into_channel()),
+                    )
+                    .expect("Failed to open volume root");
+
+                open_dir_checked(
+                    &root_proxy,
+                    fio::OpenFlags::CREATE
+                        | fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::DIRECTORY,
+                    DIR_NAME,
+                )
+                .await
+            };
+            {
+                let node_id = dir_proxy.get_attr().await.unwrap().1.id;
+                project_proxy
+                    .set_for_node(node_id, PROJECT_ID)
+                    .await
+                    .unwrap()
+                    .expect("Setting project on node");
+            }
+
+            let subdir_proxy = open_dir_checked(
+                &dir_proxy,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                SUBDIR_NAME,
+            )
+            .await;
+            {
+                let node_id = subdir_proxy.get_attr().await.unwrap().1.id;
+                assert_eq!(
+                    project_proxy
+                        .get_for_node(node_id)
+                        .await
+                        .unwrap()
+                        .expect("Setting project on node"),
+                    PROJECT_ID
+                );
+            }
+
+            let file_proxy = open_file_checked(
+                &subdir_proxy,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE,
+                FILE_NAME,
+            )
+            .await;
+            {
+                let node_id = file_proxy.get_attr().await.unwrap().1.id;
+                assert_eq!(
+                    project_proxy
+                        .get_for_node(node_id)
+                        .await
+                        .unwrap()
+                        .expect("Setting project on node"),
+                    PROJECT_ID
+                );
+            }
+
+            let (_, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
+                .await
+                .expect("Fetching usage");
+            assert_eq!(nodes, 3);
+            std::mem::drop(volume_proxy);
+            volumes_directory.terminate().await;
+            std::mem::drop(volumes_directory);
+            filesystem.close().await.expect("close filesystem failed");
+            device = filesystem.take_device().await;
+        }
+        device.ensure_unique();
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
+        fsck(filesystem.clone()).await.expect("Fsck");
+        fsck_volume(filesystem.as_ref(), volume_store_id, Some(Arc::new(InsecureCrypt::new())))
+            .await
+            .expect("Fsck volume");
+        filesystem.close().await.expect("close filesystem failed");
+    }
+
     #[fuchsia::test(threads = 10)]
     async fn test_unencrypted_volume() {
         let fixture = TestFixture::new_unencrypted().await;
