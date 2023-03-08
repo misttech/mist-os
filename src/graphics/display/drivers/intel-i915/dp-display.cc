@@ -363,7 +363,27 @@ zx_status_t DpAux::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const uint8_t* buf
   return ZX_OK;
 }
 
-zx_status_t DpAux::I2cTransact(const i2c_impl_op_t* ops, size_t count) {
+static constexpr size_t kMaxTransferSize = 255;
+zx_status_t DpAux::I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size) {
+  *out_size = kMaxTransferSize;
+  return ZX_OK;
+}
+
+zx_status_t DpAux::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
+  // no-op for now
+  return ZX_OK;
+}
+
+zx_status_t DpAux::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count) {
+  for (unsigned i = 0; i < count; i++) {
+    if (ops[i].data_size > kMaxTransferSize) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+  if (!ops[count - 1].stop) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   fbl::AutoLock lock(&lock_);
   for (unsigned i = 0; i < count; i++) {
     uint8_t* buf = static_cast<uint8_t*>(ops[i].data_buffer);
@@ -376,6 +396,11 @@ zx_status_t DpAux::I2cTransact(const i2c_impl_op_t* ops, size_t count) {
     }
   }
   return ZX_OK;
+}
+
+ddk::I2cImplProtocolClient DpAux::i2c() {
+  const i2c_impl_protocol_t i2c{.ops = &i2c_impl_protocol_ops_, .ctx = this};
+  return ddk::I2cImplProtocolClient(&i2c);
 }
 
 bool DpAux::DpcdRead(uint32_t addr, uint8_t* buf, size_t size) {
@@ -1637,7 +1662,8 @@ DpDisplay::DpDisplay(Controller* controller, uint64_t id, DdiId ddi_id, DpcdChan
     : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference),
                     IsEdp(controller, ddi_id) ? Type::kEdp : Type::kDp),
       dp_aux_(dp_aux),
-      pch_engine_(type() == Type::kEdp ? pch_engine : nullptr) {
+      pch_engine_(type() == Type::kEdp ? pch_engine : nullptr),
+      i2c_(dp_aux->i2c()) {
   ZX_ASSERT(dp_aux);
   if (type() == Type::kEdp) {
     ZX_ASSERT(pch_engine_ != nullptr);

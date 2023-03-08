@@ -147,9 +147,29 @@ bool GMBusI2c::SetDdcSegment(uint8_t segment_num) {
   return i2c_scl(mmio_space_, *gpio_port_, 1);
 }
 
-zx_status_t GMBusI2c::I2cTransact(const i2c_impl_op_t* ops, size_t size) {
+static constexpr size_t kMaxTransferSize = 255;
+zx_status_t GMBusI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size) {
+  *out_size = kMaxTransferSize;
+  return ZX_OK;
+}
+
+zx_status_t GMBusI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
+  // no-op for now
+  return ZX_OK;
+}
+
+zx_status_t GMBusI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t size) {
   ZX_ASSERT(gmbus_pin_pair_.has_value());
   ZX_ASSERT(gpio_port_.has_value());
+
+  for (unsigned i = 0; i < size; i++) {
+    if (ops[i].data_size > kMaxTransferSize) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+  if (!ops[size - 1].stop) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   // The GMBus register is a limited interface to the i2c bus - it doesn't support complex
   // transactions like setting the E-DDC segment. For now, providing a special-case interface

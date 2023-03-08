@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DP_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DP_DISPLAY_H_
 
-#include <fuchsia/hardware/i2cimpl/c/banjo.h>
+#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
 #include <threads.h>
@@ -28,18 +28,24 @@ class DpcdChannel {
  public:
   virtual ~DpcdChannel() = default;
 
+  virtual ddk::I2cImplProtocolClient i2c() = 0;
   virtual bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) = 0;
   virtual bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) = 0;
 };
 
-class DpAux : public DpcdChannel {
+class DpAux : public DpcdChannel, public ddk::I2cImplProtocol<DpAux> {
  public:
   // `mmio_buffer` must outlive this instance.
   DpAux(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id);
 
-  zx_status_t I2cTransact(const i2c_impl_op_t* ops, size_t count);
+  uint32_t I2cImplGetBusBase() { return 0; }
+  uint32_t I2cImplGetBusCount() { return 1; }
+  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size);
+  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
+  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count);
 
   // DpcdChannel overrides:
+  ddk::I2cImplProtocolClient i2c() final;
   bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) final;
   bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) final;
 
@@ -216,6 +222,7 @@ class DpDisplay : public DisplayDevice {
   bool CheckPixelRate(uint64_t pixel_rate) final;
 
   uint32_t i2c_bus_id() const final { return 2 * ddi_id(); }
+  ddk::I2cImplProtocolClient i2c() final { return i2c_; }
 
   // Returns true if the eDP panel is powered on.
   //
@@ -298,6 +305,8 @@ class DpDisplay : public DisplayDevice {
 
   // The backlight brightness coefficient, in the range [min brightness, 1].
   double backlight_brightness_ = 1.0f;
+
+  const ddk::I2cImplProtocolClient i2c_;
 
   // Debug
   inspect::Node inspect_node_;

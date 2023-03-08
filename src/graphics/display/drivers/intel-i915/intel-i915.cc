@@ -555,8 +555,8 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id, uint64_t d
     if (!ddi_reference_maybe) {
       zxlogf(DEBUG, "DDI %d PHY not available. Skip querying.", ddi_id);
     } else {
-      auto hdmi_disp = fbl::make_unique_checked<HdmiDisplay>(&ac, this, display_id, ddi_id,
-                                                             std::move(ddi_reference_maybe));
+      auto hdmi_disp = fbl::make_unique_checked<HdmiDisplay>(
+          &ac, this, display_id, ddi_id, std::move(ddi_reference_maybe), gmbus_i2cs_[ddi_id].i2c());
       if (ac.check() && reinterpret_cast<DisplayDevice*>(hdmi_disp.get())->Query()) {
         return hdmi_disp;
       }
@@ -803,6 +803,7 @@ void Controller::CallOnDisplaysChanged(DisplayDevice** added, size_t added_count
     added_args[i].display_id = added[i]->id();
     added_args[i].edid_present = true;
     added_args[i].panel.i2c_bus_id = added[i]->i2c_bus_id();
+    added[i]->i2c().GetProto(&added_args[i].panel.i2c);
     added_args[i].pixel_format_list = kSupportedFormats;
     added_args[i].pixel_format_count = static_cast<uint32_t>(std::size(kSupportedFormats));
     added_args[i].cursor_info_list = kCursorInfos;
@@ -2103,6 +2104,8 @@ uint32_t Controller::GetBusCount() {
   return static_cast<uint32_t>(size);
 }
 
+// TODO(fxbug.dev/120971): Delete the i2cimpl methods after all clients have switched to the
+// GMBusI2c and DpAux implementations.
 static constexpr size_t kMaxTxSize = 255;
 zx_status_t Controller::GetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
   *out_size = kMaxTxSize;
@@ -2131,9 +2134,9 @@ zx_status_t Controller::Transact(uint32_t bus_id, const i2c_impl_op_t* ops, size
 
   bool is_hdmi = bus_id & 1;
   if (is_hdmi) {
-    return gmbus_i2cs_[ddi_idx].I2cTransact(ops, count);
+    return gmbus_i2cs_[ddi_idx].I2cImplTransact(0, ops, count);
   }
-  return dp_auxs_[ddi_idx].I2cTransact(ops, count);
+  return dp_auxs_[ddi_idx].I2cImplTransact(0, ops, count);
 }
 
 // Ddk methods

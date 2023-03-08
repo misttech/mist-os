@@ -22,7 +22,8 @@ namespace i915 {
 
 class HdmiDisplay : public DisplayDevice {
  public:
-  HdmiDisplay(Controller* controller, uint64_t id, DdiId ddi_id, DdiReference ddi_reference);
+  HdmiDisplay(Controller* controller, uint64_t id, DdiId ddi_id, DdiReference ddi_reference,
+              const ddk::I2cImplProtocolClient& i2c);
 
   HdmiDisplay(const HdmiDisplay&) = delete;
   HdmiDisplay(HdmiDisplay&&) = delete;
@@ -46,6 +47,9 @@ class HdmiDisplay : public DisplayDevice {
   bool CheckPixelRate(uint64_t pixel_rate) final;
 
   uint32_t i2c_bus_id() const final { return 2 * ddi_id() + 1; }
+  ddk::I2cImplProtocolClient i2c() final { return i2c_; }
+
+  const ddk::I2cImplProtocolClient i2c_;
 };
 
 }  // namespace i915

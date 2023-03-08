@@ -88,8 +88,8 @@ cpp20::span<const DdiPhyConfigEntry> GetHdmiPhyConfigEntries(uint16_t device_id,
 // display; this will be updated when intel-i915 Controller gets EDID
 // information for this device (before Init()).
 HdmiDisplay::HdmiDisplay(Controller* controller, uint64_t id, DdiId ddi_id,
-                         DdiReference ddi_reference)
-    : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference), Type::kHdmi) {}
+                         DdiReference ddi_reference, const ddk::I2cImplProtocolClient& i2c)
+    : DisplayDevice(controller, id, ddi_id, std::move(ddi_reference), Type::kHdmi), i2c_(i2c) {}
 
 HdmiDisplay::~HdmiDisplay() = default;
 
@@ -125,8 +125,7 @@ bool HdmiDisplay::Query() {
         .stop = 1,
     };
     registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
-    // TODO(fxbug.dev/99979): We should read using GMBusI2c directly instead.
-    if (controller()->Transact(i2c_bus_id(), &op, 1) == ZX_OK) {
+    if (i2c().Transact(0, &op, 1) == ZX_OK) {
       zxlogf(TRACE, "Found a hdmi/dvi monitor");
       return true;
     }

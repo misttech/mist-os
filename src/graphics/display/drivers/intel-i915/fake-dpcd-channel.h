@@ -56,6 +56,8 @@ class FakeDpcdChannel : public DpcdChannel {
 
   void PopulateLinkRateTable(std::vector<uint16_t> values);
 
+  ddk::I2cImplProtocolClient i2c() override { return {}; }
+
   // DpcdChannel overrides:
   bool DpcdRead(uint32_t addr, uint8_t* buf, size_t size) override;
   bool DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) override;

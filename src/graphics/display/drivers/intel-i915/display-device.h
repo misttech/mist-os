@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -92,7 +93,9 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   Controller* controller() { return controller_; }
   const std::optional<DdiReference>& ddi_reference() const { return ddi_reference_; }
 
+  // TODO(fxbug.dev/120971): Remove this method once the bus ID is no longer used.
   virtual uint32_t i2c_bus_id() const = 0;
+  virtual ddk::I2cImplProtocolClient i2c() = 0;
 
   void set_pipe(Pipe* pipe) { pipe_ = pipe; }
   Pipe* pipe() const { return pipe_; }
