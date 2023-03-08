@@ -246,6 +246,7 @@
                 "fuchsia.lowpan.device.EnergyScanConnector",
                 "fuchsia.lowpan.DeviceWatcher",
                 "fuchsia.lowpan.thread.DatasetConnector",
+                "fuchsia.lowpan.thread.FeatureConnector",
                 "fuchsia.lowpan.thread.MeshcopConnector",
             ],
             from: "parent",

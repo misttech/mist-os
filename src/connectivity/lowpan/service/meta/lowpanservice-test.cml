@@ -42,6 +42,7 @@
                 "fuchsia.lowpan.experimental.TelemetryProviderConnector",
                 "fuchsia.lowpan.test.DeviceTestConnector",
                 "fuchsia.lowpan.thread.DatasetConnector",
+                "fuchsia.lowpan.thread.FeatureConnector",
                 "fuchsia.lowpan.thread.MeshcopConnector",
             ],
             from: "#lowpanservice",
