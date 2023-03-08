@@ -127,16 +127,21 @@ impl CrashReportHandler {
     }
 
     /// Send a File request to the CrashReporter service with the specified crash report signature.
-    async fn send_crash_report(get_proxy_fn: &GetProxyFn, signature: String) -> Result<(), Error> {
+    async fn send_crash_report(
+        get_proxy_fn: &GetProxyFn,
+        signature: String,
+    ) -> Result<fidl_feedback::FileReportResults, Error> {
         let report = fidl_feedback::CrashReport {
             program_name: Some(CrashReportHandler::DEFAULT_PROGRAM_NAME.to_string()),
             crash_signature: Some(signature),
             is_fatal: Some(false),
             ..fidl_feedback::CrashReport::EMPTY
         };
-        let result =
-            get_proxy_fn()?.file(report).await.map_err(|e| format_err!("IPC error: {}", e))?;
-        result.map_err(|e| format_err!("Service error: {}", e))
+        let result = get_proxy_fn()?
+            .file_report(report)
+            .await
+            .map_err(|e| format_err!("IPC error: {}", e))?;
+        result.map_err(|e| format_err!("Service error: {:?}", e))
     }
 }
 
@@ -186,7 +191,7 @@ mod tests {
             .unwrap();
 
         // Verify the fake service receives the crash report with expected data
-        if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder: _, report })) =
+        if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder: _, report })) =
             stream.try_next().await
         {
             assert_eq!(
@@ -252,11 +257,11 @@ mod tests {
             );
 
             // Verify the signature of the first crash report
-            if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder, report })) =
+            if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder, report })) =
                 stream.try_next().await
             {
                 // Send a reply to allow the node to process the next crash report
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
                 assert_eq!(
                     report,
                     fidl_feedback::CrashReport {
@@ -271,11 +276,11 @@ mod tests {
             }
 
             // Verify the signature of the second crash report
-            if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder, report })) =
+            if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder, report })) =
                 stream.try_next().await
             {
                 // Send a reply to allow the node to process the next crash report
-                let _ = responder.send(&mut Ok(()));
+                let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
                 assert_eq!(
                     report,
                     fidl_feedback::CrashReport {
@@ -314,7 +319,7 @@ mod tests {
             .unwrap();
 
         // Verify the fake service receives the crash report with expected data
-        if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder: _, report })) =
+        if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder: _, report })) =
             stream.try_next().await
         {
             assert_eq!(
