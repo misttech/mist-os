@@ -4,19 +4,16 @@
 
 use {
     anyhow::{Context, Error},
-    bt_device_watcher::DeviceWatcher,
-    fidl_fuchsia_bluetooth_host::HostProxy,
+    fidl_fuchsia_bluetooth_host::{HostMarker, HostProxy},
     fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
-    fuchsia_async as fasync,
     fuchsia_bluetooth::{
-        constants::{DEV_DIR, HOST_DEVICE_DIR},
+        constants::DEV_DIR,
         expectation::{
             asynchronous::{
                 expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
             },
             Predicate,
         },
-        host,
         types::{HostInfo, Peer, PeerId},
     },
     futures::{
@@ -28,7 +25,6 @@ use {
         collections::HashMap,
         convert::{AsMut, AsRef, TryInto},
         ops::{Deref, DerefMut},
-        path::{Path, PathBuf},
         sync::Arc,
     },
     test_harness::{SharedState, TestHarness},
@@ -44,9 +40,6 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct HostState {
     emulator_state: EmulatorState,
-
-    // Path of the bt-host device relative to HOST_DEVICE_DIR
-    host_path: PathBuf,
 
     // Current bt-host driver state.
     host_info: HostInfo,
@@ -106,7 +99,7 @@ impl DerefMut for HostDriverHarness {
 }
 
 impl TestHarness for HostDriverHarness {
-    type Env = (PathBuf, Emulator, Arc<HostDriverRealm>);
+    type Env = (Emulator, Arc<HostDriverRealm>);
     type Runner = BoxFuture<'static, Result<(), Error>>;
 
     fn init(
@@ -127,31 +120,20 @@ impl TestHarness for HostDriverHarness {
             let watch_emulator_params = watch_controller_parameters(harness.0.clone())
                 .map_err(|e| e.context("Error watching controller parameters"))
                 .err_into();
-            let path = harness.read().host_path;
 
             let run = future::try_join3(watch_info, watch_peers, watch_emulator_params)
                 .map_ok(|((), (), ())| ())
                 .boxed();
-            Ok((harness, (path, emulator, realm), run))
+            Ok((harness, (emulator, realm), run))
         }
         .boxed()
     }
 
     fn terminate(env: Self::Env) -> BoxFuture<'static, Result<(), Error>> {
-        let (path, mut emulator, realm) = env;
+        // Keep the realm alive until the future resolves.
         async move {
-            let stripped_path = Path::new(HOST_DEVICE_DIR).strip_prefix("/")?.to_string_lossy();
-            let dir_to_watch = fuchsia_fs::directory::open_directory(
-                realm.instance().get_exposed_dir(),
-                stripped_path.as_ref(),
-                fuchsia_fs::OpenFlags::empty(),
-            )
-            .await?;
-            let mut watcher =
-                DeviceWatcher::new(HOST_DEVICE_DIR, dir_to_watch, timeout_duration()).await?;
-            // Shut down the fake bt-hci device and make sure the bt-host device gets removed.
-            emulator.destroy_and_wait().await?;
-            watcher.watch_removed(&path).await
+            let (mut emulator, _realm) = env;
+            emulator.destroy_and_wait().await
         }
         .boxed()
     }
@@ -175,12 +157,8 @@ async fn new_host_harness(
         .context("Error publishing emulator hci device")?;
 
     // Open a Host FIDL interface channel to the bt-host device.
-    let fidl_handle =
-        host::open_host_channel(&host_dev.file()).context("Error opening host device file")?;
-    let host = HostProxy::new(
-        fasync::Channel::from_channel(fidl_handle.into())
-            .context("Error creating async channel from host device")?,
-    );
+    let (host, server_end) = fidl::endpoints::create_proxy::<HostMarker>()?;
+    host_dev.open(server_end.into_channel())?;
 
     let host_info = host
         .watch_state()
@@ -188,11 +166,10 @@ async fn new_host_harness(
         .context("Error calling WatchState()")?
         .try_into()
         .context("Invalid HostInfo received")?;
-    let host_path = host_dev.relative_path().to_path_buf();
     let peers = HashMap::new();
 
     let harness = HostDriverHarness(expectable(
-        HostState { emulator_state: EmulatorState::default(), host_path, host_info, peers },
+        HostState { emulator_state: EmulatorState::default(), host_info, peers },
         Aux { host, emulator: emulator.emulator().clone() },
     ));
 

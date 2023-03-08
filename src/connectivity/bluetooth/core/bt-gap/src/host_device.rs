@@ -13,7 +13,6 @@ use futures::{future::try_join_all, Future, FutureExt, StreamExt, TryFutureExt};
 use parking_lot::RwLock;
 use pin_utils::pin_mut;
 use std::convert::TryInto;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use tracing::{error, info, trace, warn};
 
@@ -71,7 +70,7 @@ impl Drop for HostDiscoverableSession {
 pub struct HostDevice(Arc<HostDeviceState>);
 
 pub struct HostDeviceState {
-    device_path: PathBuf,
+    device_path: String,
     proxy: HostProxy,
     info: RwLock<Inspectable<HostInfo>>,
 }
@@ -88,7 +87,7 @@ pub struct HostDebugIdentifiers {
     address: Address,
     // TODO(fxbug.dev/84729)
     #[allow(unused)]
-    path: PathBuf,
+    path: String,
 }
 
 // Many HostDevice methods return impl Future rather than being implemented as `async`. This has an
@@ -97,7 +96,7 @@ pub struct HostDebugIdentifiers {
 // If they were instead declared async, the function body would not be executed until the first time
 // the future was polled.
 impl HostDevice {
-    pub fn new(device_path: PathBuf, proxy: HostProxy, info: Inspectable<HostInfo>) -> Self {
+    pub fn new(device_path: String, proxy: HostProxy, info: Inspectable<HostInfo>) -> Self {
         HostDevice(Arc::new(HostDeviceState { device_path, proxy, info: RwLock::new(info) }))
     }
 
@@ -125,11 +124,11 @@ impl HostDevice {
         HostDebugIdentifiers {
             id: self.id(),
             address: self.public_address(),
-            path: self.path().to_path_buf(),
+            path: self.path().to_string(),
         }
     }
 
-    pub fn path(&self) -> &Path {
+    pub fn path(&self) -> &str {
         &self.0.device_path
     }
 
@@ -348,12 +347,12 @@ impl HostDevice {
         let id_val = id.0 as u8;
         let address = Address::Public([id_val; 6]);
         let path = format!("/dev/host{}", id_val);
-        let host_device = HostDevice::mock(id, address, Path::new(&path), host_proxy);
+        let host_device = HostDevice::mock(id, address, path, host_proxy);
         (host_stream, host_device)
     }
 
     #[cfg(test)]
-    pub(crate) fn mock(id: HostId, address: Address, path: &Path, proxy: HostProxy) -> HostDevice {
+    pub(crate) fn mock(id: HostId, address: Address, path: String, proxy: HostProxy) -> HostDevice {
         let info = HostInfo {
             id,
             technology: TechnologyType::DualMode,
@@ -363,11 +362,7 @@ impl HostDevice {
             discoverable: false,
             discovering: false,
         };
-        HostDevice::new(
-            path.into(),
-            proxy,
-            Inspectable::new(info, fuchsia_inspect::Node::default()),
-        )
+        HostDevice::new(path, proxy, Inspectable::new(info, fuchsia_inspect::Node::default()))
     }
 }
 

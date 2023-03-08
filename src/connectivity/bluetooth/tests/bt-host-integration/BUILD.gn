@@ -12,17 +12,16 @@ rustc_test("bt_host_integration_tests") {
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_rust",
     "//sdk/fidl/fuchsia.bluetooth.test:fuchsia.bluetooth.test_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/connectivity/bluetooth/fidl:host_rust",
-    "//src/connectivity/bluetooth/lib/bt-device-watcher",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/testing/bt-test-harness",
     "//src/connectivity/bluetooth/testing/hci-emulator-client",
     "//src/connectivity/bluetooth/testing/test-harness",
-    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [ "src/lib.rs" ]

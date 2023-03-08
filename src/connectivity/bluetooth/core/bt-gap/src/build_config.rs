@@ -146,7 +146,7 @@ mod tests {
         let host_device = HostDevice::mock(
             HostId(42),
             Address::Public([1, 2, 3, 4, 5, 6]),
-            Path::new("/dev/host"),
+            "/dev/host".to_string(),
             host_proxy,
         );
         let test_config = Config {

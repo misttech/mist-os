@@ -12,7 +12,7 @@ pub use spawn_builder::{Error as SpawnBuilderError, SpawnBuilder};
 
 use {
     bitflags::bitflags,
-    fidl_fuchsia_device as fdevice, fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio,
     fuchsia_runtime::{HandleInfo, HandleInfoError},
     fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _},
     std::{
@@ -238,16 +238,6 @@ pub fn clone_channel(f: &impl AsRawFd) -> Result<zx::Channel, zx::Status> {
     } else {
         Err(zx::Status::WRONG_TYPE)
     }
-}
-
-/// Retrieves the topological path for a device node.
-pub fn device_get_topo_path(dev: &File) -> Result<String, zx::Status> {
-    let channel = clone_channel(dev)?;
-    let interface = fdevice::ControllerSynchronousProxy::new(channel);
-    interface
-        .get_topological_path(fuchsia_zircon::Time::INFINITE)
-        .map_err(|_| zx::Status::IO)?
-        .map_err(zx::Status::from_raw)
 }
 
 /// Creates a named pipe and returns one end as a zx::Socket.

@@ -8,7 +8,6 @@
 
 use {
     anyhow::{format_err, Context as _, Error},
-    bt_device_watcher::{DeviceWatcher, WatchFilter},
     bt_test_harness::{
         emulator::{self, add_bredr_peer, add_le_peer, default_bredr_peer, default_le_peer},
         host_driver::{
@@ -16,27 +15,23 @@ use {
             v2::{expectation as host_expectation, HostDriverHarness},
         },
     },
+    fidl::endpoints::Proxy as _,
     fidl_fuchsia_bluetooth::{self as fbt, DeviceClass, MAJOR_DEVICE_CLASS_TOY},
-    fidl_fuchsia_bluetooth_host::HostProxy,
+    fidl_fuchsia_bluetooth_host as fhost,
     fidl_fuchsia_bluetooth_sys::{self as fsys, TechnologyType},
     fidl_fuchsia_bluetooth_test::{EmulatorSettings, HciError, PeerProxy},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_async::TimeoutExt as _,
     fuchsia_bluetooth::{
-        constants::{DEV_DIR, HOST_DEVICE_DIR, INTEGRATION_TIMEOUT},
+        constants::{DEV_DIR, INTEGRATION_TIMEOUT},
         expectation::{
             self,
             asynchronous::{ExpectableExt, ExpectableStateExt},
             peer,
         },
-        host,
         types::{Address, HostInfo, PeerId},
     },
-    fuchsia_fs::directory,
     hci_emulator_client::Emulator,
-    std::{
-        convert::TryInto,
-        path::{Path, PathBuf},
-    },
+    std::convert::TryInto as _,
 };
 
 // Tests that creating and destroying a fake HCI device binds and unbinds the bt-host driver.
@@ -60,27 +55,10 @@ async fn test_lifecycle(_: ()) {
     )
     .unwrap();
     let mut emulator = Emulator::create(dev_dir).await.unwrap();
-    let hci_topo = PathBuf::from(fdio::device_get_topo_path(emulator.file()).unwrap());
-
-    // Publish the bt-hci device and verify that a bt-host appears under its topology within a
-    // reasonable timeout.
-    let stripped_path = Path::new(HOST_DEVICE_DIR).strip_prefix("/").unwrap().to_string_lossy();
-    let dir_to_watch = directory::open_directory(
-        realm.instance().get_exposed_dir(),
-        stripped_path.as_ref(),
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .unwrap();
-    let mut watcher =
-        DeviceWatcher::new(HOST_DEVICE_DIR, dir_to_watch, INTEGRATION_TIMEOUT).await.unwrap();
-    let _ = emulator.publish(settings).await.unwrap();
-    let bthost = watcher.watch_new(&hci_topo, WatchFilter::AddedOnly).await.unwrap();
-
-    // Open a host channel using a fidl call and check the device is responsive
-    let handle = host::open_host_channel(bthost.file()).unwrap();
-    let host = HostProxy::new(fasync::Channel::from_channel(handle.into()).unwrap());
-    let info: HostInfo = host
+    let host = emulator.publish_and_wait_for_host(settings).await.unwrap();
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<fhost::HostMarker>().unwrap();
+    host.open(server_end.into_channel()).unwrap();
+    let info: HostInfo = proxy
         .watch_state()
         .await
         .context("Is bt-gap running? If so, try stopping it and re-running these tests")
@@ -89,13 +67,17 @@ async fn test_lifecycle(_: ()) {
         .unwrap();
 
     // The bt-host should have been initialized with the address that we initially configured.
-    assert_eq!(address, info.addresses[0]);
+    assert_eq!(info.addresses.as_slice(), &[address]);
 
     // Remove the bt-hci device and check that the test device is also destroyed.
     emulator.destroy_and_wait().await.unwrap();
 
     // Check that the bt-host device is also destroyed.
-    watcher.watch_removed(bthost.relative_path()).await.unwrap();
+    let _: (fidl::Signals, fidl::Signals) =
+        futures::future::try_join(host.as_channel().on_closed(), proxy.as_channel().on_closed())
+            .on_timeout(INTEGRATION_TIMEOUT, || panic!("timed out waiting for device to close"))
+            .await
+            .unwrap();
 }
 
 // Tests that the bt-host driver assigns the local name to "fuchsia" when initialized.
@@ -193,7 +175,7 @@ async fn test_discovery(harness: HostDriverHarness) {
         .unwrap();
 
     // Stop discovery. "discovering" should get set to false.
-    let _ = proxy.stop_discovery().unwrap();
+    proxy.stop_discovery().unwrap();
     let _ = host_expectation::host_state(&harness, expectation::host_driver::discovering(false))
         .await
         .unwrap();
@@ -270,7 +252,7 @@ async fn test_connect(harness: HostDriverHarness) {
     let peer2 = fut.await.unwrap();
 
     // Configure `peer2` to return an error for the connection attempt.
-    let _ = peer2.assign_connection_status(HciError::ConnectionTimeout).await.unwrap();
+    peer2.assign_connection_status(HciError::ConnectionTimeout).await.unwrap();
 
     let proxy = harness.aux().host.clone();
 

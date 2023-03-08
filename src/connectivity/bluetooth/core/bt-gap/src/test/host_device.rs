@@ -12,7 +12,7 @@ use {
     },
     futures::{future, join, stream::StreamExt},
     parking_lot::RwLock,
-    std::{path::Path, sync::Arc},
+    std::sync::Arc,
     test_util::assert_gt,
 };
 
@@ -46,7 +46,7 @@ impl HostListener for () {
 async fn host_device_set_local_name() -> Result<(), Error> {
     let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
-    let host = HostDevice::mock(HostId(1), address, Path::new("/dev/class/bt-host/test"), client);
+    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-host/test".to_string(), client);
     let expected_name = "EXPECTED_NAME".to_string();
     let info = Arc::new(RwLock::new(host.info()));
     let server = Arc::new(RwLock::new(server));
@@ -78,7 +78,7 @@ async fn test_discovery_session() -> Result<(), Error> {
     let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
 
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
-    let host = HostDevice::mock(HostId(1), address, Path::new("/dev/class/bt-host/test"), client);
+    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-host/test".to_string(), client);
     let info = Arc::new(RwLock::new(host.info()));
     let server = Arc::new(RwLock::new(server));
 
@@ -127,7 +127,7 @@ async fn test_discovery_session() -> Result<(), Error> {
 async fn host_device_restore_bonds() -> Result<(), Error> {
     let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
-    let host = HostDevice::mock(HostId(1), address, Path::new("/dev/class/bt-host/test"), client);
+    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-host/test".to_string(), client);
 
     // TODO(fxbug.dev/80564): Assume that 256 bonds is enough to cause HostDevice to use multiple
     // FIDL calls to transmit all of the bonds (at this time, the maximum message size is 64 KiB

@@ -14,16 +14,15 @@ use fidl_fuchsia_bluetooth_gatt2::{LocalServiceRequest, Server_Marker as Server_
 use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
 use fidl_fuchsia_device::NameProviderMarker;
 use fuchsia_async as fasync;
+use fuchsia_bluetooth::constants::{DEV_DIR, HOST_DEVICE_DIR};
 use fuchsia_component::{client::connect_to_protocol, server::ServiceFs};
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{try_join, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
-use pin_utils::pin_mut;
 use std::collections::HashMap;
 use tracing::{error, info, warn};
 
 use crate::{
-    devices::{watch_hosts, HostEvent::*},
     generic_access_service::GenericAccessService,
     host_dispatcher::{HostDispatcher, HostService, HostService::*},
     services::host_watcher,
@@ -31,7 +30,6 @@ use crate::{
 };
 
 mod build_config;
-mod devices;
 mod generic_access_service;
 mod host_device;
 mod host_dispatcher;
@@ -151,7 +149,7 @@ impl BtGap {
 
     /// Run continuous tasks that are expected to live until bt-gap terminates
     async fn run(self) -> Result<(), Error> {
-        let watch_for_hosts = run_host_watcher(self.hd.clone());
+        let watch_for_hosts = run_host_watcher(&self.hd);
 
         let set_local_name = {
             let hd = self.hd.clone();
@@ -187,24 +185,36 @@ impl BtGap {
 }
 
 /// Continuously watch the file system for bt-host devices being added or removed
-async fn run_host_watcher(hd: HostDispatcher) -> Result<(), Error> {
-    let host_events = watch_hosts();
-    pin_mut!(host_events);
-    while let Some(msg) = host_events.try_next().await.context("failed to watch hosts")? {
-        match msg {
-            HostAdded(device_path) => {
-                let result = hd.add_host_by_path(&device_path).await;
-                if let Err(e) = &result {
-                    warn!("Error adding bt-host device '{:?}': {:?}", device_path, e);
+async fn run_host_watcher(hd: &HostDispatcher) -> Result<(), Error> {
+    let dir = format!("{}/{}", DEV_DIR, HOST_DEVICE_DIR);
+    let directory = fuchsia_fs::directory::open_in_namespace(&dir, fuchsia_fs::OpenFlags::empty())?;
+    let watcher = fuchsia_fs::directory::Watcher::new(&directory).await?;
+    let directory = &directory;
+    watcher
+        .map(|result| result.context("failed to watch hosts"))
+        .try_for_each(|fuchsia_fs::directory::WatchMessage { event, filename }| async move {
+            use fuchsia_fs::directory::WatchEvent;
+            match event {
+                WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
+                    if filename != std::path::Path::new(".") {
+                        let path = filename.to_str().expect("utf-8 path");
+                        hd.add_host_by_path(directory, &path)
+                            .await
+                            .with_context(|| format!("adding bt-host device {path}"))?;
+                    }
                 }
-                result?
+                WatchEvent::REMOVE_FILE => {
+                    let path = filename.to_str().expect("utf-8 path");
+                    hd.rm_device(&path).await;
+                }
+                WatchEvent::IDLE => {}
+                e => {
+                    warn!("unrecognized host watch event: {e:?}");
+                }
             }
-            HostRemoved(device_path) => {
-                hd.rm_device(&device_path).await;
-            }
-        }
-    }
-    Ok(())
+            Ok(())
+        })
+        .await
 }
 
 /// Serve the FIDL protocols offered by bt-gap

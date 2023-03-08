@@ -2,33 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Context, Error};
-use bt_device_watcher::{DeviceFile, DeviceWatcher, WatchFilter};
-use device_watcher;
-use fdio;
-use fidl::endpoints::Proxy;
-use fidl_fuchsia_bluetooth_test::{EmulatorSettings, HciEmulatorProxy};
-use fidl_fuchsia_device::ControllerProxy;
-use fidl_fuchsia_hardware_bluetooth::{EmulatorProxy, VirtualControllerProxy};
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_bluetooth_test::{
+    EmulatorError, EmulatorSettings, HciEmulatorMarker, HciEmulatorProxy,
+};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_hardware_bluetooth::{
+    EmulatorMarker, EmulatorProxy, HostMarker, HostProxy, VirtualControllerMarker,
+};
 use fidl_fuchsia_io::DirectoryProxy;
-use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
+use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_bluetooth::constants::{
     DEV_DIR, HOST_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT,
 };
-use fuchsia_fs;
-use fuchsia_zircon::{self as zx, HandleBased};
-use fuchsia_zircon_status as zx_status;
-use futures::TryFutureExt;
-use std::fs::File;
-use std::path::Path;
+use fuchsia_zircon as zx;
+use futures::TryFutureExt as _;
 use tracing::error;
 
 pub mod types;
 
-// 0x30 => fuchsia.platform.BIND_PLATFORM_DEV_DID.BT_HCI_EMULATOR
-pub const CONTROL_DEVICE: &str = "/dev/sys/platform/00:00:30/bt_hci_virtual";
-pub const EMULATOR_DEVICE_DIR: &str = "/dev/class/bt-emulator";
-pub const HCI_DEVICE_DIR: &str = "/dev/class/bt-hci";
+const EMULATOR_DEVICE_DIR: &str = "class/bt-emulator";
 
 /// Represents a bt-hci device emulator. Instances of this type can be used manage the
 /// bt-hci-emulator driver within the test device hierarchy. The associated driver instance gets
@@ -40,7 +34,7 @@ pub struct Emulator {
     /// in `destroy_and_wait()`. This is so the destructor can assert that the TestDevice has been
     /// destroyed.
     dev: Option<TestDevice>,
-    emulator: HciEmulatorProxy,
+    hci_emulator: HciEmulatorProxy,
 }
 
 impl Emulator {
@@ -62,10 +56,10 @@ impl Emulator {
     /// `publish()`. If `realm` is present, the device will be created inside it, otherwise it will
     /// be created using the `/dev` directory in the component's namespace.
     pub async fn create(dev_directory: DirectoryProxy) -> Result<Emulator, Error> {
-        let (dev, emulator) = TestDevice::create(dev_directory)
+        let (dev, hci_emulator) = TestDevice::create(dev_directory)
             .await
             .context(format!("Error creating test device"))?;
-        Ok(Emulator { dev: Some(dev), emulator })
+        Ok(Emulator { dev: Some(dev), hci_emulator })
     }
 
     /// Publish a bt-emulator and a bt-hci device using the default emulator settings. If `realm`
@@ -80,42 +74,62 @@ impl Emulator {
     /// Sends a publish message to the emulator. This is a convenience method that internally
     /// handles the FIDL binding error.
     pub async fn publish(&self, settings: EmulatorSettings) -> Result<(), Error> {
-        let result = self.emulator().publish(settings).await?;
-        result.map_err(|e| format_err!("failed to publish bt-hci device: {:#?}", e))
+        self.emulator()
+            .publish(settings)
+            .await
+            .context("publish transport")?
+            .map_err(|e: EmulatorError| format_err!("failed to publish bt-hci device: {:#?}", e))
     }
 
     /// Sends a publish message emulator and returns a Future that resolves when a bt-host device is
     /// published. Note that this requires the bt-host driver to be installed. On success, returns a
-    /// `DeviceFile` that represents the bt-host device.
+    /// proxy to the bt-host device.
     pub async fn publish_and_wait_for_host(
         &self,
         settings: EmulatorSettings,
-    ) -> Result<DeviceFile, Error> {
-        let dev_dir = &self.dev.as_ref().expect("device should exist by now").dev_directory;
-        let mut watcher = dev_watcher(HOST_DEVICE_DIR, dev_dir).await?;
-        let _ = self.publish(settings).await?;
-        let topo = fdio::device_get_topo_path(self.file())?;
-        watcher.watch_new(Path::new(&topo), WatchFilter::AddedOrExisting).await
+    ) -> Result<HostProxy, Error> {
+        let () = self.publish(settings).await?;
+        let dev = self.dev.as_ref().expect("emulator device accessed after it was destroyed!");
+        let topo = dev.get_topological_path().await?;
+        let TestDevice { dev_directory, controller: _, emulator: _ } = dev;
+        let host_dir = fuchsia_fs::directory::open_directory_no_describe(
+            dev_directory,
+            HOST_DEVICE_DIR,
+            fuchsia_fs::OpenFlags::empty(),
+        )?;
+        let host = device_watcher::wait_for_device_with(
+            &host_dir,
+            |device_watcher::DeviceInfo { filename, topological_path }| {
+                topological_path.starts_with(&topo).then(|| {
+                    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<HostMarker>(
+                        &host_dir, filename,
+                    )
+                })
+            },
+        )
+        .on_timeout(WATCH_TIMEOUT, || Err(format_err!("timed out waiting for device to appear")))
+        .await??;
+        Ok(host)
     }
 
     /// Sends the test device a destroy message which will unbind the driver.
     /// This will wait for the test device to be unpublished from devfs.
     pub async fn destroy_and_wait(&mut self) -> Result<(), Error> {
-        let fake_dev = self.dev.take();
-        fake_dev
+        self.dev
+            .take()
             .expect("attempted to destroy an already destroyed emulator device")
             .destroy_and_wait()
             .await
     }
 
-    /// Returns a reference to the underlying file.
-    pub fn file(&self) -> &File {
-        &self.dev.as_ref().expect("emulator device accessed after it was destroyed!").file
+    pub async fn get_topological_path(&self) -> Result<String, Error> {
+        let dev = self.dev.as_ref().expect("emulator device accessed after it was destroyed!");
+        dev.get_topological_path().await
     }
 
     /// Returns a reference to the fuchsia.bluetooth.test.HciEmulator protocol proxy.
     pub fn emulator(&self) -> &HciEmulatorProxy {
-        &self.emulator
+        &self.hci_emulator
     }
 }
 
@@ -132,8 +146,9 @@ impl Drop for Emulator {
 // execution of destroy() to know about device removal. Instead, the caller should watch for the
 // device path to be removed.
 struct TestDevice {
-    file: File,
-    pub dev_directory: DirectoryProxy,
+    dev_directory: DirectoryProxy,
+    controller: ControllerProxy,
+    emulator: EmulatorProxy,
 }
 
 impl TestDevice {
@@ -142,19 +157,15 @@ impl TestDevice {
     async fn create(
         dev_directory: DirectoryProxy,
     ) -> Result<(TestDevice, HciEmulatorProxy), Error> {
-        let relative_control_dev_path = CONTROL_DEVICE
-            .strip_prefix(DEV_DIR)
-            .and_then(|p| p.strip_prefix("/"))
-            .ok_or(format_err!("unexpected control device path: {}", CONTROL_DEVICE))?;
-        // The `/dev` channel may be served by the IsolatedDevMgr before the emulator device is
-        // actually available. We use the recursive_wait_and_open_node method to ensure that the
-        // emulator device is available before we attempt to open it.
-        let controller_channel =
-            device_watcher::recursive_wait_and_open_node(&dev_directory, relative_control_dev_path)
-                .await?
-                .into_channel()
-                .map_err(|_| format_err!("failed to convert NodeProxy to channel"))?;
-        let controller = VirtualControllerProxy::new(controller_channel);
+        // 0x30 => fuchsia.platform.BIND_PLATFORM_DEV_DID.BT_HCI_EMULATOR
+        const CONTROL_DEVICE: &str = "sys/platform/00:00:30/bt_hci_virtual";
+
+        let controller = device_watcher::recursive_wait_and_open::<VirtualControllerMarker>(
+            &dev_directory,
+            CONTROL_DEVICE,
+        )
+        .await
+        .with_context(|| format!("failed to open {}", CONTROL_DEVICE))?;
         let name = controller
             .create_emulator()
             .map_err(Error::from)
@@ -162,81 +173,82 @@ impl TestDevice {
                 Err(format_err!("timed out waiting for emulator to create test device"))
             })
             .await?
-            .map_err(zx_status::Status::from_raw)?
+            .map_err(zx::Status::from_raw)?
             .ok_or_else(|| {
                 format_err!("name absent from EmulatorController::Create FIDL response")
             })?;
 
-        // Wait until a bt-emulator device gets published under our test device.
-        let topo_path = format!("{}/{}", CONTROL_DEVICE, name);
-        let mut watcher = dev_watcher(EMULATOR_DEVICE_DIR, &dev_directory).await?;
-        let emulator_dev =
-            watcher.watch_new(Path::new(&topo_path), WatchFilter::AddedOrExisting).await?;
+        let emulator_dir = fuchsia_fs::directory::open_directory_no_describe(
+            &dev_directory,
+            EMULATOR_DEVICE_DIR,
+            fuchsia_fs::OpenFlags::empty(),
+        )?;
 
-        // Connect to the bt-emulator device.
-        let channel = fdio::clone_channel(emulator_dev.file())?;
-        let emulator = EmulatorProxy::new(fasync::Channel::from_channel(channel)?);
+        // Wait until a bt-emulator device gets published under our test device.
+        let directory = device_watcher::wait_for_device_with(
+            &emulator_dir,
+            |device_watcher::DeviceInfo { filename, topological_path }| {
+                let topological_path = topological_path.strip_prefix(DEV_DIR)?;
+                let topological_path = topological_path.strip_prefix('/')?;
+                let topological_path = topological_path.strip_prefix(CONTROL_DEVICE)?;
+                let topological_path = topological_path.strip_prefix('/')?;
+                let topological_path = topological_path.strip_prefix(&name)?;
+                let _: &str = topological_path;
+                Some(fuchsia_fs::directory::open_directory_no_describe(
+                    &emulator_dir,
+                    filename,
+                    fuchsia_fs::OpenFlags::empty(),
+                ))
+            },
+        )
+        .on_timeout(WATCH_TIMEOUT, || Err(format_err!("timed out waiting for device to appear")))
+        .await??;
+
+        let controller = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+            ControllerMarker,
+        >(&directory, fidl_fuchsia_device_fs::DEVICE_CONTROLLER_NAME)?;
+        let emulator = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+            EmulatorMarker,
+        >(&directory, fidl_fuchsia_device_fs::DEVICE_PROTOCOL_NAME)?;
 
         // Open a HciEmulator protocol channel.
-        let (proxy, remote) = zx::Channel::create();
-        emulator.open(remote)?;
-        let file =
-            fdio::create_fd(emulator.into_channel().unwrap().into_zx_channel().into_handle())?;
-        Ok((
-            TestDevice { file, dev_directory },
-            HciEmulatorProxy::new(fasync::Channel::from_channel(proxy)?),
-        ))
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<HciEmulatorMarker>()?;
+        let () = emulator.open(server_end.into_channel())?;
+        Ok((Self { dev_directory, controller, emulator }, proxy))
     }
 
     /// Sends the test device a destroy message which will unbind the driver.
     /// This will wait for the test device to be unpublished from devfs.
     pub async fn destroy_and_wait(&mut self) -> Result<(), Error> {
-        let mut watcher = dev_watcher(CONTROL_DEVICE, &self.dev_directory).await?;
-        let topo_path = fdio::device_get_topo_path(&self.file)?;
-        let relative_device_path = topo_path
-            .strip_prefix(CONTROL_DEVICE)
-            .and_then(|p| p.strip_prefix("/"))
-            .ok_or_else(|| {
-                format_err!(
-                    "device topo path doesn't match expected emulator control path: {}",
-                    topo_path
-                )
-            })?;
-        self.destroy().await?;
-        watcher.watch_removed(Path::new(relative_device_path)).await
+        let () = self.controller.schedule_unbind().await?.map_err(zx::Status::from_raw)?;
+        let _: (zx::Signals, zx::Signals) = futures::future::try_join(
+            self.controller.as_channel().on_closed(),
+            self.emulator.as_channel().on_closed(),
+        )
+        .await?;
+        Ok(())
     }
 
-    // Send the test device a destroy message which will unbind the driver.
-    async fn destroy(&mut self) -> Result<(), Error> {
-        let channel = fdio::clone_channel(&self.file)?;
-        let device = ControllerProxy::new(fasync::Channel::from_channel(channel)?);
-        Ok(device.schedule_unbind().await?.map_err(zx_status::Status::from_raw)?)
+    pub async fn get_topological_path(&self) -> Result<String, Error> {
+        self.controller
+            .get_topological_path()
+            .await
+            .context("get topological path transport")?
+            .map_err(zx::Status::from_raw)
+            .context("get topological path")
     }
-}
-
-// Returns a DeviceWatcher watching `path`, which should start with `/dev`. The watched directory is
-//   - The `/dev/`-stripped part of `path` relative to `dev_dir`, if `dev_dir` is present.
-//   - `path` within the component's namespace, if `dev_dir` is not present.
-async fn dev_watcher(path: &str, dir: &DirectoryProxy) -> Result<DeviceWatcher, Error> {
-    let stripped_path = path
-        .strip_prefix(DEV_DIR)
-        .and_then(|p| p.strip_prefix("/"))
-        .ok_or_else(|| format_err!("unexpected device path: {}", path))?;
-    let open_dir =
-        fuchsia_fs::directory::open_directory(dir, stripped_path, fuchsia_fs::OpenFlags::empty())
-            .await?;
-    DeviceWatcher::new(path, open_dir, WATCH_TIMEOUT).await
 }
 
 #[cfg(test)]
 mod tests {
     use {
         super::*,
-        fidl_fuchsia_bluetooth_test::EmulatorError,
         fidl_fuchsia_driver_test as fdt, fuchsia,
         fuchsia_component_test::RealmBuilder,
         fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
     };
+
+    const HCI_DEVICE_DIR: &str = "class/bt-hci";
 
     fn default_settings() -> EmulatorSettings {
         EmulatorSettings {
@@ -250,62 +262,92 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn publish_lifecycle_with_realm() {
-        let realm = RealmBuilder::new().await.unwrap();
-        let _ = realm.driver_test_realm_setup().await.unwrap();
+    async fn test_publish_lifecycle() {
+        // We use these watchers to verify the addition and removal of these devices as tied to the
+        // lifetime of the Emulator instance we create below.
+        let emul_dev: EmulatorProxy;
+        let hci_dev: HciEmulatorProxy;
+
+        let realm = RealmBuilder::new().await.expect("realm builder");
+        let _: &RealmBuilder =
+            realm.driver_test_realm_setup().await.expect("driver test realm setup");
         let realm = realm.build().await.expect("failed to build realm");
         let args = fdt::RealmArgs {
             root_driver: Some("fuchsia-boot:///#meta/platform-bus.cm".to_string()),
             ..fdt::RealmArgs::EMPTY
         };
-        realm.driver_test_realm_start(args).await.unwrap();
-        let dev_dir = fuchsia_fs::directory::open_directory(
-            realm.root.get_exposed_dir(),
-            DEV_DIR,
-            fuchsia_fs::OpenFlags::empty(),
-        )
-        .await
-        .unwrap();
-        // We use these watchers to verify the addition and removal of these devices as tied to the
-        // lifetime of the Emulator instance we create below.
-        let mut hci_watcher: DeviceWatcher;
-        let mut emul_watcher: DeviceWatcher;
-        let hci_dev: DeviceFile;
-        let emul_dev: DeviceFile;
+        realm.driver_test_realm_start(args).await.expect("driver test realm start");
 
         {
+            let dev_dir = fuchsia_fs::directory::open_directory(
+                realm.root.get_exposed_dir(),
+                DEV_DIR,
+                fuchsia_fs::OpenFlags::empty(),
+            )
+            .await
+            .unwrap();
             let mut fake_dev =
                 Emulator::create(dev_dir).await.expect("Failed to construct Emulator");
-            let dev_dir = &fake_dev.dev.as_ref().expect("device should exist by now").dev_directory;
-            let topo_path = fdio::device_get_topo_path(&fake_dev.file())
+            let Emulator { dev, hci_emulator: _ } = &fake_dev;
+            let dev = dev.as_ref().expect("emulator device exists");
+            let topo = dev
+                .get_topological_path()
+                .await
                 .expect("Failed to obtain topological path for Emulator");
-            let topo_path = Path::new(&topo_path);
+            let TestDevice { dev_directory, controller: _, emulator: _ } = dev;
 
             // A bt-emulator device should already exist by now.
-            emul_watcher = dev_watcher(EMULATOR_DEVICE_DIR, &dev_dir)
+            {
+                let emulator_dir = fuchsia_fs::directory::open_directory_no_describe(
+                    dev_directory,
+                    EMULATOR_DEVICE_DIR,
+                    fuchsia_fs::OpenFlags::empty(),
+                )
+                .expect("open emulator directory");
+                emul_dev = device_watcher::wait_for_device_with(
+                    &emulator_dir,
+                    |device_watcher::DeviceInfo { filename, topological_path }| {
+                        topological_path.starts_with(&topo).then(|| {
+                            fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                                EmulatorMarker,
+                            >(&emulator_dir, filename)
+                            .expect("failed to connect to device")
+                        })
+                    },
+                )
+                .on_timeout(WATCH_TIMEOUT, || panic!("timed out waiting for device to appear"))
                 .await
-                .expect("Failed to create bt-emulator device watcher");
-
-            emul_dev = emul_watcher
-                .watch_existing(&topo_path)
-                .await
-                .expect("Expected bt-emulator device to have been published");
+                .expect("failed to watch for device");
+            }
 
             // Send a publish message to the device. This call should succeed and result in a new
-            // bt-hci device. (Note: it is important for `hci_watcher` to get constructed here since
-            // our expectation is based on the `ADD_FILE` event).
-            hci_watcher = dev_watcher(HCI_DEVICE_DIR, &dev_dir)
-                .await
-                .expect("Failed to create bt-hci device watcher");
-
-            let _ = fake_dev
+            // bt-hci device.
+            let () = fake_dev
                 .publish(default_settings())
                 .await
                 .expect("Failed to send Publish message to emulator device");
-            hci_dev = hci_watcher
-                .watch_new(&topo_path, WatchFilter::AddedOnly)
+            {
+                let hci_dir = fuchsia_fs::directory::open_directory_no_describe(
+                    dev_directory,
+                    HCI_DEVICE_DIR,
+                    fuchsia_fs::OpenFlags::empty(),
+                )
+                .expect("open hci directory");
+                hci_dev = device_watcher::wait_for_device_with(
+                    &hci_dir,
+                    |device_watcher::DeviceInfo { filename, topological_path }| {
+                        topological_path.starts_with(&topo).then(|| {
+                            fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                                HciEmulatorMarker,
+                            >(&hci_dir, filename)
+                            .expect("failed to connect to device")
+                        })
+                    },
+                )
+                .on_timeout(WATCH_TIMEOUT, || panic!("timed out waiting for device to appear"))
                 .await
-                .expect("Expected a new bt-hci device");
+                .expect("failed to watch for device");
+            }
 
             // Once a device is published, it should not be possible to publish again while the
             // HciEmulator channel is open.
@@ -320,13 +362,12 @@ mod tests {
         }
 
         // Both devices should be destroyed when `fake_dev` gets dropped.
-        let _ = hci_watcher
-            .watch_removed(hci_dev.relative_path())
-            .await
-            .expect("Expected bt-hci device to get removed");
-        let _ = emul_watcher
-            .watch_removed(emul_dev.relative_path())
-            .await
-            .expect("Expected bt-emulator device to get removed");
+        let _: (zx::Signals, zx::Signals) = futures::future::try_join(
+            emul_dev.as_channel().on_closed(),
+            hci_dev.as_channel().on_closed(),
+        )
+        .on_timeout(WATCH_TIMEOUT, || panic!("timed out waiting for device to close"))
+        .await
+        .expect("on closed");
     }
 }

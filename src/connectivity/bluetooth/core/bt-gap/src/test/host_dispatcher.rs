@@ -18,7 +18,6 @@ use futures::future::join;
 use futures::stream::TryStreamExt;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 use tracing::info;
 
 use crate::build_config::{BrEdrConfig, Config};
@@ -318,7 +317,7 @@ async fn test_notify_host_watcher_of_active_hosts() {
     assert_eq!(hosts[1].active, Some(true));
 
     // Removing active host 1 should mark host 0 as active.
-    host_dispatcher.rm_device(&Path::new(&format!("/dev/host{}", host_id_1.0))).await;
+    host_dispatcher.rm_device(&format!("/dev/host{}", host_id_1.0)).await;
     // The future has a timeout so that tests consistently terminate.
     let hosts = host_watcher_proxy
         .watch()

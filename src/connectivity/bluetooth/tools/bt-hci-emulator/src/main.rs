@@ -24,10 +24,10 @@ fn usage(appname: &str) {
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), Error> {
     let args: Vec<_> = std::env::args().collect();
-    let appname = &args[0];
-    match args.len() {
-        1 => (),
-        _ => {
+    match args.as_slice() {
+        [] => unreachable!(),
+        [_] => {}
+        [appname, ..] => {
             usage(appname);
             return Ok(());
         }
@@ -38,7 +38,7 @@ async fn main() -> Result<(), Error> {
 
     let emulator = Emulator::create_and_publish(dev_dir).await?;
 
-    let topo_path = fdio::device_get_topo_path(&emulator.file())?;
+    let topo_path = emulator.get_topological_path().await?;
     eprintln!("Instantiated emulator at path: {}", topo_path);
 
     // TODO(armansito): Instantiate a REPL here. For now we await forever to make sure that the

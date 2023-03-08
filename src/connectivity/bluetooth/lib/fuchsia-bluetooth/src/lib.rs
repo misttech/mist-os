@@ -17,8 +17,6 @@ pub use error::Error;
 /// Tools for writing asynchronous expectations in tests
 #[macro_use]
 pub mod expectation;
-/// Bluetooth host API
-pub mod host;
 /// Extension traits and functions for interfacing with the Inspect API
 pub mod inspect;
 /// Convenience functions and types for working with the BR/EDR Profile API
