@@ -457,6 +457,41 @@ impl Channel {
         !object.is_open()
     }
 
+    /// If [`is_closed`] returns true, this may return a string explaining why the handle was closed.
+    pub fn closed_reason(&self) -> Option<String> {
+        assert!(!self.is_invalid());
+        let Some(object) = HANDLE_TABLE.lock().unwrap().get(&self.0).map(|x| Arc::clone(&x.object)) else {
+            return None;
+        };
+
+        let object = object.lock().unwrap();
+
+        let KObjectEntry::Channel(c) = &*object else {
+            return None;
+        };
+
+        c.closed_reason.clone()
+    }
+
+    /// Close this channel, setting `msg` as a reason for the closure.
+    pub fn close_with_reason(self, msg: String) {
+        if self.is_invalid() {
+            return;
+        }
+
+        let Some(object) = HANDLE_TABLE.lock().unwrap().get(&self.0).map(|x| Arc::clone(&x.object)) else {
+            return;
+        };
+
+        let mut object = object.lock().unwrap();
+
+        let KObjectEntry::Channel(c) = &mut *object else {
+            return;
+        };
+
+        c.closed_reason = Some(msg)
+    }
+
     /// Read a message from a channel.
     pub fn read(&self, buf: &mut MessageBuf) -> Result<(), zx_status::Status> {
         let (bytes, handles) = buf.split_mut();
@@ -1624,6 +1659,7 @@ struct KObject<Q> {
     open_count: Sided<usize>,
     koid_left: u64,
     signals: Sided<Signals>,
+    closed_reason: Option<String>,
 }
 
 impl<Q> KObject<Q> {
@@ -1753,6 +1789,7 @@ fn new_handle_pair(hdl_type: HdlType, rights: Rights) -> (u32, u32, Arc<Mutex<KO
             open_count: Sided { left: 1, right: 1 },
             koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
             signals: Sided { left: Signals::empty(), right: Signals::empty() },
+            closed_reason: None,
         }
     }
 
@@ -1788,6 +1825,7 @@ fn new_handle(hdl_type: HdlType, rights: Rights) -> (u32, Arc<Mutex<KObjectEntry
             open_count: Sided { left: 1, right: 0 },
             koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
             signals: Sided { left: Signals::empty(), right: Signals::empty() },
+            closed_reason: None,
         }
     }
 
@@ -1929,7 +1967,9 @@ mod test {
     fn channel_create_not_closed() {
         let (a, b) = Channel::create();
         assert_eq!(a.is_closed(), false);
+        assert!(a.closed_reason().is_none());
         assert_eq!(b.is_closed(), false);
+        assert!(b.closed_reason().is_none());
     }
 
     #[test]
@@ -1937,6 +1977,7 @@ mod test {
         let (a, b) = Channel::create();
         drop(a);
         assert_eq!(b.is_closed(), true);
+        assert!(b.closed_reason().is_none());
     }
 
     #[test]
@@ -1944,6 +1985,17 @@ mod test {
         let (a, b) = Channel::create();
         drop(b);
         assert_eq!(a.is_closed(), true);
+        assert!(a.closed_reason().is_none());
+    }
+
+    #[test]
+    fn channel_close_message() {
+        let (a, b) = Channel::create();
+        assert_eq!(a.is_closed(), false);
+        assert!(a.closed_reason().is_none());
+        b.close_with_reason("Testing reason!!".to_owned());
+        assert_eq!(a.is_closed(), true);
+        assert_eq!(a.closed_reason().unwrap().as_str(), "Testing reason!!");
     }
 
     #[test]

@@ -44,6 +44,16 @@ impl Channel {
         self.channel.is_closed()
     }
 
+    /// If [`is_closed`] returns true, this may return a string explaining why the handle was closed.
+    pub fn closed_reason(&self) -> Option<String> {
+        self.channel.closed_reason()
+    }
+
+    /// Close this channel, setting `msg` as a reason for the closure.
+    pub fn close_with_reason(self, msg: String) {
+        self.channel.close_with_reason(msg)
+    }
+
     /// Returns a future that completes when `is_closed()` is true.
     pub fn on_closed<'a>(&'a self) -> OnSignals<'a> {
         OnSignals::new(self, Signals::CHANNEL_PEER_CLOSED)
