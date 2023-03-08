@@ -123,7 +123,6 @@ def run_bindgen(type_prefix, raw_line, output_file, clang_target, include_dirs):
     args = [
         BINDGEN_PATH,
         '--no-layout-tests',
-        '--size_t-is-usize',
         '--ignore-functions',
         '--with-derive-default',
         '--explicit-padding',
