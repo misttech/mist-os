@@ -93,7 +93,7 @@ zx_status_t AddI2cBus(const uint32_t bus_id, const I2cBus& bus,
       }},
   };
 
-  auto i2c_channels_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus.channels);
+  auto i2c_channels_fidl = fidl_metadata::i2c::I2CChannelsToFidl(bus_id, bus.channels);
   if (i2c_channels_fidl.is_error()) {
     zxlogf(ERROR, "Failed to FIDL encode I2C channel metadata: %d",
            i2c_channels_fidl.error_value());

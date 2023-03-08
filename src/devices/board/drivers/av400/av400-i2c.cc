@@ -143,7 +143,7 @@ zx_status_t AddI2cBus(const uint32_t bus_id, const I2cBus& bus,
   i2c_dev.mmio() = i2c_mmios;
   i2c_dev.irq() = i2c_irqs;
 
-  auto i2c_status = fidl_metadata::i2c::I2CChannelsToFidl(bus.channels);
+  auto i2c_status = fidl_metadata::i2c::I2CChannelsToFidl(bus_id, bus.channels);
   if (i2c_status.is_error()) {
     zxlogf(ERROR, "I2cInit: Failed to fidl encode i2c channels: %s", i2c_status.status_string());
     return i2c_status.error_value();
