@@ -254,7 +254,7 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
   zx_status_t status = kpci->SetUpOutgoingDirectory(std::move(endpoints->server));
 
   std::array offers = {
-      fidl::DiscoverableProtocolName<fpci::Device>,
+      fpci::Service::Name,
   };
 
   char device_name[ZX_DEVICE_NAME_MAX];
@@ -264,7 +264,7 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
   status = kpci->DdkAdd(ddk::DeviceAddArgs(device_name)
                             .set_flags(DEVICE_ADD_MUST_ISOLATE)
                             .set_props(fragment_props)
-                            .set_fidl_protocol_offers(offers)
+                            .set_fidl_service_offers(offers)
                             .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     return status;
