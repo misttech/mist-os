@@ -44,19 +44,19 @@ func TestFromJSON(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name           string
-		obj            string
-		expectedTarget reflect.Type
+		name     string
+		obj      string
+		expected reflect.Type
 	}{
 		{
-			name:           "derive aemu target",
-			obj:            `{"type": "aemu", "target": "x64"}`,
-			expectedTarget: reflect.TypeOf(&AEMUTarget{}),
+			name:     "derive aemu target",
+			obj:      `{"type": "aemu", "target": "x64"}`,
+			expected: reflect.TypeOf(&AEMU{}),
 		},
 		{
-			name:           "derive qemu target",
-			obj:            `{"type": "qemu", "target": "arm64"}`,
-			expectedTarget: reflect.TypeOf(&QEMUTarget{}),
+			name:     "derive qemu target",
+			obj:      `{"type": "qemu", "target": "arm64"}`,
+			expected: reflect.TypeOf(&QEMU{}),
 		},
 		// Testing FromJSON for "device" and "gce" is complex given that
 		// the constructor functions for those two targets perform a good amount
@@ -70,8 +70,8 @@ func TestFromJSON(t *testing.T) {
 			if err != nil {
 				t.Errorf("failed to derive target. err=%q", err)
 			}
-			if reflect.TypeOf(target) != test.expectedTarget {
-				t.Errorf("expected target type %q, got %q", test.expectedTarget, reflect.TypeOf(target))
+			if reflect.TypeOf(target) != test.expected {
+				t.Errorf("expected target type %q, got %q", test.expected, reflect.TypeOf(target))
 			}
 		})
 	}

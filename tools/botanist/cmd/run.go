@@ -160,7 +160,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.testrunnerOptions.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
 }
 
-func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Target, primaryTarget targets.Target, removeFFXOutputsDir *bool) (func(), error) {
+func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget, removeFFXOutputsDir *bool) (func(), error) {
 	var cleanup func()
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
 
@@ -253,7 +253,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Targ
 	return cleanup, nil
 }
 
-func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuchsiaTargets []targets.Target) error {
+func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuchsiaTargets []targets.FuchsiaTarget) error {
 	if r.serialLogDir == "" {
 		return nil
 	}
@@ -315,7 +315,7 @@ func (r *RunCommand) setupPackageServer(ctx context.Context) (*botanist.PackageS
 	return pkgSrv, nil
 }
 
-func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, baseTargets []targets.BaseTarget, fuchsiaTargets []targets.Target, primaryTarget targets.Target, testsPath string) {
+func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, baseTargets []targets.Base, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget, testsPath string) {
 	// Disable usb mass storage to determine if it affects NUC stability.
 	// TODO(rudymathu): Remove this once stability is achieved.
 	r.zirconArgs = append(r.zirconArgs, "driver.usb_mass_storage.disable")
@@ -524,7 +524,7 @@ func (r *RunCommand) runPreflights(ctx context.Context) error {
 
 // createTestbedConfig creates a configuration file that describes the targets
 // attached and returns the path to the file.
-func (r *RunCommand) createTestbedConfig(baseTargets []targets.BaseTarget) (string, error) {
+func (r *RunCommand) createTestbedConfig(baseTargets []targets.Base) (string, error) {
 	var testbedConfig []any
 	for _, t := range baseTargets {
 		c, err := t.TestConfig(r.netboot)
@@ -573,7 +573,7 @@ func (r *RunCommand) dumpSyslogOverSerial(ctx context.Context, socketPath string
 	return nil
 }
 
-func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.Target, testsPath string, testbedConfig string) error {
+func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarget, testsPath string, testbedConfig string) error {
 	testrunnerEnv := map[string]string{
 		constants.NodenameEnvKey:      t.Nodename(),
 		constants.SerialSocketEnvKey:  t.SerialSocketPath(),
@@ -685,7 +685,7 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 	return subcommands.ExitSuccess
 }
 
-func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.BaseTarget, []targets.Target, error) {
+func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.Base, []targets.FuchsiaTarget, error) {
 	data, err := os.ReadFile(r.configFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s: %w", constants.ReadConfigFileErrorMsg, err)
@@ -695,8 +695,8 @@ func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.BaseT
 		return nil, nil, fmt.Errorf("could not unmarshal config file as a JSON list: %w", err)
 	}
 
-	var baseTargets []targets.BaseTarget
-	var fuchsiaTargets []targets.Target
+	var baseTargets []targets.Base
+	var fuchsiaTargets []targets.FuchsiaTarget
 
 	for _, config := range configs {
 		t, err := targets.FromJSON(ctx, config, targets.Options{
@@ -707,7 +707,7 @@ func (r *RunCommand) deriveTargetsFromFile(ctx context.Context) ([]targets.BaseT
 			return nil, nil, err
 		}
 		baseTargets = append(baseTargets, t)
-		if f, ok := t.(targets.Target); ok {
+		if f, ok := t.(targets.FuchsiaTarget); ok {
 			fuchsiaTargets = append(fuchsiaTargets, f)
 		}
 	}

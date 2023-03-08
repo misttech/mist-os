@@ -162,9 +162,9 @@ type GCEConfig struct {
 	Zone string `json:"zone"`
 }
 
-// GCETarget represents a GCE VM running Fuchsia.
-type GCETarget struct {
-	*target
+// GCE represents a GCE VM running Fuchsia.
+type GCE struct {
+	*genericFuchsiaTarget
 	config      GCEConfig
 	currentUser string
 	ipv4        net.IP
@@ -174,7 +174,7 @@ type GCETarget struct {
 	serial      io.ReadWriteCloser
 }
 
-var _ Target = (*GCETarget)(nil)
+var _ FuchsiaTarget = (*GCE)(nil)
 
 // createInstanceRes is returned by the gcem_client's create-instance
 // subcommand. Its schema is determined by the CreateInstanceRes proto
@@ -184,9 +184,9 @@ type createInstanceRes struct {
 	Zone         string `json:"zone"`
 }
 
-// NewGCETarget creates, starts, and connects to the serial console of a GCE VM.
-func NewGCETarget(ctx context.Context, config GCEConfig, opts Options) (*GCETarget, error) {
-	// Generate an SSH keypair. We do this even if the caller has provided
+// NewGCE creates, starts, and connects to the serial console of a GCE VM.
+func NewGCE(ctx context.Context, config GCEConfig, opts Options) (*GCE, error) {
+	// Generate an SSH key pair. We do this even if the caller has provided
 	// an SSH key in opts because we require a very specific input format:
 	// PEM encoded, PKCS1 marshaled RSA keys.
 	pkeyPath, err := generatePrivateKey()
@@ -204,7 +204,7 @@ func NewGCETarget(ctx context.Context, config GCEConfig, opts Options) (*GCETarg
 	if err != nil {
 		return nil, err
 	}
-	g := &GCETarget{
+	g := &GCE{
 		config:      config,
 		currentUser: u.Username,
 		loggerCtx:   ctx,
@@ -247,11 +247,11 @@ func NewGCETarget(ctx context.Context, config GCEConfig, opts Options) (*GCETarg
 			return nil, err
 		}
 	}
-	base, err := newTarget(ctx, "", "", []string{g.opts.SSHKey}, g.serial)
+	base, err := newGenericFuchsia(ctx, "", "", []string{g.opts.SSHKey}, g.serial)
 	if err != nil {
 		return nil, err
 	}
-	g.target = base
+	g.genericFuchsiaTarget = base
 	return g, nil
 }
 
@@ -268,7 +268,7 @@ func logErrors(ctx context.Context, functionName string, errs <-chan error) {
 }
 
 // Provisions an SSH key over the serial connection.
-func (g *GCETarget) provisionSSHKey(ctx context.Context) error {
+func (g *GCE) provisionSSHKey(ctx context.Context) error {
 	if g.serial == nil {
 		return fmt.Errorf("serial is not connected")
 	}
@@ -292,7 +292,7 @@ func (g *GCETarget) provisionSSHKey(ctx context.Context) error {
 	return nil
 }
 
-func (g *GCETarget) connectToSerial() error {
+func (g *GCE) connectToSerial() error {
 	username := fmt.Sprintf(
 		"%s.%s.%s.%s.%s",
 		g.config.CloudProject,
@@ -306,7 +306,7 @@ func (g *GCETarget) connectToSerial() error {
 	return err
 }
 
-func (g *GCETarget) addSSHKey() error {
+func (g *GCE) addSSHKey() error {
 	invocation := []string{
 		gcemClientBinary,
 		"add-ssh-key",
@@ -326,7 +326,7 @@ func (g *GCETarget) addSSHKey() error {
 	return cmd.Run()
 }
 
-func (g *GCETarget) createInstance() error {
+func (g *GCE) createInstance() error {
 	taskID := os.Getenv("SWARMING_TASK_ID")
 	if taskID == "" {
 		return errors.New("task did not specify SWARMING_TASK_ID")
@@ -416,7 +416,7 @@ func generatePublicKey(pkeyFile string) (string, error) {
 	return f.Name(), err
 }
 
-func (g *GCETarget) IPv4() (net.IP, error) {
+func (g *GCE) IPv4() (net.IP, error) {
 	if g.ipv4 == nil {
 		fqdn := fmt.Sprintf("%s.%s.c.%s.internal", g.config.InstanceName, g.config.Zone, g.config.CloudProject)
 		addr, err := net.ResolveIPAddr("ip4", fqdn)
@@ -430,37 +430,37 @@ func (g *GCETarget) IPv4() (net.IP, error) {
 }
 
 // GCE targets don't have IPv6 addresses.
-func (g *GCETarget) IPv6() (*net.IPAddr, error) {
+func (g *GCE) IPv6() (*net.IPAddr, error) {
 	return nil, nil
 }
 
-func (g *GCETarget) Nodename() string {
+func (g *GCE) Nodename() string {
 	// TODO(rudymathu): fill in nodename
 	return ""
 }
 
-func (g *GCETarget) Serial() io.ReadWriteCloser {
+func (g *GCE) Serial() io.ReadWriteCloser {
 	return g.serial
 }
 
-func (g *GCETarget) SSHKey() string {
+func (g *GCE) SSHKey() string {
 	return g.opts.SSHKey
 }
 
-func (g *GCETarget) Start(ctx context.Context, _ []bootserver.Image, args []string) error {
+func (g *GCE) Start(ctx context.Context, _ []bootserver.Image, args []string) error {
 	return nil
 }
 
-func (g *GCETarget) Stop() error {
-	g.target.Stop()
+func (g *GCE) Stop() error {
+	g.genericFuchsiaTarget.Stop()
 	return g.serial.Close()
 }
 
-func (g *GCETarget) Wait(context.Context) error {
+func (g *GCE) Wait(context.Context) error {
 	return ErrUnimplemented
 }
 
-func (g *GCETarget) SSHClient() (*sshutil.Client, error) {
+func (g *GCE) SSHClient() (*sshutil.Client, error) {
 	addr, err := g.IPv4()
 	if err != nil {
 		return nil, err
@@ -469,6 +469,6 @@ func (g *GCETarget) SSHClient() (*sshutil.Client, error) {
 	return g.sshClient(&net.IPAddr{IP: addr})
 }
 
-func (g *GCETarget) TestConfig(netboot bool) (any, error) {
+func (g *GCE) TestConfig(netboot bool) (any, error) {
 	return TargetInfo(g, netboot)
 }

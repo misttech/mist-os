@@ -15,16 +15,16 @@ const (
 	aemuBinaryName = "emulator"
 )
 
-// AEMUTarget is a AEMU target.
-type AEMUTarget struct {
-	QEMUTarget
+// AEMU is a AEMU target.
+type AEMU struct {
+	QEMU
 }
 
-var _ Target = (*AEMUTarget)(nil)
+var _ FuchsiaTarget = (*AEMU)(nil)
 
-// NewAEMUTarget returns a new AEMU target with a given configuration.
-func NewAEMUTarget(ctx context.Context, config QEMUConfig, opts Options) (*AEMUTarget, error) {
-	target, err := NewQEMUTarget(ctx, config, opts)
+// NewAEMU returns a new AEMU target with a given configuration.
+func NewAEMU(ctx context.Context, config QEMUConfig, opts Options) (*AEMU, error) {
+	target, err := NewQEMU(ctx, config, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -33,5 +33,5 @@ func NewAEMUTarget(ctx context.Context, config QEMUConfig, opts Options) (*AEMUT
 	target.builder = qemu.NewAEMUCommandBuilder()
 	target.isQEMU = false
 
-	return &AEMUTarget{QEMUTarget: *target}, nil
+	return &AEMU{QEMU: *target}, nil
 }

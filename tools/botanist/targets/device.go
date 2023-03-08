@@ -83,9 +83,9 @@ func LoadDeviceConfigs(path string) ([]DeviceConfig, error) {
 	return configs, nil
 }
 
-// DeviceTarget represents a target device.
-type DeviceTarget struct {
-	*target
+// Device represents a physical Fuchsia device.
+type Device struct {
+	*genericFuchsiaTarget
 	config   DeviceConfig
 	opts     Options
 	signers  []ssh.Signer
@@ -94,10 +94,10 @@ type DeviceTarget struct {
 	stopping uint32
 }
 
-var _ Target = (*DeviceTarget)(nil)
+var _ FuchsiaTarget = (*Device)(nil)
 
-// NewDeviceTarget returns a new device target with a given configuration.
-func NewDeviceTarget(ctx context.Context, config DeviceConfig, opts Options) (*DeviceTarget, error) {
+// NewDevice returns a new device target with a given configuration.
+func NewDevice(ctx context.Context, config DeviceConfig, opts Options) (*Device, error) {
 	// If an SSH key is specified in the options, prepend it the configs list so that it
 	// corresponds to the authorized key that would be paved.
 	if opts.SSHKey != "" {
@@ -134,53 +134,53 @@ func NewDeviceTarget(ctx context.Context, config DeviceConfig, opts Options) (*D
 			return nil, fmt.Errorf("unable to open %s: %w", config.Serial, err)
 		}
 	}
-	base, err := newTarget(ctx, config.Network.Nodename, config.SerialMux, config.SSHKeys, s)
+	base, err := newGenericFuchsia(ctx, config.Network.Nodename, config.SerialMux, config.SSHKeys, s)
 	if err != nil {
 		return nil, err
 	}
-	return &DeviceTarget{
-		target:  base,
-		config:  config,
-		opts:    opts,
-		signers: signers,
-		serial:  s,
+	return &Device{
+		genericFuchsiaTarget: base,
+		config:               config,
+		opts:                 opts,
+		signers:              signers,
+		serial:               s,
 	}, nil
 }
 
 // Tftp returns a tftp client interface for the device.
-func (t *DeviceTarget) Tftp() tftp.Client {
+func (t *Device) Tftp() tftp.Client {
 	return t.tftp
 }
 
 // Nodename returns the name of the node.
-func (t *DeviceTarget) Nodename() string {
+func (t *Device) Nodename() string {
 	return t.config.Network.Nodename
 }
 
 // Serial returns the serial device associated with the target for serial i/o.
-func (t *DeviceTarget) Serial() io.ReadWriteCloser {
+func (t *Device) Serial() io.ReadWriteCloser {
 	return t.serial
 }
 
 // IPv4 returns the IPv4 address of the device.
-func (t *DeviceTarget) IPv4() (net.IP, error) {
+func (t *Device) IPv4() (net.IP, error) {
 	return net.ParseIP(t.config.Network.IPv4Addr), nil
 }
 
 // IPv6 returns the IPv6 of the device.
 // TODO(rudymathu): Re-enable mDNS resolution of IPv6 once it is no longer
 // flaky on hardware.
-func (t *DeviceTarget) IPv6() (*net.IPAddr, error) {
+func (t *Device) IPv6() (*net.IPAddr, error) {
 	return nil, nil
 }
 
 // SSHKey returns the private SSH key path associated with the authorized key to be paved.
-func (t *DeviceTarget) SSHKey() string {
+func (t *Device) SSHKey() string {
 	return t.config.SSHKeys[0]
 }
 
 // SSHClient returns an SSH client connected to the device.
-func (t *DeviceTarget) SSHClient() (*sshutil.Client, error) {
+func (t *Device) SSHClient() (*sshutil.Client, error) {
 	addr, err := t.IPv4()
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (t *DeviceTarget) SSHClient() (*sshutil.Client, error) {
 }
 
 // Start starts the device target.
-func (t *DeviceTarget) Start(ctx context.Context, images []bootserver.Image, args []string) error {
+func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string) error {
 	serialSocketPath := t.SerialSocketPath()
 	// Initialize the tftp client if:
 	// 1. It is currently uninitialized.
@@ -351,7 +351,7 @@ func getImage(imgs []bootserver.Image, label, typ string) *bootserver.Image {
 	return nil
 }
 
-func (t *DeviceTarget) ramBoot(ctx context.Context, images []bootserver.Image) error {
+func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image) error {
 	// TODO(fxbug.dev/91352): Remove experimental condition once stable.
 	if t.UseFFXExperimental(1) {
 		var zbi *bootserver.Image
@@ -388,7 +388,7 @@ func (t *DeviceTarget) ramBoot(ctx context.Context, images []bootserver.Image) e
 	return cmd.Run()
 }
 
-func (t *DeviceTarget) writePubKey() (string, error) {
+func (t *Device) writePubKey() (string, error) {
 	pubkey, err := os.CreateTemp("", "pubkey*")
 	if err != nil {
 		return "", err
@@ -401,7 +401,7 @@ func (t *DeviceTarget) writePubKey() (string, error) {
 	return pubkey.Name(), nil
 }
 
-func (t *DeviceTarget) flash(ctx context.Context, images []bootserver.Image) error {
+func (t *Device) flash(ctx context.Context, images []bootserver.Image) error {
 	var pubkey string
 	var err error
 	if len(t.signers) > 0 {
@@ -449,19 +449,19 @@ func (t *DeviceTarget) flash(ctx context.Context, images []bootserver.Image) err
 }
 
 // Stop stops the device.
-func (t *DeviceTarget) Stop() error {
-	t.target.Stop()
+func (t *Device) Stop() error {
+	t.genericFuchsiaTarget.Stop()
 	atomic.StoreUint32(&t.stopping, 1)
 	return nil
 }
 
 // Wait waits for the device target to stop.
-func (t *DeviceTarget) Wait(context.Context) error {
+func (t *Device) Wait(context.Context) error {
 	return ErrUnimplemented
 }
 
 // Config returns fields describing the target.
-func (t *DeviceTarget) TestConfig(netboot bool) (any, error) {
+func (t *Device) TestConfig(netboot bool) (any, error) {
 	return TargetInfo(t, netboot)
 }
 
@@ -489,7 +489,7 @@ func parseOutSigners(keyPaths []string) ([]ssh.Signer, error) {
 	return signers, nil
 }
 
-func (t *DeviceTarget) neededForFlashing(img bootserver.Image) bool {
+func (t *Device) neededForFlashing(img bootserver.Image) bool {
 	if img.IsFlashable {
 		return true
 	}

@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-func TestNewAEMUTarget(t *testing.T) {
+func TestNewAEMU(t *testing.T) {
 	ctx := context.Background()
-	a, err := NewAEMUTarget(
+	a, err := NewAEMU(
 		ctx,
 		QEMUConfig{
 			Target: "x64",
@@ -19,7 +19,7 @@ func TestNewAEMUTarget(t *testing.T) {
 		Options{},
 	)
 	if err != nil {
-		t.Fatalf("Unable to create NewAEMUTarget: %s", err)
+		t.Fatalf("Unable to create NewAEMU: %s", err)
 	}
 
 	if a.binary != aemuBinaryName {

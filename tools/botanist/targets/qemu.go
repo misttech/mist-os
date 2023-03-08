@@ -116,9 +116,9 @@ type QEMUConfig struct {
 	ZBITool string `json:"zbi_tool"`
 }
 
-// QEMUTarget is a QEMU target.
-type QEMUTarget struct {
-	*target
+// QEMU is a QEMU target.
+type QEMU struct {
+	*genericFuchsiaTarget
 	binary  string
 	builder EMUCommandBuilder
 	config  QEMUConfig
@@ -128,14 +128,13 @@ type QEMUTarget struct {
 	mac     [6]byte
 	serial  io.ReadWriteCloser
 	ptm     *os.File
-	// isQEMU distinguishes a QEMUTarget from an AEMUTarget
-	// since AEMUTarget inherits from QEMUTarget.
-	// TODO(ihuh): Refactor this to be a general EMUTarget so that
-	// a QEMUTarget would always have isQEMU=true, as its name implies.
+	// isQEMU distinguishes a QEMU from an AEMU since AEMU inherits from QEMU.
+	// TODO(ihuh): Refactor this to be a general EMU target so that a QEMU would
+	// always have isQEMU=true, as its name implies.
 	isQEMU bool
 }
 
-var _ Target = (*QEMUTarget)(nil)
+var _ FuchsiaTarget = (*QEMU)(nil)
 
 // EMUCommandBuilder defines the common set of functions used to build up an
 // EMU command-line.
@@ -157,14 +156,14 @@ type EMUCommandBuilder interface {
 	BuildConfig() (qemu.Config, error)
 }
 
-// NewQEMUTarget returns a new QEMU target with a given configuration.
-func NewQEMUTarget(ctx context.Context, config QEMUConfig, opts Options) (*QEMUTarget, error) {
+// NewQEMU returns a new QEMU target with a given configuration.
+func NewQEMU(ctx context.Context, config QEMUConfig, opts Options) (*QEMU, error) {
 	qemuTarget, ok := qemuTargetMapping[config.Target]
 	if !ok {
 		return nil, fmt.Errorf("invalid target %q", config.Target)
 	}
 
-	t := &QEMUTarget{
+	t := &QEMU{
 		binary:  fmt.Sprintf("%s-%s", qemuSystemPrefix, qemuTarget),
 		builder: &qemu.QEMUCommandBuilder{},
 		config:  config,
@@ -194,31 +193,31 @@ func NewQEMUTarget(ctx context.Context, config QEMUConfig, opts Options) (*QEMUT
 			return nil, fmt.Errorf("failed to create ptm/pts pair: %w", err)
 		}
 	}
-	base, err := newTarget(ctx, DefaultQEMUNodename, "", []string{opts.SSHKey}, t.serial)
+	base, err := newGenericFuchsia(ctx, DefaultQEMUNodename, "", []string{opts.SSHKey}, t.serial)
 	if err != nil {
 		return nil, err
 	}
-	t.target = base
+	t.genericFuchsiaTarget = base
 	return t, nil
 }
 
 // Nodename returns the name of the target node.
-func (t *QEMUTarget) Nodename() string {
+func (t *QEMU) Nodename() string {
 	return DefaultQEMUNodename
 }
 
 // Serial returns the serial device associated with the target for serial i/o.
-func (t *QEMUTarget) Serial() io.ReadWriteCloser {
+func (t *QEMU) Serial() io.ReadWriteCloser {
 	return t.serial
 }
 
 // SSHKey returns the private SSH key path associated with a previously embedded authorized key.
-func (t *QEMUTarget) SSHKey() string {
+func (t *QEMU) SSHKey() string {
 	return t.opts.SSHKey
 }
 
 // SSHClient creates and returns an SSH client connected to the QEMU target.
-func (t *QEMUTarget) SSHClient() (*sshutil.Client, error) {
+func (t *QEMU) SSHClient() (*sshutil.Client, error) {
 	addr, err := t.IPv6()
 	if err != nil {
 		return nil, err
@@ -227,7 +226,7 @@ func (t *QEMUTarget) SSHClient() (*sshutil.Client, error) {
 }
 
 // Start starts the QEMU target.
-func (t *QEMUTarget) Start(ctx context.Context, images []bootserver.Image, args []string) (err error) {
+func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string) (err error) {
 	if t.process != nil {
 		return fmt.Errorf("a process has already been started with PID %d", t.process.Pid)
 	}
@@ -564,7 +563,7 @@ func rewriteSDKManifest(manifestPath, targetCPU string, isQEMU bool) error {
 }
 
 // Stop stops the QEMU target.
-func (t *QEMUTarget) Stop() error {
+func (t *QEMU) Stop() error {
 	if t.UseFFX() {
 		return t.ffx.EmuStop(context.Background())
 	}
@@ -574,12 +573,12 @@ func (t *QEMUTarget) Stop() error {
 	logger.Debugf(t.targetCtx, "Sending SIGKILL to %d", t.process.Pid)
 	err := t.process.Kill()
 	t.process = nil
-	t.target.Stop()
+	t.genericFuchsiaTarget.Stop()
 	return err
 }
 
 // Wait waits for the QEMU target to stop.
-func (t *QEMUTarget) Wait(ctx context.Context) error {
+func (t *QEMU) Wait(ctx context.Context) error {
 	select {
 	case err := <-t.c:
 		return err
@@ -589,7 +588,7 @@ func (t *QEMUTarget) Wait(ctx context.Context) error {
 }
 
 // Config returns fields describing the target.
-func (t *QEMUTarget) TestConfig(netboot bool) (any, error) {
+func (t *QEMU) TestConfig(netboot bool) (any, error) {
 	return TargetInfo(t, netboot)
 }
 

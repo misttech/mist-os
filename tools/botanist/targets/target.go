@@ -48,8 +48,8 @@ type FFXInstance struct {
 	ExperimentLevel int
 }
 
-// BaseTarget represents a device used during testing.
-type BaseTarget interface {
+// Base represents a device used during testing.
+type Base interface {
 	// TestConfig returns fields describing the target to be provided to tests
 	// during runtime.
 	//
@@ -59,9 +59,9 @@ type BaseTarget interface {
 	TestConfig(netboot bool) (any, error)
 }
 
-// Target is implemented for Fuchsia targets.
-type Target interface {
-	BaseTarget
+// FuchsiaTarget is implemented for Fuchsia targets.
+type FuchsiaTarget interface {
+	Base
 
 	// AddPackageRepository adds a given package repository to the target.
 	AddPackageRepository(client *sshutil.Client, repoURL, blobURL string) error
@@ -128,10 +128,10 @@ type Target interface {
 	SetImageOverrides(build.ImageOverrides)
 }
 
-// target is a generic Fuchsia instance.
+// genericFuchsiaTarget is a generic Fuchsia instance.
 // It is not intended to be instantiated directly, but rather embedded into a
 // more concrete implementation.
-type target struct {
+type genericFuchsiaTarget struct {
 	targetCtx       context.Context
 	targetCtxCancel context.CancelFunc
 
@@ -150,10 +150,10 @@ type target struct {
 	imageOverrides build.ImageOverrides
 }
 
-// newTarget creates a new generic Fuchsia target.
-func newTarget(ctx context.Context, nodename, serialSocket string, sshKeys []string, serial io.ReadWriteCloser) (*target, error) {
+// newGenericFuchsia creates a new generic Fuchsia target.
+func newGenericFuchsia(ctx context.Context, nodename, serialSocket string, sshKeys []string, serial io.ReadWriteCloser) (*genericFuchsiaTarget, error) {
 	targetCtx, cancel := context.WithCancel(ctx)
-	t := &target{
+	t := &genericFuchsiaTarget{
 		targetCtx:       targetCtx,
 		targetCtxCancel: cancel,
 
@@ -166,43 +166,43 @@ func newTarget(ctx context.Context, nodename, serialSocket string, sshKeys []str
 }
 
 // SetFFX attaches an FFXInstance and environment to the target.
-func (t *target) SetFFX(ffx *FFXInstance, env []string) {
+func (t *genericFuchsiaTarget) SetFFX(ffx *FFXInstance, env []string) {
 	t.ffx = ffx
 	t.ffxEnv = env
 }
 
 // GetFFX returns the FFXInstance associated with the target.
-func (t *target) GetFFX() *FFXInstance {
+func (t *genericFuchsiaTarget) GetFFX() *FFXInstance {
 	return t.ffx
 }
 
 // UseFFX returns true if there is an FFXInstance associated with this target.
 // Use to enable stable ffx features.
-func (t *target) UseFFX() bool {
+func (t *genericFuchsiaTarget) UseFFX() bool {
 	return t.ffx != nil && t.ffx.FFXInstance != nil
 }
 
 // UseFFXExperimental returns true if there is an FFXInstance associated with
 // this target and we're running with an experiment level >= the provided level.
 // Use to enable experimental ffx features.
-func (t *target) UseFFXExperimental(level int) bool {
+func (t *genericFuchsiaTarget) UseFFXExperimental(level int) bool {
 	return t.UseFFX() && t.ffx.ExperimentLevel >= level
 }
 
 // FFXEnv returns the environment to run ffx with.
-func (t *target) FFXEnv() []string {
+func (t *genericFuchsiaTarget) FFXEnv() []string {
 	return t.ffxEnv
 }
 
 // SetImageOverrides sets the images to override the defaults in images.json.
-func (t *target) SetImageOverrides(images build.ImageOverrides) {
+func (t *genericFuchsiaTarget) SetImageOverrides(images build.ImageOverrides) {
 	t.imageOverrides = images
 }
 
 // StartSerialServer spawns a new serial server fo the given target.
 // This is a no-op if a serial socket already exists, or if there is
 // no attached serial device.
-func (t *target) StartSerialServer() error {
+func (t *genericFuchsiaTarget) StartSerialServer() error {
 	// We have to no-op instead of returning an error as there are code
 	// paths that directly write to the serial log using QEMU's chardev
 	// flag, and throwing an error here would break those paths.
@@ -227,7 +227,7 @@ func (t *target) StartSerialServer() error {
 
 // resolveIP uses mDNS to resolve the IPv6 and IPv4 addresses of the
 // target. It then caches the results so future requests are fast.
-func (t *target) resolveIP() error {
+func (t *genericFuchsiaTarget) resolveIP() error {
 	ctx, cancel := context.WithTimeout(t.targetCtx, 2*time.Minute)
 	defer cancel()
 	ipv4, ipv6, err := resolveIP(ctx, t.nodename)
@@ -241,12 +241,12 @@ func (t *target) resolveIP() error {
 
 // SerialSocketPath returns the path to the unix socket multiplexing serial
 // logs.
-func (t *target) SerialSocketPath() string {
+func (t *genericFuchsiaTarget) SerialSocketPath() string {
 	return t.serialSocket
 }
 
 // IPv4 returns the IPv4 address of the target.
-func (t *target) IPv4() (net.IP, error) {
+func (t *genericFuchsiaTarget) IPv4() (net.IP, error) {
 	if t.ipv4 == nil {
 		if err := t.resolveIP(); err != nil {
 			return nil, err
@@ -256,7 +256,7 @@ func (t *target) IPv4() (net.IP, error) {
 }
 
 // IPv6 returns the IPv6 address of the target.
-func (t *target) IPv6() (*net.IPAddr, error) {
+func (t *genericFuchsiaTarget) IPv6() (*net.IPAddr, error) {
 	if t.ipv6 == nil {
 		if err := t.resolveIP(); err != nil {
 			return nil, err
@@ -268,7 +268,7 @@ func (t *target) IPv6() (*net.IPAddr, error) {
 // CaptureSerialLog starts copying serial logs from the serial server
 // to the given filename. This is a blocking function; it will not return
 // until either the serial server disconnects or the target is stopped.
-func (t *target) CaptureSerialLog(filename string) error {
+func (t *genericFuchsiaTarget) CaptureSerialLog(filename string) error {
 	if t.serialSocket == "" {
 		return errors.New("CaptureSerialLog() failed; serialSocket was empty")
 	}
@@ -305,7 +305,7 @@ func (t *target) CaptureSerialLog(filename string) error {
 
 // sshClient is a helper function that returns an SSH client connected to the
 // target, which can be found at the given address.
-func (t *target) sshClient(addr *net.IPAddr) (*sshutil.Client, error) {
+func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, error) {
 	if len(t.sshKeys) == 0 {
 		return nil, errors.New("SSHClient() failed; no ssh keys provided")
 	}
@@ -333,7 +333,7 @@ func (t *target) sshClient(addr *net.IPAddr) (*sshutil.Client, error) {
 }
 
 // AddPackageRepository adds the given package repository to the target.
-func (t *target) AddPackageRepository(client *sshutil.Client, repoURL, blobURL string) error {
+func (t *genericFuchsiaTarget) AddPackageRepository(client *sshutil.Client, repoURL, blobURL string) error {
 	localhost := strings.Contains(repoURL, localhostPlaceholder) || strings.Contains(blobURL, localhostPlaceholder)
 	lScopedRepoURL := repoURL
 	if localhost {
@@ -385,7 +385,7 @@ func (t *target) AddPackageRepository(client *sshutil.Client, repoURL, blobURL s
 // and blobURL of the package repo as a matter of convenience - it makes
 // it easy to re-register the package repository on reboot. This function
 // blocks until the target is stopped.
-func (t *target) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error {
+func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error {
 	syslogger := syslog.NewSyslogger(client)
 
 	f, err := os.Create(filename)
@@ -411,7 +411,7 @@ func (t *target) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobUR
 }
 
 // Stop cleans up all of the resources used by the target.
-func (t *target) Stop() {
+func (t *genericFuchsiaTarget) Stop() {
 	// Cancelling the target context will stop any background goroutines.
 	// This includes serial/syslog capture and any serial servers that may
 	// be running.
@@ -536,7 +536,7 @@ func createSocketPath() string {
 type Options struct {
 	// Netboot gives whether to netboot or pave. Netboot here is being used in the
 	// colloquial sense of only sending netsvc a kernel to mexec. If false, the target
-	// will be paved. Ignored for QEMUTarget.
+	// will be paved. Ignored for QEMU.
 	Netboot bool
 
 	// SSHKey is a private SSH key file, corresponding to an authorized key to be paved or
@@ -544,8 +544,8 @@ type Options struct {
 	SSHKey string
 }
 
-// FromJSON parses a BaseTarget from JSON config.
-func FromJSON(ctx context.Context, config json.RawMessage, opts Options) (BaseTarget, error) {
+// FromJSON parses a Base target from JSON config.
+func FromJSON(ctx context.Context, config json.RawMessage, opts Options) (Base, error) {
 	type typed struct {
 		Type string `json:"type"`
 	}
@@ -560,25 +560,25 @@ func FromJSON(ctx context.Context, config json.RawMessage, opts Options) (BaseTa
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid QEMU config found: %w", err)
 		}
-		return NewAEMUTarget(ctx, cfg, opts)
+		return NewAEMU(ctx, cfg, opts)
 	case "qemu":
 		var cfg QEMUConfig
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid QEMU config found: %w", err)
 		}
-		return NewQEMUTarget(ctx, cfg, opts)
+		return NewQEMU(ctx, cfg, opts)
 	case "device":
 		var cfg DeviceConfig
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid device config found: %w", err)
 		}
-		return NewDeviceTarget(ctx, cfg, opts)
+		return NewDevice(ctx, cfg, opts)
 	case "gce":
 		var cfg GCEConfig
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid GCE config found: %w", err)
 		}
-		return NewGCETarget(ctx, cfg, opts)
+		return NewGCE(ctx, cfg, opts)
 	default:
 		return nil, fmt.Errorf("unknown type found: %q", x.Type)
 	}
@@ -596,8 +596,8 @@ type StartOptions struct {
 	ZirconArgs []string
 }
 
-// StartTargets starts all the targets in fuchsiaTargets given the opts.
-func StartTargets(ctx context.Context, opts StartOptions, fuchsiaTargets []Target) error {
+// StartTargets starts all the targets given the opts.
+func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarget) error {
 	bootMode := bootserver.ModePave
 	if opts.Netboot {
 		bootMode = bootserver.ModeNetboot
@@ -605,8 +605,8 @@ func StartTargets(ctx context.Context, opts StartOptions, fuchsiaTargets []Targe
 
 	// Check the first target to see if ffx is enabled. All targets share the same ffx daemon,
 	// so we can use the ffx associated with the first target to set config values.
-	if len(fuchsiaTargets) > 0 && fuchsiaTargets[0].UseFFXExperimental(1) {
-		ffx := fuchsiaTargets[0].GetFFX()
+	if len(targets) > 0 && targets[0].UseFFXExperimental(1) {
+		ffx := targets[0].GetFFX()
 		if err := ffx.ConfigSet(ctx, "ffx.fastboot.inline_target", "true"); err != nil {
 			return err
 		}
@@ -622,7 +622,7 @@ func StartTargets(ctx context.Context, opts StartOptions, fuchsiaTargets []Targe
 
 	// We wait until targets have started before running testrunner against the zeroth one.
 	eg, startCtx := errgroup.WithContext(ctx)
-	for _, t := range fuchsiaTargets {
+	for _, t := range targets {
 		t := t
 		eg.Go(func() error {
 			imgs, closeFunc, err := bootserver.GetImages(startCtx, opts.ImageManifest, bootMode)
@@ -637,11 +637,11 @@ func StartTargets(ctx context.Context, opts StartOptions, fuchsiaTargets []Targe
 	return eg.Wait()
 }
 
-// StopTargets stop all the targets in fuchsiaTargets
-func StopTargets(ctx context.Context, fuchsiaTargets []Target) {
+// StopTargets stop all the targets.
+func StopTargets(ctx context.Context, targets []FuchsiaTarget) {
 	// Stop the targets in parallel.
 	var eg errgroup.Group
-	for _, t := range fuchsiaTargets {
+	for _, t := range targets {
 		t := t
 		eg.Go(func() error {
 			return t.Stop()
@@ -675,7 +675,7 @@ type targetInfo struct {
 
 // TargetInfo returns config used to communicate with the target (device
 // properties, serial paths, SSH properties, etc.) for use by subprocesses.
-func TargetInfo(t Target, netboot bool) (targetInfo, error) {
+func TargetInfo(t FuchsiaTarget, netboot bool) (targetInfo, error) {
 	cfg := targetInfo{
 		Type:         "FuchsiaDevice",
 		Nodename:     t.Nodename(),
