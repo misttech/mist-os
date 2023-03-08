@@ -183,7 +183,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
 
   for (unsigned i = 0; i < added_count; i++) {
     fbl::AllocChecker ac;
-    auto info_or_status = DisplayInfo::Create(displays_added[i], &i2c_);
+    auto info_or_status = DisplayInfo::Create(displays_added[i]);
     if (info_or_status.is_error()) {
       zxlogf(INFO, "failed to add display %ld: %s", displays_added[i].display_id,
              info_or_status.status_string());
@@ -877,8 +877,6 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
 
   // optional display controller clamp rgb protocol client
   dc_clamp_rgb_ = ddk::DisplayClampRgbImplProtocolClient(parent_);
-
-  i2c_ = ddk::I2cImplProtocolClient(parent_);
 
   status = loop_.StartThread("display-client-loop", &loop_thread_);
   if (status != ZX_OK) {

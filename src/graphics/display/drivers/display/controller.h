@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
@@ -179,7 +178,6 @@ class Controller : public DeviceType,
   async_watchdog::Watchdog watchdog_;
   ddk::DisplayControllerImplProtocolClient dc_;
   ddk::DisplayClampRgbImplProtocolClient dc_clamp_rgb_;
-  ddk::I2cImplProtocolClient i2c_;
 
   std::list<std::unique_ptr<ClientProxy>> clients_ __TA_GUARDED(mtx());
 

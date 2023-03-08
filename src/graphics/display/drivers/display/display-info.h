@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 
@@ -30,8 +29,7 @@ namespace display {
 class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
                     public fbl::RefCounted<DisplayInfo> {
  public:
-  static zx::result<fbl::RefPtr<DisplayInfo>> Create(const added_display_args_t& info,
-                                                     ddk::I2cImplProtocolClient* i2c);
+  static zx::result<fbl::RefPtr<DisplayInfo>> Create(const added_display_args_t& info);
 
   // Should be called after init_done is set to true.
   void InitializeInspect(inspect::Node* parent_node);

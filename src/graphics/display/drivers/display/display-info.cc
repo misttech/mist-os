@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/display/display-info.h"
 
+#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+
 #include <audio-proto-utils/format-utils.h>
 #include <pretty/hexdump.h>
 
@@ -13,13 +15,8 @@ namespace display {
 
 namespace {
 
-struct I2cBus {
-  ddk::I2cImplProtocolClient i2c;
-  uint32_t bus_id;
-};
-
 edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_t count) -> bool {
-  auto i2c = static_cast<I2cBus*>(ctx);
+  auto i2c = static_cast<ddk::I2cImplProtocolClient*>(ctx);
   i2c_impl_op_t ops[count];
   for (unsigned i = 0; i < count; i++) {
     ops[i].address = msgs[i].addr;
@@ -28,7 +25,7 @@ edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_
     ops[i].is_read = msgs[i].is_read;
     ops[i].stop = i == (count - 1);
   }
-  return i2c->i2c.Transact(i2c->bus_id, ops, count) == ZX_OK;
+  return i2c->Transact(0, ops, count) == ZX_OK;
 };
 
 }  // namespace
@@ -61,8 +58,7 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 }
 
 // static
-zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_args_t& info,
-                                                         ddk::I2cImplProtocolClient* i2c) {
+zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_args_t& info) {
   fbl::AllocChecker ac;
   fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&ac) DisplayInfo);
   if (!ac.check()) {
@@ -94,7 +90,8 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
     return zx::ok(std::move(out));
   }
 
-  if (!i2c->is_valid()) {
+  ddk::I2cImplProtocolClient i2c(&info.panel.i2c);
+  if (!i2c.is_valid()) {
     zxlogf(ERROR, "Presented edid display with no i2c bus");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -111,8 +108,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
     }
     edid_attempt++;
 
-    I2cBus bus = {*i2c, info.panel.i2c_bus_id};
-    success = out->edid->base.Init(&bus, ddc_tx, &edid_err);
+    success = out->edid->base.Init(&i2c, ddc_tx, &edid_err);
   } while (!success && edid_attempt < kEdidRetries);
 
   if (!success) {
