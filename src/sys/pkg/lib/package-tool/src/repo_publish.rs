@@ -51,9 +51,11 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
         .package_lists(cmd.package_list_manifests.iter().cloned())
         .watch()?;
 
-    // Clear out the package list manifests, since the package watcher will tell us which packages
-    // from these lists have changed.
-    cmd.package_list_manifests = vec![];
+    // FIXME(fxbug.dev/122178): Since the package manifest list is just a list of files, if we read
+    // the file while it's being written to, we might end up watching less files than we expect. To
+    // work around that, lets just publish all packages in the package manifest just to be safe.
+    // We can revert back to only publishing changes packages when this is fixed.
+    //cmd.package_list_manifests = vec![];
 
     while let Some(event) = watcher.next().await {
         cmd.package_manifests.clear();
