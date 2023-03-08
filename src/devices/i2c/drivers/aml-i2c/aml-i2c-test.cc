@@ -12,6 +12,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/zx/clock.h>
 
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -48,15 +49,7 @@ class FakeAmlI2cController {
     mmio_[kControlReg].SetWriteCallback([&](uint64_t value) { WriteControlReg(value); });
   }
 
-  FakeAmlI2cController() : FakeAmlI2cController(zx::unowned_interrupt{}) {}
-
-  // A move constructor must exist in order call emplace_back() or reserve() on an
-  // std::vector<FakeAmlI2cController>. It should not be called however as we make sure the that
-  // vector never needs to resize.
-  FakeAmlI2cController(FakeAmlI2cController&& other) noexcept
-      : FakeAmlI2cController(std::move(other.irq_)) {
-    EXPECT_TRUE(false, "Move constructor called");
-  }
+  FakeAmlI2cController(FakeAmlI2cController&& other) = delete;
   FakeAmlI2cController& operator=(FakeAmlI2cController&& other) = delete;
 
   FakeAmlI2cController(const FakeAmlI2cController& other) = delete;
@@ -183,21 +176,18 @@ class AmlI2cTest : public zxtest::Test {
     kStop,
   };
 
-  cpp20::span<uint32_t> mmio(size_t index) { return controllers_[index].mmio(); }
+  cpp20::span<uint32_t> mmio() { return controller_->mmio(); }
 
-  void InitResources(uint32_t bus_count) {
-    controllers_.reserve(bus_count);
-
+  void InitResources() {
     fake_pdev::FakePDevFidl::Config config;
-    for (uint32_t i = 0; i < bus_count; i++) {
-      config.irqs[i] = {};
-      ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[i]));
-      controllers_.emplace_back(config.irqs[i].borrow());
-      config.mmios[i] = controllers_.back().GetMmioBuffer();
-    }
+    config.irqs[0] = {};
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    controller_.emplace(config.irqs[0].borrow());
+    config.mmios[0] = controller_->GetMmioBuffer();
+
     config.device_info = {
-        .mmio_count = bus_count,
-        .irq_count = bus_count,
+        .mmio_count = 1,
+        .irq_count = 1,
     };
 
     zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -216,28 +206,24 @@ class AmlI2cTest : public zxtest::Test {
                           std::move(outgoing_endpoints->client), "pdev");
   }
 
-  void Init(uint32_t bus_count) {
-    EXPECT_NO_FATAL_FAILURE(InitResources(bus_count));
+  void Init() {
+    EXPECT_NO_FATAL_FAILURE(InitResources());
 
     EXPECT_OK(AmlI2c::Bind(nullptr, root_.get()));
     ASSERT_EQ(root_->child_count(), 1);
 
-    AmlI2c* const i2c = root_->GetLatestChild()->GetDeviceContext<AmlI2c>();
-    ASSERT_EQ(i2c->i2c_devs_.size(), bus_count);
-    for (auto& i2c_dev : i2c->i2c_devs_) {
-      i2c_dev.timeout_ = zx::duration(ZX_TIME_INFINITE);
-    }
+    root_->GetLatestChild()->GetDeviceContext<AmlI2c>()->timeout_ = zx::duration(ZX_TIME_INFINITE);
   }
 
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
-  std::vector<FakeAmlI2cController> controllers_;
+  std::optional<FakeAmlI2cController> controller_;
 };
 
 TEST_F(AmlI2cTest, SmallWrite) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
@@ -256,7 +242,7 @@ TEST_F(AmlI2cTest, SmallWrite) {
 
   EXPECT_OK(i2c.Transact(0, &op, 1));
 
-  const std::vector transfers = controllers_[0].GetTransfers();
+  const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
 
   EXPECT_EQ(transfers[0].target_addr, 0x13);
@@ -279,7 +265,7 @@ TEST_F(AmlI2cTest, SmallWrite) {
 }
 
 TEST_F(AmlI2cTest, BigWrite) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
@@ -299,7 +285,7 @@ TEST_F(AmlI2cTest, BigWrite) {
 
   EXPECT_OK(i2c.Transact(0, &op, 1));
 
-  const std::vector transfers = controllers_[0].GetTransfers();
+  const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
 
   EXPECT_EQ(transfers[0].target_addr, 0x5f);
@@ -341,13 +327,13 @@ TEST_F(AmlI2cTest, BigWrite) {
 }
 
 TEST_F(AmlI2cTest, SmallRead) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
 
   constexpr uint8_t kExpectedReadData[]{0xf0, 0xdb, 0xdf, 0x6b, 0xb9, 0x3e, 0xa6, 0xfa};
-  controllers_[0].SetReadData({kExpectedReadData, std::size(kExpectedReadData)});
+  controller_->SetReadData({kExpectedReadData, std::size(kExpectedReadData)});
 
   uint8_t read_buffer[std::size(kExpectedReadData)];
   memset(read_buffer, 0xaa, sizeof(read_buffer));
@@ -361,7 +347,7 @@ TEST_F(AmlI2cTest, SmallRead) {
 
   EXPECT_OK(i2c.Transact(0, &op, 1));
 
-  const std::vector transfers = controllers_[0].GetTransfers();
+  const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
 
   EXPECT_EQ(transfers[0].target_addr, 0x41);
@@ -383,14 +369,14 @@ TEST_F(AmlI2cTest, SmallRead) {
 }
 
 TEST_F(AmlI2cTest, BigRead) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
 
   constexpr uint8_t kExpectedReadData[]{0xb9, 0x17, 0x32, 0xba, 0x8e, 0xf7, 0x19, 0xf2, 0x78, 0xbf,
                                         0xcb, 0xd3, 0xdc, 0xad, 0xbd, 0x78, 0x1b, 0xa8, 0xef, 0x1a};
-  controllers_[0].SetReadData({kExpectedReadData, std::size(kExpectedReadData)});
+  controller_->SetReadData({kExpectedReadData, std::size(kExpectedReadData)});
 
   uint8_t read_buffer[std::size(kExpectedReadData)];
   memset(read_buffer, 0xaa, sizeof(read_buffer));
@@ -404,7 +390,7 @@ TEST_F(AmlI2cTest, BigRead) {
 
   EXPECT_OK(i2c.Transact(0, &op, 1));
 
-  const std::vector transfers = controllers_[0].GetTransfers();
+  const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
 
   EXPECT_EQ(transfers[0].target_addr, 0x29);
@@ -445,7 +431,7 @@ TEST_F(AmlI2cTest, BigRead) {
 }
 
 TEST_F(AmlI2cTest, NoStopFlag) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
@@ -460,20 +446,20 @@ TEST_F(AmlI2cTest, NoStopFlag) {
 
   EXPECT_OK(i2c.Transact(0, &op, 1));
 
-  const std::vector transfers = controllers_[0].GetTransfers();
+  const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
 
   transfers[0].ExpectTokenListEq({kStart, kTargetAddrWr, kData, kData, kData, kData, kEnd});
 }
 
 TEST_F(AmlI2cTest, TransferError) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
 
   uint8_t buffer[4];
-  controllers_[0].SetReadData({buffer, std::size(buffer)});
+  controller_->SetReadData({buffer, std::size(buffer)});
   const i2c_impl_op_t op{
       .data_buffer = buffer,
       .data_size = sizeof(buffer),
@@ -481,13 +467,13 @@ TEST_F(AmlI2cTest, TransferError) {
       .stop = false,
   };
 
-  mmio(0)[kControlReg / sizeof(uint32_t)] = 1 << 3;
+  mmio()[kControlReg / sizeof(uint32_t)] = 1 << 3;
 
   EXPECT_NOT_OK(i2c.Transact(0, &op, 1));
 }
 
 TEST_F(AmlI2cTest, ManyTransactions) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
@@ -495,7 +481,7 @@ TEST_F(AmlI2cTest, ManyTransactions) {
   constexpr uint8_t kExpectedReadData[]{0x85, 0xb0, 0xd0, 0x1c, 0xc6, 0x8a, 0x35, 0xfc,
                                         0xcf, 0xca, 0x95, 0x01, 0x61, 0x42, 0x60, 0x8c,
                                         0xa6, 0x01, 0xd6, 0x2e, 0x38, 0x20, 0x09, 0xfa};
-  controllers_[0].SetReadData({kExpectedReadData, std::size(kExpectedReadData)});
+  controller_->SetReadData({kExpectedReadData, std::size(kExpectedReadData)});
 
   constexpr uint8_t kExpectedWriteData[]{0x39, 0xf0, 0xf9, 0x17, 0xad, 0x51, 0xdc, 0x30, 0xe5};
 
@@ -542,7 +528,7 @@ TEST_F(AmlI2cTest, ManyTransactions) {
 
   EXPECT_OK(i2c.Transact(0, ops, std::size(ops)));
 
-  const std::vector transfers = controllers_[0].GetTransfers();
+  const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 4);
 
   EXPECT_EQ(transfers[0].target_addr, 0x1c);
@@ -617,65 +603,8 @@ TEST_F(AmlI2cTest, ManyTransactions) {
   });
 }
 
-TEST_F(AmlI2cTest, MultipleControllers) {
-  EXPECT_NO_FATAL_FAILURE(Init(4));
-
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
-
-  uint8_t write_buffer[]{0x45};
-  const i2c_impl_op_t op{
-      .address = 0x56,
-      .data_buffer = write_buffer,
-      .data_size = sizeof(write_buffer),
-      .is_read = false,
-  };
-
-  EXPECT_OK(i2c.Transact(0, &op, 1));
-  {
-    const std::vector transfers = controllers_[0].GetTransfers();
-    ASSERT_EQ(transfers.size(), 1);
-    EXPECT_EQ(transfers[0].target_addr, 0x56);
-    ASSERT_EQ(transfers[0].write_data.size(), 1);
-    EXPECT_EQ(transfers[0].write_data[0], 0x45);
-    transfers[0].ExpectTokenListEq({kStart, kTargetAddrWr, kData, kEnd});
-  }
-
-  EXPECT_OK(i2c.Transact(1, &op, 1));
-  {
-    const std::vector transfers = controllers_[1].GetTransfers();
-    ASSERT_EQ(transfers.size(), 1);
-    EXPECT_EQ(transfers[0].target_addr, 0x56);
-    ASSERT_EQ(transfers[0].write_data.size(), 1);
-    EXPECT_EQ(transfers[0].write_data[0], 0x45);
-    transfers[0].ExpectTokenListEq({kStart, kTargetAddrWr, kData, kEnd});
-  }
-
-  EXPECT_OK(i2c.Transact(2, &op, 1));
-  {
-    const std::vector transfers = controllers_[2].GetTransfers();
-    ASSERT_EQ(transfers.size(), 1);
-    EXPECT_EQ(transfers[0].target_addr, 0x56);
-    ASSERT_EQ(transfers[0].write_data.size(), 1);
-    EXPECT_EQ(transfers[0].write_data[0], 0x45);
-    transfers[0].ExpectTokenListEq({kStart, kTargetAddrWr, kData, kEnd});
-  }
-
-  EXPECT_OK(i2c.Transact(3, &op, 1));
-  {
-    const std::vector transfers = controllers_[3].GetTransfers();
-    ASSERT_EQ(transfers.size(), 1);
-    EXPECT_EQ(transfers[0].target_addr, 0x56);
-    ASSERT_EQ(transfers[0].write_data.size(), 1);
-    EXPECT_EQ(transfers[0].write_data[0], 0x45);
-    transfers[0].ExpectTokenListEq({kStart, kTargetAddrWr, kData, kEnd});
-  }
-
-  EXPECT_NOT_OK(i2c.Transact(4, &op, 1));
-}
-
 TEST_F(AmlI2cTest, TransactionTooBig) {
-  EXPECT_NO_FATAL_FAILURE(Init(1));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
   ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
   EXPECT_TRUE(i2c.is_valid());
@@ -693,73 +622,28 @@ TEST_F(AmlI2cTest, TransactionTooBig) {
 }
 
 TEST_F(AmlI2cTest, Metadata) {
-  aml_i2c_delay_values metadata[]{
-      {.quarter_clock_delay = 0, .clock_low_delay = 0},
-      {.quarter_clock_delay = 0x3cd, .clock_low_delay = 0xf12},
-      {.quarter_clock_delay = 0, .clock_low_delay = 0},
-  };
+  constexpr aml_i2c_delay_values metadata{.quarter_clock_delay = 0x3cd, .clock_low_delay = 0xf12};
 
   root_->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
-  EXPECT_NO_FATAL_FAILURE(Init(3));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
-  EXPECT_EQ(mmio(0)[kControlReg / sizeof(uint32_t)], 0);
-  EXPECT_EQ(mmio(0)[kTargetAddrReg / sizeof(uint32_t)], 0);
-
-  EXPECT_EQ(mmio(1)[kControlReg / sizeof(uint32_t)], 0x3cd << 12);
-  EXPECT_EQ(mmio(1)[kTargetAddrReg / sizeof(uint32_t)], (0xf12 << 16) | (1 << 28));
-
-  EXPECT_EQ(mmio(2)[kControlReg / sizeof(uint32_t)], 0);
-  EXPECT_EQ(mmio(2)[kTargetAddrReg / sizeof(uint32_t)], 0);
+  EXPECT_EQ(mmio()[kControlReg / sizeof(uint32_t)], 0x3cd << 12);
+  EXPECT_EQ(mmio()[kTargetAddrReg / sizeof(uint32_t)], (0xf12 << 16) | (1 << 28));
 }
 
 TEST_F(AmlI2cTest, NoMetadata) {
-  EXPECT_NO_FATAL_FAILURE(Init(3));
+  EXPECT_NO_FATAL_FAILURE(Init());
 
-  EXPECT_EQ(mmio(0)[kControlReg / sizeof(uint32_t)], 0);
-  EXPECT_EQ(mmio(0)[kTargetAddrReg / sizeof(uint32_t)], 0);
-
-  EXPECT_EQ(mmio(1)[kControlReg / sizeof(uint32_t)], 0);
-  EXPECT_EQ(mmio(1)[kTargetAddrReg / sizeof(uint32_t)], 0);
-
-  EXPECT_EQ(mmio(2)[kControlReg / sizeof(uint32_t)], 0);
-  EXPECT_EQ(mmio(2)[kTargetAddrReg / sizeof(uint32_t)], 0);
-}
-
-TEST_F(AmlI2cTest, MetadataTooBig) {
-  aml_i2c_delay_values metadata[]{
-      {.quarter_clock_delay = 0, .clock_low_delay = 0},
-      {.quarter_clock_delay = 0x3cd, .clock_low_delay = 0xf12},
-      {.quarter_clock_delay = 0, .clock_low_delay = 0},
-      {.quarter_clock_delay = 0, .clock_low_delay = 0},
-  };
-
-  root_->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
-
-  EXPECT_NO_FATAL_FAILURE(InitResources(3));
-
-  EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
-}
-
-TEST_F(AmlI2cTest, MetadataTooSmall) {
-  aml_i2c_delay_values metadata[]{
-      {.quarter_clock_delay = 0, .clock_low_delay = 0},
-      {.quarter_clock_delay = 0x3cd, .clock_low_delay = 0xf12},
-  };
-
-  root_->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
-
-  EXPECT_NO_FATAL_FAILURE(InitResources(3));
-
-  EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
+  EXPECT_EQ(mmio()[kControlReg / sizeof(uint32_t)], 0);
+  EXPECT_EQ(mmio()[kTargetAddrReg / sizeof(uint32_t)], 0);
 }
 
 TEST_F(AmlI2cTest, CanUsePDevFragment) {
   fake_pdev::FakePDevFidl::Config config;
   config.irqs[0] = {};
   ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
-  controllers_.emplace_back(config.irqs[0].borrow());
-  config.mmios[0] = controllers_[0].GetMmioBuffer();
+  config.mmios[0] = controller_->GetMmioBuffer();
   config.device_info = {
       .mmio_count = 1,
       .irq_count = 1,
@@ -784,7 +668,7 @@ TEST_F(AmlI2cTest, CanUsePDevFragment) {
   ASSERT_EQ(root_->child_count(), 1);
 }
 
-TEST_F(AmlI2cTest, MmioIrqMismatch) {
+TEST_F(AmlI2cTest, MmioIrqCountInvalid) {
   zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   ASSERT_OK(outgoing_endpoints);
   ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
@@ -794,7 +678,7 @@ TEST_F(AmlI2cTest, MmioIrqMismatch) {
             .device_info =
                 pdev_device_info_t{
                     .mmio_count = 2,
-                    .irq_count = 1,
+                    .irq_count = 2,
                 },
         });
 
@@ -809,144 +693,4 @@ TEST_F(AmlI2cTest, MmioIrqMismatch) {
   EXPECT_NOT_OK(AmlI2c::Bind(nullptr, root_.get()));
 }
 
-TEST_F(AmlI2cTest, BusBaseSetByChannelMetadata) {
-  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
-  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-
-  fidl::Arena arena;
-
-  fidl::VectorView<I2CChannel> channels(arena, 3);
-  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[2] = I2CChannel::Builder(arena).bus_id(2).Build();
-
-  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
-
-  auto result = fidl::Persist(metadata);
-  ASSERT_TRUE(result.is_ok());
-
-  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
-
-  EXPECT_NO_FATAL_FAILURE(Init(1));
-
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
-
-  EXPECT_EQ(i2c.GetBusBase(), 2);
-  EXPECT_EQ(i2c.GetBusCount(), 1);
-
-  uint8_t buffer;
-  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
-  // Do one transaction on this bus to make sure the ID is recognized.
-  EXPECT_OK(i2c.Transact(2, &op, 1));
-
-  EXPECT_NOT_OK(i2c.Transact(0, &op, 1));
-  EXPECT_NOT_OK(i2c.Transact(1, &op, 1));
-  EXPECT_NOT_OK(i2c.Transact(3, &op, 1));
-}
-
-TEST_F(AmlI2cTest, BusBaseSetByBusIdIgnoreChannels) {
-  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
-  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-
-  fidl::Arena arena;
-
-  fidl::VectorView<I2CChannel> channels(arena, 3);
-  channels[0] = I2CChannel::Builder(arena).bus_id(1).Build();
-  channels[1] = I2CChannel::Builder(arena).bus_id(1).Build();
-  channels[2] = I2CChannel::Builder(arena).bus_id(1).Build();
-
-  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).bus_id(2).Build();
-
-  auto result = fidl::Persist(metadata);
-  ASSERT_TRUE(result.is_ok());
-
-  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
-
-  EXPECT_NO_FATAL_FAILURE(Init(1));
-
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
-
-  EXPECT_EQ(i2c.GetBusBase(), 2);
-  EXPECT_EQ(i2c.GetBusCount(), 1);
-
-  uint8_t buffer;
-  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
-  // Do one transaction on this bus to make sure the ID is recognized.
-  EXPECT_OK(i2c.Transact(2, &op, 1));
-
-  EXPECT_NOT_OK(i2c.Transact(0, &op, 1));
-  EXPECT_NOT_OK(i2c.Transact(1, &op, 1));
-  EXPECT_NOT_OK(i2c.Transact(3, &op, 1));
-}
-
-TEST_F(AmlI2cTest, BusMetadataIgnoredMultipleControllers) {
-  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
-  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-
-  fidl::Arena arena;
-
-  fidl::VectorView<I2CChannel> channels(arena, 3);
-  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[2] = I2CChannel::Builder(arena).bus_id(2).Build();
-
-  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
-
-  auto result = fidl::Persist(metadata);
-  ASSERT_TRUE(result.is_ok());
-
-  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
-
-  // Initialize the device with three controllers, which causes the channel bus IDs to be ignored
-  // when determining the bus base value.
-  EXPECT_NO_FATAL_FAILURE(Init(3));
-
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
-
-  // Having multiple controllers causes the bus metadata to be ignored.
-  EXPECT_EQ(i2c.GetBusBase(), 0);
-  EXPECT_EQ(i2c.GetBusCount(), 3);
-
-  uint8_t buffer;
-  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
-  EXPECT_OK(i2c.Transact(0, &op, 1));
-  EXPECT_OK(i2c.Transact(1, &op, 1));
-  EXPECT_OK(i2c.Transact(2, &op, 1));
-}
-
-TEST_F(AmlI2cTest, BusMetadataIgnoredMultipleBusIds) {
-  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
-  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-
-  fidl::Arena arena;
-
-  fidl::VectorView<I2CChannel> channels(arena, 3);
-  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[2] = I2CChannel::Builder(arena).bus_id(5).Build();
-
-  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
-
-  auto result = fidl::Persist(metadata);
-  ASSERT_TRUE(result.is_ok());
-
-  root_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
-
-  EXPECT_NO_FATAL_FAILURE(Init(1));
-
-  ddk::I2cImplProtocolClient i2c(root_->GetLatestChild());
-  EXPECT_TRUE(i2c.is_valid());
-
-  EXPECT_EQ(i2c.GetBusBase(), 0);
-  EXPECT_EQ(i2c.GetBusCount(), 1);
-
-  uint8_t buffer;
-  const i2c_impl_op_t op{.data_buffer = &buffer, .data_size = 1, .is_read = false};
-  EXPECT_OK(i2c.Transact(0, &op, 1));
-  EXPECT_NOT_OK(i2c.Transact(2, &op, 1));
-  EXPECT_NOT_OK(i2c.Transact(5, &op, 1));
-}
 }  // namespace aml_i2c

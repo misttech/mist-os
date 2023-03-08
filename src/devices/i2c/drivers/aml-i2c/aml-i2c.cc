@@ -4,7 +4,6 @@
 
 #include "aml-i2c.h"
 
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
@@ -15,6 +14,8 @@
 #include <zircon/types.h>
 
 #include <memory>
+
+#include <soc/aml-common/aml-i2c.h>
 
 #include "aml-i2c-regs.h"
 #include "src/devices/i2c/drivers/aml-i2c/aml_i2c_bind.h"
@@ -30,12 +31,12 @@ constexpr size_t kMaxTransferSize = 512;
 
 namespace aml_i2c {
 
-void AmlI2cDev::SetTargetAddr(uint16_t addr) const {
+void AmlI2c::SetTargetAddr(uint16_t addr) const {
   addr &= 0x7f;
   TargetAddr::Get().ReadFrom(&regs_iobuff_).set_target_address(addr).WriteTo(&regs_iobuff_);
 }
 
-int AmlI2cDev::IrqThread() const {
+int AmlI2c::IrqThread() const {
   while (true) {
     zx_status_t status = irq_.wait(nullptr);
     if (status == ZX_ERR_CANCELED) {
@@ -55,7 +56,7 @@ int AmlI2cDev::IrqThread() const {
 }
 
 #if 0
-zx_status_t AmlI2cDev::DumpState() {
+zx_status_t AmlI2c::DumpState() {
   printf("control reg      : %08x\n", regs_iobuff_.Read32(kControlReg));
   printf("target addr reg  : %08x\n", regs_iobuff_.Read32(kTargetAddrReg));
   printf("token list0 reg  : %08x\n", regs_iobuff_.Read32(kTokenList0Reg));
@@ -69,7 +70,7 @@ zx_status_t AmlI2cDev::DumpState() {
 }
 #endif
 
-void AmlI2cDev::StartXfer() const {
+void AmlI2c::StartXfer() const {
   // First have to clear the start bit before setting (RTFM)
   Control::Get()
       .ReadFrom(&regs_iobuff_)
@@ -79,7 +80,7 @@ void AmlI2cDev::StartXfer() const {
       .WriteTo(&regs_iobuff_);
 }
 
-zx_status_t AmlI2cDev::WaitTransferComplete() const {
+zx_status_t AmlI2c::WaitTransferComplete() const {
   constexpr zx_signals_t kSignalMask = kTxnCompleteSignal | kErrorSignal;
 
   uint32_t observed;
@@ -94,7 +95,7 @@ zx_status_t AmlI2cDev::WaitTransferComplete() const {
   return ZX_OK;
 }
 
-zx_status_t AmlI2cDev::Write(const uint8_t* buff, uint32_t len, const bool stop) const {
+zx_status_t AmlI2c::Write(const uint8_t* buff, uint32_t len, const bool stop) const {
   TRACE_DURATION("i2c", "aml-i2c Write");
   ZX_DEBUG_ASSERT(len <= kMaxTransferSize);
 
@@ -136,7 +137,7 @@ zx_status_t AmlI2cDev::Write(const uint8_t* buff, uint32_t len, const bool stop)
   return ZX_OK;
 }
 
-zx_status_t AmlI2cDev::Read(uint8_t* buff, uint32_t len, const bool stop) const {
+zx_status_t AmlI2c::Read(uint8_t* buff, uint32_t len, const bool stop) const {
   ZX_DEBUG_ASSERT(len <= kMaxTransferSize);
   TRACE_DURATION("i2c", "aml-i2c Read");
 
@@ -187,29 +188,33 @@ zx_status_t AmlI2cDev::Read(uint8_t* buff, uint32_t len, const bool stop) const 
   return ZX_OK;
 }
 
-void AmlI2cDev::StartIrqThread(zx_device_t* parent) {
+void AmlI2c::StartIrqThread() {
   thrd_create_with_name(
-      &irqthrd_, [](void* ctx) { return reinterpret_cast<AmlI2cDev*>(ctx)->IrqThread(); }, this,
+      &irqthrd_, [](void* ctx) { return reinterpret_cast<AmlI2c*>(ctx)->IrqThread(); }, this,
       "i2c_irq_thread");
 
   // Set role for IRQ thread.
   const char* role_name = "fuchsia.devices.i2c.drivers.aml-i2c.interrupt";
-  const zx_status_t status = device_set_profile_by_role(parent, thrd_get_zx_handle(irqthrd_),
+  const zx_status_t status = device_set_profile_by_role(zxdev(), thrd_get_zx_handle(irqthrd_),
                                                         role_name, strlen(role_name));
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
   }
 }
 
-/* create instance of AmlI2cDev and do basic initialization.  There will
-be one of these instances for each of the soc i2c ports.
-*/
-zx_status_t AmlI2c::InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDevFidl& pdev) {
-  std::optional<fdf::MmioBuffer> regs_iobuff;
-  zx_status_t status = pdev.MapMmio(index, &regs_iobuff);
+zx_status_t AmlI2c::SetClockDelay(zx_device_t* parent, const fdf::MmioBuffer& regs_iobuff) {
+  aml_i2c_delay_values delay{0, 0};
+  size_t actual;
+  zx_status_t status =
+      device_get_metadata(parent, DEVICE_METADATA_PRIVATE, &delay, sizeof(delay), &actual);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_map_mmio_buffer failed: %s", zx_status_get_string(status));
-    return status;
+    if (status != ZX_ERR_NOT_FOUND) {
+      zxlogf(ERROR, "device_get_metadata failed: %s", zx_status_get_string(status));
+      return status;
+    }
+  } else if (actual != sizeof(delay)) {
+    zxlogf(ERROR, "metadata size mismatch");
+    return ZX_ERR_INTERNAL;
   }
 
   if (delay.quarter_clock_delay > Control::kQtrClkDlyMax ||
@@ -220,9 +225,9 @@ zx_status_t AmlI2c::InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::
 
   if (delay.quarter_clock_delay > 0) {
     Control::Get()
-        .ReadFrom(&(*regs_iobuff))
+        .ReadFrom(&regs_iobuff)
         .set_qtr_clk_dly(delay.quarter_clock_delay)
-        .WriteTo(&(*regs_iobuff));
+        .WriteTo(&regs_iobuff);
   }
 
   if (delay.clock_low_delay > 0) {
@@ -230,31 +235,15 @@ zx_status_t AmlI2c::InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::
         .FromValue(0)
         .set_scl_low_dly(delay.clock_low_delay)
         .set_use_cnt_scl_low(1)
-        .WriteTo(&(*regs_iobuff));
+        .WriteTo(&regs_iobuff);
   }
 
-  zx::interrupt irq;
-  status = pdev.GetInterrupt(index, 0, &irq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_get_interrupt failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  zx::event event;
-  status = zx::event::create(0, &event);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "zx_event_create failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  i2c_devs_.emplace_back(std::move(irq), std::move(event), *std::move(regs_iobuff));
-  i2c_devs_.back().StartIrqThread(zxdev());
   return ZX_OK;
 }
 
-uint32_t AmlI2c::I2cImplGetBusCount() { return static_cast<uint32_t>(i2c_devs_.size()); }
+uint32_t AmlI2c::I2cImplGetBusCount() { return 1; }
 
-uint32_t AmlI2c::I2cImplGetBusBase() { return bus_base_; }
+uint32_t AmlI2c::I2cImplGetBusBase() { return 0; }
 
 zx_status_t AmlI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
   *out_size = kMaxTransferSize;
@@ -273,18 +262,7 @@ zx_status_t AmlI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, s
       return ZX_ERR_OUT_OF_RANGE;
     }
   }
-  if (bus_id < bus_base_) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  const uint32_t bus_index = bus_id - bus_base_;
-  if (bus_index >= i2c_devs_.size()) {
-    return ZX_ERR_INVALID_ARGS;
-  }
 
-  return i2c_devs_[bus_index].Transact(rws, count);
-}
-
-zx_status_t AmlI2cDev::Transact(const i2c_impl_op_t* rws, size_t count) const {
   for (size_t i = 0; i < count; ++i) {
     SetTargetAddr(rws[i].address);
 
@@ -300,41 +278,6 @@ zx_status_t AmlI2cDev::Transact(const i2c_impl_op_t* rws, size_t count) const {
   }
 
   return ZX_OK;
-}
-
-uint32_t AmlI2c::GetBusBase(zx_device_t* parent, const uint32_t controller_count) {
-  if (controller_count != 1) {
-    return 0;
-  }
-
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
-      parent, DEVICE_METADATA_I2C_CHANNELS);
-  if (!decoded.is_ok()) {
-    if (decoded.status_value() != ZX_ERR_NOT_FOUND) {
-      zxlogf(WARNING, "Bus metadata could not be decoded: %s", decoded.status_string());
-    }
-    return 0;
-  }
-
-  // Prefer the top-level bus ID if present.
-  if (decoded->has_bus_id()) {
-    return decoded->bus_id();
-  }
-
-  if (!decoded->has_channels() || decoded->channels().empty()) {
-    zxlogf(WARNING, "No channels specified in bus metadata");
-    return 0;
-  }
-
-  const uint32_t bus_id = decoded->channels()[0].has_bus_id() ? decoded->channels()[0].bus_id() : 0;
-  for (const auto& channel : decoded->channels()) {
-    const uint32_t this_bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
-    if (this_bus_id != bus_id) {
-      return 0;
-    }
-  }
-
-  return bus_id;
 }
 
 zx_status_t AmlI2c::Bind(void* ctx, zx_device_t* parent) {
@@ -354,57 +297,47 @@ zx_status_t AmlI2c::Bind(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  if (info.mmio_count != info.irq_count) {
-    zxlogf(ERROR, "mmio_count %u does not match irq_count %u", info.mmio_count, info.irq_count);
+  if (info.mmio_count != 1 || info.irq_count != 1) {
+    zxlogf(ERROR, "Invalid mmio_count (%u) or irq_count (%u)", info.mmio_count, info.irq_count);
     return ZX_ERR_INVALID_ARGS;
   }
 
-  const uint32_t bus_base = GetBusBase(parent, info.mmio_count);
-
-  std::unique_ptr<aml_i2c_delay_values[]> clock_delays;
-
-  size_t metadata_size;
-  status = device_get_metadata_size(parent, DEVICE_METADATA_PRIVATE, &metadata_size);
+  std::optional<fdf::MmioBuffer> regs_iobuff;
+  status = pdev.MapMmio(0, &regs_iobuff);
   if (status != ZX_OK) {
-    metadata_size = 0;
-  } else if (metadata_size != (info.mmio_count * sizeof(clock_delays[0]))) {
-    zxlogf(ERROR, "invalid metadata size");
-    return ZX_ERR_INVALID_ARGS;
+    zxlogf(ERROR, "pdev_map_mmio_buffer failed: %s", zx_status_get_string(status));
+    return status;
   }
 
-  if (metadata_size > 0) {
-    clock_delays = std::make_unique<aml_i2c_delay_values[]>(info.mmio_count);
-
-    size_t actual;
-    status = device_get_metadata(parent, DEVICE_METADATA_PRIVATE, clock_delays.get(), metadata_size,
-                                 &actual);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "device_get_metadata failed");
-      return status;
-    }
-    if (actual != metadata_size) {
-      zxlogf(ERROR, "metadata size mismatch");
-      return ZX_ERR_INTERNAL;
-    }
+  status = SetClockDelay(parent, *regs_iobuff);
+  if (status != ZX_OK) {
+    return status;
   }
 
-  auto i2c = std::make_unique<AmlI2c>(parent, bus_base);
-
-  // Must reserve space up front to prevent resizing from moving elements around.
-  i2c->i2c_devs_.reserve(info.mmio_count);
-  for (uint32_t i = 0; i < info.mmio_count; i++) {
-    status =
-        i2c->InitDevice(i, metadata_size > 0 ? clock_delays[i] : aml_i2c_delay_values{0, 0}, pdev);
-    if (status != ZX_OK) {
-      return status;
-    }
+  zx::interrupt irq;
+  status = pdev.GetInterrupt(0, 0, &irq);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "pdev_get_interrupt failed: %s", zx_status_get_string(status));
+    return status;
   }
+
+  zx::event event;
+  status = zx::event::create(0, &event);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "zx_event_create failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  auto i2c =
+      std::make_unique<AmlI2c>(parent, std::move(irq), std::move(event), *std::move(regs_iobuff));
 
   status = i2c->DdkAdd("aml-i2c");
   if (status != ZX_OK) {
     zxlogf(ERROR, "device_add failed");
     return status;
   }
+
+  i2c->StartIrqThread();
 
   [[maybe_unused]] auto* unused = i2c.release();
   return status;

@@ -13,56 +13,9 @@
 #include <lib/zx/time.h>
 #include <threads.h>
 
-#include <vector>
-
 #include <ddktl/device.h>
-#include <soc/aml-common/aml-i2c.h>
 
 namespace aml_i2c {
-
-class AmlI2cDev {
- public:
-  AmlI2cDev(zx::interrupt irq, zx::event event, fdf::MmioBuffer regs_iobuff)
-      : irq_(std::move(irq)), event_(std::move(event)), regs_iobuff_(std::move(regs_iobuff)) {}
-
-  ~AmlI2cDev() {
-    irq_.destroy();
-    if (irqthrd_) {
-      thrd_join(irqthrd_, nullptr);
-    }
-  }
-
-  // Move constructor must exist to be able to use std::vector, but should not be called.
-  AmlI2cDev(AmlI2cDev&& other) noexcept
-      : irq_(std::move(other.irq_)),
-        event_(std::move(other.event_)),
-        regs_iobuff_(std::move(other.regs_iobuff_)) {
-    ZX_DEBUG_ASSERT_MSG(false, "Move constructor called");
-  }
-  AmlI2cDev& operator=(AmlI2cDev&& other) = delete;
-
-  zx_status_t Transact(const i2c_impl_op_t* rws, size_t count) const;
-
-  void StartIrqThread(zx_device_t* parent);
-
- private:
-  friend class AmlI2cTest;
-
-  void SetTargetAddr(uint16_t addr) const;
-  void StartXfer() const;
-  zx_status_t WaitTransferComplete() const;
-
-  zx_status_t Read(uint8_t* buff, uint32_t len, bool stop) const;
-  zx_status_t Write(const uint8_t* buff, uint32_t len, bool stop) const;
-
-  int IrqThread() const;
-
-  zx::interrupt irq_;
-  zx::event event_;
-  fdf::MmioBuffer regs_iobuff_;
-  zx::duration timeout_ = zx::sec(1);
-  thrd_t irqthrd_{};
-};
 
 class AmlI2c;
 using DeviceType = ddk::Device<AmlI2c>;
@@ -71,7 +24,17 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
  public:
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
-  AmlI2c(zx_device_t* parent, uint32_t bus_base) : DeviceType(parent), bus_base_(bus_base) {}
+  AmlI2c(zx_device_t* parent, zx::interrupt irq, zx::event event, fdf::MmioBuffer regs_iobuff)
+      : DeviceType(parent),
+        irq_(std::move(irq)),
+        event_(std::move(event)),
+        regs_iobuff_(std::move(regs_iobuff)) {}
+  ~AmlI2c() {
+    irq_.destroy();
+    if (irqthrd_) {
+      thrd_join(irqthrd_, nullptr);
+    }
+  }
 
   void DdkRelease() { delete this; }
 
@@ -84,16 +47,23 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
  private:
   friend class AmlI2cTest;
 
-  // Checks the I2C channel metadata to see if only devices on a single bus are present. If so, the
-  // bus base value can be set appropriately to allow multiple aml-i2c instances to coexist. If not,
-  // zero is returned, which allows the driver to operate with multiple buses as it did previously.
-  // This way board drivers can be migrated to the single-bus model individually.
-  static uint32_t GetBusBase(zx_device_t* parent, uint32_t controller_count);
+  static zx_status_t SetClockDelay(zx_device_t* parent, const fdf::MmioBuffer& regs_iobuff);
 
-  zx_status_t InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::PDevFidl& pdev);
+  void SetTargetAddr(uint16_t addr) const;
+  void StartXfer() const;
+  zx_status_t WaitTransferComplete() const;
 
-  std::vector<AmlI2cDev> i2c_devs_;
-  const uint32_t bus_base_;
+  zx_status_t Read(uint8_t* buff, uint32_t len, bool stop) const;
+  zx_status_t Write(const uint8_t* buff, uint32_t len, bool stop) const;
+
+  void StartIrqThread();
+  int IrqThread() const;
+
+  const zx::interrupt irq_;
+  const zx::event event_;
+  const fdf::MmioBuffer regs_iobuff_;
+  zx::duration timeout_ = zx::sec(1);
+  thrd_t irqthrd_{};
 };
 
 }  // namespace aml_i2c
