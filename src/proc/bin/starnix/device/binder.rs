@@ -522,6 +522,13 @@ impl BinderProcess {
                 self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?
             }
         };
+        // Requesting a death notification implies keeping a reference to the handle until the
+        // client is not interested in the notification anymore.
+        self.handle_refcount_operation(
+            current_task,
+            binder_driver_command_protocol_BC_INCREFS,
+            handle,
+        )?;
         if let Some(owner) = proxy.owner.upgrade() {
             owner.lock().death_subscribers.push((Arc::downgrade(self), cookie));
         } else {
@@ -546,10 +553,11 @@ impl BinderProcess {
         let proxy = match handle {
             Handle::SpecialServiceManager => {
                 not_implemented!(current_task, "clear death notification for service manager");
+                self.lock().enqueue_command(Command::ClearDeathNotificationDone(cookie));
                 return Ok(());
             }
             Handle::Object { index } => {
-                self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?
+                self.lock().handles.force_get(index).ok_or_else(|| errno!(ENOENT))?
             }
         };
         if let Some(owner) = proxy.owner.upgrade() {
@@ -562,6 +570,14 @@ impl BinderProcess {
                 owner.death_subscribers.swap_remove(idx);
             }
         }
+        self.lock().enqueue_command(Command::ClearDeathNotificationDone(cookie));
+        // The client is not interested in the notification anymore, release the weak reference
+        // that was taken when registering the notification.
+        self.handle_refcount_operation(
+            current_task,
+            binder_driver_command_protocol_BC_DECREFS,
+            handle,
+        )?;
         Ok(())
     }
 
@@ -1233,7 +1249,8 @@ impl HandleTable {
             .find_map(|(idx, object_ref)| object_ref.is_ref_to_object(object).then_some(idx))
     }
 
-    /// Retrieves a reference to a binder object at index `idx`.
+    /// Retrieves a reference to a binder object at index `idx`. Returns None if the index doesn't
+    /// exist or the object has no strong reference.
     fn get(&self, idx: usize) -> Option<Arc<BinderObject>> {
         let object_ref = self.table.get(idx)?;
         if object_ref.binder_object.has_strong() {
@@ -1241,6 +1258,12 @@ impl HandleTable {
         } else {
             None
         }
+    }
+
+    /// Retrieves a reference to a binder object at index `idx`, whether the object has strong
+    /// references or not.
+    fn force_get(&self, idx: usize) -> Option<Arc<BinderObject>> {
+        self.table.get(idx).map(|r| r.binder_object.clone())
     }
 
     /// Increments the strong reference count of the binder object reference at index `idx`,
@@ -1525,6 +1548,8 @@ enum Command {
     DeadReply,
     /// Notifies a binder process that a binder object has died.
     DeadBinder(binder_uintptr_t),
+    /// Notifies a binder process that the death notification has been cleared.
+    ClearDeathNotificationDone(binder_uintptr_t),
     /// Notified the binder process that it should spawn a new looper.
     SpawnLooper,
 }
@@ -1552,6 +1577,9 @@ impl Command {
             Self::FailedReply => binder_driver_return_protocol_BR_FAILED_REPLY,
             Self::DeadReply => binder_driver_return_protocol_BR_DEAD_REPLY,
             Self::DeadBinder(..) => binder_driver_return_protocol_BR_DEAD_BINDER,
+            Self::ClearDeathNotificationDone(..) => {
+                binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE
+            }
             Self::SpawnLooper => binder_driver_return_protocol_BR_SPAWN_LOOPER,
         }
     }
@@ -1652,7 +1680,7 @@ impl Command {
                 }
                 current_task.write_object(UserRef::new(buffer.address), &self.driver_return_code())
             }
-            Self::DeadBinder(cookie) => {
+            Self::DeadBinder(cookie) | Self::ClearDeathNotificationDone(cookie) => {
                 #[repr(C, packed)]
                 #[derive(AsBytes)]
                 struct DeadBinderData {
@@ -2933,6 +2961,7 @@ impl BinderDriver {
                     | Command::FailedReply
                     | Command::DeadReply
                     | Command::DeadBinder(..)
+                    | Command::ClearDeathNotificationDone(..)
                     | Command::SpawnLooper => {}
                 }
 
@@ -5743,6 +5772,16 @@ mod tests {
                 death_notification_cookie,
             )
             .expect("clear death notification");
+
+        // Check that the client received an acknowlgement
+        {
+            let mut queue = client_proc.command_queue.lock();
+            assert_eq!(queue.commands.len(), 1);
+            assert!(matches!(queue.commands[0], Command::ClearDeathNotificationDone(_)));
+
+            // Clear the command queue.
+            queue.commands.clear();
+        }
 
         // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
         let fake_waiter = Waiter::new();
