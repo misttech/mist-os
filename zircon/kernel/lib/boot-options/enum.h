@@ -86,6 +86,15 @@ constexpr auto Enum<WallclockType> = [](auto&& Switch) {
 };
 
 template <>
+constexpr auto Enum<ScannerLruAction> = [](auto&& Switch) {
+  return Switch  //
+      .Case("none", ScannerLruAction::kNone)
+      .Case("evict_only", ScannerLruAction::kEvictOnly)
+      .Case("compress_only", ScannerLruAction::kCompressOnly)
+      .Case("evict_and_compress", ScannerLruAction::kEvictAndCompress);
+};
+
+template <>
 constexpr auto Enum<CompressionStrategy> = [](auto&& Switch) {
   return Switch  //
       .Case("none", CompressionStrategy::kNone)

@@ -648,6 +648,18 @@ arm device. Individual configurations may wish to tune this higher (or lower)
 as needed.
 )""")
 
+DEFINE_OPTION("kernel.page-scanner.lru-action", ScannerLruAction, lru_action, {ScannerLruAction::kNone}, R"""(
+Sets any reclamation action to take on old pages in the LRU queue. These actions occur regardless of
+memory pressure. If the `none` action is specified then pages will not be reclaimed just because
+they are old.
+
+Supported actions are:
+- `none`
+- `evict_only`
+- `compress_only`
+- `evict_and_compress`
+)""")
+
 DEFINE_OPTION("kernel.compression.random-debug-compress", bool, random_debug_compress, {false},
               R"""(
 Enables a testing option that causes the VM to random immediately compress pages, regardless of

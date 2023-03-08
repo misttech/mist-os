@@ -760,6 +760,20 @@ This value was chosen to consume, in the worst case, 5% CPU on a lower-end
 arm device. Individual configurations may wish to tune this higher (or lower)
 as needed.
 
+### kernel.page-scanner.lru-action=\[none | evict_only | compress_only | evict_and_compress\]
+
+**Default:** `none`
+
+Sets any reclamation action to take on old pages in the LRU queue. These actions occur regardless of
+memory pressure. If the `none` action is specified then pages will not be reclaimed just because
+they are old.
+
+Supported actions are:
+- `none`
+- `evict_only`
+- `compress_only`
+- `evict_and_compress`
+
 ### kernel.compression.random-debug-compress=\<bool>
 
 **Default:** `false`

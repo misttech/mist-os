@@ -330,6 +330,16 @@ class PageQueues {
   // Sets the active ratio multiplier.
   void SetActiveRatioMultiplier(uint32_t multiplier);
 
+  // Describes any action to take when processing the LRU queue. This is applied to pages that would
+  // otherwise have to be moved from the old LRU queue into the next queue when making space.
+  enum class LruAction {
+    None,
+    EvictOnly,
+    CompressOnly,
+    EvictAndCompress,
+  };
+  void SetLruAction(LruAction action);
+
   // Controls to enable and disable the active aging system. These must be called alternately and
   // not in parallel. That is, it is an error to call DisableAging twice without calling EnableAging
   // in between. Similar for EnableAging.
@@ -662,6 +672,9 @@ class PageQueues {
   // Used to signal the lru thread that it should wake up and check if the lru queue needs
   // processing.
   PendingSignalEvent lru_event_;
+
+  // What to do with pages when processing the LRU queue.
+  LruAction lru_action_ TA_GUARDED(lock_) = LruAction::None;
 
   // The page queues are placed into an array, indexed by page queue, for consistency and uniformity
   // of access. This does mean that the list for PageQueueNone does not actually have any pages in

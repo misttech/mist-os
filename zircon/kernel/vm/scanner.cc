@@ -398,7 +398,24 @@ static void scanner_init_func(uint level) {
   } else {
     ASSERT(!gBootOptions->compression_reclaim_zero_forks);
   }
-
+  // Convert the boot option lru_action to the page queues one. These are currently the same set,
+  // but we use different types to preserve the layering.
+  PageQueues::LruAction lru_action = PageQueues::LruAction::None;
+  switch (gBootOptions->lru_action) {
+    case ScannerLruAction::kNone:
+      lru_action = PageQueues::LruAction::None;
+      break;
+    case ScannerLruAction::kEvictOnly:
+      lru_action = PageQueues::LruAction::EvictOnly;
+      break;
+    case ScannerLruAction::kCompressOnly:
+      lru_action = PageQueues::LruAction::CompressOnly;
+      break;
+    case ScannerLruAction::kEvictAndCompress:
+      lru_action = PageQueues::LruAction::EvictAndCompress;
+      break;
+  }
+  pmm_page_queues()->SetLruAction(lru_action);
   thread->Resume();
 }
 

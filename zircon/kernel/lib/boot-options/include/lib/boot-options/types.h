@@ -91,6 +91,13 @@ enum class WallclockType {
   kHpet,
 };
 
+enum class ScannerLruAction {
+  kNone,
+  kEvictOnly,
+  kCompressOnly,
+  kEvictAndCompress,
+};
+
 enum class CompressionStrategy {
   kNone,
   kLz4,

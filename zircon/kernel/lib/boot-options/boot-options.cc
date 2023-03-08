@@ -421,6 +421,14 @@ void BootOptions::PrintValue(const WallclockType& value, FILE* out) {
   Enum<WallclockType>(EnumPrinter{value, out});
 }
 
+bool BootOptions::Parse(std::string_view value, ScannerLruAction BootOptions::*member) {
+  return Enum<ScannerLruAction>(EnumParser{value, &(this->*member)}).Check();
+}
+
+void BootOptions::PrintValue(const ScannerLruAction& value, FILE* out) {
+  Enum<ScannerLruAction>(EnumPrinter{value, out});
+}
+
 bool BootOptions::Parse(std::string_view value, CompressionStrategy BootOptions::*member) {
   return Enum<CompressionStrategy>(EnumParser{value, &(this->*member)}).Check();
 }

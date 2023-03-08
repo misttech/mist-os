@@ -12,6 +12,7 @@
 #include <fbl/ref_counted_upgradeable.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <object/thread_dispatcher.h>
+#include <vm/compression.h>
 #include <vm/page.h>
 #include <vm/page_queues.h>
 #include <vm/pmm.h>
@@ -30,6 +31,137 @@ KCOUNTER(pq_aging_reason_active_ratio, "pq.aging.reason.active_ratio")
 KCOUNTER(pq_aging_reason_manual, "pq.aging.reason.manual")
 KCOUNTER(pq_aging_blocked_on_lru, "pq.aging.blocked_on_lru")
 KCOUNTER(pq_lru_spurious_wakeup, "pq.lru.spurious_wakeup")
+KCOUNTER(pq_lru_pages_reclaimed, "pq.lru.pages_reclaimed")
+
+// Helper class for building an isolate list for deferred processing when acting on the LRU queues.
+// Pages are added while the page queues lock is held, and processed once the lock is dropped.
+// Statically sized with the maximum number of items it might need to hold and it is an error to
+// attempt to add more than this many items, as Flush() cannot automatically be called due to
+// incompatible locking requirements between flushing and adding items.
+template <size_t Items>
+class LruIsolate {
+ public:
+  using LruAction = PageQueues::LruAction;
+  LruIsolate() = default;
+  ~LruIsolate() { Flush(); }
+  // Sets the LRU action, this allows the object construction to happen without the page queues
+  // lock, where as setting the LruAction can be done within it.
+  void SetLruAction(LruAction lru_action) { lru_action_ = lru_action; }
+
+  // Adds a page to be potentially replaced with a loaned page.
+  // Requires PageQueues lock to be held
+  void AddLoanReplacement(vm_page_t* page, PageQueues* pq) TA_REQ(pq->get_lock()) {
+    DEBUG_ASSERT(page);
+    VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
+    DEBUG_ASSERT(cow);
+    fbl::RefPtr<VmCowPages> cow_ref = fbl::MakeRefPtrUpgradeFromRaw(cow, pq->get_lock());
+    if (cow_ref) {
+      AddInternal(ktl::move(cow_ref), page, ListAction::ReplaceWithLoaned);
+    }
+  }
+
+  // Add a page to be reclaimed. Actual reclamation will only be done if the `SetLruAction` is
+  // compatible with the page and its VMO owner.
+  // Requires PageQueues lock to be held
+  void AddReclaimable(vm_page_t* page, PageQueues* pq) TA_REQ(pq->get_lock()) {
+    DEBUG_ASSERT(page);
+    if (lru_action_ == LruAction::None) {
+      return;
+    }
+    VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
+    DEBUG_ASSERT(cow);
+    // Need to get the cow refptr before we can check if our lru action is appropriate for this
+    // page.
+    fbl::RefPtr<VmCowPages> cow_ref = fbl::MakeRefPtrUpgradeFromRaw(cow, pq->get_lock());
+    if (!cow_ref) {
+      return;
+    }
+    if (lru_action_ == LruAction::EvictAndCompress ||
+        (cow_ref->can_evict() == (lru_action_ == LruAction::EvictOnly))) {
+      AddInternal(ktl::move(cow_ref), page, ListAction::Reclaim);
+    } else {
+      // Must not let the cow refptr get dropped till after the lock, so even if not
+      // reclaiming must keep this entry.
+      AddInternal(ktl::move(cow_ref), page, ListAction::None);
+    }
+  }
+
+  // Performs any pending operations on the stored pages.
+  // Requires PageQueues lock NOT be held
+  void Flush() {
+    // Cannot check if the page queues lock specifically is held, but can validate that *no*
+    // spinlocks at all are held, which also needs to be true for us to acquire VMO locks.
+    DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
+    // Compression state will be lazily instantiate if needed, and then used for any remaining
+    // pages in the list.
+    VmCompression* compression = nullptr;
+    ktl::optional<VmCompression::CompressorGuard> maybe_compressor;
+    VmCompressor* compressor = nullptr;
+
+    for (size_t i = 0; i < items_; ++i) {
+      auto [backlink, action] = ktl::move(list_[i]);
+      DEBUG_ASSERT(backlink.cow);
+      if (action == ListAction::ReplaceWithLoaned) {
+        // We ignore the return value because the page may have moved, become pinned, we may not
+        // have any free loaned pages any more, or the VmCowPages may not be able to borrow.
+        backlink.cow->ReplacePageWithLoaned(backlink.page, backlink.offset);
+      } else if (action == ListAction::Reclaim) {
+        // Attempt to acquire any compressor that might exist, unless only evicting. Note that if
+        // LruAction::None we would not have enqueued any Reclaim pages, so we can just check for
+        // EvictOnly.
+        if (lru_action_ != LruAction::EvictOnly && !compression) {
+          compression = pmm_page_compression();
+          if (compression) {
+            maybe_compressor.emplace(compression->AcquireCompressor());
+            compressor = &maybe_compressor->get();
+          }
+        }
+        // If using a compressor, make sure it is Armed between reclamations.
+        if (compressor) {
+          zx_status_t status = compressor->Arm();
+          if (status != ZX_OK) {
+            // Continue processing as we might still be able to evict and we need to clear all the
+            // refptrs as well.
+            continue;
+          }
+        }
+        if (backlink.cow->ReclaimPage(backlink.page, backlink.offset,
+                                      VmCowPages::EvictionHintAction::Follow, compressor)) {
+          pq_lru_pages_reclaimed.Add(1);
+          pmm_free_page(backlink.page);
+        }
+      }
+    }
+    items_ = 0;
+  }
+
+ private:
+  // The None is needed since to know if a page can be reclaimed by the current LruAction a RefPtr
+  // to the VMO must first be created. If the page shouldn't be reclaimed the RefPtr must not be
+  // dropped till outside the lock, in case it's the last ref. The None action provides a way to
+  // retain these RefPtrs and have them dropped outside the lock.
+  enum class ListAction {
+    None,
+    ReplaceWithLoaned,
+    Reclaim,
+  };
+
+  void AddInternal(fbl::RefPtr<VmCowPages>&& cow, vm_page_t* page, ListAction action) {
+    DEBUG_ASSERT(cow);
+    DEBUG_ASSERT(items_ < list_.size());
+    if (cow) {
+      list_[items_] = {PageQueues::VmoBacklink{cow, page, page->object.get_page_offset()}, action};
+      items_++;
+    }
+  }
+
+  // Cache of the PageQueues LruAction for checking what to do with different reclaimable pages.
+  LruAction lru_action_ = LruAction::None;
+  // List of pages and the actions to perform on them.
+  ktl::array<ktl::pair<PageQueues::VmoBacklink, ListAction>, Items> list_;
+  // Number of items in the list_.
+  size_t items_ = 0;
+};
 
 }  // namespace
 
@@ -142,6 +274,11 @@ void PageQueues::StopThreads() {
     zx_status_t status = lru_thread->Join(&retcode, ZX_TIME_INFINITE);
     ASSERT(status == ZX_OK);
   }
+}
+
+void PageQueues::SetLruAction(LruAction action) {
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  lru_action_ = action;
 }
 
 void PageQueues::SetActiveRatioMultiplier(uint32_t multiplier) {
@@ -503,31 +640,22 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessQueueHelper(
   // Also, we need to limit the number to avoid sweep_to_loaned taking up excessive stack space.
   static constexpr uint32_t kMaxQueueWork = 16;
 
-  // Each page in this list can potentially be replaced with a loaned page, but we have to do this
-  // replacement outside the PageQueues::lock_, so we accumulate pages and then try to replace the
-  // pages after lock_ is released.
-  VmoBacklink sweep_to_loaned[kMaxQueueWork];
-  uint32_t sweep_to_loaned_count = 0;
+  // Pages in this list might be reclaimed or replaced with a loaned page, depending on the action
+  // specified in deferred_action. Each of these actions must be done outside the lock_, so we
+  // accumulate pages and then act after lock_ is released.
+  LruIsolate<kMaxQueueWork> deferred_list;
+
   // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
   // we're allowed to borrow at this code location.
-  bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
-                     pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
-  auto sweep_to_loaned_outside_lock =
-      fit::defer([do_sweeping, &sweep_to_loaned, &sweep_to_loaned_count] {
-        DEBUG_ASSERT(do_sweeping || sweep_to_loaned_count == 0);
-        for (uint32_t i = 0; i < sweep_to_loaned_count; ++i) {
-          DEBUG_ASSERT(sweep_to_loaned[i].cow);
-          // We ignore the return value because the page may have moved, become pinned, we may not
-          // have any free loaned pages any more, or the VmCowPages may not be able to borrow.
-          sweep_to_loaned[i].cow->ReplacePageWithLoaned(sweep_to_loaned[i].page,
-                                                        sweep_to_loaned[i].offset);
-        }
-      });
+  const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
+                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
 
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
   const uint64_t mru = mru_gen_.load(ktl::memory_order_relaxed);
   const uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
+  // Fill in the lru action now that the lock is held.
+  deferred_list.SetLruAction(lru_action_);
 
   // If we're processing the lru queue and it has already hit the target gen, return early.
   if (processing_queue == ProcessingQueue::Lru && lru >= target_gen) {
@@ -590,15 +718,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessQueueHelper(
       list_add_head(&page_queues_[page_queue], &page->queue_node);
 
       if (queue_is_active(page_queue, mru_queue) && do_sweeping && !page->is_loaned()) {
-        DEBUG_ASSERT(sweep_to_loaned_count < kMaxQueueWork);
-        VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
-        uint64_t page_offset = page->object.get_page_offset();
-        DEBUG_ASSERT(cow);
-        sweep_to_loaned[sweep_to_loaned_count] =
-            VmoBacklink{fbl::MakeRefPtrUpgradeFromRaw(cow, lock_), page, page_offset};
-        if (sweep_to_loaned[sweep_to_loaned_count].cow) {
-          ++sweep_to_loaned_count;
-        }
+        deferred_list.AddLoanReplacement(page, this);
       }
     } else if (peek) {
       VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
@@ -637,6 +757,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessQueueHelper(
       // We should only have performed this step to move from one inactive bucket to the next,
       // so there should be no active/inactive count changes needed.
       DEBUG_ASSERT(!queue_is_active(new_queue, mru_gen_to_queue()));
+      deferred_list.AddReclaimable(page, this);
     }
   }
 
