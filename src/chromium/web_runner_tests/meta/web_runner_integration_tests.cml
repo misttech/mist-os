@@ -20,6 +20,10 @@
             url: "#meta/fake_build_info.cm",
         },
         {
+            name: "netstack",
+            url: "#meta/netstack-debug.cm",
+        },
+        {
             name: "ui",
             url: "fuchsia-pkg://fuchsia.com/test-ui-stack#meta/test-ui-stack.cm",
         },
@@ -34,10 +38,16 @@
                 "fuchsia.logger.LogSink",
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.memorypressure.Provider",
-                "fuchsia.net.interfaces.State",
                 "fuchsia.sys.Launcher",
                 "fuchsia.sysmem.Allocator",
             ],
+        },
+
+        // Also needed to create a WebContext but get it directly from the
+        // hermetic netstack component.
+        {
+            protocol: "fuchsia.net.interfaces.State",
+            from: "#netstack",
         },
         {
             protocol: [
@@ -60,6 +70,7 @@
         {
             // Needed to launch a web server
             protocol: "fuchsia.posix.socket.Provider",
+            from: "#netstack",
         },
     ],
     offer: [
