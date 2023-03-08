@@ -574,9 +574,6 @@ zx_status_t PlatformDevice::Start() {
   ddk::DeviceAddArgs args(name);
   args.set_props(props).set_proto_id(ZX_PROTOCOL_PDEV);
 
-  std::array fidl_protocol_offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_platform_device::Device>,
-  };
   std::array fidl_service_offers = {
       fuchsia_hardware_platform_device::Service::Name,
   };
@@ -597,8 +594,7 @@ zx_status_t PlatformDevice::Start() {
       return result.error_value();
     }
 
-    args.set_fidl_protocol_offers(fidl_protocol_offers)
-        .set_fidl_service_offers(fidl_service_offers);
+    args.set_fidl_service_offers(fidl_service_offers);
   }
 
   switch (type_) {
