@@ -88,9 +88,6 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
 
   const zx::vmo& vmo() { return vmo_; }
 
-  void set_z_index(uint32_t z_index) { z_index_ = z_index; }
-  uint32_t z_index() const { return z_index_; }
-
   void set_latest_controller_config_stamp(config_stamp_t stamp) {
     latest_controller_config_stamp_ = stamp;
   }
@@ -133,9 +130,6 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   uint32_t stride_px_;
 
   Controller* const controller_;
-
-  // z_index is set/read by controller.cpp under its lock
-  uint32_t z_index_;
 
   // |id_| of the client that created the image.
   const uint32_t client_id_;

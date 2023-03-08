@@ -78,9 +78,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
   // Flag indicating that the display is ready to be published to clients.
   bool init_done = false;
 
-  // A list of all images which have been sent to display driver. For multiple
-  // images which are displayed at the same time, images with a lower z-order
-  // occur first.
+  // A list of all images which have been sent to display driver.
   fbl::DoublyLinkedList<Image::DoublyLinkedListNode*> images;
 
   // The number of layers in the applied configuration which are important for vsync (i.e.

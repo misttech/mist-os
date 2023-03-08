@@ -375,16 +375,21 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
   };
 
   if (!info->pending_layer_change) {
-    // Since we know there are no pending layer changes, we know that every
-    // layer (i.e z_index) has an image. So every image either matches a handle
-    // (in which case it's being displayed), is older than its layer's image
-    // (i.e. in front of in the queue) and can be retired, or is newer than
-    // its layer's image (i.e. behind in the queue) and has yet to be presented.
+    // Each image in the `info->images` set can fall into one of the following
+    // cases:
+    // - being displayed (its `latest_controller_config_stamp` matches the
+    //   incoming `controller_config_stamp` from display driver);
+    // - older than the current displayed image (its
+    //   `latest_controller_config_stamp` is less than the incoming
+    //   `controller_config_stamp`) and should be retired;
+    // - newer than the current displayed image (its
+    //   `latest_controller_config_stamp` is greater than the incoming
+    //   `controller_config_stamp`) and yet to be presented.
     for (auto it = info->images.begin(); it != info->images.end();) {
       bool should_retire = it->self->latest_controller_config_stamp() < controller_config_stamp;
 
-      // Retire any images for which we don't already have a z-match, since
-      // those are older than whatever is currently in their layer.
+      // Retire any images which are older than whatever is currently in their
+      // layer.
       if (should_retire) {
         // Image must be removed from containers before being destroyed. So we
         // create a copy of the RefPtr to keep its lifetime.
@@ -571,9 +576,9 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
           continue;
         }
 
-        // Set the image z index so vsync knows what layer the image is in
+        // Set the image controller config stamp so vsync knows what config the
+        // image was used at.
         AssertMtxAliasHeld(image->mtx());
-        image->set_z_index(layer->z_order());
         image->set_latest_controller_config_stamp(controller_stamp_);
         image->StartPresent();
 
