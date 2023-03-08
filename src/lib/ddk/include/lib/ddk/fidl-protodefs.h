@@ -17,7 +17,7 @@
 #error Internal use only. Do not include.
 #else
 DDK_FIDL_PROTOCOL_DEF(RPMB,            1, "fuchsia.hardware.rpmb.Service")
-DDK_FIDL_PROTOCOL_DEF(CHROMEOS_EC,     2, "fuchsia.hardware.google.ec.Device")
+DDK_FIDL_PROTOCOL_DEF(CHROMEOS_EC,     2, "fuchsia.hardware.google.ec.Service")
 DDK_FIDL_PROTOCOL_DEF(I2C,             3, "fuchsia.hardware.i2c.Service")
 DDK_FIDL_PROTOCOL_DEF(PCI,             4, "fuchsia.hardware.pci.Service")
 DDK_FIDL_PROTOCOL_DEF(GOLDFISH_PIPE,   5, "fuchsia.hardware.goldfish.pipe.Service")
