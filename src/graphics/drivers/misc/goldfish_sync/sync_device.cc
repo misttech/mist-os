@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
@@ -47,8 +46,7 @@ zx_status_t SyncDevice::Create(void* ctx, zx_device_t* device) {
     return client.status_value();
   }
 
-  async_dispatcher_t* dispatcher =
-      fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
+  async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   auto sync_device = std::make_unique<goldfish::sync::SyncDevice>(
       device, /* can_read_multiple_commands= */ true, std::move(client.value()), dispatcher);
 
@@ -65,10 +63,8 @@ SyncDevice::SyncDevice(zx_device_t* parent, bool can_read_multiple_commands, acp
     : SyncDeviceType(parent),
       can_read_multiple_commands_(can_read_multiple_commands),
       acpi_fidl_(std::move(client)),
-      loop_(&kAsyncLoopConfigNeverAttachToThread),
-      dispatcher_(dispatcher) {
-  loop_.StartThread("goldfish-sync-loop-thread");
-}
+      outgoing_(dispatcher),
+      dispatcher_(dispatcher) {}
 
 SyncDevice::~SyncDevice() {
   if (irq_.is_valid()) {
@@ -77,7 +73,6 @@ SyncDevice::~SyncDevice() {
   if (irq_thread_.has_value()) {
     thrd_join(irq_thread_.value(), nullptr);
   }
-  loop_.Shutdown();
 }
 
 zx_status_t SyncDevice::Bind() {
@@ -154,33 +149,33 @@ zx_status_t SyncDevice::Bind() {
 
   mmio_->Write32(0, SYNC_REG_INIT);
 
-  outgoing_.emplace(loop_.dispatcher());
-  outgoing_->svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::SyncDevice>,
-      fbl::MakeRefCounted<fs::Service>(
-          [device = this](fidl::ServerEnd<fuchsia_hardware_goldfish::SyncDevice> request) mutable {
-            fidl::BindServer(device->dispatcher_, std::move(request), device);
-            return ZX_OK;
-          }));
+  zx::result add_result = outgoing_.AddService<fuchsia_hardware_goldfish::SyncService>(
+      fuchsia_hardware_goldfish::SyncService::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (add_result.is_error()) {
+    zxlogf(ERROR, "Failed to add service the outgoing directory");
+    return add_result.status_value();
+  }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
-  status = outgoing_->Serve(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to service the outgoing directory: %s", zx_status_get_string(status));
-    return status;
+  zx::result serve_result = outgoing_.Serve(std::move(endpoints->server));
+  if (serve_result.is_error()) {
+    zxlogf(ERROR, "failed to service the outgoing directory: %s", serve_result.status_string());
+    return serve_result.status_value();
   }
 
   std::array offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::SyncDevice>,
+      fuchsia_hardware_goldfish::SyncService::Name,
   };
 
   return DdkAdd(ddk::DeviceAddArgs("goldfish-sync")
                     .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                    .set_fidl_protocol_offers(offers)
+                    .set_fidl_service_offers(offers)
                     .set_outgoing_dir(endpoints->client.TakeChannel())
                     .set_proto_id(ZX_PROTOCOL_GOLDFISH_SYNC));
 }
@@ -325,7 +320,7 @@ int SyncDevice::IrqHandler() {
 
     // Handle incoming commands.
     if (ReadCommands()) {
-      async::PostTask(loop_.dispatcher(), [this]() { HandleStagedCommands(); });
+      async::PostTask(dispatcher_, [this]() { HandleStagedCommands(); });
     }
   }
 
@@ -333,7 +328,7 @@ int SyncDevice::IrqHandler() {
 }
 
 SyncTimeline::SyncTimeline(SyncDevice* parent)
-    : parent_device_(parent), dispatcher_(parent->loop()->dispatcher()) {}
+    : parent_device_(parent), dispatcher_(parent->dispatcher()) {}
 
 SyncTimeline::~SyncTimeline() = default;
 

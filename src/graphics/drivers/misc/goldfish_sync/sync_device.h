@@ -6,12 +6,11 @@
 #define SRC_GRAPHICS_DRIVERS_MISC_GOLDFISH_SYNC_SYNC_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/mmio/mmio.h>
-#include <lib/svc/outgoing.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/eventpair.h>
@@ -66,9 +65,9 @@ class SyncDevice : public SyncDeviceType {
   // Used only by |SyncTimeline|.
   void SendGuestCommand(GuestCommand command);
 
-  // Shared async loop across all created Sync timelines. All incoming FIDL
-  // calls and event waits will be posted on this loop.
-  async::Loop* loop() { return &loop_; }
+  // Shared async dispatcher across all created Sync timelines. All incoming FIDL
+  // calls and event waits will be posted on this dispatcher.
+  async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  protected:
   // Executes given "host->guest" command. Used only by |HandleStagedCommands()|
@@ -112,8 +111,8 @@ class SyncDevice : public SyncDeviceType {
   fbl::Mutex mmio_lock_ TA_ACQ_AFTER(cmd_lock_);
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(mmio_lock_);
 
-  async::Loop loop_;
-  std::optional<svc::Outgoing> outgoing_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_goldfish::SyncDevice> bindings_;
   async_dispatcher_t* dispatcher_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(SyncDevice);
@@ -147,7 +146,7 @@ class SyncTimeline : public fbl::RefCounted<SyncTimeline>,
   // Create a new sync fence using given |event| and add it to the |fences_|
   // set.
   //
-  // To handle fence lifetime, we also add an async wait to its parent loop
+  // To handle fence lifetime, we also add an async wait to its parent dispatcher
   // for |ZX_EVENTPAIR_PEER_CLOSED| signal on |event|. Once the couterpart of
   // |event| is closed, we'll destroy the Fence instance.
   void CreateFence(zx::eventpair event, std::optional<uint64_t> seqno = std::nullopt);

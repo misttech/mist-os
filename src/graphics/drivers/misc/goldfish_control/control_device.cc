@@ -117,19 +117,15 @@ zx_status_t Control::Init() {
   }
   address_space_ = fidl::WireSyncClient(std::move(address_space_endpoints->client));
 
-  auto sync_endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish::SyncDevice>();
-  if (sync_endpoints.is_error()) {
-    zxlogf(ERROR, "%s: failed to create FIDL endpoints: %s", kTag, sync_endpoints.status_string());
-    return sync_endpoints.status_value();
-  }
-
-  status = DdkConnectFragmentFidlProtocol("goldfish-sync", std::move(sync_endpoints->server));
-  if (status != ZX_OK) {
+  zx::result sync_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_goldfish::SyncService::Device>(
+          "goldfish-sync");
+  if (sync_client.is_error()) {
     zxlogf(ERROR, "%s: failed to connect to FIDL goldfish-sync fragment: %s", kTag,
-           zx_status_get_string(status));
-    return status;
+           sync_client.status_string());
+    return sync_client.status_value();
   }
-  sync_ = fidl::WireSyncClient(std::move(sync_endpoints->client));
+  sync_ = fidl::WireSyncClient(std::move(sync_client.value()));
 
   return ZX_OK;
 }

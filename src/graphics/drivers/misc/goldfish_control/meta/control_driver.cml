@@ -17,5 +17,6 @@
     },
     use: [
         { service: "fuchsia.hardware.goldfish.pipe.Service" },
+        { service: "fuchsia.hardware.goldfish.SyncService" },
     ],
 }

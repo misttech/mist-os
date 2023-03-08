@@ -340,15 +340,19 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
           return ZX_OK;
         },
         "goldfish-address-space");
-    fake_parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::SyncDevice>,
-        [this](zx::channel channel) {
-          fidl::BindServer(
-              sync_server_loop_.dispatcher(),
-              fidl::ServerEnd<fuchsia_hardware_goldfish::SyncDevice>(std::move(channel)), &sync_);
-          return ZX_OK;
-        },
-        "goldfish-sync");
+
+    service_result = outgoing_.AddService<fuchsia_hardware_goldfish::SyncService>(
+        fuchsia_hardware_goldfish::SyncService::InstanceHandler({
+            .device = sync_.bind_handler(sync_server_loop_.dispatcher()),
+        }));
+    ASSERT_EQ(service_result.status_value(), ZX_OK);
+
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints.status_value());
+    ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
+
+    fake_parent_->AddFidlService(fuchsia_hardware_goldfish::SyncService::Name,
+                                 std::move(endpoints->client), "goldfish-sync");
 
     pipe_server_loop_.StartThread("goldfish-pipe-fidl-server");
     address_space_server_loop_.StartThread("goldfish-address-space-fidl-server");

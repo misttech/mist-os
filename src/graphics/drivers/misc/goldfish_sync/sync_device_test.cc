@@ -5,6 +5,7 @@
 #include "src/graphics/drivers/misc/goldfish_sync/sync_device.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/channel.h>
@@ -75,7 +76,9 @@ class TestDevice : public SyncDevice {
 // Test suite creating fake SyncDevice on a mock ACPI bus.
 class SyncDeviceTest : public zxtest::Test {
  public:
-  SyncDeviceTest() : async_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  SyncDeviceTest()
+      : async_loop_(&kAsyncLoopConfigNeverAttachToThread),
+        test_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   // |zxtest::Test|
   void SetUp() override {
@@ -132,7 +135,7 @@ class SyncDeviceTest : public zxtest::Test {
     }
 
     auto dut = std::make_unique<TestDevice>(fake_parent_.get(), std::move(acpi_client.value()),
-                                            async_loop_.dispatcher());
+                                            test_loop_.dispatcher());
     auto status = dut->Bind();
     EXPECT_OK(status);
     if (status != ZX_OK) {
@@ -193,6 +196,7 @@ class SyncDeviceTest : public zxtest::Test {
  protected:
   acpi::mock::Device mock_acpi_fidl_;
   async::Loop async_loop_;
+  async::Loop test_loop_;
   std::shared_ptr<MockDevice> fake_parent_;
   zx::bti acpi_bti_;
   zx::vmo vmo_control_;
@@ -260,9 +264,11 @@ TEST_F(SyncDeviceTest, TriggerHostWait) {
   auto result = tl->TriggerHostWait(kGlSyncHandle, kSyncThreadHandle, std::move(event_server));
   ASSERT_TRUE(result.ok());
 
+  test_loop_.RunUntilIdle();
+
   // Verify the returned eventpair.
   zx_status_t wait_status =
-      event_client.wait_one(ZX_EVENTPAIR_SIGNALED, zx::deadline_after(zx::msec(100)), nullptr);
+      event_client.wait_one(ZX_EVENTPAIR_SIGNALED, zx::time::infinite_past(), nullptr);
   EXPECT_EQ(wait_status, ZX_ERR_TIMED_OUT);
 
   // Verify the control registers.
@@ -442,12 +448,10 @@ TEST_F(SyncDeviceTest, HostCommand_CreateSignalFences) {
   }
 
   // At this moment, neither of the events should be signalled.
-  EXPECT_EQ(
-      event_timeline_1.wait_one(ZX_EVENTPAIR_SIGNALED, zx::deadline_after(zx::msec(100)), nullptr),
-      ZX_ERR_TIMED_OUT);
-  EXPECT_EQ(
-      event_timeline_2.wait_one(ZX_EVENTPAIR_SIGNALED, zx::deadline_after(zx::msec(100)), nullptr),
-      ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(event_timeline_1.wait_one(ZX_EVENTPAIR_SIGNALED, zx::time::infinite_past(), nullptr),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(event_timeline_2.wait_one(ZX_EVENTPAIR_SIGNALED, zx::time::infinite_past(), nullptr),
+            ZX_ERR_TIMED_OUT);
 
   // Now we increase timeline to timestamp 1.
   dut->RunHostCommand({
@@ -459,12 +463,10 @@ TEST_F(SyncDeviceTest, HostCommand_CreateSignalFences) {
 
   // |event_timeline_1| should be signalled, while |event_timeline_2| is still
   // waiting for the timeline getting to timestamp 2.
-  EXPECT_EQ(
-      event_timeline_1.wait_one(ZX_EVENTPAIR_SIGNALED, zx::deadline_after(zx::msec(100)), nullptr),
-      ZX_OK);
-  EXPECT_EQ(
-      event_timeline_2.wait_one(ZX_EVENTPAIR_SIGNALED, zx::deadline_after(zx::msec(100)), nullptr),
-      ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(event_timeline_1.wait_one(ZX_EVENTPAIR_SIGNALED, zx::time::infinite_past(), nullptr),
+            ZX_OK);
+  EXPECT_EQ(event_timeline_2.wait_one(ZX_EVENTPAIR_SIGNALED, zx::time::infinite_past(), nullptr),
+            ZX_ERR_TIMED_OUT);
 
   // Now we increase timeline to timestamp 2.
   dut->RunHostCommand({
@@ -516,12 +518,13 @@ TEST_F(SyncDeviceTest, IrqHandler) {
   irq_.trigger(0u, zx::time());
 
   // Irq handler thread handles the interrupt, copying command into staging
-  // buffer and post a task on async loop to handle the commands.
-  // Async loop thread runs the command and returns the value back to the
+  // buffer and post a task on async dispatcher to handle the commands.
+  // Async dispatcher runs the command and returns the value back to the
   // command buffer.
-  // We wait on the test thread until all the tasks above have finished.
+  // We spin on the test_loop until all the tasks above have finished.
   uint32_t wait_msecs = 0u;
   while (true) {
+    test_loop_.RunUntilIdle();
     auto mapped = MapIoBuffer();
     CommandBuffers* cmd_buffers = reinterpret_cast<CommandBuffers*>(mapped.start());
     if (cmd_buffers->batch_hostcmd.handle) {
@@ -564,10 +567,11 @@ TEST_F(SyncDeviceTest, TriggerHostWaitAndSignalFence) {
 
   auto result = tl->TriggerHostWait(kGlSyncHandle, kSyncThreadHandle, std::move(event_server));
   ASSERT_TRUE(result.ok());
+  test_loop_.RunUntilIdle();
 
   // Verify the returned eventpair.
   zx_status_t wait_status =
-      event_client.wait_one(ZX_EVENTPAIR_SIGNALED, zx::deadline_after(zx::msec(100)), nullptr);
+      event_client.wait_one(ZX_EVENTPAIR_SIGNALED, zx::time::infinite_past(), nullptr);
   EXPECT_EQ(wait_status, ZX_ERR_TIMED_OUT);
 
   fbl::RefPtr<SyncTimeline> timeline_ptr;
@@ -589,11 +593,14 @@ TEST_F(SyncDeviceTest, TriggerHostWaitAndSignalFence) {
     cmd_buffers->batch_hostcmd.time_arg = 1u;
   }
   irq_.trigger(0u, zx::time());
-
-  // Event should be signalled once the host command is executed.
-  wait_status =
-      event_client.wait_one(ZX_EVENTPAIR_SIGNALED, zx::deadline_after(zx::sec(15)), nullptr);
-  EXPECT_EQ(wait_status, ZX_OK);
+  while (true) {
+    test_loop_.RunUntilIdle();
+    // Event should be signalled once the host command is executed.
+    wait_status = event_client.wait_one(ZX_EVENTPAIR_SIGNALED, zx::time::infinite_past(), nullptr);
+    if (wait_status == ZX_OK) {
+      break;
+    }
+  }
 }
 
 // This test case creates an orphaned SyncTimeline and let it creates a
@@ -604,10 +611,6 @@ TEST_F(SyncDeviceTest, TimelineDestroyedAfterFenceClosed) {
   auto dut = CreateAndBindDut();
   ASSERT_NE(dut, nullptr);
 
-  // Instead of running the loop in another thread, we reset that loop and
-  // will run it later in this test.
-  dut->loop()->ResetQuit();
-
   zx::eventpair event_client, event_server;
   zx_status_t status = zx::eventpair::create(0u, &event_client, &event_server);
   ASSERT_EQ(status, ZX_OK);
@@ -616,10 +619,10 @@ TEST_F(SyncDeviceTest, TimelineDestroyedAfterFenceClosed) {
   tl->CreateFence(std::move(event_server));
   tl.reset();
 
-  ASSERT_EQ(ZX_OK, dut->loop()->RunUntilIdle());
+  ASSERT_EQ(ZX_OK, test_loop_.RunUntilIdle());
 
   event_client.reset();
-  ASSERT_EQ(ZX_OK, dut->loop()->RunUntilIdle());
+  ASSERT_EQ(ZX_OK, test_loop_.RunUntilIdle());
 }
 
 }  // namespace sync

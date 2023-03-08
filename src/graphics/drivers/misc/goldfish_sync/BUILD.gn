@@ -18,6 +18,7 @@ source_set("common_deps") {
   public_deps = [
     ":goldfish-sync-bind",
     "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp_wire",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/acpi",
     "//src/devices/lib/driver",
@@ -27,7 +28,6 @@ source_set("common_deps") {
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/svc",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zircon-internal",
