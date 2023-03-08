@@ -66,6 +66,7 @@ json_generator_tests_*.txt
 tables_generator_tests_*.txt
 
 ### Checkout generated files
+/build/checkout.gni
 /build/cipd.gni
 
 ### Infra files
