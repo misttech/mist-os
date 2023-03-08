@@ -106,7 +106,6 @@ source_set("block-watcher") {
     "block-device-manager.cc",
     "block-device.cc",
     "block-watcher.cc",
-    "copier.cc",
     "encrypted-volume.cc",
     "filesystem-mounter.cc",
     "fxfs.cc",
@@ -254,27 +253,6 @@ fuchsia_unittest_component("fshost-inspect-test") {
   deps = [ ":fshost_inspect_test" ]
 }
 
-test("copier_test") {
-  sources = [
-    "copier.cc",
-    "copier_test.cc",
-  ]
-  deps = [
-    ":headers",
-    "//sdk/lib/syslog/cpp:cpp-macros",
-    "//src/lib/files",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/uuid:uuid",
-    "//src/sys/test_runners:tmp_storage",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_unittest_component("copier-test") {
-  deps = [ ":copier_test" ]
-}
-
 # Generates a test component for the fshost integration tests.
 #
 #   test_component_name (required)
@@ -294,7 +272,6 @@ template("fshost_integration_test") {
       "block-device-test.cc",
       "block-watcher-test.cc",
       "filesystem-mounter-test.cc",
-      "migration-test.cc",
       "recovery-test.cc",
       "testing/fshost_integration_test.cc",
       "testing/fshost_integration_test.h",
@@ -420,53 +397,6 @@ fshost_integration_test_with_custom_fshost("fshost-f2fs-integration-test") {
   options.data_filesystem_format = "f2fs"
 }
 
-test("disk-migration-test") {
-  # Note that these mirror the config variables set in
-  # "//src/storage/fshost/testing:test-fshost-fxfs-disk-migration" but we don't
-  # seem able to access those from the test, nor paramaterize this target
-  # per component, so they're hard coded here.
-  data_filesystem_format = "fxfs"
-  use_disk_based_minfs_migration = true
-  sources = [
-    "disk-migration-test.cc",
-    "testing/fshost_integration_test.cc",
-    "testing/fshost_integration_test.h",
-  ]
-  deps = [
-    ":block-watcher",
-    ":config",
-    ":fshost_config",
-    ":headers",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
-    "//sdk/lib/component/incoming/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/storage/fs_management",
-    "//src/lib/storage/ramdevice_client/cpp",
-    "//src/storage/lib/utils:topological_path",
-    "//src/storage/minfs",
-    "//src/storage/testing:storage_driver_test_support",
-  ]
-  defines = [
-    "DATA_FILESYSTEM_FORMAT=\"$data_filesystem_format\"",
-    "USE_DISK_BASED_MINFS_MIGRATION=$use_disk_based_minfs_migration",
-    "TEST_COMPONENT_NAME=\"test-fshost-fxfs-disk-migration\"",
-  ]
-}
-
-fuchsia_component("fshost-disk-migration-test") {
-  testonly = true
-  manifest = "meta/disk_migration_test.cml"
-  deps = [
-    ":disk-migration-test",
-    "//src/storage/fshost/testing:test-fshost-fxfs-disk-migration",
-    "//src/storage/testing:storage_driver_test_realm",
-  ]
-}
-
 fuchsia_test_package("fshost-tests") {
   test_specs = {
     log_settings = {
@@ -480,8 +410,6 @@ fuchsia_test_package("fshost-tests") {
     ":fshost-integration-test",
     ":fshost-test",
     ":fshost-inspect-test",
-    ":copier-test",
-    ":fshost-disk-migration-test",
   ]
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",

@@ -66,9 +66,6 @@ class MockBlockDevice : public BlockDeviceInterface {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  void AddData(Copier) override {}
-  zx::result<Copier> ExtractData() override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
-
   fs_management::DiskFormat content_format() const override { return options_.content_format; }
   const std::string& topological_path() const override { return options_.topological_path; }
   const std::string& partition_name() const override { return partition_name_; }

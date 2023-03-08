@@ -123,54 +123,6 @@ zx_status_t RunBinary(const fbl::Vector<const char*>& argv,
   return ZX_OK;
 }
 
-Copier TryReadingFilesystem(fidl::ClientEnd<fuchsia_io::Directory> export_root) {
-  auto root_dir_or = fs_management::FsRootHandle(export_root);
-  if (root_dir_or.is_error())
-    return {};
-
-  fbl::unique_fd fd;
-  if (zx_status_t status =
-          fdio_fd_create(root_dir_or->TakeChannel().release(), fd.reset_and_get_address());
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "fdio_fd_create failed: " << zx_status_get_string(status);
-    return {};
-  }
-
-  // Clone the handle so that we can unmount.
-  zx::channel root_dir_handle;
-  if (zx_status_t status = fdio_fd_clone(fd.get(), root_dir_handle.reset_and_get_address());
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "fdio_fd_clone failed: " << zx_status_get_string(status);
-    return {};
-  }
-
-  fidl::ClientEnd<fuchsia_io::Directory> root_dir_client(std::move(root_dir_handle));
-  auto unmount = fit::defer([&export_root] {
-    auto admin_client = component::ConnectAt<fuchsia_fs::Admin>(export_root);
-    if (admin_client.is_ok()) {
-      [[maybe_unused]] auto result = fidl::WireCall(*admin_client)->Shutdown();
-    }
-  });
-
-  auto copier_or = Copier::Read(std::move(fd));
-  if (copier_or.is_error()) {
-    FX_LOGS(ERROR) << "Copier::Read: " << copier_or.status_string();
-    return {};
-  }
-  return std::move(copier_or).value();
-}
-
-// Tries to mount Minfs and reads all data found on the minfs partition.  Errors are ignored.
-Copier TryReadingMinfs(fidl::ClientEnd<fuchsia_io::Node> device) {
-  fbl::Vector<const char*> argv = {kMinfsPath, "mount", nullptr};
-  auto export_root_or = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (export_root_or.is_error())
-    return {};
-  if (RunBinary(argv, std::move(device), std::move(export_root_or->server)) != ZX_OK)
-    return {};
-  return TryReadingFilesystem(std::move(export_root_or->client));
-}
-
 }  // namespace
 
 zx::result<std::string> GetTopologicalPath(
@@ -256,20 +208,6 @@ zx::result<std::unique_ptr<BlockDeviceInterface>> BlockDevice::OpenBlockDeviceBy
     return device.take_error();
   }
   return zx::ok(std::make_unique<BlockDevice>(mounter_, std::move(device.value()), device_config_));
-}
-
-void BlockDevice::AddData(Copier copier) { source_data_ = std::move(copier); }
-
-zx::result<Copier> BlockDevice::ExtractData() {
-  if (content_format() != fs_management::kDiskFormatMinfs) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-  zx::result cloned = component::Clone(block_, component::AssumeProtocolComposesNode);
-  if (cloned.is_error()) {
-    return cloned.take_error();
-  }
-  fidl::ClientEnd<fuchsia_io::Node> node(cloned.value().TakeChannel());
-  return zx::ok(TryReadingMinfs(std::move(node)));
 }
 
 DiskFormat BlockDevice::content_format() const {
@@ -779,12 +717,8 @@ zx_status_t BlockDevice::MountFilesystem() {
     case fs_management::kDiskFormatMinfs: {
       fs_management::MountOptions options;
 
-      std::optional<Copier> copier = std::move(source_data_);
-      source_data_.reset();
-
       FX_LOGS(INFO) << "BlockDevice::MountFilesystem(data partition)";
-      if (zx_status_t status =
-              MountData(options, std::move(copier), std::move(block_device.value()));
+      if (zx_status_t status = MountData(options, std::move(block_device.value()));
           status != ZX_OK) {
         FX_LOGS(ERROR) << "Failed to mount data partition: " << zx_status_get_string(status) << ".";
         return status;
@@ -799,16 +733,12 @@ zx_status_t BlockDevice::MountFilesystem() {
 
 // Attempt to mount the device at a known location.
 //
-// If |copier| is set, the data will be copied into the data filesystem before exposing the
-// filesystem to clients.  This is only supported for the data guid (i.e. not the durable guid).
-//
 // Returns ZX_ERR_ALREADY_BOUND if the device could be mounted, but something
 // is already mounted at that location. Returns ZX_ERR_INVALID_ARGS if the
 // GUID of the device does not match a known valid one. Returns
 // ZX_ERR_NOT_SUPPORTED if the GUID is a system GUID. Returns ZX_OK if an
 // attempt to mount is made, without checking mount success.
 zx_status_t BlockDevice::MountData(const fs_management::MountOptions& options,
-                                   std::optional<Copier> copier,
                                    fidl::ClientEnd<fuchsia_hardware_block::Block> block_device) {
   const uint8_t* guid = GetTypeGuid().value.data();
   FX_LOGS(INFO) << "Detected type GUID " << gpt::KnownGuid::TypeDescription(guid)
@@ -818,7 +748,7 @@ zx_status_t BlockDevice::MountData(const fs_management::MountOptions& options,
     return ZX_ERR_NOT_SUPPORTED;
   }
   if (gpt_is_data_guid(guid, GPT_GUID_LEN)) {
-    return mounter_->MountData(std::move(block_device), std::move(copier), options, format_);
+    return mounter_->MountData(std::move(block_device), options, format_);
   }
   FX_LOGS(ERROR) << "Unrecognized type GUID for data partition; not mounting";
   return ZX_ERR_WRONG_TYPE;
@@ -963,11 +893,6 @@ zx_status_t BlockDevice::FormatCustomFilesystem(fs_management::DiskFormat format
     zx::result cloned = component::Clone(block_, component::AssumeProtocolComposesNode);
     if (cloned.is_error()) {
       return cloned.error_value();
-    }
-    fidl::ClientEnd<fuchsia_io::Node> node(cloned.value().TakeChannel());
-    if (Copier copier = TryReadingMinfs(std::move(node)); !copier.empty()) {
-      FX_LOGS(INFO) << "Successfully read Minfs data";
-      source_data_.emplace(std::move(copier));
     }
   }
 

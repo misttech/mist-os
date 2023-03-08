@@ -14,7 +14,6 @@
 #include <string_view>
 
 #include "src/lib/storage/fs_management/cpp/mount.h"
-#include "src/storage/fshost/copier.h"
 
 namespace fshost {
 
@@ -34,14 +33,6 @@ class BlockDeviceInterface {
   // Opens a block device given a file descriptor.
   virtual zx::result<std::unique_ptr<BlockDeviceInterface>> OpenBlockDeviceByFd(
       fbl::unique_fd fd) const = 0;
-
-  // When the filesystem inside the device is mounted, this data will be inserted into the
-  // filesystem.  If called repeatedly, only the most recent data is inserted.
-  virtual void AddData(Copier) = 0;
-
-  // Attempt to extract the data out of the block device (which should be formatted as a mutable
-  // filesystem, e.g. minfs).
-  virtual zx::result<Copier> ExtractData() = 0;
 
   // Returns the format that the content appears to be.  Avoid using this unless
   // there is no other way to determine the format of the device.

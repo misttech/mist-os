@@ -19,7 +19,6 @@
 
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/storage/fshost/block-device-interface.h"
-#include "src/storage/fshost/copier.h"
 #include "src/storage/fshost/filesystem-mounter.h"
 #include "src/storage/fshost/fshost_config.h"
 
@@ -50,8 +49,6 @@ class BlockDevice : public BlockDeviceInterface {
       const char* topological_path) const override;
   zx::result<std::unique_ptr<BlockDeviceInterface>> OpenBlockDeviceByFd(
       fbl::unique_fd fd) const override;
-  void AddData(Copier) override;
-  zx::result<Copier> ExtractData() override;
   fs_management::DiskFormat GetFormat() override;
   void SetFormat(fs_management::DiskFormat format) override;
   zx::result<fuchsia_hardware_block::wire::BlockInfo> GetInfo() const override;
@@ -83,7 +80,7 @@ class BlockDevice : public BlockDeviceInterface {
   const fshost_config::Config* device_config_;
 
  private:
-  zx_status_t MountData(const fs_management::MountOptions& options, std::optional<Copier> copier,
+  zx_status_t MountData(const fs_management::MountOptions& options,
                         fidl::ClientEnd<fuchsia_hardware_block::Block> block_device);
 
   fidl::ClientEnd<fuchsia_hardware_block::Block> block_;
@@ -94,9 +91,6 @@ class BlockDevice : public BlockDeviceInterface {
   mutable std::string partition_name_;
   mutable std::optional<fuchsia_hardware_block_partition::wire::Guid> instance_guid_;
   mutable std::optional<fuchsia_hardware_block_partition::wire::Guid> type_guid_;
-
-  // Data that should be written to the partition once mounted.
-  std::optional<Copier> source_data_;
 };
 
 }  // namespace fshost

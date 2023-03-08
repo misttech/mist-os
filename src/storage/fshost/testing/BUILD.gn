@@ -49,16 +49,3 @@ fshost_component_and_config("test-fshost-no-watcher") {
   options.data_filesystem_format = "minfs"
   options.disable_block_watcher = true
 }
-
-fshost_component_and_config("test-fshost-fxfs-disk-migration") {
-  testonly = true
-  options = default_integration_test_options
-  options.data_filesystem_format = "fxfs"
-  options.use_disk_based_minfs_migration = true
-
-  # FVM doesn't persist a slice_limit. The limit is set in BlockDeviceManager:Add based on
-  # this value stored in fshost_config.data_max_bytes. This value has been specifically
-  # chosen for our success/fail tests to ensure that a small device (10MiB) won't have
-  # enough free space for a side-by-side migration but a larger device will.
-  options.data_max_bytes = 9437184  # 9MiB
-}

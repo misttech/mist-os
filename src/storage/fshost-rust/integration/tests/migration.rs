@@ -23,14 +23,8 @@
 //!   - zxcrypt+minfs
 //!   - zxcrypt+f2fs
 //!
-//! In 4 of these scenarios, we migrate the data on the partition to the new format.
-//!   - minfs         -> f2fs
-//!   - minfs         -> fxfs
-//!   - zxcrypt+minfs -> fxfs
-//!   - zxcrypt+minfs -> zxcrypt+f2fs
-//!
-//! In the rest of the combinations, if the original state doesn't match the goal state, we format
-//! the device with the goal state, disregarding any contents of the original filesystem.
+//! If the original state doesn't match the goal state, we format the device with the goal state,
+//! disregarding any contents of the original filesystem.
 //!
 //! A set of fshost integration tests are generated for each of the three filesystem types. For
 //! filesystems which use zxcrypt, there is a set for both with and without zxcrypt. This covers
@@ -63,12 +57,6 @@ async fn fxfs_to_format() {
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    if data_fs_name() == "fxfs" {
-        // Original state matches goal state
-        fixture.check_test_data_file().await;
-    }
-
     fixture.tear_down().await;
 }
 
@@ -81,17 +69,6 @@ async fn minfs_no_zxcrypt_to_format() {
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    // This covers the minfs->fxfs and minfs->f2fs migrations outlined above.
-    if data_fs_name() == "fxfs" || (data_fs_name() == "f2fs" && !data_fs_zxcrypt()) {
-        fixture.check_test_data_file().await;
-    }
-
-    if data_fs_name() == "minfs" && !data_fs_zxcrypt() {
-        // Original state matches goal state
-        fixture.check_test_data_file().await;
-    }
-
     fixture.tear_down().await;
 }
 
@@ -104,12 +81,6 @@ async fn f2fs_no_zxcrypt_to_format() {
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    if data_fs_name() == "f2fs" && !data_fs_zxcrypt() {
-        // Original state matches goal state
-        fixture.check_test_data_file().await;
-    }
-
     fixture.tear_down().await;
 }
 
@@ -139,16 +110,6 @@ async fn minfs_zxcrypt_to_format() {
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    // This covers the zxcrypt+minfs->fxfs and zxcrypt+minfs->f2fs migrations outlined above.
-    if data_fs_name() == "f2fs" && data_fs_zxcrypt() {
-        fixture.check_test_data_file().await;
-    }
-
-    if (data_fs_name() == "minfs" && data_fs_zxcrypt()) || data_fs_name() == "fxfs" {
-        fixture.check_test_data_file().await;
-    }
-
     fixture.tear_down().await;
 }
 
@@ -165,11 +126,5 @@ async fn f2fs_zxcrypt_to_format() {
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    if data_fs_name() == "f2fs" && data_fs_zxcrypt() {
-        // Original state matches goal state
-        fixture.check_test_data_file().await;
-    }
-
     fixture.tear_down().await;
 }

@@ -31,8 +31,6 @@ use {
     std::sync::Arc,
 };
 
-mod copier;
-
 /// Environment is a trait that performs actions when a device is matched.
 #[async_trait]
 pub trait Environment: Send + Sync {
@@ -191,64 +189,6 @@ impl Environment for FshostEnvironment {
             };
         }
 
-        // Potentially read the data off the disk in cases where we want to migrate the data.
-        // TODO(fxbug.dev/120317): This is good enough for the ram-based migration, but the
-        // disk-based migration wants to be able to deactivate the zxcrypt partition after
-        // mounting. This will probably require a minor refactor to the launcher code.
-        let copied_data = match (device.content_format().await?, format, self.config.no_zxcrypt) {
-            // minfs->fxfs or minfs->f2fs, with no zxcrypt anywhere
-            (DiskFormat::Minfs, DiskFormat::Fxfs, _)
-            | (DiskFormat::Minfs, DiskFormat::F2fs, true) => self
-                .launcher
-                .try_read_data_from_minfs(device)
-                .await
-                .map_err(|error| {
-                    tracing::warn!(
-                        ?error,
-                        path = %device.path(),
-                        "Failed to copy data from old partition. Expect data loss!",
-                    );
-                    error
-                })
-                .ok(),
-            // zxcrypt+minfs->fxfs or zxcrypt+minfs->zxcrypt+f2fs
-            (DiskFormat::Zxcrypt, DiskFormat::Fxfs, _)
-            | (DiskFormat::Zxcrypt, DiskFormat::F2fs, false) => {
-                // Bind zxcrypt so we can peek at the contents
-                self.bind_zxcrypt(device).await?;
-                let mut inner_device = device.get_child("/zxcrypt/unsealed/block").await?;
-
-                let copied_data = if inner_device.content_format().await? == DiskFormat::Minfs {
-                    // Read everything off the disk into memory.
-                    self.launcher
-                        .try_read_data_from_minfs(inner_device.as_mut())
-                        .await
-                        .map_err(|error| {
-                            tracing::warn!(
-                                ?error,
-                                path = %inner_device.path(),
-                                "Failed to copy data from old partition. Expect data loss!",
-                            );
-                            error
-                        })
-                        .ok()
-                } else {
-                    None
-                };
-
-                // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-                let controller: ClientEnd<ControllerMarker> =
-                    device.client_end()?.into_channel().into();
-                let controller = controller.into_proxy()?;
-                // Once we unbind, the inner_device is no longer valid.
-                controller.unbind_children().await?.map_err(zx::Status::from_raw)?;
-                copied_data
-            }
-
-            // Everything else - no migration. The mount path will reformat if needed.
-            (_, _, _) => None,
-        };
-
         // Potentially bind zxcrypt before serving data.
         let mut new_dev;
         let mut inside_zxcrypt = false;
@@ -277,17 +217,17 @@ impl Environment for FshostEnvironment {
             DiskFormat::Fxfs => {
                 let config =
                     Fxfs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.serve_data(device, config, inside_zxcrypt, copied_data).await?
+                self.launcher.serve_data(device, config, inside_zxcrypt).await?
             }
             DiskFormat::F2fs => {
                 let config =
                     F2fs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.serve_data(device, config, inside_zxcrypt, copied_data).await?
+                self.launcher.serve_data(device, config, inside_zxcrypt).await?
             }
             DiskFormat::Minfs => {
                 let config =
                     Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.serve_data(device, config, inside_zxcrypt, copied_data).await?
+                self.launcher.serve_data(device, config, inside_zxcrypt).await?
             }
             _ => unreachable!(),
         };
@@ -378,11 +318,10 @@ impl FilesystemLauncher {
         device: &mut dyn Device,
         config: FSC,
         inside_zxcrypt: bool,
-        copied_data: Option<copier::CopiedData>,
     ) -> Result<Filesystem, Error> {
         let block = device.client_end()?;
         let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)?;
-        self.serve_data_from(device, fs, inside_zxcrypt, copied_data).await
+        self.serve_data_from(device, fs, inside_zxcrypt).await
     }
 
     // NB: keep these larger functions monomorphized, otherwise they cause significant code size
@@ -392,7 +331,6 @@ impl FilesystemLauncher {
         device: &mut dyn Device,
         mut fs: fs_management::filesystem::Filesystem,
         inside_zxcrypt: bool,
-        copied_data: Option<copier::CopiedData>,
     ) -> Result<Filesystem, Error> {
         let format = fs.config().disk_format();
         tracing::info!(
@@ -414,7 +352,7 @@ impl FilesystemLauncher {
                 expected_format = ?format,
                 "Expected format not detected. Reformatting.",
             );
-            return self.format_data(&mut fs, volume_proxy, inside_zxcrypt, copied_data).await;
+            return self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await;
         }
 
         if self.config.check_filesystems {
@@ -423,9 +361,7 @@ impl FilesystemLauncher {
                 self.report_corruption(format, &error);
                 if self.config.format_data_on_corruption {
                     tracing::info!("Reformatting filesystem, expect data loss...");
-                    return self
-                        .format_data(&mut fs, volume_proxy, inside_zxcrypt, copied_data)
-                        .await;
+                    return self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await;
                 } else {
                     tracing::error!(?format, "format on corruption is disabled, not continuing");
                     return Err(error);
@@ -454,13 +390,13 @@ impl FilesystemLauncher {
             Ok(Either::Left(fs)) => Ok(fs),
             Ok(Either::Right(())) => {
                 tracing::info!("Detected marker file, shredding volume. Expect data loss...");
-                self.format_data(&mut fs, volume_proxy, inside_zxcrypt, copied_data).await
+                self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await
             }
             Err(error) => {
                 self.report_corruption(format, &error);
                 if self.config.format_data_on_corruption {
                     tracing::info!("Reformatting filesystem, expect data loss...");
-                    self.format_data(&mut fs, volume_proxy, inside_zxcrypt, copied_data).await
+                    self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await
                 } else {
                     tracing::error!(?format, "format on corruption is disabled, not continuing");
                     Err(error)
@@ -474,7 +410,6 @@ impl FilesystemLauncher {
         fs: &mut fs_management::filesystem::Filesystem,
         volume_proxy: fidl_fuchsia_hardware_block_volume::VolumeProxy,
         inside_zxcrypt: bool,
-        copied_data: Option<copier::CopiedData>,
     ) -> Result<Filesystem, Error> {
         let format = fs.config().disk_format();
         tracing::info!(?format, "Formatting");
@@ -530,7 +465,7 @@ impl FilesystemLauncher {
         }
 
         fs.format().await.context("formatting data partition")?;
-        let mut serving_fs = if let DiskFormat::Fxfs = format {
+        let serving_fs = if let DiskFormat::Fxfs = format {
             let mut serving_fs =
                 fs.serve_multi_volume().await.context("serving multi volume data partition")?;
             let (crypt_service, volume_name, _) =
@@ -541,16 +476,6 @@ impl FilesystemLauncher {
         } else {
             Filesystem::Serving(fs.serve().await.context("serving single volume data partition")?)
         };
-
-        if let Some(data) = copied_data {
-            let path = "/copy-target";
-            let _binding = fs_management::filesystem::NamespaceBinding::create(
-                &serving_fs.root()?,
-                path.to_string(),
-            )
-            .context("making copy target binding")?;
-            data.write_to(&path).await.context("writing copied data to filesystem")?;
-        }
 
         Ok(serving_fs)
     }
@@ -582,23 +507,6 @@ impl FilesystemLauncher {
             }
         })
         .detach();
-    }
-
-    async fn try_read_data_from_minfs(
-        &self,
-        device: &mut dyn Device,
-    ) -> Result<copier::CopiedData, Error> {
-        tracing::info!(path = %device.topological_path(), "Copying data off device");
-        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-        let controller: ClientEnd<ControllerMarker> = device.client_end()?.into_channel().into();
-        let controller = controller.into_proxy()?;
-        let mut minfs = Minfs::new(controller);
-        let mut fs = minfs.serve().await.context("serving minfs filesystem")?;
-        let path = "/minfs-for-copying";
-        fs.bind_to_path(path).context("binding minfs to path")?;
-        let copied_data = copier::read_from(path).await.context("reading minfs data")?;
-        fs.shutdown().await.context("shutting down minfs")?;
-        Ok(copied_data)
     }
 }
 

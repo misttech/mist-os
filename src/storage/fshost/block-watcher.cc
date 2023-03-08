@@ -57,7 +57,7 @@ constexpr zx_signals_t kSignalWatcherShutDown = ZX_USER_SIGNAL_1;
 }  // namespace
 
 BlockWatcher::BlockWatcher(FsManager& fshost, const fshost_config::Config* config)
-    : mounter_(fshost, config), device_manager_(config, &fshost.inspect_manager()) {
+    : mounter_(fshost, config), device_manager_(config) {
   zx_status_t status = zx::event::create(0, &pause_event_);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "failed to create block watcher pause event: "

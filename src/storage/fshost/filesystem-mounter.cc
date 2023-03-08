@@ -45,20 +45,6 @@ namespace fshost {
 
 namespace fio = fuchsia_io;
 
-namespace {
-
-zx::result<> CopyDataToFilesystem(fidl::ClientEnd<fuchsia_io::Directory> data_root, Copier copier) {
-  fbl::unique_fd fd;
-  if (zx_status_t status =
-          fdio_fd_create(data_root.TakeHandle().release(), fd.reset_and_get_address());
-      status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::make_result(copier.Write(std::move(fd)));
-}
-
-}  // namespace
-
 StartedFilesystem::StartedFilesystem(fs_management::StartedSingleVolumeFilesystem&& fs)
     : fs_(std::move(fs)) {}
 StartedFilesystem::StartedFilesystem(fs_management::StartedMultiVolumeFilesystem&& fs)
@@ -166,7 +152,7 @@ zx::result<> FilesystemMounter::LaunchFsNative(
 }
 
 zx_status_t FilesystemMounter::MountData(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> block_device, std::optional<Copier> copier,
+    fidl::ClientEnd<fuchsia_hardware_block::Block> block_device,
     fs_management::MountOptions options, fs_management::DiskFormat format) {
   if (data_mounted_) {
     return ZX_ERR_ALREADY_BOUND;
@@ -177,20 +163,6 @@ zx_status_t FilesystemMounter::MountData(
     // TODO(fxbug.dev/91577): Remove this special case.
     const std::string binary_path = fs_management::DiskFormatBinaryPath(format);
     ZX_ASSERT(!binary_path.empty());
-    if (copier) {
-      FX_LOGS(INFO) << "Copying data into filesystem...";
-      zx::result device = component::Clone(block_device, component::AssumeProtocolComposesNode);
-      if (device.is_error()) {
-        FX_PLOGS(WARNING, device.status_value())
-            << "Failed to clone block device for copying; expect data loss";
-      } else if (zx_status_t status =
-                     CopyDataToLegacyFilesystem(format, std::move(device.value()), *copier);
-                 status != ZX_OK) {
-        FX_PLOGS(WARNING, status) << "Failed to copy data; expect data loss";
-      } else {
-        FX_LOGS(INFO) << "Copying successful!";
-      }
-    }
     if (auto status = MountLegacyFilesystem(FsManager::MountPoint::kData, format,
                                             binary_path.c_str(), options, std::move(block_device));
         status.is_error()) {
@@ -256,17 +228,6 @@ zx_status_t FilesystemMounter::MountData(
     }
     if (data_root.is_error()) {
       FX_PLOGS(ERROR, data_root.status_value()) << "Failed to get data root";
-    }
-
-    if (copier) {
-      // Copy data before we route the filesystem to the world.
-      FX_LOGS(INFO) << "Copying data into filesystem...";
-      if (auto status = CopyDataToFilesystem(*std::move(data_root), std::move(copier.value()));
-          status.is_error()) {
-        FX_PLOGS(WARNING, status.status_value()) << "Faile to copy data; expect data loss";
-      } else {
-        FX_LOGS(INFO) << "Copying successful!";
-      }
     }
 
     if (zx_status_t status = RouteData(*export_root, device_path); status != ZX_OK) {
@@ -351,48 +312,6 @@ void FilesystemMounter::ReportPartitionCorrupted(fs_management::DiskFormat forma
   // This may need to change in the future should we want to file synthetic crash reports for
   // other possible failure modes.
   fshost_.FileReport(format, FsManager::ReportReason::kFsckFailure);
-}
-
-// This copies source data for filesystems that aren't components.
-zx_status_t FilesystemMounter::CopyDataToLegacyFilesystem(
-    fs_management::DiskFormat df, fidl::ClientEnd<fuchsia_hardware_block::Block> block_device,
-    const Copier& copier) const {
-  FX_LOGS(INFO) << "Copying data...";
-  auto export_root_or = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (export_root_or.is_error())
-    return export_root_or.error_value();
-
-  fs_management::MountOptions options;
-  options.readonly = true;
-  auto res = LaunchFs(std::move(block_device), options, df);
-  if (res.is_error()) {
-    FX_PLOGS(ERROR, res.status_value()) << "Unable to mount for copying";
-    return res.status_value();
-  }
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> data_root;
-  if (const auto* fs = std::get_if<fs_management::StartedSingleVolumeFilesystem>(&res->fs_)) {
-    data_root = fs->DataRoot();
-  } else {
-    FX_LOGS(ERROR) << "Unexpectedly multi-volume filesystem";
-    return ZX_ERR_BAD_STATE;
-  }
-  if (data_root.is_error()) {
-    FX_PLOGS(ERROR, data_root.status_value()) << "Unable to open data root for copying";
-    return data_root.status_value();
-  }
-  fbl::unique_fd fd;
-  if (zx_status_t status =
-          fdio_fd_create(data_root->TakeChannel().release(), fd.reset_and_get_address());
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "fdio_fd_create failed";
-    return status;
-  }
-  if (zx_status_t status = copier.Write(std::move(fd)); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to copy data: " << zx_status_get_string(status);
-    return status;
-  }
-  FX_LOGS(INFO) << "Successfully copied data";
-  return ZX_OK;
 }
 
 std::string_view BinaryPathForFormat(fs_management::DiskFormat format) {

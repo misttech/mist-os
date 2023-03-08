@@ -19,7 +19,6 @@
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/lib/storage/fs_management/cpp/mount.h"
 #include "src/lib/storage/fs_management/cpp/options.h"
-#include "src/storage/fshost/copier.h"
 #include "src/storage/fshost/fs-manager.h"
 #include "src/storage/fshost/fshost-boot-args.h"
 #include "src/storage/fshost/fshost_config.h"
@@ -61,12 +60,8 @@ class FilesystemMounter {
 
   // Attempts to mount a block device to "/data".
   // Fails if already mounted.
-  // If |copier| is set, its data will be copied into the data filesystem before exposing the
-  // filesystem to clients.
-  //
   zx_status_t MountData(fidl::ClientEnd<fuchsia_hardware_block::Block> block_device,
-                        std::optional<Copier> copier, fs_management::MountOptions options,
-                        fs_management::DiskFormat format);
+                        fs_management::MountOptions options, fs_management::DiskFormat format);
 
   // Attempts to mount a block device to "/blob".
   // Fails if already mounted.
@@ -120,10 +115,6 @@ class FilesystemMounter {
                                       const char* binary,
                                       fidl::ClientEnd<fuchsia_hardware_block::Block> block_device,
                                       const fs_management::MountOptions& options) const;
-
-  zx_status_t CopyDataToLegacyFilesystem(fs_management::DiskFormat df,
-                                         fidl::ClientEnd<fuchsia_hardware_block::Block> device,
-                                         const Copier& copier) const;
 
   FsManager& fshost_;
   const fshost_config::Config& config_;

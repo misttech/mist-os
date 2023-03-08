@@ -140,7 +140,7 @@ TEST_F(MounterTest, FactoryMount) {
 TEST_F(MounterTest, DataMount) {
   TestMounter mounter(manager(), &config_);
   mounter.ExpectFilesystem(FilesystemType::kData);
-  ASSERT_OK(mounter.MountData({}, std::nullopt, fs_management::MountOptions(),
+  ASSERT_OK(mounter.MountData({}, fs_management::MountOptions(),
                               fs_management::DiskFormat::kDiskFormatMinfs));
   ASSERT_TRUE(mounter.DataMounted());
 }

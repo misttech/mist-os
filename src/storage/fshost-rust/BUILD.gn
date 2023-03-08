@@ -69,7 +69,6 @@ rustc_binary("bin") {
     "src/device.rs",
     "src/device/constants.rs",
     "src/environment.rs",
-    "src/environment/copier.rs",
     "src/inspect.rs",
     "src/main.rs",
     "src/manager.rs",

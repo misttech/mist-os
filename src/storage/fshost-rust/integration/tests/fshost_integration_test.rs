@@ -20,7 +20,6 @@ use {
     futures::FutureExt,
 };
 
-mod migration;
 mod wipe_storage;
 mod write_data_file;
 
