@@ -354,7 +354,10 @@ mod tests {
                     name: name2,
                     kind: fuchsia_fs::directory::DirentKind::File,
                 },
-            ] if name1 == "device_controller" && name2 == "device_protocol"
+            ] if [name1, name2] == [
+                fidl_fuchsia_device_fs::DEVICE_CONTROLLER_NAME,
+                fidl_fuchsia_device_fs::DEVICE_PROTOCOL_NAME,
+              ]
         );
 
         let () = ramdisk.destroy_and_wait_for_removal().await.unwrap();
