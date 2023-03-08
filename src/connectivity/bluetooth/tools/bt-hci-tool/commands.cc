@@ -429,7 +429,7 @@ bool HandleLESetAdvParams(const CommandData* cmd_data, const fxl::CommandLine& c
   params->adv_interval_min = htole16(::bt::hci_spec::kLEAdvertisingIntervalDefault);
   params->adv_interval_max = htole16(::bt::hci_spec::kLEAdvertisingIntervalDefault);
   params->adv_type = adv_type;
-  params->own_address_type = ::bt::hci_spec::LEOwnAddressType::kPublic;
+  params->own_address_type = pw::bluetooth::emboss::LEOwnAddressType::PUBLIC;
   params->peer_address_type = ::bt::hci_spec::LEPeerAddressType::kPublic;
   params->peer_address.SetToZero();
   params->adv_channel_map = ::bt::hci_spec::kLEAdvertisingChannelAll;
@@ -503,28 +503,29 @@ bool HandleLESetScanParams(const CommandData* cmd_data, const fxl::CommandLine& 
     return false;
   }
 
-  ::bt::hci_spec::LEScanType scan_type = ::bt::hci_spec::LEScanType::kPassive;
+  pw::bluetooth::emboss::LEScanType scan_type = pw::bluetooth::emboss::LEScanType::PASSIVE;
   std::string type;
   if (cmd_line.GetOptionValue("type", &type)) {
     if (type == "passive") {
-      scan_type = ::bt::hci_spec::LEScanType::kPassive;
+      scan_type = pw::bluetooth::emboss::LEScanType::PASSIVE;
     } else if (type == "active") {
-      scan_type = ::bt::hci_spec::LEScanType::kActive;
+      scan_type = pw::bluetooth::emboss::LEScanType::ACTIVE;
     } else {
       std::cout << "  Unrecognized scan type: " << type << std::endl;
       return false;
     }
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::LESetScanParametersCommandParams);
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetScanParameters, kPayloadSize);
-
-  auto params = packet->mutable_payload<::bt::hci_spec::LESetScanParametersCommandParams>();
-  params->scan_type = scan_type;
-  params->scan_interval = htole16(::bt::hci_spec::kLEScanIntervalDefault);
-  params->scan_window = htole16(::bt::hci_spec::kLEScanIntervalDefault);
-  params->own_address_type = ::bt::hci_spec::LEOwnAddressType::kPublic;
-  params->filter_policy = ::bt::hci_spec::LEScanFilterPolicy::kNoFilterAcceptList;
+  auto packet =
+      ::bt::hci::EmbossCommandPacket::New<pw::bluetooth::emboss::LESetScanParametersCommandWriter>(
+          ::bt::hci_spec::kLESetScanParameters);
+  auto params = packet.view_t();
+  params.le_scan_type().Write(scan_type);
+  params.le_scan_interval().Write(::bt::hci_spec::kLEScanIntervalDefault);
+  params.le_scan_window().Write(::bt::hci_spec::kLEScanIntervalDefault);
+  params.own_address_type().Write(pw::bluetooth::emboss::LEOwnAddressType::PUBLIC);
+  params.scanning_filter_policy().Write(
+      pw::bluetooth::emboss::LEScanFilterPolicy::BASIC_UNFILTERED);
 
   auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
 

@@ -57,13 +57,14 @@ FakeController::Settings SettingsFromFidl(const ftest::EmulatorSettings& input) 
   return settings;
 }
 
-fuchsia::bluetooth::AddressType LeOwnAddressTypeToFidl(bt::hci_spec::LEOwnAddressType type) {
+fuchsia::bluetooth::AddressType LeOwnAddressTypeToFidl(
+    pw::bluetooth::emboss::LEOwnAddressType type) {
   switch (type) {
-    case bt::hci_spec::LEOwnAddressType::kPublic:
-    case bt::hci_spec::LEOwnAddressType::kPrivateDefaultToPublic:
+    case pw::bluetooth::emboss::LEOwnAddressType::PUBLIC:
+    case pw::bluetooth::emboss::LEOwnAddressType::PRIVATE_DEFAULT_TO_PUBLIC:
       return fuchsia::bluetooth::AddressType::PUBLIC;
-    case bt::hci_spec::LEOwnAddressType::kRandom:
-    case bt::hci_spec::LEOwnAddressType::kPrivateDefaultToRandom:
+    case pw::bluetooth::emboss::LEOwnAddressType::RANDOM:
+    case pw::bluetooth::emboss::LEOwnAddressType::PRIVATE_DEFAULT_TO_RANDOM:
       return fuchsia::bluetooth::AddressType::RANDOM;
   }
 
