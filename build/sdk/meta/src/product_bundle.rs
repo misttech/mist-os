@@ -8,7 +8,8 @@ mod v1;
 mod v2;
 
 use anyhow::{Context, Result};
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
+use fuchsia_repo::repository::FileSystemRepository;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 pub use v1::*;
@@ -103,6 +104,38 @@ impl ProductBundle {
             Self::V2(_) => panic!("no emu_manifest"),
         }
     }
+}
+
+/// Construct a Vec<FileSystemRepository> from product bundle.
+pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSystemRepository>> {
+    let pb = match ProductBundle::try_load_from(&product_bundle_dir)
+        .with_context(|| format!("loading {}", product_bundle_dir))?
+    {
+        ProductBundle::V1(_) => {
+            panic!(
+                "This command does not support product bundle v1, \
+                please use `ffx product-bundle get` to set up the repository."
+            )
+        }
+        ProductBundle::V2(pb) => pb,
+    };
+
+    let mut repos = Vec::<FileSystemRepository>::new();
+    for repo in pb.repositories {
+        let repo_builder = FileSystemRepository::builder(
+            repo.metadata_path
+                .canonicalize()
+                .with_context(|| format!("failed to canonicalize {:?}", repo.metadata_path))?
+                .try_into()?,
+            repo.blobs_path
+                .canonicalize()
+                .with_context(|| format!("failed to canonicalize {:?}", repo.blobs_path))?
+                .try_into()?,
+        )
+        .alias(repo.name);
+        repos.push(repo_builder.build());
+    }
+    Ok(repos)
 }
 
 #[cfg(test)]

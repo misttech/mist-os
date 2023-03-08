@@ -3,62 +3,39 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Result},
+    anyhow::Result,
     errors::{ffx_bail, ffx_error},
     ffx_core::ffx_plugin,
     ffx_repository_add_args::AddCommand,
     fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-    fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec},
+    fidl_fuchsia_developer_ffx_ext::RepositoryError,
+    fuchsia_repo::repository::RepoProvider,
     fuchsia_url::RepositoryUrl,
-    sdk_metadata::ProductBundle,
-    std::{collections::BTreeSet, convert::TryInto},
+    sdk_metadata::get_repositories,
 };
 
 #[ffx_plugin("ffx-repo-add", RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -> Result<()> {
-    let pb = match ProductBundle::try_load_from(&cmd.product_bundle_dir)
-        .with_context(|| format!("loading {}", cmd.product_bundle_dir))?
-    {
-        ProductBundle::V1(_) => {
-            ffx_bail!(
-                "This command does not support product bundle v1, \
-                please use `ffx product-bundle get` to set up the repository."
-            )
-        }
-        ProductBundle::V2(pb) => pb,
-    };
-
     if cmd.prefix.is_empty() {
         ffx_bail!("name cannot be empty");
     }
-
-    for repo in pb.repositories {
+    let repositories = get_repositories(cmd.product_bundle_dir)?;
+    for repository in repositories {
         // Validate that we can construct a valid repository url from the name.
-        let repo_url =
-            RepositoryUrl::parse_host(format!("{}.{}", cmd.prefix, repo.name)).map_err(|err| {
-                ffx_error!("invalid repository name for {:?} {:?}: {}", cmd.prefix, repo.name, err)
+        let repo_alias = repository.aliases().first().unwrap();
+        let repo_url = RepositoryUrl::parse_host(format!("{}.{}", cmd.prefix, &repo_alias))
+            .map_err(|err| {
+                ffx_error!(
+                    "invalid repository name for {:?} {:?}: {}",
+                    cmd.prefix,
+                    &repo_alias,
+                    err
+                )
             })?;
 
         let repo_name = repo_url.host();
 
-        let repo_spec = RepositorySpec::FileSystem {
-            metadata_repo_path: repo
-                .metadata_path
-                .canonicalize()
-                .with_context(|| format!("failed to canonicalize {:?}", repo.metadata_path))?
-                .try_into()?,
-
-            blob_repo_path: repo
-                .blobs_path
-                .canonicalize()
-                .with_context(|| format!("failed to canonicalize {:?}", repo.blobs_path))?
-                .try_into()?,
-
-            // Create an alias to the repository name.
-            aliases: BTreeSet::from([repo.name]),
-        };
-
-        match repos.add_repository(repo_name, &mut repo_spec.into()).await? {
+        match repos.add_repository(repo_name, &mut repository.spec().into()).await? {
             Ok(()) => {
                 println!("added repository {}", repo_name);
             }
@@ -86,7 +63,7 @@ mod tests {
         fuchsia_async as fasync,
         futures::{channel::mpsc, SinkExt as _, StreamExt as _, TryStreamExt as _},
         pretty_assertions::assert_eq,
-        sdk_metadata::{ProductBundleV2, Repository},
+        sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
     };
 
     #[fasync::run_singlethreaded(test)]
