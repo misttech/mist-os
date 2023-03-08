@@ -115,8 +115,41 @@ fuchsia_test_component("echo_realm_component") {
   manifest = "meta/echo_realm.cml"
 }
 
+rustc_test("arbitrary_realm_test_bin") {
+  name = "arbitrary_realm_test_bin"
+  edition = "2021"
+  source_root = "src/arbitrary_realm_test.rs"
+  sources = [ source_root ]
+
+  deps = [
+    "..:fuchsia-component-test",
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
+fuchsia_test_component("arbitrary_realm_test_component") {
+  manifest = "meta/arbitrary_realm_test.cml"
+  component_name = "arbitrary_realm_test"
+  deps = [ ":arbitrary_realm_test_bin" ]
+
+  # disable check for realm_builder.shard.cml as we don't want the realm builder
+  # library to use it from namespace.
+  check_includes = false
+}
+
+fuchsia_component("child_realm_with_realmbuilder") {
+  testonly = true
+  manifest = "meta/child_realm.cml"
+  component_name = "child_realm_with_realmbuilder"
+}
+
 fuchsia_test_package("fuchsia-component-test-tests") {
   deps = [
+    ":child_realm_with_realmbuilder",
     ":echo_client_empty_component",
     ":echo_realm_component",
     ":echo_server_empty_component",
@@ -127,7 +160,10 @@ fuchsia_test_package("fuchsia-component-test-tests") {
     "//src/sys/component_manager/testing/echo_client",
     "//src/sys/component_manager/testing/echo_server",
   ]
-  test_components = [ ":fuchsia_component_test_tests_component" ]
+  test_components = [
+    ":fuchsia_component_test_tests_component",
+    ":arbitrary_realm_test_component",
+  ]
 }
 
 fuchsia_test_package("scoped-instance-tests") {
