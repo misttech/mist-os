@@ -768,9 +768,6 @@ if (!is_efi_toolchain) {
       ":kernel(:kernel_$current_cpu)",
       ":kernel-unittests-boot-test.cmdline",
     ]
-
-    # TODO(fxbug.dev/122154): disabled in infra because tests wedge
-    device_types = []
   }
 
   kernel_cmdline("kernel-unittests-boot-test.cmdline") {

@@ -59,6 +59,12 @@ Event scanner_disabled_event;
 DECLARE_SINGLETON_MUTEX(scanner_disabled_lock);
 uint32_t scanner_disable_count TA_GUARDED(scanner_disabled_lock::Get()) = 0;
 
+// This variable needs to be protected by a mutex because it may be accessed by
+// |scanner_push_disable_count| or |scanner_pop_disable_count| concurrently with
+// |scanner_init_func|.  We're reusing the |scanner_disabled_lock| because the push and pop
+// functions already acquire it.
+Thread* scanner_thread TA_GUARDED(scanner_disabled_lock::Get()) = nullptr;
+
 // Mutex used to ensure only a single access scan is happening at once.
 DECLARE_SINGLETON_MUTEX(accessed_scanner_lock);
 // To avoid redundant scanning we remember when the last accessed scan happened. As an accessed scan
@@ -333,6 +339,8 @@ void scanner_disable_page_table_reclaim() {
 
 void scanner_push_disable_count() {
   Guard<Mutex> guard{scanner_disabled_lock::Get()};
+  // Make sure we have a scanner thread, otherwise the wait may block forever.
+  DEBUG_ASSERT(scanner_thread != nullptr);
   if (scanner_disable_count == 0) {
     scanner_operation.fetch_or(kScannerOpDisable);
     scanner_request_event.Signal();
@@ -343,6 +351,7 @@ void scanner_push_disable_count() {
 
 void scanner_pop_disable_count() {
   Guard<Mutex> guard{scanner_disabled_lock::Get()};
+  DEBUG_ASSERT(scanner_thread != nullptr);
   DEBUG_ASSERT(scanner_disable_count > 0);
   scanner_disable_count--;
   if (scanner_disable_count == 0) {
@@ -417,9 +426,17 @@ static void scanner_init_func(uint level) {
   }
   pmm_page_queues()->SetLruAction(lru_action);
   thread->Resume();
+
+  {
+    Guard<Mutex> guard{scanner_disabled_lock::Get()};
+    DEBUG_ASSERT(scanner_thread == nullptr);
+    ktl::swap(scanner_thread, thread);
+  }
 }
 
-LK_INIT_HOOK(scanner_init, &scanner_init_func, LK_INIT_LEVEL_LAST)
+// Start the scanner before the kernel shell and userspace since they may interact with and depend
+// on the scanner running.
+LK_INIT_HOOK(scanner_init, &scanner_init_func, LK_INIT_LEVEL_USER - 1)
 
 static int cmd_scanner(int argc, const cmd_args *argv, uint32_t flags) {
   if (argc < 2) {
