@@ -62,8 +62,8 @@ class FakeI2cImpl : public DeviceType,
   std::vector<uint8_t> metadata_;
 };
 
-fi2c::I2CChannel MakeChannel(fidl::AnyArena& arena, uint32_t bus_id, uint16_t addr) {
-  return fi2c::I2CChannel::Builder(arena).address(addr).bus_id(bus_id).Build();
+fi2c::I2CChannel MakeChannel(fidl::AnyArena& arena, uint16_t addr) {
+  return fi2c::I2CChannel::Builder(arena).address(addr).Build();
 }
 
 }  // namespace
@@ -94,8 +94,8 @@ class I2cMetadataTest : public zxtest::Test {
 TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
   std::vector<fi2c::I2CChannel> channels;
   fidl::Arena<> arena;
-  channels.emplace_back(MakeChannel(arena, 0, 0xa));
-  channels.emplace_back(MakeChannel(arena, 0, 0xb));
+  channels.emplace_back(MakeChannel(arena, 0xa));
+  channels.emplace_back(MakeChannel(arena, 0xb));
 
   auto impl = FakeI2cImpl::Create(fake_root_.get(), std::move(channels));
 
@@ -110,15 +110,10 @@ TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
   // Check the number of devices we have makes sense.
   ASSERT_EQ(impl->zxdev()->child_count(), 1);
 
-  auto* const i2c_device = impl->zxdev()->GetLatestChild()->GetDeviceContext<i2c::I2cDevice>();
-  ASSERT_EQ(i2c_device->dispatchers().size(), 1);
-
-  async_dispatcher_t* const dispatcher = i2c_device->dispatchers()[0]->dispatcher();
-
   // I2cDevice::Create has posted a task to create children on its dispatcher. Verify device
   // properties on that dispatcher to ensure we are running after the children have been added.
   {
-    auto result = fdf::RunOnDispatcherSync(dispatcher, [impl]() {
+    auto result = fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), [impl]() {
       zx_device_t* i2c = impl->zxdev()->GetLatestChild();
       // There should be two devices per channel.
       ASSERT_EQ(i2c->child_count(), 2);

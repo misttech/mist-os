@@ -7,16 +7,15 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <lib/async/dispatcher.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <string>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
-#include <fbl/ref_ptr.h>
 
-#include "i2c-bus.h"
+#include "i2c.h"
+#include "lib/fdf/dispatcher.h"
 
 namespace i2c {
 
@@ -27,19 +26,16 @@ using I2cChildType = ddk::Device<I2cChild, ddk::Messageable<fidl_i2c::Device>::M
 
 class I2cChild : public I2cChildType {
  public:
-  I2cChild(zx_device_t* parent, fbl::RefPtr<I2cBus> bus, uint16_t address,
-           async_dispatcher_t* dispatcher, const std::string& name)
-      : I2cChildType(parent),
-        outgoing_dir_(dispatcher),
-        bus_(std::move(bus)),
+  I2cChild(I2cDevice* parent, uint16_t address, const std::string& name)
+      : I2cChildType(parent->zxdev()),
+        outgoing_dir_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+        parent_(parent),
         address_(address),
-        name_(name),
-        dispatcher_(dispatcher) {}
+        name_(name) {}
 
-  // Must be run on the bus's dispatcher.
-  static zx_status_t CreateAndAddDeviceOnDispatcher(
-      zx_device_t* parent, const fuchsia_hardware_i2c_businfo::wire::I2CChannel& channel,
-      const fbl::RefPtr<I2cBus>& bus, async_dispatcher_t* dispatcher);
+  static zx_status_t CreateAndAddDevice(
+      uint32_t bus_id, const fuchsia_hardware_i2c_businfo::wire::I2CChannel& channel,
+      I2cDevice* parent);
 
   void DdkRelease();
 
@@ -51,15 +47,15 @@ class I2cChild : public I2cChildType {
   friend class I2cChildTest;
 
   void Bind(fidl::ServerEnd<fidl_i2c::Device> request) {
-    bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
+    bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request),
+                         this, fidl::kIgnoreBindingClosure);
   }
 
   component::OutgoingDirectory outgoing_dir_;
 
-  fbl::RefPtr<I2cBus> bus_;
+  I2cDevice* const parent_;
   const uint16_t address_;
   const std::string name_;
-  async_dispatcher_t* const dispatcher_;
   fidl::ServerBindingGroup<fidl_i2c::Device> bindings_;
 };
 

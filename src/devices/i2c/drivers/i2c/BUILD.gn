@@ -22,7 +22,6 @@ fuchsia_driver("i2c-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
-    "i2c-bus.cc",
     "i2c-child.cc",
     "i2c.cc",
   ]
@@ -39,10 +38,7 @@ fuchsia_driver("i2c-driver") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
@@ -59,7 +55,6 @@ test("i2c-test-bin") {
   output_name = "i2c-test"
   configs += [ "//build/config:all_source" ]
   sources = [
-    "i2c-bus.cc",
     "i2c-child-test.cc",
     "i2c-child.cc",
     "i2c-test.cc",
@@ -78,10 +73,7 @@ test("i2c-test-bin") {
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

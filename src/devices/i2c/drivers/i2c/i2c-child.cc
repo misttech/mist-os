@@ -4,10 +4,8 @@
 
 #include "i2c-child.h"
 
-#include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/sync/completion.h>
 
 #include <fbl/alloc_checker.h>
 
@@ -15,10 +13,9 @@
 
 namespace i2c {
 
-zx_status_t I2cChild::CreateAndAddDeviceOnDispatcher(
-    zx_device_t* parent, const fuchsia_hardware_i2c_businfo::wire::I2CChannel& channel,
-    const fbl::RefPtr<I2cBus>& bus, async_dispatcher_t* dispatcher) {
-  const uint32_t bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
+zx_status_t I2cChild::CreateAndAddDevice(
+    const uint32_t bus_id, const fuchsia_hardware_i2c_businfo::wire::I2CChannel& channel,
+    I2cDevice* const parent) {
   const uint16_t address = channel.has_address() ? channel.address() : 0;
   const uint32_t i2c_class = channel.has_i2c_class() ? channel.i2c_class() : 0;
   const uint32_t vid = channel.has_vid() ? channel.vid() : 0;
@@ -53,8 +50,7 @@ zx_status_t I2cChild::CreateAndAddDeviceOnDispatcher(
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<I2cChild> dev(new (&ac)
-                                    I2cChild(parent, bus, address, dispatcher, friendly_name));
+  std::unique_ptr<I2cChild> dev(new (&ac) I2cChild(parent, address, friendly_name));
   if (!ac.check()) {
     zxlogf(ERROR, "Failed to create child device: %s", zx_status_get_string(ZX_ERR_NO_MEMORY));
     return ZX_ERR_NO_MEMORY;
@@ -110,19 +106,10 @@ zx_status_t I2cChild::CreateAndAddDeviceOnDispatcher(
   return status;
 }
 
-void I2cChild::DdkRelease() {
-  // Synchronously delete ourselves to prevent our parent's release hook from being called until
-  // after we're gone. At that point it will be safe to wait for our dispatcher to stop.
-  sync_completion_t delete_done;
-  async::PostTask(dispatcher_, [this, delete_done = &delete_done]() {
-    delete this;
-    sync_completion_signal(delete_done);
-  });
-  sync_completion_wait(&delete_done, ZX_TIME_INFINITE);
-}
+void I2cChild::DdkRelease() { delete this; }
 
 void I2cChild::Transfer(TransferRequestView request, TransferCompleter::Sync& completer) {
-  bus_->Transact(address_, request, completer);
+  parent_->Transact(address_, request, completer);
 }
 
 void I2cChild::GetName(GetNameCompleter::Sync& completer) {

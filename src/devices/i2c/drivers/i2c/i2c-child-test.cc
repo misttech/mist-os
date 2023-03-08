@@ -73,26 +73,26 @@ class I2cChildTest : public zxtest::Test {
 
  protected:
   fidl::WireSyncClient<fuchsia_hardware_i2c::Device> GetI2cChildClient(
-      ddk::I2cImplProtocolClient i2c, const char* name = kDefaultName) {
+      ddk::I2cImplProtocolClient i2c, const char* name = kDefaultName, const uint32_t bus_id = 0) {
     fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client{};
-    GetI2cChildClient(i2c, name, &client);
+    GetI2cChildClient(i2c, name, &client, bus_id);
     return client;
   }
 
  private:
   static constexpr char kDefaultName[] = "";
 
-  void SetMetadata(const char* name) {
+  void SetMetadata(const char* name, const uint32_t bus_id) {
     fidl::Arena<> arena;
 
     fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel> channels(arena, 1);
     channels[0] = fuchsia_hardware_i2c_businfo::wire::I2CChannel::Builder(arena)
                       .address(0x10)
-                      .bus_id(0)
                       .name(name)
                       .Build();
     auto metadata = fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata::Builder(arena)
                         .channels(channels)
+                        .bus_id(bus_id)
                         .Build();
 
     auto bytes = fidl::Persist(metadata);
@@ -103,12 +103,13 @@ class I2cChildTest : public zxtest::Test {
 
   // Helper function that returns void to allow ASSERT and EXPECT calls.
   void GetI2cChildClient(ddk::I2cImplProtocolClient i2c, const char* name,
-                         fidl::WireSyncClient<fuchsia_hardware_i2c::Device>* client) {
+                         fidl::WireSyncClient<fuchsia_hardware_i2c::Device>* client,
+                         const uint32_t bus_id) {
     i2c_impl_protocol_t proto{};
     i2c.GetProto(&proto);
     fake_root_->AddProtocol(ZX_PROTOCOL_I2C_IMPL, proto.ops, proto.ctx);
 
-    SetMetadata(name);
+    SetMetadata(name, bus_id);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     ASSERT_OK(endpoints.status_value());
@@ -126,14 +127,9 @@ class I2cChildTest : public zxtest::Test {
     ASSERT_EQ(fake_root_->child_count(), 1);
     zx_device_t* i2c_root = fake_root_->GetLatestChild();
 
-    auto* const i2c_device = i2c_root->GetDeviceContext<i2c::I2cDevice>();
-    ASSERT_EQ(i2c_device->dispatchers().size(), 1);
-
-    async_dispatcher_t* const dispatcher = i2c_device->dispatchers()[0]->dispatcher();
-
     {
       auto result = fdf::RunOnDispatcherSync(
-          dispatcher, [=, server = std::move(endpoints->server)]() mutable {
+          dispatcher_.dispatcher(), [=, server = std::move(endpoints->server)]() mutable {
             auto* const i2c_child = i2c_root->GetLatestChild()->GetDeviceContext<I2cChild>();
             i2c_child->Bind(std::move(server));
           });
@@ -471,6 +467,31 @@ TEST_F(I2cChildTest, HugeTransfer) {
   ASSERT_EQ(read->value()->read_data[0].count(), 1024);
   cpp20::span data(read->value()->read_data[0].data(), read->value()->read_data[0].count());
   EXPECT_TRUE(std::all_of(data.begin(), data.end(), [](uint8_t b) { return b == 'r'; }));
+}
+
+TEST_F(I2cChildTest, BusId) {
+  uint32_t actual_bus_id = 0;
+  FakeI2cImpl i2c([&actual_bus_id](uint32_t bus_id, const i2c_impl_op_t*, size_t) {
+    actual_bus_id = bus_id;
+    return ZX_OK;
+  });
+
+  auto client_wrap = GetI2cChildClient(i2c.GetClient(), "", 3);
+  ASSERT_TRUE(client_wrap.is_valid());
+
+  fidl::Arena arena;
+  auto read_transfer = fidl_i2c::wire::DataTransfer::WithReadSize(1);
+
+  auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 1);
+  transactions[0] =
+      fidl_i2c::wire::Transaction::Builder(arena).data_transfer(read_transfer).Build();
+
+  auto read = client_wrap->Transfer(transactions);
+
+  ASSERT_OK(read.status());
+  ASSERT_FALSE(read->is_error());
+
+  EXPECT_EQ(actual_bus_id, 3);
 }
 
 }  // namespace i2c
