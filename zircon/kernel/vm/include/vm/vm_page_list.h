@@ -747,6 +747,30 @@ class VmPageList final {
   // ReturnEmptySlot, to ensure no empty nodes are retained.
   VmPageOrMarker* LookupOrAllocate(uint64_t offset);
 
+  // Similar to LookupOrAllocate but also checks if offset falls in a sparse page interval,
+  // returning true via the bool in ktl::pair if it does, along with the slot. Also splits the
+  // interval around offset if split_interval is set to true. This allows the caller to freely
+  // manipulate the slot at offset similar to LookupOrAllocate. If offset is found in an interval,
+  // but split_interval was false, no VmPageOrMarker* is returned, as it is not safe to manipulate
+  // any slot in an interval without also splitting the interval around it.
+  //
+  // In other words, the return values fall into three categories.
+  //  1. {page, false} : offset does not lie in an interval. |slot| is the required slot.
+  //  2. {page, true} : offset lies in an interval and split_interval was true. |page| is the
+  //  required slot. The interval has been correctly split around the slot, so |page| can be treated
+  //  similar to any non-interval type.
+  //  3. {nullptr, true} : offset lies in an interval but split_interval was false. No slot is
+  //  returned.
+  //
+  // Splitting the interval would look as follows. If the interval previously was:
+  //  [start, end) where start < offset < end.
+  // After the split we would have three intervals:
+  //  [start, offset) [offset, offset + PAGE_SIZE) [offset + PAGE_SIZE, end)
+  // The middle interval containing offset spans only a single page, i.e. offset is an
+  // IntervalSentinel::Slot, which can now be manipulated independently.
+  ktl::pair<VmPageOrMarker*, bool> LookupOrAllocateCheckForInterval(uint64_t offset,
+                                                                    bool split_interval);
+
   // Returns a slot that was empty after LookupOrAllocate, and that the caller did not end up
   // filling.
   // This ensures that if LookupOrAllocate allocated a new underlying list node, then that list node

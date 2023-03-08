@@ -195,6 +195,218 @@ bool VmPageList::HasNoPageOrRef() const {
   return no_pages;
 }
 
+ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(uint64_t offset,
+                                                                              bool split_interval) {
+  // Find the node that would contain this offset.
+  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+  const size_t node_index = offset_to_node_index(offset, list_skew_);
+  if (node_offset >= VmPageList::MAX_SIZE) {
+    return {nullptr, false};
+  }
+
+  // If the node containing offset is populated, the lower bound will return that node. If not
+  // populated, it will return the next populated node.
+  //
+  // The overall intent with this function is to keep the number of tree lookups similar to
+  // LookupOrAllocate for both empty and non-empty slots. So we hold on to the looked up node and
+  // walk left or right in the tree only if required. The same principle is followed for traversal
+  // within a node as well, the ordering of operations is chosen such that we can exit the traversal
+  // as soon as possible or avoid it entirely.
+  auto pln = list_.lower_bound(node_offset);
+
+  // If offset falls in an interval, this will hold an interval sentinel for the interval that
+  // offset is found in. It will be used to mint new sentinel values if we were also asked to split
+  // the interval.
+  const VmPageOrMarker* found_interval = nullptr;
+  bool is_in_interval = false;
+  // For the offset to lie in an interval, it is going to have an interval end so we should have
+  // found some valid node if the offset falls in an interval. If we could not find a valid node,
+  // we know that offset cannot lie in an interval, so skip the check.
+  if (pln.IsValid()) {
+    is_in_interval = IfOffsetInIntervalHelper(offset, *pln, &found_interval);
+    // If we found an interval, we should have found a valid interval sentinel too.
+    DEBUG_ASSERT(!is_in_interval || found_interval);
+    DEBUG_ASSERT(!is_in_interval || found_interval->IsInterval());
+
+    // If we are in an interval but cannot split it, we cannot return a slot. The caller should not
+    // be able to manipulate the slot freely without correctly handling the interval(s) around it.
+    if (is_in_interval && !split_interval) {
+      return {nullptr, true};
+    }
+  }
+
+  // The slot that will eventually hold offset.
+  VmPageOrMarker* slot = nullptr;
+  if (pln.IsValid() && pln->offset() == node_offset) {
+    // We found the node containing offset. Get the slot.
+    slot = &pln->Lookup(node_index);
+  } else {
+    // Otherwise allocate the node that would contain offset and then get the slot.
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<VmPageListNode> pl =
+        ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(node_offset));
+    if (!ac.check()) {
+      return {nullptr, is_in_interval};
+    }
+    VmPageListNode& raw_node = *pl;
+    slot = &pl->Lookup(node_index);
+    list_.insert(ktl::move(pl));
+    pln = list_.make_iterator(raw_node);
+  }
+  // Should have a valid slot at this point.
+  DEBUG_ASSERT(slot);
+
+  // If offset does not lie in an interval, or if the slot is already a single page interval, there
+  // is nothing more to be done. Return the slot.
+  if (!is_in_interval || slot->IsIntervalSlot()) {
+    return {slot, is_in_interval};
+  }
+
+  // If we reached here, we know that we are in an interval and we need to split it in order to
+  // return the required slot.
+  DEBUG_ASSERT(is_in_interval && split_interval);
+  DEBUG_ASSERT(pln.IsValid());
+
+  // Depending on whether the slot is empty or not, we might need to insert a new interval
+  // start, a new interval end, or both. Figure out which slots are needed first.
+  //  - If the slot is empty, we need to insert an end to the left, a start to the right and a
+  //  single page interval slot at offset. So we need both a new start and a new end.
+  //  - If the slot is populated, since we know that offset falls in an interval, it could only be
+  //  an interval start or an interval end. We will either need a new start or a new end but not
+  //  both.
+  bool need_new_end = true, need_new_start = true;
+  if (slot->IsIntervalStart()) {
+    // We can move the interval start to the right, and replace the old start with a slot. Don't
+    // need a new end.
+    need_new_end = false;
+  } else if (slot->IsIntervalEnd()) {
+    // We can move the interval end to the left, and replace the old end with a slot. Don't need a
+    // new start.
+    need_new_start = false;
+  }
+
+  // Now find the previous and next slots as needed for the new end and new start respectively.
+  // Note that the node allocations below are mutually exclusive. If we allocate the previous node,
+  // we won't need to allocate the next node and vice versa, since the allocation logic depends on
+  // the value of node_index. So if the required node allocation fails, all the cleanup that's
+  // required is returning the slot at offset if it is empty, as we might have allocated a new node
+  // previously to hold offset.
+  VmPageOrMarker* new_end = nullptr;
+  if (need_new_end) {
+    if (node_index > 0) {
+      // The previous slot is in the same node.
+      new_end = &pln->Lookup(node_index - 1);
+    } else {
+      // The previous slot is in the node to the left. We might need to allocate a new node to the
+      // left if it does not exist. Try to walk left and see if we find the previous node we're
+      // looking for.
+      auto iter = pln;
+      iter--;
+      // We are here because slot was either an empty slot inside an interval or it was an interval
+      // end. Additionally, the slot was the left-most slot in its node, which means we are
+      // guaranteed to find a node to the left which holds the start of the interval.
+      DEBUG_ASSERT(iter.IsValid());
+      const uint64_t prev_node_offset = node_offset - VmPageListNode::kPageFanOut * PAGE_SIZE;
+      if (iter->offset() == prev_node_offset) {
+        new_end = &iter->Lookup(VmPageListNode::kPageFanOut - 1);
+      } else {
+        DEBUG_ASSERT(iter->offset() < prev_node_offset);
+        fbl::AllocChecker ac;
+        ktl::unique_ptr<VmPageListNode> pl =
+            ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(prev_node_offset));
+        if (!ac.check()) {
+          if (slot->IsEmpty()) {
+            ReturnEmptySlot(offset);
+          }
+          return {nullptr, true};
+        }
+        new_end = &pl->Lookup(VmPageListNode::kPageFanOut - 1);
+        list_.insert(ktl::move(pl));
+      }
+    }
+    DEBUG_ASSERT(new_end);
+  }
+
+  VmPageOrMarker* new_start = nullptr;
+  if (need_new_start) {
+    if (node_index < VmPageListNode::kPageFanOut - 1) {
+      // The next slot is in the same node.
+      new_start = &pln->Lookup(node_index + 1);
+    } else {
+      // The next slot is in the node to the right. We might need to allocate a new node to the
+      // right if it does not exist. Try to walk right and see if we find the next node we're
+      // looking for.
+      auto iter = pln;
+      iter++;
+      // We are here because slot was either empty or it was an interval start. Additionally, the
+      // slot was the right-most slot in its node, which means we are guaranteed to find a node to
+      // the right which holds the end of the interval.
+      DEBUG_ASSERT(iter.IsValid());
+      const uint64_t next_node_offset = node_offset + VmPageListNode::kPageFanOut * PAGE_SIZE;
+      if (iter->offset() == next_node_offset) {
+        new_start = &iter->Lookup(0);
+      } else {
+        DEBUG_ASSERT(iter->offset() > next_node_offset);
+        fbl::AllocChecker ac;
+        ktl::unique_ptr<VmPageListNode> pl =
+            ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(next_node_offset));
+        if (!ac.check()) {
+          if (slot->IsEmpty()) {
+            ReturnEmptySlot(offset);
+          }
+          return {nullptr, true};
+        }
+        new_start = &pl->Lookup(0);
+        list_.insert(ktl::move(pl));
+      }
+    }
+    DEBUG_ASSERT(new_start);
+  }
+
+  // Helper to mint new sentinel values for the split. Only creates zero ranges. If we support
+  // other page interval types in the future, we will need to modify this to support them.
+  auto mint_new_sentinel =
+      [&found_interval](VmPageOrMarker::IntervalSentinel sentinel) -> VmPageOrMarker {
+    DEBUG_ASSERT(found_interval);
+    // We only support zero intervals for now.
+    DEBUG_ASSERT(found_interval->IsIntervalZero());
+    // Preserve dirty state across the split.
+    return VmPageOrMarker::ZeroInterval(sentinel, found_interval->GetZeroIntervalDirtyState());
+  };
+
+  // Now that we've looked up the relevant slots after performing any required allocations, make
+  // the actual change. Install new end and start sentinels on the left and right of offset
+  // respectively.
+  if (new_start) {
+    if (new_start->IsIntervalEnd()) {
+      // If an interval was ending at the next slot, change it into a Slot sentinel.
+      new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    } else {
+      DEBUG_ASSERT(new_start->IsEmpty());
+      *new_start = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::Start);
+    }
+  }
+  if (new_end) {
+    if (new_end->IsIntervalStart()) {
+      // If an interval was starting at the previous slot, change it into a Slot sentinel.
+      new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    } else {
+      DEBUG_ASSERT(new_end->IsEmpty());
+      *new_end = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::End);
+    }
+  }
+
+  // Finally, install a slot sentinel at offset.
+  if (slot->IsEmpty()) {
+    *slot = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::Slot);
+  } else {
+    DEBUG_ASSERT(slot->IsIntervalStart() || slot->IsIntervalEnd());
+    slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+  }
+
+  return {slot, true};
+}
+
 bool VmPageList::IsOffsetInInterval(uint64_t offset) const {
   // Find the node that would contain this offset.
   const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
