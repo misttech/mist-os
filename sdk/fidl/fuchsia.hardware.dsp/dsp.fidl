@@ -29,3 +29,7 @@ protocol DspDevice {
     /// `ZX_ERR_OUT_OF_RANGE` if the execution of the smcc command stopped by the DSP fails.
     Stop() -> () error zx.status;
 };
+
+service Service {
+    device client_end:DspDevice;
+};

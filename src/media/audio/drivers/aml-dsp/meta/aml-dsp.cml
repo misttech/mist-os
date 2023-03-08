@@ -14,5 +14,14 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: 'fuchsia.hardware.dsp.Service' },
+    ],
     use: [],
+    expose: [
+        {
+            service: 'fuchsia.hardware.dsp.Service',
+            from: 'self',
+        },
+    ],
 }

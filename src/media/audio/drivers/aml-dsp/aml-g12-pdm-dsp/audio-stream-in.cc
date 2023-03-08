@@ -84,20 +84,14 @@ int AudioStreamInDsp::MailboxBind() {
 }
 
 int AudioStreamInDsp::DspBind() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_dsp::DspDevice>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create endpoints");
-    return endpoints.status_value();
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_dsp::Service::Device>("audio-dsp");
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol: %s", client.status_string());
+    return client.status_value();
   }
 
-  auto status = DdkConnectFragmentFidlProtocol("audio-dsp", std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect fidl protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_dsp::DspDevice> audio_dsp =
-      fidl::WireSyncClient(std::move(endpoints->client));
+  auto audio_dsp = fidl::WireSyncClient(std::move(client.value()));
 
   audio_dsp_ = std::make_unique<AmlDspDevice>(std::move(audio_dsp));
   if (audio_dsp_ == nullptr) {
@@ -106,7 +100,7 @@ int AudioStreamInDsp::DspBind() {
   }
 
   // Load the DSP firmware that processes PDM audio data.
-  status = audio_dsp_->DspHwInit(false);
+  zx_status_t status = audio_dsp_->DspHwInit(false);
   if (status != ZX_OK) {
     zxlogf(ERROR, "HW DSP initialization failed: %s", zx_status_get_string(status));
     return status;

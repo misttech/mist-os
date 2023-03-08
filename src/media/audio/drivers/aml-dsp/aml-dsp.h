@@ -9,9 +9,9 @@
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
-#include <lib/svc/outgoing.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
 
@@ -42,6 +42,7 @@ class AmlDsp : public DeviceType {
         dsp_sram_addr_(std::move(dsp_sram_addr)),
         dsp_clk_sel_(dsp_clk_sel),
         dsp_clk_gate_(dsp_clk_gate),
+        outgoing_(dispatcher),
         dispatcher_(dispatcher) {}
 
   ~AmlDsp() = default;
@@ -88,7 +89,8 @@ class AmlDsp : public DeviceType {
   fidl::WireSyncClient<fuchsia_hardware_mailbox::Device> dsp_mailbox_;
 
   // This is a helper class which we use to serve the outgoing directory.
-  std::optional<svc::Outgoing> outgoing_dir_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_dsp::DspDevice> bindings_;
   async_dispatcher_t* dispatcher_;
 };
 

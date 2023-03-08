@@ -342,33 +342,33 @@ void AmlDsp::Stop(StopCompleter::Sync& completer) {
 }
 
 zx_status_t AmlDsp::Bind() {
-  outgoing_dir_.emplace(dispatcher_);
-  outgoing_dir_->svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<FidlDsp::DspDevice>,
-      fbl::MakeRefCounted<fs::Service>(
-          [device = this](fidl::ServerEnd<FidlDsp::DspDevice> request) mutable {
-            fidl::BindServer(device->dispatcher_, std::move(request), device);
-            return ZX_OK;
-          }));
+  zx::result result = outgoing_.AddService<fuchsia_hardware_dsp::Service>(
+      fuchsia_hardware_dsp::Service::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service the outgoing directory");
+    return result.status_value();
+  }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
-  auto status = outgoing_dir_->Serve(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to service the outgoing directory: %s", zx_status_get_string(status));
-    return status;
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "failed to service the outgoing directory: %s", result.status_string());
+    return result.status_value();
   }
 
   std::array offers = {
-      fidl::DiscoverableProtocolName<FidlDsp::DspDevice>,
+      fuchsia_hardware_dsp::Service::Name,
   };
 
   return DdkAdd(ddk::DeviceAddArgs("aml-dsp")
                     .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                    .set_fidl_protocol_offers(offers)
+                    .set_fidl_service_offers(offers)
                     .set_outgoing_dir(endpoints->client.TakeChannel())
                     .set_proto_id(ZX_PROTOCOL_AML_DSP));
 }
