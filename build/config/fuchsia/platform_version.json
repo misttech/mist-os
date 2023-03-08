@@ -1,8 +1,6 @@
 {
     "in_development_api_level": 11,
     "supported_fuchsia_api_levels": [
-        9,
-        10,
         11
     ]
 }
