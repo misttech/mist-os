@@ -10,6 +10,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio-ptr/fake.h>
@@ -148,36 +150,44 @@ class FakePci : public fidl::testing::WireTestBase<fuchsia_hardware_pci::Device>
   zx::vmo vmo_control_;
 };
 
+struct IncomingNamespace {
+  FakePci fake_pci;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 }  // namespace
 
 class AddressSpaceDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
   AddressSpaceDeviceTest()
       : async_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        pci_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        outgoing_(dispatcher()) {}
+        ns_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        ns_(ns_loop_.dispatcher(), std::in_place) {}
 
   // |zxtest::Test|
   void SetUp() override {
     fake_root_ = MockDevice::FakeRootParent();
 
-    auto service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
-        fuchsia_hardware_pci::Service::InstanceHandler(
-            {.device = fake_pci_.bind_handler(pci_loop_.dispatcher())}));
-    ZX_ASSERT(service_result.is_ok());
+    ns_loop_.StartThread("incoming-namespace-thread");
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    ns_.SyncCall([&](IncomingNamespace* ns) {
+      auto service_result = ns->outgoing.AddService<fuchsia_hardware_pci::Service>(
+          fuchsia_hardware_pci::Service::InstanceHandler({
+              .device = ns->fake_pci.bind_handler(async_get_default_dispatcher()),
+          }));
+      ZX_ASSERT(service_result.is_ok());
+
+      ZX_ASSERT(ns->outgoing.Serve(std::move(endpoints->server)).is_ok());
+    });
 
     fake_root_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
                                "pci");
 
-    pci_loop_.StartThread("pci-fidl-server-thread");
-
-    std::unique_ptr<AddressSpaceDevice> dut(
-        new AddressSpaceDevice(fake_root_.get(), async_loop_.dispatcher()));
-    PerformBlockingWork([&]() { ASSERT_OK(dut->Bind()); });
+    std::unique_ptr<AddressSpaceDevice> dut(new AddressSpaceDevice(fake_root_.get(), dispatcher()));
+    ASSERT_OK(dut->Bind());
     dut_ = dut.release();
   }
 
@@ -186,17 +196,10 @@ class AddressSpaceDeviceTest : public zxtest::Test, public loop_fixture::RealLoo
     device_async_remove(dut_->zxdev());
     ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root_.get()));
   }
-  std::unique_ptr<VmoMapping> MapControlRegisters() const {
+  std::unique_ptr<VmoMapping> MapControlRegisters() {
     std::unique_ptr<VmoMapping> ret;
 
-    // Have to run this code in the pci_loop's async dispatcher because fake_pci
-    // is bound to it as a FIDL server.
-    sync_completion_t completion;
-    async::PostTask(pci_loop_.dispatcher(), [&] {
-      ret = fake_pci_.MapControlRegisters();
-      sync_completion_signal(&completion);
-    });
-    sync_completion_wait(&completion, ZX_TIME_INFINITE);
+    ns_.SyncCall([&](IncomingNamespace* ns) { ret = ns->fake_pci.MapControlRegisters(); });
 
     return ret;
   }
@@ -208,9 +211,8 @@ class AddressSpaceDeviceTest : public zxtest::Test, public loop_fixture::RealLoo
 
  protected:
   async::Loop async_loop_;
-  async::Loop pci_loop_;
-  FakePci fake_pci_;
-  component::OutgoingDirectory outgoing_;
+  async::Loop ns_loop_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> ns_;
   std::shared_ptr<MockDevice> fake_root_;
   AddressSpaceDevice* dut_;
 };

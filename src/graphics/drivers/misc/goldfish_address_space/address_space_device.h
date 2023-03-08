@@ -6,13 +6,11 @@
 #define SRC_GRAPHICS_DRIVERS_MISC_GOLDFISH_ADDRESS_SPACE_ADDRESS_SPACE_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio.h>
-#include <lib/svc/outgoing.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/pmt.h>
@@ -76,9 +74,9 @@ class AddressSpaceDevice : public DeviceType {
   fbl::Mutex mmio_lock_;
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(mmio_lock_);
 
-  std::optional<svc::Outgoing> outgoing_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_goldfish::AddressSpaceDevice> device_bindings_;
   async_dispatcher_t* dispatcher_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 
   fidl::ServerBindingGroup<fuchsia_hardware_goldfish::AddressSpaceChildDriver> bindings_;
   std::optional<ddk::UnbindTxn> unbind_txn_;

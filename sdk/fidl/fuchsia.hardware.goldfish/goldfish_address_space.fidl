@@ -120,5 +120,5 @@ protocol AddressSpaceChildDriver {
 };
 
 service AddressSpaceService {
-    device client_end:AddressSpaceChildDriver;
+    device client_end:AddressSpaceDevice;
 };

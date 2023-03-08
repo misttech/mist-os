@@ -13,7 +13,16 @@
         colocate: "false",
         compat: "driver/goldfish_address_space.so",
     },
+    capabilities: [
+        { service: 'fuchsia.hardware.goldfish.AddressSpaceService' },
+    ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: 'fuchsia.hardware.goldfish.AddressSpaceService',
+            from: 'self',
+        },
     ],
 }

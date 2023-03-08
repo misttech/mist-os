@@ -330,16 +330,18 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
     fake_parent_->AddFidlService(fuchsia_hardware_goldfish_pipe::Service::Name,
                                  std::move(endpoints->client), "goldfish-pipe");
 
-    fake_parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::AddressSpaceDevice>,
-        [this](zx::channel channel) {
-          fidl::BindServer(
-              address_space_server_loop_.dispatcher(),
-              fidl::ServerEnd<fuchsia_hardware_goldfish::AddressSpaceDevice>(std::move(channel)),
-              &address_space_);
-          return ZX_OK;
-        },
-        "goldfish-address-space");
+    service_result = outgoing_.AddService<fuchsia_hardware_goldfish::AddressSpaceService>(
+        fuchsia_hardware_goldfish::AddressSpaceService::InstanceHandler({
+            .device = address_space_.bind_handler(address_space_server_loop_.dispatcher()),
+        }));
+    ASSERT_EQ(service_result.status_value(), ZX_OK);
+
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints.status_value());
+    ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
+
+    fake_parent_->AddFidlService(fuchsia_hardware_goldfish::AddressSpaceService::Name,
+                                 std::move(endpoints->client), "goldfish-address-space");
 
     service_result = outgoing_.AddService<fuchsia_hardware_goldfish::SyncService>(
         fuchsia_hardware_goldfish::SyncService::InstanceHandler({

@@ -100,22 +100,15 @@ zx_status_t Control::Init() {
   }
   pipe_ = fidl::WireSyncClient(std::move(client.value()));
 
-  auto address_space_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_goldfish::AddressSpaceDevice>();
-  if (address_space_endpoints.is_error()) {
-    return address_space_endpoints.status_value();
-  }
-
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "goldfish-address-space",
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::AddressSpaceDevice>,
-      address_space_endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
+  zx::result address_space_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_goldfish::AddressSpaceService::Device>(
+          "goldfish-address-space");
+  if (address_space_client.is_error()) {
     zxlogf(ERROR, "%s: failed to connect to FIDL goldfish-address-space fragment: %s", kTag,
-           zx_status_get_string(status));
-    return status;
+           address_space_client.status_string());
+    return address_space_client.status_value();
   }
-  address_space_ = fidl::WireSyncClient(std::move(address_space_endpoints->client));
+  address_space_ = fidl::WireSyncClient(std::move(address_space_client.value()));
 
   zx::result sync_client =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_goldfish::SyncService::Device>(

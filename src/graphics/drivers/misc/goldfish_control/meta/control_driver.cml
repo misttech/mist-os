@@ -18,5 +18,6 @@
     use: [
         { service: "fuchsia.hardware.goldfish.pipe.Service" },
         { service: "fuchsia.hardware.goldfish.SyncService" },
+        { service: "fuchsia.hardware.goldfish.AddressSpaceService" },
     ],
 }

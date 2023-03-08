@@ -17,6 +17,7 @@ driver_bind_rules("goldfish_address_space-bind") {
 common_deps = [
   ":goldfish_address_space-bind",
   "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp_wire",
+  "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//sdk/lib/fidl",
   "//src/devices/lib/driver",
@@ -29,7 +30,6 @@ common_deps = [
   "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-  "//zircon/system/ulib/svc",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/zircon-internal",
@@ -65,9 +65,11 @@ test("goldfish-address-space-test") {
     "address_space_device_test.cc",
   ]
   deps = common_deps + [
+           "//sdk/lib/async_patterns/testing/cpp",
            "//sdk/lib/component/outgoing/cpp",
            "//src/devices/testing/fake-bti",
            "//src/devices/testing/mock-ddk",
+           "//zircon/system/ulib/async-default",
            "//zircon/system/ulib/async-loop:async-loop-cpp",
            "//zircon/system/ulib/async-loop/testing:async-loop-testing",
            "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",

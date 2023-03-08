@@ -67,8 +67,7 @@ uint32_t lower_32_bits(uint64_t n) { return static_cast<uint32_t>(n); }
 
 // static
 zx_status_t AddressSpaceDevice::Create(void* ctx, zx_device_t* device) {
-  async_dispatcher_t* dispatcher =
-      fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
+  async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   auto address_space_device = std::make_unique<goldfish::AddressSpaceDevice>(device, dispatcher);
 
   zx_status_t status = address_space_device->Bind();
@@ -80,7 +79,7 @@ zx_status_t AddressSpaceDevice::Create(void* ctx, zx_device_t* device) {
 }
 
 AddressSpaceDevice::AddressSpaceDevice(zx_device_t* parent, async_dispatcher_t* dispatcher)
-    : DeviceType(parent), pci_(parent, "pci"), dispatcher_(dispatcher) {}
+    : DeviceType(parent), pci_(parent, "pci"), outgoing_(dispatcher), dispatcher_(dispatcher) {}
 
 AddressSpaceDevice::~AddressSpaceDevice() = default;
 
@@ -153,40 +152,34 @@ zx_status_t AddressSpaceDevice::Bind() {
   // passthrough device.
   auto passthrough_dev = std::make_unique<AddressSpacePassthroughDevice>(this);
 
-  status = loop_.StartThread("goldfish-address-space-thread");
-  outgoing_.emplace(loop_.dispatcher());
-  outgoing_->svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::AddressSpaceDevice>,
-      fbl::MakeRefCounted<fs::Service>(
-          [device = this, impl = passthrough_dev.get()](
-              fidl::ServerEnd<fuchsia_hardware_goldfish::AddressSpaceDevice> request) mutable {
-            auto status =
-                fidl::BindSingleInFlightOnly(device->dispatcher_, std::move(request), impl);
-            if (status != ZX_OK) {
-              zxlogf(ERROR, "%s: failed to bind channel: %s", kTag, zx_status_get_string(status));
-            }
-            return status;
-          }));
+  zx::result result = outgoing_.AddService<fuchsia_hardware_goldfish::AddressSpaceService>(
+      fuchsia_hardware_goldfish::AddressSpaceService::InstanceHandler({
+          .device = device_bindings_.CreateHandler(passthrough_dev.get(), dispatcher_,
+                                                   fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service the outgoing directory");
+    return result.status_value();
+  }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
-  status = outgoing_->Serve(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to service the outgoing directory: %s", kTag,
-           zx_status_get_string(status));
-    return status;
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "%s: failed to service the outgoing directory: %s", kTag, result.status_string());
+    return result.status_value();
   }
 
   // Add passthrough device
   std::array offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::AddressSpaceDevice>,
+      fuchsia_hardware_goldfish::AddressSpaceService::Name,
   };
   status = passthrough_dev->DdkAdd(ddk::DeviceAddArgs("address-space-passthrough")
                                        .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                                       .set_fidl_protocol_offers(offers)
+                                       .set_fidl_service_offers(offers)
                                        .set_outgoing_dir(endpoints->client.TakeChannel())
                                        .set_proto_id(ZX_PROTOCOL_GOLDFISH_ADDRESS_SPACE));
   if (status != ZX_OK) {
