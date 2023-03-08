@@ -384,13 +384,7 @@
                 "MlockTest.MadviseDontneed",
 
                 // mmap_test
-                "MMapTest.MapDevZeroShared",
-                "MMapTest.MapDevZeroPrivate",
-                "MMapTest.MapDevZeroNoPersistence",
-                "MMapTest.MapDevZeroSharedMultiplePages",
-                "MMapTest.MapDevZeroSharedFdNoPersistence",
                 "MMapTest.MapDevZeroSegfaultAfterUnmap",
-                "MMapTest.MapDevZeroUnaligned",
                 "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
                 "MMapTest.ExceedLimitData",

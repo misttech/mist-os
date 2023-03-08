@@ -63,7 +63,14 @@ struct Mapping {
     /// The flags for this mapping.
     options: MappingOptions,
 
-    /// The name of the file used for the mapping. None if the mapping is anonymous.
+    /// The name of the file used for the mapping.
+    /// This is usually set to none if the mapping is anonymous.
+    ///
+    /// The only exception is when mapping `/dev/zero` which is equivalent to an
+    /// anonymous mapping despite having this field set.
+    ///
+    /// Because of this exception, avoid using this field to check if a mapping is anonymous.
+    /// Instead, check if `options` bitfield contains `MappingOptions::ANONYMOUS`.
     filename: Option<NamespaceNode>,
 
     /// A name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
@@ -659,7 +666,7 @@ impl MemoryManagerState {
             let start = mapping.address_to_offset(range_to_zero.start);
             let end = mapping.address_to_offset(range_to_zero.end);
             let op = match advice {
-                MADV_DONTNEED if mapping.filename.is_some() => {
+                MADV_DONTNEED if !mapping.options.contains(MappingOptions::ANONYMOUS) => {
                     // Note, we cannot simply implemented MADV_DONTNEED with
                     // zx::VmoOp::DONT_NEED because they have different
                     // semantics.
@@ -1725,6 +1732,23 @@ impl FileOps for ProcStatusFile {
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }
+}
+
+/// Creates a VMO that can be used in an anonymous mapping for the `mmap`
+/// syscall.
+pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
+    // mremap can grow memory regions, so make sure the VMO is resizable.
+    let mut vmo =
+        zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, size).map_err(|s| match s {
+            zx::Status::NO_MEMORY => errno!(ENOMEM),
+            zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
+            _ => impossible_error(s),
+        })?;
+    vmo.set_name(CStr::from_bytes_with_nul(b"starnix-anon\0").unwrap())
+        .map_err(impossible_error)?;
+    // TODO(fxbug.dev/105639): Audit replace_as_executable usage
+    vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
+    Ok(Arc::new(vmo))
 }
 
 #[cfg(test)]

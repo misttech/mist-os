@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_runtime::duplicate_utc_clock_handle;
-use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::ffi::CStr;
+use fuchsia_zircon as zx;
 use std::sync::Arc;
 
 use crate::fs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
@@ -12,7 +11,6 @@ use crate::fs::*;
 use crate::logging::*;
 use crate::mm::*;
 use crate::syscalls::*;
-use crate::vmex_resource::VMEX_RESOURCE;
 
 fn mmap_prot_to_vm_opt(prot: u32) -> zx::VmarFlags {
     let mut flags = zx::VmarFlags::empty();
@@ -118,19 +116,7 @@ pub fn sys_mmap(
     }
 
     let MappedVmo { vmo, user_address } = if flags & MAP_ANONYMOUS != 0 {
-        // mremap can grow memory regions, so make sure the VMO is resizable.
-        let mut vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, length as u64).map_err(
-            |s| match s {
-                zx::Status::NO_MEMORY => errno!(ENOMEM),
-                zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
-                _ => impossible_error(s),
-            },
-        )?;
-        vmo.set_name(CStr::from_bytes_with_nul(b"starnix-anon\0").unwrap())
-            .map_err(impossible_error)?;
-        // TODO(fxbug.dev/105639): Audit replace_as_executable usage
-        vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
-        let vmo = Arc::new(vmo);
+        let vmo = create_anonymous_mapping_vmo(length as u64)?;
         let user_address =
             current_task.mm.map(addr, vmo.clone(), vmo_offset, length, zx_flags, options, None)?;
         MappedVmo::new(vmo, user_address)

@@ -9,6 +9,7 @@ use crate::device::DeviceOps;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::logging::*;
+use crate::mm::*;
 use crate::task::*;
 use crate::types::*;
 
@@ -58,6 +59,46 @@ impl FileOps for DevNull {
 struct DevZero;
 impl FileOps for DevZero {
     fileops_impl_seekless!();
+
+    fn mmap(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        addr: DesiredAddress,
+        vmo_offset: u64,
+        length: usize,
+        flags: zx::VmarFlags,
+        mut options: MappingOptions,
+        filename: NamespaceNode,
+    ) -> Result<MappedVmo, Errno> {
+        // All /dev/zero mappings behave as anonymous mappings.
+        //
+        // This means that we always create a new zero-filled VMO for this mmap request.
+        // Memory is never shared between two mappings of /dev/zero, even if
+        // `MappingOptions::SHARED` is set.
+        //
+        // Similar to anonymous mappings, if this process were to request a shared mapping
+        // of /dev/zero and then fork, the child and the parent process would share the
+        // VMO created here.
+        let vmo = create_anonymous_mapping_vmo(length as u64)?;
+
+        options |= MappingOptions::ANONYMOUS;
+
+        let addr = current_task.mm.map(
+            addr,
+            vmo.clone(),
+            vmo_offset,
+            length,
+            flags,
+            options,
+            // We set the filename here, even though we are creating what is
+            // functionally equivalent to an anonymous mapping. Doing so affects
+            // the output of `/proc/self/maps` and identifies this mapping as
+            // file-based.
+            Some(filename),
+        )?;
+        Ok(MappedVmo::new(vmo, addr))
+    }
 
     fn write_at(
         &self,
