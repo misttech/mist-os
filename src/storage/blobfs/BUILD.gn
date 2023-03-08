@@ -126,6 +126,7 @@ static_library("blobfs") {
       "blob_loader.cc",
       "blob_verifier.cc",
       "blob_verifier.h",
+      "blob_writer.cc",
       "blobfs.cc",
       "blobfs_inspect_tree.cc",
       "blobfs_inspect_tree.h",

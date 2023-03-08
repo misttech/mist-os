@@ -12,35 +12,19 @@
 #endif
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/async/cpp/wait.h>
-#include <lib/fpromise/promise.h>
 #include <lib/zx/event.h>
-#include <string.h>
 
 #include <memory>
 
 #include <fbl/algorithm.h>
-#include <fbl/intrusive_wavl_tree.h>
-#include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
-#include <storage/buffer/owned_vmoid.h>
 
 #include "src/lib/digest/digest.h"
-#include "src/lib/storage/vfs/cpp/journal/data_streamer.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
-#include "src/lib/storage/vfs/cpp/vnode.h"
-#include "src/storage/blobfs/allocator/allocator.h"
-#include "src/storage/blobfs/allocator/extent_reserver.h"
-#include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/blob_cache.h"
 #include "src/storage/blobfs/blob_layout.h"
-#include "src/storage/blobfs/common.h"
-#include "src/storage/blobfs/compression/blob_compressor.h"
-#include "src/storage/blobfs/compression/compressor.h"
-#include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/format_assertions.h"
+#include "src/storage/blobfs/cache_node.h"
+#include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/loader_info.h"
-#include "src/storage/blobfs/transaction.h"
 
 namespace blobfs {
 
@@ -51,23 +35,22 @@ enum class BlobState : uint8_t {
   kEmpty,      // After open.
   kDataWrite,  // After space reserved (but allocation not yet persisted).
   kReadable,   // After writing.
-  kPurged,     // After unlink,
+  kPurged,     // After unlink.
   kError,      // Unrecoverable error state.
 };
 
 class Blob final : public CacheNode, fbl::Recyclable<Blob> {
  public:
-  // Constructs a blob, reads in data, verifies the contents, then destroys the in-memory copy.
-  static zx_status_t LoadAndVerifyBlob(Blobfs* bs, uint32_t node_index);
+  // Creates a writable blob. Will become readable once all data has been written and verified.
+  // `blobfs` must outlive this blob.
+  Blob(Blobfs& blobfs, const digest::Digest& digest, CompressionAlgorithm data_format);
 
-  Blob(Blobfs* bs, const digest::Digest& digest, CompressionAlgorithm data_format);
-
-  // Creates a readable blob from existing data.
-  Blob(Blobfs* bs, uint32_t node_index, const Inode& inode);
+  // Creates a readable blob from existing data. `blobfs` must outlive this blob.
+  Blob(Blobfs& blobfs, uint32_t node_index, const Inode& inode);
 
   ~Blob() override;
 
-  // Note this Blob's hash is stored on the CacheNode base class:
+  // Note this Blob's hash is stored on the CacheNode base class `digest()` method.
   //
   // const digest::Digest& digest() const;
 
@@ -128,15 +111,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // Marks the blob as deletable, and attempt to purge it.
   zx_status_t QueueUnlink() __TA_EXCLUDES(mutex_);
 
-  // PrepareWrite should be called after allocating a vnode and before writing any data to the blob.
-  // The function sets blob size, allocates vmo needed for data and merkle tree, initiates
-  // structures needed for compression and reserves an inode for the blob.  It is not meant to be
-  // called multiple times on a given vnode.  This is public only for testing.
-  zx_status_t PrepareWrite(uint64_t size_data, bool compress) __TA_EXCLUDES(mutex_);
-
-  // Sets the target_compression_size in write_info to |size|. Setter made public for testing.
-  void SetTargetCompressionSize(uint64_t size) __TA_EXCLUDES(mutex_);
-
   // Reads in and verifies the contents of this Blob.
   zx_status_t Verify() __TA_EXCLUDES(mutex_);
 
@@ -168,16 +142,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   bool ShouldCache() const final __TA_EXCLUDES(mutex_);
   void ActivateLowMemory() final __TA_EXCLUDES(mutex_);
 
-  void set_state(BlobState new_state) __TA_REQUIRES(mutex_) { state_ = new_state; }
-  BlobState state() const __TA_REQUIRES_SHARED(mutex_) { return state_; }
-
-  // After writing the blob, marks the blob as readable.
-  [[nodiscard]] zx_status_t MarkReadable() __TA_REQUIRES(mutex_);
-
-  // Puts a blob into an error state and removes it from the cache so that a client may immediately
-  // have another write attempt if required.
-  void LatchWriteError(zx_status_t write_error) __TA_REQUIRES(mutex_);
-
   // Returns a handle to an event which will be signalled when the blob is readable.
   //
   // Returns "ZX_OK" if successful, otherwise the error code will indicate the failure status.
@@ -196,18 +160,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // after this is called.
   zx_status_t Purge() __TA_REQUIRES(mutex_);
 
-  // Schedules journal transaction prepared by PrepareWrite for the null blob. Null blob doesn't
-  // have any data to write. They don't go through regular Write()/WriteInternal path so we
-  // explicitly issue journaled write that commits inode allocation and creation.
-  zx_status_t WriteNullBlob() __TA_REQUIRES(mutex_);
-
-  // If successful, allocates Blob Node and Blocks (in-memory)
-  // kBlobStateEmpty --> kBlobStateDataWrite
-  zx_status_t SpaceAllocate() __TA_REQUIRES(mutex_);
-
-  // Write blob data into memory (or stream to disk) and update Merkle tree.
-  zx_status_t WriteInternal(const void* data, size_t len, size_t* actual) __TA_REQUIRES(mutex_);
-
   // Reads from a blob. Requires: kBlobStateReadable
   zx_status_t ReadInternal(void* data, size_t len, size_t off, size_t* actual)
       __TA_EXCLUDES(mutex_);
@@ -220,54 +172,32 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   zx_status_t LoadPagedVmosFromDisk() __TA_REQUIRES(mutex_);
   zx_status_t LoadVmosFromDisk() __TA_REQUIRES(mutex_);
 
-  // Initialize the blob layout for writing.
-  zx_status_t InitializeBlobLayout() __TA_REQUIRES(mutex_);
-
-  // Initialize Merkle tree buffers for writing.
-  zx_status_t InitializeMerkleBuffer() __TA_REQUIRES(mutex_);
-
-  // Initialize seek table and decompressor when streaming precompressed blobs. Returns true if
-  // initialization was successful, false if more data is required to decode the seek table.
-  zx::result<bool> InitializeDecompressor(size_t buff_pos) __TA_REQUIRES(mutex_);
-
-  // Verifies the integrity of the null blob (i.e. that its name is correct). Can only be called on
-  // the null blob and will assert otherwise.
-  zx_status_t VerifyNullBlob() const __TA_REQUIRES_SHARED(mutex_);
-
-  // Called by the Vnode once the last write has completed, updating the on-disk metadata.
-  zx_status_t WriteMetadata(BlobTransaction& transaction) __TA_REQUIRES(mutex_);
-
   // Returns whether the data or merkle tree bytes are mapped and resident in memory.
   bool IsDataLoaded() const __TA_REQUIRES_SHARED(mutex_);
 
-  // Commits the blob to persistent storage.
-  zx_status_t Commit() __TA_REQUIRES(mutex_);
-
   // Returns the block size used by blobfs.
   uint64_t GetBlockSize() const;
-
-  // Flush blob data to persistent storage, and issue commit of metadata. Only blob data is
-  // guaranteed to persist on return. Metadata may still remain in cache until next journal flush.
-  zx_status_t FlushData() __TA_REQUIRES(mutex_);
-
-  // Write |block_count| blocks at |block_offset| using the data from |producer| into |streamer|.
-  zx_status_t WriteData(uint64_t block_count, uint64_t block_offset, BlobDataProducer& producer,
-                        fs::DataStreamer& streamer) __TA_REQUIRES(mutex_);
 
   // Sets the name on the paged_vmo() to indicate where this blob came from. The name will vary
   // according to whether the vmo is currently active to help developers find bugs.
   void SetPagedVmoName(bool active) __TA_REQUIRES(mutex_);
 
-  // Stream as much outstanding data as possible when performing streaming writes. |buff_pos| refers
-  // to the offset of the last byte which was buffered in the write buffer VMO. Some data may be
-  // flushed to disk to save memory, but this is not guaranteed.
-  zx_status_t StreamBufferedData(size_t buff_pos) __TA_REQUIRES(mutex_);
+  // Write-path specific functionality:
 
-  // When using deprecated blob format with Merkle tree at beginning, ensure outstanding data writes
-  // have been issued, and reset block iterator. This ensures only the Merkle tree is outstanding.
-  zx_status_t WriteRemainingDataForDeprecatedFormat() __TA_REQUIRES(mutex_);
+  // Move this blob into the error state and evict it from the blob cache. Returns the status code
+  // of the specified `error` to simplify error propagation.
+  zx_status_t OnWriteError(zx::error_result error) __TA_REQUIRES(mutex_);
 
-  Blobfs* const blobfs_;  // Doesn't need locking because this is never changed.
+  struct WrittenBlob {
+    uint32_t map_index;
+    std::unique_ptr<BlobLayout> layout;
+  };
+
+  // Move blob into a readable state once fully written to disk and verified. On success, will
+  // destroy the associated `writer_`.
+  zx_status_t MarkReadable(const WrittenBlob& written_blob) __TA_REQUIRES(mutex_);
+
+  Blobfs& blobfs_;  // Doesn't need locking because this is never changed.
   BlobState state_ __TA_GUARDED(mutex_) = BlobState::kEmpty;
   // True if this node should be unlinked when closed.
   bool deletable_ __TA_GUARDED(mutex_) = false;
@@ -305,20 +235,20 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // is protected by the mutex.
   SyncingState syncing_state_ __TA_GUARDED(mutex_) = SyncingState::kDataIncomplete;
 
-  uint32_t map_index_ __TA_GUARDED(mutex_) = 0;
-
   zx::event readable_event_ __TA_GUARDED(mutex_);
 
+  uint32_t map_index_ __TA_GUARDED(mutex_) = 0;
   uint64_t blob_size_ __TA_GUARDED(mutex_) = 0;
   uint64_t block_count_ __TA_GUARDED(mutex_) = 0;
 
-  // Data used exclusively during writeback.
-  struct WriteInfo;
-  std::unique_ptr<WriteInfo> write_info_ __TA_GUARDED(mutex_);
+  // Data used exclusively during writeback. Only used by Write()/Append().
+  class Writer;
+  std::unique_ptr<Writer> writer_ __TA_GUARDED(mutex_);
 };
 
-// Returns true if the given inode supports paging.
-bool SupportsPaging(const Inode& inode);
+// Verifies the integrity of the null blob (i.e. that |digest| is correct). On failure, the |blobfs|
+// metrics and corruption notifier will be updated accordingly.
+zx::result<> VerifyNullBlob(Blobfs& blobfs, const digest::Digest& digest);
 
 }  // namespace blobfs
 

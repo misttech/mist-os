@@ -445,30 +445,6 @@ TEST_P(BlobTest, ReadErrorsTemporary) {
   set_hook([](const block_fifo_request_t& _req, const zx::vmo* _vmo) { return ZX_OK; });
 }
 
-TEST_P(BlobTest, BlobPrepareWriteFailure) {
-  // Remount without compression so that we can trigger failure.
-  MountOptions options = {.compression_settings = {
-                              .compression_algorithm = CompressionAlgorithm::kUncompressed,
-                          }};
-  Remount(options);
-
-  std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
-  {
-    auto root = OpenRoot();
-    fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
-    auto blob = fbl::RefPtr<Blob>::Downcast(file);
-    // PrepareWrite should assert on debug builds and return ZX_ERR_INTERNAL
-    // on non-debug builds.
-#ifndef NDEBUG
-    ASSERT_DEATH({ blob->PrepareWrite(info->size_data, /*compress=*/true); }, "");
-#else
-    EXPECT_EQ(blob->PrepareWrite(info->size_data, /*compress=*/true), ZX_ERR_INTERNAL);
-#endif
-    ASSERT_EQ(file->Close(), ZX_OK);
-  }
-}
-
 std::string GetVmoName(const zx::vmo& vmo) {
   char buf[ZX_MAX_NAME_LEN + 1] = {'\0'};
   EXPECT_EQ(vmo.get_property(ZX_PROP_NAME, buf, ZX_MAX_NAME_LEN), ZX_OK);

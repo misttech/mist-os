@@ -240,8 +240,7 @@ TEST_F(BlobfsTestWithLargeDevice, WritingBlobLargerThanWritebackCapacitySucceeds
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_EQ(root_node->Create(info->path + 1, 0, &file), ZX_OK);
   auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
-  // Force no compression so that we have finer control over the size.
-  EXPECT_EQ(blob->PrepareWrite(info->size_data, /*compress=*/false), ZX_OK);
+  EXPECT_EQ(blob->Truncate(info->size_data), ZX_OK);
   size_t actual;
   // If this starts to fail with an ERR_NO_SPACE error it could be because WriteBufferBlockCount()
   // has changed and is now returning something too big for the device we're using in this test.

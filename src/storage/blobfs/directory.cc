@@ -116,7 +116,7 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
       return status;
     }
 
-    fbl::RefPtr<Blob> vn = fbl::AdoptRef(new Blob(blobfs_, digest, data_format));
+    fbl::RefPtr<Blob> vn = fbl::AdoptRef(new Blob(*blobfs_, digest, data_format));
     if (zx_status_t status = blobfs_->GetCache().Add(vn); status != ZX_OK) {
       return status;
     }

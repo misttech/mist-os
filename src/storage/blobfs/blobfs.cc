@@ -428,7 +428,7 @@ zx_status_t Blobfs::LoadAndVerifyBlob(uint32_t node_index) {
   }
 
   // Create a blob and open it (required for verification).
-  fbl::RefPtr<Blob> blob = fbl::MakeRefCounted<Blob>(this, node_index, *inode.value());
+  fbl::RefPtr<Blob> blob = fbl::MakeRefCounted<Blob>(*this, node_index, *inode.value());
   fs::ScopedVnodeOpen opener;
   if (zx_status_t status = opener.Open(blob); status != ZX_OK)
     return status;
@@ -929,7 +929,7 @@ zx_status_t Blobfs::InitializeVnodes() {
       return ZX_ERR_IO_DATA_INTEGRITY;
     }
 
-    fbl::RefPtr<Blob> vnode = fbl::MakeRefCounted<Blob>(this, node_index, *inode.value());
+    fbl::RefPtr<Blob> vnode = fbl::MakeRefCounted<Blob>(*this, node_index, *inode.value());
 
     // This blob is added to the cache, where it will quickly be relocated into the "closed set"
     // once we drop our reference to |vnode|. Although we delay reading any of the contents of the
