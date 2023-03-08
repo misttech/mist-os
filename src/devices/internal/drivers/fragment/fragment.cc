@@ -81,13 +81,10 @@ zx_status_t Fragment::Bind(void* ctx, zx_device_t* parent) {
     return result.status_value();
   }
 
-  std::array offers = {"proxy_channel"};
-
   // The thing before the comma will become the process name, if a new process
   // is created
   auto status = dev->DdkAdd(ddk::DeviceAddArgs(name)
                                 .set_flags(DEVICE_ADD_NON_BINDABLE | DEVICE_ADD_MUST_ISOLATE)
-                                .set_fidl_protocol_offers(offers)
                                 .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status == ZX_OK) {
     // devmgr owns the memory now
