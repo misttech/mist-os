@@ -206,17 +206,16 @@ void AmlSpi::Exchange64(const uint8_t* txdata, uint8_t* out_rxdata, size_t size)
 }
 
 void AmlSpi::SetThreadProfile() {
-  if (thread_profile_.is_valid()) {
+  if (!applied_scheduler_role_) {
+    applied_scheduler_role_ = true;
     // Set profile for bus transaction thread.
-    // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-    // coding parameters.
-
-    zx::unowned_thread thread{thrd_get_zx_handle(thrd_current())};
-    zx_status_t status = thread->set_profile(thread_profile_, 0);
+    const char* role_name = "fuchsia.devices.spi.drivers.aml-spi.transaction";
+    const zx_status_t status = device_set_profile_by_role(
+        zxdev(), thrd_get_zx_handle(thrd_current()), role_name, strlen(role_name));
     if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to apply deadline profile: %s", zx_status_get_string(status));
+      zxlogf(WARNING, "Failed to apply role to transaction thread: %s",
+             zx_status_get_string(status));
     }
-    thread_profile_.reset();
   }
 }
 
@@ -705,24 +704,13 @@ zx_status_t AmlSpi::Create(void* ctx, zx_device_t* device) {
     return ZX_OK;
   }
 
-  zx::profile thread_profile;
-  if (config.capacity && config.period) {
-    status = device_get_deadline_profile(device, config.capacity, config.period, config.period,
-                                         "aml-spi-thread-profile",
-                                         thread_profile.reset_and_get_address());
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to get deadline profile: %s", zx_status_get_string(status));
-    }
-  }
-
   const uint32_t reset_mask =
       config.bus_id == 0 ? kSpi0ResetMask : (config.bus_id == 1 ? kSpi1ResetMask : 0);
 
   fbl::AllocChecker ac;
-  std::unique_ptr<AmlSpi> spi(
-      new (&ac) AmlSpi(device, *std::move(mmio), std::move(reset_fidl_client), reset_mask,
-                       std::move(chips), std::move(thread_profile), std::move(interrupt), config,
-                       std::move(bti), std::move(tx_buffer), std::move(rx_buffer)));
+  std::unique_ptr<AmlSpi> spi(new (&ac) AmlSpi(
+      device, *std::move(mmio), std::move(reset_fidl_client), reset_mask, std::move(chips),
+      std::move(interrupt), config, std::move(bti), std::move(tx_buffer), std::move(rx_buffer)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

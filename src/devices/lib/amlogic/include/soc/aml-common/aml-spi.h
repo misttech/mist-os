@@ -16,10 +16,6 @@ struct amlspi_config_t {
   static constexpr uint32_t kCsClientManaged = UINT32_MAX;
   static constexpr uint32_t kDefaultDelayControl = 0x15;
 
-  // The capacity and period to use when setting the scheduler profile for the driver thread(s). No
-  // profile will be set if either capacity or period is zero.
-  zx_duration_t capacity;
-  zx_duration_t period;
   uint32_t bus_id;
   // The number of SPI devices on this bus, as well as the number of entries in cs below.
   uint32_t cs_count;

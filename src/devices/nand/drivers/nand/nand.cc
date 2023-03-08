@@ -394,30 +394,16 @@ zx_status_t NandDevice::Init() {
   read_internal_failure_ = root_.CreateUint("read_internal_failure", 0);
   read_failure_ = root_.CreateUint("read_failure", 0);
 
-  // Set a scheduling deadline profile for the nand-worker thread.
+  // Set a scheduling role for the nand-worker thread.
   // This is required in order to service the blobfs-pager-thread, which is on a deadline profile.
   // This will no longer be needed once we have the ability to propagate deadlines. Until then, we
   // need to set deadline profiles for all threads that the blobfs-pager-thread interacts with in
   // order to service page requests.
-  //
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
-  const zx_duration_t capacity = ZX_USEC(300);
-  const zx_duration_t deadline = ZX_MSEC(2);
-  const zx_duration_t period = deadline;
-
-  zx_handle_t profile = ZX_HANDLE_INVALID;
-  status = device_get_deadline_profile(this->zxdev(), capacity, deadline, period,
-                                       "driver_host:nand-worker", &profile);
+  const char* role_name = "fuchsia.devices.nand.drivers.nand.device";
+  status = device_set_profile_by_role(this->zxdev(), thrd_get_zx_handle(worker_thread_), role_name,
+                                      strlen(role_name));
   if (status != ZX_OK) {
-    zxlogf(WARNING, "nand: failed to get deadline profile: %d\n", status);
-  } else {
-    const zx_handle_t thread_handle = thrd_get_zx_handle(worker_thread_);
-    status = zx_object_set_profile(thread_handle, profile, 0);
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "nand: failed to set deadline profile: %d\n", status);
-    }
-    zx_handle_close(profile);
+    zxlogf(WARNING, "nand: failed to apply role to worker: %d\n", status);
   }
 
   return ZX_OK;

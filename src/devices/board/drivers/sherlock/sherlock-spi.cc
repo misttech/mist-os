@@ -56,8 +56,6 @@ static const spi_channel_t spi_channels[] = {
 };
 
 static const amlogic_spi::amlspi_config_t spi_config = {
-    .capacity = 0,
-    .period = 0,
     .bus_id = SHERLOCK_SPICC0,
     .cs_count = 1,
     .cs = {0},                                       // index into fragments list

@@ -1071,26 +1071,13 @@ zx_status_t AmlogicDisplay::Bind() {
     }
   }
 
-  // Set profile for vsync thread.
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
+  // Set scheduler role for vsync thread.
   {
-    const zx_duration_t capacity = ZX_USEC(500);
-    const zx_duration_t deadline = ZX_MSEC(8);
-    const zx_duration_t period = deadline;
-
-    zx_handle_t profile = ZX_HANDLE_INVALID;
-    if (zx_status_t status =
-            device_get_deadline_profile(this->zxdev(), capacity, deadline, period,
-                                        "dev/display/amlogic-display/vsync_thread", &profile);
-        status != ZX_OK) {
-      DISP_ERROR("Failed to get deadline profile: %d\n", status);
-    } else {
-      const zx_handle_t thread_handle = thrd_get_zx_handle(vsync_thread_);
-      if (zx_status_t status = zx_object_set_profile(thread_handle, profile, 0); status != ZX_OK) {
-        DISP_ERROR("Failed to set deadline profile: %d\n", status);
-      }
-      zx_handle_close(profile);
+    const char* role_name = "fuchsia.graphics.display.drivers.amlogic-display.vsync";
+    zx_status_t status = device_set_profile_by_role(
+        this->zxdev(), thrd_get_zx_handle(vsync_thread_), role_name, strlen(role_name));
+    if (status != ZX_OK) {
+      DISP_ERROR("Failed to apply role: %d\n", status);
     }
   }
 

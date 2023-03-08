@@ -82,7 +82,7 @@ zx_status_t Interrupter::IrqThread() {
   async_executor_.emplace(async_loop_->dispatcher());
 
   {
-    const char* role_name = "fuchsia.devices.usb.xhci.interrupter";
+    const char* role_name = "fuchsia.devices.usb.drivers.xhci.interrupter";
     const size_t role_name_size = strlen(role_name);
     const zx_status_t status =
         device_set_profile_by_role(hci_->zxdev(), zx_thread_self(), role_name, role_name_size);

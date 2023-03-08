@@ -166,27 +166,15 @@ zx_status_t NelsonBrownoutProtection::Init(ddk::CodecProtocolClient codec) {
 }
 
 int NelsonBrownoutProtection::Thread() {
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
   {
     // AGL should be enabled at most 4ms after the power sensor raises an interrupt. The capacity
     // was chosen through experimentation -- too low and page faults end up using most of the time.
     // This is especially noticeable with the codec driver.
-    constexpr zx::duration capacity = zx::msec(3);
-    constexpr zx::duration deadline = zx::msec(4);
-    constexpr zx::duration period = deadline;
-
-    zx::profile profile;
-    zx_status_t status =
-        device_get_deadline_profile(parent_, capacity.get(), deadline.get(), period.get(),
-                                    "Brownout protection profile", profile.reset_and_get_address());
+    const char* role_name = "fuchsia.devices.power.drivers.nelson-brownout-protection";
+    const zx_status_t status = device_set_profile_by_role(parent_, thrd_get_zx_handle(thread_),
+                                                          role_name, strlen(role_name));
     if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to get deadline profile: %s", zx_status_get_string(status));
-    } else {
-      status = zx_object_set_profile(thrd_get_zx_handle(thread_), profile.get(), 0);
-      if (status != ZX_OK) {
-        zxlogf(WARNING, "Failed to apply deadline profile: %s", zx_status_get_string(status));
-      }
+      zxlogf(WARNING, "Failed to set role: %s", zx_status_get_string(status));
     }
   }
 

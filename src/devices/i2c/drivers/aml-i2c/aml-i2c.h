@@ -43,7 +43,7 @@ class AmlI2cDev {
 
   zx_status_t Transact(const i2c_impl_op_t* rws, size_t count) const;
 
-  void StartIrqThread();
+  void StartIrqThread(zx_device_t* parent);
 
  private:
   friend class AmlI2cTest;

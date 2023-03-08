@@ -1046,24 +1046,14 @@ void Dwc2::DdkInit(ddk::InitTxn txn) {
 
 int Dwc2::IrqThread() {
   auto* mmio = get_mmio();
-  const zx::duration capacity = zx::usec(125);
-  const zx::duration deadline = zx::msec(1);
-  const zx::duration period = deadline;
-  zx::profile profile;
-  zx_status_t status =
-      device_get_deadline_profile(parent_, capacity.get(), deadline.get(), period.get(),
-                                  "src/devices/usb/drivers/dwc2", profile.reset_and_get_address());
+  const char* role_name = "fuchsia.devices.usb.drivers.dwc2.interrupt";
+  const zx_status_t status = device_set_profile_by_role(parent_, thrd_get_zx_handle(thrd_current()),
+                                                        role_name, strlen(role_name));
   if (status != ZX_OK) {
-    zxlogf(WARNING, "%s Failed to get deadline profile: %s", __FUNCTION__,
+    // This should be an error since we won't be able to guarantee we can meet deadlines.
+    // Failure to meet deadlines can result in undefined behavior on the bus.
+    zxlogf(ERROR, "%s: Failed to apply role to IRQ thread: %s", __FUNCTION__,
            zx_status_get_string(status));
-  } else {
-    status = zx_object_set_profile(thrd_get_zx_handle(thrd_current()), profile.get(), 0);
-    if (status != ZX_OK) {
-      // This should be an error since we won't be able to guarantee we can meet deadlines.
-      // Failure to meet deadlines can result in undefined behavior on the bus.
-      zxlogf(ERROR, "%s: Failed to apply deadline profile to IRQ thread: %s", __FUNCTION__,
-             zx_status_get_string(status));
-    }
   }
   while (1) {
     wait_start_time_ = zx::clock::get_monotonic();

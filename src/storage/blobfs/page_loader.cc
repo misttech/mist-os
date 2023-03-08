@@ -98,32 +98,20 @@ void SetDeadlineProfile(const std::vector<zx::unowned_thread>& threads) {
     return;
   }
 
-  // Deadline profile parameters for the pager thread.
-  // Details on the performance analysis to arrive at these numbers can be found in fxbug.dev/56291.
-  //
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
-  const zx_duration_t capacity = ZX_USEC(1800);
-  const zx_duration_t deadline = ZX_USEC(2800);
-  const zx_duration_t period = deadline;
-
-  const fidl::WireResult result =
-      fidl::WireCall(provider.value())
-          ->GetDeadlineProfile(capacity, deadline, period, "/boot/bin/blobfs:blobfs-pager-thread");
-  if (!result.ok()) {
-    FX_PLOGS(WARNING, result.status()) << "Failed to get deadline profile";
-    return;
-  }
-  const auto& response = result.value();
-  if (zx_status_t status = response.status; status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "Failed to get deadline profile";
-    return;
-  }
-
-  // Apply to each thread.
+  // Apply role to each thread.
+  const char role[]{"fuchsia.storage.blobfs.pager"};
   for (const auto& thread : threads) {
-    if (zx_status_t status = thread->set_profile(response.profile, 0); status != ZX_OK) {
-      FX_LOGS(WARNING) << "Failed to set deadline profile: " << zx_status_get_string(status);
+    zx::thread dup_thread;
+    const zx_status_t status = thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_thread);
+    if (status != ZX_OK) {
+      FX_PLOGS(WARNING, status) << "Failed to duplicate thread handle";
+      continue;
+    }
+    const fidl::WireResult result =
+        fidl::WireCall(provider.value())->SetProfileByRole(std::move(dup_thread), role);
+    if (!result.ok()) {
+      FX_PLOGS(WARNING, result.status()) << "Failed to set role " << role;
+      continue;
     }
   }
 }

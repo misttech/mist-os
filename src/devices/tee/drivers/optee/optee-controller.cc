@@ -355,30 +355,12 @@ zx_status_t OpteeController::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t OpteeController::SetProfileByRole(thrd_t& thr, const std::string& role) {
-  zx_status_t status;
-
-  // TODO(https://fxbug.dev/40858): SetProfileByRole has to be uset do set thread profile by the
-  // rule when corresponding API will be ready to use. Use workaround for now: only
-  // fuchsia.default and fuchsia.tee.deadline are hardcoded and supported.
-  if (role == kDefaultRoleName) {
-    // do nothing.
-  } else if (role == "fuchsia.tee.media") {
-    zx::profile profile;
-    status = device_get_deadline_profile(parent(), ZX_USEC(2000), ZX_USEC(2500), ZX_USEC(2500),
-                                         "optee", profile.reset_and_get_address());
-    if (status != ZX_OK) {
-      LOG(WARNING, "could not get deadline profile");
-    } else {
-      status = zx::unowned_thread(thrd_get_zx_handle(thr))->set_profile(std::move(profile), 0);
-      if (status != ZX_OK) {
-        LOG(WARNING, "could not set profile %d", status);
-      }
-    }
-  } else {
-    LOG(ERROR, "Unsupported thread profile role %s", role.c_str());
-    return ZX_ERR_INTERNAL;
+  const zx_status_t status =
+      device_set_profile_by_role(parent(), thrd_get_zx_handle(thr), role.data(), role.size());
+  if (status != ZX_OK) {
+    LOG(WARNING, "Failed to apply role \"%s\" to thread %d", role.c_str(), status);
   }
-  return ZX_OK;
+  return status;
 }
 
 zx_status_t OpteeController::CreateThreadPool(async::Loop* loop, uint32_t thread_count,
@@ -398,7 +380,7 @@ zx_status_t OpteeController::CreateThreadPool(async::Loop* loop, uint32_t thread
 
     status = SetProfileByRole(optee_thread, role);
     if (status != ZX_OK) {
-      LOG(ERROR, "could not set role to %s thread: %d", name, status);
+      LOG(ERROR, "could not set role to %s for %s thread: %d", role.c_str(), name, status);
       return status;
     }
   }

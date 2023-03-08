@@ -83,7 +83,7 @@ class AmlSpi : public DeviceType, public ddk::SpiImplProtocol<AmlSpi, ddk::base_
 
   AmlSpi(zx_device_t* device, fdf::MmioBuffer mmio,
          fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset, uint32_t reset_mask,
-         fbl::Array<ChipInfo> chips, zx::profile thread_profile, zx::interrupt interrupt,
+         fbl::Array<ChipInfo> chips, zx::interrupt interrupt,
          const amlogic_spi::amlspi_config_t& config, zx::bti bti, DmaBuffer tx_buffer,
          DmaBuffer rx_buffer)
       : DeviceType(device),
@@ -91,7 +91,6 @@ class AmlSpi : public DeviceType, public ddk::SpiImplProtocol<AmlSpi, ddk::base_
         reset_(std::move(reset)),
         reset_mask_(reset_mask),
         chips_(std::move(chips)),
-        thread_profile_(std::move(thread_profile)),
         interrupt_(std::move(interrupt)),
         config_(config),
         bti_(std::move(bti)),
@@ -141,9 +140,9 @@ class AmlSpi : public DeviceType, public ddk::SpiImplProtocol<AmlSpi, ddk::base_
   const uint32_t reset_mask_;
   const fbl::Array<ChipInfo> chips_;
   bool need_reset_ TA_GUARDED(bus_lock_) = false;
-  zx::profile thread_profile_;
   zx::interrupt interrupt_;
   const amlogic_spi::amlspi_config_t config_;
+  bool applied_scheduler_role_ = false;
   // Protects mmio_, need_reset_, and the DMA buffers.
   fbl::Mutex bus_lock_;
   // Protects registered_vmos members of chips_.

@@ -893,25 +893,13 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
     return status;
   }
 
-  // Set the display controller looper thread to use a deadline profile.
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
+  // Set the display controller looper thread to use a scheduler role.
   {
-    const zx_duration_t capacity = ZX_USEC(500);
-    const zx_duration_t deadline = ZX_MSEC(8);
-    const zx_duration_t period = deadline;
-
-    zx_handle_t profile = ZX_HANDLE_INVALID;
-    if ((status = device_get_deadline_profile(this->zxdev(), capacity, deadline, period,
-                                              "dev/display/controller", &profile)) != ZX_OK) {
-      zxlogf(ERROR, "Failed to get deadline profile: %s", zx_status_get_string(status));
-    } else {
-      zx_handle_t thread_handle = thrd_get_zx_handle(loop_thread_);
-      status = zx_object_set_profile(thread_handle, profile, 0);
-      if (status != ZX_OK) {
-        zxlogf(WARNING, "Failed to set deadline profile: %s", zx_status_get_string(status));
-      }
-      zx_handle_close(profile);
+    const char* role_name = "fuchsia.graphics.display.drivers.display.controller";
+    status = device_set_profile_by_role(this->zxdev(), thrd_get_zx_handle(loop_thread_), role_name,
+                                        strlen(role_name));
+    if (status != ZX_OK) {
+      zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
     }
   }
 

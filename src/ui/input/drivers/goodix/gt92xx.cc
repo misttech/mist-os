@@ -162,28 +162,14 @@ zx_status_t Gt92xxDevice::Create(zx_device_t* device) {
   int ret = thrd_create_with_name(&goodix_dev->thread_, thunk, goodix_dev.get(), "gt92xx-thread");
   ZX_DEBUG_ASSERT(ret == thrd_success);
 
-  // Set profile for bus transaction thread.
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
+  // Set scheduler role for device thread.
   {
-    const zx::duration capacity = zx::usec(200);
-    const zx::duration deadline = zx::msec(1);
-    const zx::duration period = deadline;
-
-    zx::profile profile;
-    status =
-        device_get_deadline_profile(goodix_dev->zxdev(), capacity.get(), deadline.get(),
-                                    period.get(), "gt92xx-thread", profile.reset_and_get_address());
+    const char* role_name = "fuchsia.ui.input.drivers.goodix.gt92xx.device";
+    status = device_set_profile_by_role(
+        goodix_dev->zxdev(), thrd_get_zx_handle(goodix_dev->thread_), role_name, strlen(role_name));
     if (status != ZX_OK) {
-      zxlogf(WARNING, "Gt92xxDevice::Create: Failed to get deadline profile: %s",
+      zxlogf(WARNING, "Gt92xxDevice::Create: Failed to apply role: %s",
              zx_status_get_string(status));
-    } else {
-      status = zx_object_set_profile(thrd_get_zx_handle(goodix_dev->thread_), profile.get(), 0);
-      if (status != ZX_OK) {
-        zxlogf(WARNING,
-               "Gt92xxDevice::Create: Failed to apply deadline profile to dispatch thread: %s",
-               zx_status_get_string(status));
-      }
     }
   }
 

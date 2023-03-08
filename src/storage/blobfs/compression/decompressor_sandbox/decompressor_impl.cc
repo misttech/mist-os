@@ -172,29 +172,25 @@ void SetDeadlineProfile(thrd_t& thread) {
     return;
   }
 
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
-  const zx_duration_t capacity = ZX_USEC(1000);
-  const zx_duration_t deadline = ZX_MSEC(2);
-  const zx_duration_t period = deadline;
+  const zx::unowned_thread borrowed_thread{thrd_get_zx_handle(thread)};
+  zx::thread dup_thread;
+  const zx_status_t status = borrowed_thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_thread);
+  if (status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "Failed to duplicate thread handle";
+    return;
+  }
 
+  const char role_name[]{"fuchsia.storage.blobfs.compression.decompressor"};
   const fidl::WireResult result =
-      fidl::WireCall(provider.value())
-          ->GetDeadlineProfile(capacity, deadline, period, "decompressor-fifo-thread");
+      fidl::WireCall(provider.value())->SetProfileByRole(std::move(dup_thread), role_name);
   if (!result.ok()) {
-    FX_PLOGS(WARNING, result.status()) << "[decompressor]: Failed to get deadline profile";
+    FX_PLOGS(WARNING, result.status()) << "[decompressor]: Failed to set role";
     return;
   }
   const auto& response = result.value();
   if (zx_status_t status = response.status; status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "[decompressor]: Failed to get deadline profile";
+    FX_PLOGS(WARNING, status) << "[decompressor]: Failed to set role";
     return;
-  }
-
-  auto zx_thread = zx::unowned_thread(thrd_get_zx_handle(thread));
-  // Set the deadline profile.
-  if (zx_status_t status = zx_thread->set_profile(response.profile, 0); status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "[decompressor]: Failed to set deadline profile";
   }
 }
 

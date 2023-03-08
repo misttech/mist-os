@@ -189,7 +189,7 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
     return;
   }
 
-  // Set a scheduling deadline profile for the block_server thread.
+  // Set a scheduling role for the block_server thread.
   // This is required in order to service the blobfs-pager-thread, which is on a deadline profile.
   // This will no longer be needed once we have the ability to propagate deadlines. Until then, we
   // need to set deadline profiles for all threads that the blobfs-pager-thread interacts with in
@@ -202,29 +202,15 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
   // device, the block_server thread runs for less than 50us. 1ms provides us with a generous
   // leeway, without hurting performance in the typical case - a thread is not penalized for not
   // using its full capacity.
-  //
-  // TODO(https://fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
-  const zx_duration_t capacity = ZX_MSEC(1);
-  const zx_duration_t deadline = ZX_MSEC(2);
-  const zx_duration_t period = deadline;
-
-  [&]() {
-    zx::profile profile;
-    if (zx_status_t status = device_get_deadline_profile(zxdev(), capacity, deadline, period,
-                                                         "driver_host:block_server",
-                                                         profile.reset_and_get_address());
+  {
+    const char* role_name = "fuchsia.devices.block.drivers.core.block-server";
+    if (zx_status_t status = device_set_profile_by_role(zxdev(), thrd_get_zx_handle(thread),
+                                                        role_name, strlen(role_name));
         status != ZX_OK) {
-      zxlogf(WARNING, "block: Failed to get deadline profile: %s\n", zx_status_get_string(status));
-      return;
+      zxlogf(WARNING, "block: Failed to apply role to block server: %s\n",
+             zx_status_get_string(status));
     }
-    if (zx_status_t status =
-            zx::unowned_thread(thrd_get_zx_handle(thread))->set_profile(profile, 0);
-        status != ZX_OK) {
-      zxlogf(WARNING, "block: Failed to set deadline profile: %s\n", zx_status_get_string(status));
-      return;
-    }
-  }();
+  }
 
   fidl::BindServer(
       fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request->session),

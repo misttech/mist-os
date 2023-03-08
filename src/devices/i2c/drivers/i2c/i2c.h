@@ -36,7 +36,7 @@ class I2cDevice : public I2cDeviceType {
 
  private:
   zx_status_t Init(const ddk::I2cImplProtocolClient& i2c, uint32_t bus_base, uint32_t bus_count);
-  zx_status_t SetDeadlineProfile(uint32_t bus_id, async_dispatcher_t* dispatcher);
+  zx_status_t SetSchedulerRole(uint32_t bus_id, async_dispatcher_t* dispatcher);
 
   // Retain ownership of the metadata so we can pass references to children.
   ddk::DecodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata> metadata_;

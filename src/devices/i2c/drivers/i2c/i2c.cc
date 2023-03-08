@@ -96,7 +96,7 @@ zx_status_t I2cDevice::Init(const ddk::I2cImplProtocolClient& i2c, const uint32_
 
     async_dispatcher_t* const dispatcher = dispatchers_.back()->dispatcher();
 
-    if (zx_status_t status = SetDeadlineProfile(i + bus_base, dispatcher); status != ZX_OK) {
+    if (zx_status_t status = SetSchedulerRole(i + bus_base, dispatcher); status != ZX_OK) {
       return status;
     }
 
@@ -110,31 +110,18 @@ zx_status_t I2cDevice::Init(const ddk::I2cImplProtocolClient& i2c, const uint32_
   return ZX_OK;
 }
 
-zx_status_t I2cDevice::SetDeadlineProfile(const uint32_t bus_id,
-                                          async_dispatcher_t* const dispatcher) {
+zx_status_t I2cDevice::SetSchedulerRole(const uint32_t bus_id,
+                                        async_dispatcher_t* const dispatcher) {
   zx_status_t status = async::PostTask(dispatcher, [device = zxdev(), bus_id]() {
     char name[32];
     snprintf(name, sizeof(name), "I2cBus[%u]", bus_id);
 
-    // Set profile for bus transaction thread.
-    // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-    // coding parameters.
-    const zx::duration capacity = zx::usec(150);
-    const zx::duration deadline = zx::msec(1);
-    const zx::duration period = deadline;
-
-    zx::profile profile;
+    // Set role for bus transaction thread.
+    const char* role_name = "fuchsia.devices.i2c.drivers.i2c.bus";
     zx_status_t status =
-        device_get_deadline_profile(device, capacity.get(), deadline.get(), period.get(),
-                                    "I2cBus Dispatcher", profile.reset_and_get_address());
+        device_set_profile_by_role(device, zx::thread::self()->get(), role_name, strlen(role_name));
     if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to get deadline profile: %s", zx_status_get_string(status));
-    } else {
-      status = zx::thread::self()->set_profile(profile, 0);
-      if (status != ZX_OK) {
-        zxlogf(WARNING, "Failed to apply deadline profile to dispatch thread: %s",
-               zx_status_get_string(status));
-      }
+      zxlogf(WARNING, "Failed to apply role to dispatch thread: %s", zx_status_get_string(status));
     }
   });
 

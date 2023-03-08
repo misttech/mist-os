@@ -106,23 +106,12 @@ zx::result<Event> Fusb302::GetInterrupt() {
 zx_status_t Fusb302::IrqThread() {
   zx_status_t status = ZX_OK;
 
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
   {
-    constexpr zx::duration capacity = zx::msec(3);
-    constexpr zx::duration deadline = zx::msec(4);
-    constexpr zx::duration period = deadline;
-
-    zx::profile profile;
-    status = device_get_deadline_profile(parent_, capacity.get(), deadline.get(), period.get(),
-                                         "fusb302_profile", profile.reset_and_get_address());
+    const char* role_name = "fuchsia.devices.power.drivers.fusb302.interrupt";
+    status = device_set_profile_by_role(parent_, thrd_get_zx_handle(irq_thread_), role_name,
+                                        strlen(role_name));
     if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to get deadline profile: %s", zx_status_get_string(status));
-    } else {
-      status = zx_object_set_profile(thrd_get_zx_handle(irq_thread_), profile.get(), 0);
-      if (status != ZX_OK) {
-        zxlogf(WARNING, "Failed to apply deadline profile: %s", zx_status_get_string(status));
-      }
+      zxlogf(WARNING, "Failed to apply role to interrupt thread: %s", zx_status_get_string(status));
     }
   }
 

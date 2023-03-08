@@ -59,8 +59,6 @@ static constexpr spi_channel_t spi_1_channels[] = {
 };
 
 static constexpr amlogic_spi::amlspi_config_t spi_1_config = {
-    .capacity = 0,
-    .period = 0,
     .bus_id = AV400_SPICC1,
     .cs_count = 1,
     .cs = {0},                                     // index into fragments list

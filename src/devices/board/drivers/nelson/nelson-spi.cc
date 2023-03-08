@@ -93,8 +93,6 @@ zx_status_t Nelson::Spi0Init() {
   };
 
   static const amlogic_spi::amlspi_config_t spi_0_config = {
-      .capacity = 0,
-      .period = 0,
       .bus_id = NELSON_SPICC0,
       .cs_count = 1,
       .cs = {0},                                       // index into fragments list
@@ -211,8 +209,6 @@ zx_status_t Nelson::Spi1Init() {
   constexpr uint32_t kMiCapAhead2Cycles = 0 << 4;
 
   static const amlogic_spi::amlspi_config_t spi_1_config = {
-      .capacity = 0,
-      .period = 0,
       .bus_id = NELSON_SPICC1,
       .cs_count = 1,
       .cs = {0},                                      // index into fragments list

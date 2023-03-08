@@ -187,31 +187,17 @@ zx_status_t AmlI2cDev::Read(uint8_t* buff, uint32_t len, const bool stop) const 
   return ZX_OK;
 }
 
-void AmlI2cDev::StartIrqThread() {
+void AmlI2cDev::StartIrqThread(zx_device_t* parent) {
   thrd_create_with_name(
       &irqthrd_, [](void* ctx) { return reinterpret_cast<AmlI2cDev*>(ctx)->IrqThread(); }, this,
       "i2c_irq_thread");
 
-  // Set profile for IRQ thread.
-  // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
-  // coding parameters.
-  const zx::duration capacity = zx::usec(20);
-  const zx::duration deadline = zx::usec(100);
-  const zx::duration period = deadline;
-
-  zx::profile irq_profile;
-  zx_status_t status =
-      device_get_deadline_profile(nullptr, capacity.get(), deadline.get(), period.get(),
-                                  "aml_i2c_irq_thread", irq_profile.reset_and_get_address());
+  // Set role for IRQ thread.
+  const char* role_name = "fuchsia.devices.i2c.drivers.aml-i2c.interrupt";
+  const zx_status_t status = device_set_profile_by_role(parent, thrd_get_zx_handle(irqthrd_),
+                                                        role_name, strlen(role_name));
   if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to get deadline profile: %s", zx_status_get_string(status));
-  } else {
-    zx::unowned_thread thread(thrd_get_zx_handle(irqthrd_));
-    status = thread->set_profile(irq_profile, 0);
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to apply deadline profile to IRQ thread: %s",
-             zx_status_get_string(status));
-    }
+    zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
   }
 }
 
@@ -262,7 +248,7 @@ zx_status_t AmlI2c::InitDevice(uint32_t index, aml_i2c_delay_values delay, ddk::
   }
 
   i2c_devs_.emplace_back(std::move(irq), std::move(event), *std::move(regs_iobuff));
-  i2c_devs_.back().StartIrqThread();
+  i2c_devs_.back().StartIrqThread(zxdev());
   return ZX_OK;
 }
 

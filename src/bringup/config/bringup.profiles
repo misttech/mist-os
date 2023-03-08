@@ -2,7 +2,31 @@
 {
   "scope": "bringup",
   "profiles": {
+    // Fuchsia platform profiles.
     "fuchsia.async.loop": { "priority": 16 },
     "fuchsia.system.profile-provider.dispatch": { "capacity": "500us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.tee.media": { "capacity": "2ms", "deadline": "2500us", "period": "2500us" },
+    "fuchsia.tee.default": { "priority": 16 },
+
+    // Fuchsia driver profiles.
+    "fuchsia.devices.block.drivers.ftl.device": { "capacity": "400us", "deadline": "2ms", "period": "2ms" },
+    "fuchsia.devices.block.drivers.core.block-server": { "capacity": "1ms", "deadline": "2ms", "period": "2ms" },
+    "fuchsia.devices.i2c.drivers.i2c.bus": { "capacity": "150us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.devices.i2c.drivers.aml-i2c.interrupt": { "capacity": "20us", "deadline": "100us", "period": "100us" },
+    "fuchsia.devices.nand.drivers.nand.device": { "capacity": "300us", "deadline": "2ms", "period": "2ms" },
+    "fuchsia.devices.power.drivers.fusb302.interrupt": { "capacity": "3ms", "deadline": "4ms", "period": "4ms" },
+    "fuchsia.devices.power.drivers.nelson-brownout-protection": { "capacity": "3ms", "deadline": "4ms", "period": "4ms" },
+    "fuchsia.devices.spi.drivers.aml-spi.transaction": { "priority": 16 },
+    "fuchsia.devices.usb.drivers.xhci.interrupter": { "capacity": "100us", "deadline": "125us", "period": "125us" },
+    "fuchsia.devices.usb.drivers.dwc2.interrupt": { "capacity": "125us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.devices.usb.drivers.crg-udc.interrupt": { "capacity": "125us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.devices.usb.audio": { "capacity": "250us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.graphics.display.drivers.display.controller": { "capacity": "500us", "deadline": "8ms", "period": "8ms" },
+    "fuchsia.graphics.display.drivers.amlogic-display.vsync": { "capacity": "500us", "deadline": "8ms", "period": "8ms" },
+    "fuchsia.storage.blobfs.pager": { "capacity": "1800us", "deadline": "2800us", "period": "2800us" },
+    "fuchsia.storage.blobfs.compression.decompressor": { "capacity": "1ms", "deadline": "2ms", "period": "2ms" },
+    "fuchsia.ui.input.drivers.gt6853.device": { "capacity": "200us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.ui.input.drivers.focaltech.device": { "capacity": "200us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.ui.input.drivers.goodix.gt92xx.device": { "capacity": "200us", "deadline": "1ms", "period": "1ms" },
   },
 }
