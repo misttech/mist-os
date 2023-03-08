@@ -59,6 +59,7 @@
 namespace {
 
 KCOUNTER(vm_vmo_high_priority, "vm.vmo.high_priority")
+KCOUNTER(vm_vmo_no_reclamation_strategy, "vm.vmo.no_reclamation_strategy")
 
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
@@ -5794,6 +5795,8 @@ bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintActio
   // No other reclamation strategies, so to avoid this page remaining in a reclamation list we
   // simulate an access.
   UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+  // Keep a count as having no reclamation strategy is probably a sign of miss-configuration.
+  vm_vmo_no_reclamation_strategy.Add(1);
   return false;
 }
 
