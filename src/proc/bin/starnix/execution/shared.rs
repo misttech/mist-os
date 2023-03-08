@@ -86,12 +86,12 @@ pub fn execute_syscall(
     log_trace!(current_task, "{:?}", syscall);
     match dispatch_syscall(current_task, &syscall) {
         Ok(return_value) => {
-            log_trace!(current_task, "-> {:#x}", return_value.value(),);
+            log_trace!(current_task, "-> {:#x}", return_value.value());
             current_task.registers.set_return_register(return_value.value());
             None
         }
         Err(errno) => {
-            log_trace!(current_task, "!-> {:?}", errno,);
+            log_trace!(current_task, "!-> {:?}", errno);
             current_task.registers.set_return_register(errno.return_value());
             Some(ErrorContext { error: errno, syscall })
         }
