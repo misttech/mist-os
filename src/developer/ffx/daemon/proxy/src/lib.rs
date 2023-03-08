@@ -9,9 +9,10 @@ use errors::{ffx_bail, ffx_error, FfxError};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path};
+use ffx_metrics::add_ffx_rcs_protocol_event;
 use ffx_target::{get_remote_proxy, open_target_with_fut, TargetKind};
 use ffx_writer::{Format, Writer};
-use fidl::endpoints::create_proxy;
+use fidl::endpoints::{create_proxy, Proxy};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, DaemonProxy, FastbootMarker, FastbootProxy, TargetProxy, VersionInfo,
 };
@@ -177,7 +178,7 @@ impl Injector for Injection {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
         let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
-        timeout(proxy_timeout, async {
+        let proxy = timeout(proxy_timeout, async {
             self.remote_once
                 .get_or_try_init(self.init_remote_proxy())
                 .await
@@ -187,7 +188,30 @@ impl Injector for Injection {
         .map_err(|_| {
             tracing::warn!("Timed out getting remote control proxy for: {:?}", target);
             timeout_error
-        })?
+        })?;
+
+        if let Ok(proxy) = proxy.as_ref() {
+            let proto_fut = proxy.as_channel().get_channel_proxy_protocol();
+            let proto_timeout = std::time::Duration::from_millis(500);
+
+            match timeout(proto_timeout, proto_fut).await {
+                Ok(Some(proto)) => {
+                    let proto = proto.as_str();
+                    if let Err(e) = add_ffx_rcs_protocol_event(proto).await {
+                        tracing::warn!(error = ?e, "Problem sending protocol metrics");
+                    }
+                }
+                // Peer seems to have closed. That'll be handled up the stack.
+                Ok(None) => (),
+                Err(_) => {
+                    // This can happen if for some reason this channel isn't proxied by Overnet.
+                    // That shouldn't ever happen but it's worth avoiding a hang.
+                    tracing::warn!("Timed out waiting for protocol report from Overnet");
+                }
+            }
+        }
+
+        proxy
     }
 
     async fn is_experiment(&self, key: &str) -> bool {

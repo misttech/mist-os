@@ -56,6 +56,13 @@ async fn add_ffx_timing_event(
     batcher.add_timing_event(Some(&sanitized_args), time, None, None, custom_dimensions).await
 }
 
+/// Add a metric announcing what protocol our RCS proxy is using.
+pub async fn add_ffx_rcs_protocol_event(proto_name: &str) -> Result<()> {
+    let mut custom_dimensions = BTreeMap::new();
+    add_client_id_as_custom_dimension(&mut custom_dimensions).await;
+    add_custom_event(Some("ffx_rcs_protocol"), Some(&proto_name), None, custom_dimensions).await
+}
+
 pub async fn add_daemon_metrics_event(request_str: &str) {
     let request = request_str.to_string();
     let analytics_start = Instant::now();
