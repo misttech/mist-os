@@ -12,8 +12,12 @@
 
 #include <string>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <ddk/metadata/pwm.h>
+#include <ddktl/device.h>
 #include <soc/aml-a311d/a311d-power.h>
 #include <soc/aml-a311d/a311d-pwm.h>
 #include <soc/aml-common/aml-power.h>
@@ -168,44 +172,23 @@ constexpr composite_device_desc_t power_domain_little_core_desc = {
     .metadata_count = std::size(power_domain_little_core_metadata),
 };
 
-zx_device_prop_t fusb302_props[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-    {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_FUSB302},
+const ddk::BindRule kI2cRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, 0x22u)};
+
+const device_bind_prop_t kI2cProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
 };
 
-constexpr zx_bind_inst_t i2c_match[] = {
-    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C),
-    BI_ABORT_IF(NE, BIND_I2C_BUS_ID, 0),
-    BI_MATCH_IF(EQ, BIND_I2C_ADDRESS, 0x22),
-};
+const ddk::BindRule kGpioRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_FUSB302_INT))};
 
-constexpr zx_bind_inst_t gpio_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
-    BI_MATCH_IF(EQ, BIND_GPIO_PIN, VIM3_FUSB302_INT),
-};
-
-constexpr device_fragment_part_t i2c_fragment[] = {
-    {std::size(i2c_match), i2c_match},
-};
-
-constexpr device_fragment_part_t gpio_fragment[] = {
-    {std::size(gpio_match), gpio_match},
-};
-
-constexpr device_fragment_t fusb302_fragments[] = {
-    {"i2c", std::size(i2c_fragment), i2c_fragment},
-    {"gpio", std::size(gpio_fragment), gpio_fragment},
-};
-
-constexpr composite_device_desc_t fusb302_desc = {
-    .props = fusb302_props,
-    .props_count = std::size(fusb302_props),
-    .fragments = fusb302_fragments,
-    .fragments_count = std::size(fusb302_fragments),
-    .primary_fragment = "i2c",
-    .spawn_colocated = true,
-};
+const device_bind_prop_t kGpioProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_USB_POWER_DELIVERY)};
 
 }  // namespace
 
@@ -317,9 +300,11 @@ zx_status_t Vim3::PowerInit() {
   }
 
   // Add USB power delivery unit
-  st = DdkAddComposite("fusb302", &fusb302_desc);
+  st = DdkAddCompositeNodeSpec(
+      "fusb302",
+      ddk::CompositeNodeSpec(kI2cRules, kI2cProperties).AddParentSpec(kGpioRules, kGpioProperties));
   if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddComposite for fusb302 failed, st = %d", __FUNCTION__, st);
+    zxlogf(ERROR, "%s: DdkAddCompositeNodeSpec for fusb302 failed, st = %d", __FUNCTION__, st);
     return st;
   }
 
