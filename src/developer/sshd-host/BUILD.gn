@@ -40,6 +40,12 @@ executable("bin") {
   ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":sshd-host" ]
+}
+
 fuchsia_package_with_single_component("sshd-host") {
   manifest = "meta/sshd-host.cml"
   deps = [
@@ -58,6 +64,12 @@ fuchsia_package_with_single_component("sshd-host") {
 
 core_shard("core_shard") {
   shard_file = "meta/sshd-host.core_shard.cml"
+}
+
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("config-for_transition") {
+  public_deps = [ ":config" ]
 }
 
 config_data("config") {

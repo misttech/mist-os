@@ -20,6 +20,12 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":start_sl4f" ]
+}
+
 fuchsia_shell_package("start_sl4f") {
   deps = [ ":bin" ]
 }

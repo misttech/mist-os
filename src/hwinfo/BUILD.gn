@@ -52,6 +52,12 @@ fuchsia_component("hwinfo_component") {
   deps = [ ":hwinfo_bin" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":hwinfo" ]
+}
+
 fuchsia_package("hwinfo") {
   deps = [ ":hwinfo_component" ]
 }

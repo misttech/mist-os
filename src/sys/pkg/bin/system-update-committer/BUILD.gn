@@ -74,6 +74,12 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":system-update-committer" ]
+}
+
 fuchsia_package("system-update-committer") {
   deps = [ ":component" ]
 }

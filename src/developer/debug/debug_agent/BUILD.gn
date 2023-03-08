@@ -175,6 +175,12 @@ executable("zxdb_test_app") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":debug_agent" ]
+}
+
 fuchsia_package("debug_agent") {
   deps = [ ":debug_agent-component" ]
 

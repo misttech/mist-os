@@ -338,6 +338,12 @@ core_shard("sl4f_terminal_core_shard") {
   shard_file = "meta/sl4f_terminal.core_shard.cml"
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":sl4f" ]
+}
+
 # WARNING: Known to infrastructure.
 fuchsia_package("sl4f") {
   package_name = "sl4f"

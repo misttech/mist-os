@@ -706,3 +706,9 @@ assembly_input_bundle("emulator_support") {
   qemu_kernel = _qemu_kernel_file
   deps = [ _qemu_kernel_target ]
 }
+
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("third_party_sbase_for_transition") {
+  public_deps = [ "//third_party/sbase" ]
+}

@@ -46,6 +46,12 @@ fuchsia_component("build-info") {
   deps = [ ":bin" ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("for_transition") {
+  public_deps = [ ":build-info-service" ]
+}
+
 fuchsia_package("build-info-service") {
   deps = [ ":build-info" ]
 }

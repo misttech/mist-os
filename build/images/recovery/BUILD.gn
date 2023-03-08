@@ -83,49 +83,92 @@ if (is_fuchsia) {
   # TODO(122863) Remove use of transitional labels
   core_realm_aib_pkgs = [
     # The required SWD stack artifacts to enable packages in an FVM.
-    "//src/sys/pkg/bin/pkg-cache",
-    "//src/sys/pkg/bin/pkg-resolver",
+    "//src/sys/pkg/bin/pkg-cache:for_transition",
+    "//src/sys/pkg/bin/pkg-resolver:for_transition",
 
     # This is a required dependency of pkg-cache
-    "//src/sys/pkg/bin/system-update-committer",
+    "//src/sys/pkg/bin/system-update-committer:for_transition",
 
-    # Build-Information
-    "//src/developer/build_info:build-info-service",
-
-    # Hardware Information
-    "//src/hwinfo:hwinfo",
-
-    # System Time
-    "//src/sys/time/timekeeper",
-    "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
+    # Build-Information Service
+    "//src/developer/build_info:for_transition",
 
     # Other
-    "//src/sys/stash:pkg",
+    "//src/devices/sysmem/bin/sysmem_connector:for_transition",
   ]
   core_realm_aib_shards = [ "//src/developer/build_info:build_info_core_shard" ]
+  core_realm_network_aib_pkgs = [
+    # Hardware Information
+    "//src/hwinfo:for_transition",
+
+    # Newtorking itself
+    "//src/connectivity/network:for_transition",
+    "//src/connectivity/network:netstack",
+    "//src/connectivity/wlan/wlancfg:for_transition",
+    "//src/security/bin/root_ssl_certificates:for_transition",
+
+    # System Time
+    "//src/sys/time/timekeeper:for_transition",
+    "//src/sys/time/httpsdate_time_source:for_transition",
+    "//src/sys/time/httpsdate_time_source:pull_for_transition",
+
+    # Other
+    "//src/sys/stash:for_transition",
+  ]
+  core_realm_network_aib_shards = [
+    "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
+    "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
+    "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
+  ]
   core_realm_eng_aib_pkgs = [
     # Dash launcher should be available in every engineering-mode product.
-    "//src/sys/tools/debug-dash-launcher",
+    "//src/sys/tools/debug-dash-launcher:for_transition",
 
     # The fs_realm component should be available in every engineering-mode product.
-    "//src/storage/fs_realm",
+    "//src/storage/fs_realm:for_transition",
+
+    # Enable ffx support.
+    "//src/connectivity/network/mdns/bundles:services",  # group for transition
+    "//src/developer/ffx:runtime",  # group for transition
+
+    # Enable SSH (for engineering builds):
+    "//src/developer/sshd-host:for_transition",
+    "//src/developer/sshd-host:config-for_transition",
+    "//src/sys/process-resolver:for_transition",
+
+    # Basic command-line tools:
+    "//bundles/assembly:third_party_sbase_for_transition",
+    "//src/diagnostics/log_listener:for_transition",
+
+    # Command-line interface to wlan stack:
+    "//src/connectivity/wlan/wlancfg/tool:for_transition",
+
+    # Device side of zxdb & fidlcat:
+    "//src/developer/debug/debug_agent:for_transition",
   ]
   core_realm_eng_aib_shards = [
-    "//src/sys/tools/debug-dash-launcher:core-shard",
-    "//src/storage/fs_realm:fs_realm_core_shard",
+    "//src/sys/tools/debug-dash-launcher:core_shard_for_transition",
+    "//src/storage/fs_realm:core_shard_for_transition",
+    "//src/sys/process-resolver:core_shard",
+  ]
+  core_realm_testing_aib_pkgs = [
+    # SL4F for infra testing
+    "//src/testing/sl4f:for_transition",
+    "//src/sys/bin/start_sl4f:for_transition",
+  ]
+  core_realm_testing_aib_shards = [
+    # SL4F for infra testing
+    "//src/testing/sl4f:sl4f_core_shard",
   ]
 
-  _core_realm_deps = core_realm_aib_shards + [
-                       "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",
-                       "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-core-shard",
-                       "//src/connectivity/wlan/wlanstack:wlanstack-core-shard",
-                       "//src/developer/forensics:core_shard",
-                       "//src/diagnostics/realm:core_shard",
-                       "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
-                       "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
-                       "//src/recovery/factory_reset:factory_reset_core_shard",
-                       "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
-                     ]
+  _core_realm_deps =
+      core_realm_aib_shards + core_realm_network_aib_shards + [
+        "//src/developer/forensics:core_shard",
+        "//src/diagnostics/realm:core_shard",
+        "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
+        "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
+        "//src/recovery/factory_reset:factory_reset_core_shard",
+        "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
+      ]
 
   core_realm_definition("core") {
     restrict_persistent_storage = false
@@ -138,7 +181,9 @@ if (is_fuchsia) {
 
     # TODO(fxbug.dev/102390): deprecate appmgr from this product config
     deps =
-        _core_realm_deps + appmgr_core_shards + core_realm_eng_aib_shards + [
+        _core_realm_deps + appmgr_core_shards + core_realm_eng_aib_shards +
+        core_realm_testing_aib_shards +
+        [
           # required for SL4F
           "//src/developer:default-laboratory-env-core-shard",
           "//src/developer/memory/monitor:memory_monitor_core_shard",
@@ -146,31 +191,23 @@ if (is_fuchsia) {
           "//src/factory/factory_store_providers:factory_store_providers_shard",
           "//src/recovery/system:system_recovery_core_shard",
           "//src/settings/service:setui_service_core_shard",
-          "//src/sys/process-resolver:core_shard",
-          "//src/testing/sl4f:sl4f_core_shard",
         ]
   }
 
   core_realm_definition("core-installer") {
     restrict_persistent_storage = false
-    deps = _core_realm_deps + [
-             "//src/recovery/system:system_recovery_installer_core_shard",
-             "//src/sys/process-resolver:core_shard",
-           ]
+    deps = _core_realm_deps +
+           [ "//src/recovery/system:system_recovery_installer_core_shard" ]
   }
 
-  recovery_packages = board_recovery_package_labels + core_realm_aib_pkgs + [
+  recovery_packages = board_recovery_package_labels + core_realm_aib_pkgs +
+                      core_realm_network_aib_pkgs + [
                         ":build-info-recovery",
                         "//src/connectivity/location/regulatory_region:regulatory_region",
-                        "//src/connectivity/network",
-                        "//src/connectivity/network:netstack",
                         "//src/connectivity/network/netcfg:config-default",
-                        "//src/connectivity/wlan/wlancfg",
                         "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-privacy",
-                        "//src/devices/sysmem/bin/sysmem_connector",
                         "//src/recovery/factory_reset",
                         "//src/recovery/system:system_recovery",
-                        "//src/security/bin/root_ssl_certificates",
                         "//src/sys/appmgr",
                         "//src/sys/appmgr:appmgr_scheme_config",
                         "//src/sys/appmgr:component_id_index_no_restrict_storage",
@@ -187,7 +224,9 @@ if (is_fuchsia) {
                       ]
 
   recovery_eng_packages =
-      recovery_packages + core_realm_eng_aib_pkgs + [
+      recovery_packages + core_realm_eng_aib_pkgs +
+      core_realm_testing_aib_pkgs +
+      [
         "//src/cobalt/bin/app:build_type_eng",
         "//src/cobalt/bin/app:cobalt",
         "//src/cobalt/bin/app:cobalt_registry",
@@ -197,24 +236,7 @@ if (is_fuchsia) {
         "//src/security/policy:appmgr_policy_eng",
 
         # Enable ffx support.
-        "//src/connectivity/network/mdns/bundles:services",
         "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config",
-        "//src/developer/ffx:runtime",
-
-        # Enable SSH (for engineering builds):
-        "//src/developer/sshd-host",
-        "//src/developer/sshd-host:config",
-        "//src/sys/process-resolver",
-
-        # Basic command-line tools:
-        "//third_party/sbase",
-        "//src/diagnostics/log_listener:log_listener_shell",
-
-        # Command-line interface to wlan stack:
-        "//src/connectivity/wlan/wlancfg/tool:donut",
-
-        # Device side of zxdb & fidlcat:
-        "//src/developer/debug/debug_agent",
 
         # The SWD stack for OTAs.
         "//src/sys/pkg/lib/isolated-swd:isolated-swd-components",
@@ -227,10 +249,6 @@ if (is_fuchsia) {
 
         # Support privacy switch
         "//src/settings/service:setui_service",
-
-        # SL4F for infra testing
-        "//src/testing/sl4f",
-        "//src/sys/bin/start_sl4f",
 
         # Forensics and crash reporting
         "//src/developer/forensics:pkg",
@@ -302,17 +320,16 @@ if (is_fuchsia) {
 
     product_assembly_config_label = ":for-fastboot"
 
-    base_packages = core_realm_aib_pkgs + core_realm_eng_aib_pkgs + [
+    base_packages = core_realm_aib_pkgs + core_realm_eng_aib_pkgs +
+                    core_realm_network_aib_pkgs +
+                    [
                       "//build/info:build-info",
-                      "//src/connectivity/network",
                       "//src/connectivity/network/netcfg:config-default",
-                      "//src/devices/sysmem/bin/sysmem_connector",
                       "//src/sys/appmgr",
                       "//src/sys/appmgr:appmgr_scheme_config",
                       "//src/sys/appmgr:component_id_index_no_restrict_storage",
                       "//src/sys/sysmgr",
                       "//src/firmware/fastboot-tcp",
-                      "//src/connectivity/network/mdns/bundles:services",
                       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
                       "//src/firmware/fastboot-usb",
                     ]
