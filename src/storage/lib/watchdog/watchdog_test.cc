@@ -30,6 +30,7 @@
 
 #include <fbl/unique_fd.h>
 #include <src/diagnostics/lib/cpp-log-decoder/log_decoder.h>
+#include <src/diagnostics/lib/cpp-log-tester/log_tester.h>
 #include <src/lib/diagnostics/accessor2logger/log_message.h>
 #include <src/lib/fsl/vmo/sized_vmo.h>
 #include <src/lib/fsl/vmo/strings.h>
@@ -134,146 +135,6 @@ bool CheckOccurance(const std::string& str, const std::string_view substr, int e
   return count == expected;
 }
 
-class FakeLogSink : public fuchsia::logger::LogSink {
- public:
-  explicit FakeLogSink(async_dispatcher_t* dispatcher, zx::channel channel)
-      : dispatcher_(dispatcher) {
-    fidl::InterfaceRequest<fuchsia::logger::LogSink> request(std::move(channel));
-    bindings_.AddBinding(this, std::move(request), dispatcher);
-  }
-
-  /// Send this socket to be drained.
-  ///
-  /// See //zircon/system/ulib/syslog/include/lib/syslog/wire_format.h for what
-  /// is expected to be received over the socket.
-  void Connect(::zx::socket socket) override {
-    // Not supported by this test.
-    abort();
-  }
-
-  void WaitForInterestChange(WaitForInterestChangeCallback callback) override {
-    // Ignored.
-  }
-
-  struct Wait : async_wait_t {
-    FakeLogSink* this_ptr;
-    Wait* next = this;
-    Wait* prev = this;
-  };
-
-  static std::string DecodeMessageToString(uint8_t* data, size_t len) {
-    auto raw_message = fuchsia_decode_log_message_to_json(data, len);
-    std::string ret = raw_message;
-    fuchsia_free_decoded_log_message(raw_message);
-    return ret;
-  }
-
-  void OnDataAvailable(zx_handle_t socket) {
-    constexpr size_t kSize = 65536;
-    std::unique_ptr<unsigned char[]> data = std::make_unique<unsigned char[]>(kSize);
-    size_t actual = 0;
-    zx_socket_read(socket, 0, data.get(), kSize, &actual);
-    std::string msg = DecodeMessageToString(data.get(), actual);
-    fsl::SizedVmo vmo;
-    fsl::VmoFromString(msg, &vmo);
-    fuchsia::diagnostics::FormattedContent content;
-    fuchsia::mem::Buffer buffer;
-    buffer.vmo = std::move(vmo.vmo());
-    buffer.size = msg.size();
-    content.set_json(std::move(buffer));
-    callback_.value()(std::move(content));
-  }
-
-  static void OnDataAvailable_C(async_dispatcher_t* dispatcher, async_wait_t* raw,
-                                zx_status_t status, const zx_packet_signal_t* signal) {
-    switch (status) {
-      case ZX_OK:
-        static_cast<Wait*>(raw)->this_ptr->OnDataAvailable(raw->object);
-        async_begin_wait(dispatcher, raw);
-        break;
-      case ZX_ERR_PEER_CLOSED:
-        zx_handle_close(raw->object);
-        break;
-    }
-  }
-
-  /// Send this socket to be drained, using the structured logs format.
-  ///
-  /// See //docs/reference/diagnostics/logs/encoding.md for what is expected to
-  /// be received over the socket.
-  void ConnectStructured(::zx::socket socket) override {
-    Wait* wait = new Wait();
-    waits_.push_back(wait);
-    wait->this_ptr = this;
-    wait->object = socket.release();
-    wait->handler = OnDataAvailable_C;
-    wait->options = 0;
-    wait->trigger = ZX_SOCKET_PEER_CLOSED | ZX_SOCKET_READABLE;
-    async_begin_wait(dispatcher_, wait);
-  }
-
-  void Collect(std::function<void(fuchsia::diagnostics::FormattedContent content)> callback) {
-    callback_ = std::move(callback);
-  }
-
-  ~FakeLogSink() override {
-    for (auto& wait : waits_) {
-      async_cancel_wait(dispatcher_, wait);
-      delete wait;
-    }
-  }
-
- private:
-  std::vector<Wait*> waits_;
-  fidl::BindingSet<fuchsia::logger::LogSink> bindings_;
-  std::optional<std::function<void(fuchsia::diagnostics::FormattedContent content)>> callback_;
-  async_dispatcher_t* dispatcher_;
-};
-
-static std::string RetrieveLogs(zx::channel remote) {
-  auto guid = uuid::Generate();
-  FX_LOGS(ERROR) << guid;
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  std::stringstream s;
-  bool in_log = true;
-  bool exit = false;
-  auto log_service = std::make_unique<FakeLogSink>(loop.dispatcher(), std::move(remote));
-  log_service->Collect([&](fuchsia::diagnostics::FormattedContent content) {
-    if (exit) {
-      return;
-    }
-    auto chunk_result =
-        diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content));
-    auto messages = chunk_result.take_value();  // throws exception if conversion fails.
-    for (auto& msg : messages) {
-      std::string formatted = msg.value().msg;
-      if (formatted.find(guid) != std::string::npos) {
-        if (in_log) {
-          exit = true;
-          loop.Quit();
-          return;
-        } else {
-          in_log = true;
-        }
-      }
-      if (in_log) {
-        s << formatted << std::endl;
-      }
-    }
-  });
-  loop.Run();
-  return s.str();
-}
-
-zx::channel SetupLog() {
-  zx::channel channels[2];
-  zx::channel::create(0, &channels[0], &channels[1]);
-  syslog::LogSettings settings{.log_sink = channels[0].release(),
-                               .wait_for_initial_interest = false};
-  syslog::SetLogSettings(settings);
-  return std::move(channels[1]);
-}
-
 TEST(Watchdog, TryToAddDuplicate) {
   auto watchdog = CreateWatchdog(kDefaultOptions);
   EXPECT_TRUE(watchdog->Start().is_ok());
@@ -285,7 +146,7 @@ TEST(Watchdog, TryToAddDuplicate) {
 }
 
 TEST(Watchdog, TryToAddDuplicateAfterTimeout) {
-  [[maybe_unused]] auto fd_pair = SetupLog();
+  [[maybe_unused]] auto fd_pair = log_tester::SetupFakeLog();
   auto watchdog = CreateWatchdog(kDefaultOptions);
   EXPECT_TRUE(watchdog->Start().is_ok());
   TestOperation op(kTestOperationName1, kOperationTimeout);
@@ -339,7 +200,7 @@ TEST(Watchdog, RemoveUntrackedOperation) {
 }
 
 TEST(Watchdog, OperationTimesOut) {
-  auto fd_pair = SetupLog();
+  auto fd_pair = log_tester::SetupFakeLog();
   {
     auto watchdog = CreateWatchdog(kDefaultOptions);
     EXPECT_TRUE(watchdog->Start().is_ok());
@@ -350,7 +211,7 @@ TEST(Watchdog, OperationTimesOut) {
       ASSERT_TRUE(tracker.TimeoutHandlerCalled());
     }
   }
-  auto str = RetrieveLogs(std::move(fd_pair));
+  auto str = log_tester::RetrieveLogs(std::move(fd_pair));
 
   // Find known strings.
   ASSERT_TRUE(CheckOccurance(str, kLogMessageOperation, 1));
@@ -359,7 +220,7 @@ TEST(Watchdog, OperationTimesOut) {
 }
 
 TEST(Watchdog, NoTimeoutsWhenDisabled) {
-  auto fd_pair = SetupLog();
+  auto fd_pair = log_tester::SetupFakeLog();
   {
     auto watchdog = CreateWatchdog(kDisabledOptions);
     EXPECT_TRUE(watchdog->Start().is_error());
@@ -371,7 +232,7 @@ TEST(Watchdog, NoTimeoutsWhenDisabled) {
       ASSERT_FALSE(tracker.TimeoutHandlerCalled());
     }
   }
-  auto str = RetrieveLogs(std::move(fd_pair));
+  auto str = log_tester::RetrieveLogs(std::move(fd_pair));
   // Find known strings.
   ASSERT_TRUE(CheckOccurance(str, kLogMessageOperation, 0));
   ASSERT_TRUE(CheckOccurance(str, kLogMessageExceededTimeout, 0));
@@ -379,7 +240,7 @@ TEST(Watchdog, NoTimeoutsWhenDisabled) {
 }
 
 TEST(Watchdog, NoTimeoutsWhenShutDown) {
-  auto fd_pair = SetupLog();
+  auto fd_pair = log_tester::SetupFakeLog();
   {
     auto watchdog = CreateWatchdog(kDefaultOptions);
     EXPECT_TRUE(watchdog->Start().is_ok());
@@ -391,7 +252,7 @@ TEST(Watchdog, NoTimeoutsWhenShutDown) {
       ASSERT_FALSE(tracker.TimeoutHandlerCalled());
     }
   }
-  auto str = RetrieveLogs(std::move(fd_pair));
+  auto str = log_tester::RetrieveLogs(std::move(fd_pair));
   // Find known strings.
   ASSERT_TRUE(CheckOccurance(str, kLogMessageOperation, 0));
   ASSERT_TRUE(CheckOccurance(str, kLogMessageExceededTimeout, 0));
@@ -399,7 +260,7 @@ TEST(Watchdog, NoTimeoutsWhenShutDown) {
 }
 
 TEST(Watchdog, OperationDoesNotTimesOut) {
-  auto fd_pair = SetupLog();
+  auto fd_pair = log_tester::SetupFakeLog();
   {
     auto watchdog = CreateWatchdog(kDefaultOptions);
     EXPECT_TRUE(watchdog->Start().is_ok());
@@ -410,7 +271,7 @@ TEST(Watchdog, OperationDoesNotTimesOut) {
       ASSERT_FALSE(tracker.TimeoutHandlerCalled());
     }
   }
-  auto str = RetrieveLogs(std::move(fd_pair));
+  auto str = log_tester::RetrieveLogs(std::move(fd_pair));
   // We should not find known strings.
   ASSERT_TRUE(CheckOccurance(str, kLogMessageOperation, 0));
   ASSERT_TRUE(CheckOccurance(str, kLogMessageExceededTimeout, 0));
@@ -418,7 +279,7 @@ TEST(Watchdog, OperationDoesNotTimesOut) {
 }
 
 TEST(Watchdog, MultipleOperationsTimeout) {
-  auto fd_pair = SetupLog();
+  auto fd_pair = log_tester::SetupFakeLog();
   {
     auto watchdog = CreateWatchdog(kDefaultOptions);
     EXPECT_TRUE(watchdog->Start().is_ok());
@@ -435,7 +296,7 @@ TEST(Watchdog, MultipleOperationsTimeout) {
       ASSERT_FALSE(tracker3.TimeoutHandlerCalled());
     }
   }
-  auto str = RetrieveLogs(std::move(fd_pair));
+  auto str = log_tester::RetrieveLogs(std::move(fd_pair));
   // Find known strings.
   ASSERT_TRUE(CheckOccurance(str, kLogMessageOperation, 2));
   ASSERT_TRUE(CheckOccurance(str, kLogMessageExceededTimeout, 2));
@@ -445,7 +306,7 @@ TEST(Watchdog, MultipleOperationsTimeout) {
 }
 
 TEST(Watchdog, LoggedOnlyOnce) {
-  auto fd_pair = SetupLog();
+  auto fd_pair = log_tester::SetupFakeLog();
   {
     auto watchdog = CreateWatchdog(kDefaultOptions);
     EXPECT_TRUE(watchdog->Start().is_ok());
@@ -459,7 +320,7 @@ TEST(Watchdog, LoggedOnlyOnce) {
       ASSERT_EQ(tracker.TimeoutHandlerCalledCount(), 1);
     }
   }
-  auto str = RetrieveLogs(std::move(fd_pair));
+  auto str = log_tester::RetrieveLogs(std::move(fd_pair));
   // Find known strings.
   ASSERT_TRUE(CheckOccurance(str, kLogMessageOperation, 1));
   ASSERT_TRUE(CheckOccurance(str, kLogMessageExceededTimeout, 1));
@@ -470,7 +331,7 @@ TEST(Watchdog, LoggedOnlyOnce) {
 }
 
 TEST(Watchdog, DelayedCompletionLogging) {
-  auto fd_pair = SetupLog();
+  auto fd_pair = log_tester::SetupFakeLog();
   {
     auto watchdog = CreateWatchdog(kDefaultOptions);
     EXPECT_TRUE(watchdog->Start().is_ok());
@@ -484,7 +345,7 @@ TEST(Watchdog, DelayedCompletionLogging) {
       ASSERT_EQ(tracker.TimeoutHandlerCalledCount(), 1);
     }
   }
-  auto str = RetrieveLogs(std::move(fd_pair));
+  auto str = log_tester::RetrieveLogs(std::move(fd_pair));
   // Find known strings.
   ASSERT_TRUE(CheckOccurance(str, kLogMessageTimeout, 1));
   ASSERT_TRUE(CheckOccurance(str, kLogMessageExceededOperation, 1));
