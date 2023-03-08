@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{binder::create_binders, starnix::StarnixDevice, wayland::serve_wayland};
+use crate::device::{
+    binder::create_binders, input::InputFile, starnix::StarnixDevice, wayland::serve_wayland,
+};
 use crate::fs::{devtmpfs::dev_tmp_fs, SpecialNode};
 use crate::logging::log_warn;
 use crate::task::CurrentTask;
@@ -23,12 +25,25 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
             }
             "selinux_enabled" => {}
             "framebuffer" => {
-                let framebuffer = current_task.kernel().framebuffer.clone();
-                current_task
-                    .kernel()
-                    .device_registry
-                    .write()
-                    .register_chrdev_major(framebuffer.clone(), FB_MAJOR)?;
+                let kernel = current_task.kernel();
+                let mut dev_reg = kernel.device_registry.write();
+
+                // Register a framebuffer.
+                dev_reg.register_chrdev_major(kernel.framebuffer.clone(), FB_MAJOR)?;
+
+                // Also register an input device, which can be used to read pointer events
+                // associated with the framebuffer's `View`.
+                //
+                // Note: input requires the `framebuffer` feature, because Starnix cannot receive
+                // input events without a Fuchsia `View`.
+                //
+                // TODO(quiche): Pass in the Fuchsia `View` for the `framebuffer`, so that
+                // `InputFile` can receive pointer events from Fuchsia.
+                //
+                // TODO(quiche): When adding support for multiple input devices, ensure
+                // that the appropriate `InputFile` is associated with the appropriate
+                // `INPUT_MINOR`.
+                dev_reg.register_chrdev_major(InputFile::new(), INPUT_MAJOR)?;
             }
             "magma" => {
                 // Add the starnix device group.

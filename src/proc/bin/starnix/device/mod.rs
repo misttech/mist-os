@@ -12,6 +12,7 @@ pub use features::*;
 pub use registry::*;
 
 pub mod framebuffer;
+pub mod input;
 pub mod magma;
 pub mod mem;
 pub mod starnix;

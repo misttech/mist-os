@@ -108,4 +108,31 @@ TEST(UdevTest, AddDevMapper) {
   ASSERT_FALSE(parameters["SEQNUM"].empty());
 }
 
+TEST(UdevTest, AddInput) {
+  if (getuid() != 0) {
+    GTEST_SKIP() << "Can only be run as root.";
+  }
+  auto fd = GetUdevSocket();
+  ASSERT_TRUE(fd.is_valid());
+
+  // This path is based on values in `ueventd.rc`.
+  ScopedFD write_fd(open("/sys/devices/virtual/input/input/uevent", O_WRONLY));
+  ASSERT_TRUE(write_fd.is_valid());
+  ASSERT_EQ(write(write_fd.get(), "add\n", 4), 4);
+
+  std::string command;
+  std::map<std::string, std::string> parameters;
+  ASSERT_TRUE(read_next_uevent(fd.get(), &command, &parameters));
+  // These values are compatible with `ueventd`.
+  ASSERT_EQ(command, "add@/devices/virtual/input/event0");
+  ASSERT_EQ(parameters["ACTION"], "add");
+  ASSERT_EQ(parameters["DEVPATH"], "/devices/virtual/input/event0");
+  ASSERT_EQ(parameters["SUBSYSTEM"], "input");
+  ASSERT_EQ(parameters["SYNTH_UUID"], "0");
+  ASSERT_EQ(parameters["MAJOR"], "13");
+  ASSERT_EQ(parameters["MINOR"], "0");
+  ASSERT_EQ(parameters["DEVNAME"], "input/event0");
+  ASSERT_FALSE(parameters["SEQNUM"].empty());
+}
+
 }  // namespace

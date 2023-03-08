@@ -6,6 +6,7 @@ use super::*;
 use crate::auth::FsCred;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::cgroup::CgroupDirectoryNode;
+use crate::logging::*;
 use crate::task::*;
 use crate::types::*;
 use std::sync::Arc;
@@ -33,6 +34,13 @@ impl SysFs {
         // TODO(fxb/119437): Create a dynamic directory that depends on registered devices.
         dir.subdir(b"devices", 0o755, |dir| {
             dir.subdir(b"virtual", 0o755, |dir| {
+                dir.subdir(b"input", 0o755, |dir| {
+                    dir.entry(
+                        b"input",
+                        DeviceDirectory::new(kernel.clone(), DeviceType::new(INPUT_MAJOR, 0)),
+                        mode!(IFDIR, 0o755),
+                    )
+                });
                 dir.subdir(b"misc", 0o755, |dir| {
                     dir.entry(
                         b"device-mapper",
@@ -67,17 +75,25 @@ impl FileOps for UEventFile {
     fn read_at(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        // TODO(fxb/119437): Retrieve DEVNAME from DeviceRegistry
-        let content = format!(
-            "MAJOR={}\nMINOR={}\nDEVNAME=mapper/control\n",
-            self.device.major(),
-            self.device.minor()
-        );
-        data.write(content[offset..].as_bytes())
+        match self.device {
+            DeviceType::DEVICE_MAPPER => {
+                let content = format!(
+                    "MAJOR={}\nMINOR={}\nDEVNAME=mapper/control\n",
+                    self.device.major(),
+                    self.device.minor()
+                );
+                data.write(content[offset..].as_bytes())
+            }
+            _ => {
+                // TODO(fxb/119437): Retrieve DEVNAME from DeviceRegistry
+                not_implemented!(current_task, "read_at for {}", self.device);
+                error!(EOPNOTSUPP)
+            }
+        }
     }
 
     fn write_at(

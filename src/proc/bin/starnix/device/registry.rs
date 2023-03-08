@@ -174,6 +174,8 @@ struct DynRegistry {
 
 impl DynRegistry {
     fn register(&mut self, device: impl DeviceOps) -> Result<DeviceType, Errno> {
+        // TODO(quiche): Emit a `uevent` to notify userspace of the new device.
+
         let minor = self.next_dynamic_minor;
         if minor > 255 {
             return error!(ENOMEM);

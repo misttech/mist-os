@@ -684,17 +684,30 @@ impl SocketOps for UEventNetlinkSocket {
 
 impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
     fn on_device_event(&self, seqnum: u64, device: DeviceType) {
-        if device != DeviceType::DEVICE_MAPPER {
-            crate::logging::not_implemented!(
-                "?",
-                "Device event for {:?} is not implemented!",
-                device
-            );
-            return;
-        }
-        let message = format!(
-            "add@/devices/virtual/misc/device-mapper\0ACTION=add\0DEVPATH=/devices/virtual/misc/device-mapper\0SUBSYSTEM=misc\0SYNTH_UUID=0\0MAJOR=10\0MINOR=236\0DEVNAME=mapper/control\0SEQNUM={seqnum}\0"
-        );
+        let message = match (device, device.major(), device.minor()) {
+            (DeviceType::DEVICE_MAPPER, _, _) => format!(
+                "add@/devices/virtual/misc/device-mapper\0ACTION=add\0DEVPATH=/devices/virtual/misc/device-mapper\0SUBSYSTEM=misc\0SYNTH_UUID=0\0MAJOR=10\0MINOR=236\0DEVNAME=mapper/control\0SEQNUM={seqnum}\0"
+            ),
+            (_, major @ INPUT_MAJOR, minor) => format!(
+                "add@/devices/virtual/input/event{minor}\0\
+                ACTION=add\0\
+                DEVPATH=/devices/virtual/input/event{minor}\0\
+                SUBSYSTEM=input\0\
+                SYNTH_UUID=0\0\
+                MAJOR={major}\0\
+                MINOR={minor}\0\
+                DEVNAME=input/event{minor}\0\
+                SEQNUM={seqnum}",
+            ),
+            _ => {
+                crate::logging::not_implemented!(
+                    "?",
+                    "Device event for {} is not implemented!",
+                    device,
+                );
+                return;
+            }
+        };
         let ancillary_data = AncillaryData::Unix(UnixControlData::Credentials(Default::default()));
         let mut ancillary_data = vec![ancillary_data];
         // Ignore write errors

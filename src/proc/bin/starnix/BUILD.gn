@@ -147,6 +147,7 @@ rustc_binary("starnix_kernel_bin") {
     "device/features.rs",
     "device/framebuffer.rs",
     "device/framebuffer_server.rs",
+    "device/input.rs",
     "device/magma/ffi.rs",
     "device/magma/file.rs",
     "device/magma/magma.rs",
