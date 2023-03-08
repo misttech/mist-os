@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.bluetooth;
 
+using fuchsia.bluetooth.test;
 using zx;
 
 const MAX_NAME_LENGTH uint32 = 32;
@@ -25,11 +26,10 @@ protocol VirtualController {
 /// Represents the bt-emulator device protocol. A bt-emulator device is used for configuring and
 /// publishing fake bt-hci devices.
 protocol Emulator {
-    /// Opens a fake controller management channel that speaks the
-    /// "//sdk/fidl/fuchsia.bluetooth.test.HciEmulator" protocol.
+    /// Opens a fake controller management channel.
     /// Only one channel to this protocol can be open on a given bt-hci-emulator
     /// device.
     Open(resource struct {
-        channel zx.handle:CHANNEL;
+        channel server_end:fuchsia.bluetooth.test.HciEmulator;
     });
 };

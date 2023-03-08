@@ -158,7 +158,7 @@ async fn new_host_harness(
 
     // Open a Host FIDL interface channel to the bt-host device.
     let (host, server_end) = fidl::endpoints::create_proxy::<HostMarker>()?;
-    host_dev.open(server_end.into_channel())?;
+    host_dev.open(server_end)?;
 
     let host_info = host
         .watch_state()

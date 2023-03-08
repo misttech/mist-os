@@ -213,7 +213,7 @@ impl TestDevice {
 
         // Open a HciEmulator protocol channel.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<HciEmulatorMarker>()?;
-        let () = emulator.open(server_end.into_channel())?;
+        let () = emulator.open(server_end)?;
         Ok((Self { dev_directory, controller, emulator }, proxy))
     }
 

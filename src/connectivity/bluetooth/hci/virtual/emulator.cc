@@ -624,7 +624,7 @@ void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 }
 
 void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChan(Channel::EMULATOR, request->channel.release());
+  if (zx_status_t status = OpenChan(Channel::EMULATOR, request->channel.TakeChannel().release());
       status != ZX_OK) {
     completer.Close(status);
   }

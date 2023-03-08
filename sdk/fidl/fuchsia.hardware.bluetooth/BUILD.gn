@@ -11,7 +11,11 @@ fidl("fuchsia.hardware.bluetooth") {
     "virtual.fidl",
   ]
 
-  public_deps = [ "//zircon/vdso/zx" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.bluetooth.test",
+    "//src/connectivity/bluetooth/fidl:host",
+    "//zircon/vdso/zx",
+  ]
 
   enable_hlcpp = true
 }

@@ -974,7 +974,7 @@ async fn init_host(
     >(dir, path)
     .context("failed to open bt-host device")?;
     let (host, server_end) = fidl::endpoints::create_proxy::<HostMarker>()?;
-    hardware.open(server_end.into_channel())?;
+    hardware.open(server_end)?;
 
     node.record_string("path", path);
 

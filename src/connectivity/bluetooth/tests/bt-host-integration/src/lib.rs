@@ -57,7 +57,7 @@ async fn test_lifecycle(_: ()) {
     let mut emulator = Emulator::create(dev_dir).await.unwrap();
     let host = emulator.publish_and_wait_for_host(settings).await.unwrap();
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fhost::HostMarker>().unwrap();
-    host.open(server_end.into_channel()).unwrap();
+    host.open(server_end).unwrap();
     let info: HostInfo = proxy
         .watch_state()
         .await
