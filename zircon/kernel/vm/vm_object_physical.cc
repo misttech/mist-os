@@ -29,7 +29,7 @@
 
 VmObjectPhysical::VmObjectPhysical(fbl::RefPtr<VmHierarchyState> state, paddr_t base, uint64_t size,
                                    bool is_slice)
-    : VmObject(ktl::move(state)), size_(size), base_(base), is_slice_(is_slice) {
+    : VmObject(VMOType::Physical, ktl::move(state)), size_(size), base_(base), is_slice_(is_slice) {
   LTRACEF("%p, size %#" PRIx64 "\n", this, size_);
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));

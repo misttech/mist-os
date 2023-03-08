@@ -279,8 +279,9 @@ class VmObject : public VmHierarchyBase,
   virtual uint64_t size() const TA_EXCL(lock()) { return 0; }
   virtual uint32_t create_options() const { return 0; }
 
-  // Returns true if the object is backed by RAM.
-  virtual bool is_paged() const { return false; }
+  // Returns true if the object is backed by RAM and this object can be cast to a VmObjectPaged, if
+  // false this is a VmObjectPhysical.
+  bool is_paged() const { return type_ == VMOType::Paged; }
   // Returns true if the object is backed by a contiguous range of physical
   // memory.
   virtual bool is_contiguous() const { return false; }
@@ -735,7 +736,11 @@ class VmObject : public VmHierarchyBase,
   virtual void DetachSource() {}
 
  protected:
-  explicit VmObject(fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr);
+  enum class VMOType : bool {
+    Paged = true,
+    Physical = false,
+  };
+  VmObject(VMOType type, fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr);
 
   // private destructor, only called from refptr
   virtual ~VmObject();
@@ -754,6 +759,9 @@ class VmObject : public VmHierarchyBase,
 
   // magic value
   fbl::Canary<fbl::magic("VMO_")> canary_;
+
+  // whether this is a VmObjectPaged or a VmObjectPhysical.
+  const VMOType type_;
 
   // list of every mapping
   fbl::DoublyLinkedList<VmMapping*> mapping_list_ TA_GUARDED(lock());

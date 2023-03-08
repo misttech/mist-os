@@ -69,7 +69,6 @@ class VmObjectPaged final : public VmObject {
     Guard<CriticalMutex> guard{lock()};
     return cow_pages_locked()->size_locked();
   }
-  bool is_paged() const override { return true; }
   bool is_contiguous() const override { return (options_ & kContiguous); }
   bool is_resizable() const override { return (options_ & kResizable); }
   bool is_discardable() const override { return (options_ & kDiscardable); }

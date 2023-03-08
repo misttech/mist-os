@@ -47,7 +47,7 @@ KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_pages.object.cache_misses"
 }  // namespace
 
 VmObjectPaged::VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state)
-    : VmObject(ktl::move(hierarchy_state)), options_(options) {
+    : VmObject(VMOType::Paged, ktl::move(hierarchy_state)), options_(options) {
   LTRACEF("%p\n", this);
 }
 

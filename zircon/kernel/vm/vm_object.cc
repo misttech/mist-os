@@ -35,8 +35,8 @@ VmObject::GlobalList VmObject::all_vmos_ = {};
 
 fbl::DoublyLinkedList<VmObject::Cursor*> VmObject::all_vmos_cursors_ = {};
 
-VmObject::VmObject(fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr)
-    : VmHierarchyBase(ktl::move(hierarchy_state_ptr)) {
+VmObject::VmObject(VMOType type, fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr)
+    : VmHierarchyBase(ktl::move(hierarchy_state_ptr)), type_(type) {
   LTRACEF("%p\n", this);
 }
 
