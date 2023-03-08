@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_bluetooth_test::{EmulatorSettings, HciError, PeerProxy},
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_bluetooth::{
-        constants::{HOST_DEVICE_DIR, INTEGRATION_TIMEOUT},
+        constants::{DEV_DIR, HOST_DEVICE_DIR, INTEGRATION_TIMEOUT},
         expectation::{
             self,
             asynchronous::{ExpectableExt, ExpectableStateExt},
@@ -53,7 +53,13 @@ async fn test_lifecycle(_: ()) {
         ..EmulatorSettings::EMPTY
     };
 
-    let mut emulator = Emulator::create(Some(realm.instance())).await.unwrap();
+    let dev_dir = fuchsia_fs::directory::open_directory_no_describe(
+        realm.instance().get_exposed_dir(),
+        DEV_DIR,
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .unwrap();
+    let mut emulator = Emulator::create(dev_dir).await.unwrap();
     let hci_topo = PathBuf::from(fdio::device_get_topo_path(emulator.file()).unwrap());
 
     // Publish the bt-hci device and verify that a bt-host appears under its topology within a

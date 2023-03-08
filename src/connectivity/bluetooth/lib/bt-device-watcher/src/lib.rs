@@ -90,8 +90,7 @@ impl DeviceWatcher {
         dir: &str,
         timeout: zx::Duration,
     ) -> Result<DeviceWatcher, Error> {
-        let open_dir =
-            fuchsia_fs::directory::open_in_namespace(dir, fio::OpenFlags::RIGHT_READABLE)?;
+        let open_dir = fuchsia_fs::directory::open_in_namespace(dir, fio::OpenFlags::empty())?;
         Self::new(dir, open_dir, timeout).await
     }
 
@@ -218,7 +217,7 @@ impl DeviceWatcher {
         let file = fuchsia_fs::directory::open_file_no_describe(
             &self.watched_dir,
             relative_path.to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
         )?;
         let file = fdio::create_fd(
             file.into_channel()
@@ -272,7 +271,7 @@ mod tests {
         let dev_dir = fuchsia_fs::directory::open_directory(
             realm.root.get_exposed_dir(),
             "dev",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
         )
         .await?;
         // Block until the test control device is ready.
@@ -285,7 +284,7 @@ mod tests {
         let dev_test_dir = fuchsia_fs::directory::open_directory(
             &dev_dir,
             DEVICE_TEST_DIRECTORY,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
         )
         .await?;
         Ok(IsolatedDevMgrTest { realm, test_dev, dev_test_dir })
@@ -305,7 +304,7 @@ mod tests {
         let dev_dir = fuchsia_fs::directory::open_directory(
             realm.root.get_exposed_dir(),
             "dev",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
         )
         .await?;
 

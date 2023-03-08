@@ -7,9 +7,9 @@ use {
     bt_device_watcher::DeviceWatcher,
     fidl_fuchsia_bluetooth_host::HostProxy,
     fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_async as fasync,
     fuchsia_bluetooth::{
-        constants::HOST_DEVICE_DIR,
+        constants::{DEV_DIR, HOST_DEVICE_DIR},
         expectation::{
             asynchronous::{
                 expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
@@ -144,7 +144,7 @@ impl TestHarness for HostDriverHarness {
             let dir_to_watch = fuchsia_fs::directory::open_directory(
                 realm.instance().get_exposed_dir(),
                 stripped_path.as_ref(),
-                fio::OpenFlags::RIGHT_READABLE,
+                fuchsia_fs::OpenFlags::empty(),
             )
             .await?;
             let mut watcher =
@@ -161,9 +161,14 @@ impl TestHarness for HostDriverHarness {
 async fn new_host_harness(
     realm: Arc<HostDriverRealm>,
 ) -> Result<(HostDriverHarness, Emulator), Error> {
-    let emulator = Emulator::create(Some(realm.instance()))
-        .await
-        .context("Error creating emulator root device")?;
+    let dev_dir = fuchsia_fs::directory::open_directory_no_describe(
+        realm.instance().get_exposed_dir(),
+        DEV_DIR,
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .with_context(|| format!("failed to open {}", DEV_DIR))?;
+    let emulator =
+        Emulator::create(dev_dir).await.context("Error creating emulator root device")?;
     let host_dev = emulator
         .publish_and_wait_for_host(Emulator::default_settings())
         .await

@@ -15,7 +15,7 @@ const DAI_DEVICE_DIR: &str = "/dev/class/dai";
 pub async fn find_devices() -> Result<Vec<DigitalAudioInterface>, Error> {
     // Connect to the component's environment.
     let directory_proxy =
-        fuchsia_fs::directory::open_in_namespace(DAI_DEVICE_DIR, OpenFlags::RIGHT_READABLE)?;
+        fuchsia_fs::directory::open_in_namespace(DAI_DEVICE_DIR, OpenFlags::empty())?;
     find_devices_internal(directory_proxy).await
 }
 

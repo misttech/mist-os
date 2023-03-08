@@ -2,7 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Error, futures::future::pending, hci_emulator_client::Emulator};
+use {
+    anyhow::{Context as _, Error},
+    fuchsia_bluetooth::constants::DEV_DIR,
+    futures::future::pending,
+    hci_emulator_client::Emulator,
+};
 
 fn usage(appname: &str) {
     eprintln!("usage: {}", appname);
@@ -28,7 +33,10 @@ async fn main() -> Result<(), Error> {
         }
     };
 
-    let emulator = Emulator::create_and_publish(None).await?;
+    let dev_dir = fuchsia_fs::directory::open_in_namespace(DEV_DIR, fuchsia_fs::OpenFlags::empty())
+        .with_context(|| format!("failed to open {}", DEV_DIR))?;
+
+    let emulator = Emulator::create_and_publish(dev_dir).await?;
 
     let topo_path = fdio::device_get_topo_path(&emulator.file())?;
     eprintln!("Instantiated emulator at path: {}", topo_path);

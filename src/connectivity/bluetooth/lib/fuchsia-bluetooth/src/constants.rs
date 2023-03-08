@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 use fuchsia_zircon::Duration;
 
+pub const DEV_DIR: &str = "/dev";
+
 pub const HOST_DRIVER_PATH: &str = "/system/driver/bt-host.so";
 
 pub const HOST_DEVICE_DIR: &str = "/dev/class/bt-host";

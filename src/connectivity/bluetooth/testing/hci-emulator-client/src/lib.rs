@@ -10,10 +10,11 @@ use fidl::endpoints::Proxy;
 use fidl_fuchsia_bluetooth_test::{EmulatorSettings, HciEmulatorProxy};
 use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_hardware_bluetooth::{EmulatorProxy, VirtualControllerProxy};
-use fidl_fuchsia_io as fio;
+use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
-use fuchsia_bluetooth::constants::{HOST_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT};
-use fuchsia_component_test::ScopedInstance;
+use fuchsia_bluetooth::constants::{
+    DEV_DIR, HOST_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT,
+};
 use fuchsia_fs;
 use fuchsia_zircon::{self as zx, HandleBased};
 use fuchsia_zircon_status as zx_status;
@@ -24,7 +25,6 @@ use tracing::error;
 
 pub mod types;
 
-const DEV_DIR: &str = "/dev";
 // 0x30 => fuchsia.platform.BIND_PLATFORM_DEV_DID.BT_HCI_EMULATOR
 pub const CONTROL_DEVICE: &str = "/dev/sys/platform/00:00:30/bt_hci_virtual";
 pub const EMULATOR_DEVICE_DIR: &str = "/dev/class/bt-emulator";
@@ -61,20 +61,18 @@ impl Emulator {
     /// will be published; to do so it must be explicitly configured and created with a call to
     /// `publish()`. If `realm` is present, the device will be created inside it, otherwise it will
     /// be created using the `/dev` directory in the component's namespace.
-    pub async fn create(realm: Option<&ScopedInstance>) -> Result<Emulator, Error> {
-        let (dev, emulator) = match realm {
-            Some(r) => TestDevice::create_from_realm(r).await,
-            None => TestDevice::create().await,
-        }
-        .context(format!("Error creating test device"))?;
-        Ok(Emulator { dev: Some(dev), emulator: emulator })
+    pub async fn create(dev_directory: DirectoryProxy) -> Result<Emulator, Error> {
+        let (dev, emulator) = TestDevice::create(dev_directory)
+            .await
+            .context(format!("Error creating test device"))?;
+        Ok(Emulator { dev: Some(dev), emulator })
     }
 
     /// Publish a bt-emulator and a bt-hci device using the default emulator settings. If `realm`
     /// is present, the device will be created inside it, otherwise it will be created using the
     /// `/dev` directory in the component's namespace.
-    pub async fn create_and_publish(realm: Option<&ScopedInstance>) -> Result<Emulator, Error> {
-        let fake_dev = Self::create(realm).await?;
+    pub async fn create_and_publish(dev_directory: DirectoryProxy) -> Result<Emulator, Error> {
+        let fake_dev = Self::create(dev_directory).await?;
         fake_dev.publish(Self::default_settings()).await?;
         Ok(fake_dev)
     }
@@ -135,36 +133,14 @@ impl Drop for Emulator {
 // device path to be removed.
 struct TestDevice {
     file: File,
-    pub dev_directory: fio::DirectoryProxy,
+    pub dev_directory: DirectoryProxy,
 }
 
 impl TestDevice {
     // Creates a new device as a child of the emulator controller device and obtain the HciEmulator
     // protocol channel.
-    async fn create() -> Result<(TestDevice, HciEmulatorProxy), Error> {
-        let dev_dir =
-            fuchsia_fs::directory::open_in_namespace(DEV_DIR, fio::OpenFlags::RIGHT_READABLE)
-                .with_context(|| format!("failed to open {}", DEV_DIR))?;
-        Self::create_internal(dev_dir).await
-    }
-
-    // Like create, but for when the emulator controller device lives within an IsolatedDevMgr
-    // component inside the ScopedInstance.
-    async fn create_from_realm(
-        realm: &ScopedInstance,
-    ) -> Result<(TestDevice, HciEmulatorProxy), Error> {
-        let dev_dir = fuchsia_fs::directory::open_directory(
-            realm.get_exposed_dir(),
-            DEV_DIR,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .with_context(|| format!("failed to open {}", DEV_DIR))?;
-        Self::create_internal(dev_dir).await
-    }
-
-    async fn create_internal(
-        dev_directory: fio::DirectoryProxy,
+    async fn create(
+        dev_directory: DirectoryProxy,
     ) -> Result<(TestDevice, HciEmulatorProxy), Error> {
         let relative_control_dev_path = CONTROL_DEVICE
             .strip_prefix(DEV_DIR)
@@ -241,13 +217,13 @@ impl TestDevice {
 // Returns a DeviceWatcher watching `path`, which should start with `/dev`. The watched directory is
 //   - The `/dev/`-stripped part of `path` relative to `dev_dir`, if `dev_dir` is present.
 //   - `path` within the component's namespace, if `dev_dir` is not present.
-async fn dev_watcher(path: &str, dir: &fio::DirectoryProxy) -> Result<DeviceWatcher, Error> {
+async fn dev_watcher(path: &str, dir: &DirectoryProxy) -> Result<DeviceWatcher, Error> {
     let stripped_path = path
         .strip_prefix(DEV_DIR)
         .and_then(|p| p.strip_prefix("/"))
         .ok_or_else(|| format_err!("unexpected device path: {}", path))?;
     let open_dir =
-        fuchsia_fs::directory::open_directory(dir, stripped_path, fio::OpenFlags::RIGHT_READABLE)
+        fuchsia_fs::directory::open_directory(dir, stripped_path, fuchsia_fs::OpenFlags::empty())
             .await?;
     DeviceWatcher::new(path, open_dir, WATCH_TIMEOUT).await
 }
@@ -273,69 +249,6 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[ignore] // TODO(fxbug.dev/35077) Re-enable once test flake is resolved
-    async fn test_publish_lifecycle() {
-        // We use these watchers to verify the addition and removal of these devices as tied to the
-        // lifetime of the Emulator instance we create below.
-        let mut hci_watcher: DeviceWatcher;
-        let mut emul_watcher: DeviceWatcher;
-        let hci_dev: DeviceFile;
-        let emul_dev: DeviceFile;
-
-        {
-            let mut fake_dev = Emulator::create(None).await.expect("Failed to construct Emulator");
-            let topo_path = fdio::device_get_topo_path(&fake_dev.file())
-                .expect("Failed to obtain topological path for Emulator");
-            let topo_path = Path::new(&topo_path);
-
-            // A bt-emulator device should already exist by now.
-            emul_watcher = DeviceWatcher::new_in_namespace(EMULATOR_DEVICE_DIR, WATCH_TIMEOUT)
-                .await
-                .expect("Failed to create bt-emulator device watcher");
-            emul_dev = emul_watcher
-                .watch_existing(&topo_path)
-                .await
-                .expect("Expected bt-emulator device to have been published");
-
-            // Send a publish message to the device. This call should succeed and result in a new
-            // bt-hci device. (Note: it is important for `hci_watcher` to get constructed here since
-            // our expectation is based on the `ADD_FILE` event).
-            hci_watcher = DeviceWatcher::new_in_namespace(HCI_DEVICE_DIR, WATCH_TIMEOUT)
-                .await
-                .expect("Failed to create bt-hci device watcher");
-            let _ = fake_dev
-                .publish(default_settings())
-                .await
-                .expect("Failed to send Publish message to emulator device");
-            hci_dev = hci_watcher
-                .watch_new(&topo_path, WatchFilter::AddedOnly)
-                .await
-                .expect("Expected a new bt-hci device");
-
-            // Once a device is published, it should not be possible to publish again while the
-            // HciEmulator channel is open.
-            let result = fake_dev
-                .emulator()
-                .publish(default_settings())
-                .await
-                .expect("Failed to send second Publish message to emulator device");
-            assert_eq!(Err(EmulatorError::HciAlreadyPublished), result);
-
-            fake_dev.destroy_and_wait().await.expect("Expected test device to be removed");
-        }
-
-        // Both devices should be destroyed when `fake_dev` gets dropped.
-        let _ = hci_watcher
-            .watch_removed(hci_dev.relative_path())
-            .await
-            .expect("Expected bt-hci device to get removed");
-        let _ = emul_watcher
-            .watch_removed(emul_dev.relative_path())
-            .await
-            .expect("Expected bt-emulator device to get removed");
-    }
-
     #[fuchsia::test]
     async fn publish_lifecycle_with_realm() {
         let realm = RealmBuilder::new().await.unwrap();
@@ -349,7 +262,7 @@ mod tests {
         let dev_dir = fuchsia_fs::directory::open_directory(
             realm.root.get_exposed_dir(),
             DEV_DIR,
-            fio::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::OpenFlags::empty(),
         )
         .await
         .unwrap();
@@ -362,7 +275,8 @@ mod tests {
 
         {
             let mut fake_dev =
-                Emulator::create(Some(&realm.root)).await.expect("Failed to construct Emulator");
+                Emulator::create(dev_dir).await.expect("Failed to construct Emulator");
+            let dev_dir = &fake_dev.dev.as_ref().expect("device should exist by now").dev_directory;
             let topo_path = fdio::device_get_topo_path(&fake_dev.file())
                 .expect("Failed to obtain topological path for Emulator");
             let topo_path = Path::new(&topo_path);

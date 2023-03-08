@@ -7,6 +7,7 @@ use {
     fidl_fuchsia_bluetooth_sys::{HostWatcherMarker, HostWatcherProxy},
     fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
     fuchsia_bluetooth::{
+        constants::DEV_DIR,
         expectation::asynchronous::{
             expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
         },
@@ -128,7 +129,13 @@ pub async fn activate_fake_host(
     let initial_hosts: Vec<HostId> = host_watcher.read().hosts.keys().cloned().collect();
     let initial_hosts_ = initial_hosts.clone();
 
-    let hci = Emulator::create_and_publish(Some(host_watcher.realm.instance())).await?;
+    let dev_dir = fuchsia_fs::directory::open_directory_no_describe(
+        host_watcher.realm.instance().get_exposed_dir(),
+        DEV_DIR,
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .with_context(|| format!("failed to open {}", DEV_DIR))?;
+    let hci = Emulator::create_and_publish(dev_dir).await?;
 
     let host_watcher_state = host_watcher
         .when_satisfied(
