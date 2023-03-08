@@ -405,6 +405,7 @@ void Device::ProbeBars() {
 zx::result<std::unique_ptr<PciAllocation>> Device::AllocateFromUpstream(
     const Bar& bar, std::optional<zx_paddr_t> base) {
   ZX_DEBUG_ASSERT(bar.size > 0);
+  zx_paddr_t start = base.value_or(0);
 
   // On all platforms if a BAR is not marked in its register as MMIO then it
   // goes through the Root Host IO/PIO allocator, regardless of whether the
@@ -413,25 +414,25 @@ zx::result<std::unique_ptr<PciAllocation>> Device::AllocateFromUpstream(
     return upstream_->pio_regions().Allocate(base, bar.size);
   }
 
-  // Prefetchable bars *must* come from a prefetchable region. However, Bridges
-  // only allocate 64 bit space to the prefetchable window. This means if we
-  // want to allocate a 64 bit BAR then it must also come from the prefetchable
-  // window. At the Root Host level if no address base is provided it will
-  // attempt to allocate from the 32 bit allocator if the platform does not
-  // populate any space in the > 4GB region, but this does not matter at the
-  // level of endpoints below a bridge since they will be assigning out of the
-  // address windows provided to their upstream bridges.
-  // TODO(fxb/32978): Do we need to worry about BARs that want to span the 4GB boundary?
-  if (bar.is_prefetchable || bar.is_64bit) {
-    if (auto result = upstream_->pf_mmio_regions().Allocate(base, bar.size); result.is_ok()) {
-      return result;
-    }
+  // If a BAR is prefetchable and we're attached to a bridge then the only
+  // allocation option available is to use the PF-MMIO window. Otherwise, when
+  // attached to a root we can use either MMIO allocator.
+  if (upstream_->type() == pci::UpstreamNode::Type::BRIDGE && bar.is_prefetchable) {
+    return upstream_->pf_mmio_regions().Allocate(base, bar.size);
   }
 
-  // If the BAR is 32 bit, or for some reason the 64 bit window wasn't populated
-  // them fall back to the 32 bit allocator. 64 bit BARs are commonly allocated
-  // out of the < 4GB range on Intel platforms.
-  return upstream_->mmio_regions().Allocate(base, bar.size);
+  // If the allocation fits within the low MMIO window then attempt to allocate
+  // it there. Ensure it can't cross the low to high boundary between 4GB and
+  // beyond. Any prefetchable BARs at this point are downstream of a root so it
+  // doesn't matter which allocator we use.
+  zx_paddr_t end_offset = 0;
+  if (!add_overflow(start, bar.size - 1, &end_offset) &&
+      end_offset <= std::numeric_limits<uint32_t>::max()) {
+    return upstream_->mmio_regions().Allocate(base, bar.size);
+  }
+
+  // Otherwise, use the high MMIO allocator.
+  return upstream_->pf_mmio_regions().Allocate(base, bar.size);
 }
 
 // Higher level method to allocate address space a previously probed BAR id
