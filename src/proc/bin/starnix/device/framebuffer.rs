@@ -46,8 +46,8 @@ impl Framebuffer {
             let vmo = Arc::new(server.get_vmo()?);
             let vmo_len = vmo.info().map_err(|_| errno!(EINVAL))?.size_bytes as u32;
             // Fill the buffer with white pixels as a placeholder.
-            if vmo.write(&vec![0xff; vmo_len as usize], 0).is_err() {
-                log_warn!("could not write initial framebuffer");
+            if let Err(err) = vmo.write(&vec![0xff; vmo_len as usize], 0) {
+                log_warn!("could not write initial framebuffer: {:?}", err);
             }
 
             Ok(Arc::new(Self { vmo, vmo_len, server: Some(server), info: RwLock::new(info) }))
