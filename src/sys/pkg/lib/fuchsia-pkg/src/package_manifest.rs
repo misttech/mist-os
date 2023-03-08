@@ -7,7 +7,8 @@ use {
         BlobEntry, MetaContents, MetaPackage, MetaSubpackages, Package, PackageManifestError,
         PackageName, PackagePath, PackageVariant,
     },
-    anyhow::Result,
+    anyhow::{Context, Result},
+    camino::Utf8Path,
     fuchsia_archive::{self, Utf8Reader},
     fuchsia_hash::Hash,
     fuchsia_merkle::from_slice,
@@ -21,6 +22,7 @@ use {
         path::Path,
         str,
     },
+    utf8_path::{path_relative_from_file, resolve_path_from_file},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -49,6 +51,7 @@ impl PackageManifest {
         }
     }
 
+    /// Returns the current packages blobs and subpackages.
     pub fn into_blobs_and_subpackages(self) -> (Vec<BlobInfo>, Vec<SubpackageInfo>) {
         match self.0 {
             VersionedPackageManifest::Version1(manifest) => (manifest.blobs, manifest.subpackages),
@@ -325,6 +328,37 @@ impl PackageManifest {
         };
         Ok(PackageManifest(VersionedPackageManifest::Version1(manifest_v1)))
     }
+
+    pub fn try_load_from(manifest_path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {
+        fn inner(manifest_path: &Utf8Path) -> anyhow::Result<PackageManifest> {
+            let file = File::open(manifest_path)
+                .with_context(|| format!("Opening package manifest: {manifest_path}"))?;
+
+            PackageManifest::from_reader(manifest_path, BufReader::new(file))
+        }
+        inner(manifest_path.as_ref())
+    }
+
+    pub fn from_reader(
+        manifest_path: impl AsRef<Utf8Path>,
+        reader: impl std::io::Read,
+    ) -> anyhow::Result<Self> {
+        fn inner(
+            manifest_path: &Utf8Path,
+            reader: impl std::io::Read,
+        ) -> anyhow::Result<PackageManifest> {
+            let versioned: VersionedPackageManifest = serde_json::from_reader(reader)?;
+
+            let versioned = match versioned {
+                VersionedPackageManifest::Version1(manifest) => VersionedPackageManifest::Version1(
+                    manifest.resolve_source_paths(manifest_path)?,
+                ),
+            };
+
+            Ok(Self(versioned))
+        }
+        inner(manifest_path.as_ref(), reader)
+    }
 }
 
 pub struct PackageManifestBuilder {
@@ -445,45 +479,8 @@ pub struct SubpackageInfo {
 
 pub mod host {
     use super::*;
-    use anyhow::Context;
-    use camino::Utf8Path;
-    use std::fs::File;
-    use utf8_path::{path_relative_from_file, resolve_path_from_file};
 
     impl PackageManifest {
-        pub fn try_load_from(manifest_path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {
-            fn inner(manifest_path: &Utf8Path) -> anyhow::Result<PackageManifest> {
-                let file = File::open(manifest_path)
-                    .with_context(|| format!("Opening package manifest: {manifest_path}"))?;
-
-                PackageManifest::from_reader(manifest_path, BufReader::new(file))
-            }
-            inner(manifest_path.as_ref())
-        }
-
-        pub fn from_reader(
-            manifest_path: impl AsRef<Utf8Path>,
-            reader: impl std::io::Read,
-        ) -> anyhow::Result<Self> {
-            fn inner(
-                manifest_path: &Utf8Path,
-                reader: impl std::io::Read,
-            ) -> anyhow::Result<PackageManifest> {
-                let versioned: VersionedPackageManifest = serde_json::from_reader(reader)?;
-
-                let versioned = match versioned {
-                    VersionedPackageManifest::Version1(manifest) => {
-                        VersionedPackageManifest::Version1(
-                            manifest.resolve_source_paths(manifest_path)?,
-                        )
-                    }
-                };
-
-                Ok(Self(versioned))
-            }
-            inner(manifest_path.as_ref(), reader)
-        }
-
         pub fn write_with_relative_paths(self, path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {
             fn inner(this: PackageManifest, path: &Utf8Path) -> anyhow::Result<PackageManifest> {
                 let versioned = match this.0 {
@@ -1048,17 +1045,6 @@ mod tests {
             }))
         );
     }
-}
-
-#[cfg(all(test, not(target_os = "fuchsia")))]
-mod host_tests {
-    use super::*;
-    use crate::{path_to_string::PathToStringExt, PackageBuilder};
-    use camino::Utf8Path;
-    use serde_json::Value;
-    use std::{collections::HashMap, fs::File};
-    use tempfile::{NamedTempFile, TempDir};
-    use tests::{ones_hash, ones_hash_str, zeros_hash, zeros_hash_str};
 
     #[test]
     fn test_load_from_simple() {
@@ -1173,6 +1159,17 @@ mod host_tests {
         assert_eq!(subpackage.name, "subpackage0");
         assert_eq!(subpackage.manifest_path, expected_subpackage_manifest_path);
     }
+}
+
+#[cfg(all(test, not(target_os = "fuchsia")))]
+mod host_tests {
+    use super::*;
+    use crate::{path_to_string::PathToStringExt, PackageBuilder};
+    use camino::Utf8Path;
+    use serde_json::Value;
+    use std::{collections::HashMap, fs::File};
+    use tempfile::{NamedTempFile, TempDir};
+    use tests::{ones_hash, ones_hash_str, zeros_hash};
 
     #[test]
     fn test_write_package_manifest_already_relative() {
