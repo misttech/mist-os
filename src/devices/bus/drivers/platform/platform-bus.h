@@ -121,6 +121,10 @@ class PlatformBus : public PlatformBusType,
 
   fdf::UnownedDispatcher dispatcher() { return dispatcher_->borrow(); }
 
+  fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus>& bindings() {
+    return bindings_;
+  }
+
  private:
   fdf::WireClient<fuchsia_hardware_platform_bus::SysSuspend> suspend_cb_;
 
@@ -173,6 +177,7 @@ class PlatformBus : public PlatformBusType,
 
   zx_device_t* protocol_passthrough_ = nullptr;
   fdf::OutgoingDirectory outgoing_;
+  fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bindings_;
   fdf::UnownedDispatcher dispatcher_;
 };
 

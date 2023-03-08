@@ -588,7 +588,9 @@ zx_status_t PlatformDevice::Start() {
   {
     zx::result result = outgoing_.AddService<fuchsia_hardware_platform_device::Service>(
         fuchsia_hardware_platform_device::Service::InstanceHandler({
-            .device = bind_handler(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+            .device = device_bindings_.CreateHandler(
+                this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                fidl::kIgnoreBindingClosure),
         }));
     if (result.is_error()) {
       zxlogf(ERROR, "could not add service to outgoing directory: %s", result.status_string());
@@ -601,13 +603,9 @@ zx_status_t PlatformDevice::Start() {
 
   switch (type_) {
     case Protocol: {
-      auto protocol_handler =
-          [this](fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> server_end) {
-            fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end),
-                            restricted_.get());
-          };
       fuchsia_hardware_platform_bus::Service::InstanceHandler handler({
-          .platform_bus = std::move(protocol_handler),
+          .platform_bus = bus_bindings_.CreateHandler(
+              restricted_.get(), fdf::Dispatcher::GetCurrent()->get(), fidl::kIgnoreBindingClosure),
       });
 
       zx::result result =

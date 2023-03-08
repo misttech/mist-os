@@ -26,11 +26,8 @@ void PlatformInterruptFragment::Get(GetCompleter::Sync& completer) {
 
 zx_status_t PlatformInterruptFragment::Add(const char* name, PlatformDevice* pdev,
                                            fuchsia_hardware_platform_bus::Irq& irq) {
-  auto provider_handler = [this](fidl::ServerEnd<fuchsia_hardware_interrupt::Provider> request) {
-    fidl::BindServer(dispatcher_, std::move(request), this);
-  };
   fuchsia_hardware_interrupt::Service::InstanceHandler handler(
-      {.provider = std::move(provider_handler)});
+      {.provider = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure)});
 
   auto result = outgoing_.AddService<fuchsia_hardware_interrupt::Service>(std::move(handler));
   if (result.is_error()) {

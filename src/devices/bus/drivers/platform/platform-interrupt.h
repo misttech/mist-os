@@ -40,6 +40,7 @@ class PlatformInterruptFragment : public InterruptDeviceType,
   PlatformDevice* pdev_;
   uint32_t index_;
   component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_interrupt::Provider> bindings_;
   async_dispatcher_t* dispatcher_;
 };
 
