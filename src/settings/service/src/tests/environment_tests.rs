@@ -76,16 +76,7 @@ impl TestAgent {
         &mut self,
         _service_context: Arc<ServiceContext>,
     ) -> InvocationResult {
-        let (_, mut receptor) = self
-            .delegate
-            .create(MessengerType::Broker(Arc::new(move |message| {
-                matches!(
-                    message.payload(),
-                    Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD)))
-                )
-            })))
-            .await
-            .expect("Failed to create broker");
+        let (_, mut receptor) = self.delegate.create_sink().await.expect("Failed to create broker");
 
         fasync::Task::spawn(async move {
             verify_payload(
@@ -125,7 +116,7 @@ async fn test_message_hub() {
 
     let mut client_receptor = messenger.message(
         Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD))),
-        Audience::Broadcast,
+        Audience::EventSink,
     );
 
     // Wait for reply from TestAgent.
