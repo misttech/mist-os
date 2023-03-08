@@ -4,5 +4,5 @@
 
 declare_args() {
   # If true, Flatland is the default graphics protocol in Scenic.
-  use_flatland_by_default = false
+  use_flatland_by_default = true
 }
