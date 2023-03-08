@@ -63,9 +63,6 @@ class Device : public DeviceParent, public fidl::WireServer<fidl_examples_echo::
       return result.status_value();
     }
 
-    std::array protocol_offers = {
-        fidl::DiscoverableProtocolName<fidl_examples_echo::Echo>,
-    };
     std::array offers = {
         fidl_examples_echo::EchoService::Name,
         fidl_examples_echo::EchoService2::Name,
@@ -73,7 +70,6 @@ class Device : public DeviceParent, public fidl::WireServer<fidl_examples_echo::
 
     auto status = device->DdkAdd(ddk::DeviceAddArgs("parent")
                                      .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                                     .set_fidl_protocol_offers(protocol_offers)
                                      .set_fidl_service_offers(offers)
                                      .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status == ZX_OK) {
