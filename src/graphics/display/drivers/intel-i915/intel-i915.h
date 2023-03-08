@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <lib/device-protocol/pci.h>
@@ -50,7 +49,7 @@ typedef struct buffer_allocation {
 
 class Controller;
 using DeviceType = ddk::Device<Controller, ddk::Initializable, ddk::Unbindable, ddk::Suspendable,
-                               ddk::Resumable, ddk::GetProtocolable, ddk::ChildPreReleaseable>;
+                               ddk::Resumable, ddk::ChildPreReleaseable>;
 
 class Controller : public DeviceType,
                    public ddk::DisplayControllerImplProtocol<Controller, ddk::base_protocol>,
@@ -70,7 +69,6 @@ class Controller : public DeviceType,
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkSuspend(ddk::SuspendTxn txn);
   void DdkResume(ddk::ResumeTxn txn);
   void DdkChildPreRelease(void* child_ctx) {
@@ -156,12 +154,6 @@ class Controller : public DeviceType,
   zx_status_t IntelGpuCoreGttInsert(uint64_t addr, zx::vmo buffer, uint64_t page_offset,
                                     uint64_t page_count);
   void GpuRelease();
-
-  // i2c ops
-  uint32_t GetBusCount();
-  zx_status_t GetMaxTransferSize(uint32_t bus_id, size_t* out_size);
-  zx_status_t SetBitrate(uint32_t bus_id, uint32_t bitrate);
-  zx_status_t Transact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count);
 
   fdf::MmioBuffer* mmio_space() { return mmio_space_.has_value() ? &*mmio_space_ : nullptr; }
   Interrupts* interrupts() { return &interrupts_; }

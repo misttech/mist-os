@@ -110,24 +110,6 @@ constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
     .release = [](void* ctx) {},
 };
 
-// Can't be const because i2c_impl_protocol_t::ops is non-const.
-i2c_impl_protocol_ops_t g_i2c_protocol_ops = {
-    .get_bus_base = [](void* ctx) { return uint32_t{0}; },
-    .get_bus_count = [](void* ctx) { return static_cast<Controller*>(ctx)->GetBusCount(); },
-    .get_max_transfer_size =
-        [](void* ctx, uint32_t bus_id, size_t* out_size) {
-          return static_cast<Controller*>(ctx)->GetMaxTransferSize(bus_id, out_size);
-        },
-    .set_bitrate =
-        [](void* ctx, uint32_t bus_id, uint32_t bitrate) {
-          return static_cast<Controller*>(ctx)->SetBitrate(bus_id, bitrate);
-        },
-    .transact =
-        [](void* ctx, uint32_t bus_id, const i2c_impl_op_t* ops, size_t count) {
-          return static_cast<Controller*>(ctx)->Transact(bus_id, ops, count);
-        },
-};
-
 const display_config_t* FindConfig(uint64_t display_id,
                                    cpp20::span<const display_config_t*> display_configs) {
   auto found =
@@ -802,7 +784,6 @@ void Controller::CallOnDisplaysChanged(DisplayDevice** added, size_t added_count
   for (unsigned i = 0; i < added_count; i++) {
     added_args[i].display_id = added[i]->id();
     added_args[i].edid_present = true;
-    added_args[i].panel.i2c_bus_id = added[i]->i2c_bus_id();
     added[i]->i2c().GetProto(&added_args[i].panel.i2c);
     added_args[i].pixel_format_list = kSupportedFormats;
     added_args[i].pixel_format_count = static_cast<uint32_t>(std::size(kSupportedFormats));
@@ -2096,49 +2077,6 @@ void Controller::GpuRelease() {
   }
 }
 
-// I2C methods
-
-uint32_t Controller::GetBusCount() {
-  const size_t size = ddis_.size() * 2;
-  ZX_DEBUG_ASSERT_MSG(size <= std::numeric_limits<uint32_t>::max(), "%zu overflows uint32_t", size);
-  return static_cast<uint32_t>(size);
-}
-
-// TODO(fxbug.dev/120971): Delete the i2cimpl methods after all clients have switched to the
-// GMBusI2c and DpAux implementations.
-static constexpr size_t kMaxTxSize = 255;
-zx_status_t Controller::GetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
-  *out_size = kMaxTxSize;
-  return ZX_OK;
-}
-
-zx_status_t Controller::SetBitrate(uint32_t bus_id, uint32_t bitrate) {
-  // no-op for now
-  return ZX_OK;
-}
-
-zx_status_t Controller::Transact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count) {
-  for (unsigned i = 0; i < count; i++) {
-    if (ops[i].data_size > kMaxTxSize) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-  }
-  if (!ops[count - 1].stop) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  size_t ddi_idx = bus_id >> 1;
-  if (ddi_idx >= ddis_.size()) {
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  bool is_hdmi = bus_id & 1;
-  if (is_hdmi) {
-    return gmbus_i2cs_[ddi_idx].I2cImplTransact(0, ops, count);
-  }
-  return dp_auxs_[ddi_idx].I2cImplTransact(0, ops, count);
-}
-
 // Ddk methods
 
 void Controller::DdkInit(ddk::InitTxn txn) {
@@ -2190,25 +2128,6 @@ void Controller::DdkRelease() {
   if (gpu_released_) {
     delete this;
   }
-}
-
-zx_status_t Controller::DdkGetProtocol(uint32_t proto_id, void* out) {
-  if (proto_id == ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL) {
-    auto ops = static_cast<display_controller_impl_protocol_t*>(out);
-    ops->ctx = this;
-    ops->ops = static_cast<display_controller_impl_protocol_ops_t*>(
-        &display_controller_impl_protocol_ops_);
-    return ZX_OK;
-  }
-
-  if (proto_id == ZX_PROTOCOL_I2C_IMPL) {
-    auto ops = static_cast<i2c_impl_protocol_t*>(out);
-    ops->ctx = this;
-    ops->ops = &g_i2c_protocol_ops;
-    return ZX_OK;
-  }
-
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 void Controller::DdkSuspend(ddk::SuspendTxn txn) {

@@ -76,7 +76,6 @@ class FakeDisplay : public DisplayDevice {
   }
   DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_10khz) final { return {}; }
   uint32_t LoadClockRateForTranscoder(TranscoderId transcoder_id) final { return 0; }
-  uint32_t i2c_bus_id() const final { return 2 * ddi_id(); }
   ddk::I2cImplProtocolClient i2c() final { return {}; }
   bool CheckPixelRate(uint64_t pixel_rate) final { return true; }
 };

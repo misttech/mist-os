@@ -46,7 +46,6 @@ class HdmiDisplay : public DisplayDevice {
 
   bool CheckPixelRate(uint64_t pixel_rate) final;
 
-  uint32_t i2c_bus_id() const final { return 2 * ddi_id() + 1; }
   ddk::I2cImplProtocolClient i2c() final { return i2c_; }
 
   const ddk::I2cImplProtocolClient i2c_;
