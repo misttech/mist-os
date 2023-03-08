@@ -12,6 +12,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   MSM8X53 = 0x01,
   MSM8998 = 0x02,
   MSM8150 = 0x03,
+  ETH_PHY = 0x04,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
@@ -21,4 +22,5 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   CLOCK = 0x04,
   POWER = 0x05,
   MAGMA_ADRENO = 0x06,
+  AR8031 = 0x7,
 };
