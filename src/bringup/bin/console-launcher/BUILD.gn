@@ -55,6 +55,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.virtualconsole:fuchsia.virtualconsole_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",

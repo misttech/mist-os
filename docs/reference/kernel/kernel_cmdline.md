@@ -385,12 +385,6 @@ that it should update the ABR metadata.
 Specify console device path. If not specified device manager will open
 `/dev/misc/console`. Only has effect if kernel.shell=false.
 
-## console.is_virtio=\<bool>
-
-Specify if the device given with `console.path` is a virtio-console device.
-Defaults to false. This is needed as a workaround due to drivers not being able
-to implement fuchsia.io.File themselves.
-
 # Additional Gigaboot Command Line Options
 
 ## bootloader.timeout=\<num>

@@ -10,6 +10,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -72,6 +73,18 @@ std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& args)
     os << args[i];
   }
   return os;
+}
+
+zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>> ConnectToPty(
+    const console_launcher::Arguments& args) {
+  zx::result controller_result = device_watcher::RecursiveWaitForFile(args.device.path.c_str());
+  if (controller_result.is_error()) {
+    FX_PLOGS(ERROR, controller_result.status_value())
+        << "failed to wait for console '" << args.device.path << "'";
+    return controller_result.take_error();
+  }
+  return zx::ok(
+      fidl::ClientEnd<fuchsia_hardware_pty::Device>(std::move(controller_result.value())));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_pty::Device>> CreateVirtualConsole(
@@ -451,38 +464,12 @@ int main(int argv, char** argc) {
                      std::make_move_iterator(autorun.end()));
     }
 
-    zx::result fd = console_launcher::WaitForFile(args.device.path.c_str(), zx::time::infinite());
-    if (fd.is_error()) {
-      FX_PLOGS(FATAL, fd.status_value())
-          << "failed to wait for console '" << args.device.path << "'";
+    zx::result pty_result = ConnectToPty(args);
+    if (pty_result.is_error()) {
+      FX_PLOGS(FATAL, pty_result.error_value()) << "Failed to connect to PTY";
     }
 
-    fdio_cpp::FdioCaller caller(std::move(fd).value());
-
-    fidl::ClientEnd<fuchsia_hardware_pty::Device> stdio;
-    // TODO(https://fxbug.dev/112484): Clean this up once devhost stops speaking
-    // fuchsia.io.File on behalf of drivers. Once that happens, the
-    // virtio-console driver should just speak that instead of this shim
-    // interface.
-    if (args.device.is_virtio) {
-      zx::result server = fidl::CreateEndpoints(&stdio);
-      if (server.is_error()) {
-        FX_PLOGS(FATAL, server.status_value()) << "failed to create pty endpoints";
-      }
-      const fidl::Status result = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())
-                                      ->ConnectToDeviceFidl(server.value().TakeChannel());
-      if (!result.ok()) {
-        FX_PLOGS(FATAL, result.status()) << "failed to get virtio console channel";
-      }
-    } else {
-      zx::result channel = caller.take_as<fuchsia_hardware_pty::Device>();
-      if (channel.is_error()) {
-        FX_PLOGS(FATAL, channel.status_value()) << "failed to get console channel";
-      }
-      stdio = std::move(channel.value());
-    }
-
-    workers.emplace_back([&, stdio = std::move(stdio)]() mutable {
+    workers.emplace_back([&, stdio = std::move(pty_result.value())]() mutable {
       RunSerialConsole(launcher, ldsvc, vfs, root, std::move(stdio), args.term, {});
     });
   } else {

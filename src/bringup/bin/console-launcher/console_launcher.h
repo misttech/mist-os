@@ -20,11 +20,8 @@
 
 namespace console_launcher {
 
-zx::result<fbl::unique_fd> WaitForFile(const char* path, zx::time deadline);
-
 struct Device {
   std::string path = "/svc/console";
-  bool is_virtio = false;
 };
 
 struct Arguments {

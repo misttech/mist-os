@@ -20,45 +20,6 @@
 
 namespace console_launcher {
 
-// Wait for the requested file.  Its parent directory must exist.
-zx::result<fbl::unique_fd> WaitForFile(const char* path, zx::time deadline) {
-  std::string_view basename{path};
-  std::string_view dirname = "/";
-  if (const size_t slash = basename.rfind('/'); slash != std::string::npos) {
-    dirname = basename.substr(0, slash);
-    basename = basename.substr(slash + 1);
-  }
-
-  auto watch_func = [](int dirfd, int event, const char* fn, void* cookie) -> zx_status_t {
-    const std::string_view basename = *static_cast<std::string_view*>(cookie);
-    if (event != WATCH_EVENT_ADD_FILE) {
-      return ZX_OK;
-    }
-    if (fn == basename) {
-      return ZX_ERR_STOP;
-    }
-    return ZX_OK;
-  };
-
-  fbl::unique_fd dirfd(open(std::string{dirname}.c_str(), O_RDONLY | O_DIRECTORY));
-  if (!dirfd.is_valid()) {
-    FX_LOGS(ERROR) << "failed to open directory '" << dirname << "': " << strerror(errno);
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  if (zx_status_t status = fdio_watch_directory(dirfd.get(), watch_func, deadline.get(), &basename);
-      status != ZX_ERR_STOP) {
-    return zx::error(status);
-  }
-
-  fbl::unique_fd fd(openat(dirfd.get(), std::string{basename}.c_str(), O_RDWR));
-  if (!fd.is_valid()) {
-    FX_LOGS(ERROR) << "failed to open file '" << basename << "': " << strerror(errno);
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-  return zx::ok(std::move(fd));
-}
-
 zx::result<ConsoleLauncher> ConsoleLauncher::Create() {
   ConsoleLauncher launcher;
 
@@ -107,10 +68,6 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
             .defaultval = false,
         },
         {
-            .key = "console.is_virtio",
-            .defaultval = false,
-        },
-        {
             .key = "netsvc.disable",
             .defaultval = true,
         },
@@ -131,9 +88,8 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
     // If the kernel console is running a shell we can't launch our own shell.
     ret.run_shell = console_shell && !kernel_shell;
     ret.virtcon_disable = response.values[2];
-    ret.device.is_virtio = response.values[3];
-    const bool netsvc_disable = response.values[4];
-    const bool netsvc_netboot = response.values[5];
+    const bool netsvc_disable = response.values[3];
+    const bool netsvc_netboot = response.values[4];
     const bool netboot = !netsvc_disable && netsvc_netboot;
     ret.virtual_console_need_debuglog = netboot;
   }

@@ -14,7 +14,6 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
   std::map<std::string, std::string> arguments;
   arguments["kernel.shell"] = "false";
   arguments["console.shell"] = "true";
-  arguments["console.is_virtio"] = "true";
   arguments["console.path"] = "/test/path";
   arguments["TERM"] = "FAKE_TERM";
   arguments["zircon.autorun.boot"] = "/boot/bin/ls+/dev/class/";
@@ -31,7 +30,6 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
   ASSERT_OK(args.status_value());
 
   ASSERT_TRUE(args->run_shell);
-  ASSERT_TRUE(args->device.is_virtio);
   ASSERT_EQ(args->term, "TERM=FAKE_TERM");
   ASSERT_EQ(args->device.path, "/test/path");
   ASSERT_EQ(args->autorun_boot, "/boot/bin/ls+/dev/class/");
@@ -42,7 +40,6 @@ TEST(SystemInstanceTest, CheckBootArgDefaultStrings) {
   std::map<std::string, std::string> arguments;
   arguments["kernel.shell"] = "true";
   arguments["console.shell"] = "true";
-  arguments["console.is_virtio"] = "false";
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   mock_boot_arguments::Server boot_server(std::move(arguments));
@@ -55,7 +52,6 @@ TEST(SystemInstanceTest, CheckBootArgDefaultStrings) {
   ASSERT_OK(args.status_value());
 
   ASSERT_FALSE(args->run_shell);
-  ASSERT_FALSE(args->device.is_virtio);
   ASSERT_EQ(args->term, "TERM=uart");
   ASSERT_EQ(args->device.path, "/svc/console");
   ASSERT_EQ(args->autorun_boot, "");

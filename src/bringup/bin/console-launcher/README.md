@@ -7,7 +7,6 @@ quits.
 This component can be configured by the the following kernel commandline
 options:
 - console.shell
-- console.is_virtio
 - console.path
 - TERM
 

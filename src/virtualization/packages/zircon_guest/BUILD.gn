@@ -26,7 +26,6 @@ guest_package("zircon_guest") {
   zircon = guest_image_dir + "/guest/guest.zbi"
 
   cmdline = "console.path=/dev/class/console/virtio-console"
-  cmdline += " console.is_virtio=true"
   cmdline += " console.shell=true"
 
   disk_filename = "filesystem.fvm"
