@@ -21,6 +21,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect/device_inspect.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_data_path.h"
 
 struct brcmf_bus;
 
@@ -45,7 +46,7 @@ class SimDevice : public Device {
 
   async_dispatcher_t* GetDispatcher() override;
   DeviceInspect* GetInspect() override;
-  bool IsNetworkDeviceBus() const override { return false; }
+  bool IsNetworkDeviceBus() const override { return true; }
 
   // Trampolines for DDK functions, for platforms that support them.
   zx_status_t DeviceInit() override;
@@ -55,6 +56,8 @@ class SimDevice : public Device {
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
 
   brcmf_simdev* GetSim();
+
+  SimDataPath& DataPath() { return data_path_; }
 
  protected:
   void Shutdown() override;
@@ -67,6 +70,8 @@ class SimDevice : public Device {
   std::unique_ptr<DeviceInspect> inspect_;
   std::unique_ptr<brcmf_bus> brcmf_bus_;
   zx_device_t* phy_device_;
+
+  SimDataPath data_path_;
 };
 
 }  // namespace wlan::brcmfmac

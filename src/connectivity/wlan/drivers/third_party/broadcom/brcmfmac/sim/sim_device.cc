@@ -82,7 +82,14 @@ zx_status_t SimDevice::Create(zx_device_t* parent_device, simulation::FakeDevMgr
   return ZX_OK;
 }
 
-zx_status_t SimDevice::BusInit() { return brcmf_sim_register(drvr()); }
+zx_status_t SimDevice::BusInit() {
+  zx_status_t status = brcmf_sim_register(drvr());
+  if (status != ZX_OK) {
+    return status;
+  }
+  data_path_.Init(&NetDev());
+  return ZX_OK;
+}
 
 async_dispatcher_t* SimDevice::GetDispatcher() { return sim_environ_->GetDispatcher(); }
 

@@ -43,6 +43,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_errinj.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_hw.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_iovar.h"
+#include "wlan/drivers/components/frame_storage.h"
 
 namespace wlan::brcmfmac {
 
@@ -257,14 +258,22 @@ class SimFirmware {
   zx_status_t BusPreinit();
   void BusStop();
   zx_status_t BusTxCtl(unsigned char* msg, uint len);
-  zx_status_t BusTxData(struct brcmf_netbuf* netbuf);
+  zx_status_t BusTxFrameSingle(const wlan::drivers::components::Frame& frame);
+  zx_status_t BusTxFrames(cpp20::span<wlan::drivers::components::Frame> frames);
   zx_status_t BusRxCtl(unsigned char* msg, uint len, int* rxlen_out);
   zx_status_t BusFlushTxQueue(int ifidx);
   zx_status_t BusGetBootloaderMacAddr(uint8_t* mac_addr);
+  zx_status_t BusQueueRxSpace(const rx_space_buffer_t* buffer_list, size_t buffer_count,
+                              uint8_t* vmo_addrs[]);
+  drivers::components::FrameContainer BusAcquireTxSpace(size_t count);
   // This function returns the wsec_key_list for an iface to outside.
   std::vector<brcmf_wsec_key_le> GetKeyList(uint16_t ifidx);
 
+  std::optional<drivers::components::Frame> GetRxFrame();
+
   zx_status_t SetupIovarTable();
+  zx_status_t SetupInternalVmo();
+
   // Direct handlers for different iovars.
   zx_status_t IovarIfaceVarSet(SimIovarSetReq* req);
   zx_status_t IovarIfaceVarGet(SimIovarGetReq* req);
@@ -544,6 +553,15 @@ class SimFirmware {
   AssocState assoc_state_;
   AuthState auth_state_;
   ChannelSwitchState channel_switch_state_;
+
+  // This vmo and tx frame storage are used only internally
+  // Note that this VMO id should not conflict with the ones used by SimDataPath
+  static constexpr uint8_t kInternalVmoId = 0;
+  zx::vmo vmo_;
+  drivers::components::FrameStorage internal_tx_frame_storage_;
+
+  // This stores frames given to SimFw through calls to BusQueueRxSpace
+  drivers::components::FrameStorage rx_frame_storage_;
 
   // Internal firmware state variables
   std::array<uint8_t, ETH_ALEN> mac_addr_;

@@ -167,6 +167,44 @@ zx_status_t SimFirmware::SetupIovarTable() {
   return ZX_OK;
 }
 
+zx_status_t SimFirmware::SetupInternalVmo() {
+  // Setup internal vmo and frame container (used by BusAcquireTxSpace)
+  // For simplicity, this vmo only contains the space for a single frame.
+
+  zx_status_t status = zx::vmo::create(zx_system_get_page_size(), 0, &vmo_);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  uint64_t size = 0;
+  status = vmo_.get_size(&size);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  zx_vaddr_t vaddr;
+  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo_, 0, size, &vaddr);
+
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  rx_space_buffer_t buffer{.region = {
+                               .vmo = kInternalVmoId,
+                               .offset = 0,
+                               .length = size,
+                           }};
+
+  std::array<uint8_t*, kInternalVmoId + 1> addrs{};
+  addrs[kInternalVmoId] = reinterpret_cast<uint8_t*>(vaddr);
+  {
+    std::lock_guard lock(internal_tx_frame_storage_);
+    internal_tx_frame_storage_.Store(&buffer, 1, addrs.data());
+  }
+
+  return ZX_OK;
+}
+
 SimFirmware::SimFirmware(brcmf_simdev* simdev) : simdev_(simdev), hw_(simdev->env) {
   // Configure the chanspec encode/decoder
   d11_inf_.io_type = kIoType;
@@ -187,6 +225,10 @@ SimFirmware::SimFirmware(brcmf_simdev* simdev) : simdev_(simdev), hw_(simdev->en
 
   if (SetupIovarTable() != ZX_OK) {
     ZX_PANIC("Unable to setup Iovar Table");
+  }
+
+  if (SetupInternalVmo() != ZX_OK) {
+    ZX_PANIC("Unable to setup internal VMO");
   }
 }
 
@@ -665,30 +707,25 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
   return status;
 }
 
-zx_status_t SimFirmware::BusTxData(struct brcmf_netbuf* netbuf) {
-  if (netbuf->len < BCDC_HEADER_LEN + sizeof(ethhdr)) {
-    BRCMF_DBG(SIM, "Data netbuf (%u) smaller than BCDC + ethernet header %lu\n", netbuf->len,
+zx_status_t SimFirmware::BusTxFrameSingle(const wlan::drivers::components::Frame& frame) {
+  if (frame.Size() < BCDC_HEADER_LEN + sizeof(ethhdr)) {
+    BRCMF_DBG(SIM, "Frame size (%u) smaller than BCDC + ethernet header %lu\n", frame.Size(),
               BCDC_HEADER_LEN + sizeof(ethhdr));
     return ZX_ERR_INVALID_ARGS;
   }
 
   // Get ifidx from bcdc header
-  brcmf_proto_bcdc_header* bcdc_header = (struct brcmf_proto_bcdc_header*)(netbuf);
+  auto bcdc_header = reinterpret_cast<const struct brcmf_proto_bcdc_header*>(frame.Data());
   uint16_t ifidx = BCDC_GET_IF_IDX(bcdc_header);
   // For now we only support data transmission for client iface, another logic path should be added
   // if we need to support data transmission for softap iface.
   ZX_ASSERT_MSG(ifidx == kClientIfidx,
                 "Only data transmission for client iface is supported for now.");
   // Ignore the BCDC Header
-  ethhdr* ethFrame = reinterpret_cast<ethhdr*>(netbuf->data + BCDC_HEADER_LEN);
+  const ethhdr* ethFrame = reinterpret_cast<const ethhdr*>(frame.Data() + BCDC_HEADER_LEN);
 
   // Build MAC frame
   simulation::SimQosDataFrame dataFrame{};
-
-  // we can't send data frames if we aren't associated with anything
-  if (assoc_state_.opts == nullptr) {
-    return ZX_ERR_BAD_STATE;
-  }
 
   // IEEE Std 802.11-2016, 9.4.1.4
   switch (assoc_state_.opts->bss_type) {
@@ -709,7 +746,7 @@ zx_status_t SimFirmware::BusTxData(struct brcmf_netbuf* netbuf) {
       dataFrame.addr3_ = common::MacAddr(ethFrame->h_dest);
       // Sim FW currently doesn't distinguish QoS from non-QoS association. If it does, this should
       // only be set for a QoS association.
-      dataFrame.qosControl_ = netbuf->priority;
+      dataFrame.qosControl_ = frame.Priority();
       break;
     default:
       // TODO: support other bss types such as Mesh
@@ -719,19 +756,40 @@ zx_status_t SimFirmware::BusTxData(struct brcmf_netbuf* netbuf) {
 
   // For now, since the LLC information would always be the same aside from the redundant ethernet
   // type (Table M2 IEEE 802.11 2016). we will not append/parse LLC headers
-  uint32_t payload_size = netbuf->len - BCDC_HEADER_LEN - sizeof(ethhdr);
+  uint32_t payload_size = frame.Size() - BCDC_HEADER_LEN - sizeof(ethhdr);
   dataFrame.payload_.resize(payload_size);
-  memcpy(dataFrame.payload_.data(), netbuf->data + BCDC_HEADER_LEN + sizeof(ethhdr), payload_size);
-
+  memcpy(dataFrame.payload_.data(), frame.Data() + BCDC_HEADER_LEN + sizeof(ethhdr), payload_size);
   hw_.Tx(dataFrame);
 
-  if (netbuf->ifc_netbuf) {
-    netbuf->ifc_netbuf->Return(ZX_OK);
+  return ZX_OK;
+}
+
+zx_status_t SimFirmware::BusTxFrames(cpp20::span<wlan::drivers::components::Frame> frames) {
+  // we can't send data frames if we aren't associated with anything
+  if (assoc_state_.opts == nullptr) {
+    brcmf_tx_complete(simdev_->drvr, frames, ZX_ERR_BAD_STATE);
+    return ZX_ERR_BAD_STATE;
   }
 
-  brcmf_netbuf_free(netbuf);
+  zx_status_t status = ZX_OK;
+  size_t frames_sent = 0;
 
-  return ZX_OK;
+  for (const auto& f : frames) {
+    status = BusTxFrameSingle(f);
+    if (status != ZX_OK)
+      break;
+    ++frames_sent;
+  }
+
+  if (status != ZX_OK && frames_sent > 0) {
+    // Some frames were sent successfully, complete those as a success, the rest will be completed
+    // as failures below.
+    brcmf_tx_complete(simdev_->drvr, frames.subspan(0, frames_sent), ZX_OK);
+    frames = frames.subspan(frames_sent);
+  }
+
+  brcmf_tx_complete(simdev_->drvr, frames, status);
+  return status;
 }
 
 // Stop the SoftAP
@@ -831,6 +889,23 @@ zx_status_t SimFirmware::BusGetBootloaderMacAddr(uint8_t* mac_addr) {
 
   memcpy(mac_addr, fixed_random_macaddr, sizeof(fixed_random_macaddr));
   return ZX_OK;
+}
+
+zx_status_t SimFirmware::BusQueueRxSpace(const rx_space_buffer_t* buffer_list, size_t buffer_count,
+                                         uint8_t* vmo_addrs[]) {
+  std::lock_guard lock(rx_frame_storage_);
+  rx_frame_storage_.Store(buffer_list, buffer_count, vmo_addrs);
+  return ZX_OK;
+}
+
+drivers::components::FrameContainer SimFirmware::BusAcquireTxSpace(size_t count) {
+  std::lock_guard lock(internal_tx_frame_storage_);
+  return internal_tx_frame_storage_.Acquire(count);
+}
+
+std::optional<drivers::components::Frame> SimFirmware::GetRxFrame() {
+  std::lock_guard lock(rx_frame_storage_);
+  return rx_frame_storage_.Acquire();
 }
 
 void SimFirmware::BcdcResponse::Clear() { len_ = 0; }

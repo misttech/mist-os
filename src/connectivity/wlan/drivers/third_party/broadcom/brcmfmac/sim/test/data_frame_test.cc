@@ -8,8 +8,14 @@
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <zircon/errors.h>
 
+#include <array>
+#include <cstdint>
+#include <vector>
+
+#include "fuchsia/hardware/network/driver/c/banjo.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_utils.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
 
@@ -112,14 +118,9 @@ class DataFrameTest : public SimTest {
   void Init();
   void Finish();
 
-  std::vector<uint8_t> CreateEthernetFrame(common::MacAddr dstAddr, common::MacAddr srcAddr,
-                                           uint16_t ethType, const std::vector<uint8_t>& data);
-
   // Run through the join => auth => assoc flow
   void StartConnect();
 
-  // Send a data frame
-  void Tx(std::vector<uint8_t>& ethFrame);
   // Send a eapol request
   void TxEapolRequest(common::MacAddr dstAddr, common::MacAddr srcAddr,
                       const std::vector<uint8_t>& eapol);
@@ -146,21 +147,11 @@ class DataFrameTest : public SimTest {
     size_t deauth_ind_count = 0;
   };
 
-  // Data Context with respect to driver callbacks
-  struct DataContext {
-    // data frames our driver is expected to send
-    std::list<std::vector<uint8_t>> expected_sent_data;
-
-    // data frames our driver indicated that we sent
+  // Context for managing eapol callbacks
+  struct EapolContext {
     std::list<std::vector<uint8_t>> sent_data;
-    std::list<zx_status_t> tx_data_status_codes;
-    std::list<wlan_eapol_result_t> tx_eapol_conf_codes;
-
-    // data frames our test the driver is expected to receive
-    std::list<std::vector<uint8_t>> expected_received_data;
-
-    // data frames received by the driver
     std::list<std::vector<uint8_t>> received_data;
+    std::list<wlan_eapol_result_t> tx_eapol_conf_codes;
   };
 
   // data frames sent by our driver detected by the environment
@@ -187,7 +178,7 @@ class DataFrameTest : public SimTest {
   // at the end of each test.
   std::list<simulation::FakeAp*> aps_;
 
-  DataContext data_context_;
+  EapolContext eapol_context_;
 
   bool assoc_check_for_eapol_rx_ = false;
 
@@ -202,15 +193,13 @@ class DataFrameTest : public SimTest {
   static wlan_fullmac_impl_ifc_protocol_ops_t sme_ops_;
   wlan_fullmac_impl_ifc_protocol sme_protocol_ = {.ops = &sme_ops_, .ctx = this};
 
-  // Event handlers
+  // Fullmac event handlers
   void OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind);
   void OnConnectConf(const wlan_fullmac_connect_confirm_t* resp);
   void OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind);
   void OnEapolConf(const wlan_fullmac_eapol_confirm_t* resp);
   void OnSignalReport(const wlan_fullmac_signal_report_indication* ind);
   void OnEapolInd(const wlan_fullmac_eapol_indication_t* ind);
-  void OnDataRecv(const void* data_buffer, size_t data_size);
-  static void TxComplete(void* ctx, zx_status_t status, ethernet_netbuf_t* netbuf);
 };
 
 // Since we're acting as wlan_fullmac, we need handlers for any protocol calls we may receive
@@ -251,10 +240,6 @@ wlan_fullmac_impl_ifc_protocol_ops_t DataFrameTest::sme_ops_ = {
         [](void* cookie, const wlan_fullmac_eapol_indication_t* ind) {
           static_cast<DataFrameTest*>(cookie)->OnEapolInd(ind);
         },
-    .data_recv =
-        [](void* cookie, const uint8_t* data_buffer, size_t data_size, uint32_t flags) {
-          static_cast<DataFrameTest*>(cookie)->OnDataRecv(data_buffer, data_size);
-        },
 };
 
 // Create our device instance and hook up the callbacks
@@ -283,20 +268,6 @@ void DataFrameTest::Finish() {
   aps_.clear();
 }
 
-std::vector<uint8_t> DataFrameTest::CreateEthernetFrame(common::MacAddr dstAddr,
-                                                        common::MacAddr srcAddr, uint16_t ethType,
-                                                        const std::vector<uint8_t>& ethBody) {
-  std::vector<uint8_t> ethFrame;
-  ethFrame.resize(14 + ethBody.size());
-  memcpy(ethFrame.data(), &dstAddr, sizeof(dstAddr));
-  memcpy(ethFrame.data() + common::kMacAddrLen, &srcAddr, sizeof(srcAddr));
-  ethFrame.at(common::kMacAddrLen * 2) = ethType;
-  ethFrame.at(common::kMacAddrLen * 2 + 1) = ethType >> 8;
-  memcpy(ethFrame.data() + 14, ethBody.data(), ethBody.size());
-
-  return ethFrame;
-}
-
 void DataFrameTest::OnDeauthInd(const wlan_fullmac_deauth_indication_t* ind) {
   if (!testing_rx_freeze_deauth_) {
     // This function is only used for rx freeze deauth testing now.
@@ -315,7 +286,7 @@ void DataFrameTest::OnConnectConf(const wlan_fullmac_connect_confirm_t* resp) {
 }
 
 void DataFrameTest::OnEapolConf(const wlan_fullmac_eapol_confirm_t* resp) {
-  data_context_.tx_eapol_conf_codes.push_back(resp->result_code);
+  eapol_context_.tx_eapol_conf_codes.push_back(resp->result_code);
 }
 
 void DataFrameTest::OnEapolInd(const wlan_fullmac_eapol_indication_t* ind) {
@@ -323,7 +294,8 @@ void DataFrameTest::OnEapolInd(const wlan_fullmac_eapol_indication_t* ind) {
   resp.resize(ind->data_count);
   std::memcpy(resp.data(), ind->data_list, ind->data_count);
 
-  data_context_.received_data.push_back(std::move(resp));
+  eapol_context_.received_data.push_back(std::move(resp));
+
   if (assoc_check_for_eapol_rx_) {
     ASSERT_EQ(assoc_context_.connect_resp_count, 1U);
   }
@@ -336,19 +308,14 @@ void DataFrameTest::OnSignalReport(const wlan_fullmac_signal_report_indication* 
     return;
   }
   // Transmit a frame to AP right after each signal report to increase tx count and hold rx count.
-  auto frame = CreateEthernetFrame(kApBssid, kClientMacAddress, htobe16(ETH_P_IP), kSampleEthBody);
-  env_->ScheduleNotification(std::bind(&DataFrameTest::Tx, this, frame), zx::msec(200));
+  constexpr uint16_t kFrameId = 123;
+  auto transmit = [&](void) {
+    device_->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP, kSampleEthBody);
+  };
+  env_->ScheduleNotification(transmit, zx::msec(200));
 }
 
 void DataFrameTest::OnDisassocInd(const wlan_fullmac_disassoc_indication_t* ind) {}
-
-void DataFrameTest::OnDataRecv(const void* data_buffer, size_t data_size) {
-  std::vector<uint8_t> resp;
-  resp.resize(data_size);
-  std::memcpy(resp.data(), data_buffer, data_size);
-  data_context_.received_data.push_back(std::move(resp));
-  non_eapol_data_count++;
-}
 
 void DataFrameTest::StartConnect() {
   // Send connect request
@@ -360,34 +327,6 @@ void DataFrameTest::StartConnect() {
   connect_req.auth_type = WLAN_AUTH_TYPE_OPEN_SYSTEM;
   connect_req.connect_failure_timeout = 1000;  // ~1s (although value is ignored for now)
   client_ifc_.if_impl_ops_->connect_req(client_ifc_.if_impl_ctx_, &connect_req);
-}
-
-void DataFrameTest::TxComplete(void* ctx, zx_status_t status, ethernet_netbuf_t* netbuf) {
-  DataContext* context = reinterpret_cast<DataContext*>(ctx);
-
-  context->tx_data_status_codes.push_back(status);
-
-  if (status != ZX_OK) {
-    return;
-  }
-
-  std::vector<uint8_t> payload;
-  payload.resize(netbuf->data_size);
-  std::memcpy(payload.data(), netbuf->data_buffer, netbuf->data_size);
-  context->sent_data.push_back(std::move(payload));
-}
-
-void DataFrameTest::Tx(std::vector<uint8_t>& ethFrame) {
-  // Wrap frame in a netbuf
-  ethernet_netbuf_t* netbuf = new ethernet_netbuf_t;
-  netbuf->data_buffer = ethFrame.data();
-  netbuf->data_size = ethFrame.size();
-
-  // Send it
-  client_ifc_.if_impl_ops_->data_queue_tx(client_ifc_.if_impl_ctx_, 0, netbuf, TxComplete,
-                                          &data_context_);
-  ethFrame.clear();
-  delete netbuf;
 }
 
 void DataFrameTest::TxEapolRequest(common::MacAddr dstAddr, common::MacAddr srcAddr,
@@ -442,22 +381,26 @@ TEST_F(DataFrameTest, TxDataFrame) {
   assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(10));
 
-  // Simulate sending a data frame from driver to the AP
-  data_context_.expected_sent_data.push_back(
-      CreateEthernetFrame(kClientMacAddress, ifc_mac_, htobe16(ETH_P_IP), kSampleEthBody));
-  env_->ScheduleNotification(
-      std::bind(&DataFrameTest::Tx, this, data_context_.expected_sent_data.front()), zx::sec(1));
+  constexpr uint16_t kFrameId = 123;
+  auto transmit = [&](void) {
+    device_->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP, kSampleEthBody);
+  };
+
+  env_->ScheduleNotification(transmit, zx::sec(1));
+
   recv_addr_capture_filter = ap.GetBssid();
 
   env_->Run(kSimulatedClockDuration);
 
   // Verify frame was sent successfully
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
-  EXPECT_EQ(data_context_.tx_data_status_codes.front(), ZX_OK);
-  ASSERT_EQ(data_context_.sent_data.size(), data_context_.expected_sent_data.size());
-  EXPECT_EQ(data_context_.sent_data.front(), data_context_.expected_sent_data.front());
 
-  ASSERT_EQ(env_data_frame_capture_.size(), 1U);
+  auto& tx_results = device_->DataPath().TxResults();
+  ASSERT_EQ(tx_results.size(), 1);
+  EXPECT_EQ(tx_results[0].id, kFrameId);
+  EXPECT_EQ(tx_results[0].status, ZX_OK);
+
+  EXPECT_EQ(env_data_frame_capture_.size(), 1U);
   EXPECT_EQ(env_data_frame_capture_.front().toDS_, true);
   EXPECT_EQ(env_data_frame_capture_.front().fromDS_, false);
   EXPECT_EQ(env_data_frame_capture_.front().addr2_, ifc_mac_);
@@ -482,15 +425,20 @@ TEST_F(DataFrameTest, TxMalformedDataFrame) {
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(10));
 
   // Simulate sending a illegal ethernet frame from us to the AP
-  std::vector<uint8_t> ethFrame = {0x20, 0x43};
-  env_->ScheduleNotification(std::bind(&DataFrameTest::Tx, this, ethFrame), zx::sec(1));
+  std::vector<uint8_t> illegal = {0x20, 0x43};
+  constexpr uint16_t kFrameId = 123;
+  auto transmit = [&]() { device_->DataPath().TxRaw(kFrameId, illegal); };
+  env_->ScheduleNotification(transmit, zx::sec(1));
 
   env_->Run(kSimulatedClockDuration);
 
   // Verify frame was rejected
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
-  EXPECT_EQ(data_context_.tx_data_status_codes.front(), ZX_ERR_INVALID_ARGS);
-  EXPECT_EQ(data_context_.sent_data.size(), 0U);
+
+  auto& tx_results = device_->DataPath().TxResults();
+  ASSERT_EQ(tx_results.size(), 1);
+  EXPECT_EQ(tx_results[0].id, kFrameId);
+  EXPECT_EQ(tx_results[0].status, ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(DataFrameTest, TxEapolFrame) {
@@ -507,7 +455,6 @@ TEST_F(DataFrameTest, TxEapolFrame) {
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(10));
 
   // Simulate sending a EAPOL packet from us to the AP
-  data_context_.expected_sent_data.push_back(kSampleEapol);
   env_->ScheduleNotification(
       std::bind(&DataFrameTest::TxEapolRequest, this, kClientMacAddress, ifc_mac_, kSampleEapol),
       zx::sec(1));
@@ -517,7 +464,10 @@ TEST_F(DataFrameTest, TxEapolFrame) {
 
   // Verify response
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
-  EXPECT_EQ(data_context_.tx_eapol_conf_codes.front(), WLAN_EAPOL_RESULT_SUCCESS);
+  EXPECT_EQ(eapol_context_.tx_eapol_conf_codes.front(), WLAN_EAPOL_RESULT_SUCCESS);
+
+  auto& tx_results = device_->DataPath().TxResults();
+  ASSERT_EQ(tx_results.size(), 0);
 
   ASSERT_EQ(env_data_frame_capture_.size(), 1U);
   EXPECT_EQ(env_data_frame_capture_.front().toDS_, true);
@@ -542,22 +492,27 @@ TEST_F(DataFrameTest, RxDataFrame) {
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), delay);
 
   // Want to send packet from test to driver
-  data_context_.expected_received_data.push_back(
-      CreateEthernetFrame(ifc_mac_, kClientMacAddress, htobe16(ETH_P_IP), kSampleEthBody));
+  std::vector<uint8_t> expected =
+      sim_utils::CreateEthernetFrame(ifc_mac_, kClientMacAddress, ETH_P_IP, kSampleEthBody);
+
   // Ensure the data packet is sent after the client has associated
   delay += kSsidEventDelay + zx::msec(100);
-  env_->ScheduleNotification(std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress,
-                                       data_context_.expected_received_data.back()),
-                             delay);
+  env_->ScheduleNotification(
+      std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress, expected), delay);
 
   // Run
   env_->Run(kSimulatedClockDuration);
 
   // Confirm that the driver received that packet
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
-  EXPECT_EQ(non_eapol_data_count, 1U);
-  ASSERT_EQ(data_context_.received_data.size(), data_context_.expected_received_data.size());
-  EXPECT_EQ(data_context_.received_data.front(), data_context_.expected_received_data.front());
+  EXPECT_EQ(eapol_ind_count, 0U);
+  EXPECT_EQ(eapol_context_.received_data.size(), 0);
+
+  ASSERT_EQ(device_->DataPath().RxData().size(), 1);
+  auto& actual = device_->DataPath().RxData().front();
+
+  ASSERT_EQ(actual.size(), expected.size());
+  ASSERT_EQ(actual, expected);
 }
 
 // Test driver can receive data frames
@@ -587,7 +542,7 @@ TEST_F(DataFrameTest, RxMalformedDataFrame) {
   // Confirm that the driver received that packet
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
   EXPECT_EQ(non_eapol_data_count, 0U);
-  ASSERT_EQ(data_context_.received_data.size(), 0U);
+  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
 }
 
 TEST_F(DataFrameTest, RxEapolFrame) {
@@ -603,11 +558,10 @@ TEST_F(DataFrameTest, RxEapolFrame) {
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(30));
 
   // Want to send packet from test to driver
-  data_context_.expected_received_data.push_back(kSampleEapol);
-  auto frame = CreateEthernetFrame(ifc_mac_, kClientMacAddress, htobe16(ETH_P_PAE), kSampleEapol);
-
+  std::vector<uint8_t> eth =
+      sim_utils::CreateEthernetFrame(ifc_mac_, kClientMacAddress, ETH_P_PAE, kSampleEapol);
   env_->ScheduleNotification(
-      std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress, frame), zx::sec(5));
+      std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress, eth), zx::sec(5));
 
   // Run
   env_->Run(kSimulatedClockDuration);
@@ -615,8 +569,13 @@ TEST_F(DataFrameTest, RxEapolFrame) {
   // Confirm that the driver received that packet
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
   EXPECT_EQ(eapol_ind_count, 1U);
-  ASSERT_EQ(data_context_.received_data.size(), data_context_.expected_received_data.size());
-  EXPECT_EQ(data_context_.received_data.front(), data_context_.expected_received_data.front());
+
+  EXPECT_EQ(eapol_context_.received_data.size(), 1);
+
+  // The driver strips the ethernet header from the sent frame
+  EXPECT_EQ(eapol_context_.received_data.front().size(), kSampleEapol.size());
+  EXPECT_EQ(eapol_context_.received_data.front(), kSampleEapol);
+  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
 }
 
 TEST_F(DataFrameTest, RxEapolFrameAfterAssoc) {
@@ -634,13 +593,13 @@ TEST_F(DataFrameTest, RxEapolFrameAfterAssoc) {
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), delay);
 
   // Want to send packet from test to driver
-  data_context_.expected_received_data.push_back(kSampleEapol);
-  auto frame = CreateEthernetFrame(ifc_mac_, kClientMacAddress, htobe16(ETH_P_PAE), kSampleEapol);
+  std::vector<uint8_t> eth =
+      sim_utils::CreateEthernetFrame(ifc_mac_, kClientMacAddress, ETH_P_PAE, kSampleEapol);
 
   // Send the packet before the SSID event is sent from SIM FW
   delay = delay + kSsidEventDelay / 2;
   env_->ScheduleNotification(
-      std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress, frame), delay);
+      std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress, eth), delay);
   assoc_check_for_eapol_rx_ = true;
   // Run
   env_->Run(kSimulatedClockDuration);
@@ -648,6 +607,7 @@ TEST_F(DataFrameTest, RxEapolFrameAfterAssoc) {
   // Confirm that the driver received that packet
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
   EXPECT_EQ(eapol_ind_count, 1U);
+  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
 }
 
 // Send a ucast packet to client before association is complete. Resulting E_DEAUTH from SIM FW
@@ -666,20 +626,20 @@ TEST_F(DataFrameTest, RxUcastBeforeAssoc) {
   assoc_context_.expected_results.push_front(STATUS_CODE_SUCCESS);
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), delay);
 
-  // Want to send packet from test to driver
-  data_context_.expected_received_data.push_back(kSampleEthBody);
-  auto frame = CreateEthernetFrame(ifc_mac_, kClientMacAddress, htobe16(ETH_P_IP), kSampleEthBody);
+  std::vector<uint8_t> expected =
+      sim_utils::CreateEthernetFrame(ifc_mac_, kClientMacAddress, ETH_P_PAE, kSampleEthBody);
 
   // Send the packet before the Assoc event is sent by SIM FW.
   delay = delay + kAssocEventDelay / 2;
   env_->ScheduleNotification(
-      std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress, frame), delay);
+      std::bind(&DataFrameTest::ClientTx, this, ifc_mac_, kClientMacAddress, expected), delay);
   // Run
   env_->Run(kSimulatedClockDuration);
 
   // Confirm that the driver did not receive the packet
-  EXPECT_EQ(non_eapol_data_count, 0U);
+  EXPECT_EQ(device_->DataPath().RxData().size(), 0U);
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
+  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
 }
 
 TEST_F(DataFrameTest, DeauthWhenRxFreeze) {

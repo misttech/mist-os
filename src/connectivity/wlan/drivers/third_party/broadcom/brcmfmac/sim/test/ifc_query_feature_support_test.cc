@@ -33,7 +33,7 @@ TEST_F(SimTest, ClientIfcQueryMacSublayerSupport) {
   env_->Run(kSimulatedClockDuration);
 
   EXPECT_FALSE(resp.rate_selection_offload.supported);
-  EXPECT_EQ(resp.data_plane.data_plane_type, DATA_PLANE_TYPE_ETHERNET_DEVICE);
+  EXPECT_EQ(resp.data_plane.data_plane_type, DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE);
   EXPECT_EQ(resp.device.mac_implementation_type, MAC_IMPLEMENTATION_TYPE_FULLMAC);
 }
 

@@ -58,14 +58,46 @@ static const struct brcmf_bus_ops brcmf_sim_bus_ops = {
         },
     .preinit = [](brcmf_bus* bus) { return BUS_OP(bus)->BusPreinit(); },
     .stop = [](brcmf_bus* bus) { return BUS_OP(bus)->BusStop(); },
-    .txdata = [](brcmf_bus* bus, brcmf_netbuf* netbuf) { return BUS_OP(bus)->BusTxData(netbuf); },
+    .txdata =
+        [](brcmf_bus* bus, brcmf_netbuf* netbuf) {
+          ZX_PANIC("txdata should not be called");
+          return ZX_ERR_NOT_SUPPORTED;
+        },
+    .txframes =
+        [](brcmf_bus* bus, cpp20::span<wlan::drivers::components::Frame> frames) {
+          return BUS_OP(bus)->BusTxFrames(frames);
+        },
     .txctl = [](brcmf_bus* bus, unsigned char* msg,
                 uint len) { return BUS_OP(bus)->BusTxCtl(msg, len); },
     .rxctl = [](brcmf_bus* bus, unsigned char* msg, uint len,
                 int* rxlen_out) { return BUS_OP(bus)->BusRxCtl(msg, len, rxlen_out); },
     .flush_txq = [](brcmf_bus* bus, int ifidx) { return BUS_OP(bus)->BusFlushTxQueue(ifidx); },
+    .get_tx_depth =
+        [](brcmf_bus* bus, uint16_t* tx_depth_out) {
+          *tx_depth_out = 1;
+          return ZX_OK;
+        },
+    .get_rx_depth =
+        [](brcmf_bus* bus, uint16_t* rx_depth_out) {
+          *rx_depth_out = 1;
+          return ZX_OK;
+        },
+    .get_tail_length =
+        [](brcmf_bus* bus, uint16_t* tail_length_out) {
+          *tail_length_out = 0;
+          return ZX_OK;
+        },
     .recovery = [](brcmf_bus* bus) { return brcmf_sim_recovery(bus); },
-    .log_stats = [](brcmf_bus* bus) { BRCMF_INFO("Simulated bus, no stats to log"); }};
+    .log_stats = [](brcmf_bus* bus) { BRCMF_INFO("Simulated bus, no stats to log"); },
+    .prepare_vmo = [](brcmf_bus*, uint8_t, zx_handle_t, uint8_t*, size_t) { return ZX_OK; },
+    .queue_rx_space =
+        [](brcmf_bus* bus, const rx_space_buffer_t* buffer_list, size_t buffer_count,
+           uint8_t* vmo_addrs[]) {
+          return BUS_OP(bus)->BusQueueRxSpace(buffer_list, buffer_count, vmo_addrs);
+        },
+    .acquire_tx_space = [](brcmf_bus* bus,
+                           size_t count) { return BUS_OP(bus)->BusAcquireTxSpace(count); },
+};
 #undef BUS_OP
 
 // Get device-specific information
@@ -160,11 +192,18 @@ void brcmf_sim_rx_event(brcmf_simdev* simdev, std::shared_ptr<std::vector<uint8_
 
 // Handle a simulator frame
 void brcmf_sim_rx_frame(brcmf_simdev* simdev, std::shared_ptr<std::vector<uint8_t>> buffer) {
-  brcmf_netbuf* netbuf = nullptr;
-  zx_status_t status = brcmf_sim_create_netbuf(simdev, std::move(buffer), &netbuf);
-  if (status == ZX_OK) {
-    brcmf_rx_frame(simdev->drvr, netbuf, false);
-  }
+  ZX_ASSERT_MSG(buffer->size() >= ETH_HLEN, "Malformed packet");
+
+  auto maybe_frame = simdev->sim_fw->GetRxFrame();
+  ZX_ASSERT_MSG(maybe_frame.has_value(),
+                "Simulator tried to receive a frame without queueing space");
+
+  auto& frame = maybe_frame.value();
+  ZX_ASSERT_MSG(frame.Size() >= buffer->size(), "Queued rx frame is too small");
+
+  memcpy(frame.Data(), buffer->data(), buffer->size());
+  frame.SetSize(buffer->size());
+  brcmf_rx_frame(simdev->drvr, std::move(frame), false);
 }
 
 zx_status_t brcmf_sim_recovery(brcmf_bus* bus) {

@@ -28,18 +28,22 @@ source_set("sim_common") {
   testonly = true
   sources = [
     "sim.cc",
+    "sim_data_path.cc",
     "sim_device.cc",
     "sim_errinj.cc",
     "sim_hw.cc",
     "sim_iovar.cc",
+    "sim_utils.cc",
   ]
   public = [
     "sim.h",
+    "sim_data_path.h",
     "sim_device.h",
     "sim_errinj.h",
     "sim_fw.h",
     "sim_hw.h",
     "sim_iovar.h",
+    "sim_utils.h",
   ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.wlan.associnfo:fuchsia.hardware.wlan.associnfo_banjo_c",
