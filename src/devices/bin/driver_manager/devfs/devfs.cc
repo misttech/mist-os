@@ -504,9 +504,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       // TODO(https://fxbug.dev/113839): Remove.
       "securemem",
 
-      // TODO(https://fxbug.dev/113840): Remove.
-      "tee",
-
       // TODO(https://fxbug.dev/113713): Remove.
       // TODO(https://fxbug.dev/113842): Remove.
       "temperature",

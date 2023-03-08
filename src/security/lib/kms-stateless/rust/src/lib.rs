@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    device_watcher::recursive_wait_and_open_node, fuchsia_async::TimeoutExt, futures::TryFutureExt,
-    std::ffi::CStr,
+    fuchsia_async::TimeoutExt as _,
+    futures::{TryFutureExt as _, TryStreamExt as _},
+    std::ffi::{CStr, CString},
 };
 
 /// Hardware derived key is expected to be a 128-bit AES key.
 const DERIVED_KEY_SIZE: usize = 16;
 const KEY_INFO_SIZE: usize = 32;
-const DEV_CLASS_TEE: &'static str = "/dev/class/tee/000";
 
 #[derive(Copy, Clone, Debug)]
 pub enum TaKeysafeCommand {
@@ -122,18 +122,28 @@ fn rotate_key_from_tee_device(device: Option<&CStr>, info: KeyInfo) -> Result<()
     call_command(device, &mut op, TaKeysafeCommand::RotateHardwareDerivedKey)
 }
 
-/// Gets a hardware derived key using the device /dev/class/tee/000. This is useful in early boot
-/// when other services may not be up.
+/// Gets a hardware derived key using the first device found in /dev/class/tee.
+/// This is useful in early boot when other services may not be up.
 pub async fn get_hardware_derived_key(info: KeyInfo) -> Result<Vec<u8>, Error> {
-    let dev =
-        fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
-    let _ = recursive_wait_and_open_node(&dev, DEV_CLASS_TEE.strip_prefix("/dev/").unwrap())
+    const DEV_CLASS_TEE: &str = "/dev/class/tee";
+
+    let dir =
+        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_TEE, fuchsia_fs::OpenFlags::empty())?;
+    let mut stream = device_watcher::watch_for_files(&dir).await?;
+    let first = stream
+        .try_next()
         .map_err(Error::from)
         .on_timeout(std::time::Duration::from_secs(5), || Err(Error::TeeDeviceWaitTimeout))
         .await?;
+    let first = first.ok_or_else(|| {
+        Error::TeeDeviceWaitFailure(anyhow::anyhow!(
+            "'{DEV_CLASS_TEE}' watcher closed unexpectedly"
+        ))
+    })?;
+    let first = first.to_str().expect("paths are utf-8");
 
-    // Unwrap is fine because we are using a const we provide with no null bytes.
-    let dev = std::ffi::CString::new(DEV_CLASS_TEE).unwrap();
+    let dev = format!("{DEV_CLASS_TEE}/{first}");
+    let dev = CString::new(dev).expect("paths do not contain nul bytes");
     get_key_from_tee_device(Some(&dev), info)
 }
 
