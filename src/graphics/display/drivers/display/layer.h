@@ -6,11 +6,11 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_DISPLAY_LAYER_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <zircon/listnode.h>
 #include <zircon/types.h>
 
 #include <memory>
 
+#include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_ptr.h>
 
@@ -116,7 +116,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   fbl::RefPtr<Image> pending_image_;
 
   // Image which are waiting to be displayed
-  list_node_t waiting_images_ = LIST_INITIAL_VALUE(waiting_images_);
+  fbl::DoublyLinkedList<Image::DoublyLinkedListNode*> waiting_images_;
+
   // The image which has most recently been sent to the display controller impl
   fbl::RefPtr<Image> displayed_image_;
 

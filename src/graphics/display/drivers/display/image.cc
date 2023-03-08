@@ -36,7 +36,7 @@ Image::Image(Controller* controller, const image_t& info, inspect::Node* parent_
 Image::~Image() {
   if (!capture_image_) {
     ZX_ASSERT(!std::atomic_load(&in_use_));
-    ZX_ASSERT(!list_in_list(&node.link));
+    ZX_ASSERT(!doubly_linked_list_node.InContainer());
     controller_->ReleaseImage(this);
   } else {
     controller_->ReleaseCaptureImage(info_.handle);

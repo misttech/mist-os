@@ -694,7 +694,7 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
         // Controller::ApplyConfig for more details.
         auto* layer = new_current.pop_front();
         if (layer->layer->current_display_id_ != display_config.id &&
-            layer->layer->displayed_image_ && !list_is_empty(&layer->layer->waiting_images_)) {
+            layer->layer->displayed_image_ && !layer->layer->waiting_images_.is_empty()) {
           {
             fbl::AutoLock lock(controller_->mtx());
             controller_->AssertMtxAliasHeld(layer->layer->displayed_image_->mtx());
@@ -1343,9 +1343,8 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
 void Client::OnFenceFired(FenceReference* fence) {
   bool new_image_ready = false;
   for (auto& layer : layers_) {
-    image_node_t* waiting;
-    list_for_every_entry (&layer.waiting_images_, waiting, image_node_t, link) {
-      new_image_ready |= waiting->self->OnFenceReady(fence);
+    for (Image::DoublyLinkedListNode& waiting_image : layer.waiting_images_) {
+      new_image_ready |= waiting_image.self->OnFenceReady(fence);
     }
   }
   if (new_image_ready) {

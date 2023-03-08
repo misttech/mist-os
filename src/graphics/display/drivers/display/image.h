@@ -9,11 +9,11 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/vmo.h>
-#include <zircon/listnode.h>
 #include <zircon/types.h>
 
 #include <atomic>
 
+#include <fbl/intrusive_container_utils.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
@@ -24,11 +24,6 @@
 namespace display {
 
 class Controller;
-
-typedef struct image_node {
-  list_node_t link;
-  fbl::RefPtr<class Image> self;
-} image_node_t;
 
 // An Image is both a reference to an imported pixel buffer (hereafter ImageRef)
 // and the state machine (hereafter ImageUse) for tracking its use as part of a config.
@@ -104,17 +99,30 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   void set_latest_client_config_stamp(config_stamp_t stamp) { latest_client_config_stamp_ = stamp; }
   config_stamp_t latest_client_config_stamp() const { return latest_client_config_stamp_; }
 
-  // The node alternates between a client's waiting image list and the controller's
-  // presented image list. The presented image list is protected with the controller mutex,
-  // and the waiting list is only accessed on the loop and thus is not generally
-  // protected. However, transfers between the lists are protected by the controller mutex.
-  image_node_t node __TA_GUARDED(mtx()) = {
-      .link = LIST_INITIAL_CLEARED_VALUE,
-      .self = nullptr,
-  };
-
   // Aliases controller_->mtx() for the purpose of thread-safety analysis.
   mtx_t* mtx();
+
+  // This node allows the Image to be placed in an fbl::DoublyLinkedList which
+  // can be either a Client's waiting image list, or the Controller's presented
+  // image list.
+  //
+  // The presented image list is protected with the controller mutex, and the
+  // waiting list is only accessed on the loop and thus is not generally
+  // protected. However, transfers between the lists are protected by the
+  // controller mutex.
+  //
+  // TODO(fxbug.dev/123301): Having a RefPtr pointing to the class itself is
+  // risky and memory leak-prone. This "Node" should be replaced with a
+  // DoublyLinkedListable trait of the parent class, or the trait itself should
+  // be removed completely from the class.
+  struct DoublyLinkedListNode
+      : public fbl::DoublyLinkedListable<DoublyLinkedListNode*,
+                                         fbl::NodeOptions::AllowRemoveFromContainer> {
+    // Points to the Image itself iff the Node is in a linked list to keep the
+    // lifetime of the Image. Otherwise, it could cause a memory leak.
+    fbl::RefPtr<Image> self;
+  };
+  DoublyLinkedListNode doubly_linked_list_node __TA_GUARDED(mtx());
 
  private:
   // Retires the image and signals |fence|.

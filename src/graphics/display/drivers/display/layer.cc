@@ -5,10 +5,12 @@
 #include "src/graphics/display/drivers/display/layer.h"
 
 #include <lib/ddk/debug.h>
+#include <zircon/assert.h>
 
 #include <algorithm>
 
 #include <fbl/auto_lock.h>
+#include <fbl/intrusive_double_list.h>
 
 #include "src/graphics/display/drivers/display/fence.h"
 
@@ -21,12 +23,12 @@ namespace {
 static constexpr uint32_t kInvalidLayerType = UINT32_MAX;
 
 // Removes and invokes EarlyRetire on all entries before end.
-static void do_early_retire(list_node_t* list, display::image_node_t* end = nullptr) {
-  display::image_node_t* node;
-  while ((node = list_peek_head_type(list, display::image_node_t, link)) != end) {
+static void EarlyRetireUpTo(fbl::DoublyLinkedList<Image::DoublyLinkedListNode*>& list,
+                            fbl::DoublyLinkedList<Image::DoublyLinkedListNode*>::iterator end) {
+  while (list.begin() != end) {
+    auto node = list.pop_front();
     node->self->EarlyRetire();
     node->self.reset();
-    list_remove_head(list);
   }
 }
 
@@ -61,7 +63,7 @@ Layer::~Layer() {
   if (pending_image_) {
     pending_image_->DiscardAcquire();
   }
-  do_early_retire(&waiting_images_);
+  EarlyRetireUpTo(waiting_images_, waiting_images_.end());
   if (displayed_image_) {
     fbl::AutoLock lock(displayed_image_->mtx());
     displayed_image_->StartRetire();
@@ -78,9 +80,7 @@ bool Layer::ResolvePendingLayerProperties() {
       return false;
     }
 
-    while (!list_is_empty(&waiting_images_)) {
-      do_early_retire(&waiting_images_);
-    }
+    EarlyRetireUpTo(waiting_images_, waiting_images_.end());
     if (displayed_image_ != nullptr) {
       {
         fbl::AutoLock lock(displayed_image_->mtx());
@@ -103,14 +103,13 @@ bool Layer::ResolvePendingImage(FenceCollection* fences, config_stamp_t stamp) {
                                   fences->GetFence(pending_signal_event_id_));
     {
       fbl::AutoLock lock(pending_image_->mtx());
-      list_add_tail(&waiting_images_, &pending_image_->node.link);
-      pending_image_->node.self = std::move(pending_image_);
+      waiting_images_.push_back(&pending_image_->doubly_linked_list_node);
+      pending_image_->doubly_linked_list_node.self = std::move(pending_image_);
     }
   }
 
-  image_node_t* tail_node = list_peek_tail_type(&waiting_images_, image_node_t, link);
-  if (tail_node) {
-    tail_node->self->set_latest_client_config_stamp(stamp);
+  if (!waiting_images_.is_empty()) {
+    waiting_images_.back().self->set_latest_client_config_stamp(stamp);
   }
   return true;
 }
@@ -174,16 +173,15 @@ bool Layer::CleanUpImage(Image* image) {
     pending_image_ = nullptr;
   }
   if (image == nullptr) {
-    do_early_retire(&waiting_images_, nullptr);
+    EarlyRetireUpTo(waiting_images_, waiting_images_.end());
   } else {
-    image_node_t* waiting;
-    list_for_every_entry (&waiting_images_, waiting, image_node_t, link) {
-      if (waiting->self.get() == image) {
-        list_delete(&waiting->link);
-        waiting->self->EarlyRetire();
-        waiting->self.reset();
-        break;
-      }
+    auto it = waiting_images_.find_if(
+        [image](const Image::DoublyLinkedListNode& node) { return node.self.get() == image; });
+    if (it != waiting_images_.end()) {
+      auto to_retire = waiting_images_.erase(it);
+      ZX_DEBUG_ASSERT(to_retire);
+      to_retire->self->EarlyRetire();
+      to_retire->self.reset();
     }
   }
   if (displayed_image_ && (image == nullptr || displayed_image_.get() == image)) {
@@ -208,11 +206,22 @@ std::optional<config_stamp_t> Layer::GetCurrentClientConfigStamp() const {
 }
 
 bool Layer::ActivateLatestReadyImage() {
-  image_node_t* node = list_peek_tail_type(&waiting_images_, image_node_t, link);
-  while (node != nullptr && !node->self->IsReady()) {
-    node = list_prev_type(&waiting_images_, &node->link, image_node_t, link);
+  if (waiting_images_.is_empty()) {
+    return false;
   }
-  if (node == nullptr) {
+
+  // Find the most recent (i.e. the most behind) waiting image that is ready.
+  auto it = waiting_images_.end();
+  bool found_ready_image = false;
+  do {
+    --it;
+    if (it->self->IsReady()) {
+      found_ready_image = true;
+      break;
+    }
+  } while (it != waiting_images_.begin());
+
+  if (!found_ready_image) {
     return false;
   }
 
@@ -222,10 +231,10 @@ bool Layer::ActivateLatestReadyImage() {
     displayed_image_->StartRetire();
   }
 
-  // Retire the pending images that were never presented.
-  do_early_retire(&waiting_images_, node);
-  displayed_image_ = std::move(node->self);
-  list_remove_head(&waiting_images_);
+  // Retire the waiting images that were never presented.
+  EarlyRetireUpTo(waiting_images_, /*end=*/it);
+  displayed_image_ = std::move(it->self);
+  waiting_images_.pop_front();
 
   uint64_t handle = displayed_image_->info().handle;
   if (current_layer_.type == LAYER_TYPE_PRIMARY) {

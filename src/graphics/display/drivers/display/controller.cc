@@ -169,12 +169,11 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
   for (unsigned i = 0; i < removed_count; i++) {
     auto target = displays_.erase(displays_removed[i]);
     if (target) {
-      image_node_t* n;
-      while ((n = list_remove_head_type(&target->images, image_node_t, link))) {
-        AssertMtxAliasHeld(n->self->mtx());
-        n->self->StartRetire();
-        n->self->OnRetire();
-        n->self.reset();
+      while (auto node = target->images.pop_front()) {
+        AssertMtxAliasHeld(node->self->mtx());
+        node->self->StartRetire();
+        node->self->OnRetire();
+        node->self.reset();
       }
     } else {
       zxlogf(DEBUG, "Unknown display %ld removed", displays_removed[i]);
@@ -381,24 +380,28 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
     // (in which case it's being displayed), is older than its layer's image
     // (i.e. in front of in the queue) and can be retired, or is newer than
     // its layer's image (i.e. behind in the queue) and has yet to be presented.
-    image_node_t* cur;
-    image_node_t* tmp;
-    list_for_every_entry_safe (&info->images, cur, tmp, image_node_t, link) {
-      bool should_retire = cur->self->latest_controller_config_stamp() < controller_config_stamp;
+    for (auto it = info->images.begin(); it != info->images.end();) {
+      bool should_retire = it->self->latest_controller_config_stamp() < controller_config_stamp;
 
       // Retire any images for which we don't already have a z-match, since
       // those are older than whatever is currently in their layer.
       if (should_retire) {
-        list_delete(&cur->link);
-        AssertMtxAliasHeld(cur->self->mtx());
-        cur->self->OnRetire();
+        // Image must be removed from containers before being destroyed. So we
+        // create a copy of the RefPtr to keep its lifetime.
+        fbl::RefPtr<Image> image_to_retire = it->self;
+        it->self.reset();
+        info->images.erase(it++);
+
+        AssertMtxAliasHeld(image_to_retire->mtx());
+        image_to_retire->OnRetire();
         // Older images may not be presented. Ending their flows here
         // ensures the correctness of traces.
         //
         // NOTE: If changing this flow name or ID, please also do so in the
         // corresponding FLOW_BEGIN in display_swapchain.cc.
-        TRACE_FLOW_END("gfx", "present_image", cur->self->id);
-        cur->self.reset();
+        TRACE_FLOW_END("gfx", "present_image", image_to_retire->id);
+      } else {
+        it++;
       }
     }
   }
@@ -581,16 +584,16 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
         // Even if we're on the same display, the entry needs to be moved to the end of the
         // list to ensure that the last config->current.layer_count elements in the queue
         // are the current images.
-        if (list_in_list(&image->node.link)) {
-          list_delete(&image->node.link);
+        if (image->doubly_linked_list_node.InContainer()) {
+          image->doubly_linked_list_node.RemoveFromContainer();
         } else {
-          image->node.self = image;
+          image->doubly_linked_list_node.self = image;
         }
-        list_add_tail(&display->images, &image->node.link);
+        display->images.push_back(&image->doubly_linked_list_node);
 
         config_image_queue.back().images.push_back({image->id, image->client_id()});
       }
-      ZX_ASSERT(display->vsync_layer_count == 0 || !list_is_empty(&display->images));
+      ZX_ASSERT(display->vsync_layer_count == 0 || !display->images.is_empty());
     }
 
     vc_applied_ = is_vc;
@@ -972,11 +975,7 @@ size_t Controller::TEST_imported_images_count() const {
   size_t primary_images = primary_client_ ? primary_client_->TEST_imported_images_count() : 0;
   size_t display_images = 0;
   for (const auto& display : displays_) {
-    image_node_t* cur;
-    image_node_t* tmp;
-    list_for_every_entry_safe (&display.images, cur, tmp, image_node_t, link) {
-      ++display_images;
-    }
+    display_images += display.images.size_slow();
   }
   return vc_images + primary_images + display_images;
 }

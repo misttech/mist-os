@@ -22,6 +22,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/display/id-map.h"
+#include "src/graphics/display/drivers/display/image.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display {
@@ -80,7 +81,8 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
   // A list of all images which have been sent to display driver. For multiple
   // images which are displayed at the same time, images with a lower z-order
   // occur first.
-  list_node_t images = LIST_INITIAL_VALUE(images);
+  fbl::DoublyLinkedList<Image::DoublyLinkedListNode*> images;
+
   // The number of layers in the applied configuration which are important for vsync (i.e.
   // that have images).
   uint32_t vsync_layer_count;

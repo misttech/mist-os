@@ -23,7 +23,6 @@
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/fidl.h>
-#include <zircon/listnode.h>
 #include <zircon/types.h>
 
 #include <cstdint>
