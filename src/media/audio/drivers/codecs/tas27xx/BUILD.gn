@@ -12,7 +12,15 @@ driver_bind_rules("ti_tas27xx-bind") {
   header_output = "ti_tas27xx-bind.h"
   bind_output = "tas27xx.bindbc"
   tests = "tests.json"
-  deps = [ "//src/devices/bind/fuchsia.ti.platform" ]
+
+  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # fragments for composite bind rules.
+  disable_fragment_gen = true
+  deps = [
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.ti.platform",
+  ]
 }
 
 fuchsia_driver("tas27xx-driver") {

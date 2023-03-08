@@ -207,18 +207,6 @@ driver_bind_rules("astro-dai-test-out-bind") {
   ]
 }
 
-driver_bind_rules("audio-codec-tas27xx-bind") {
-  rules = "bind/audio-codec-tas27xx.bind"
-  header_output = "audio-codec-tas27xx-bind.h"
-  bind_output = "audio-codec-tas27xx-bind.bc"
-  tests = "bind-tests/audio-codec-tas27xx-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-  ]
-}
-
 driver_bind_rules("astro-aml-sdio-bind") {
   rules = "bind/astro-aml-sdio.bind"
   header_output = "astro-aml-sdio-bind.h"
@@ -298,7 +286,6 @@ fuchsia_driver("astro-driver") {
     ":astro-video-bind_header",
     ":astro-wifi-bind_header",
     ":astro-xhci-bind_header",
-    ":audio-codec-tas27xx-bind_header",
     ":pd-armcore-bind_header",
     ":pwm-ao-d-bind_header",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
@@ -390,7 +377,6 @@ group("tests") {
     ":astro-video-bind_test",
     ":astro-wifi-bind_test",
     ":astro-xhci-bind_test",
-    ":audio-codec-tas27xx-bind_test",
     ":pd-armcore-bind_test",
     ":pwm-ao-d-bind_test",
   ]

@@ -16,6 +16,7 @@
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
@@ -26,7 +27,6 @@
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/board/drivers/astro/audio-codec-tas27xx-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 // Enables BT PCM audio.
@@ -122,6 +122,31 @@ const std::vector<fdf::BindRule> kCodecRules = std::vector{
 const std::vector<fdf::NodeProperty> kCodecProps = std::vector{
     fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
     fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(1)),
+};
+
+const ddk::BindRule kI2cRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(ASTRO_I2C_3)),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                            bind_fuchsia_i2c::BIND_I2C_ADDRESS_AUDIO_CODEC),
+};
+const device_bind_prop_t kI2cProps[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_AUDIO_CODEC),
+    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                      bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
+    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                      bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS2770),
+};
+
+const ddk::BindRule kFaultGpioRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_AUDIO_SOC_FAULT_L)),
+};
+const device_bind_prop_t kFaultGpioProps[] = {
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_FAULT),
 };
 
 const std::vector<fdf::ParentSpec> kTdmI2sSpec = std::vector{
@@ -296,9 +321,6 @@ zx_status_t Astro::AudioInit() {
 #endif
   // Add TDM OUT to the codec.
   {
-    zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, kCodecVid},
-                                {BIND_PLATFORM_DEV_DID, 0, kCodecDid}};
-
     metadata::ti::TasConfig metadata = {};
 #ifdef TAS2770_CONFIG_PATH
     metadata.number_of_writes1 = sizeof(tas2770_init_sequence1) / sizeof(cfg_reg);
@@ -320,18 +342,12 @@ zx_status_t Astro::AudioInit() {
         },
     };
 
-    composite_device_desc_t comp_desc = {};
-    comp_desc.props = props;
-    comp_desc.props_count = std::size(props);
-    comp_desc.spawn_colocated = false;
-    comp_desc.fragments = audio_codec_tas27xx_fragments;
-    comp_desc.fragments_count = std::size(audio_codec_tas27xx_fragments);
-    comp_desc.primary_fragment = "i2c";
-    comp_desc.metadata_list = codec_metadata;
-    comp_desc.metadata_count = std::size(codec_metadata);
-    status = DdkAddComposite("audio-codec-tas27xx", &comp_desc);
+    status = DdkAddCompositeNodeSpec("audio-codec-tas27xx",
+                                     ddk::CompositeNodeSpec(kI2cRules, kI2cProps)
+                                         .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
+                                         .set_metadata(codec_metadata));
     if (status != ZX_OK) {
-      zxlogf(ERROR, "%s DdkAddComposite failed %d", __FILE__, status);
+      zxlogf(ERROR, "%s DdkAddCompositeNodeSpec failed %d", __FILE__, status);
       return status;
     }
   }
