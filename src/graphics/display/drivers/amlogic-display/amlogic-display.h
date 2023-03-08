@@ -180,6 +180,11 @@ class AmlogicDisplay
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }
 
+  ddk::I2cImplProtocolClient i2c() {
+    const i2c_impl_protocol_t i2c{.ops = &i2c_impl_protocol_ops_, .ctx = this};
+    return ddk::I2cImplProtocolClient(&i2c);
+  }
+
   // Zircon handles
   zx::bti bti_;
   zx::interrupt inth_;

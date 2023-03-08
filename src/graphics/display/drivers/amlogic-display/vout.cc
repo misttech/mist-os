@@ -169,7 +169,8 @@ zx_status_t Vout::RestartDisplay() {
   return ZX_OK;
 }
 
-void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display_id) {
+void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display_id,
+                                    const ddk::I2cImplProtocolClient& i2c) {
   switch (type_) {
     case VoutType::kDsi:
       args->display_id = display_id;
@@ -185,6 +186,7 @@ void Vout::PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display
       args->display_id = display_id;
       args->edid_present = true;
       args->panel.i2c_bus_id = 0;
+      i2c.GetProto(&args->panel.i2c);
       args->pixel_format_list = kHdmiSupportedPixelFormats;
       args->pixel_format_count = std::size(kHdmiSupportedPixelFormats);
       args->cursor_info_count = 0;

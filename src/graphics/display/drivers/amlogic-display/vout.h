@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/zx/result.h>
 #include <zircon/pixelformat.h>
@@ -28,7 +29,8 @@ class Vout {
 
   zx_status_t RestartDisplay();
 
-  void PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display_id);
+  void PopulateAddedDisplayArgs(added_display_args_t* args, uint64_t display_id,
+                                const ddk::I2cImplProtocolClient& i2c);
   bool IsFormatSupported(zx_pixel_format_t format);
 
   VoutType type() { return type_; }
