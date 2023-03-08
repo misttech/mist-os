@@ -321,30 +321,8 @@ impl ClientImpl {
     }
 }
 
-pub(crate) struct Handler<C: controller::Create + controller::Handle + Send + Sync + 'static> {
-    _data: PhantomData<C>,
-}
-
-impl<C: controller::Create + controller::Handle + Send + Sync + 'static> Handler<C> {
-    pub(crate) fn spawn(context: Context) -> BoxFuture<'static, ControllerGenerateResult> {
-        Box::pin(async move {
-            ClientImpl::create(
-                context,
-                Box::new(|proxy| {
-                    Box::pin(async move {
-                        C::create(proxy)
-                            .await
-                            .map(|controller| Box::new(controller) as BoxedController)
-                    })
-                }),
-            )
-            .await
-        })
-    }
-}
-
 /// `IntoHandlerResult` helps with converting a value into the result of a setting request.
-pub trait IntoHandlerResult {
+pub(crate) trait IntoHandlerResult {
     #[allow(clippy::result_large_err)] // TODO(fxbug.dev/117896)
     /// Converts `Self` into a `SettingHandlerResult` for use in a `Controller`.
     fn into_handler_result(self) -> SettingHandlerResult;

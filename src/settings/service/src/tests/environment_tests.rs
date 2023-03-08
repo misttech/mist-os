@@ -170,7 +170,6 @@ async fn test_display_interface_consolidation() {
             .expect("environment should be built");
 
     assert!(entities.contains(&Entity::Handler(SettingType::Display)));
-    assert!(entities.contains(&Entity::Handler(SettingType::LightSensor)));
 }
 
 #[fuchsia::test(allow_stalls = false)]

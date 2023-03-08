@@ -57,7 +57,6 @@ mod tests {
         let _ = settings.insert(SettingType::Intl);
         let _ = settings.insert(SettingType::Keyboard);
         let _ = settings.insert(SettingType::Light);
-        let _ = settings.insert(SettingType::LightSensor);
         let _ = settings.insert(SettingType::NightMode);
         let _ = settings.insert(SettingType::Privacy);
         let _ = settings.insert(SettingType::Setup);

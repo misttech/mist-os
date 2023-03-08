@@ -10,7 +10,7 @@ use crate::handler::setting_handler::{
     controller, persist, persist::controller as data_controller,
     persist::ClientProxy as DataClientProxy, persist::Handler as DataHandler, BoxedController,
     ClientImpl, Command, ControllerError, ControllerStateResult, Event, GenerateController,
-    Handler, IntoHandlerResult, Payload, SettingHandlerResult, State,
+    IntoHandlerResult, Payload, SettingHandlerResult, State,
 };
 use crate::message::base::{Audience, MessengerType};
 use crate::service;
@@ -30,39 +30,6 @@ use std::sync::Arc;
 
 const ENV_NAME: &str = "settings_service_setting_handler_test_environment";
 const CONTEXT_ID: u64 = 0;
-
-macro_rules! gen_controller {
-    ($name:ident, $succeed:expr) => {
-        /// Controller is a simple controller test implementation that refers to a
-        /// Control type for how to behave.
-        struct $name {}
-
-        #[async_trait]
-        impl controller::Create for $name {
-            async fn create(_: ::std::sync::Arc<ClientImpl>) -> Result<Self, ControllerError> {
-                if $succeed {
-                    Ok($name {})
-                } else {
-                    Err(ControllerError::InitFailure("failure".into()))
-                }
-            }
-        }
-
-        #[async_trait]
-        impl controller::Handle for $name {
-            async fn handle(&self, _: Request) -> Option<SettingHandlerResult> {
-                return None;
-            }
-
-            async fn change_state(&mut self, _: State) -> Option<ControllerStateResult> {
-                return None;
-            }
-        }
-    };
-}
-
-gen_controller!(SucceedController, true);
-gen_controller!(FailController, false);
 
 macro_rules! gen_data_controller {
     ($name:ident, $succeed:expr) => {
@@ -111,10 +78,6 @@ macro_rules! verify_handle {
 
 #[fuchsia::test(allow_stalls = false)]
 async fn test_spawn() {
-    // Exercises successful spawn of a simple controller.
-    verify_handle!(Handler::<SucceedController>::spawn);
-    // Exercises failed spawn of a simple controller.
-    verify_handle!(Handler::<FailController>::spawn);
     // Exercises successful spawn of a data controller.
     verify_handle!(DataHandler::<SucceedDataController>::spawn);
     // Exercises failed spawn of a data controller.

@@ -5,7 +5,7 @@
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 
-use crate::base::{Merge, SettingInfo};
+use crate::base::Merge;
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -79,21 +79,6 @@ pub enum LowLightMode {
     DisableImmediately,
     /// Device should be in low-light mode.
     Enable,
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub struct LightData {
-    /// Overall illuminance as measured in lux.
-    pub illuminance: f32,
-
-    /// Light sensor color reading in rgb.
-    pub color: fidl_fuchsia_ui_types::ColorRgb,
-}
-
-impl From<LightData> for SettingInfo {
-    fn from(light: LightData) -> SettingInfo {
-        SettingInfo::LightSensor(light)
-    }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]

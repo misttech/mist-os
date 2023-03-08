@@ -9,31 +9,14 @@ use crate::job::source::{Error as JobError, ErrorResponder};
 use crate::job::Job;
 use fidl::endpoints::{ControlHandle, Responder};
 use fidl_fuchsia_settings::{
-    DisplayRequest, DisplaySetResponder, DisplaySetResult, DisplaySettings,
-    DisplayWatchLightSensorResponder, DisplayWatchResponder, LightSensorData,
+    DisplayRequest, DisplaySetResponder, DisplaySetResult, DisplaySettings, DisplayWatchResponder,
     LowLightMode as FidlLowLightMode, Theme as FidlTheme, ThemeMode as FidlThemeMode,
     ThemeType as FidlThemeType,
 };
 
 use fuchsia_syslog::fx_log_warn;
 
-use std::collections::hash_map::DefaultHasher;
 use std::convert::TryFrom;
-use std::hash::Hash;
-use std::hash::Hasher;
-
-impl From<SettingInfo> for LightSensorData {
-    fn from(response: SettingInfo) -> Self {
-        if let SettingInfo::LightSensor(data) = response {
-            let mut sensor_data = fidl_fuchsia_settings::LightSensorData::EMPTY;
-            sensor_data.illuminance_lux = Some(data.illuminance);
-            sensor_data.color = Some(data.color);
-            sensor_data
-        } else {
-            panic!("incorrect value sent to display");
-        }
-    }
-}
 
 impl From<FidlThemeMode> for ThemeMode {
     fn from(fidl: FidlThemeMode) -> Self {
@@ -148,21 +131,6 @@ impl watch::Responder<DisplaySettings, fuchsia_zircon::Status> for DisplayWatchR
     }
 }
 
-impl watch::Responder<LightSensorData, fuchsia_zircon::Status>
-    for DisplayWatchLightSensorResponder
-{
-    fn respond(self, response: Result<LightSensorData, fuchsia_zircon::Status>) {
-        match response {
-            Ok(settings) => {
-                let _ = self.send(settings);
-            }
-            Err(error) => {
-                self.control_handle().shutdown_with_epitaph(error);
-            }
-        }
-    }
-}
-
 fn to_request(settings: DisplaySettings) -> Option<Request> {
     let set_display_info = SetDisplayInfo {
         manual_brightness_value: settings.brightness_value,
@@ -200,30 +168,6 @@ impl TryFrom<DisplayRequest> for Job {
             },
             DisplayRequest::Watch { responder } => {
                 Ok(watch::Work::new_job(SettingType::Display, responder))
-            }
-            DisplayRequest::WatchLightSensor { delta, responder } => {
-                let mut hasher = DefaultHasher::new();
-                // Bucket watch requests to the nearest 0.01.
-                format!("{delta:.2}").hash(&mut hasher);
-                Ok(watch::Work::new_job_with_change_function(
-                    SettingType::LightSensor,
-                    responder,
-                    watch::ChangeFunction::new(
-                        hasher.finish(),
-                        Box::new(move |old: &SettingInfo, new: &SettingInfo| match (old, new) {
-                            (
-                                SettingInfo::LightSensor(old_data),
-                                SettingInfo::LightSensor(new_data),
-                            ) => {
-                                // If the delta is 0, set the delta at a minimum level so that
-                                // clients don't get repeatedly notified for the same value.
-                                let min_change = delta.max(f32::EPSILON);
-                                (new_data.illuminance - old_data.illuminance).abs() >= min_change
-                            }
-                            _ => false,
-                        }),
-                    ),
-                ))
             }
             _ => {
                 fx_log_warn!("Received a call to an unsupported API: {:?}", req);

@@ -31,9 +31,9 @@ protocol Display {
     ///
     /// This method returns raw sensor values, and does not handle auto gain
     /// functionality. It is being replaced with the Watch method on
-    /// fuchsia.lightsensor.Sensor, which does handle autogain. This will be 
+    /// fuchsia.lightsensor.Sensor, which does handle autogain. This will be
     /// Removed in API Version 11.
-    @available(deprecated=10, note="Use fuchsia.lightsensor.Sensor::Watch")
+    @available(deprecated=10, removed=HEAD, note="Use fuchsia.lightsensor.Sensor::Watch")
     WatchLightSensor(struct {
         delta float32;
     }) -> (struct {
@@ -80,7 +80,7 @@ type DisplaySettings = table {
 /// fuchsia.lightsensor.LightSensorData. The [illuminance_lux] value here was
 /// incorrectly named and actually represents the clear color channel from the
 /// light sensor. This struct will be removed in API version 11.
-@available(deprecated=10, note="Use fuchsia.lightsensor.LightSensorData")
+@available(deprecated=10, removed=HEAD, note="Use fuchsia.lightsensor.LightSensorData")
 type LightSensorData = table {
     /// Brightness from the light sensor (a.k.a. the `Clear` value in RGBC).
     1: illuminance_lux float32;

@@ -15,7 +15,7 @@
 
 use crate::accessibility::types::AccessibilityInfo;
 use crate::audio::types::AudioInfo;
-use crate::display::types::{DisplayInfo, LightData};
+use crate::display::types::DisplayInfo;
 use crate::do_not_disturb::types::DoNotDisturbInfo;
 use crate::factory_reset::types::FactoryResetInfo;
 use crate::ingress::fidl;
@@ -47,7 +47,6 @@ pub enum SettingType {
     Intl,
     Keyboard,
     Light,
-    LightSensor,
     NightMode,
     Privacy,
     Setup,
@@ -130,7 +129,6 @@ generate_inspect_with_info! {
         Brightness(DisplayInfo),
         FactoryReset(FactoryResetInfo),
         Light(LightInfo),
-        LightSensor(LightData),
         DoNotDisturb(DoNotDisturbInfo),
         Input(InputInfo),
         Intl(IntlInfo),
@@ -175,7 +173,6 @@ conversion_impls! {
     Brightness(DisplayInfo) => Display,
     FactoryReset(FactoryResetInfo) => FactoryReset,
     Light(LightInfo) => Light,
-    LightSensor(LightData) => LightSensor,
     DoNotDisturb(DoNotDisturbInfo) => DoNotDisturb,
     Input(InputInfo) => Input,
     Intl(IntlInfo) => Intl,
@@ -199,7 +196,6 @@ impl From<&SettingInfo> for SettingType {
             SettingInfo::Intl(_) => SettingType::Intl,
             SettingInfo::Keyboard(_) => SettingType::Keyboard,
             SettingInfo::Light(_) => SettingType::Light,
-            SettingInfo::LightSensor(_) => SettingType::LightSensor,
             SettingInfo::NightMode(_) => SettingType::NightMode,
             SettingInfo::Privacy(_) => SettingType::Privacy,
             SettingInfo::Setup(_) => SettingType::Setup,
@@ -245,7 +241,6 @@ pub(crate) fn get_all_setting_types() -> HashSet<SettingType> {
         SettingType::Intl,
         SettingType::Keyboard,
         SettingType::Light,
-        SettingType::LightSensor,
         SettingType::NightMode,
         SettingType::Privacy,
         SettingType::Setup,

@@ -39,7 +39,6 @@ use settings_storage::fidl_storage::FidlStorage;
 
 pub use display::display_configuration::DisplayConfiguration;
 pub use display::LightSensorConfig;
-use handler::setting_handler::Handler;
 pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
 pub use input::input_device_configuration::InputConfiguration;
 pub use light::light_hardware_configuration::LightHardwareConfiguration;
@@ -64,7 +63,6 @@ use crate::audio::audio_controller::AudioController;
 use crate::base::{Dependency, Entity, SettingType};
 use crate::config::base::{AgentType, ControllerFlag};
 use crate::display::display_controller::{DisplayController, ExternalBrightnessControl};
-use crate::display::light_sensor_controller::LightSensorController;
 use crate::do_not_disturb::do_not_disturb_controller::DoNotDisturbController;
 use crate::factory_reset::factory_reset_controller::FactoryResetController;
 use crate::handler::base::GenerateHandler;
@@ -667,18 +665,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
                 .expect("storage should still be initializing");
             factory_handle
                 .register(SettingType::Light, Box::new(DataHandler::<LightController>::spawn));
-        }
-
-        // Light sensor
-        if components.contains(&SettingType::LightSensor) {
-            device_storage_factory
-                .initialize::<LightSensorController>()
-                .await
-                .expect("storage should still be initializing");
-            factory_handle.register(
-                SettingType::LightSensor,
-                Box::new(Handler::<LightSensorController>::spawn),
-            );
         }
 
         // Input

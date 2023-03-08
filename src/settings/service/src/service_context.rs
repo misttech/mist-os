@@ -93,61 +93,6 @@ impl ServiceContext {
         Ok(external_proxy)
     }
 
-    /// Connect to a service with the given name and ProtocolMarker.
-    ///
-    /// If a GenerateService was specified at creation, the given name will be used to generate a
-    /// service.
-    pub(crate) async fn connect_named<P: ProtocolMarker>(
-        &self,
-        service_name: &str,
-    ) -> Result<ExternalServiceProxy<P::Proxy>, Error> {
-        if let Some(generate_service) = &self.generate_service {
-            let (client, server) = zx::Channel::create();
-            if (generate_service)(service_name, server).await.is_err() {
-                return Err(format_err!("Could not handl service {:?}", service_name));
-            }
-
-            let publisher = self.make_publisher().await;
-            let external_proxy = ExternalServiceProxy::new(
-                P::Proxy::from_channel(fasync::Channel::from_channel(client)?),
-                publisher.clone(),
-            );
-            if let Some(p) = publisher {
-                p.send_event(Event::ExternalServiceEvent(ExternalServiceEvent::Created(
-                    P::DEBUG_NAME,
-                    clock::inspect_format_now().into(),
-                )));
-            }
-
-            Ok(external_proxy)
-        } else {
-            Err(format_err!("No service generator"))
-        }
-    }
-
-    /// Connect to a service at the given path and ProtocolMarker.
-    ///
-    /// If a GenerateService was specified at creation, the name of the service marker will be used
-    /// to generate a service and the path will be ignored.
-    pub(crate) async fn connect_path<P: ProtocolMarker>(
-        &self,
-        path: &str,
-    ) -> Result<ExternalServiceProxy<P::Proxy>, Error> {
-        let (proxy, server) = fidl::endpoints::create_proxy::<P>()?;
-        fdio::service_connect(path, server.into_channel())?;
-
-        let publisher = self.make_publisher().await;
-        let external_proxy = ExternalServiceProxy::new(proxy, publisher.clone());
-        if let Some(p) = publisher {
-            p.send_event(Event::ExternalServiceEvent(ExternalServiceEvent::Created(
-                P::DEBUG_NAME,
-                clock::inspect_format_now().into(),
-            )));
-        }
-
-        Ok(external_proxy)
-    }
-
     /// Connect to a service by discovering a hardware device at the given glob-style pattern.
     ///
     /// The first discovered path will be used to connected.
@@ -184,10 +129,6 @@ impl ServiceContext {
         }
 
         Ok(external_proxy)
-    }
-
-    pub(crate) async fn wrap_proxy<P: Proxy>(&self, proxy: P) -> ExternalServiceProxy<P> {
-        ExternalServiceProxy::new(proxy, self.make_publisher().await)
     }
 }
 

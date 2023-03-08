@@ -80,6 +80,7 @@ impl From<InterfaceSpec> for Interface {
     }
 }
 
+// TODO(https://fxbug.dev/123112) Remove light sensor flags after configs updated.
 pub mod display {
     use bitflags::bitflags;
     use serde::Deserialize;
@@ -134,11 +135,6 @@ impl Interface {
 
                 if interfaces.contains(display::InterfaceFlags::BASE) {
                     dependencies.push(Dependency::Entity(Entity::Handler(SettingType::Display)));
-                }
-
-                if interfaces.contains(display::InterfaceFlags::LIGHT_SENSOR) {
-                    dependencies
-                        .push(Dependency::Entity(Entity::Handler(SettingType::LightSensor)));
                 }
 
                 if dependencies.is_empty() {

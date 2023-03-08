@@ -47,9 +47,6 @@ mod test {
             DisplayRequest::Watch { responder } => {
                 let _ = responder.send(DisplaySettings::from(expected_display.clone()));
             }
-            DisplayRequest::WatchLightSensor { .. } => {
-                panic!("Unexpected call to watch light sensor");
-            }
         });
 
         let display =

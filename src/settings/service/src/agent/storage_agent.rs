@@ -290,9 +290,6 @@ where
                     SettingType::Intl => self.read::<IntlInfo>(id, responder).await,
                     SettingType::Keyboard => self.read::<KeyboardInfo>(id, responder).await,
                     SettingType::Light => self.fidl_read::<LightInfo>(id, responder).await,
-                    SettingType::LightSensor => {
-                        panic!("SettingType::LightSensor does not support storage")
-                    }
                     SettingType::NightMode => self.read::<NightModeInfo>(id, responder).await,
                     SettingType::Privacy => self.read::<PrivacyInfo>(id, responder).await,
                     SettingType::Setup => self.read::<SetupInfo>(id, responder).await,
@@ -314,9 +311,6 @@ where
                 SettingInfo::Intl(info) => self.write(info, responder).await,
                 SettingInfo::Keyboard(info) => self.write(info, responder).await,
                 SettingInfo::Light(info) => self.fidl_write(info, responder).await,
-                SettingInfo::LightSensor(_) => {
-                    panic!("SettingInfo::LightSensor does not support storage")
-                }
                 SettingInfo::NightMode(info) => self.write(info, responder).await,
                 SettingInfo::Privacy(info) => self.write(info, responder).await,
                 SettingInfo::Setup(info) => self.write(info, responder).await,
@@ -326,78 +320,3 @@ where
 }
 
 payload_convert!(Storage, Payload);
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::async_property_test;
-    use crate::display::types::LightData;
-    use crate::message::base::Audience;
-    use crate::storage::testing::InMemoryStorageFactory;
-    use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_io::DirectoryMarker;
-    use settings_storage::storage_factory::FidlStorageFactory;
-
-    enum Setting {
-        Info(SettingInfo),
-        Type(SettingType),
-    }
-
-    async_property_test!(unsupported_types_panic_on_read_and_write => [
-        #[should_panic(expected = "SettingType::LightSensor does not support storage")]
-        light_sensor_read(Setting::Type(SettingType::LightSensor)),
-
-        #[should_panic(expected = "SettingInfo::LightSensor does not support storage")]
-        light_sensor_write(Setting::Info(SettingInfo::LightSensor(LightData {
-            illuminance: 0.0f32,
-            color: fidl_fuchsia_ui_types::ColorRgb {
-                red: 0.0f32,
-                green: 0.0f32,
-                blue: 0.0f32,
-            },
-        }))),
-    ]);
-
-    async fn unsupported_types_panic_on_read_and_write(setting: Setting) {
-        let (directory_proxy, _stream) =
-            create_proxy_and_stream::<DirectoryMarker>().expect("success");
-        let storage_manager = StorageManagement {
-            device_storage_factory: Arc::new(InMemoryStorageFactory::new()),
-            fidl_storage_factory: Arc::new(FidlStorageFactory::new(1, directory_proxy)),
-        };
-
-        // This section is just to get a responder. We don't need it to actually respond to anything.
-        let delegate = service::MessageHub::create_hub();
-        let (messenger, _) =
-            delegate.create(MessengerType::Unbound).await.expect("messenger created");
-        let (_, mut receptor) =
-            delegate.create(MessengerType::Unbound).await.expect("receptor created");
-        let _ = messenger.message(
-            service::Payload::Storage(Payload::Request(StorageRequest::Read(
-                SettingType::Unknown.into(),
-                0.into(),
-            ))),
-            Audience::Messenger(receptor.get_signature()),
-        );
-
-        // Will stall if not encountered.
-        let responder =
-            if let Ok((Payload::Request(_), responder)) = receptor.next_of::<Payload>().await {
-                responder
-            } else {
-                panic!("Test setup is broken, should have received a storage request")
-            };
-
-        match setting {
-            Setting::Type(setting_type) => {
-                storage_manager
-                    .handle_request(StorageRequest::Read(setting_type.into(), 0.into()), responder)
-                    .await;
-            }
-            Setting::Info(setting_info) => {
-                storage_manager
-                    .handle_request(StorageRequest::Write(setting_info.into(), 0.into()), responder)
-                    .await;
-            }
-        }
-    }
-}
