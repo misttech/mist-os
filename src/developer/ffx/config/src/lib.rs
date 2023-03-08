@@ -222,7 +222,7 @@ pub async fn get_connection_modes() -> ConnectionModes {
                 None
             }
         })
-        .unwrap_or(ConnectionModes::CsoDisabled)
+        .unwrap_or(ConnectionModes::CsoEnabled)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
