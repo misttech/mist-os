@@ -402,9 +402,9 @@ TEST(ConvertTest, ToFidlChannel) {
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, ConvertChannel(in, &out));
 }
 
-TEST(ConvertTest, ToFidlBssConfig) {
-  // Populate bss_config_t
-  bss_config_t in = {
+TEST(ConvertTest, ToFidlJoinBssRequest) {
+  // Populate join_bss_request_t
+  join_bss_request_t in = {
       .bss_type = kFakeBanjoBssType,
       .remote = kPopulaterBool,
       .beacon_period = kRandomPopulaterUint16,
@@ -414,8 +414,8 @@ TEST(ConvertTest, ToFidlBssConfig) {
   }
 
   // Conduct conversion
-  wlan_internal::BssConfig out;
-  EXPECT_EQ(ZX_OK, ConvertBssConfig(in, &out));
+  wlan_internal::JoinBssRequest out;
+  EXPECT_EQ(ZX_OK, ConvertJoinBssRequest(in, &out));
 
   // Verify outputs
   for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
@@ -427,16 +427,16 @@ TEST(ConvertTest, ToFidlBssConfig) {
 
   // Assign an invalid value to cbw, and the conversion will fail.
   in.bss_type = kRandomPopulaterUint32;
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertBssConfig(in, &out));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertJoinBssRequest(in, &out));
 }
 
 TEST(ConvertTest, ToFidlBcn) {
-  // Populate wlan_bcn_config_t
+  // Populate wlan_beacon_configuration_t
   uint8_t* tx_packet_template_buffer = (uint8_t*)calloc(kFakePacketSize, sizeof(uint8_t));
   for (size_t i = 0; i < kFakePacketSize; i++) {
     tx_packet_template_buffer[i] = kRandomPopulaterUint8;
   }
-  wlan_bcn_config_t in = {
+  wlan_beacon_configuration_t in = {
       .packet_template =
           {
               .mac_frame_buffer = tx_packet_template_buffer,
@@ -457,7 +457,7 @@ TEST(ConvertTest, ToFidlBcn) {
 
   // Conduct conversion
   fidl::Arena arena;
-  wlan_softmac::WlanBcnConfig out;
+  wlan_softmac::WlanBeaconConfiguration out;
   ConvertBcn(in, &out, arena);
 
   // Verify outputs
@@ -493,8 +493,8 @@ TEST(ConvertTest, ToFidlKeyConfig) {
   uint8_t TmpKey[wlan_ieee80211::kMaxKeyLen];
   memcpy(TmpKey, kFakeKey, wlan_ieee80211::kMaxKeyLen);
 
-  // Populate wlan_key_config_t
-  wlan_key_config_t in = {
+  // Populate wlan_key_configuration_t
+  wlan_key_configuration_t in = {
       .protection = kFakeBanjoProtection,
       .cipher_type = kRandomPopulaterUint8,
       .key_type = kFakeBanjoKeyType,
@@ -514,7 +514,7 @@ TEST(ConvertTest, ToFidlKeyConfig) {
 
   // Conduct conversion
   fidl::Arena arena;
-  wlan_softmac::WlanKeyConfig out;
+  wlan_softmac::WlanKeyConfiguration out;
   EXPECT_EQ(ZX_OK, ConvertKeyConfig(in, &out, arena));
 
   // Verify outputs

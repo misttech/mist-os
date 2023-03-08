@@ -661,7 +661,7 @@ protocol WlanFullmacImplIfc {
     }) -> ();
     OnWmmStatusResp(struct {
         status zx.status;
-        wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParams;
+        wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
     }) -> ();
 
     // Data operations

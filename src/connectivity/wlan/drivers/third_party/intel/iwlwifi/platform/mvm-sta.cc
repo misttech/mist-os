@@ -107,13 +107,13 @@ zx_status_t MvmSta::Create(struct iwl_mvm_vif* iwl_mvm_vif, const uint8_t bssid[
   return status;
 }
 
-zx_status_t MvmSta::SetKey(const fuchsia_wlan_softmac::wire::WlanKeyConfig* key_config) {
+zx_status_t MvmSta::SetKey(const fuchsia_wlan_softmac::wire::WlanKeyConfiguration* key_config) {
   zx_status_t status = ZX_OK;
   struct iwl_mvm* const mvm = iwl_mvm_sta_->mvmvif->mvm;
 
   if (!(key_config->has_cipher_oui() && key_config->has_key_type() && key_config->has_key() &&
         key_config->has_cipher_type() && key_config->has_key_idx() && key_config->has_rsc())) {
-    IWL_ERR(mvmvif, "WlanKeyConfig missing fields: %s %s %s %s %s %s.",
+    IWL_ERR(mvmvif, "WlanKeyConfiguration missing fields: %s %s %s %s %s %s.",
             key_config->has_cipher_oui() ? "" : "cipher_oui",
             key_config->has_key_type() ? "" : "key_type", key_config->has_key() ? "" : "key",
             key_config->has_cipher_type() ? "" : "cipher_type",

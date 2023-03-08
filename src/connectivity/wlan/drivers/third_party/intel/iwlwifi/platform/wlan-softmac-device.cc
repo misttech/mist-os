@@ -240,8 +240,8 @@ void WlanSoftmacDevice::SetChannel(SetChannelRequestView request, fdf::Arena& ar
   completer.buffer(arena).ReplySuccess();
 }  // namespace wlan::iwlwifi
 
-void WlanSoftmacDevice::ConfigureBss(ConfigureBssRequestView request, fdf::Arena& arena,
-                                     ConfigureBssCompleter::Sync& completer) {
+void WlanSoftmacDevice::JoinBss(JoinBssRequestView request, fdf::Arena& arena,
+                                JoinBssCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
 
@@ -249,7 +249,7 @@ void WlanSoftmacDevice::ConfigureBss(ConfigureBssRequestView request, fdf::Arena
   if (ap_mvm_sta_ != nullptr) {
     IWL_INFO(this, "AP sta already exist.  Unassociate it first.\n");
 
-    if ((status = mac_unconfigure_bss(mvmvif_)) != ZX_OK) {
+    if ((status = mac_leave_bss(mvmvif_)) != ZX_OK) {
       IWL_ERR(this, "failed mac unconfigure bss: %s\n", zx_status_get_string(status));
       completer.buffer(arena).ReplyError(status);
       return;
@@ -258,7 +258,7 @@ void WlanSoftmacDevice::ConfigureBss(ConfigureBssRequestView request, fdf::Arena
     ap_mvm_sta_.reset();
   }
 
-  if ((status = mac_configure_bss(mvmvif_, &request->config)) != ZX_OK) {
+  if ((status = mac_join_bss(mvmvif_, &request->join_request)) != ZX_OK) {
     IWL_ERR(this, "failed mac configure bss: %s\n", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
@@ -266,7 +266,8 @@ void WlanSoftmacDevice::ConfigureBss(ConfigureBssRequestView request, fdf::Arena
 
   ZX_DEBUG_ASSERT(mvmvif_->mac_role == WLAN_MAC_ROLE_CLIENT);
   std::unique_ptr<MvmSta> ap_mvm_sta;
-  if ((status = MvmSta::Create(mvmvif_, request->config.bssid.begin(), &ap_mvm_sta)) != ZX_OK) {
+  if ((status = MvmSta::Create(mvmvif_, request->join_request.bssid.begin(), &ap_mvm_sta)) !=
+      ZX_OK) {
     IWL_ERR(this, "failed creating MvmSta: %s\n", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
@@ -279,7 +280,7 @@ void WlanSoftmacDevice::ConfigureBss(ConfigureBssRequestView request, fdf::Arena
 void WlanSoftmacDevice::EnableBeaconing(EnableBeaconingRequestView request, fdf::Arena& arena,
                                         EnableBeaconingCompleter::Sync& completer) {
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
-  zx_status_t status = mac_enable_beaconing(mvmvif_, &request->bcn_cfg);
+  zx_status_t status = mac_enable_beaconing(mvmvif_, &request->beacon_config);
   if (status != ZX_OK) {
     // Expected for now since this is not supported yet in iwlwifi driver.
     IWL_ERR(this, "%s() failed mac enable beaconing: %s\n", __func__, zx_status_get_string(status));
@@ -290,8 +291,8 @@ void WlanSoftmacDevice::EnableBeaconing(EnableBeaconingRequestView request, fdf:
   completer.buffer(arena).ReplySuccess();
 }
 
-void WlanSoftmacDevice::ConfigureBeacon(ConfigureBeaconRequestView request, fdf::Arena& arena,
-                                        ConfigureBeaconCompleter::Sync& completer) {
+void WlanSoftmacDevice::ConfigureBeaconing(ConfigureBeaconingRequestView request, fdf::Arena& arena,
+                                           ConfigureBeaconingCompleter::Sync& completer) {
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
   zx_status_t status = mac_configure_beacon(mvmvif_, &request->packet);
   if (status != ZX_OK) {
@@ -408,8 +409,9 @@ void WlanSoftmacDevice::CancelScan(CancelScanRequestView request, fdf::Arena& ar
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void WlanSoftmacDevice::UpdateWmmParams(UpdateWmmParamsRequestView request, fdf::Arena& arena,
-                                        UpdateWmmParamsCompleter::Sync& completer) {
+void WlanSoftmacDevice::UpdateWmmParameters(UpdateWmmParametersRequestView request,
+                                            fdf::Arena& arena,
+                                            UpdateWmmParametersCompleter::Sync& completer) {
   IWL_ERR(this, "%s() needs porting\n", __func__);
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);

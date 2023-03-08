@@ -144,15 +144,15 @@ protocol WlantapPhy {
     });
     /// AP: The device is to use args.config as a template for beacon frames.
     /// Client: The device is to be configured with this BSS as it peer.
-    -> ConfigureBss(struct {
-        args ConfigureBssArgs;
+    -> JoinBss(struct {
+        args JoinBssArgs;
     });
 
     -> StartScan(struct {
         args StartScanArgs;
     });
 
-    // TODO: ConfigureBeacon
+    // TODO: ConfigureBeaconing
 
     /// The device is to install the keys (often coming from RSN, exceptions apply).
     -> SetKey(struct {
@@ -179,9 +179,9 @@ type SetChannelArgs = struct {
     channel fuchsia.wlan.common.WlanChannel;
 };
 
-type ConfigureBssArgs = struct {
+type JoinBssArgs = struct {
     wlan_softmac_id uint16;
-    config fuchsia.wlan.internal.BssConfig;
+    config fuchsia.wlan.internal.JoinBssRequest;
 };
 
 type StartScanArgs = struct {

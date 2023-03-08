@@ -64,7 +64,8 @@ class MockFullmacIfc : public ::ddk::WlanFullmacImplIfcProtocol<MockFullmacIfc> 
   void WlanFullmacImplIfcOnPmkAvailable(const wlan_fullmac_pmk_info_t* info) {}
   void WlanFullmacImplIfcSaeHandshakeInd(const wlan_fullmac_sae_handshake_ind_t* ind) {}
   void WlanFullmacImplIfcSaeFrameRx(const wlan_fullmac_sae_frame_t* frame) {}
-  void WlanFullmacImplIfcOnWmmStatusResp(zx_status_t status, const wlan_wmm_params_t* wmm_params) {}
+  void WlanFullmacImplIfcOnWmmStatusResp(zx_status_t status,
+                                         const wlan_wmm_parameters_t* wmm_params) {}
   void WlanFullmacImplIfcDataRecv(const uint8_t* data_buffer, size_t data_size, uint32_t flags) {}
 
   mock_function::MockFunction<void, const wlan_fullmac_scan_result_t*> on_scan_result;

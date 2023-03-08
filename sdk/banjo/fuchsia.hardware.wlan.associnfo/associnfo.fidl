@@ -79,14 +79,14 @@ type WlanGi = strict enum : uint8 {
 
 /// Access category
 /// WFA WMM v1.2, 2.2.2 Table 6
-type WlanAc = strict enum {
+type WlanAccessCategory = strict enum {
     BACKGROUND = 1;
     BEST_EFFORT = 2;
     VIDEO = 3;
     VOICE = 4;
 };
 
-type WlanWmmParams = struct {
+type WlanWmmParameters = struct {
     apsd bool;
     ac_be_params WlanWmmAcParams;
     ac_bk_params WlanWmmAcParams;
@@ -130,7 +130,7 @@ type WlanAssocCtx = struct {
     /// QoS capable and parameters
     qos bool;
     /// WFA WMM v1.2, 2.2.2
-    wmm_params WlanWmmParams;
+    wmm_params WlanWmmParameters;
 
     /// Coincatenation of SupportedRates and ExtendedSupportedRates
     /// IEEE Std 802.11-2016, 9.4.2.3 & 9.4.2.13

@@ -694,7 +694,7 @@ mod tests {
         ];
 
         assert_eq!(
-            fake_device.bcn_cfg.expect("expected bcn_cfg"),
+            fake_device.beacon_config.expect("expected beacon_config"),
             (beacon_tmpl, 49, TimeUnit::DEFAULT_BEACON_INTERVAL)
         );
     }
@@ -706,7 +706,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device.as_device());
         let bss = make_infra_bss(&mut ctx);
         bss.stop(&mut ctx).expect("expected InfraBss::stop ok");
-        assert!(fake_device.bcn_cfg.is_none());
+        assert!(fake_device.beacon_config.is_none());
     }
 
     #[test]
@@ -2347,7 +2347,8 @@ mod tests {
 
         bss.handle_pre_tbtt_hw_indication(&mut ctx)
             .expect("expected handle pre-TBTT hw indication OK");
-        let (bcn, _, _) = fake_device.bcn_cfg.as_ref().expect("expected beacon configuration");
+        let (bcn, _, _) =
+            fake_device.beacon_config.as_ref().expect("expected beacon configuration");
         assert_eq!(
             &bcn[..],
             &[
@@ -2374,7 +2375,8 @@ mod tests {
 
         bss.handle_pre_tbtt_hw_indication(&mut ctx)
             .expect("expected handle pre-TBTT hw indication OK");
-        let (bcn, _, _) = fake_device.bcn_cfg.as_ref().expect("expected beacon configuration");
+        let (bcn, _, _) =
+            fake_device.beacon_config.as_ref().expect("expected beacon configuration");
         assert_eq!(
             &bcn[..],
             &[
@@ -2401,7 +2403,8 @@ mod tests {
 
         bss.handle_pre_tbtt_hw_indication(&mut ctx)
             .expect("expected handle pre-TBTT hw indication OK");
-        let (bcn, _, _) = fake_device.bcn_cfg.as_ref().expect("expected beacon configuration");
+        let (bcn, _, _) =
+            fake_device.beacon_config.as_ref().expect("expected beacon configuration");
         assert_eq!(
             &bcn[..],
             &[
@@ -2428,7 +2431,8 @@ mod tests {
 
         bss.handle_pre_tbtt_hw_indication(&mut ctx)
             .expect("expected handle pre-TBTT hw indication OK");
-        let (bcn, _, _) = fake_device.bcn_cfg.as_ref().expect("expected beacon configuration");
+        let (bcn, _, _) =
+            fake_device.beacon_config.as_ref().expect("expected beacon configuration");
         assert_eq!(
             &bcn[..],
             &[
@@ -2492,7 +2496,8 @@ mod tests {
 
         bss.handle_pre_tbtt_hw_indication(&mut ctx)
             .expect("expected handle pre-TBTT hw indication OK");
-        let (bcn, _, _) = fake_device.bcn_cfg.as_ref().expect("expected beacon configuration");
+        let (bcn, _, _) =
+            fake_device.beacon_config.as_ref().expect("expected beacon configuration");
         assert_eq!(
             &bcn[..],
             &[
@@ -2539,7 +2544,8 @@ mod tests {
 
         bss.handle_pre_tbtt_hw_indication(&mut ctx)
             .expect("expected handle pre-TBTT hw indication OK");
-        let (bcn, _, _) = fake_device.bcn_cfg.as_ref().expect("expected beacon configuration");
+        let (bcn, _, _) =
+            fake_device.beacon_config.as_ref().expect("expected beacon configuration");
         assert_eq!(
             &bcn[..],
             &[

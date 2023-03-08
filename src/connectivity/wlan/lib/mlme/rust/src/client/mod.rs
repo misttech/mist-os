@@ -368,7 +368,7 @@ impl ClientMlme {
         self.set_main_channel(channel)
             .map_err(|status| Error::Status(format!("Error setting device channel"), status))?;
 
-        let bss_config = banjo_internal::BssConfig {
+        let bss_config = banjo_internal::JoinBssRequest {
             bssid: bss.bssid.0,
             bss_type: banjo_internal::BssType::INFRASTRUCTURE,
             remote: true,
@@ -378,7 +378,7 @@ impl ClientMlme {
         // Configure driver to pass frames from this BSS to MLME. Otherwise they will be dropped.
         self.ctx
             .device
-            .configure_bss(bss_config)
+            .join_bss(bss_config)
             .map(|()| join_caps)
             .map_err(|status| Error::Status(format!("Error setting BSS in driver"), status))
     }

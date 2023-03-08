@@ -399,11 +399,11 @@ zx_status_t mac_set_channel(struct iwl_mvm_vif* mvmvif, const wlan_channel_t* ch
 }
 
 // This is called after mac_set_channel(). The MAC (mvmvif) will be configured as a CLIENT role.
-zx_status_t mac_configure_bss(struct iwl_mvm_vif* mvmvif,
-                              const fuchsia_wlan_internal::wire::BssConfig* config) {
+zx_status_t mac_join_bss(struct iwl_mvm_vif* mvmvif,
+                         const fuchsia_wlan_internal::wire::JoinBssRequest* config) {
   zx_status_t ret = ZX_OK;
 
-  IWL_INFO(mvmvif, "mac_configure_bss(bssid=" FMT_SSID ", type=%d, remote=%d, beacon_period=%u)\n",
+  IWL_INFO(mvmvif, "mac_join_bss(bssid=" FMT_SSID ", type=%d, remote=%d, beacon_period=%u)\n",
            FMT_SSID_BYTES(config->bssid.data(), sizeof(config->bssid)), config->bss_type,
            config->remote, config->beacon_period);
 
@@ -437,7 +437,7 @@ zx_status_t mac_configure_bss(struct iwl_mvm_vif* mvmvif,
 }
 
 // This function is to revert what mac_configure_bss() does.
-zx_status_t mac_unconfigure_bss(struct iwl_mvm_vif* mvmvif) {
+zx_status_t mac_leave_bss(struct iwl_mvm_vif* mvmvif) {
   zx_status_t ret = ZX_OK;
 
   {
@@ -456,7 +456,8 @@ zx_status_t mac_unconfigure_bss(struct iwl_mvm_vif* mvmvif) {
   return ZX_OK;
 }
 
-zx_status_t mac_enable_beaconing(void* ctx, const wlan_softmac_wire::WlanBcnConfig* bcn_cfg) {
+zx_status_t mac_enable_beaconing(void* ctx,
+                                 const wlan_softmac_wire::WlanBeaconConfiguration* beacon_config) {
   IWL_ERR(ctx, "%s() needs porting ... see fxbug.dev/36742\n", __func__);
   return ZX_ERR_NOT_SUPPORTED;
 }
@@ -469,7 +470,7 @@ zx_status_t mac_configure_beacon(void* ctx,
 
 // Set the association result to the firmware.
 //
-// The current mac context is set by mac_configure_bss() with default values.
+// The current mac context is set by mac_join_bss() with default values.
 //   TODO(fxbug.dev/36684): supports VHT (802.11ac)
 //
 zx_status_t mac_configure_assoc(
@@ -583,7 +584,7 @@ zx_status_t mac_clear_assoc(struct iwl_mvm_vif* mvmvif,
     }
   }
 
-  ret = mac_unconfigure_bss(mvmvif);
+  ret = mac_leave_bss(mvmvif);
   if (ret != ZX_OK) {
     return ret;
   }

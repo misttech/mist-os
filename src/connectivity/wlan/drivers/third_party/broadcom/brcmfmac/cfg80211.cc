@@ -4911,7 +4911,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   zx_status_t status = ZX_OK;
   bcme_status_t fw_err = BCME_OK;
   edcf_acparam_t ac_params[AC_COUNT];
-  wlan_wmm_params_t resp;
+  wlan_wmm_parameters_t resp;
   uint32_t wme_bss_disable;
   brcmf_if* ifp = ndev_to_if(ndev);
 

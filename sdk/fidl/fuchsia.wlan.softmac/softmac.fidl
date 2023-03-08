@@ -144,7 +144,7 @@ type WlanProtection = strict enum : uint8 {
     RX_TX = 3;
 };
 
-type WlanKeyConfig = table {
+type WlanKeyConfiguration = table {
     /// Which path to protect: None, TX, RX, or TX and RX.
     1: protection WlanProtection;
     /// IEEE Cipher suite selector.
@@ -181,7 +181,7 @@ type WlanTxPacket = struct {
 };
 
 /// Includes the information about beacon template.
-type WlanBcnConfig = table {
+type WlanBeaconConfiguration = table {
     /// Points to the beacon template. Since this is just the template, some packet content can
     /// contain only minimum valid info. They will be changed later by hardware/firmware or software.
     /// Note that the driver must copy the packet content into its own memory and cannot rely on
@@ -383,27 +383,41 @@ protocol WlanSoftmac {
         1: channel fuchsia.wlan.common.WlanChannel;
     }) -> () error zx.status;
 
-    // Configures a BSS which the STA is either joining or managing.
-    ConfigureBss(struct {
-        config fuchsia.wlan.internal.BssConfig;
+    /// Join a specific BSS in which we will participate.
+    /// This applies regardless of if we are hosting the BSS or joining it
+    /// (indicated by the `remote` flag in `JoinBssRequest`).
+    /// If successful, the device will switch to the correct channel and perform
+    /// any internal filtering/timing operations required to join the BSS.
+    /// For client STAs, this is the first step before authenticating.
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given bss config.
+    JoinBss(struct {
+        join_request fuchsia.wlan.internal.JoinBssRequest;
     }) -> () error zx.status;
 
     // Enables or disables hardware Beaconing.
-    // * |bcn_cfg|: Pass `nullptr` to disable hardware Beacons. Used by hardware beacon offload.
+    // * |beacon_config|: Pass `nullptr` to disable hardware Beacons. Used by hardware beacon offload.
     EnableBeaconing(struct {
-        bcn_cfg WlanBcnConfig;
+        beacon_config WlanBeaconConfiguration;
     }) -> () error zx.status;
 
-    /// Configures a Beacon frame in hardware to announce the BSS' existence.
-    /// * |packet|: Pass `nullptr` to disable hardware Beacons. Used by software generated beacon.
-    /// TODO(fxbug.dev/29298): Rename to update_beacon.
-    ConfigureBeacon(struct {
+    /// Enables, disables or updates hardware beaconing.
+    /// The device should start transmitting a beacon derived from the given
+    /// configuration, or update the transmitted beacon if hardware beaconing
+    /// is already enabled.
+    /// If the config is not provided, hardware beaconing should be disabled.
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_NOT_SUPPORTED: The device does not support hardware beacons. \
+    ///   ZX_ERR_INVALID_ARGS: The device cannot transmit the requested beacon.
+    ConfigureBeaconing(struct {
         packet WlanTxPacket;
     }) -> () error zx.status;
 
     /// Specify a key for frame protection.
     SetKey(struct {
-        key_config WlanKeyConfig;
+        key_config WlanKeyConfiguration;
     }) -> () error zx.status;
 
     /// Notifies MAC and PHY parameters negotiated through a successful association
@@ -495,10 +509,11 @@ protocol WlanSoftmac {
         1: scan_id uint64;
     }) -> () error zx.status;
 
-    /// Notifies change of WMM parameters for specified AC
-    UpdateWmmParams(struct {
-        ac fuchsia.hardware.wlan.associnfo.WlanAc;
-        params fuchsia.hardware.wlan.associnfo.WlanWmmParams;
+    /// Indicate the device of modified WiFi Multimedia (WMM) parameters for a
+    /// particular access category (AC).
+    UpdateWmmParameters(struct {
+        ac fuchsia.hardware.wlan.associnfo.WlanAccessCategory;
+        params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
     }) -> () error zx.status;
 };
 

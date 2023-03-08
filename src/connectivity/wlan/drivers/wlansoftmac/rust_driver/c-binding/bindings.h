@@ -89,9 +89,9 @@ typedef struct {
   int32_t (*set_wlan_channel)(void *device, wlan_channel_t channel);
   /**
    * Set a key on the device.
-   * |key| is mutable because the underlying API does not take a const wlan_key_config_t.
+   * |key| is mutable because the underlying API does not take a const wlan_key_configuration_t.
    */
-  int32_t (*set_key)(void *device, wlan_key_config_t *key);
+  int32_t (*set_key)(void *device, wlan_key_configuration_t *key);
   /**
    * Make passive scan request to the driver
    */
@@ -130,9 +130,9 @@ typedef struct {
   spectrum_management_support_t (*get_spectrum_management_support)(void *device);
   /**
    * Configure the device's BSS.
-   * |cfg| is mutable because the underlying API does not take a const bss_config_t.
+   * |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
    */
-  int32_t (*configure_bss)(void *device, bss_config_t *cfg);
+  int32_t (*join_bss)(void *device, join_bss_request_t *cfg);
   /**
    * Enable hardware offload of beaconing on the device.
    */

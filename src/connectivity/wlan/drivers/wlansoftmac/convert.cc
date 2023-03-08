@@ -392,7 +392,8 @@ zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::
   return ConvertChannelBandwidth(in.cbw, &out->cbw);
 }
 
-zx_status_t ConvertBssConfig(const bss_config_t& in, fuchsia_wlan_internal::wire::BssConfig* out) {
+zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
+                                  fuchsia_wlan_internal::wire::JoinBssRequest* out) {
   out->remote = in.remote;
   memcpy(out->bssid.data(), in.bssid, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
   switch (in.bss_type) {
@@ -420,9 +421,9 @@ zx_status_t ConvertBssConfig(const bss_config_t& in, fuchsia_wlan_internal::wire
   return ZX_OK;
 }
 
-void ConvertBcn(const wlan_bcn_config_t& in, fuchsia_wlan_softmac::wire::WlanBcnConfig* out,
-                fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_softmac::wire::WlanBcnConfig::Builder(arena);
+void ConvertBcn(const wlan_beacon_configuration_t& in,
+                fuchsia_wlan_softmac::wire::WlanBeaconConfiguration* out, fidl::AnyArena& arena) {
+  auto builder = fuchsia_wlan_softmac::wire::WlanBeaconConfiguration::Builder(arena);
   fuchsia_wlan_softmac::wire::WlanTxPacket packet_template;
   auto mac_frame_vec =
       std::vector<uint8_t>(in.packet_template.mac_frame_buffer,
@@ -512,10 +513,10 @@ void ConvertBcn(const wlan_bcn_config_t& in, fuchsia_wlan_softmac::wire::WlanBcn
   *out = builder.Build();
 }
 
-zx_status_t ConvertKeyConfig(const wlan_key_config_t& in,
-                             fuchsia_wlan_softmac::wire::WlanKeyConfig* out,
+zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
+                             fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
                              fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_softmac::wire::WlanKeyConfig::Builder(arena);
+  auto builder = fuchsia_wlan_softmac::wire::WlanKeyConfiguration::Builder(arena);
   fuchsia_wlan_softmac::wire::WlanProtection wlan_protection;
 
   // Enum conversion to WlanProtection.

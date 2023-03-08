@@ -2171,7 +2171,7 @@ mod handle_driver_event_tests {
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let status = zx::sys::ZX_OK;
-        let wmm_params = banjo_wlan_associnfo::WlanWmmParams {
+        let wmm_params = banjo_wlan_associnfo::WlanWmmParameters {
             apsd: true,
             ac_be_params: banjo_wlan_associnfo::WlanWmmAcParams {
                 ecw_min: 1,

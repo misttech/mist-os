@@ -49,12 +49,11 @@ class WlanSoftmacDevice
   void QueueTx(QueueTxRequestView request, fdf::Arena& arena, QueueTxCompleter::Sync& completer);
   void SetChannel(SetChannelRequestView request, fdf::Arena& arena,
                   SetChannelCompleter::Sync& completer);
-  void ConfigureBss(ConfigureBssRequestView request, fdf::Arena& arena,
-                    ConfigureBssCompleter::Sync& completer);
+  void JoinBss(JoinBssRequestView request, fdf::Arena& arena, JoinBssCompleter::Sync& completer);
   void EnableBeaconing(EnableBeaconingRequestView request, fdf::Arena& arena,
                        EnableBeaconingCompleter::Sync& completer);
-  void ConfigureBeacon(ConfigureBeaconRequestView request, fdf::Arena& arena,
-                       ConfigureBeaconCompleter::Sync& completer);
+  void ConfigureBeaconing(ConfigureBeaconingRequestView request, fdf::Arena& arena,
+                          ConfigureBeaconingCompleter::Sync& completer);
   void SetKey(SetKeyRequestView request, fdf::Arena& arena, SetKeyCompleter::Sync& completer);
   void ConfigureAssoc(ConfigureAssocRequestView request, fdf::Arena& arena,
                       ConfigureAssocCompleter::Sync& completer);
@@ -66,8 +65,8 @@ class WlanSoftmacDevice
                        StartActiveScanCompleter::Sync& completer);
   void CancelScan(CancelScanRequestView request, fdf::Arena& arena,
                   CancelScanCompleter::Sync& completer);
-  void UpdateWmmParams(UpdateWmmParamsRequestView request, fdf::Arena& arena,
-                       UpdateWmmParamsCompleter::Sync& completer);
+  void UpdateWmmParameters(UpdateWmmParametersRequestView request, fdf::Arena& arena,
+                           UpdateWmmParametersCompleter::Sync& completer);
 
   // Entry functions to access WlanSoftmacIfc protocol implementation in client_.
   void Recv(fuchsia_wlan_softmac::wire::WlanRxPacket* rx_packet);

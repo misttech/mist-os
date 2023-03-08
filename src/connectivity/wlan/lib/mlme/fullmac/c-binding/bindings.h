@@ -37,7 +37,8 @@ typedef struct {
   void (*on_pmk_available)(void *ctx, const wlan_fullmac_pmk_info_t *info);
   void (*sae_handshake_ind)(void *ctx, const wlan_fullmac_sae_handshake_ind_t *ind);
   void (*sae_frame_rx)(void *ctx, const wlan_fullmac_sae_frame_t *frame);
-  void (*on_wmm_status_resp)(void *ctx, zx_status_t status, const wlan_wmm_params_t *wmm_params);
+  void (*on_wmm_status_resp)(void *ctx, zx_status_t status,
+                             const wlan_wmm_parameters_t *wmm_params);
 } rust_wlan_fullmac_ifc_protocol_ops_copy_t;
 
 /**

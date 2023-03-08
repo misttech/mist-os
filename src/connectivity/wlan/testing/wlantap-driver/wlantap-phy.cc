@@ -35,7 +35,7 @@ namespace wlan_common = fuchsia_wlan_common::wire;
 
 namespace {
 
-wlan_tap::SetKeyArgs ToSetKeyArgs(const wlan_softmac::WlanKeyConfig& config) {
+wlan_tap::SetKeyArgs ToSetKeyArgs(const wlan_softmac::WlanKeyConfiguration& config) {
   ZX_ASSERT(config.has_protection() && config.has_cipher_oui() && config.has_cipher_type() &&
             config.has_key_type() && config.has_peer_addr() && config.has_key_idx() &&
             config.has_key());
@@ -329,21 +329,21 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     }
   }
 
-  virtual void WlantapMacConfigureBss(const wlan_internal::BssConfig& config) override {
-    zxlogf(INFO, "%s: WlantapMacConfigureBss", name_.c_str());
+  virtual void WlantapMacJoinBss(const wlan_internal::JoinBssRequest& config) override {
+    zxlogf(INFO, "%s: WlantapMacJoinBss", name_.c_str());
     std::lock_guard<std::mutex> guard(fidl_server_lock_);
     if (fidl_server_unbound_) {
-      zxlogf(INFO, "%s: WlantapMacConfigureBss ignored, shutting down", name_.c_str());
+      zxlogf(INFO, "%s: WlantapMacJoinBss ignored, shutting down", name_.c_str());
       return;
     }
 
-    fidl::Status status = fidl::WireSendEvent(user_binding_)->ConfigureBss({.config = config});
+    fidl::Status status = fidl::WireSendEvent(user_binding_)->JoinBss({.config = config});
     if (!status.ok()) {
-      zxlogf(ERROR, "%s: ConfigureBss() failed", status.status_string());
+      zxlogf(ERROR, "%s: JoinBss() failed", status.status_string());
       return;
     }
 
-    zxlogf(DEBUG, "%s: WlantapMacConfigureBss done", name_.c_str());
+    zxlogf(DEBUG, "%s: WlantapMacJoinBss done", name_.c_str());
   }
 
   virtual void WlantapMacStartScan(const uint64_t scan_id) override {
@@ -365,7 +365,7 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     zxlogf(DEBUG, "%s: WlantapMacStartScan done", name_.c_str());
   }
 
-  virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfig& key_config) override {
+  virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfiguration& key_config) override {
     zxlogf(INFO, "%s: WlantapMacSetKey", name_.c_str());
     std::lock_guard<std::mutex> guard(fidl_server_lock_);
     if (fidl_server_unbound_) {

@@ -400,7 +400,7 @@ fn convert_wmm_ac_params(
 }
 
 pub fn convert_wmm_params(
-    wmm_params: banjo_wlan_associnfo::WlanWmmParams,
+    wmm_params: banjo_wlan_associnfo::WlanWmmParameters,
 ) -> fidl_internal::WmmStatusResponse {
     fidl_internal::WmmStatusResponse {
         apsd: wmm_params.apsd,

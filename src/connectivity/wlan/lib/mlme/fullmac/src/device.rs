@@ -105,7 +105,7 @@ pub struct WlanFullmacIfcProtocolOps {
     pub(crate) on_wmm_status_resp: extern "C" fn(
         ctx: &mut FullmacDriverEventSink,
         status: zx::sys::zx_status_t,
-        wmm_params: *const banjo_wlan_associnfo::WlanWmmParams,
+        wmm_params: *const banjo_wlan_associnfo::WlanWmmParameters,
     ),
 }
 
@@ -267,7 +267,7 @@ extern "C" fn sae_frame_rx(
 extern "C" fn on_wmm_status_resp(
     ctx: &mut FullmacDriverEventSink,
     status: zx::sys::zx_status_t,
-    wmm_params: *const banjo_wlan_associnfo::WlanWmmParams,
+    wmm_params: *const banjo_wlan_associnfo::WlanWmmParameters,
 ) {
     let resp = banjo_to_fidl::convert_wmm_params(unsafe { *wmm_params });
     ctx.0.send(FullmacDriverEvent::OnWmmStatusResp { status, resp });

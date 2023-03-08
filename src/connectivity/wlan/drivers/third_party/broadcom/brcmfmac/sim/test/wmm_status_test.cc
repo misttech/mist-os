@@ -24,13 +24,13 @@ class WmmStatusTest : public SimTest {
   wlan_fullmac_impl_ifc_protocol sme_protocol_ = {.ops = &sme_ops_, .ctx = this};
 
   // Event handlers
-  void OnWmmStatusResp(zx_status_t status, const wlan_wmm_params_t* resp);
+  void OnWmmStatusResp(zx_status_t status, const wlan_wmm_parameters_t* resp);
 };
 
 // Since we're acting as wlanif, we need handlers for any protocol calls we may receive
 wlan_fullmac_impl_ifc_protocol_ops_t WmmStatusTest::sme_ops_ = {
     .on_wmm_status_resp =
-        [](void* ctx, zx_status_t status, const wlan_wmm_params_t* resp) {
+        [](void* ctx, zx_status_t status, const wlan_wmm_parameters_t* resp) {
           static_cast<WmmStatusTest*>(ctx)->OnWmmStatusResp(status, resp);
         },
 };
@@ -41,7 +41,7 @@ void WmmStatusTest::Init() {
   on_wmm_status_resp_called_ = false;
 }
 
-void WmmStatusTest::OnWmmStatusResp(zx_status_t status, const wlan_wmm_params_t* resp) {
+void WmmStatusTest::OnWmmStatusResp(zx_status_t status, const wlan_wmm_parameters_t* resp) {
   ASSERT_EQ(status, ZX_OK);
 
   EXPECT_TRUE(resp->apsd);

@@ -19,7 +19,7 @@ type BssType = strict enum {
     PERSONAL = 4;
 };
 
-type BssConfig = struct {
+type JoinBssRequest = struct {
     bssid ieee80211.MacAddr;
     bss_type BssType;
     remote bool;

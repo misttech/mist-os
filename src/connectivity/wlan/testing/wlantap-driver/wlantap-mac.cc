@@ -150,14 +150,14 @@ struct WlantapMacImpl : WlantapMac,
     completer.buffer(arena).ReplySuccess();
   }
 
-  void ConfigureBss(ConfigureBssRequestView request, fdf::Arena& arena,
-                    ConfigureBssCompleter::Sync& completer) override {
+  void JoinBss(JoinBssRequestView request, fdf::Arena& arena,
+               JoinBssCompleter::Sync& completer) override {
     bool expected_remote = role_ == wlan_common::WlanMacRole::kClient;
-    if (request->config.remote != expected_remote) {
+    if (request->join_request.remote != expected_remote) {
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
-    listener_->WlantapMacConfigureBss(request->config);
+    listener_->WlantapMacJoinBss(request->join_request);
     completer.buffer(arena).ReplySuccess();
   }
 
@@ -167,8 +167,8 @@ struct WlantapMacImpl : WlantapMac,
     completer.buffer(arena).ReplySuccess();
   }
 
-  void ConfigureBeacon(ConfigureBeaconRequestView request, fdf::Arena& arena,
-                       ConfigureBeaconCompleter::Sync& completer) override {
+  void ConfigureBeaconing(ConfigureBeaconingRequestView request, fdf::Arena& arena,
+                          ConfigureBeaconingCompleter::Sync& completer) override {
     // This is the test driver, so we can just pretend the beacon was configured.
     completer.buffer(arena).ReplySuccess();
   }
@@ -221,9 +221,9 @@ struct WlantapMacImpl : WlantapMac,
     ZX_PANIC("CancelScan is not supported.");
   }
 
-  void UpdateWmmParams(UpdateWmmParamsRequestView request, fdf::Arena& arena,
-                       UpdateWmmParamsCompleter::Sync& completer) override {
-    ZX_PANIC("UpdateWmmParams is not supported.");
+  void UpdateWmmParameters(UpdateWmmParametersRequestView request, fdf::Arena& arena,
+                           UpdateWmmParametersCompleter::Sync& completer) override {
+    ZX_PANIC("UpdateWmmParameters is not supported.");
   }
 
   // WlantapMac impl

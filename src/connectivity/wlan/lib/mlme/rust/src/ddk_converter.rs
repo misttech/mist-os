@@ -89,8 +89,8 @@ pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
     }
 }
 
-pub fn blank_wmm_params() -> banjo_wlan_associnfo::WlanWmmParams {
-    banjo_wlan_associnfo::WlanWmmParams {
+pub fn blank_wmm_params() -> banjo_wlan_associnfo::WlanWmmParameters {
+    banjo_wlan_associnfo::WlanWmmParameters {
         apsd: false,
         ac_be_params: blank_wmm_ac_params(),
         ac_bk_params: blank_wmm_ac_params(),

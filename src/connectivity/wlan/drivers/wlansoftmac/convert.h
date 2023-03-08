@@ -38,11 +38,13 @@ zx_status_t ConvertTxPacket(const uint8_t* data_in, const size_t data_len_in,
                             const wlan_tx_info_t& info_in,
                             fuchsia_wlan_softmac::wire::WlanTxPacket* out);
 zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::WlanChannel* out);
-zx_status_t ConvertBssConfig(const bss_config_t& in, fuchsia_wlan_internal::wire::BssConfig* out);
-void ConvertBcn(const wlan_bcn_config_t& in, fuchsia_wlan_softmac::wire::WlanBcnConfig* out,
-                fidl::AnyArena& arena);
-zx_status_t ConvertKeyConfig(const wlan_key_config_t& in,
-                             fuchsia_wlan_softmac::wire::WlanKeyConfig* out, fidl::AnyArena& arena);
+zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
+                                  fuchsia_wlan_internal::wire::JoinBssRequest* out);
+void ConvertBcn(const wlan_beacon_configuration_t& in,
+                fuchsia_wlan_softmac::wire::WlanBeaconConfiguration* out, fidl::AnyArena& arena);
+zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
+                             fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
+                             fidl::AnyArena& arena);
 void ConvertPassiveScanArgs(const wlan_softmac_start_passive_scan_request_t& in,
                             fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest* out,
                             fidl::AnyArena& arena);

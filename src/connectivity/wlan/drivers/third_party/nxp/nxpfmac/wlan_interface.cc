@@ -620,7 +620,7 @@ void WlanInterface::WlanFullmacImplWmmStatusReq() {
   // TODO(https://fxbug.dev/110091): Implement support for this.
   std::lock_guard lock(fullmac_ifc_mutex_);
 
-  const wlan_wmm_params_t wmm{};
+  const wlan_wmm_parameters_t wmm{};
   fullmac_ifc_.OnWmmStatusResp(ZX_OK, &wmm);
 }
 

@@ -7,7 +7,7 @@ use {
     banjo_fuchsia_hardware_wlan_associnfo::*,
     banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxStatus},
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
-    banjo_fuchsia_wlan_internal::BssConfig,
+    banjo_fuchsia_wlan_internal::JoinBssRequest,
     banjo_fuchsia_wlan_softmac::{
         self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacInfo, WlanTxPacket,
     },
@@ -156,8 +156,8 @@ impl Device {
         self.raw_device.spectrum_management_support()
     }
 
-    pub fn configure_bss(&self, cfg: BssConfig) -> Result<(), zx::Status> {
-        self.raw_device.configure_bss(cfg)
+    pub fn join_bss(&self, cfg: JoinBssRequest) -> Result<(), zx::Status> {
+        self.raw_device.join_bss(cfg)
     }
 
     pub fn enable_beaconing(
@@ -390,8 +390,11 @@ pub struct DeviceInterface {
     /// chosen channel.
     set_wlan_channel: extern "C" fn(device: *mut c_void, channel: banjo_common::WlanChannel) -> i32,
     /// Set a key on the device.
-    /// |key| is mutable because the underlying API does not take a const wlan_key_config_t.
-    set_key: extern "C" fn(device: *mut c_void, key: *mut banjo_wlan_softmac::WlanKeyConfig) -> i32,
+    /// |key| is mutable because the underlying API does not take a const wlan_key_configuration_t.
+    set_key: extern "C" fn(
+        device: *mut c_void,
+        key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
+    ) -> i32,
     /// Make passive scan request to the driver
     start_passive_scan: extern "C" fn(
         device: *mut c_void,
@@ -419,8 +422,8 @@ pub struct DeviceInterface {
     get_spectrum_management_support:
         extern "C" fn(device: *mut c_void) -> banjo_common::SpectrumManagementSupport,
     /// Configure the device's BSS.
-    /// |cfg| is mutable because the underlying API does not take a const bss_config_t.
-    configure_bss: extern "C" fn(device: *mut c_void, cfg: &mut BssConfig) -> i32,
+    /// |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
+    join_bss: extern "C" fn(device: *mut c_void, cfg: &mut JoinBssRequest) -> i32,
     /// Enable hardware offload of beaconing on the device.
     enable_beaconing: extern "C" fn(
         device: *mut c_void,
@@ -474,7 +477,7 @@ impl DeviceInterface {
     }
 
     fn set_key(&self, key: key::KeyConfig) -> Result<(), zx::Status> {
-        let mut banjo_key = banjo_wlan_softmac::WlanKeyConfig {
+        let mut banjo_key = banjo_wlan_softmac::WlanKeyConfiguration {
             protection: match key.protection {
                 key::Protection::NONE => banjo_wlan_softmac::WlanProtection::NONE,
                 key::Protection::RX => banjo_wlan_softmac::WlanProtection::RX,
@@ -553,8 +556,8 @@ impl DeviceInterface {
         (self.get_spectrum_management_support)(self.device)
     }
 
-    fn configure_bss(&self, mut cfg: BssConfig) -> Result<(), zx::Status> {
-        let status = (self.configure_bss)(self.device, &mut cfg);
+    fn join_bss(&self, mut cfg: JoinBssRequest) -> Result<(), zx::Status> {
+        let status = (self.join_bss)(self.device, &mut cfg);
         zx::ok(status)
     }
 
@@ -657,7 +660,7 @@ pub mod test_utils {
         pub mlme_proxy_channel: zx::Channel,
         pub mlme_request_stream_channel: Option<zx::Channel>,
         pub wlan_channel: banjo_common::WlanChannel,
-        pub keys: Vec<banjo_wlan_softmac::WlanKeyConfig>,
+        pub keys: Vec<banjo_wlan_softmac::WlanKeyConfiguration>,
         pub keys_vec: Vec<Vec<u8>>,
         pub next_scan_id: u64,
         pub captured_passive_scan_args: Option<CapturedWlanSoftmacStartPassiveScanRequest>,
@@ -667,8 +670,8 @@ pub mod test_utils {
         pub mac_sublayer_support: banjo_common::MacSublayerSupport,
         pub security_support: banjo_common::SecuritySupport,
         pub spectrum_management_support: banjo_common::SpectrumManagementSupport,
-        pub bss_cfg: Option<BssConfig>,
-        pub bcn_cfg: Option<(Vec<u8>, usize, TimeUnit)>,
+        pub join_bss_request: Option<JoinBssRequest>,
+        pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
         pub assocs: std::collections::HashMap<MacAddr, WlanAssocCtx>,
         pub buffer_provider: BufferProvider,
@@ -704,8 +707,8 @@ pub mod test_utils {
                 spectrum_management_support: fake_spectrum_management_support(),
                 keys: vec![],
                 keys_vec: vec![],
-                bss_cfg: None,
-                bcn_cfg: None,
+                join_bss_request: None,
+                beacon_config: None,
                 link_status: LinkStatus::DOWN,
                 assocs: std::collections::HashMap::new(),
                 buffer_provider: FakeBufferProvider::new(),
@@ -805,7 +808,7 @@ pub mod test_utils {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn set_key(
             device: *mut c_void,
-            key: *mut banjo_wlan_softmac::WlanKeyConfig,
+            key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
         ) -> i32 {
             let device = unsafe { &mut *(device as *mut Self) };
             device.keys.push(unsafe { (*key).clone() });
@@ -900,9 +903,9 @@ pub mod test_utils {
             unsafe { (*(device as *const Self)).spectrum_management_support }
         }
 
-        pub extern "C" fn configure_bss(device: *mut c_void, cfg: &mut BssConfig) -> i32 {
+        pub extern "C" fn join_bss(device: *mut c_void, cfg: &mut JoinBssRequest) -> i32 {
             unsafe {
-                (*(device as *mut Self)).bss_cfg.replace(cfg.clone());
+                (*(device as *mut Self)).join_bss_request.replace(cfg.clone());
             }
             zx::sys::ZX_OK
         }
@@ -914,7 +917,7 @@ pub mod test_utils {
             beacon_interval: u16,
         ) -> i32 {
             unsafe {
-                (*(device as *mut Self)).bcn_cfg =
+                (*(device as *mut Self)).beacon_config =
                     Some((buf.as_slice().to_vec(), tim_ele_offset, TimeUnit(beacon_interval)));
                 buf.free();
             }
@@ -923,16 +926,17 @@ pub mod test_utils {
 
         pub extern "C" fn disable_beaconing(device: *mut c_void) -> i32 {
             unsafe {
-                (*(device as *mut Self)).bcn_cfg = None;
+                (*(device as *mut Self)).beacon_config = None;
             }
             zx::sys::ZX_OK
         }
 
         pub extern "C" fn configure_beacon(device: *mut c_void, buf: OutBuf) -> i32 {
             unsafe {
-                if let Some((_, tim_ele_offset, beacon_interval)) = (*(device as *mut Self)).bcn_cfg
+                if let Some((_, tim_ele_offset, beacon_interval)) =
+                    (*(device as *mut Self)).beacon_config
                 {
-                    (*(device as *mut Self)).bcn_cfg =
+                    (*(device as *mut Self)).beacon_config =
                         Some((buf.as_slice().to_vec(), tim_ele_offset, beacon_interval));
                     buf.free();
                     zx::sys::ZX_OK
@@ -954,7 +958,7 @@ pub mod test_utils {
         pub extern "C" fn clear_assoc(device: *mut c_void, addr: &MacAddr) -> i32 {
             unsafe {
                 (*(device as *mut Self)).assocs.remove(addr);
-                (*(device as *mut Self)).bss_cfg = None;
+                (*(device as *mut Self)).join_bss_request = None;
             }
             zx::sys::ZX_OK
         }
@@ -998,7 +1002,7 @@ pub mod test_utils {
                 get_mac_sublayer_support: Self::get_mac_sublayer_support,
                 get_security_support: Self::get_security_support,
                 get_spectrum_management_support: Self::get_spectrum_management_support,
-                configure_bss: Self::configure_bss,
+                join_bss: Self::join_bss,
                 enable_beaconing: Self::enable_beaconing,
                 disable_beaconing: Self::disable_beaconing,
                 configure_beacon: Self::configure_beacon,
@@ -1406,18 +1410,18 @@ mod tests {
     }
 
     #[test]
-    fn configure_bss() {
+    fn join_bss() {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
-        dev.configure_bss(BssConfig {
+        dev.join_bss(JoinBssRequest {
             bssid: [1, 2, 3, 4, 5, 6],
             bss_type: banjo_internal::BssType::PERSONAL,
             remote: true,
             beacon_period: 100,
         })
         .expect("error configuring bss");
-        assert!(fake_device.bss_cfg.is_some());
+        assert!(fake_device.join_bss_request.is_some());
     }
 
     #[test]
@@ -1432,14 +1436,14 @@ mod tests {
         dev.enable_beaconing(OutBuf::from(in_buf, 4), 1, TimeUnit(2))
             .expect("error enabling beaconing");
         assert_variant!(
-        fake_device.bcn_cfg.as_ref(),
+        fake_device.beacon_config.as_ref(),
         Some((buf, tim_ele_offset, beacon_interval)) => {
             assert_eq!(&buf[..], &[1, 2, 3, 4][..]);
             assert_eq!(*tim_ele_offset, 1);
             assert_eq!(*beacon_interval, TimeUnit(2));
         });
         dev.disable_beaconing().expect("error disabling beaconing");
-        assert_variant!(fake_device.bcn_cfg.as_ref(), None);
+        assert_variant!(fake_device.beacon_config.as_ref(), None);
     }
 
     #[test]
@@ -1454,7 +1458,7 @@ mod tests {
             in_buf.as_mut_slice().copy_from_slice(&[1, 2, 3, 4][..]);
             dev.enable_beaconing(OutBuf::from(in_buf, 4), 1, TimeUnit(2))
                 .expect("error enabling beaconing");
-            assert_variant!(fake_device.bcn_cfg.as_ref(), Some((buf, _, _)) => {
+            assert_variant!(fake_device.beacon_config.as_ref(), Some((buf, _, _)) => {
                 assert_eq!(&buf[..], &[1, 2, 3, 4][..]);
             });
         }
@@ -1464,7 +1468,7 @@ mod tests {
                 fake_device.buffer_provider.get_buffer(4).expect("error getting buffer");
             in_buf.as_mut_slice().copy_from_slice(&[1, 2, 3, 5][..]);
             dev.configure_beacon(OutBuf::from(in_buf, 4)).expect("error enabling beaconing");
-            assert_variant!(fake_device.bcn_cfg.as_ref(), Some((buf, _, _)) => {
+            assert_variant!(fake_device.beacon_config.as_ref(), Some((buf, _, _)) => {
                 assert_eq!(&buf[..], &[1, 2, 3, 5][..]);
             });
         }
@@ -1526,7 +1530,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
-        dev.configure_bss(BssConfig {
+        dev.join_bss(JoinBssRequest {
             bssid: [1, 2, 3, 4, 5, 6],
             bss_type: banjo_internal::BssType::PERSONAL,
             remote: true,
@@ -1550,11 +1554,11 @@ mod tests {
             None,
             None,
         );
-        assert!(fake_device.bss_cfg.is_some());
+        assert!(fake_device.join_bss_request.is_some());
         dev.configure_assoc(assoc_ctx).expect("error configuring assoc");
         assert_eq!(fake_device.assocs.len(), 1);
         dev.clear_assoc(&[1, 2, 3, 4, 5, 6]).expect("error clearing assoc");
         assert_eq!(fake_device.assocs.len(), 0);
-        assert!(fake_device.bss_cfg.is_none());
+        assert!(fake_device.join_bss_request.is_none());
     }
 }

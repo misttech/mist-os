@@ -26,9 +26,9 @@ class WlantapMac {
     virtual void WlantapMacStop() = 0;
     virtual void WlantapMacQueueTx(const wlan_softmac::WlanTxPacket& pkt) = 0;
     virtual void WlantapMacSetChannel(const wlan_common::WlanChannel& channel) = 0;
-    virtual void WlantapMacConfigureBss(const wlan_internal::BssConfig& config) = 0;
+    virtual void WlantapMacJoinBss(const wlan_internal::JoinBssRequest& join_request) = 0;
     virtual void WlantapMacStartScan(uint64_t scan_id) = 0;
-    virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfig& key_config) = 0;
+    virtual void WlantapMacSetKey(const wlan_softmac::WlanKeyConfiguration& key_config) = 0;
   };
 
   virtual void Rx(const fidl::VectorView<uint8_t>& data, const wlan_tap::WlanRxInfo& rx_info) = 0;

@@ -132,7 +132,7 @@ zx_status_t WlanSoftmacHandle::Init() {
       .set_wlan_channel = [](void* device, wlan_channel_t channel) -> zx_status_t {
         return DEVICE(device)->SetChannel(channel);
       },
-      .set_key = [](void* device, wlan_key_config_t* key) -> zx_status_t {
+      .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
         return DEVICE(device)->SetKey(key);
       },
       .start_passive_scan = [](void* device,
@@ -160,13 +160,13 @@ zx_status_t WlanSoftmacHandle::Init() {
       .get_spectrum_management_support = [](void* device) -> spectrum_management_support_t {
         return DEVICE(device)->GetSpectrumManagementSupport();
       },
-      .configure_bss = [](void* device, bss_config_t* cfg) -> zx_status_t {
-        return DEVICE(device)->ConfigureBss(cfg);
+      .join_bss = [](void* device, join_bss_request_t* cfg) -> zx_status_t {
+        return DEVICE(device)->JoinBss(cfg);
       },
       .enable_beaconing = [](void* device, wlansoftmac_out_buf_t buf, size_t tim_ele_offset,
                              uint16_t beacon_interval) -> zx_status_t {
         auto pkt = FromRustOutBuf(buf);
-        wlan_bcn_config_t bcn_cfg = {
+        wlan_beacon_configuration_t beacon_config = {
             .packet_template =
                 {
                     .mac_frame_buffer = pkt->data(),
@@ -175,13 +175,13 @@ zx_status_t WlanSoftmacHandle::Init() {
             .tim_ele_offset = tim_ele_offset,
             .beacon_interval = beacon_interval,
         };
-        return DEVICE(device)->EnableBeaconing(&bcn_cfg);
+        return DEVICE(device)->EnableBeaconing(&beacon_config);
       },
       .disable_beaconing = [](void* device) -> zx_status_t {
         return DEVICE(device)->EnableBeaconing(nullptr);
       },
       .configure_beacon = [](void* device, wlansoftmac_out_buf_t buf) -> zx_status_t {
-        return DEVICE(device)->ConfigureBeacon(FromRustOutBuf(buf));
+        return DEVICE(device)->ConfigureBeaconing(FromRustOutBuf(buf));
       },
       .set_link_status = [](void* device,
                             uint8_t status) { return DEVICE(device)->SetStatus(status); },
@@ -724,7 +724,7 @@ zx_status_t Device::SetStatus(uint32_t status) {
   return ZX_OK;
 }
 
-zx_status_t Device::ConfigureBss(bss_config_t* cfg) {
+zx_status_t Device::JoinBss(join_bss_request_t* cfg) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
@@ -732,13 +732,13 @@ zx_status_t Device::ConfigureBss(bss_config_t* cfg) {
   }
 
   zx_status_t status = ZX_OK;
-  fuchsia_wlan_internal::wire::BssConfig fidl_bss_config;
-  if ((status = ConvertBssConfig(*cfg, &fidl_bss_config)) != ZX_OK) {
-    errorf("BssConfig conversion failed: %s", zx_status_get_string(status));
+  fuchsia_wlan_internal::wire::JoinBssRequest fidl_bss_config;
+  if ((status = ConvertJoinBssRequest(*cfg, &fidl_bss_config)) != ZX_OK) {
+    errorf("JoinBssRequest conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
-  auto result = client_.sync().buffer(*std::move(arena))->ConfigureBss(fidl_bss_config);
+  auto result = client_.sync().buffer(*std::move(arena))->JoinBss(fidl_bss_config);
   if (!result.ok()) {
     errorf("Config bss failed (FIDL error %s)", result.status_string());
     return result.status();
@@ -751,29 +751,29 @@ zx_status_t Device::ConfigureBss(bss_config_t* cfg) {
   return ZX_OK;
 }
 
-// Max size of WlanBcnConfig.
-static constexpr size_t kWlanBcnConfigBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanBcnConfig,
+// Max size of WlanBeaconConfiguration.
+static constexpr size_t kWlanBeaconConfigurationBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanBeaconConfiguration,
                            fidl::MessageDirection::kSending>();
 
-zx_status_t Device::EnableBeaconing(wlan_bcn_config_t* bcn_cfg) {
+zx_status_t Device::EnableBeaconing(wlan_beacon_configuration_t* beacon_config) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
-  if (bcn_cfg != nullptr) {
-    ZX_DEBUG_ASSERT(
-        ValidateFrame("Malformed beacon template",
-                      {reinterpret_cast<const uint8_t*>(bcn_cfg->packet_template.mac_frame_buffer),
-                       bcn_cfg->packet_template.mac_frame_size}));
+  if (beacon_config != nullptr) {
+    ZX_DEBUG_ASSERT(ValidateFrame(
+        "Malformed beacon template",
+        {reinterpret_cast<const uint8_t*>(beacon_config->packet_template.mac_frame_buffer),
+         beacon_config->packet_template.mac_frame_size}));
   }
-  fidl::Arena<kWlanBcnConfigBufferSize> fidl_arena;
-  fuchsia_wlan_softmac::wire::WlanBcnConfig fidl_bcn_cfg;
-  ConvertBcn(*bcn_cfg, &fidl_bcn_cfg, fidl_arena);
+  fidl::Arena<kWlanBeaconConfigurationBufferSize> fidl_arena;
+  fuchsia_wlan_softmac::wire::WlanBeaconConfiguration fidl_beacon_config;
+  ConvertBcn(*beacon_config, &fidl_beacon_config, fidl_arena);
 
-  auto result = client_.sync().buffer(*std::move(arena))->EnableBeaconing(fidl_bcn_cfg);
+  auto result = client_.sync().buffer(*std::move(arena))->EnableBeaconing(fidl_beacon_config);
   if (!result.ok()) {
     errorf("EnableBeaconing failed (FIDL error %s)", result.status_string());
     return result.status();
@@ -785,7 +785,7 @@ zx_status_t Device::EnableBeaconing(wlan_bcn_config_t* bcn_cfg) {
   return ZX_OK;
 }
 
-zx_status_t Device::ConfigureBeacon(std::unique_ptr<Packet> beacon) {
+zx_status_t Device::ConfigureBeaconing(std::unique_ptr<Packet> beacon) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
@@ -811,19 +811,19 @@ zx_status_t Device::ConfigureBeacon(std::unique_ptr<Packet> beacon) {
     return status;
   }
 
-  auto result = client_.sync().buffer(*std::move(arena))->ConfigureBeacon(fidl_tx_packet);
+  auto result = client_.sync().buffer(*std::move(arena))->ConfigureBeaconing(fidl_tx_packet);
   if (!result.ok()) {
-    errorf("ConfigureBeacon failed (FIDL error %s)", result.status_string());
+    errorf("ConfigureBeaconing failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("ConfigureBeacon failed (status %s)", zx_status_get_string(result->error_value()));
+    errorf("ConfigureBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
 }
 
-zx_status_t Device::SetKey(wlan_key_config_t* key_config) {
+zx_status_t Device::SetKey(wlan_key_configuration_t* key_config) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
@@ -832,9 +832,9 @@ zx_status_t Device::SetKey(wlan_key_config_t* key_config) {
 
   zx_status_t status = ZX_OK;
   fidl::Arena fidl_arena;
-  fuchsia_wlan_softmac::wire::WlanKeyConfig fidl_key_config;
+  fuchsia_wlan_softmac::wire::WlanKeyConfiguration fidl_key_config;
   if ((status = ConvertKeyConfig(*key_config, &fidl_key_config, fidl_arena)) != ZX_OK) {
-    errorf("WlanKeyConfig conversion failed: %s", zx_status_get_string(status));
+    errorf("WlanKeyConfiguration conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
