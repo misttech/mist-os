@@ -55,44 +55,35 @@ class Device : public fidl::WireServer<fidl_examples_echo::Echo> {
     auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
     auto device = std::make_unique<Device>(parent, dispatcher);
 
-    // We start by creating a pair of endpoints. These are equivalent to a
-    // zircon channel pair with better type safety.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
-    }
-
     // We add the FIDL protocol we wish to export to our child to our outgoing
     // directory. When a connection is attempted we will bind the server end of
     // the channel pair to our server implementation.
-    device->outgoing_dir_.svc_dir()->AddEntry(
-        fidl::DiscoverableProtocolName<fidl_examples_echo::Echo>,
-        fbl::MakeRefCounted<fs::Service>(
-            [device = device.get()](fidl::ServerEnd<fidl_examples_echo::Echo> request) mutable {
-              device->Bind(std::move(request));
-              return ZX_OK;
+    zx::result = device->outgoing_.AddService<fidl_examples_echo::EchoService>(
+        fidl_examples_echo::EchoService::InstanceHandler({
+            .echo = device->bindings_.CreateHandler(device.get(), dispatcher,
+                                                    fidl::kIgnoreBindingClosure),
             }));
 
     // Utilizing the server end of the endpoint pair we created above, we bind
     // it to our outgoing directory.
-    auto status = device->outgoing_dir_.Serve(std::move(endpoints->server));
-    if (status != ZX_OK) {
+    result = device->outgoing_.Serve(std::move(endpoints->server));
+    if (result.is_error()) {
       zxlogf(ERROR, "Failed to service the outgoing directory");
-      return status;
+      return result.status_value();
     }
 
     // We declare our outgoing protocols here. These will be utilize to
     // help the framework populate node properties which can be used for
     // binding.
     std::array offers = {
-        fidl::DiscoverableProtocolName<fidl_examples_echo::Echo>,
+        fidl_examples_echo::Service::Name,
     };
 
     status = device->DdkAdd(ddk::DeviceAddArgs("parent")
                                 // The device must be spawned in a separate
                                 // driver host.
                                 .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                                .set_fidl_protocol_offers(offers)
+                                .set_fidl_service_offers(offers)
                                 // The client side of outgoing directory is
                                 // provided to the framework. This will be
                                 // forwarded to the new driver host that spawns to
@@ -109,21 +100,15 @@ class Device : public fidl::WireServer<fidl_examples_echo::Echo> {
   }
 
  private:
-  // This is a helper routine which will bind the incoming request to our
-  // server. Note that we continue to utilize the same framework provided
-  // dispatcher to service the work.
-  void Bind(fidl::ServerEnd<fidl_examples_echo::Echo> request) {
-    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-    fidl::BindServer(dispatcher, std::move(request), this);
-  }
-
   // This is the implementation of the only method our FIDL protocol requires.
   void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
     completer.Reply(request->value);
   }
 
   // This is a helper class which we use to serve the outgoing directory.
-  svc::Outgoing outgoing_dir_;
+  component::OutgoingDirectory outgoing_;
+  // This ensures that the fidl connections don't outlive the device object.
+  fidl::ServerBindingGroup<fidl_examples_echo::Echo> bindings_;
 };
 ```
 
