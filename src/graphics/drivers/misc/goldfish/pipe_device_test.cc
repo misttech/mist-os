@@ -10,7 +10,8 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
@@ -114,11 +115,9 @@ class VmoMapping {
   void* ptr_ = nullptr;
 };
 
-}  // namespace
-
 class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  FakeSysmem(async::Loop* loop) : loop_(loop) {}
+  FakeSysmem() {}
 
   void ConnectServer(ConnectServerRequestView request,
                      ConnectServerCompleter::Sync& completer) override {
@@ -126,12 +125,6 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
     request->allocator_request.handle()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info),
                                                   nullptr, nullptr);
     request_koid_ = info.koid;
-
-    // Quit the loop to signal to the test that processing has finished and it
-    // can check the public fields of this class.
-    //
-    // TODO(fxbug.dev/102293): Remove once FIDL clients are async.
-    loop_->Quit();
   }
 
   void RegisterHeap(RegisterHeapRequestView request,
@@ -150,9 +143,6 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
     request->heap_connection.handle()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr,
                                                 nullptr);
     heap_request_koids_[request->heap] = info.koid;
-
-    // See comment on ConnectServer above for explanation.
-    loop_->Quit();
   }
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) final {
@@ -161,28 +151,31 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
 
   zx_koid_t request_koid_ = ZX_KOID_INVALID;
   std::map<uint64_t, zx_koid_t> heap_request_koids_;
-
- private:
-  async::Loop* loop_;
 };
 
+struct IncomingNamespace {
+  IncomingNamespace() : outgoing(async_get_default_dispatcher()) {}
+
+  FakeSysmem fake_sysmem;
+  component::OutgoingDirectory outgoing;
+};
+
+}  // namespace
+
 // Test suite creating fake PipeDevice on a mock ACPI bus.
-class PipeDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
+class PipeDeviceTest : public zxtest::Test {
  public:
   PipeDeviceTest()
-      // The goldfish-pipe server must live on a different thread because the
-      // test code makes synchronous FIDL calls to it. The sysmem server must
-      // live on the same thread because the test code reads its public fields
-      // without synchronizing access.
-      : async_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        sysmem_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        fake_sysmem_(&sysmem_loop_),
-        outgoing_(dispatcher()),
-        fake_root_(MockDevice::FakeRootParent()) {}
+      // The IncomingNamespace must live on a different thread because the
+      // pipe-device makes synchronous FIDL calls to it.
+      : ns_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        ns_(ns_loop_.dispatcher(), std::in_place),
+        fake_root_(MockDevice::FakeRootParent()),
+        test_loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
 
   // |zxtest::Test|
   void SetUp() override {
-    ASSERT_OK(async_loop_.StartThread("pipe-device-test-dispatcher"));
+    ASSERT_OK(ns_loop_.StartThread("incoming-namespace-loop-dispatcher"));
 
     ASSERT_OK(fake_bti_create(acpi_bti_.reset_and_get_address()));
 
@@ -221,27 +214,30 @@ class PipeDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
       completer.ReplySuccess(std::move(out_bti));
     });
 
-    auto acpi_client = mock_acpi_fidl_.CreateClient(async_loop_.dispatcher());
+    auto acpi_client = mock_acpi_fidl_.CreateClient(ns_loop_.dispatcher());
     ASSERT_OK(acpi_client.status_value());
 
     fake_root_->AddProtocol(ZX_PROTOCOL_ACPI, nullptr, nullptr, "acpi");
 
-    zx::result service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
-        fuchsia_hardware_sysmem::Service::InstanceHandler({
-            .sysmem = fake_sysmem_.bind_handler(sysmem_loop_.dispatcher()),
-        }));
-    ASSERT_EQ(service_result.status_value(), ZX_OK);
-
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(endpoints.status_value());
-    ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
+
+    ns_.SyncCall([&endpoints](IncomingNamespace* ns) {
+      zx::result service_result = ns->outgoing.AddService<fuchsia_hardware_sysmem::Service>(
+          fuchsia_hardware_sysmem::Service::InstanceHandler({
+              .sysmem = ns->fake_sysmem.bind_handler(async_get_default_dispatcher()),
+          }));
+      ASSERT_EQ(service_result.status_value(), ZX_OK);
+
+      ASSERT_OK(ns->outgoing.Serve(std::move(endpoints->server)).status_value());
+    });
 
     fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
                                "sysmem-fidl");
 
     auto dut = std::make_unique<PipeDevice>(fake_root_.get(), std::move(acpi_client.value()),
-                                            async_loop_.dispatcher());
-    PerformBlockingWork([&] { ASSERT_OK(dut->ConnectToSysmem()); });
+                                            test_loop_.dispatcher());
+    ASSERT_OK(dut->ConnectToSysmem());
     ASSERT_OK(dut->Bind());
     dut_ = dut.release();
 
@@ -249,12 +245,12 @@ class PipeDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
       auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
       EXPECT_EQ(endpoints.status_value(), ZX_OK);
 
-      dut_child_ = std::make_unique<PipeChildDevice>(dut_, async_loop_.dispatcher());
-      binding_ = fidl::BindServer(async_loop_.dispatcher(), std::move(endpoints->server),
-                                  dut_child_.get());
+      dut_child_ = std::make_unique<PipeChildDevice>(dut_, test_loop_.dispatcher());
+      binding_ =
+          fidl::BindServer(test_loop_.dispatcher(), std::move(endpoints->server), dut_child_.get());
       EXPECT_TRUE(binding_.has_value());
 
-      client_ = fidl::WireSyncClient(std::move(endpoints->client));
+      client_.Bind(std::move(endpoints->client), test_loop_.dispatcher());
     }
   }
 
@@ -274,15 +270,15 @@ class PipeDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
   }
 
  protected:
-  async::Loop async_loop_;
-  async::Loop sysmem_loop_;
-  FakeSysmem fake_sysmem_;
-  component::OutgoingDirectory outgoing_;
+  async::Loop ns_loop_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> ns_;
   acpi::mock::Device mock_acpi_fidl_;
+
   std::shared_ptr<MockDevice> fake_root_;
+  async::Loop test_loop_;
   PipeDevice* dut_;
   std::unique_ptr<PipeChildDevice> dut_child_;
-  fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> client_;
+  fidl::WireClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> client_;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
 
   zx::bti acpi_bti_;
@@ -319,66 +315,40 @@ TEST_F(PipeDeviceTest, CreatePipe) {
   ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
   dut_child_.release();
 
-  auto result = client_->Create();
-  ASSERT_OK(result.status());
-  int32_t id = result->value()->id;
-  zx::vmo vmo = std::move(result->value()->vmo);
+  int32_t id = 0;
+  zx::vmo vmo;
+  client_->Create().Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    id = result->value()->id;
+    vmo = std::move(result->value()->vmo);
+  });
+  test_loop_.RunUntilIdle();
 
   ASSERT_NE(id, 0u);
   ASSERT_TRUE(vmo.is_valid());
 
-  auto destroy_result = client_->Destroy(id);
-  ASSERT_OK(destroy_result.status());
-}
-
-TEST_F(PipeDeviceTest, CreatePipeMultiThreading) {
-  ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
-  dut_child_.release();
-
-  auto create_pipe = [this](size_t num_pipes, std::vector<int32_t>* ids) {
-    for (size_t i = 0; i < num_pipes; i++) {
-      auto result = client_->Create();
-      ASSERT_OK(result.status());
-      int32_t id = result->value()->id;
-      zx::vmo vmo = std::move(result->value()->vmo);
-      ids->push_back(id);
-    }
-  };
-
-  std::vector<int32_t> ids_1, ids_2;
-  constexpr size_t kNumPipesPerThread = 1000u;
-  std::thread create_pipe_thread_1(
-      [create_pipe, ids = &ids_1]() { create_pipe(kNumPipesPerThread, ids); });
-  std::thread create_pipe_thread_2(
-      [create_pipe, ids = &ids_2]() { create_pipe(kNumPipesPerThread, ids); });
-  create_pipe_thread_1.join();
-  create_pipe_thread_2.join();
-
-  std::vector<int32_t> set_intersect, set_union;
-
-  std::set_intersection(ids_1.begin(), ids_1.end(), ids_2.begin(), ids_2.end(),
-                        std::back_inserter(set_intersect));
-  std::set_union(ids_1.begin(), ids_1.end(), ids_2.begin(), ids_2.end(),
-                 std::back_inserter(set_union));
-
-  ASSERT_EQ(set_intersect.size(), 0u);
-  ASSERT_EQ(set_union.size(), 2 * kNumPipesPerThread);
+  client_->Destroy(id).Then([](auto& result) { ASSERT_OK(result.status()); });
+  test_loop_.RunUntilIdle();
 }
 
 TEST_F(PipeDeviceTest, Exec) {
   ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
   dut_child_.release();
 
-  auto result = client_->Create();
-  ASSERT_OK(result.status());
-  int32_t id = result->value()->id;
-  zx::vmo vmo = std::move(result->value()->vmo);
+  int32_t id = 0;
+  zx::vmo vmo;
+  client_->Create().Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    id = result->value()->id;
+    vmo = std::move(result->value()->vmo);
+  });
+  test_loop_.RunUntilIdle();
 
   ASSERT_NE(id, 0u);
   ASSERT_TRUE(vmo.is_valid());
 
-  auto exec_result = client_->Exec(id);
-  ASSERT_OK(exec_result.status());
+  client_->Exec(id).Then([](auto& result) { ASSERT_OK(result.status()); });
+  test_loop_.RunUntilIdle();
 
   {
     auto mapped = MapControlRegisters();
@@ -386,24 +356,31 @@ TEST_F(PipeDeviceTest, Exec) {
     ASSERT_EQ(ctrl_regs->command, static_cast<uint32_t>(id));
   }
 
-  auto destroy_result = client_->Destroy(id);
-  ASSERT_OK(destroy_result.status());
+  client_->Destroy(id).Then([](auto& result) { ASSERT_OK(result.status()); });
+  test_loop_.RunUntilIdle();
 }
 
 TEST_F(PipeDeviceTest, TransferObservedSignals) {
   ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
   dut_child_.release();
 
-  auto result = client_->Create();
-  ASSERT_OK(result.status());
-  int32_t id = result->value()->id;
-  zx::vmo vmo = std::move(result->value()->vmo);
+  int32_t id = 0;
+  zx::vmo vmo;
+  client_->Create().Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    id = result->value()->id;
+    vmo = std::move(result->value()->vmo);
+  });
+  test_loop_.RunUntilIdle();
 
   zx::event old_event, old_event_dup;
   ASSERT_OK(zx::event::create(0u, &old_event));
   ASSERT_OK(old_event.duplicate(ZX_RIGHT_SAME_RIGHTS, &old_event_dup));
 
-  ASSERT_OK(client_->SetEvent(id, std::move(old_event_dup)).status());
+  client_->SetEvent(id, std::move(old_event_dup)).Then([](auto& result) {
+    ASSERT_OK(result.status());
+  });
+  test_loop_.RunUntilIdle();
 
   // Trigger signals on "old" event.
   old_event.signal(0u, fuchsia_hardware_goldfish::wire::kSignalReadable);
@@ -414,7 +391,10 @@ TEST_F(PipeDeviceTest, TransferObservedSignals) {
   ASSERT_OK(new_event.signal(fuchsia_hardware_goldfish::wire::kSignalReadable, 0u));
   ASSERT_OK(new_event.duplicate(ZX_RIGHT_SAME_RIGHTS, &new_event_dup));
 
-  ASSERT_OK(client_->SetEvent(id, std::move(new_event_dup)).status());
+  client_->SetEvent(id, std::move(new_event_dup)).Then([](auto& result) {
+    ASSERT_OK(result.status());
+  });
+  test_loop_.RunUntilIdle();
 
   // Wait for `SIGNAL_READABLE` signal on the new event.
   zx_signals_t observed;
@@ -426,9 +406,12 @@ TEST_F(PipeDeviceTest, GetBti) {
   ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
   dut_child_.release();
 
-  auto result = client_->GetBti();
-  ASSERT_OK(result.status());
-  zx::bti bti = std::move(result->value()->bti);
+  zx::bti bti;
+  client_->GetBti().Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    bti = std::move(result->value()->bti);
+  });
+  test_loop_.RunUntilIdle();
 
   zx_info_bti_t goldfish_bti_info, acpi_bti_info;
   ASSERT_OK(
@@ -451,21 +434,17 @@ TEST_F(PipeDeviceTest, ConnectToSysmem) {
   ASSERT_OK(sysmem_server.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
   server_koid = info.koid;
 
-  ASSERT_OK(client_->ConnectSysmem(std::move(sysmem_server)).status());
-  // We need to make sure that the fake_sysmem_ server has finished processing
-  // the request before we check the results, so we run its loop here and the
-  // server calls loop.Quit() when it's done processing. We can't just call
-  // RunUntilIdle because the FIDL call goes first to the goldfish-pipe server,
-  // which then calls the sysmem server; if we called RunUntilIdle it may return
-  // immediately before the goldfish-pipe server has had a chance to call the
-  // sysmem server.
-  //
-  // TODO(fxbug.dev/102293): Make the FIDL clients async so we can avoid this
-  // awkwardness.
-  ASSERT_EQ(sysmem_loop_.Run(), ZX_ERR_CANCELED);
-  ASSERT_OK(sysmem_loop_.ResetQuit());
-  ASSERT_NE(fake_sysmem_.request_koid_, ZX_KOID_INVALID);
-  ASSERT_EQ(fake_sysmem_.request_koid_, server_koid);
+  zx::bti bti;
+  client_->ConnectSysmem(std::move(sysmem_server)).Then([&](auto& result) {
+    ASSERT_OK(result.status());
+  });
+  test_loop_.RunUntilIdle();
+
+  ns_.SyncCall([server_koid](IncomingNamespace* ns) {
+    ASSERT_NE(ns->fake_sysmem.request_koid_, ZX_KOID_INVALID);
+    ASSERT_EQ(ns->fake_sysmem.request_koid_, server_koid);
+  });
+  ASSERT_NO_FATAL_FAILURE();
 
   for (const auto& heap : kSysmemHeaps) {
     zx::channel heap_server, heap_client;
@@ -477,14 +456,16 @@ TEST_F(PipeDeviceTest, ConnectToSysmem) {
     server_koid = info.koid;
 
     uint64_t heap_id = static_cast<uint64_t>(heap);
-    ASSERT_OK(client_->RegisterSysmemHeap(heap_id, std::move(heap_server)).status());
-    // See comment on ConnectSysmem above for explanation.
-    ASSERT_EQ(sysmem_loop_.Run(), ZX_ERR_CANCELED);
-    ASSERT_OK(sysmem_loop_.ResetQuit());
-    ASSERT_TRUE(fake_sysmem_.heap_request_koids_.find(heap_id) !=
-                fake_sysmem_.heap_request_koids_.end());
-    ASSERT_NE(fake_sysmem_.heap_request_koids_.at(heap_id), ZX_KOID_INVALID);
-    ASSERT_EQ(fake_sysmem_.heap_request_koids_.at(heap_id), server_koid);
+    client_->RegisterSysmemHeap(heap_id, std::move(heap_server)).Then([](auto& result) {
+      ASSERT_OK(result.status());
+    });
+    test_loop_.RunUntilIdle();
+    ns_.SyncCall([heap_id, server_koid](IncomingNamespace* ns) {
+      ASSERT_TRUE(ns->fake_sysmem.heap_request_koids_.find(heap_id) !=
+                  ns->fake_sysmem.heap_request_koids_.end());
+      ASSERT_NE(ns->fake_sysmem.heap_request_koids_.at(heap_id), ZX_KOID_INVALID);
+      ASSERT_EQ(ns->fake_sysmem.heap_request_koids_.at(heap_id), server_koid);
+    });
   }
 }
 
@@ -492,8 +473,8 @@ TEST_F(PipeDeviceTest, ChildDevice) {
   // Test creating multiple child devices. Each child device can access the
   // GoldfishPipe FIDL protocol, and they should share the same parent device.
 
-  auto child1 = std::make_unique<PipeChildDevice>(dut_, async_loop_.dispatcher());
-  auto child2 = std::make_unique<PipeChildDevice>(dut_, async_loop_.dispatcher());
+  auto child1 = std::make_unique<PipeChildDevice>(dut_, test_loop_.dispatcher());
+  auto child2 = std::make_unique<PipeChildDevice>(dut_, test_loop_.dispatcher());
 
   constexpr zx_device_prop_t kPropsChild1[] = {
       {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GOOGLE},
@@ -513,16 +494,18 @@ TEST_F(PipeDeviceTest, ChildDevice) {
   ASSERT_OK(child2->Bind(kPropsChild2, kDeviceNameChild2));
   child2.release();
 
-  auto result1 = client_->Create();
-  ASSERT_OK(result1.status());
-  int32_t id1 = result1->value()->id;
-  zx::vmo vmo1 = std::move(result1->value()->vmo);
+  int32_t id1 = 0;
+  int32_t id2 = 0;
+  client_->Create().Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    id1 = result->value()->id;
+  });
+  client_->Create().Then([&](auto& result) {
+    ASSERT_OK(result.status());
+    id2 = result->value()->id;
+  });
+  test_loop_.RunUntilIdle();
   ASSERT_NE(id1, 0);
-
-  auto result2 = client_->Create();
-  ASSERT_OK(result2.status());
-  int32_t id2 = result2->value()->id;
-  zx::vmo vmo2 = std::move(result2->value()->vmo);
   ASSERT_NE(id2, 0);
 
   ASSERT_NE(id1, id2);

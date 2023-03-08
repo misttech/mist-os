@@ -413,41 +413,35 @@ PipeChildDevice::PipeChildDevice(PipeDevice* parent, async_dispatcher_t* dispatc
 }
 
 zx_status_t PipeChildDevice::Bind(cpp20::span<const zx_device_prop_t> props, const char* dev_name) {
-  outgoing_.svc_dir()->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish_pipe::GoldfishPipe>,
-      fbl::MakeRefCounted<fs::Service>(
-          [this](fidl::ServerEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe> request) mutable {
-            auto status = fidl::BindSingleInFlightOnly<
-                fidl::WireServer<fuchsia_hardware_goldfish_pipe::GoldfishPipe>>(
-                dispatcher_, std::move(request), this);
-            if (status != ZX_OK) {
-              zxlogf(ERROR, "%s: failed to bind channel: %s", kTag, zx_status_get_string(status));
-            }
-            return status;
-          }));
+  zx::result result = outgoing_.AddService<fuchsia_hardware_goldfish_pipe::Service>(
+      fuchsia_hardware_goldfish_pipe::Service::InstanceHandler({
+          .device = pipe_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service the outgoing directory");
+    return result.status_value();
+  }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
-  zx_status_t status = outgoing_.Serve(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to service the outgoing directory: %s", kTag,
-           zx_status_get_string(status));
-    return status;
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    return result.status_value();
   }
 
   std::array offers = {
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish_pipe::GoldfishPipe>,
+      fuchsia_hardware_goldfish_pipe::Service::Name,
   };
 
-  status = DdkAdd(ddk::DeviceAddArgs(dev_name)
-                      .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                      .set_props(props)
-                      .set_fidl_protocol_offers(offers)
-                      .set_outgoing_dir(endpoints->client.TakeChannel())
-                      .set_proto_id(ZX_PROTOCOL_GOLDFISH_PIPE));
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs(dev_name)
+                                  .set_props(props)
+                                  .set_fidl_service_offers(offers)
+                                  .set_outgoing_dir(endpoints->client.TakeChannel())
+                                  .set_proto_id(ZX_PROTOCOL_GOLDFISH_PIPE));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: create %s device failed: %d", kTag, dev_name, status);
     return status;

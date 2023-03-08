@@ -91,20 +91,14 @@ Control::~Control() {
 }
 
 zx_status_t Control::Init() {
-  auto pipe_endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-  if (pipe_endpoints.is_error()) {
-    return pipe_endpoints.status_value();
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>(
+          "goldfish-pipe");
+  if (client.is_error()) {
+    zxlogf(ERROR, "%s: failed to connect to FIDL fragment: %s", kTag, client.status_string());
+    return client.status_value();
   }
-
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "goldfish-pipe",
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish_pipe::GoldfishPipe>,
-      pipe_endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to connect to FIDL fragment: %s", kTag, zx_status_get_string(status));
-    return status;
-  }
-  pipe_ = fidl::WireSyncClient(std::move(pipe_endpoints->client));
+  pipe_ = fidl::WireSyncClient(std::move(client.value()));
 
   auto address_space_endpoints =
       fidl::CreateEndpoints<fuchsia_hardware_goldfish::AddressSpaceDevice>();
@@ -112,7 +106,7 @@ zx_status_t Control::Init() {
     return address_space_endpoints.status_value();
   }
 
-  status = device_connect_fragment_fidl_protocol(
+  zx_status_t status = device_connect_fragment_fidl_protocol(
       parent(), "goldfish-address-space",
       fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish::AddressSpaceDevice>,
       address_space_endpoints->server.TakeChannel().release());
@@ -717,10 +711,9 @@ zx_status_t Control::GoldfishControlCreateSyncFence(zx::eventpair event) {
 }
 
 zx_status_t Control::GoldfishControlConnectToPipeDevice(zx::channel channel) {
-  zx_status_t status = device_connect_fragment_fidl_protocol(
-      parent(), "goldfish-pipe",
-      fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish_pipe::GoldfishPipe>,
-      channel.release());
+  zx_status_t status = device_connect_fragment_fidl_protocol2(
+      parent(), "goldfish-pipe", fuchsia_hardware_goldfish_pipe::Service::Name,
+      fuchsia_hardware_goldfish_pipe::Service::Device::Name, channel.release());
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to bind channel: %s", kTag, zx_status_get_string(status));
   }

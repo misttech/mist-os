@@ -8,10 +8,10 @@
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/mmio/mmio.h>
-#include <lib/svc/outgoing.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/event.h>
@@ -134,8 +134,9 @@ class PipeChildDevice : public PipeChildDeviceType,
  private:
   PipeDevice* const parent_;
   async_dispatcher_t* const dispatcher_;
-  svc::Outgoing outgoing_;
+  component::OutgoingDirectory outgoing_;
 
+  fidl::ServerBindingGroup<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_goldfish::PipeDevice> bindings_;
   std::optional<ddk::UnbindTxn> unbind_txn_;
 };

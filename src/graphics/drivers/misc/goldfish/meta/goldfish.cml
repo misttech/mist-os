@@ -14,8 +14,17 @@
         compat: "driver/goldfish.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
+    capabilities: [
+        { service: 'fuchsia.hardware.goldfish.pipe.Service' },
+    ],
     use: [
         { service: "fuchsia.hardware.acpi.Service" },
         { service: "fuchsia.hardware.sysmem.Service" },
+    ],
+    expose: [
+        {
+            service: 'fuchsia.hardware.goldfish.pipe.Service',
+            from: 'self',
+        },
     ],
 }

@@ -71,21 +71,13 @@ RootDevice::~RootDevice() {
 }
 
 zx_status_t RootDevice::Setup(const std::map<uint64_t, InputDeviceInfo>& input_devices) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_goldfish_pipe::GoldfishPipe>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "%s: could not create FIDL endpoints: %s", kTag, endpoints.status_string());
-    return endpoints.status_value();
-  }
-
-  zx_status_t status = device_connect_fidl_protocol(
-      parent(), fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish_pipe::GoldfishPipe>,
-      endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
+  zx::result client_end = DdkConnectFidlProtocol<fuchsia_hardware_goldfish_pipe::Service::Device>();
+  if (client_end.is_error()) {
     zxlogf(ERROR, "%s: could not connect to goldfish-pipe protocol: %s", kTag,
-           zx_status_get_string(status));
-    return status;
+           client_end.status_string());
+    return client_end.status_value();
   }
-  fidl::WireSyncClient client{std::move(endpoints->client)};
+  fidl::WireSyncClient client{std::move(client_end.value())};
 
   auto_reader_ =
       std::make_unique<PipeAutoReader>(std::move(client), kPipeName, pipe_io_loop_.dispatcher(),
@@ -128,7 +120,7 @@ zx_status_t RootDevice::Setup(const std::map<uint64_t, InputDeviceInfo>& input_d
     }
   }
 
-  status = auto_reader_->BeginRead();
+  zx_status_t status = auto_reader_->BeginRead();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: BeginRead() failed: %d", kTag, status);
     return status;

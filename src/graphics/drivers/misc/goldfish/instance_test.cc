@@ -12,7 +12,8 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl-async/cpp/bind.h>
@@ -75,52 +76,63 @@ class FakePipeDevice
   int32_t id_ = 0;
 };
 
+struct IncomingNamespace {
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 // Test suite creating fake Instance on a mock Pipe device.
-class InstanceDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
+class InstanceDeviceTest : public zxtest::Test {
  public:
   InstanceDeviceTest()
       : zxtest::Test(),
         fake_root_(MockDevice::FakeRootParent()),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        outgoing_(dispatcher()) {}
+        incoming_(loop_.dispatcher(), std::in_place) {}
 
   // |zxtest::Test|
   void SetUp() override {
+    ASSERT_OK(loop_.StartThread("goldfish-pipe-thread"));
+
     auto acpi_result = mock_acpi_.CreateClient(loop_.dispatcher());
     ASSERT_OK(acpi_result.status_value());
-
-    fake_root_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish_pipe::GoldfishPipe>,
-        [this](zx::channel channel) {
-          fidl::BindServer(
-              loop_.dispatcher(),
-              fidl::ServerEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>(std::move(channel)),
-              pipe_device_.get());
-          return ZX_OK;
-        },
-        "goldfish-pipe");
-
-    zx::result service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
-        fuchsia_hardware_sysmem::Service::InstanceHandler({
-            .sysmem =
-                [](fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem> request) {
-                  // The device connects to the protocol in its constructor but does not
-                  // otherwise use it, so we don't need to bind a server here.
-                },
-        }));
-    ASSERT_EQ(service_result.status_value(), ZX_OK);
-
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints.status_value());
-    ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
-
-    fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
-                               "sysmem-fidl");
 
     pipe_device_ = std::make_unique<FakePipeDevice>(
         fake_root_.get(), std::move(acpi_result.value()), loop_.dispatcher());
 
-    ASSERT_OK(loop_.StartThread("goldfish-pipe-thread"));
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints.status_value());
+
+    incoming_.SyncCall([&](IncomingNamespace* ns) {
+      zx::result service_result = ns->outgoing.AddService<fuchsia_hardware_goldfish_pipe::Service>(
+          fuchsia_hardware_goldfish_pipe::Service::InstanceHandler({
+              .device = pipe_device_->bind_handler(async_get_default_dispatcher()),
+          }));
+      ASSERT_EQ(service_result.status_value(), ZX_OK);
+      ASSERT_OK(ns->outgoing.Serve(std::move(endpoints->server)).status_value());
+    });
+
+    fake_root_->AddFidlService(fuchsia_hardware_goldfish_pipe::Service::Name,
+                               std::move(endpoints->client), "goldfish-pipe");
+
+    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints.status_value());
+
+    incoming_.SyncCall([&](IncomingNamespace* ns) {
+      zx::result service_result = ns->outgoing.AddService<fuchsia_hardware_sysmem::Service>(
+          fuchsia_hardware_sysmem::Service::InstanceHandler({
+              .sysmem =
+                  [](fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem> request) {
+                    // The device connects to the protocol in its constructor but does not
+                    // otherwise use it, so we don't need to bind a server here.
+                  },
+          }));
+      ASSERT_EQ(service_result.status_value(), ZX_OK);
+
+      ASSERT_OK(ns->outgoing.Serve(std::move(endpoints->server)).status_value());
+    });
+
+    fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
+                               "sysmem-fidl");
 
     dut_.emplace(pipe_device_.get(), loop_.dispatcher());
 
@@ -133,12 +145,6 @@ class InstanceDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
     }
   }
 
-  // |zxtest::Test|
-  void TearDown() override {
-    loop_.Quit();
-    loop_.JoinThreads();
-  }
-
  protected:
   acpi::mock::Device mock_acpi_;
 
@@ -149,7 +155,7 @@ class InstanceDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
 
   fidl::WireSyncClient<fuchsia_hardware_goldfish::PipeDevice> fidl_goldfish_client_;
   async::Loop loop_;
-  component::OutgoingDirectory outgoing_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
 
  private:
   zx::bti acpi_bti_;

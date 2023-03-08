@@ -8,6 +8,8 @@
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/driver.h>
 
 #include <string>
@@ -108,23 +110,26 @@ class TestRootDevice : public RootDevice {
   using RootDevice::RootDevice;
 };
 
-class RootDeviceTest : public ::testing::Test {
+class RootDeviceTest : public ::testing::Test, public loop_fixture::RealLoop {
  public:
-  RootDeviceTest() : async_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  RootDeviceTest() : async_loop_(&kAsyncLoopConfigNeverAttachToThread), outgoing_(dispatcher()) {}
 
   void SetUp() override {
     async_loop_.StartThread("goldfish-server-thread");
 
     fake_parent_ = MockDevice::FakeRootParent();
-    fake_parent_->AddFidlProtocol(
-        fidl::DiscoverableProtocolName<fuchsia_hardware_goldfish_pipe::GoldfishPipe>,
-        [this](zx::channel channel) {
-          fidl::BindServer(
-              async_loop_.dispatcher(),
-              fidl::ServerEnd<fuchsia_hardware_goldfish_pipe::GoldfishPipe>(std::move(channel)),
-              &fake_pipe_);
-          return ZX_OK;
-        });
+    zx::result service_result = outgoing_.AddService<fuchsia_hardware_goldfish_pipe::Service>(
+        fuchsia_hardware_goldfish_pipe::Service::InstanceHandler({
+            .device = fake_pipe_.bind_handler(async_loop_.dispatcher()),
+        }));
+    ASSERT_EQ(service_result.status_value(), ZX_OK);
+
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
+
+    fake_parent_->AddFidlService(fuchsia_hardware_goldfish_pipe::Service::Name,
+                                 std::move(endpoints->client));
 
     auto device = std::make_unique<TestRootDevice>(fake_parent_.get());
     ASSERT_EQ(device->Bind(), ZX_OK);
@@ -148,6 +153,7 @@ class RootDeviceTest : public ::testing::Test {
   TestRootDevice* dut_;
   testing::FakePipe fake_pipe_;
   async::Loop async_loop_;
+  component::OutgoingDirectory outgoing_;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_goldfish_pipe::GoldfishPipe>> binding_;
 };
 
@@ -167,7 +173,7 @@ TEST_F(RootDeviceTest, SetupDevices) {
         }
       });
 
-  ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK);
+  PerformBlockingWork([&] { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
   EXPECT_EQ(FakeInputDevice::GetAllDevices().size(), 1u);
   EXPECT_TRUE(list_sensors_called);
 
@@ -192,7 +198,7 @@ TEST_F(RootDeviceTest, SetupMultipleDevices) {
         }
       });
 
-  ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK);
+  PerformBlockingWork([&] { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
   EXPECT_EQ(FakeInputDevice::GetAllDevices().size(), 2u);
   EXPECT_TRUE(list_sensors_called);
 
@@ -223,7 +229,7 @@ TEST_F(RootDeviceTest, DispatchSensorReports) {
         }
       });
 
-  ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK);
+  PerformBlockingWork([&] { ASSERT_EQ(dut_->Setup(kFakeDevices), ZX_OK); });
   EXPECT_EQ(FakeInputDevice::GetAllDevices().size(), 2u);
   EXPECT_TRUE(list_sensors_called);
 
