@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.google.ec/cpp/markers.h>
 #include <fidl/fuchsia.hardware.google.ec/cpp/wire_test_base.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
@@ -16,7 +17,7 @@
 #include "src/devices/lib/acpi/mock/mock-acpi.h"
 #include "src/devices/mcu/drivers/chromiumos-ec-core/chromiumos_ec_core.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "zircon/system/ulib/async-loop/testing/include/lib/async-loop/testing/cpp/real_loop.h"
+
 namespace chromiumos_ec_core {
 
 template <typename T>

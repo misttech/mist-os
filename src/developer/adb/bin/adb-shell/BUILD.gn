@@ -63,9 +63,9 @@ test("adb-shell-test-bin") {
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_cpp_wire_testing",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/zxtest",
   ]
 }

@@ -291,6 +291,7 @@ sdk_molecule("core_lib") {
   visibility = [ ":*" ]
 
   deps = [
+    "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
     "//sdk/lib/fdio:fdio_sdk",
@@ -324,7 +325,6 @@ sdk_molecule("core_lib") {
     "//zircon/system/ulib/async-loop:async-loop-cpp_sdk",
     "//zircon/system/ulib/async-loop:async-loop-default_sdk",
     "//zircon/system/ulib/async-loop:async-loop_sdk",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing_sdk",
     "//zircon/system/ulib/inspect:inspect_sdk",
     "//zircon/system/ulib/sync:sync_sdk",
     "//zircon/system/ulib/syslog:syslog_sdk",

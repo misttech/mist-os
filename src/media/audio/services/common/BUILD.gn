@@ -33,13 +33,13 @@ source_set("common") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.audio:fuchsia.audio_cpp_wire",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/ffl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync:sync-cpp",

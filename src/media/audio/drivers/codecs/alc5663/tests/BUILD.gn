@@ -17,13 +17,13 @@ test("alc5663-test") {
   include_dirs = [ ".." ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/testing/mock-ddk",
     "//src/media/audio/drivers/codecs/alc5663:shared",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/zxtest",
   ]
 }

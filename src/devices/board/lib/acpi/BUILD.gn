@@ -128,9 +128,9 @@ test("acpi-test") {
          shared_fuchsia_public_deps +
          [
            "test:mock-acpi",
+           "//sdk/lib/async-loop-testing/cpp",
            "//src/devices/testing/fake-resource",
            "//src/devices/testing/mock-ddk",
-           "//zircon/system/ulib/async-loop/testing:async-loop-testing",
            "//zircon/system/ulib/zxtest",
          ]
 

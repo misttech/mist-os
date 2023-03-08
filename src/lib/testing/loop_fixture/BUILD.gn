@@ -26,6 +26,7 @@ source_set("gtest") {
   deps = [ "//zircon/system/ulib/async:async-cpp" ]
 
   public_deps = [
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//src/lib/fxl",
@@ -33,7 +34,6 @@ source_set("gtest") {
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/zx",
   ]

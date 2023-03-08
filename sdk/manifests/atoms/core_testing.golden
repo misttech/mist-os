@@ -24,6 +24,7 @@
 //sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_sdk
 //sdk/fidl/fuchsia.unknown:fuchsia.unknown_sdk
 //sdk/fidl/fuchsia.url:fuchsia.url_sdk
+//sdk/lib/async-loop-testing/cpp:cpp_sdk
 //sdk/lib/fdio:fdio_sdk_manifest
 //sdk/lib/fidl/cpp:cpp_base_sdk
 //sdk/lib/fidl/cpp:cpp_sdk
@@ -42,7 +43,6 @@
 //sdk/lib/vfs/cpp:cpp_sdk
 //tools/docsgen:ref_docs_sdk
 //zircon/system/ulib/async-default:async-default_sdk_manifest
-//zircon/system/ulib/async-loop/testing:async-loop-testing_sdk
 //zircon/system/ulib/async-loop:async-loop-cpp_sdk
 //zircon/system/ulib/async-loop:async-loop-default_sdk_manifest
 //zircon/system/ulib/async-loop:async-loop_sdk

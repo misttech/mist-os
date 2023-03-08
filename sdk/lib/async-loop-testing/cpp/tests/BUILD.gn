@@ -1,0 +1,36 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+executable("bin") {
+  output_dir = target_out_dir
+  output_name = "async_loop_testing_unittests"
+
+  sources = [ "real_loop_test.cc" ]
+
+  deps = [
+    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/fit-promise",
+    "//src/lib/fxl",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/fxl/test:test_settings",
+    "//src/lib/testing/predicates",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-default",
+    "//zircon/system/ulib/sync:sync-cpp",
+  ]
+
+  testonly = true
+}
+
+fuchsia_unittest_package("async_loop_testing_tests") {
+  deps = [ ":bin" ]
+}
+
+group("tests") {
+  testonly = true
+
+  deps = [ ":async_loop_testing_tests" ]
+}

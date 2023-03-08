@@ -2,8 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(yifeit): Remove this soon after vendor repositories are migrated.
-group("async-loop-testing") {
+group("tests") {
   testonly = true
-  public_deps = [ "//sdk/lib/async-loop-testing/cpp" ]
+  deps = [ "cpp:tests" ]
 }

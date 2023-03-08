@@ -115,12 +115,12 @@ test("focaltech-test-bin") {
   deps = [
     ":common",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp_mock",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

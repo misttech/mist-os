@@ -98,6 +98,7 @@ executable("fidl_unittests") {
   deps = [
     ":fidl",
     "//sdk/fidl/fuchsia.audio.mixer:fuchsia.audio.mixer_cpp_natural_ostream",
+    "//sdk/lib/async-loop-testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/media/audio/lib/clock/testing",
     "//src/media/audio/lib/processing:prebuilt_coefficient_tables",
@@ -108,7 +109,6 @@ executable("fidl_unittests") {
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

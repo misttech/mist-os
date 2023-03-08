@@ -9,10 +9,10 @@ ctf_executable("svc-unittests") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/svc",
     "//sdk/lib/vfs/cpp",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

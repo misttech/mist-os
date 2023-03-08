@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
-#define LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
+#ifndef LIB_ASYNC_LOOP_TESTING_CPP_INCLUDE_LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
+#define LIB_ASYNC_LOOP_TESTING_CPP_INCLUDE_LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -18,6 +18,24 @@
 
 namespace loop_fixture {
 
+// A class which sets up a |async::Loop| and offers a variety of ways to run
+// the loop until a certain condition is satisfied.
+//
+// Example:
+//
+//     // Creates a fixture that creates a message loop on this thread.
+//     class FooTest : public ::testing::Test, public loop_fixture::RealLoop {};
+//
+//     TEST_F(FooTest, TestCase) {
+//       // Schedule asynchronous operations, and quit the loop when done.
+//       DoSomeAsyncWork([&] { QuitLoop(); });
+//
+//       // Run the loop until it is quit.
+//       RunLoop();
+//
+//       // Check results of those asynchronous operations here.
+//     }
+//
 class RealLoop {
  protected:
   RealLoop();
@@ -135,4 +153,4 @@ Result RealLoop::PerformBlockingWorkImpl(Callable&& work) {
 
 }  // namespace loop_fixture
 
-#endif  // LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_
+#endif  // LIB_ASYNC_LOOP_TESTING_CPP_INCLUDE_LIB_ASYNC_LOOP_TESTING_CPP_REAL_LOOP_H_

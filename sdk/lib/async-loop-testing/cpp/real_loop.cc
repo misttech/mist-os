@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/async-loop/testing/cpp/real_loop.h"
-
 #include <lib/async-loop/default.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/zx/clock.h>
 
