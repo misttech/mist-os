@@ -329,15 +329,6 @@ struct zx_device
   inline void* ctx() const { return dfv2_symbol_.context; }
   void set_ctx(void* ctx) { dfv2_symbol_.context = ctx; }
 
-  cpp20::span<const char*> fidl_offers() { return {fidl_offers_.data(), fidl_offers_.size()}; }
-
-  void set_fidl_offers(cpp20::span<const char*> fidl_offers) {
-    fidl_offers_ = {fidl_offers.begin(), fidl_offers.end()};
-    inspect_->set_fidl_offers(fidl_offers);
-  }
-
-  std::vector<const char*> fidl_offers_;
-
   cpp20::span<const char*> fidl_service_offers() {
     return {fidl_service_offers_.data(), fidl_service_offers_.size()};
   }

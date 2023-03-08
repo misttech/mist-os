@@ -334,13 +334,12 @@ class DeviceAddArgsTest : public ::testing::Test {
                 right.performance_states[i].restore_latency);
     }
 
-    EXPECT_NE(left.fidl_protocol_offers, right.fidl_protocol_offers);
-    ASSERT_EQ(left.fidl_protocol_offer_count, right.fidl_protocol_offer_count);
-    for (size_t i = 0; i < left.fidl_protocol_offer_count; ++i) {
-      EXPECT_NE(left.fidl_protocol_offers[i], right.fidl_protocol_offers[i]);
-      EXPECT_STREQ(left.fidl_protocol_offers[i], right.fidl_protocol_offers[i]);
+    EXPECT_NE(left.fidl_service_offers, right.fidl_service_offers);
+    ASSERT_EQ(left.fidl_service_offer_count, right.fidl_service_offer_count);
+    for (size_t i = 0; i < left.fidl_service_offer_count; ++i) {
+      EXPECT_NE(left.fidl_service_offers[i], right.fidl_service_offers[i]);
+      EXPECT_STREQ(left.fidl_service_offers[i], right.fidl_service_offers[i]);
     }
-
   }
 
   const device_add_args_t original_args_ = {
@@ -350,8 +349,8 @@ class DeviceAddArgsTest : public ::testing::Test {
       .power_state_count = std::size(kPowerStates),
       .performance_states = kPerformanceStates,
       .performance_state_count = std::size(kPerformanceStates),
-      .fidl_protocol_offers = kFidlProtocolOffers,
-      .fidl_protocol_offer_count = std::size(kFidlProtocolOffers),
+      .fidl_service_offers = kFidlProtocolOffers,
+      .fidl_service_offer_count = std::size(kFidlProtocolOffers),
   };
 };
 

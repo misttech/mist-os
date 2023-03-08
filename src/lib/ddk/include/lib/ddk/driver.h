@@ -166,16 +166,6 @@ typedef struct device_add_args {
   // Optional custom protocol operations for this device
   const void* proto_ops;
 
-  // Optional list of fidl protocols to offer to child driver.
-  // These protocols will automatically be added as bind properties which may be used in
-  // bind rules.
-  // If provided, the `DEVICE_ADD_MUST_ISOLATE` flag must also be specified, and a proxy will not be
-  // spawned.
-  const char** fidl_protocol_offers;
-
-  // The number of elements in the above list.
-  size_t fidl_protocol_offer_count;
-
   // Optional list of fidl services to offer to child driver.
   // These service will automatically be added as bind properties which may be used in
   // bind rules.
@@ -457,17 +447,6 @@ static inline zx_status_t load_firmware(zx_device_t* device, const char* path, z
 // |protocol_name| automatically.
 zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
                                          zx_handle_t request);
-
-// Opens a connection to the specified FIDL protocol offered by |device|.
-//
-// |device| should be a composite device. |fragment_name| picks out the specific
-// fragment device to use; it must match the fragment name declared in the
-// composite device's bind file.
-//
-// Arguments are otherwise the same as for device_connect_fidl_protocol. The
-// ddktl equivalent is DdkConnectFragmentFidlProtocol.
-zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device, const char* fragment_name,
-                                                  const char* protocol_name, zx_handle_t request);
 
 // Opens a connection to the specified FIDL service offered by |device|.
 //

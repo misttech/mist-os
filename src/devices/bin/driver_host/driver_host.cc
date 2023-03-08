@@ -316,20 +316,6 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
     }
     str_props_list.push_back(convert_device_str_prop(add_args->str_props[i], allocator));
   }
-  for (const auto& offer : child->fidl_offers()) {
-    auto str_property = fuchsia_device_manager::wire::DeviceStrProperty{
-        .key = fidl::StringView(allocator, offer),
-        .value = fuchsia_device_manager::wire::PropertyValue::WithEnumValue(
-            allocator, std::string(offer) + ".ZirconTransport"),
-    };
-    str_props_list.push_back(str_property);
-
-    auto prop = fidl_offer_to_device_prop(offer);
-    if (prop) {
-      props_list.push_back(*prop);
-    }
-  }
-
   for (const auto& offer : child->fidl_service_offers()) {
     auto str_property = fuchsia_device_manager::wire::DeviceStrProperty{
         .key = fidl::StringView(allocator, offer),

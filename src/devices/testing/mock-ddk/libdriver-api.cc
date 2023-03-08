@@ -146,24 +146,6 @@ zx_status_t device_get_fragment_metadata(zx_device_t* device, const char* name, 
   return device_get_metadata(device, type, buf, buflen, actual);
 }
 
-__EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
-                                                  zx_handle_t request) {
-  if (!device) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return device->ConnectToFidlProtocol(protocol_name, zx::channel(request));
-}
-
-__EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
-                                                           const char* fragment_name,
-                                                           const char* protocol_name,
-                                                           zx_handle_t request) {
-  if (!device) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return device->ConnectToFidlProtocol(protocol_name, zx::channel(request), fragment_name);
-}
-
 __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
                                                    const char* protocol_name, zx_handle_t request) {
   if (!device) {

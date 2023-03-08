@@ -54,8 +54,8 @@ class DeviceAddArgs {
   std::optional<zx_protocol_device_t> ops_;
   std::vector<device_power_state_info_t> power_states_;
   std::vector<device_performance_state_info_t> performance_states_;
-  std::vector<std::string> fidl_protocol_offer_strings_;
-  std::vector<const char*> fidl_protocol_offers_;
+  std::vector<std::string> fidl_service_offer_strings_;
+  std::vector<const char*> fidl_service_offers_;
 };
 
 class FakeDevice {

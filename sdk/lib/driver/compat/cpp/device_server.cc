@@ -151,14 +151,4 @@ void DeviceServer::GetMetadata(GetMetadataCompleter::Sync& completer) {
       metadata.data(), metadata.size()));
 }
 
-void DeviceServer::ConnectFidl(ConnectFidlRequestView request,
-                               ConnectFidlCompleter::Sync& completer) {
-  if (service_offers_) {
-    auto path = std::string("svc/").append(request->name.data(), request->name.size());
-    fdio_service_connect_at(service_offers_->dir().channel()->get(), path.data(),
-                            request->server.release());
-  }
-  completer.Reply();
-}
-
 }  // namespace compat

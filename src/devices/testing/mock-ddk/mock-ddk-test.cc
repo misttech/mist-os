@@ -96,36 +96,6 @@ class TestDevice : public DeviceType {
     return zx::error(status);
   }
 
-  zx::result<zx::channel> ConnectToProtocol(const char* protocol_name) {
-    zx::channel client, server;
-    auto status = zx::channel::create(0, &client, &server);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-
-    status = device_connect_fidl_protocol(parent_, protocol_name, server.release());
-    if (status == ZX_OK) {
-      return zx::ok(std::move(client));
-    }
-    return zx::error(status);
-  }
-
-  zx::result<zx::channel> ConnectToFragmentProtocol(const char* fragment_name,
-                                                    const char* protocol_name) {
-    zx::channel client, server;
-    auto status = zx::channel::create(0, &client, &server);
-    if (status != ZX_OK) {
-      return zx::error(status);
-    }
-
-    status = device_connect_fragment_fidl_protocol(parent_, fragment_name, protocol_name,
-                                                   server.release());
-    if (status == ZX_OK) {
-      return zx::ok(std::move(client));
-    }
-    return zx::error(status);
-  }
-
   zx::result<std::vector<uint8_t>> GetMetadata(uint32_t type, size_t max_size) {
     std::vector<uint8_t> data(max_size);
     size_t actual;
@@ -526,46 +496,6 @@ class EchoServer : public fidl::WireServer<fidl_examples_echo::Echo> {
   }
 };
 
-TEST(MockDdk, SetFidlProtocol) {
-  auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
-  auto result = TestDevice::Bind(parent.get());
-  ASSERT_OK(result.status_value());
-  TestDevice* test_device = result.value();
-
-  constexpr char kFakeProtocolName[] = "Foo";
-  constexpr auto kEchoProtocolName = fidl::DiscoverableProtocolName<fidl_examples_echo::Echo>;
-
-  // Initially, the device will fail to get a protocol:
-  EXPECT_FALSE(test_device->ConnectToProtocol(kEchoProtocolName).is_ok());
-
-  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
-  EchoServer server;
-  // So we add the necessary protocol to the parent:
-  parent->AddFidlProtocol(kEchoProtocolName, [&](zx::channel request) {
-    server.Bind(loop.dispatcher(), fidl::ServerEnd<fidl_examples_echo::Echo>(std::move(request)));
-    return ZX_OK;
-  });
-
-  // Protocol is available after being set.
-  auto proto_result = test_device->ConnectToProtocol(kEchoProtocolName);
-  ASSERT_OK(proto_result.status_value());
-  ASSERT_TRUE(proto_result.value().is_valid());
-  fidl::WireClient client(fidl::ClientEnd<fidl_examples_echo::Echo>(std::move(*proto_result)),
-                          loop.dispatcher());
-
-  constexpr std::string_view kInput = "Test String";
-
-  client->EchoString(fidl::StringView::FromExternal(kInput))
-      .ThenExactlyOnce([&](fidl::WireUnownedResult<fidl_examples_echo::Echo::EchoString>& result) {
-        EXPECT_OK(result.status());
-        EXPECT_EQ(result.value().response.get(), kInput);
-      });
-  EXPECT_OK(loop.RunUntilIdle());
-
-  // Incorrect proto ids still fail.
-  EXPECT_FALSE(test_device->ConnectToProtocol(kFakeProtocolName).is_ok());
-}
-
 TEST(MockDdk, SetFidlService) {
   auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
   auto result = TestDevice::Bind(parent.get());
@@ -662,49 +592,6 @@ TEST(MockDdk, SetFragments) {
   // Mismatched fragment / protocol id:
   EXPECT_NE(device_get_fragment_protocol(parent.get(), "fragment 2", kFakeProtocolID, &protocol),
             ZX_OK);
-}
-
-// Fragments are devices that allow for protocols to come from different parents.
-TEST(MockDdk, SetFragmentsFidl) {
-  auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
-  auto result = TestDevice::Bind(parent.get());
-  ASSERT_TRUE(result.is_ok());
-  TestDevice* test_device = result.value();
-
-  constexpr char kFakeProtocolName[] = "Foo";
-  constexpr char kFakeProtocolName2[] = "Bar";
-
-  // Initially, the device will fail to get a protocol:
-  EXPECT_FALSE(test_device->ConnectToProtocol(kFakeProtocolName).is_ok());
-
-  // You can add protocols to new or existing fragments using AddProtocol:
-  parent->AddFidlProtocol(
-      kFakeProtocolName, [](zx::channel) { return ZX_OK; }, "fragment 1");
-  parent->AddFidlProtocol(
-      kFakeProtocolName2, [](zx::channel) { return ZX_OK; }, "fragment 2");
-
-  // Now, when querying the normal protocols, the device will fail to get a protocol:
-  EXPECT_FALSE(test_device->ConnectToProtocol(kFakeProtocolName).is_ok());
-
-  // But if you query a fragment protocol, it can succeed:
-  auto proto_result = test_device->ConnectToFragmentProtocol("fragment 1", kFakeProtocolName);
-  EXPECT_TRUE(proto_result.is_ok());
-  EXPECT_TRUE(proto_result.value().is_valid());
-
-  proto_result = test_device->ConnectToFragmentProtocol("fragment 2", kFakeProtocolName2);
-  EXPECT_TRUE(proto_result.is_ok());
-  EXPECT_TRUE(proto_result.value().is_valid());
-
-  // As expected, device_get_fragment_protocol will fail if you request a protocol id
-  // that is not present in the fragment, or a non-existing fragment:
-  // non-existing fragment:
-  EXPECT_FALSE(test_device->ConnectToFragmentProtocol("not a fragment", kFakeProtocolName).is_ok());
-
-  // Mismatched fragment / protocol id:
-  EXPECT_FALSE(test_device->ConnectToFragmentProtocol("fragment 1", kFakeProtocolName2).is_ok());
-
-  // Mismatched fragment / protocol id:
-  EXPECT_FALSE(test_device->ConnectToFragmentProtocol("fragment 2", kFakeProtocolName).is_ok());
 }
 
 // In case a device loads firmware as part of its initialization, MockDevice provides

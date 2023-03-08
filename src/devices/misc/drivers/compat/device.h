@@ -81,13 +81,10 @@ class Device : public std::enable_shared_from_this<Device>,
   zx::result<uint32_t> SetPerformanceStateOp(uint32_t state);
 
   void InitReply(zx_status_t status);
-  zx_status_t ConnectFragmentFidl(const char* fragment_name, const char* protocol_name,
-                                  zx::channel request);
   zx_status_t ConnectFragmentFidl(const char* fragment_name, const char* service_name,
                                   const char* protocol_name, zx::channel request);
   zx_status_t AddComposite(const char* name, const composite_device_desc_t* composite);
   zx_status_t AddCompositeNodeSpec(const char* name, const composite_node_spec_t* spec);
-  zx_status_t ConnectRuntime(const char* protocol_name, fdf::Channel request);
   // Connects to the runtime service using the v2 protocol discovery with tokens.
   zx_status_t ConnectRuntime(const char* service_name, const char* protocol_name,
                              fdf::Channel request);

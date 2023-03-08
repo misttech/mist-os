@@ -167,17 +167,10 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   // if you want to add a protocol to a fragment, add the fragment's name as 'name'.
   void AddProtocol(uint32_t id, const void* ops, void* ctx, const char* name = "");
 
-  // You can add FIDL protocols here to your device or your parent device.
-  // if you want to add a protocol to a fragment, add the fragment's name as 'name'.
-  // Devices will use `device_connect_fidl_protocol` or
-  // `device_connect_fragment_fidl_protocol` to connect to these protocols
-  void AddFidlProtocol(const char* protocol_name, mock_ddk::ConnectCallback callback,
-                       const char* name = "");
-
   // You can add FIDL service here to your device or your parent device.
   // if you want to add a service to a fragment, add the fragment's name as 'name'.
-  // Devices will use `device_connect_fidl_protocol` or
-  // `device_connect_fragment_fidl_protocol` to connect to these protocols
+  // Devices will use `device_connect_fidl_protocol2` or
+  // `device_connect_fragment_fidl_protocol2` to connect to these protocols
   void AddFidlService(const char* service_name, fidl::ClientEnd<fuchsia_io::Directory> ns,
                       const char* name = "");
 
@@ -248,15 +241,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
                                          void* protocol);
   friend zx_status_t device_get_fragment_protocol(zx_device_t* device, const char* fragment_name,
                                                   uint32_t proto_id, void* protocol);
-
-  zx_status_t ConnectToFidlProtocol(const char* protocol_name, zx::channel request,
-                                    const char* fragment_name = "");
-  friend zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
-                                                  zx_handle_t request);
-  friend zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
-                                                           const char* fragment_name,
-                                                           const char* protocol_name,
-                                                           zx_handle_t request);
 
   zx_status_t ConnectToFidlProtocol(const char* service_name, const char* protocol_name,
                                     zx::channel request, const char* fragment_name = "");

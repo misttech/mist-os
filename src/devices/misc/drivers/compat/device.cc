@@ -98,7 +98,7 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
     fidl::AnyArena& arena, fdf::Logger& logger, device_add_args_t* zx_args) {
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties;
   properties.reserve(zx_args->prop_count + zx_args->str_prop_count +
-                     zx_args->fidl_protocol_offer_count + 1);
+                     zx_args->fidl_service_offer_count + 1);
   bool has_protocol = false;
   for (auto [id, _, value] : cpp20::span(zx_args->props, zx_args->prop_count)) {
     properties.emplace_back(fdf::MakeProperty(arena, id, value));
@@ -124,17 +124,6 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
       default:
         FDF_LOGL(ERROR, logger, "Unsupported property type, key: %s", key);
         break;
-    }
-  }
-
-  for (auto value :
-       cpp20::span(zx_args->fidl_protocol_offers, zx_args->fidl_protocol_offer_count)) {
-    properties.emplace_back(
-        fdf::MakeProperty(arena, value, std::string(value) + ".ZirconTransport"));
-
-    auto property = fidl_offer_to_device_prop(arena, value);
-    if (property) {
-      properties.push_back(*property);
     }
   }
 
@@ -779,44 +768,6 @@ fpromise::promise<void, zx_status_t> Device::RebindToLibname(std::string_view li
   return promise;
 }
 
-zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* protocol_name,
-                                        zx::channel request) {
-  if (std::string_view(fragment_name) != "default") {
-    bool fragment_exists = false;
-    for (auto& fragment : fragments_) {
-      if (fragment == fragment_name) {
-        fragment_exists = true;
-        break;
-      }
-    }
-    if (!fragment_exists) {
-      FDF_LOG(ERROR, "Tried to connect to fragment '%s' but it's not in the fragment list",
-              fragment_name);
-      return ZX_ERR_NOT_FOUND;
-    }
-  }
-
-  auto connect_string = std::string(fuchsia_driver_compat::Service::Name)
-                            .append("/")
-                            .append(fragment_name)
-                            .append("/device");
-
-  auto device =
-      driver_->driver_namespace().Connect<fuchsia_driver_compat::Device>(connect_string.c_str());
-  if (device.status_value() != ZX_OK) {
-    FDF_LOG(ERROR, "Error connecting: %s", device.status_string());
-    return device.status_value();
-  }
-  auto result = fidl::WireCall(*device)->ConnectFidl(fidl::StringView::FromExternal(protocol_name),
-                                                     std::move(request));
-  if (result.status() != ZX_OK) {
-    FDF_LOG(ERROR, "Error calling connect fidl: %s", result.status_string());
-    return result.status();
-  }
-
-  return ZX_OK;
-}
-
 zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* service_name,
                                         const char* protocol_name, zx::channel request) {
   if (std::string_view(fragment_name) != "default") {
@@ -923,31 +874,6 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
     return result.status();
   }
 
-  return ZX_OK;
-}
-
-zx_status_t Device::ConnectRuntime(const char* protocol_name, fdf::Channel request) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework_deprecated::RuntimeConnector>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-  zx_status_t status = ConnectFragmentFidl(
-      "default",
-      fidl::DiscoverableProtocolName<fuchsia_driver_framework_deprecated::RuntimeConnector>,
-      endpoints->server.TakeChannel());
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Error connecting to RuntimeConnector protocol: %s",
-            zx_status_get_string(status));
-    return status;
-  }
-  auto result = fidl::WireCall(endpoints->client)
-                    ->Connect(fidl::StringView::FromExternal(protocol_name),
-                              fuchsia_driver_framework_deprecated::wire::RuntimeProtocolServerEnd{
-                                  request.release()});
-  if (result.status() != ZX_OK) {
-    FDF_LOG(ERROR, "Error calling RuntimeConnector::Connect fidl: %s", result.status_string());
-    return result.status();
-  }
   return ZX_OK;
 }
 

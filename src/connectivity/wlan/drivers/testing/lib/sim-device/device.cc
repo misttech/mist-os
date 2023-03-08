@@ -60,10 +60,10 @@ void DeviceAddArgs::CopyRawDeviceAddArgs(const device_add_args_t& args) {
     performance_states_.assign(args.performance_states,
                                args.performance_states + args.performance_state_count);
   }
-  fidl_protocol_offer_strings_.clear();
-  if (args.fidl_protocol_offers) {
-    fidl_protocol_offer_strings_.assign(args.fidl_protocol_offers,
-                                        args.fidl_protocol_offers + args.fidl_protocol_offer_count);
+  fidl_service_offer_strings_.clear();
+  if (args.fidl_service_offers) {
+    fidl_service_offer_strings_.assign(args.fidl_service_offers,
+                                       args.fidl_service_offers + args.fidl_service_offer_count);
   }
 
   // Update the raw pointers in our device_add_args_t to point to our locally copied data.
@@ -85,14 +85,13 @@ void DeviceAddArgs::SetRawPointers() {
   args_.performance_state_count = static_cast<uint8_t>(performance_states_.size());
 
   // This needs to be a two step process, we need to store the strings as std::strings to manage
-  // the memory and then we need to have an array of char* that fidl_protocol_offers can point to.
-  fidl_protocol_offers_.clear();
-  std::transform(fidl_protocol_offer_strings_.begin(), fidl_protocol_offer_strings_.end(),
-                 std::back_inserter(fidl_protocol_offers_),
+  // the memory and then we need to have an array of char* that fidl_service_offers can point to.
+  fidl_service_offers_.clear();
+  std::transform(fidl_service_offer_strings_.begin(), fidl_service_offer_strings_.end(),
+                 std::back_inserter(fidl_service_offers_),
                  [](const std::string& str) { return str.c_str(); });
-  args_.fidl_protocol_offers =
-      fidl_protocol_offers_.empty() ? nullptr : fidl_protocol_offers_.data();
-  args_.fidl_protocol_offer_count = static_cast<uint8_t>(fidl_protocol_offers_.size());
+  args_.fidl_service_offers = fidl_service_offers_.empty() ? nullptr : fidl_service_offers_.data();
+  args_.fidl_service_offer_count = static_cast<uint8_t>(fidl_service_offers_.size());
 }
 
 FakeDevice::FakeDevice(uint64_t id, zx_device_t* parent, device_add_args_t dev_args,

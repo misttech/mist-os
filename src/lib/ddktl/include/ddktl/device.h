@@ -416,11 +416,6 @@ class DeviceAddArgs {
     args_.outgoing_dir_channel = outgoing_dir.release();
     return *this;
   }
-  DeviceAddArgs& set_fidl_protocol_offers(cpp20::span<const char*> fidl_protocol_offers) {
-    args_.fidl_protocol_offers = fidl_protocol_offers.data();
-    args_.fidl_protocol_offer_count = fidl_protocol_offers.size();
-    return *this;
-  }
   DeviceAddArgs& set_fidl_service_offers(cpp20::span<const char*> fidl_service_offers) {
     args_.fidl_service_offers = fidl_service_offers.data();
     args_.fidl_service_offer_count = fidl_service_offers.size();
@@ -533,25 +528,6 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
 
   zx_status_t DdkGetFragmentProtocol(const char* name, uint32_t proto_id, void* out) {
     return device_get_fragment_protocol(zxdev(), name, proto_id, out);
-  }
-
-  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
-  zx_status_t DdkConnectFidlProtocol(
-      fidl::ServerEnd<Protocol> request,
-      const char* path = fidl::DiscoverableProtocolName<Protocol>) const {
-    static_assert(std::is_same_v<typename Protocol::Transport, fidl::internal::ChannelTransport>);
-
-    return device_connect_fidl_protocol(parent(), path, request.TakeChannel().release());
-  }
-
-  template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
-  zx_status_t DdkConnectFragmentFidlProtocol(
-      const char* fragment_name, fidl::ServerEnd<Protocol> request,
-      const char* path = fidl::DiscoverableProtocolName<Protocol>) const {
-    static_assert(std::is_same_v<typename Protocol::Transport, fidl::internal::ChannelTransport>);
-
-    return device_connect_fragment_fidl_protocol(parent(), fragment_name, path,
-                                                 request.TakeChannel().release());
   }
 
   template <typename ServiceMember,

@@ -51,7 +51,6 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   // fuchsia.driver.compat.Compat
   void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
   void GetMetadata(GetMetadataCompleter::Sync& completer) override;
-  void ConnectFidl(ConnectFidlRequestView request, ConnectFidlCompleter::Sync& completer) override;
 
   std::string name_;
   std::string topological_path_;

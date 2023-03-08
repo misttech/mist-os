@@ -144,9 +144,6 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
     dev->set_protocol_id(args->proto_id);
     dev->set_protocol_ops(args->proto_ops);
   }
-  if (args->fidl_protocol_offers) {
-    dev->set_fidl_offers({args->fidl_protocol_offers, args->fidl_protocol_offer_count});
-  }
   if (args->fidl_service_offers) {
     dev->set_fidl_service_offers({args->fidl_service_offers, args->fidl_service_offer_count});
   }
@@ -549,20 +546,6 @@ __EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const cha
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   return internal::ContextForApi()->ConnectFidlProtocol(fbl::RefPtr(device), {}, {}, protocol_name,
                                                         zx::channel{request});
-}
-
-__EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
-                                                           const char* fragment_name,
-                                                           const char* protocol_name,
-                                                           zx_handle_t request) {
-  DEBUG_ASSERT_VALID_DEVICE(device);
-  if (!fragment_name || !protocol_name) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  return internal::ContextForApi()->ConnectFidlProtocol(fbl::RefPtr(device), fragment_name, {},
-                                                        protocol_name, zx::channel{request});
 }
 
 __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, char* out,
