@@ -11,7 +11,17 @@
 # between inputs.
 
 readonly output="$1"
+
+if [[ -z "$output" ]]; then
+  echo output file not specified 1>&2
+  exit 1
+fi
+
 shift 1
+
+tmpfile=$( mktemp "${output}.XXXXXXXXXX" )
+trap 'rm -f "${tmpfile}"' EXIT
+
 for file in "$@"
 do
   while read line
@@ -20,4 +30,6 @@ do
       echo "${line}"
     fi
   done < "${file}"
-done > "${output}"
+done > "${tmpfile}"
+
+mv "${tmpfile}" "${output}"
