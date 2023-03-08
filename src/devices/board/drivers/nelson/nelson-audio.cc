@@ -16,6 +16,7 @@
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
@@ -41,30 +42,8 @@ using namespace fuchsia_driver_framework;
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
-static const zx_bind_inst_t out_i2c_match[] = {
-    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C),
-    BI_ABORT_IF(NE, BIND_I2C_BUS_ID, NELSON_I2C_3),
-    BI_MATCH_IF(EQ, BIND_I2C_ADDRESS, I2C_AUDIO_CODEC_ADDR),
-};
 
-static const device_fragment_part_t out_i2c_fragment[] = {
-    {std::size(out_i2c_match), out_i2c_match},
-};
-
-static const zx_bind_inst_t out_fault_gpio_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
-    BI_MATCH_IF(EQ, BIND_GPIO_PIN, GPIO_AUDIO_SOC_FAULT_L),
-};
-static const device_fragment_part_t out_fault_gpio_fragment[] = {
-    {std::size(out_fault_gpio_match), out_fault_gpio_match},
-};
-
-static const device_fragment_t codec_fragments[] = {
-    {"i2c", std::size(out_i2c_fragment), out_i2c_fragment},
-    {"gpio-fault", std::size(out_fault_gpio_fragment), out_fault_gpio_fragment},
-};
-
-// Composite node specifications.
+// Audio out controller composite node specifications.
 const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
@@ -89,6 +68,30 @@ const std::vector<fdf::NodeProperty> kOutCodecProps = std::vector{
 const std::vector<fdf::ParentSpec> kOutControllerParents = std::vector{
     fdf::ParentSpec{{kAudioEnableGpioRules, kAudioEnableGpioProps}},
     fdf::ParentSpec{{kOutCodecRules, kOutCodecProps}},
+};
+
+// Codec composite node specifications.
+const ddk::BindRule kOutI2cRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(NELSON_I2C_3)),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, static_cast<uint32_t>(I2C_AUDIO_CODEC_ADDR)),
+};
+const device_bind_prop_t kOutI2cProps[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                      bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
+    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                      bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS58XX),
+};
+
+const ddk::BindRule kFaultGpioRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_AUDIO_SOC_FAULT_L)),
+};
+const device_bind_prop_t kFaultGpioProps[] = {
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_FAULT),
 };
 
 zx_status_t Nelson::AudioInit() {
@@ -259,9 +262,6 @@ zx_status_t Nelson::AudioInit() {
   zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
   // I2S clocks are configured by the controller and the rest of the initialization is done
   // in the codec itself.
-
-  constexpr zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
-                                        {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS58xx}};
   metadata::ti::TasConfig tas_metadata = {};
   tas_metadata.bridged = true;
 #ifdef TAS5805M_CONFIG_PATH
@@ -283,18 +283,12 @@ zx_status_t Nelson::AudioInit() {
           .length = sizeof(tas_metadata),
       },
   };
-  composite_device_desc_t codec_desc = {};
-  codec_desc.props = props;
-  codec_desc.props_count = std::size(props);
-  codec_desc.spawn_colocated = false;
-  codec_desc.fragments = codec_fragments;
-  codec_desc.fragments_count = std::size(codec_fragments);
-  codec_desc.primary_fragment = "i2c";
-  codec_desc.metadata_list = codec_metadata;
-  codec_desc.metadata_count = std::size(codec_metadata);
-  status = DdkAddComposite("audio-tas58xx", &codec_desc);
+  status =
+      DdkAddCompositeNodeSpec("audio-tas58xx", ddk::CompositeNodeSpec(kOutI2cRules, kOutI2cProps)
+                                                   .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
+                                                   .set_metadata(codec_metadata));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAddComposite failed: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "%s DdkAddCompositeNodeSpec failed %d", __FILE__, status);
     return status;
   }
   {
