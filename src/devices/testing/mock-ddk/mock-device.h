@@ -86,7 +86,6 @@ using ConnectCallback = fit::function<zx_status_t(zx::channel)>;
 // The following libdriver calls:
 //   device_open_protocol_session_multibindable
 //   device_get_profile
-//   device_get_deadline_profile
 //   device_fidl_transaction_take_ownership
 //   get_root_resource
 // This needs to be a struct, not a class, to match the public definition

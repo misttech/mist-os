@@ -50,8 +50,6 @@ class Driver : public fdf::DriverBase {
   // is done.
   zx_status_t AddDevice(Device* parent, device_add_args_t* args, zx_device_t** out);
   zx::result<zx::profile> GetSchedulerProfile(uint32_t priority, const char* name);
-  zx::result<zx::profile> GetDeadlineProfile(uint64_t capacity, uint64_t deadline, uint64_t period,
-                                             const char* name);
   zx::result<> SetProfileByRole(zx::unowned_thread thread, std::string_view role);
   zx::result<std::string> GetVariable(const char* name);
 

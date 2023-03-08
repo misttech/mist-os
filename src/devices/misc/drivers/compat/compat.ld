@@ -10,7 +10,6 @@
     device_suspend_reply;
     device_resume_reply;
     device_get_profile;
-    device_get_deadline_profile;
     device_set_profile_by_role;
     device_get_protocol;
     device_open_protocol_session_multibindable;

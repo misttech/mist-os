@@ -300,15 +300,6 @@ void device_resume_reply(zx_device_t* device, zx_status_t status, uint8_t out_po
 zx_status_t device_get_profile(zx_device_t* device, uint32_t priority, const char* name,
                                zx_handle_t* out_profile);
 
-// Retrieves a deadline profile handle into |out_profile| from the scheduler for
-// the given deadline parameters.  See |device_get_profile|
-//
-// TODO(fxbug.dev/40858): This API will be deprecated and removed in the future, use
-// device_set_profile_by_role instead.
-zx_status_t device_get_deadline_profile(zx_device_t* device, uint64_t capacity, uint64_t deadline,
-                                        uint64_t period, const char* name,
-                                        zx_handle_t* out_profile);
-
 // Requests that the given thread be assigned a profile with parameters appropriate for the given
 // role. The available roles and the specific parameters assigned are device-dependent and may also
 // vary across builds. Requests are not guaranteed to be honored for all roles and requestors, and

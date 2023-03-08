@@ -179,13 +179,7 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
 
   void GetDeadlineProfile(GetDeadlineProfileRequestView request,
                           GetDeadlineProfileCompleter::Sync& completer) override {
-    if (get_deadline_profile_callback_) {
-      get_deadline_profile_callback_(request);
-    }
-    completer.Reply(ZX_OK, zx::profile());
-  }
-  void SetGetDeadlineProfileCallback(std::function<void(GetDeadlineProfileRequestView&)> cb) {
-    get_deadline_profile_callback_ = std::move(cb);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, zx::profile());
   }
 
   void SetProfileByRole(SetProfileByRoleRequestView request,
@@ -205,7 +199,6 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
 
  private:
   std::function<void(uint32_t, std::string_view)> get_profile_callback_;
-  std::function<void(GetDeadlineProfileRequestView&)> get_deadline_profile_callback_;
   std::function<void(SetProfileByRoleRequestView&)> set_profile_by_role_callback_;
 };
 
@@ -712,34 +705,6 @@ TEST_F(DriverTest, GetProfile) {
 
   zx_handle_t out_profile;
   ASSERT_EQ(ZX_OK, device_get_profile(v1_test->zxdev, 10, "test-profile", &out_profile));
-
-  UnbindAndFreeDriver(std::move(driver));
-}
-
-TEST_F(DriverTest, GetDeadlineProfile) {
-  profile_provider_.SetGetDeadlineProfileCallback(
-      [](TestProfileProvider::GetDeadlineProfileRequestView& rv) {
-        ASSERT_EQ(10u, rv->capacity);
-        ASSERT_EQ(20u, rv->deadline);
-        ASSERT_EQ(30u, rv->period);
-        std::string_view sv(rv->name.data(), rv->name.size());
-        ASSERT_EQ("test-profile", sv);
-      });
-
-  zx_protocol_device_t ops{
-      .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-  };
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops);
-  // Verify that v1_test.so has added a child device.
-  WaitForChildDeviceAdded();
-
-  // Verify that v1_test.so has set a context.
-  std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
-  ASSERT_NE(nullptr, v1_test.get());
-
-  zx_handle_t out_profile;
-  ASSERT_EQ(ZX_OK,
-            device_get_deadline_profile(v1_test->zxdev, 10, 20, 30, "test-profile", &out_profile));
 
   UnbindAndFreeDriver(std::move(driver));
 }

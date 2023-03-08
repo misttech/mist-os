@@ -41,19 +41,6 @@ __EXPORT zx_status_t device_get_profile(zx_device_t* dev, uint32_t priority, con
   return profile.status_value();
 }
 
-__EXPORT zx_status_t device_get_deadline_profile(zx_device_t* device, uint64_t capacity,
-                                                 uint64_t deadline, uint64_t period,
-                                                 const char* name, zx_handle_t* out_profile) {
-  if (device == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  auto profile = device->driver()->GetDeadlineProfile(capacity, deadline, period, name);
-  if (profile.is_ok()) {
-    *out_profile = profile->release();
-  }
-  return profile.status_value();
-}
-
 __EXPORT zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread,
                                                 const char* role, size_t role_size) {
   if (device == nullptr) {
