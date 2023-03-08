@@ -192,7 +192,7 @@ impl CrashReportHandler {
     async fn send_crash_report(
         proxy: &fidl_feedback::CrashReporterProxy,
         payload: SnapshotRequest,
-    ) -> Result<(), Error> {
+    ) -> Result<fidl_feedback::FileReportResults, Error> {
         warn!("Filing crash report, signature '{}'", payload.signature);
         let report = fidl_feedback::CrashReport {
             program_name: Some(CRASH_PROGRAM_NAME.to_string()),
@@ -201,8 +201,9 @@ impl CrashReportHandler {
             ..fidl_feedback::CrashReport::EMPTY
         };
 
-        let result = proxy.file(report).await.map_err(|e| format_err!("IPC error: {}", e))?;
-        result.map_err(|e| format_err!("Service error: {}", e))
+        let result =
+            proxy.file_report(report).await.map_err(|e| format_err!("IPC error: {}", e))?;
+        result.map_err(|e| format_err!("Service error: {:?}", e))
     }
 }
 
@@ -232,7 +233,7 @@ mod tests {
             .unwrap();
 
         // Verify the fake service receives the crash report with expected data
-        if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder: _, report })) =
+        if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder: _, report })) =
             stream.try_next().await
         {
             assert_eq!(
@@ -289,11 +290,11 @@ mod tests {
         );
 
         // Verify the signature of the first crash report
-        if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder, report })) =
+        if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder, report })) =
             stream.try_next().await
         {
             // Send a reply to allow the node to process the next crash report
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {
@@ -308,11 +309,11 @@ mod tests {
         }
 
         // Verify the signature of the second crash report
-        if let Ok(Some(fidl_feedback::CrashReporterRequest::File { responder, report })) =
+        if let Ok(Some(fidl_feedback::CrashReporterRequest::FileReport { responder, report })) =
             stream.try_next().await
         {
             // Send a reply to allow the node to process the next crash report
-            let _ = responder.send(&mut Ok(()));
+            let _ = responder.send(&mut Ok(fidl_feedback::FileReportResults::EMPTY));
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {
