@@ -436,3 +436,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0209_memory_priority_profiles.md
   - title: "RFC-0210: Virtualization Capability Routing"
     path: /docs/contribute/governance/rfcs/0210_virtualization_capability_routing.md
+  - title: "RFC-0212: Package Sets"
+    path: /docs/contribute/governance/rfcs/0212_package_sets.md

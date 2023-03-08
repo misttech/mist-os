@@ -2749,3 +2749,16 @@
   reviewers: ['aaronwood@google.com', 'abdulla@google.com', 'alerad@google.com', 'jsankey@google.com', 'ypomortsev@google.com' ]
   submitted: '2022-11-07'
   reviewed: '2023-02-23'
+
+- name: 'RFC-0212'
+  title: 'Package Sets'
+  short_description: 'Proposes a series of changes to the definition and menu of package sets on Fuchsia'
+  authors: ['jsankey@google.com']
+  file: '0212_package_sets.md'
+  area: ['Software Delivery']
+  issue: ['110948']
+  gerrit_change_id: ['794079']
+  status: 'Accepted'
+  reviewers: ['aaronwood@google.com', 'aminuttam@google.com', 'markdittmer@google.com', 'marvinpaul@google.com', 'sethladd@google.com', 'wittrock@google.com']
+  submitted: '2022-11-17'
+  reviewed: '2023-03-07'
