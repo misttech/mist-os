@@ -57,7 +57,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:23/aml-video-enc",
       "sys/platform/05:04:17/mali/aml-gpu",
       "sys/platform/05:04:13/sherlock-audio-pdm-in",
-      "sys/platform/05:04:12:1/sherlock-i2s-audio-out",
+      "sys/platform/05:04:12:1/aml_tdm/sherlock-audio-i2s-out",
       "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch",
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0",

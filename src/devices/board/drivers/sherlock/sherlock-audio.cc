@@ -9,8 +9,15 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <string.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/codec/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
 #include <soc/aml-meson/g12b-clk.h>
@@ -36,6 +43,10 @@
 #include "src/devices/board/drivers/sherlock/sherlock-dai-test-out-bind.h"
 #endif
 #endif
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -101,52 +112,42 @@ zx_status_t Sherlock::AudioInit() {
   const char* product_name = "sherlock";
   constexpr size_t device_name_max_length = 32;
 
-  // TODO(fxb/84194): Migrate remaining fragments once a solution for
-  // dynamic binding is figured out.
-  constexpr zx_bind_inst_t enable_gpio_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
-      BI_MATCH_IF(EQ, BIND_GPIO_PIN, GPIO_SOC_AUDIO_EN),
-  };
-  constexpr zx_bind_inst_t codec_woofer_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS5720),
-      BI_MATCH_IF(EQ, BIND_CODEC_INSTANCE, 1),
-  };
-  constexpr zx_bind_inst_t codec_tweeter_left_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS5720),
-      BI_MATCH_IF(EQ, BIND_CODEC_INSTANCE, 2),
-  };
-  constexpr zx_bind_inst_t codec_tweeter_right_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS5720),
-      BI_MATCH_IF(EQ, BIND_CODEC_INSTANCE, 3),
-  };
+  std::vector<fdf::ParentSpec> sherlock_tdm_i2s_parents;
+  sherlock_tdm_i2s_parents.reserve(4);
 
-  const device_fragment_part_t enable_gpio_fragment[] = {
-      {std::size(enable_gpio_match), enable_gpio_match},
+  // Add a spec for the enable audio GPIO pin.
+  auto enable_audio_gpio_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
   };
+  auto enable_audio_gpio_props = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_ENABLE),
+  };
+  sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{
+      .bind_rules = enable_audio_gpio_rules,
+      .properties = enable_audio_gpio_props,
+  }});
 
-  // Fragment to be used by the controller, pointing to the codecs.
-  const device_fragment_part_t codec_woofer_fragment[] = {
-      {std::size(codec_woofer_match), codec_woofer_match},
-  };
-  const device_fragment_part_t codec_tweeter_left_fragment[] = {
-      {std::size(codec_tweeter_left_match), codec_tweeter_left_match},
-  };
-  const device_fragment_part_t codec_tweeter_right_fragment[] = {
-      {std::size(codec_tweeter_right_match), codec_tweeter_right_match},
-  };
-
-  const device_fragment_t sherlock_tdm_i2s_fragments[] = {
-      {"gpio-enable", std::size(enable_gpio_fragment), enable_gpio_fragment},
-      {"codec-01", std::size(codec_woofer_fragment), codec_woofer_fragment},
-      {"codec-02", std::size(codec_tweeter_left_fragment), codec_tweeter_left_fragment},
-      {"codec-03", std::size(codec_tweeter_right_fragment), codec_tweeter_right_fragment},
-  };
+  // Add a spec for the woofer, left tweeter, and right tweeter in that order.
+  for (size_t i = 0; i < 3; i++) {
+    auto codec_rules = std::vector{
+        fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                                bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
+        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                                bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS5720),
+        fdf::MakeAcceptBindRule(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
+    };
+    auto codec_props = std::vector{
+        fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+        fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
+    };
+    sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{
+        .bind_rules = codec_rules,
+        .properties = codec_props,
+    }});
+  }
 
   zx_status_t status = clk_impl_.Disable(g12b_clk::CLK_HIFI_PLL);
   if (status != ZX_OK) {
@@ -311,9 +312,9 @@ zx_status_t Sherlock::AudioInit() {
   char name[device_name_max_length];
   snprintf(name, sizeof(name), "%s-i2s-audio-out", product_name);
   tdm_dev.name() = name;
-  tdm_dev.vid() = PDEV_VID_AMLOGIC;
-  tdm_dev.pid() = PDEV_PID_AMLOGIC_T931;
-  tdm_dev.did() = PDEV_DID_AMLOGIC_TDM;
+  tdm_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  tdm_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
+  tdm_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_TDM;
   tdm_dev.instance_id() = tdm_instance_id++;
   tdm_dev.mmio() = audio_mmios;
   tdm_dev.bti() = tdm_btis;
@@ -323,18 +324,19 @@ zx_status_t Sherlock::AudioInit() {
   {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('AUDI');
-    auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-        fidl::ToWire(fidl_arena, tdm_dev),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, sherlock_tdm_i2s_fragments,
-                                                 std::size(sherlock_tdm_i2s_fragments)),
-        {});
+    auto sherlock_tdm_i2s_spec = fdf::CompositeNodeSpec{{
+        .name = name,
+        .parents = sherlock_tdm_i2s_parents,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+        fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, sherlock_tdm_i2s_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
-             __func__, result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(tdm_dev) request failed: %s",
+             result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s", __func__,
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(tdm_dev) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }

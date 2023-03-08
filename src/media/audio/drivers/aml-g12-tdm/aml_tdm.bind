@@ -2,15 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.amlogic.platform;
+composite aml_tdm;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TDM;
-accept fuchsia.BIND_PLATFORM_DEV_PID {
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A1,
+using fuchsia.amlogic.platform;
+using fuchsia.codec;
+using fuchsia.gpio;
+using fuchsia.platform;
+
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.TDM;
+  accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A5,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A1,
+  }
+}
+
+node "gpio-enable" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.SOC_AUDIO_ENABLE;
+}
+
+node "codec-01" {
+  fuchsia.BIND_PROTOCOL == fuchsia.codec.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_CODEC_INSTANCE == 1;
+}
+
+optional node "codec-02" {
+  fuchsia.BIND_PROTOCOL == fuchsia.codec.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_CODEC_INSTANCE == 2;
+}
+
+optional node "codec-03" {
+  fuchsia.BIND_PROTOCOL == fuchsia.codec.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_CODEC_INSTANCE == 3;
 }

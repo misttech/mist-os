@@ -9,7 +9,14 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/codec/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
 #include <soc/aml-meson/sm1-clk.h>
@@ -25,6 +32,10 @@
 #include TAS5805M_CONFIG_PATH
 #endif
 
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
+
 // Enables BT PCM audio.
 #define ENABLE_BT
 
@@ -35,29 +46,14 @@ static const zx_bind_inst_t out_i2c_match[] = {
     BI_ABORT_IF(NE, BIND_I2C_BUS_ID, NELSON_I2C_3),
     BI_MATCH_IF(EQ, BIND_I2C_ADDRESS, I2C_AUDIO_CODEC_ADDR),
 };
-static const zx_bind_inst_t out_codec_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-    BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS58xx),
-};
 
 static const device_fragment_part_t out_i2c_fragment[] = {
     {std::size(out_i2c_match), out_i2c_match},
 };
-static const device_fragment_part_t out_codec_fragment[] = {
-    {std::size(out_codec_match), out_codec_match},
-};
 
-static const zx_bind_inst_t out_enable_gpio_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
-    BI_MATCH_IF(EQ, BIND_GPIO_PIN, GPIO_SOC_AUDIO_EN),
-};
 static const zx_bind_inst_t out_fault_gpio_match[] = {
     BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
     BI_MATCH_IF(EQ, BIND_GPIO_PIN, GPIO_AUDIO_SOC_FAULT_L),
-};
-static const device_fragment_part_t out_enable_gpio_fragment[] = {
-    {std::size(out_enable_gpio_match), out_enable_gpio_match},
 };
 static const device_fragment_part_t out_fault_gpio_fragment[] = {
     {std::size(out_fault_gpio_match), out_fault_gpio_match},
@@ -67,9 +63,32 @@ static const device_fragment_t codec_fragments[] = {
     {"i2c", std::size(out_i2c_fragment), out_i2c_fragment},
     {"gpio-fault", std::size(out_fault_gpio_fragment), out_fault_gpio_fragment},
 };
-static const device_fragment_t controller_fragments[] = {
-    {"gpio-enable", std::size(out_enable_gpio_fragment), out_enable_gpio_fragment},
-    {"codec-01", std::size(out_codec_fragment), out_codec_fragment},
+
+// Composite node specifications.
+const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
+};
+const std::vector<fdf::NodeProperty> kAudioEnableGpioProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_ENABLE),
+};
+
+const std::vector<fdf::BindRule> kOutCodecRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                            bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                            bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS58XX),
+};
+const std::vector<fdf::NodeProperty> kOutCodecProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(1)),
+};
+
+const std::vector<fdf::ParentSpec> kOutControllerParents = std::vector{
+    fdf::ParentSpec{{kAudioEnableGpioRules, kAudioEnableGpioProps}},
+    fdf::ParentSpec{{kOutCodecRules, kOutCodecProps}},
 };
 
 zx_status_t Nelson::AudioInit() {
@@ -279,18 +298,19 @@ zx_status_t Nelson::AudioInit() {
     return status;
   }
   {
-    auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-        fidl::ToWire(fidl_arena, controller_out),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, controller_fragments,
-                                                 std::size(controller_fragments)),
-        {});
+    auto controller_out_spec = fdf::CompositeNodeSpec{{
+        "nelson-i2s-audio-out-tdm",
+        kOutControllerParents,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+        fidl::ToWire(fidl_arena, controller_out), fidl::ToWire(fidl_arena, controller_out_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(controller_out) request failed: %s",
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(controller_out) request failed: %s",
              result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "AddCompositeImplicitPbusFragment Audio(controller_out) failed: %s",
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(controller_out) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }

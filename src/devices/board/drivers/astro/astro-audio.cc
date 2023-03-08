@@ -9,7 +9,14 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/codec/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
 #include <soc/aml-common/aml-audio.h>
 #include <soc/aml-meson/g12a-clk.h>
@@ -44,11 +51,15 @@ static const device_fragment_t tdm_pcm_fragments[] = {};
 #include TAS2770_CONFIG_PATH
 #endif
 
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
+
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-constexpr uint32_t kCodecVid = PDEV_VID_TI;
-constexpr uint32_t kCodecDid = PDEV_DID_TI_TAS2770;
+constexpr uint32_t kCodecVid = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
+constexpr uint32_t kCodecDid = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS2770;
 
 static const std::vector<fpbus::Mmio> audio_mmios{
     {{
@@ -94,27 +105,28 @@ static const std::vector<fpbus::Bti> tdm_btis{
     }},
 };
 
-static const zx_bind_inst_t enable_gpio_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
-    BI_MATCH_IF(EQ, BIND_GPIO_PIN, GPIO_SOC_AUDIO_EN),
+const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
+};
+const std::vector<fdf::NodeProperty> kAudioEnableGpioProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_ENABLE),
 };
 
-static const zx_bind_inst_t codec_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-    BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, kCodecVid),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, kCodecDid),
+const std::vector<fdf::BindRule> kCodecRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, kCodecVid),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, kCodecDid),
+};
+const std::vector<fdf::NodeProperty> kCodecProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(1)),
 };
 
-static const device_fragment_part_t enable_gpio_fragment[] = {
-    {std::size(enable_gpio_match), enable_gpio_match},
-};
-static const device_fragment_part_t codec_fragment[] = {
-    {std::size(codec_match), codec_match},
-};
-
-static const device_fragment_t tdm_i2s_fragments[] = {
-    {"gpio-enable", std::size(enable_gpio_fragment), enable_gpio_fragment},
-    {"codec-01", std::size(codec_fragment), codec_fragment},
+const std::vector<fdf::ParentSpec> kTdmI2sSpec = std::vector{
+    fdf::ParentSpec{{kAudioEnableGpioRules, kAudioEnableGpioProps}},
+    fdf::ParentSpec{{kCodecRules, kCodecProps}},
 };
 
 zx_status_t Astro::AudioInit() {
@@ -380,19 +392,18 @@ zx_status_t Astro::AudioInit() {
     tdm_dev.bti() = tdm_btis;
     tdm_dev.irq() = frddr_b_irqs;
     tdm_dev.metadata() = tdm_metadata;
-    auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-        fidl::ToWire(fidl_arena, tdm_dev),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, tdm_i2s_fragments,
-                                                 std::size(tdm_i2s_fragments)),
-        {});
+    auto tdm_spec = fdf::CompositeNodeSpec{{
+        "astro-i2s-audio-out-tdm",
+        kTdmI2sSpec,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
+                                                            fidl::ToWire(fidl_arena, tdm_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment request failed: %s", __func__,
-             result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s", result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
+      zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", zx_status_get_string(result->error_value()));
       return result->error_value();
     }
   }
