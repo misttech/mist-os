@@ -102,7 +102,8 @@ class TestBundle {
     }
 
     final bool incrementalEnabled =
-        (testsConfig.fxEnv.isFeatureEnabled('incremental') ||
+        (testsConfig.fxEnv.isFeatureEnabled('fxtest_auto_publishes_packages') ||
+            testsConfig.fxEnv.isFeatureEnabled('incremental') ||
             testsConfig.fxEnv.isFeatureEnabled('incremental_new') ||
             testsConfig.fxEnv.isFeatureEnabled('incremental_legacy'));
 

@@ -5,6 +5,7 @@
 
 function list_optional_features {
   echo \
+    "fxtest_auto_publishes_packages" \
     "incremental" \
     "incremental_legacy" \
     "incremental_new" \
@@ -14,6 +15,7 @@ function list_optional_features {
 # Return 0 (true) if the default of the given feature is enabled, 1 (false) otherwise.
 function is_feature_enabled_by_default {
   case "$1" in
+  "fxtest_auto_publishes_publishes") return 0;;
   "incremental") return 1 ;;
   "incremental_legacy") return 1 ;;
   "incremental_new") return 1 ;;
@@ -28,6 +30,12 @@ _FX_INDENT="      "
 function help_optional_feature {
   local h=()
   case "$1" in
+  "fxtest_auto_publishes_packages")
+    h=(
+      "Enables 'fx test' to automatically publish packages to the package"
+      "repository server."
+      )
+    ;;
   "incremental_legacy")
     h=(
       "Packages are published and served incrementally by 'fx serve-updates'"
