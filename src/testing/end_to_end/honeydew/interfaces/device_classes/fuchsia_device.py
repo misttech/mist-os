@@ -8,7 +8,7 @@ import abc
 import os
 from typing import Optional
 
-from honeydew import custom_types
+from honeydew import custom_types, errors
 from honeydew.interfaces.affordances import component
 from honeydew.utils import ffx_cli, properties
 
@@ -34,6 +34,9 @@ class FuchsiaDevice(abc.ABC):
 
         device_ip_address: Device IP (V4|V6) address. If not provided, attempts
             to resolve automatically.
+
+    Raises:
+        errors.FuchsiaDeviceError: Failed to instantiate.
     """
 
     def __init__(
@@ -43,7 +46,7 @@ class FuchsiaDevice(abc.ABC):
             ssh_user: str = DEFAULT_SSH_USER,
             device_ip_address: Optional[str] = None) -> None:
         if not ssh_pkey:
-            raise RuntimeError(
+            raise errors.FuchsiaDeviceError(
                 "ssh_pkey arg is not valid. This is needed to SSH into fuchsia "
                 "device. Please either pass ssh_pkey or set this value in "
                 "'SSH_PRIVATE_KEY_FILE' environmental variable")

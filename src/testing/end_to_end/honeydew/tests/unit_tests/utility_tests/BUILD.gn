@@ -34,13 +34,13 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+}
 
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":ffx_cli_test($host_toolchain)",
-      ":host_utils_test($host_toolchain)",
-      ":http_utils_test($host_toolchain)",
-    ]
-  }
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":ffx_cli_test($host_toolchain)",
+    ":host_utils_test($host_toolchain)",
+    ":http_utils_test($host_toolchain)",
+  ]
 }

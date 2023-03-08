@@ -14,14 +14,14 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+}
 
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":init_test($host_toolchain)",
-      "affordances_tests:tests",
-      "device_class_tests:tests",
-      "utility_tests:tests",
-    ]
-  }
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":init_test($host_toolchain)",
+    "affordances_tests:tests",
+    "device_class_tests:tests",
+    "utility_tests:tests",
+  ]
 }

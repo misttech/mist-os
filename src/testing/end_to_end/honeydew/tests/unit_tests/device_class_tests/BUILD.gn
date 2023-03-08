@@ -14,9 +14,9 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+}
 
-  group("tests") {
-    testonly = true
-    public_deps = [ ":fuchsia_device_base_test($host_toolchain)" ]
-  }
+group("tests") {
+  testonly = true
+  public_deps = [ ":fuchsia_device_base_test($host_toolchain)" ]
 }

@@ -46,7 +46,8 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it returns default
         fuchsia device object."""
         device_name = "fuchsia-emulator"
-        fd_obj = honeydew.create_device(device_name=device_name)
+        fd_obj = honeydew.create_device(
+            device_name=device_name, ssh_pkey="/tmp/pkey")
 
         self.assertIsInstance(
             fd_obj, generic_fuchsia_device.GenericFuchsiaDevice)
@@ -76,7 +77,8 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it returns a specific
         fuchsia device object."""
         device_name = "fuchsia-emulator"
-        fd_obj = honeydew.create_device(device_name=device_name)
+        fd_obj = honeydew.create_device(
+            device_name=device_name, ssh_pkey="/tmp/pkey")
 
         self.assertIsInstance(fd_obj, x64.X64)
 

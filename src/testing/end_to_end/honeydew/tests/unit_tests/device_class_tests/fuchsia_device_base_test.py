@@ -91,12 +91,6 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         [
             (
                 {
-                    "label": "no_optional_params",
-                    "device_name": _INPUT_ARGS["device_name"],
-                    "optional_params": {},
-                },),
-            (
-                {
                     "label": "all_optional_params",
                     "device_name": _INPUT_ARGS["device_name"],
                     "optional_params":
@@ -168,6 +162,13 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             mock_get_target_address.assert_called_once()
         else:
             mock_get_target_address.assert_not_called()
+
+    def test_fuchsia_device_base_init_exception_when_no_ssh_pkey(self):
+        """Test case for FuchsiaDeviceBase class instantiation when ssh_pkey
+        arg is None."""
+        with self.assertRaises(errors.FuchsiaDeviceError):
+            fuchsia_device_base.FuchsiaDeviceBase(
+                device_name=_INPUT_ARGS["device_name"], ssh_pkey=None)
 
     # List all the tests related to static properties in alphabetical order
     @mock.patch.object(
