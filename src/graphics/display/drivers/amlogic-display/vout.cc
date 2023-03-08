@@ -314,8 +314,7 @@ zx_status_t Vout::OnDisplaysChanged(added_display_info_t& info) {
 zx_status_t Vout::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count) {
   switch (type_) {
     case kHdmi:
-      hdmi_.hdmi_host->EdidTransfer(op_list, op_count);
-      return ZX_OK;
+      return hdmi_.hdmi_host->EdidTransfer(op_list, op_count);
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
