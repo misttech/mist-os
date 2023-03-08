@@ -139,5 +139,15 @@ template("run_target_test_and_host_script") {
       deps = []
     }
     deps += _data_deps
+
+    metadata = {
+      # Since <target_name> is added automatically to tests.json and will invoke
+      # <test_package> at runtime, ensure that the latter does not appear in that
+      # file too. This prevents the test package from being run twice when all
+      # tests are run on infra.
+      #
+      # This is used by the //:tests build_api_module() target.
+      tests_barrier = []
+    }
   }
 }

@@ -452,6 +452,9 @@ template("test_spec") {
                              "assert_no_deps",
                            ])
     metadata = {
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
       tests = [ test_spec ]
     }
     deps = target_name_deps

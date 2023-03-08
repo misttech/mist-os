@@ -110,6 +110,7 @@ template("python_host_test") {
     forward_variables_from(invoker,
                            [
                              "environments",
+                             "metadata",
                              "visibility",
                            ])
 

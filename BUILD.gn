@@ -762,6 +762,7 @@ build_api_module("prebuilt_package_flavors") {
 build_api_module("tests") {
   testonly = true
   data_keys = [ "tests" ]
+  walk_keys = [ "tests_barrier" ]
   deps = [
     # Pull in tests from host_labels.
     "//:host",
