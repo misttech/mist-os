@@ -14,13 +14,13 @@
 
     // The URL of the component to start as monitor time source. If unset, no
     // monitor time source is started.
-    monitor_time_source_url: "",
+    monitor_time_source_url: "fuchsia-pkg://fuchsia.com/httpsdate-time-source-pull#meta/httpsdate_time_source.cm",
 
     // Default value is 1Hz, i.e. one million parts per million.
     initial_frequency_ppm: 1000000,
 
     // Don't use monitor track by default.
-    monitor_uses_pull: false,
+    monitor_uses_pull: true,
 
     // Don't use pull by default.
     primary_uses_pull: false,
