@@ -8,7 +8,6 @@ import("//build/packages/package_metadata.gni")
 import("//build/product.gni")
 import("//build/security.gni")
 import("//src/sys/pkg/bin/package-tool/package-tool.gni")
-import("//src/sys/pkg/bin/pm/pm.gni")
 import("//src/sys/pkg/bin/system-updater/epoch/generate_epoch.gni")
 import("//src/sys/pkg/repositories/devhost/devhost.gni")
 
