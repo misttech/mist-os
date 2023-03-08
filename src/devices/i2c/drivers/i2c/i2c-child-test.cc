@@ -491,7 +491,7 @@ TEST_F(I2cChildTest, BusId) {
   ASSERT_OK(read.status());
   ASSERT_FALSE(read->is_error());
 
-  EXPECT_EQ(actual_bus_id, 3);
+  EXPECT_EQ(actual_bus_id, 0);
 }
 
 }  // namespace i2c

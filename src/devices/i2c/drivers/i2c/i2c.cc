@@ -38,16 +38,14 @@ zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  const uint32_t bus_id = decoded->has_bus_id() ? decoded->bus_id() : 0;
-
   uint64_t max_transfer_size = 0;
-  if (zx_status_t status = i2c.GetMaxTransferSize(bus_id, &max_transfer_size); status != ZX_OK) {
+  if (zx_status_t status = i2c.GetMaxTransferSize(0, &max_transfer_size); status != ZX_OK) {
     zxlogf(ERROR, "Failed to get max transfer size: %s", zx_status_get_string(status));
     return status;
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<I2cDevice> device(new (&ac) I2cDevice(parent, bus_id, max_transfer_size, i2c));
+  std::unique_ptr<I2cDevice> device(new (&ac) I2cDevice(parent, max_transfer_size, i2c));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -106,7 +104,7 @@ void I2cDevice::Transact(const uint16_t address, TransferRequestView request,
   }
   impl_ops_[transactions.count() - 1].stop = true;
 
-  zx_status_t status = i2c_.Transact(bus_id_, impl_ops_.data(), transactions.count());
+  zx_status_t status = i2c_.Transact(0, impl_ops_.data(), transactions.count());
   if (status == ZX_OK) {
     completer.ReplySuccess(
         fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_.data(), read_ops));
@@ -120,8 +118,9 @@ zx_status_t I2cDevice::Init(const fuchsia_hardware_i2c_businfo::wire::I2CBusMeta
 
   zxlogf(DEBUG, "%zu channels supplied.", metadata.channels().count());
 
+  const uint32_t bus_id = metadata.has_bus_id() ? metadata.bus_id() : 0;
   for (const auto& channel : metadata.channels()) {
-    if (auto status = I2cChild::CreateAndAddDevice(bus_id_, channel, this); status != ZX_OK) {
+    if (auto status = I2cChild::CreateAndAddDevice(bus_id, channel, this); status != ZX_OK) {
       return status;
     }
   }

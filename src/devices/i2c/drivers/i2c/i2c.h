@@ -22,9 +22,8 @@ class I2cDevice : public I2cDeviceType {
   using TransferRequestView = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferRequestView;
   using TransferCompleter = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferCompleter;
 
-  I2cDevice(zx_device_t* parent, uint32_t bus_id, uint64_t max_transfer_size,
-            const ddk::I2cImplProtocolClient& i2c)
-      : I2cDeviceType(parent), i2c_(i2c), bus_id_(bus_id), max_transfer_(max_transfer_size) {
+  I2cDevice(zx_device_t* parent, uint64_t max_transfer_size, const ddk::I2cImplProtocolClient& i2c)
+      : I2cDeviceType(parent), i2c_(i2c), max_transfer_(max_transfer_size) {
     impl_ops_.resize(kInitialOpCount);
     read_vectors_.resize(kInitialOpCount);
     read_buffer_.resize(kInitialReadBufferSize);
@@ -47,7 +46,6 @@ class I2cDevice : public I2cDeviceType {
       const fidl::VectorView<fuchsia_hardware_i2c::wire::Transaction>& transactions);
 
   const ddk::I2cImplProtocolClient i2c_;
-  const uint32_t bus_id_;
   const uint64_t max_transfer_;
 
   // Ops and read data/vectors to be used in Transact(). Set to the initial capacities specified
