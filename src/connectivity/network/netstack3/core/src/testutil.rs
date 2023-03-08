@@ -12,7 +12,7 @@ use net_types::{
     ip::{AddrSubnet, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither},
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
-use packet::{BufferMut, Serializer};
+use packet::{Buf, BufferMut};
 use packet_formats::ip::IpProto;
 use rand::{self, CryptoRng, Rng as _, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -20,9 +20,9 @@ use rand_xorshift::XorShiftRng;
 use crate::{
     context::{
         testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, InstantAndData},
-        EventContext, InstantContext, SendFrameContext as _, TimerContext,
+        EventContext, InstantContext, TimerContext,
     },
-    device::{ethernet, BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher},
+    device::{ethernet, DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError},
     ip::{
         device::{dad::DadEvent, route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
@@ -101,7 +101,8 @@ pub(crate) mod benchmarks {
 pub(crate) struct FakeNonSyncCtxState {
     icmpv4_replies: HashMap<IcmpConnId<Ipv4>, Vec<(u16, Vec<u8>)>>,
     icmpv6_replies: HashMap<IcmpConnId<Ipv6>, Vec<(u16, Vec<u8>)>>,
-    rx_available: Vec<DeviceId<FakeInstant>>,
+    pub(crate) rx_available: Vec<DeviceId<FakeInstant>>,
+    pub(crate) tx_available: Vec<DeviceId<FakeInstant>>,
 }
 
 // Use the `Never` type for the `crate::context::testutil::FakeCtx`'s frame
@@ -711,15 +712,18 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
     fn wake_rx_task(&mut self, device: &DeviceId<FakeInstant>) {
         self.state_mut().rx_available.push(device.clone());
     }
-}
 
-impl<B: BufferMut> BufferDeviceLayerEventDispatcher<B> for FakeNonSyncCtx {
-    fn send_frame<S: Serializer<Buffer = B>>(
+    fn wake_tx_task(&mut self, device: &DeviceId<FakeInstant>) {
+        self.state_mut().tx_available.push(device.clone());
+    }
+
+    fn send_frame(
         &mut self,
         device: &DeviceId<FakeInstant>,
-        frame: S,
-    ) -> Result<(), S> {
-        self.frame_ctx_mut().send_frame(&mut (), device.clone(), frame)
+        frame: Buf<Vec<u8>>,
+    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+        self.frame_ctx_mut().push(device.clone(), frame.as_ref().to_vec());
+        Ok(())
     }
 }
 

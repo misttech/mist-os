@@ -43,7 +43,7 @@ use futures::{
     channel::mpsc, lock::Mutex, FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _,
 };
 use log::{debug, error};
-use packet::{BufferMut, Serializer};
+use packet::{Buf, BufferMut};
 use packet_formats::icmp::{IcmpEchoReply, IcmpMessage, IcmpUnusedCode};
 use rand::rngs::OsRng;
 use util::{ConversionContext, IntoFidl as _};
@@ -60,7 +60,7 @@ use netstack3_core::{
     add_ip_addr_subnet,
     context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
     data_structures::id_map::IdMap,
-    device::{BufferDeviceLayerEventDispatcher, DeviceId, DeviceLayerEventDispatcher},
+    device::{DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError},
     error::NetstackError,
     handle_timer,
     ip::{
@@ -273,19 +273,17 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
             }
         }
     }
-}
 
-impl<B> BufferDeviceLayerEventDispatcher<B> for BindingsNonSyncCtxImpl
-where
-    B: BufferMut,
-{
-    fn send_frame<S: Serializer<Buffer = B>>(
+    fn wake_tx_task(&mut self, device: &DeviceId<StackTime>) {
+        unimplemented!("TODO(https://fxbug.dev/105615): wake_tx_task(_, {})", device);
+    }
+
+    fn send_frame(
         &mut self,
         device: &DeviceId<StackTime>,
-        frame: S,
-    ) -> Result<(), S> {
+        frame: Buf<Vec<u8>>,
+    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         // TODO(wesleyac): Error handling
-        let frame = frame.serialize_vec_outer().map_err(|(_, ser)| ser)?;
         let dev = match self.devices.get_core_device_mut(device) {
             Some(dev) => dev,
             None => {

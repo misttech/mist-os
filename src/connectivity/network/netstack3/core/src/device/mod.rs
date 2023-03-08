@@ -12,6 +12,7 @@ pub(crate) mod ndp;
 pub mod queue;
 mod state;
 
+use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Display, Formatter},
     marker::PhantomData,
@@ -31,11 +32,11 @@ use net_types::{
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
-use packet::{BufferMut, Serializer};
+use packet::{Buf, BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
-    context::{InstantContext, NonTestCtxMarker, RecvFrameContext, SendFrameContext},
+    context::{InstantContext, RecvFrameContext},
     data_structures::{
         id_map::{self, IdMap},
         id_map_collection::IdMapCollectionKey,
@@ -46,7 +47,10 @@ use crate::{
             EthernetLinkDevice, EthernetTimerId,
         },
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackWeakDeviceId},
-        queue::rx::ReceiveQueueHandler,
+        queue::{
+            rx::ReceiveQueueHandler,
+            tx::{BufferTransmitQueueHandler, TransmitQueueConfiguration, TransmitQueueHandler},
+        },
         state::IpLinkDeviceState,
     },
     error::{ExistsError, NotFoundError, NotSupportedError},
@@ -139,10 +143,13 @@ impl<NonSyncCtx: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceLaye
     }
 }
 
-fn with_ethernet_state<
+fn with_ethernet_state_and_sync_ctx<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(Locked<'_, IpLinkDeviceState<NonSyncCtx::Instant, EthernetDeviceState>, L>) -> O,
+    F: FnOnce(
+        Locked<'_, IpLinkDeviceState<NonSyncCtx::Instant, EthernetDeviceState>, L>,
+        &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
+    ) -> O,
     L,
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
@@ -158,7 +165,22 @@ fn with_ethernet_state<
     // Even though the device state is technically accessible outside of the
     // `SyncCtx`, it is held inside `SyncCtx` so we propagate the same lock
     // level as we were called with to avoid lock ordering issues.
-    cb(Locked::new_locked(&state))
+    cb(Locked::new_locked(&state), sync_ctx)
+}
+
+fn with_ethernet_state<
+    NonSyncCtx: NonSyncContext,
+    O,
+    F: FnOnce(Locked<'_, IpLinkDeviceState<NonSyncCtx::Instant, EthernetDeviceState>, L>) -> O,
+    L,
+>(
+    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
+    device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+    cb: F,
+) -> O {
+    with_ethernet_state_and_sync_ctx(sync_ctx, device_id, |ip_device_state, _sync_ctx| {
+        cb(ip_device_state)
+    })
 }
 
 fn with_loopback_state<
@@ -489,7 +511,7 @@ fn send_ip_frame<
     S: Serializer<Buffer = B>,
     A: IpAddress,
     L: LockBefore<crate::lock_ordering::IpState<A::Version>>
-        + LockBefore<crate::lock_ordering::LoopbackRxQueue>,
+        + LockBefore<crate::lock_ordering::LoopbackTxQueue>,
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
@@ -500,7 +522,8 @@ fn send_ip_frame<
 where
     A::Version: EthernetIpExt,
     for<'a> Locked<'a, SyncCtx<NonSyncCtx>, L>: EthernetIpLinkDeviceContext<NonSyncCtx, DeviceId = EthernetDeviceId<NonSyncCtx::Instant>>
-        + BufferNudHandler<B, A::Version, EthernetLinkDevice, NonSyncCtx>,
+        + BufferNudHandler<B, A::Version, EthernetLinkDevice, NonSyncCtx>
+        + BufferTransmitQueueHandler<EthernetLinkDevice, B, NonSyncCtx, Meta = ()>,
 {
     match device.inner() {
         DeviceIdInner::Ethernet(id) => {
@@ -900,19 +923,6 @@ impl<
         body: S,
     ) -> Result<(), S> {
         send_ip_frame(self, ctx, device, local_addr, body)
-    }
-}
-
-impl<SC: NonTestCtxMarker, B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>
-    SendFrameContext<NonSyncCtx, B, EthernetDeviceId<NonSyncCtx::Instant>> for SC
-{
-    fn send_frame<S: Serializer<Buffer = B>>(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device: EthernetDeviceId<NonSyncCtx::Instant>,
-        frame: S,
-    ) -> Result<(), S> {
-        BufferDeviceLayerEventDispatcher::send_frame(ctx, &device.into(), frame)
     }
 }
 
@@ -1410,21 +1420,70 @@ pub trait DeviceLayerEventDispatcher: InstantContext {
     /// scheduled to be called as soon as possible so that enqueued RX frames
     /// are promptly handled.
     fn wake_rx_task(&mut self, device: &DeviceId<Self::Instant>);
-}
 
-/// A [`DeviceLayerEventDispatcher`] with a buffer.
-pub trait BufferDeviceLayerEventDispatcher<B: BufferMut>: DeviceLayerEventDispatcher {
+    /// Signals to the dispatcher that TX frames are available and ready to be
+    /// sent by [`transmit_queued_tx_frames`].
+    ///
+    /// Implementations must make sure that [`transmit_queued_tx_frames`] is
+    /// scheduled to be called as soon as possible so that enqueued TX frames
+    /// are promptly sent.
+    fn wake_tx_task(&mut self, device: &DeviceId<Self::Instant>);
+
     /// Send a frame to a device driver.
     ///
     /// If there was an MTU error while attempting to serialize the frame, the
     /// original serializer is returned in the `Err` variant. All other errors
     /// (for example, errors in allocating a buffer) are silently ignored and
     /// reported as success.
-    fn send_frame<S: Serializer<Buffer = B>>(
+    fn send_frame(
         &mut self,
         device: &DeviceId<Self::Instant>,
-        frame: S,
-    ) -> Result<(), S>;
+        frame: Buf<Vec<u8>>,
+    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>>;
+}
+
+/// An error encountered when sending a frame.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DeviceSendFrameError<T> {
+    /// The device is not ready to send frames.
+    DeviceNotReady(T),
+}
+
+/// Sets the TX queue configuration for a device.
+pub fn set_tx_queue_configuration<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx::Instant>,
+    config: TransmitQueueConfiguration,
+) {
+    let sync_ctx = &mut Locked::new(sync_ctx);
+    match device.inner() {
+        DeviceIdInner::Ethernet(id) => {
+            TransmitQueueHandler::<EthernetLinkDevice, _>::set_configuration(
+                sync_ctx, ctx, id, config,
+            )
+        }
+        DeviceIdInner::Loopback(id) => {
+            TransmitQueueHandler::<LoopbackDevice, _>::set_configuration(sync_ctx, ctx, id, config)
+        }
+    }
+}
+
+/// Does the work of transmitting frames for a device.
+pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx::Instant>,
+) -> Result<(), DeviceSendFrameError<()>> {
+    let sync_ctx = &mut Locked::new(sync_ctx);
+    match device.inner() {
+        DeviceIdInner::Ethernet(id) => {
+            TransmitQueueHandler::<EthernetLinkDevice, _>::transmit_queued_frames(sync_ctx, ctx, id)
+        }
+        DeviceIdInner::Loopback(id) => {
+            TransmitQueueHandler::<LoopbackDevice, _>::transmit_queued_frames(sync_ctx, ctx, id)
+        }
+    }
 }
 
 /// Handle a batch of queued RX packets for the device.
@@ -1782,11 +1841,15 @@ mod tests {
     use net_declare::net_mac;
     use net_types::ip::SubnetEither;
     use nonzero_ext::nonzero;
+    use test_case::test_case;
 
     use super::*;
     use crate::{
         context::testutil::FakeInstant,
-        testutil::{FakeEventDispatcherConfig, FakeSyncCtx, FAKE_CONFIG_V4},
+        testutil::{
+            FakeEventDispatcherConfig, FakeSyncCtx, TestIpExt as _, FAKE_CONFIG_V4,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
         Ctx,
     };
 
@@ -1907,5 +1970,105 @@ mod tests {
         crate::device::remove_device(&mut sync_ctx, &mut non_sync_ctx, ethernet_device);
 
         assert_eq!(non_sync_ctx.timer_ctx().timers(), &[]);
+    }
+
+    fn add_ethernet(
+        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        _non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+    ) -> DeviceId<FakeInstant> {
+        crate::device::add_ethernet_device(
+            sync_ctx,
+            Ipv6::FAKE_CONFIG.local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        )
+    }
+
+    fn add_loopback(
+        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
+    ) -> DeviceId<FakeInstant> {
+        let device = crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap();
+        crate::device::add_ip_addr_subnet(
+            sync_ctx,
+            non_sync_ctx,
+            &device,
+            AddrSubnet::from_witness(Ipv6::LOOPBACK_ADDRESS, Ipv6::LOOPBACK_SUBNET.prefix())
+                .unwrap(),
+        )
+        .unwrap();
+        device
+    }
+
+    fn check_transmitted_ethernet(
+        non_sync_ctx: &crate::testutil::FakeNonSyncCtx,
+        _device_id: &DeviceId<FakeInstant>,
+        count: usize,
+    ) {
+        assert_eq!(non_sync_ctx.frames_sent().len(), count);
+    }
+
+    fn check_transmitted_loopback(
+        non_sync_ctx: &crate::testutil::FakeNonSyncCtx,
+        device_id: &DeviceId<FakeInstant>,
+        count: usize,
+    ) {
+        // Loopback frames leave the stack; outgoing frames land in
+        // its RX queue.
+        if count == 0 {
+            assert_eq!(non_sync_ctx.state().rx_available, <[DeviceId::<_>; 0]>::default());
+        } else {
+            assert_eq!(non_sync_ctx.state().rx_available, [device_id.clone()]);
+        }
+    }
+
+    #[test_case(add_ethernet, check_transmitted_ethernet, true; "ethernet with queue")]
+    #[test_case(add_ethernet, check_transmitted_ethernet, false; "ethernet without queue")]
+    #[test_case(add_loopback, check_transmitted_loopback, true; "loopback with queue")]
+    #[test_case(add_loopback, check_transmitted_loopback, false; "loopback without queue")]
+    fn tx_queue(
+        add_device: fn(
+            &mut &crate::testutil::FakeSyncCtx,
+            &mut crate::testutil::FakeNonSyncCtx,
+        ) -> DeviceId<FakeInstant>,
+        check_transmitted: fn(&crate::testutil::FakeNonSyncCtx, &DeviceId<FakeInstant>, usize),
+        with_tx_queue: bool,
+    ) {
+        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        let mut sync_ctx = &sync_ctx;
+        let device = add_device(&mut sync_ctx, &mut non_sync_ctx);
+
+        if with_tx_queue {
+            crate::device::set_tx_queue_configuration(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                &device,
+                TransmitQueueConfiguration::Fifo,
+            );
+        }
+
+        crate::device::update_ipv6_configuration(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            |state| {
+                state.ip_config.ip_enabled = true;
+                // Enable DAD so that the auto-generated address triggers a DAD
+                // message immediately on interface enable.
+                state.dad_transmits = Some(nonzero!(1u8));
+            },
+        );
+
+        if with_tx_queue {
+            check_transmitted(&non_sync_ctx, &device, 0);
+            assert_eq!(
+                core::mem::take(&mut non_sync_ctx.state_mut().tx_available),
+                [device.clone()]
+            );
+            crate::device::transmit_queued_tx_frames(&mut sync_ctx, &mut non_sync_ctx, &device)
+                .unwrap();
+        }
+
+        check_transmitted(&non_sync_ctx, &device, 1);
+        assert_eq!(non_sync_ctx.state_mut().tx_available, <[DeviceId::<_>; 0]>::default());
     }
 }

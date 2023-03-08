@@ -7,10 +7,11 @@
 use alloc::collections::VecDeque;
 
 use derivative::Derivative;
-use packet::ParseBuffer;
+use packet::{ParseBuffer, Serializer, TargetBuffer};
 
 use crate::device::queue::{
-    DequeueResult, EnqueueResult, ReceiveQueueFullError, MAX_RX_QUEUED_PACKETS,
+    DequeueResult, EnqueueResult, ReceiveQueueFullError, TransmitQueueFrameError,
+    MAX_RX_QUEUED_PACKETS, MAX_TX_QUEUED_FRAMES,
 };
 
 /// A FiFo (First In, First Out) queue of packets.
@@ -24,6 +25,12 @@ pub(super) struct Queue<Meta, Buffer> {
 }
 
 impl<Meta, Buffer> Queue<Meta, Buffer> {
+    pub(crate) fn requeue_packets(&mut self, source: &mut VecDeque<(Meta, Buffer)>) {
+        while let Some(p) = source.pop_back() {
+            self.packets.push_front(p);
+        }
+    }
+
     /// Dequeues packets from this queue and pushes them to the back of the
     /// sink.
     ///
@@ -67,6 +74,34 @@ impl<Meta, Buffer: ParseBuffer> Queue<Meta, Buffer> {
         }
 
         packets.push_back((meta, body));
+
+        Ok(if len == 0 {
+            EnqueueResult::QueueWasPreviouslyEmpty
+        } else {
+            EnqueueResult::QueuePreviouslyHadPackets
+        })
+    }
+}
+
+impl<Meta, Buffer: TargetBuffer> Queue<Meta, Buffer> {
+    /// Attempts to add the tx frame to the queue.
+    pub(crate) fn queue_tx_frame<
+        S: Serializer,
+        F: FnOnce(S) -> Result<Buffer, TransmitQueueFrameError<S>>,
+    >(
+        &mut self,
+        meta: Meta,
+        body: S,
+        get_buffer: F,
+    ) -> Result<EnqueueResult, TransmitQueueFrameError<S>> {
+        let Self { packets } = self;
+
+        let len = packets.len();
+        if len == MAX_TX_QUEUED_FRAMES {
+            return Err(TransmitQueueFrameError::QueueFull(body));
+        }
+
+        packets.push_back((meta, get_buffer(body)?));
 
         Ok(if len == 0 {
             EnqueueResult::QueueWasPreviouslyEmpty

@@ -28,12 +28,17 @@ pub(crate) enum EthernetDeviceDynamicState {}
 
 pub(crate) enum EthernetIpv4Arp {}
 pub(crate) enum EthernetIpv6Nud {}
+pub(crate) enum EthernetTxQueue {}
+pub(crate) enum EthernetTxDequeue {}
 
 pub(crate) enum LoopbackRxQueue {}
 pub(crate) enum LoopbackRxDequeue {}
+pub(crate) enum LoopbackTxQueue {}
+pub(crate) enum LoopbackTxDequeue {}
 
-impl LockAfter<Unlocked> for LoopbackRxDequeue {}
-
+impl LockAfter<Unlocked> for LoopbackTxDequeue {}
+impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);
+impl_lock_after!(EthernetTxDequeue => LoopbackRxDequeue);
 impl_lock_after!(LoopbackRxDequeue => UdpSockets<Ipv4>);
 
 // Ideally we'd have separate impls `LoopbackRxDequeue => UdpSockets<Ipv4>` and
@@ -61,7 +66,9 @@ impl_lock_after!(IpState<Ipv4> => IpState<Ipv6>);
 
 // The loopback data path operates at L3 so we can enqueue packets without going
 // through the device layer lock.
-impl_lock_after!(IpState<Ipv6> => LoopbackRxQueue);
+impl_lock_after!(IpState<Ipv6> => LoopbackTxQueue);
+impl_lock_after!(IpState<Ipv6> => EthernetTxQueue);
+impl_lock_after!(LoopbackTxQueue => LoopbackRxQueue);
 
 impl_lock_after!(IpState<Ipv6> => DeviceLayerState);
 

@@ -19,7 +19,7 @@ use net_types::{
     BroadcastAddress, MulticastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, UnicastAddress,
     Witness,
 };
-use packet::{Buf, BufferMut, EmptyBuf, InnerPacketBuilder as _, Nested, Serializer};
+use packet::{Buf, BufferMut, InnerPacketBuilder as _, Nested, Serializer};
 use packet_formats::{
     arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
     ethernet::{
@@ -45,8 +45,17 @@ use crate::{
             ArpContext, ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId, BufferArpContext,
         },
         link::LinkDevice,
+        queue::{
+            tx::{
+                BufVecU8Allocator, BufferTransmitQueueHandler, TransmitDequeueContext,
+                TransmitQueue, TransmitQueueContext, TransmitQueueNonSyncContext,
+                TransmitQueueState, TransmitQueueTypes,
+            },
+            DequeueState, TransmitQueueFrameError,
+        },
         state::IpLinkDeviceState,
-        with_ethernet_state, Device, DeviceIdContext, EthernetDeviceId, FrameDestination, Mtu,
+        with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
+        DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
         RecvIpFrameMeta,
     },
     ip::device::{
@@ -85,8 +94,6 @@ impl<DeviceId, C: CounterContext + RngContext + TimerContext<EthernetTimerId<Dev
 /// The execution context for an Ethernet device.
 pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>>:
     DeviceIdContext<EthernetLinkDevice>
-    + SendFrameContext<C, EmptyBuf, Self::DeviceId>
-    + SendFrameContext<C, Buf<Vec<u8>>, Self::DeviceId>
 {
     /// Calls the function with the ethernet device's static state.
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
@@ -212,7 +219,6 @@ pub(super) trait BufferEthernetIpLinkDeviceContext<
     B: BufferMut,
 >:
     EthernetIpLinkDeviceContext<C>
-    + SendFrameContext<C, B, Self::DeviceId>
     + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv4>>
     + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv6>>
 {
@@ -222,7 +228,6 @@ impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         B: BufferMut,
         SC: EthernetIpLinkDeviceContext<C>
-            + SendFrameContext<C, B, SC::DeviceId>
             + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
             + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv6>>,
     > BufferEthernetIpLinkDeviceContext<C, B> for SC
@@ -329,7 +334,8 @@ fn send_ip_frame_to_dst<
     B: BufferMut,
     S: Serializer<Buffer = B>,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C> + SendFrameContext<C, B, SC::DeviceId>,
+    SC: EthernetIpLinkDeviceContext<C>
+        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -339,13 +345,22 @@ fn send_ip_frame_to_dst<
     ether_type: EtherType,
 ) -> Result<(), S> {
     let local_mac = get_mac(sync_ctx, device_id);
-    sync_ctx
-        .send_frame(
-            ctx,
-            device_id.clone().into(),
-            body.encapsulate(EthernetFrameBuilder::new(local_mac.get(), dst_mac, ether_type)),
-        )
-        .map_err(|ser| ser.into_inner())
+    match BufferTransmitQueueHandler::<EthernetLinkDevice, _, _>::queue_tx_frame(
+        sync_ctx,
+        ctx,
+        device_id,
+        (),
+        body.encapsulate(EthernetFrameBuilder::new(local_mac.get(), dst_mac, ether_type)),
+    ) {
+        Ok(()) => Ok(()),
+        Err(TransmitQueueFrameError::NoQueue(e)) => {
+            log::error!("device {} not ready to send frame: {:?}", device_id, e);
+            Ok(())
+        }
+        Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {
+            Err(s.into_inner())
+        }
+    }
 }
 
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
@@ -462,6 +477,7 @@ impl EthernetDeviceStateBuilder {
             ipv6_nud: Default::default(),
             static_state: StaticEthernetDeviceState { mac, max_frame_size },
             dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
+            tx_queue: Default::default(),
         }
     }
 }
@@ -504,6 +520,8 @@ pub(crate) struct EthernetDeviceState {
     static_state: StaticEthernetDeviceState,
 
     dynamic_state: RwLock<DynamicEthernetDeviceState>,
+
+    tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
 }
 
 impl<I: Instant> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
@@ -591,6 +609,172 @@ impl<I: Instant> LockFor<crate::lock_ordering::EthernetIpv4Arp>
     }
 }
 
+impl<I: Instant> LockFor<crate::lock_ordering::EthernetTxQueue>
+    for IpLinkDeviceState<I, EthernetDeviceState>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.link.tx_queue.queue.lock()
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::EthernetTxDequeue>
+    for IpLinkDeviceState<I, EthernetDeviceState>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.link.tx_queue.deque.lock()
+    }
+}
+
+impl<C: NonSyncContext>
+    TransmitQueueNonSyncContext<EthernetLinkDevice, EthernetDeviceId<C::Instant>> for C
+{
+    fn wake_tx_task(&mut self, device_id: &EthernetDeviceId<C::Instant>) {
+        DeviceLayerEventDispatcher::wake_tx_task(self, &device_id.clone().into())
+    }
+}
+
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
+impl<'a, C: NonSyncContext> TransmitQueueTypes<EthernetLinkDevice, C> for &'a SyncCtx<C> {
+    type Meta = <Locked<'a, SyncCtx<C>, crate::lock_ordering::Unlocked> as TransmitQueueTypes<
+        EthernetLinkDevice,
+        C,
+    >>::Meta;
+    type Allocator =
+        <Locked<'a, SyncCtx<C>, crate::lock_ordering::Unlocked> as TransmitQueueTypes<
+            EthernetLinkDevice,
+            C,
+        >>::Allocator;
+    type Buffer = <Locked<'a, SyncCtx<C>, crate::lock_ordering::Unlocked> as TransmitQueueTypes<
+        EthernetLinkDevice,
+        C,
+    >>::Buffer;
+}
+
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
+impl<C: NonSyncContext> TransmitQueueContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
+    fn with_transmit_queue_mut<
+        O,
+        F: FnOnce(&mut TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<C::Instant>,
+        cb: F,
+    ) -> O {
+        TransmitQueueContext::<EthernetLinkDevice, _>::with_transmit_queue_mut(
+            &mut Locked::new(*self),
+            device_id,
+            cb,
+        )
+    }
+
+    fn send_frame(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        meta: Self::Meta,
+        buf: Self::Buffer,
+    ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+        TransmitQueueContext::<EthernetLinkDevice, _>::send_frame(
+            &mut Locked::new(*self),
+            ctx,
+            device_id,
+            meta,
+            buf,
+        )
+    }
+}
+
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
+impl<C: NonSyncContext> TransmitDequeueContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
+    type TransmitQueueCtx<'a> =
+        <Locked<'a, SyncCtx<C>, crate::lock_ordering::Unlocked> as TransmitDequeueContext<
+            EthernetLinkDevice,
+            C,
+        >>::TransmitQueueCtx<'a>;
+
+    fn with_dequed_packets_and_tx_queue_ctx<
+        O,
+        F: FnOnce(&mut DequeueState<Self::Meta, Self::Buffer>, &mut Self::TransmitQueueCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        TransmitDequeueContext::<EthernetLinkDevice, C>::with_dequed_packets_and_tx_queue_ctx(
+            &mut Locked::new(*self),
+            device_id,
+            cb,
+        )
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
+    TransmitQueueTypes<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+{
+    type Meta = ();
+    type Allocator = BufVecU8Allocator;
+    type Buffer = Buf<Vec<u8>>;
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
+    TransmitQueueContext<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+{
+    fn with_transmit_queue_mut<
+        O,
+        F: FnOnce(&mut TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<C::Instant>,
+        cb: F,
+    ) -> O {
+        with_ethernet_state(self, device_id, |mut state| {
+            let mut x = state.lock::<crate::lock_ordering::EthernetTxQueue>();
+            cb(&mut x)
+        })
+    }
+
+    fn send_frame(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        meta: Self::Meta,
+        buf: Self::Buffer,
+    ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+        DeviceLayerEventDispatcher::send_frame(ctx, &device_id.clone().into(), buf).map_err(
+            |DeviceSendFrameError::DeviceNotReady(buf)| {
+                DeviceSendFrameError::DeviceNotReady((meta, buf))
+            },
+        )
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
+    TransmitDequeueContext<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+{
+    type TransmitQueueCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::EthernetTxDequeue>;
+
+    fn with_dequed_packets_and_tx_queue_ctx<
+        O,
+        F: FnOnce(&mut DequeueState<Self::Meta, Self::Buffer>, &mut Self::TransmitQueueCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
+            let mut x = state.lock::<crate::lock_ordering::EthernetTxDequeue>();
+            let mut locked = sync_ctx.cast_locked();
+            cb(&mut x, &mut locked)
+        })
+    }
+}
+
 /// Should a packet with destination MAC address, `dst`, be accepted by this
 /// device?
 ///
@@ -675,8 +859,8 @@ pub(super) fn send_ip_frame<
     B: BufferMut,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceContext<C>
-        + SendFrameContext<C, B, <SC as DeviceIdContext<EthernetLinkDevice>>::DeviceId>
-        + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>,
+        + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
+        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
     A: IpAddress,
     S: Serializer<Buffer = B>,
 >(
@@ -960,7 +1144,7 @@ impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         B: BufferMut,
         SC: EthernetIpLinkDeviceContext<C>
-            + SendFrameContext<C, B, <SC as DeviceIdContext<EthernetLinkDevice>>::DeviceId>,
+            + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
     > SendFrameContext<C, B, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
 {
     fn send_frame<S: Serializer<Buffer = B>>(
@@ -1141,7 +1325,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::FakeInstant,
+        context::testutil::{FakeFrameCtx, FakeInstant},
         device::DeviceId,
         error::{ExistsError, NotFoundError},
         ip::{
@@ -1163,6 +1347,7 @@ mod tests {
         static_state: StaticEthernetDeviceState,
         dynamic_state: DynamicEthernetDeviceState,
         static_arp_entries: HashMap<SpecifiedAddr<Ipv4Addr>, Mac>,
+        tx_queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
     }
 
     impl FakeEthernetCtx {
@@ -1171,6 +1356,7 @@ mod tests {
                 static_state: StaticEthernetDeviceState { max_frame_size, mac },
                 dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
                 static_arp_entries: Default::default(),
+                tx_queue: Default::default(),
             }
         }
     }
@@ -1294,6 +1480,43 @@ mod tests {
             } else {
                 Ok(())
             }
+        }
+    }
+
+    impl TransmitQueueNonSyncContext<EthernetLinkDevice, FakeDeviceId> for FakeNonSyncCtx {
+        fn wake_tx_task(&mut self, FakeDeviceId: &FakeDeviceId) {
+            unimplemented!("unused by tests")
+        }
+    }
+
+    impl TransmitQueueTypes<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+        type Meta = ();
+        type Allocator = BufVecU8Allocator;
+        type Buffer = Buf<Vec<u8>>;
+    }
+
+    impl TransmitQueueContext<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+        fn with_transmit_queue_mut<
+            O,
+            F: FnOnce(&mut TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+        >(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            cb(&mut self.get_mut().tx_queue)
+        }
+
+        fn send_frame(
+            &mut self,
+            _ctx: &mut FakeNonSyncCtx,
+            device_id: &Self::DeviceId,
+            (): Self::Meta,
+            buf: Self::Buffer,
+        ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+            let frame_ctx: &mut FakeFrameCtx<_> = self.as_mut();
+            frame_ctx.push(device_id.clone(), buf.as_ref().to_vec());
+            Ok(())
         }
     }
 

@@ -887,6 +887,10 @@ pub(crate) mod testutil {
         pub(crate) fn frames(&self) -> &[(Meta, Vec<u8>)] {
             self.frames.as_slice()
         }
+
+        pub(crate) fn push(&mut self, meta: Meta, frame: Vec<u8>) {
+            self.frames.push((meta, frame))
+        }
     }
 
     impl<C, B: BufferMut, Meta> SendFrameContext<C, B, Meta> for FakeFrameCtx<Meta> {
@@ -903,7 +907,7 @@ pub(crate) mod testutil {
             }
 
             let buffer = frame.serialize_vec_outer().map_err(|(_err, s)| s)?;
-            self.frames.push((metadata, buffer.as_ref().to_vec()));
+            self.push(metadata, buffer.as_ref().to_vec());
             Ok(())
         }
     }

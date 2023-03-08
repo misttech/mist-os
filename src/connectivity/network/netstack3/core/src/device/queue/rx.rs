@@ -97,21 +97,15 @@ pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
 }
 
 /// An implementation of a receive queue.
-pub(crate) trait ReceiveQueueHandler<D: Device, C>: DeviceIdContext<D> {
-    /// Metadata associated with an RX packet.
-    type Meta;
-
+pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
     /// Handle any queued RX packets.
     fn handle_queued_rx_packets(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
 }
 
 /// An implementation of a receive queue, with a buffer.
 pub(crate) trait BufferReceiveQueueHandler<D: Device, B: ParseBuffer, C>:
-    DeviceIdContext<D>
+    ReceiveQueueTypes<D, C>
 {
-    /// Metadata associated with an RX packet.
-    type Meta;
-
     /// Queues a packet for reception.
     ///
     /// # Errors
@@ -129,8 +123,6 @@ pub(crate) trait BufferReceiveQueueHandler<D: Device, B: ParseBuffer, C>:
 impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDequeContext<D, C>>
     ReceiveQueueHandler<D, C> for SC
 {
-    type Meta = SC::Meta;
-
     fn handle_queued_rx_packets(&mut self, ctx: &mut C, device_id: &SC::DeviceId) {
         self.with_dequed_packets_and_rx_queue_ctx(
             device_id,
@@ -168,8 +160,6 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDeque
 impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueueContext<D, C>>
     BufferReceiveQueueHandler<D, SC::Buffer, C> for SC
 {
-    type Meta = SC::Meta;
-
     fn queue_rx_packet(
         &mut self,
         ctx: &mut C,

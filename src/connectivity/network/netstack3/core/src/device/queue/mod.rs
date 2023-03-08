@@ -6,14 +6,25 @@
 
 mod fifo;
 pub(super) mod rx;
+pub mod tx;
 
 use alloc::collections::VecDeque;
 
+use crate::device::DeviceSendFrameError;
+
 const MAX_RX_QUEUED_PACKETS: usize = 10000;
+const MAX_TX_QUEUED_FRAMES: usize = 10000;
 const MAX_BATCH_SIZE: usize = 100;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ReceiveQueueFullError<T>(pub T);
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum TransmitQueueFrameError<S> {
+    NoQueue(DeviceSendFrameError<()>),
+    QueueFull(S),
+    SerializeError(S),
+}
 
 /// The state used to dequeue and handle packets from the device queue.
 pub(crate) struct DequeueState<Meta, Buffer> {
