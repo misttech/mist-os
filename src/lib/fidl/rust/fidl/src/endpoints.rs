@@ -399,16 +399,6 @@ pub fn create_endpoints<T: ProtocolMarker>() -> (ClientEnd<T>, ServerEnd<T>) {
     (client_end, server_end)
 }
 
-// TODO(https://fxbug.dev/115384) delete once create_endpoints is infallible
-#[deprecated]
-#[allow(missing_docs)]
-pub fn try_create_endpoints<T: ProtocolMarker>() -> Result<(ClientEnd<T>, ServerEnd<T>), Error> {
-    let (client, server) = Channel::create();
-    let client_end = ClientEnd::<T>::new(client);
-    let server_end = ServerEnd::new(server);
-    Ok((client_end, server_end))
-}
-
 /// Create a client proxy and a server endpoint connected to it by a channel.
 ///
 /// Useful for sending channel handles to calls that take arguments
