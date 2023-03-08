@@ -37,6 +37,12 @@ license_data("licenses_data") {
 
   # Analysis is not needed - it is assumed it is done elsewhere.
   run_analysis = false
+
+  # These targets are not being distributed.
+  prune_targets = [
+    "//prebuilt/third_party/android/aemu/release/linux-x64",
+    "//src/developer/ffx/plugins/emulator",
+  ]
 }
 
 # Note: To make this target on the Bazel side, this target needs be added:

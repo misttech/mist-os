@@ -19,6 +19,9 @@ import("//build/info/info.gni")
 #   target (optional)
 #     [string] Target to analyze. Defaults to "//:default".
 #
+#   prune_targets (optional)
+#     [string list] Targets to explicitly filter out of the build graph. Defaults to empty list.
+#
 #   run_analysis (optional)
 #     [bool] Whether to analyze license texts and run tests. Default == true.
 #
@@ -123,6 +126,13 @@ template("license_data") {
       rebase_path(root_out_dir, root_build_dir),
       "--run_analysis=$run_analysis",
     ]
+
+    if (defined(invoker.prune_targets)) {
+      args += [
+        "--prune_targets",
+        string_join(",", invoker.prune_targets),
+      ]
+    }
 
     args += [
       "--build_info_version",

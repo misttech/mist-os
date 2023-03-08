@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -35,8 +36,9 @@ var (
 	buildInfoProduct = flag.String("build_info_product", "product", "Version of fuchsia being built. Used for uploading results.")
 	buildInfoBoard   = flag.String("build_info_board", "board", "Version of fuchsia being built. Used for uploading results.")
 
-	gnPath    = flag.String("gn_path", "{FUCHSIA_DIR}/prebuilt/third_party/gn/linux-x64/gn", "Path to GN executable. Required when target is specified.")
-	gnGenFile = flag.String("gn_gen_file", "{BUILD_DIR}/project.json", "Path to 'project.json' output file.")
+	gnPath       = flag.String("gn_path", "{FUCHSIA_DIR}/prebuilt/third_party/gn/linux-x64/gn", "Path to GN executable. Required when target is specified.")
+	gnGenFile    = flag.String("gn_gen_file", "{BUILD_DIR}/project.json", "Path to 'project.json' output file.")
+	pruneTargets = flag.String("prune_targets", "", "Flag for filtering out targets from the dependency tree. Targets separated by comma.")
 
 	checkURLs = flag.Bool("check_urls", false, "Flag for enabling checks for license URLs.")
 
@@ -144,10 +146,23 @@ func mainImpl() error {
 		return fmt.Errorf("Failed to get absolute directory for *gnGenFile %v: %v", *gnGenFile, err)
 	}
 
+	pruneTargetsList := strings.Split(*pruneTargets, ",")
+	pruneTargetsMap := make(map[string]bool)
+	for _, t := range pruneTargetsList {
+		if len(t) > 0 {
+			pruneTargetsMap[t] = true
+		}
+	}
+	pruneTargetsJSON, err := json.Marshal(pruneTargetsMap)
+	if err != nil {
+		return fmt.Errorf("Failed to serialize pruneTargets flag %s: %w", *pruneTargets, err)
+	}
+
 	ConfigVars["{GN_PATH}"] = *gnPath
 	ConfigVars["{GN_GEN_FILE}"] = *gnPath
 	ConfigVars["{OUTPUT_LICENSE_FILE}"] = strconv.FormatBool(*outputLicenseFile)
 	ConfigVars["{RUN_ANALYSIS}"] = strconv.FormatBool(*runAnalysis)
+	ConfigVars["{PRUNE_TARGETS}"] = string(pruneTargetsJSON)
 
 	ConfigVars["{CHECK_URLS}"] = strconv.FormatBool(*checkURLs)
 

@@ -46,7 +46,7 @@ func TestFilterTargets(t *testing.T) {
 	}
 
 	target := "//tools/check-licenses/util/testdata/example:example"
-	err = gen.FilterTargets(target)
+	err = gen.FilterTargets(target, make(map[string]bool, 0))
 	if err != nil {
 		t.Fatalf("%v: expected no error, (target: %v) got %v.", t.Name(), target, err)
 	}

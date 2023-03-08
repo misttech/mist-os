@@ -32,6 +32,10 @@ type ProjectConfig struct {
 	// ends, and the license info for another project begins.
 	// (e.g. "third_party")
 	Barriers []*Barrier `json:"barriers"`
+
+	// The strings in this map match targets that are found in $root_build_dir/project.json.
+	// These targets will be filtered out during project filtering.
+	PruneTargets map[string]bool `json:"pruneTargets"`
 }
 
 type Readme struct {
@@ -63,8 +67,9 @@ func IsBarrier(path string) bool {
 
 func NewConfig() *ProjectConfig {
 	return &ProjectConfig{
-		Readmes:  make([]*Readme, 0),
-		Barriers: make([]*Barrier, 0),
+		Readmes:      make([]*Readme, 0),
+		Barriers:     make([]*Barrier, 0),
+		PruneTargets: make(map[string]bool, 0),
 	}
 }
 
@@ -85,4 +90,9 @@ func (c *ProjectConfig) Merge(other *ProjectConfig) {
 	c.Readmes = append(c.Readmes, other.Readmes...)
 	c.Barriers = append(c.Barriers, other.Barriers...)
 	c.OutputLicenseFile = c.OutputLicenseFile || other.OutputLicenseFile
+	c.OutputLicenseFile = c.OutputLicenseFile || other.OutputLicenseFile
+
+	for k, v := range other.PruneTargets {
+		c.PruneTargets[k] = v
+	}
 }

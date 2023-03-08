@@ -26,7 +26,7 @@ func FilterProjects() error {
 	}
 
 	// Run "fx gn <>" command, and retrieve the output data.
-	gen, err := gn.Gen(context.Background(), Config.Target)
+	gen, err := gn.Gen(context.Background(), Config.Target, Config.PruneTargets)
 	if err != nil {
 		return err
 	}

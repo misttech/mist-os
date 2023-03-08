@@ -65,7 +65,7 @@ func NewGen(projectFile string) (*Gen, error) {
 
 // Process returns a list of paths that the rootTarget requires.
 // The results may include GN labels or paths to files in the repository.
-func (g *Gen) FilterTargets(rootTarget string) error {
+func (g *Gen) FilterTargets(rootTarget string, pruneTargets map[string]bool) error {
 	root := g.Targets[rootTarget]
 	if root == nil {
 		return fmt.Errorf("Failed to find %v target in the Gen target map", rootTarget)
@@ -76,15 +76,26 @@ func (g *Gen) FilterTargets(rootTarget string) error {
 
 	for len(toProcess) > 0 {
 		toProcessNext := []*Target{}
+
+	OUTER:
 		for _, t := range toProcess {
+
+			// If this target matches any entry in our pruneTargets list,
+			// skip processing this target.
+			for _, cleanName := range t.CleanNames {
+				if _, ok := pruneTargets[cleanName]; ok {
+					continue OUTER
+				}
+			}
+
 			seenTargets[t.Name] = t
 			toProcessNextCandidates := t.Deps
 			for _, candidateName := range toProcessNextCandidates {
 				t.Children = append(t.Children, g.Targets[candidateName])
 				candidate := g.Targets[candidateName]
-				if seenTarget, ok := seenTargets[candidateName]; !ok {
+				if _, ok := seenTargets[candidateName]; !ok {
 					toProcessNext = append(toProcessNext, candidate)
-					seenTargets[candidateName] = seenTarget
+					seenTargets[candidateName] = candidate
 				}
 			}
 		}

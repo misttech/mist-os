@@ -52,7 +52,7 @@ func NewGn(gnPath, buildDir string) (*Gn, error) {
 	return gn, nil
 }
 
-func (gn *Gn) Gen(ctx context.Context, target string) (*Gen, error) {
+func (gn *Gn) Gen(ctx context.Context, target string, pruneTargets map[string]bool) (*Gen, error) {
 	projectFile := filepath.Join(gn.outDir, "project.json")
 
 	if _, err := os.Stat(projectFile); err != nil {
@@ -81,7 +81,7 @@ func (gn *Gn) Gen(ctx context.Context, target string) (*Gen, error) {
 		return nil, err
 	}
 
-	err = gen.FilterTargets(target)
+	err = gen.FilterTargets(target, pruneTargets)
 	if err != nil {
 		return nil, err
 	}

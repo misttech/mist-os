@@ -5,6 +5,7 @@
         "buildDir": "{BUILD_DIR}",
         "fuchsiaDir": "{FUCHSIA_DIR}",
         "outputLicenseFile": {OUTPUT_LICENSE_FILE},
+        "pruneTargets": {PRUNE_TARGETS},
         "readmes": [
             {
                 "paths": [
