@@ -29,6 +29,7 @@ use core::{
     num::{NonZeroU16, NonZeroUsize},
     ops::RangeInclusive,
 };
+use lock_order::Locked;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
@@ -148,7 +149,7 @@ pub trait NonSyncContext: TimerContext<TimerId> {
 pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     IpDeviceIdContext<I>
 {
-    type IpTransportCtx: BufferTransportIpContext<
+    type IpTransportCtx<'a>: BufferTransportIpContext<
             I,
             C,
             Buf<Vec<u8>>,
@@ -162,7 +163,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
         O,
         F: FnOnce(
-            &mut Self::IpTransportCtx,
+            &mut Self::IpTransportCtx<'_>,
             &IsnGenerator<C::Instant>,
             &mut Sockets<I, Self::WeakDeviceId, C>,
         ) -> O,
@@ -175,7 +176,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     /// to TCP socket state.
     fn with_ip_transport_ctx_and_tcp_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpTransportCtx, &mut Sockets<I, Self::WeakDeviceId, C>) -> O,
+        F: FnOnce(&mut Self::IpTransportCtx<'_>, &mut Sockets<I, Self::WeakDeviceId, C>) -> O,
     >(
         &mut self,
         cb: F,
@@ -196,7 +197,10 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
     }
 
     /// Calls the function with an immutable reference to TCP socket state.
-    fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, Self::WeakDeviceId, C>) -> O>(&self, cb: F) -> O;
+    fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, Self::WeakDeviceId, C>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O;
 }
 
 /// Socket address includes the ip address and the port number.
@@ -1062,11 +1066,11 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
     fn remove_bound(&mut self, id: BoundId<I>);
     fn shutdown_listener(&mut self, ctx: &mut C, id: ListenerId<I>) -> BoundId<I>;
 
-    fn get_unbound_info(&self, id: UnboundId<I>) -> UnboundInfo<Self::WeakDeviceId>;
-    fn get_bound_info(&self, id: BoundId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
-    fn get_listener_info(&self, id: ListenerId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
+    fn get_unbound_info(&mut self, id: UnboundId<I>) -> UnboundInfo<Self::WeakDeviceId>;
+    fn get_bound_info(&mut self, id: BoundId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
+    fn get_listener_info(&mut self, id: ListenerId<I>) -> BoundInfo<I::Addr, Self::WeakDeviceId>;
     fn get_connection_info(
-        &self,
+        &mut self,
         id: ConnectionId<I>,
     ) -> ConnectionInfo<I::Addr, Self::WeakDeviceId>;
     fn do_send(&mut self, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>);
@@ -1092,15 +1096,15 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
         f: F,
     ) -> R;
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R, Id: Into<SocketId<I>>>(
-        &self,
+        &mut self,
         id: Id,
         f: F,
     ) -> R;
 
     fn set_send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
-    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, ctx: &mut C, id: Id) -> Option<usize>;
+    fn send_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id) -> Option<usize>;
     fn set_receive_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id, size: usize);
-    fn receive_buffer_size<Id: Into<SocketId<I>>>(&self, ctx: &mut C, id: Id) -> Option<usize>;
+    fn receive_buffer_size<Id: Into<SocketId<I>>>(&mut self, ctx: &mut C, id: Id) -> Option<usize>;
 
     fn set_reuseaddr_unbound(&mut self, id: UnboundId<I>, reuse: bool);
     fn set_reuseaddr_bound(&mut self, id: BoundId<I>, reuse: bool)
@@ -1110,7 +1114,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
         id: ListenerId<I>,
         reuse: bool,
     ) -> Result<(), SetReuseAddrError>;
-    fn reuseaddr(&self, id: SocketId<I>) -> bool;
+    fn reuseaddr(&mut self, id: SocketId<I>) -> bool;
 }
 
 impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
@@ -1599,14 +1603,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         )
     }
 
-    fn get_unbound_info(&self, id: UnboundId<I>) -> UnboundInfo<SC::WeakDeviceId> {
+    fn get_unbound_info(&mut self, id: UnboundId<I>) -> UnboundInfo<SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
             let Sockets { socketmap: _, inactive, port_alloc: _ } = sockets;
             inactive.get(id.into()).expect("invalid unbound ID").into()
         })
     }
 
-    fn get_bound_info(&self, id: BoundId<I>) -> BoundInfo<I::Addr, SC::WeakDeviceId> {
+    fn get_bound_info(&mut self, id: BoundId<I>) -> BoundInfo<I::Addr, SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
             let (bound, _, bound_addr): &(_, ListenerSharingState, _) =
                 sockets.socketmap.listeners().get_by_id(&id.into()).expect("invalid bound ID");
@@ -1616,7 +1620,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         .into()
     }
 
-    fn get_listener_info(&self, id: ListenerId<I>) -> BoundInfo<I::Addr, SC::WeakDeviceId> {
+    fn get_listener_info(&mut self, id: ListenerId<I>) -> BoundInfo<I::Addr, SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
             let (listener, _, addr): &(_, ListenerSharingState, _) =
                 sockets.socketmap.listeners().get_by_id(&id.into()).expect("invalid listener ID");
@@ -1627,7 +1631,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     }
 
     fn get_connection_info(
-        &self,
+        &mut self,
         id: ConnectionId<I>,
     ) -> ConnectionInfo<I::Addr, SC::WeakDeviceId> {
         self.with_tcp_sockets(|sockets| {
@@ -1704,7 +1708,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     }
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R, Id: Into<SocketId<I>>>(
-        &self,
+        &mut self,
         id: Id,
         f: F,
     ) -> R {
@@ -1738,7 +1742,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         set_buffer_size::<SendBufferSize, I, C, SC>(self, id.into(), size)
     }
 
-    fn send_buffer_size<Id: Into<SocketId<I>>>(&self, _ctx: &mut C, id: Id) -> Option<usize> {
+    fn send_buffer_size<Id: Into<SocketId<I>>>(&mut self, _ctx: &mut C, id: Id) -> Option<usize> {
         get_buffer_size::<SendBufferSize, I, C, SC>(self, id.into())
     }
 
@@ -1751,7 +1755,11 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         set_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id.into(), size)
     }
 
-    fn receive_buffer_size<Id: Into<SocketId<I>>>(&self, _ctx: &mut C, id: Id) -> Option<usize> {
+    fn receive_buffer_size<Id: Into<SocketId<I>>>(
+        &mut self,
+        _ctx: &mut C,
+        id: Id,
+    ) -> Option<usize> {
         get_buffer_size::<ReceiveBufferSize, I, C, SC>(self, id.into())
     }
 
@@ -1783,13 +1791,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         set_reuseaddr_maybe_listener(true, self, id.into(), reuse)
     }
 
-    fn reuseaddr(&self, id: SocketId<I>) -> bool {
+    fn reuseaddr(&mut self, id: SocketId<I>) -> bool {
         get_reuseaddr(self, id.into())
     }
 }
 
 fn get_reuseaddr<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>>(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     id: SocketId<I>,
 ) -> bool {
     sync_ctx.with_tcp_sockets(|sockets| {
@@ -2011,7 +2019,7 @@ fn get_buffer_size<
     C: NonSyncContext,
     SC: SyncContext<I, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     id: SocketId<I>,
 ) -> Option<usize> {
     sync_ctx.with_tcp_sockets(|sockets| {
@@ -2060,11 +2068,12 @@ fn get_buffer_size<
 }
 
 /// Creates a new socket in unbound state.
-pub fn create_socket<I, C>(mut sync_ctx: &SyncCtx<C>, ctx: &mut C) -> UnboundId<I>
+pub fn create_socket<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C) -> UnboundId<I>
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         IpInvariant((&mut sync_ctx, ctx)),
         |IpInvariant((sync_ctx, ctx))| SocketHandler::create_socket(sync_ctx, ctx),
@@ -2077,7 +2086,7 @@ where
 /// Sets the device on which the socket (once bound or connected) should send
 /// and receive packets, or `None` to clear the bound device.
 pub fn set_unbound_device<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
     device: Option<DeviceId<C::Instant>>,
@@ -2085,6 +2094,7 @@ pub fn set_unbound_device<I, C>(
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
         |(IpInvariant((sync_ctx, ctx, device)), id)| {
@@ -2112,7 +2122,7 @@ pub enum SetDeviceError {
 /// Sets the device on which the given socket will listen for new incoming
 /// connections. Passing `None` clears the bound device.
 pub fn set_listener_device<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
     device: Option<DeviceId<C::Instant>>,
@@ -2121,6 +2131,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
         |(IpInvariant((sync_ctx, ctx, device)), id)| {
@@ -2138,7 +2149,7 @@ where
 /// listening socket) accept connections or (if connected to a remote address)
 /// or send and receive packets. Passing `None` clears the bound device.
 pub fn set_bound_device<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: BoundId<I>,
     device: Option<DeviceId<C::Instant>>,
@@ -2147,6 +2158,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
         |(IpInvariant((sync_ctx, ctx, device)), id)| {
@@ -2163,7 +2175,7 @@ where
 /// Sets the device on which the connected socket sends and receives packets.
 /// Passing `None` clears the bound device.
 pub fn set_connection_device<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnectionId<I>,
     device: Option<DeviceId<C::Instant>>,
@@ -2172,6 +2184,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, device)), id),
         |(IpInvariant((sync_ctx, ctx, device)), id)| {
@@ -2190,7 +2203,7 @@ where
 /// the socket will be bound to that port. Otherwise a port will be selected to
 /// not conflict with existing bound or connected sockets.
 pub fn bind<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
     local_ip: Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>,
@@ -2200,6 +2213,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, port)), id, local_ip),
         |(IpInvariant((sync_ctx, ctx, port)), id, local_ip)| {
@@ -2213,7 +2227,7 @@ where
 
 /// Listens on an already bound socket.
 pub fn listen<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: BoundId<I>,
     backlog: NonZeroUsize,
@@ -2222,6 +2236,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, backlog)), id),
         |(IpInvariant((sync_ctx, ctx, backlog)), id)| {
@@ -2257,7 +2272,7 @@ pub struct SetReuseAddrError;
 
 /// Accepts an established socket from the queue of a listener socket.
 pub fn accept<I: Ip, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
 ) -> Result<
@@ -2267,6 +2282,7 @@ pub fn accept<I: Ip, C>(
 where
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2300,7 +2316,7 @@ pub enum ConnectError {
 /// established. Bindings are free to use anything available on the platform to
 /// check, for instance, signals.
 pub fn connect_bound<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: BoundId<I>,
     remote: SocketAddr<I::Addr, DeviceId<C::Instant>>,
@@ -2310,6 +2326,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, netstack_buffers)), id, remote),
         |(IpInvariant((sync_ctx, ctx, netstack_buffers)), id, remote)| {
@@ -2328,7 +2345,7 @@ where
 /// established. Bindings are free to use anything available on the platform to
 /// check, for instance, signals.
 pub fn connect_unbound<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
     remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
@@ -2339,6 +2356,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port, netstack_buffers)), id, remote_ip)| {
@@ -2443,11 +2461,12 @@ where
 
 /// Closes the connection. The user has promised that they will not use `id`
 /// again, we can reclaim the connection after the connection becomes `Closed`.
-pub fn close_conn<I, C>(mut sync_ctx: &SyncCtx<C>, ctx: &mut C, id: ConnectionId<I>)
+pub fn close_conn<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: ConnectionId<I>)
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::close_conn(sync_ctx, ctx, id),
@@ -2461,7 +2480,7 @@ where
 /// reaching `Closed` state. The user needs to call `close_conn` in order to
 /// remove it.
 pub fn shutdown_conn<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnectionId<I>,
 ) -> Result<(), NoConnection>
@@ -2469,6 +2488,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_conn(sync_ctx, ctx, id),
@@ -2477,11 +2497,12 @@ where
 }
 
 /// Removes an unbound socket.
-pub fn remove_unbound<I, C>(mut sync_ctx: &SyncCtx<C>, id: UnboundId<I>)
+pub fn remove_unbound<I, C>(sync_ctx: &SyncCtx<C>, id: UnboundId<I>)
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::remove_unbound(sync_ctx, id),
@@ -2490,11 +2511,12 @@ where
 }
 
 /// Removes a bound socket.
-pub fn remove_bound<I, C>(mut sync_ctx: &SyncCtx<C>, id: BoundId<I>)
+pub fn remove_bound<I, C>(sync_ctx: &SyncCtx<C>, id: BoundId<I>)
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::remove_bound(sync_ctx, id),
@@ -2506,15 +2528,12 @@ where
 ///
 /// The socket remains in the socket map as a bound socket, taking the port
 /// that the socket has been using. Returns the id of that bound socket.
-pub fn shutdown_listener<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    id: ListenerId<I>,
-) -> BoundId<I>
+pub fn shutdown_listener<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: ListenerId<I>) -> BoundId<I>
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::shutdown_listener(sync_ctx, ctx, id),
@@ -2523,11 +2542,12 @@ where
 }
 
 /// Sets the POSIX SO_REUSEADDR socket option on an unbound socket.
-pub fn set_reuseaddr_unbound<I, C>(mut sync_ctx: &SyncCtx<C>, id: UnboundId<I>, reuse: bool)
+pub fn set_reuseaddr_unbound<I, C>(sync_ctx: &SyncCtx<C>, id: UnboundId<I>, reuse: bool)
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, reuse)), id),
         |(IpInvariant((sync_ctx, reuse)), id)| {
@@ -2541,7 +2561,7 @@ where
 
 /// Sets the POSIX SO_REUSEADDR socket option on a bound socket.
 pub fn set_reuseaddr_bound<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     id: BoundId<I>,
     reuse: bool,
 ) -> Result<(), SetReuseAddrError>
@@ -2549,6 +2569,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, reuse)), id),
         |(IpInvariant((sync_ctx, reuse)), id)| {
@@ -2562,7 +2583,7 @@ where
 
 /// Sets the POSIX SO_REUSEADDR socket option on a listening socket.
 pub fn set_reuseaddr_listener<I, C>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     id: ListenerId<I>,
     reuse: bool,
 ) -> Result<(), SetReuseAddrError>
@@ -2570,6 +2591,7 @@ where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, reuse)), id),
         |(IpInvariant((sync_ctx, reuse)), id)| {
@@ -2582,11 +2604,12 @@ where
 }
 
 /// Gets the POSIX SO_REUSEADDR socket option on a socket.
-pub fn reuseaddr<I, C>(mut sync_ctx: &SyncCtx<C>, id: impl Into<SocketId<I>>) -> bool
+pub fn reuseaddr<I, C>(sync_ctx: &SyncCtx<C>, id: impl Into<SocketId<I>>) -> bool
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let id = id.into();
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -2665,9 +2688,10 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>> for Co
 
 /// Get information for unbound TCP socket.
 pub fn get_unbound_info<I: Ip, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     id: UnboundId<I>,
 ) -> UnboundInfo<WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_unbound_info(sync_ctx, id),
@@ -2677,9 +2701,10 @@ pub fn get_unbound_info<I: Ip, C: crate::NonSyncContext>(
 
 /// Get information for bound TCP socket.
 pub fn get_bound_info<I: Ip, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     id: BoundId<I>,
 ) -> BoundInfo<I::Addr, WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_bound_info(sync_ctx, id),
@@ -2689,9 +2714,10 @@ pub fn get_bound_info<I: Ip, C: crate::NonSyncContext>(
 
 /// Get information for listener TCP socket.
 pub fn get_listener_info<I: Ip, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     id: ListenerId<I>,
 ) -> BoundInfo<I::Addr, WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_listener_info(sync_ctx, id),
@@ -2701,9 +2727,10 @@ pub fn get_listener_info<I: Ip, C: crate::NonSyncContext>(
 
 /// Get information for connection TCP socket.
 pub fn get_connection_info<I: Ip, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     id: ConnectionId<I>,
 ) -> ConnectionInfo<I::Addr, WeakDeviceId<C::Instant>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
         |(IpInvariant(sync_ctx), id)| SocketHandler::<Ipv4, _>::get_connection_info(sync_ctx, id),
@@ -2719,11 +2746,12 @@ pub fn with_socket_options_mut<
     F: FnOnce(&mut SocketOptions) -> R,
     Id: Into<SocketId<I>>,
 >(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
     f: F,
 ) -> R {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(r) = I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, f)), id.into()),
         |(IpInvariant((sync_ctx, ctx, f)), id)| {
@@ -2748,8 +2776,9 @@ pub fn with_socket_options<
     id: Id,
     f: F,
 ) -> R {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(r) = I::map_ip(
-        (IpInvariant((&sync_ctx, f)), id.into()),
+        (IpInvariant((&mut sync_ctx, f)), id.into()),
         |(IpInvariant((sync_ctx, f)), id)| {
             IpInvariant(SocketHandler::with_socket_options(sync_ctx, id, f))
         },
@@ -2762,11 +2791,12 @@ pub fn with_socket_options<
 
 /// Set the size of the send buffer for this socket and future derived sockets.
 pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
     size: usize,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, size)), id.into()),
         |(IpInvariant((sync_ctx, ctx, size)), id)| {
@@ -2780,10 +2810,11 @@ pub fn set_send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I
 
 /// Get the size of the send buffer for this socket and future derived sockets.
 pub fn send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
 ) -> Option<usize> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(size) = I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id.into()),
         |(IpInvariant((sync_ctx, ctx)), id)| {
@@ -2838,11 +2869,12 @@ pub fn receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>
 /// - A retransmission timer fires.
 /// - An ack received from peer so that our send window is enlarged.
 /// - The user puts data into the buffer and we are notified.
-pub fn do_send<I, C>(mut sync_ctx: &SyncCtx<C>, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>)
+pub fn do_send<I, C>(sync_ctx: &SyncCtx<C>, ctx: &mut C, conn_id: MaybeClosedConnectionId<I>)
 where
     I: IpExt,
     C: crate::NonSyncContext,
 {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), conn_id),
         |(IpInvariant((sync_ctx, ctx)), conn_id)| SocketHandler::do_send(sync_ctx, ctx, conn_id),
@@ -3172,7 +3204,7 @@ mod tests {
     impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId + 'static> SyncContext<I, TcpNonSyncCtx>
         for TcpSyncCtx<I, D>
     {
-        type IpTransportCtx = FakeBufferIpTransportCtx<I, D>;
+        type IpTransportCtx<'a> = FakeBufferIpTransportCtx<I, D>;
 
         fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
             O,
@@ -3193,7 +3225,7 @@ mod tests {
         }
 
         fn with_tcp_sockets<O, F: FnOnce(&Sockets<I, FakeWeakDeviceId<D>, TcpNonSyncCtx>) -> O>(
-            &self,
+            &mut self,
             cb: F,
         ) -> O {
             let WrappedFakeSyncCtx { outer: FakeTcpState { isn_generator: _, sockets }, inner: _ } =
@@ -3609,7 +3641,7 @@ mod tests {
         // select a port.
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
         let result = SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
-            .map(|bound| SocketHandler::get_bound_info(&sync_ctx, bound).port);
+            .map(|bound| SocketHandler::get_bound_info(&mut sync_ctx, bound).port);
         assert_eq!(result, expected_result);
     }
 
@@ -3903,9 +3935,9 @@ mod tests {
             let listener =
                 SocketHandler::listen(&mut sync_ctx, &mut non_sync_ctx, bound, nonzero!(25usize))
                     .expect("can listen");
-            SocketHandler::get_listener_info(&sync_ctx, listener)
+            SocketHandler::get_listener_info(&mut sync_ctx, listener)
         } else {
-            SocketHandler::get_bound_info(&sync_ctx, bound)
+            SocketHandler::get_bound_info(&mut sync_ctx, bound)
         };
         assert_eq!(
             info,
@@ -3944,7 +3976,7 @@ mod tests {
         .expect("connect should succeed");
 
         assert_eq!(
-            SocketHandler::get_connection_info(&sync_ctx, connected),
+            SocketHandler::get_connection_info(&mut sync_ctx, connected),
             ConnectionInfo {
                 local_addr: local.map_zone(FakeWeakDeviceId),
                 remote_addr: remote.map_zone(FakeWeakDeviceId),
@@ -4068,7 +4100,7 @@ mod tests {
         .expect("bind should succeed");
 
         assert_eq!(
-            SocketHandler::get_bound_info(&sync_ctx, bound),
+            SocketHandler::get_bound_info(&mut sync_ctx, bound),
             BoundInfo {
                 addr: Some(local_addr.ip.map_zone(FakeWeakDeviceId)),
                 port: local_addr.port,
@@ -4086,7 +4118,7 @@ mod tests {
         .expect("connect should succeed");
 
         assert_eq!(
-            SocketHandler::get_connection_info(&sync_ctx, connected),
+            SocketHandler::get_connection_info(&mut sync_ctx, connected),
             ConnectionInfo {
                 local_addr: local_addr.map_zone(FakeWeakDeviceId),
                 remote_addr: remote_addr.map_zone(FakeWeakDeviceId),

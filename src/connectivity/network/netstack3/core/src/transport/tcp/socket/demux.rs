@@ -121,7 +121,7 @@ where
 
         sync_ctx.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
             |ip_transport_ctx, isn, sockets| {
-                handle_incoming_packet::<I, B, C, SC::IpTransportCtx>(
+                handle_incoming_packet::<I, B, C, SC::IpTransportCtx<'_>>(
                     ctx,
                     ip_transport_ctx,
                     isn,

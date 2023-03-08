@@ -9,6 +9,9 @@ use core::{convert::Infallible as Never, marker::PhantomData};
 use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
+pub(crate) struct TcpSockets<I>(PhantomData<I>, Never);
+pub(crate) struct TcpIsnGenerator<I>(PhantomData<I>, Never);
+
 pub(crate) struct UdpSockets<I>(PhantomData<I>, Never);
 
 pub(crate) enum Ipv4StateNextPacketId {}
@@ -39,11 +42,13 @@ pub(crate) enum LoopbackTxDequeue {}
 impl LockAfter<Unlocked> for LoopbackTxDequeue {}
 impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);
 impl_lock_after!(EthernetTxDequeue => LoopbackRxDequeue);
-impl_lock_after!(LoopbackRxDequeue => UdpSockets<Ipv4>);
+impl_lock_after!(LoopbackRxDequeue => TcpSockets<Ipv4>);
 
-// Ideally we'd have separate impls `LoopbackRxDequeue => UdpSockets<Ipv4>` and
+// Ideally we'd have separate impls `LoopbackRxDequeue => TcpSockets<Ipv4>` and
 // for `Ipv6`, but that doesn't play well with the blanket impls. Linearize IPv4
-// and IPv6 like for `IpState` below.
+// and IPv6, and TCP and UDP, like for `IpState` below.
+impl_lock_after!(TcpSockets<Ipv4> => TcpSockets<Ipv6>);
+impl_lock_after!(TcpSockets<Ipv6> => UdpSockets<Ipv4>);
 impl_lock_after!(UdpSockets<Ipv4> => UdpSockets<Ipv6>);
 impl_lock_after!(UdpSockets<Ipv6> => IpState<Ipv4>);
 

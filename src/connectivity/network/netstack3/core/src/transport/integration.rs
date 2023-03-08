@@ -2,11 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_order::{relation::LockBefore, Locked, Unlocked};
+use lock_order::{
+    lock::{LockFor, UnlockedAccess},
+    relation::LockBefore,
+    Locked, Unlocked,
+};
 use net_types::ip::{Ipv4, Ipv6};
 use packet::BufferMut;
 
 use crate::{
+    device::WeakDeviceId,
     ip::{device::IpDeviceNonSyncContext, BufferTransportIpContext, IpExt},
     transport::{
         tcp::{self, socket::isn::IsnGenerator, TcpState},
@@ -15,15 +20,17 @@ use crate::{
     NonSyncContext, SyncCtx,
 };
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>>
     tcp::socket::SyncContext<Ipv4, C> for &'_ SyncCtx<C>
 {
-    type IpTransportCtx = Self;
+    type IpTransportCtx<'a> =
+        <Locked<'a, SyncCtx<C>, Unlocked> as tcp::socket::SyncContext<Ipv4, C>>::IpTransportCtx<'a>;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
         O,
         F: FnOnce(
-            &mut Self,
+            &mut Self::IpTransportCtx<'_>,
             &IsnGenerator<C::Instant>,
             &mut tcp::socket::Sockets<Ipv4, Self::WeakDeviceId, C>,
         ) -> O,
@@ -31,29 +38,63 @@ impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>>
         &mut self,
         cb: F,
     ) -> O {
-        let mut s = *self;
-        let TcpState { isn_generator, sockets } = &s.state.transport.tcpv4;
-        cb(&mut s, isn_generator, &mut sockets.lock())
+        tcp::socket::SyncContext::<Ipv4, _>::with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
+            &mut Locked::new(*self),
+            cb,
+        )
     }
 
     fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv4, Self::WeakDeviceId, C>) -> O>(
-        &self,
+        &mut self,
         cb: F,
     ) -> O {
-        let TcpState { sockets, isn_generator: _ } = &self.state.transport.tcpv4;
-        cb(&sockets.lock())
+        tcp::socket::SyncContext::<Ipv4, _>::with_tcp_sockets(&mut Locked::new(*self), cb)
     }
 }
 
-impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>
-    tcp::socket::SyncContext<Ipv6, C> for &'_ SyncCtx<C>
+impl<
+        C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>,
+        L: LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>,
+    > tcp::socket::SyncContext<Ipv4, C> for Locked<'_, SyncCtx<C>, L>
 {
-    type IpTransportCtx = Self;
+    type IpTransportCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::TcpSockets<Ipv4>>;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
         O,
         F: FnOnce(
-            &mut Self,
+            &mut Self::IpTransportCtx<'_>,
+            &IsnGenerator<C::Instant>,
+            &mut tcp::socket::Sockets<Ipv4, Self::WeakDeviceId, C>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let isn_generator = self.unlocked_access::<crate::lock_ordering::TcpIsnGenerator<Ipv4>>();
+        let (mut sockets, mut locked) = self.lock_and::<crate::lock_ordering::TcpSockets<Ipv4>>();
+        cb(&mut locked, isn_generator, &mut *sockets)
+    }
+
+    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv4, Self::WeakDeviceId, C>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let sockets = self.lock::<crate::lock_ordering::TcpSockets<Ipv4>>();
+        cb(&*sockets)
+    }
+}
+
+// TODO(https://fxbug.dev/121450): Remove this when it is unused.
+impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>
+    tcp::socket::SyncContext<Ipv6, C> for &'_ SyncCtx<C>
+{
+    type IpTransportCtx<'a> =
+        <Locked<'a, SyncCtx<C>, Unlocked> as tcp::socket::SyncContext<Ipv6, C>>::IpTransportCtx<'a>;
+
+    fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut Self::IpTransportCtx<'_>,
             &IsnGenerator<C::Instant>,
             &mut tcp::socket::Sockets<Ipv6, Self::WeakDeviceId, C>,
         ) -> O,
@@ -61,17 +102,49 @@ impl<C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>
         &mut self,
         cb: F,
     ) -> O {
-        let mut s = *self;
-        let TcpState { isn_generator, sockets } = &s.state.transport.tcpv6;
-        cb(&mut s, isn_generator, &mut sockets.lock())
+        tcp::socket::SyncContext::<Ipv6, _>::with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
+            &mut Locked::new(*self),
+            cb,
+        )
     }
 
     fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv6, Self::WeakDeviceId, C>) -> O>(
-        &self,
+        &mut self,
         cb: F,
     ) -> O {
-        let TcpState { sockets, isn_generator: _ } = &self.state.transport.tcpv6;
-        cb(&sockets.lock())
+        tcp::socket::SyncContext::<Ipv6, _>::with_tcp_sockets(&mut Locked::new(*self), cb)
+    }
+}
+
+impl<
+        C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>,
+        L: LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>,
+    > tcp::socket::SyncContext<Ipv6, C> for Locked<'_, SyncCtx<C>, L>
+{
+    type IpTransportCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::TcpSockets<Ipv6>>;
+
+    fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut Self::IpTransportCtx<'_>,
+            &IsnGenerator<C::Instant>,
+            &mut tcp::socket::Sockets<Ipv6, Self::WeakDeviceId, C>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let isn_generator = self.unlocked_access::<crate::lock_ordering::TcpIsnGenerator<Ipv6>>();
+        let (mut sockets, mut locked) = self.lock_and::<crate::lock_ordering::TcpSockets<Ipv6>>();
+        cb(&mut locked, isn_generator, &mut sockets)
+    }
+
+    fn with_tcp_sockets<O, F: FnOnce(&tcp::socket::Sockets<Ipv6, Self::WeakDeviceId, C>) -> O>(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let sockets = self.lock::<crate::lock_ordering::TcpSockets<Ipv6>>();
+        cb(&*sockets)
     }
 }
 
@@ -220,4 +293,40 @@ where
     for<'a> Self::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
 {
     type BufferIpSocketsCtx<'a> = <Self as udp::StateContext<I, C>>::IpSocketsCtx<'a>;
+}
+
+impl<C: NonSyncContext> LockFor<crate::lock_ordering::TcpSockets<Ipv4>> for SyncCtx<C> {
+    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv4, WeakDeviceId<C::Instant>, C>>
+        where Self: 'l;
+
+    fn lock(&self) -> Self::Data<'_> {
+        self.state.transport.tcpv4.sockets.lock()
+    }
+}
+
+impl<C: NonSyncContext> LockFor<crate::lock_ordering::TcpSockets<Ipv6>> for SyncCtx<C> {
+    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv6, WeakDeviceId<C::Instant>, C>>
+        where Self: 'l;
+
+    fn lock(&self) -> Self::Data<'_> {
+        self.state.transport.tcpv6.sockets.lock()
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<Ipv4>> for SyncCtx<C> {
+    type Data<'l> = &'l IsnGenerator<C::Instant> where Self: 'l;
+
+    fn access(&self) -> Self::Data<'_> {
+        let TcpState { isn_generator, sockets: _ } = &self.state.transport.tcpv4;
+        isn_generator
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<Ipv6>> for SyncCtx<C> {
+    type Data<'l> = &'l IsnGenerator<C::Instant> where Self: 'l;
+
+    fn access(&self) -> Self::Data<'_> {
+        let TcpState { isn_generator, sockets: _ } = &self.state.transport.tcpv6;
+        isn_generator
+    }
 }
