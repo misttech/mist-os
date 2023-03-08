@@ -17,7 +17,6 @@
 
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
-#include <fbl/vector.h>
 
 #include "imx8m-i2c-regs.h"
 
@@ -30,13 +29,9 @@ using DeviceType = ddk::Device<Imx8mI2c, ddk::Unbindable>;
 
 class Imx8mI2c : public DeviceType, public ddk::I2cImplProtocol<Imx8mI2c, ddk::base_protocol> {
  public:
-  explicit Imx8mI2c(zx_device_t* parent, fbl::Vector<std::unique_ptr<Imx8mI2cBus>>&& bus_list,
-                    uint32_t bus_base)
-      : DeviceType(parent),
-        buses_(std::move(bus_list)),
-        bus_count_(buses_.size()),
-        bus_base_(bus_base) {}
-  ~Imx8mI2c() = default;
+  Imx8mI2c(zx_device_t* parent, ddk::MmioBuffer mmio, zx::interrupt& irq)
+      : DeviceType(parent), mmio_(std::move(mmio)), irq_(std::move(irq)) {}
+  virtual ~Imx8mI2c() { Shutdown(); }
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
   void Shutdown();
@@ -51,30 +46,7 @@ class Imx8mI2c : public DeviceType, public ddk::I2cImplProtocol<Imx8mI2c, ddk::b
   zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
   zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count);
 
-  // visible and implemented for testing, not used on hardware.
-  // Test coverage document mentions that when waiting on an asynchronous operation
-  // in a test, it's best to wait indefinitely and let the test runner's overall
-  // timeout expire, so below function is exposed to overwrite kDefaultTimeout with
-  // zx::duration::infinite() for each bus during test.
-  void SetTimeout(zx::duration timeout);
-
- private:
-  zx_status_t Bind();
-  fbl::Vector<std::unique_ptr<Imx8mI2cBus>> buses_;
-  size_t bus_count_ = 0;
-  const uint32_t bus_base_;
-};
-
-class Imx8mI2cBus {
- public:
-  explicit Imx8mI2cBus(ddk::MmioBuffer mmio, zx::interrupt& irq)
-      : mmio_(std::move(mmio)), irq_(std::move(irq)) {}
-
-  Imx8mI2cBus() = delete;
-  virtual ~Imx8mI2cBus() { Shutdown(); }
-
   zx_status_t Init();
-  void Shutdown();
   zx_status_t Transact(const i2c_impl_op_t* op_list, size_t count);
   zx_status_t SetBitRate(uint32_t bitrate);
   // visible and implemented for testing, not used on hardware.
@@ -85,7 +57,7 @@ class Imx8mI2cBus {
   void SetTimeout(zx::duration timeout);
 
  private:
-  static uint32_t GetBusBase(zx_device_t* parent, uint32_t controller_count);
+  zx_status_t Bind();
 
   zx_status_t HostInit();
   zx_status_t WaitForBusState(bool busy);
@@ -103,7 +75,7 @@ class Imx8mI2cBus {
                  const zx_packet_interrupt_t* interrupt);
 
   ddk::MmioBuffer mmio_;
-  async::IrqMethod<Imx8mI2cBus, &Imx8mI2cBus::HandleIrq> irq_handler_{this};
+  async::IrqMethod<Imx8mI2c, &Imx8mI2c::HandleIrq> irq_handler_{this};
   zx::interrupt irq_;
   zx::event event_;
   zx::duration timeout_;

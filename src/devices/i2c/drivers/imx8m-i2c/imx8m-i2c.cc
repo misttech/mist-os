@@ -4,7 +4,6 @@
 
 #include "imx8m-i2c.h"
 
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
@@ -26,6 +25,7 @@
 
 #include <memory>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/i2c/drivers/imx8m-i2c/imx8m-i2c-bind.h"
@@ -45,8 +45,8 @@ static const uint32_t divider_table[] = {
     22,  24,  26,  28,  32,  36,  40,  44,  48,   56,   64,   72,   80,   96,   112,  128,
     160, 192, 224, 256, 320, 384, 448, 512, 640,  768,  896,  1024, 1280, 1536, 1792, 2048};
 
-void Imx8mI2cBus::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
-                            const zx_packet_interrupt_t* interrupt) {
+void Imx8mI2c::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                         const zx_packet_interrupt_t* interrupt) {
   if (status != ZX_OK) {
     return;
   }
@@ -68,7 +68,7 @@ void Imx8mI2cBus::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq,
   irq_.ack();
 }
 
-zx_status_t Imx8mI2cBus::WaitForBusState(bool state) {
+zx_status_t Imx8mI2c::WaitForBusState(bool state) {
   const zx::time deadline = zx::clock::get_monotonic() + zx::msec(500);
 
   do {
@@ -81,7 +81,7 @@ zx_status_t Imx8mI2cBus::WaitForBusState(bool state) {
   return ZX_ERR_TIMED_OUT;
 }
 
-zx_status_t Imx8mI2cBus::PreStart() {
+zx_status_t Imx8mI2c::PreStart() {
   auto status_reg = StatusReg::Get().ReadFrom(&mmio_);
   if (status_reg.ial()) {
     zxlogf(ERROR, "Arbitration lost");
@@ -101,7 +101,7 @@ zx_status_t Imx8mI2cBus::PreStart() {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::Start() {
+zx_status_t Imx8mI2c::Start() {
   ControlReg::Get().ReadFrom(&mmio_).set_msta(1).set_mtx(1).set_txak(1).set_iien(1).WriteTo(&mmio_);
 
   // Wait until bus becomes busy
@@ -114,7 +114,7 @@ zx_status_t Imx8mI2cBus::Start() {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::RepeatedStart() {
+zx_status_t Imx8mI2c::RepeatedStart() {
   auto control_reg = ControlReg::Get().ReadFrom(&mmio_);
   control_reg.set_rsta(1).WriteTo(&mmio_);
 
@@ -128,7 +128,7 @@ zx_status_t Imx8mI2cBus::RepeatedStart() {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::Stop() {
+zx_status_t Imx8mI2c::Stop() {
   auto control_reg = ControlReg::Get().ReadFrom(&mmio_);
   control_reg.set_msta(0).set_mtx(0).set_iien(0).WriteTo(&mmio_);
 
@@ -142,7 +142,7 @@ zx_status_t Imx8mI2cBus::Stop() {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::IsAcked() {
+zx_status_t Imx8mI2c::IsAcked() {
   auto status_reg = StatusReg::Get().ReadFrom(&mmio_);
 
   if (status_reg.rxak()) {
@@ -152,7 +152,7 @@ zx_status_t Imx8mI2cBus::IsAcked() {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::WaitForTransactionComplete() {
+zx_status_t Imx8mI2c::WaitForTransactionComplete() {
   uint32_t observed = 0;
   uint32_t sig_mask = kTransactionCompleteSignal | kTransactionError;
   auto deadline = zx::deadline_after(timeout_);
@@ -172,7 +172,7 @@ zx_status_t Imx8mI2cBus::WaitForTransactionComplete() {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::SendAddress(const i2c_impl_op_t& op) {
+zx_status_t Imx8mI2c::SendAddress(const i2c_impl_op_t& op) {
   uint16_t addr = static_cast<uint16_t>(op.address << 1 | static_cast<uint16_t>(op.is_read));
 
   DataReg::Get().FromValue(0).set_data(addr).WriteTo(&mmio_);
@@ -184,7 +184,7 @@ zx_status_t Imx8mI2cBus::SendAddress(const i2c_impl_op_t& op) {
   return IsAcked();
 }
 
-zx_status_t Imx8mI2cBus::Transmit(const i2c_impl_op_t& op) {
+zx_status_t Imx8mI2c::Transmit(const i2c_impl_op_t& op) {
   zx_status_t status = SendAddress(op);
   if (status != ZX_OK) {
     zxlogf(DEBUG, "Addr send failed with error %s", zx_status_get_string(status));
@@ -211,7 +211,7 @@ zx_status_t Imx8mI2cBus::Transmit(const i2c_impl_op_t& op) {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::Receive(const i2c_impl_op_t& op, bool last_msg) {
+zx_status_t Imx8mI2c::Receive(const i2c_impl_op_t& op, bool last_msg) {
   zx_status_t status = SendAddress(op);
   if (status != ZX_OK) {
     zxlogf(DEBUG, "Addr send failed with error %s", zx_status_get_string(status));
@@ -257,7 +257,7 @@ zx_status_t Imx8mI2cBus::Receive(const i2c_impl_op_t& op, bool last_msg) {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::Transact(const i2c_impl_op_t* op_list, size_t count) {
+zx_status_t Imx8mI2c::Transact(const i2c_impl_op_t* op_list, size_t count) {
   fbl::AutoLock lock(&transact_lock_);
 
   zx_status_t status = PreStart();
@@ -311,9 +311,9 @@ zx_status_t Imx8mI2cBus::Transact(const i2c_impl_op_t* op_list, size_t count) {
   return status;
 }
 
-void Imx8mI2cBus::Shutdown() { irq_handler_.Cancel(); }
+void Imx8mI2c::Shutdown() { irq_handler_.Cancel(); }
 
-void Imx8mI2cBus::DumpRegs() {
+void Imx8mI2c::DumpRegs() {
   zxlogf(INFO, "IADR = 0x%x", AddressReg::Get().ReadFrom(&mmio_).reg_value());
   zxlogf(INFO, "IFDR = 0x%x", FrequencyDividerRegister::Get().ReadFrom(&mmio_).reg_value());
   zxlogf(INFO, "I2CR = 0x%x", ControlReg::Get().ReadFrom(&mmio_).reg_value());
@@ -321,7 +321,7 @@ void Imx8mI2cBus::DumpRegs() {
   zxlogf(INFO, "I2DR = 0x%x", DataReg::Get().ReadFrom(&mmio_).reg_value());
 }
 
-zx_status_t Imx8mI2cBus::HostInit() {
+zx_status_t Imx8mI2c::HostInit() {
   ControlReg::Get().ReadFrom(&mmio_).set_ien(0).WriteTo(&mmio_);
 
   StatusReg::Get().ReadFrom(&mmio_).set_ial(0).set_iif(0).WriteTo(&mmio_);
@@ -335,7 +335,7 @@ zx_status_t Imx8mI2cBus::HostInit() {
   return ZX_OK;
 }
 
-zx_status_t Imx8mI2cBus::SetBitRate(uint32_t bitrate) {
+zx_status_t Imx8mI2c::SetBitRate(uint32_t bitrate) {
   uint32_t computed_rate;
   uint32_t abs_error;
   uint32_t best_error = UINT32_MAX;
@@ -363,9 +363,9 @@ zx_status_t Imx8mI2cBus::SetBitRate(uint32_t bitrate) {
   return ZX_OK;
 }
 
-void Imx8mI2cBus::SetTimeout(zx::duration timeout) { timeout_ = timeout; }
+void Imx8mI2c::SetTimeout(zx::duration timeout) { timeout_ = timeout; }
 
-zx_status_t Imx8mI2cBus::Init() {
+zx_status_t Imx8mI2c::Init() {
   timeout_ = zx::duration(kDefaultTimeout);
 
   zx_status_t status = zx::event::create(0, &event_);
@@ -380,10 +380,6 @@ zx_status_t Imx8mI2cBus::Init() {
 }
 
 zx_status_t Imx8mI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t count) {
-  if (bus_id < bus_base_ || (bus_id - bus_base_) >= bus_count_) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
   for (uint32_t i = 0; i < count; ++i) {
     if (op_list[i].data_size > kMaxTransferSize) {
       return ZX_ERR_OUT_OF_RANGE;
@@ -400,31 +396,19 @@ zx_status_t Imx8mI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_l
     }
   }
 
-  return buses_[bus_id - bus_base_]->Transact(op_list, count);
+  return Transact(op_list, count);
 }
 
 zx_status_t Imx8mI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
-  if (bus_id < bus_base_ || (bus_id - bus_base_) >= bus_count_) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  return buses_[bus_id - bus_base_]->SetBitRate(bitrate);
+  return SetBitRate(bitrate);
 }
 
-uint32_t Imx8mI2c::I2cImplGetBusBase() { return bus_base_; }
-uint32_t Imx8mI2c::I2cImplGetBusCount() { return static_cast<uint32_t>(bus_count_); }
+uint32_t Imx8mI2c::I2cImplGetBusBase() { return 0; }
+uint32_t Imx8mI2c::I2cImplGetBusCount() { return 1; }
 
 zx_status_t Imx8mI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
-  if (bus_id < bus_base_ || (bus_id - bus_base_) >= bus_count_) {
-    return ZX_ERR_INVALID_ARGS;
-  }
   *out_size = kMaxTransferSize;
   return ZX_OK;
-}
-
-void Imx8mI2c::Shutdown() {
-  for (uint32_t id = 0; id < bus_count_; id++) {
-    buses_[id]->Shutdown();
-  }
 }
 
 void Imx8mI2c::DdkUnbind(ddk::UnbindTxn txn) {
@@ -433,47 +417,6 @@ void Imx8mI2c::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void Imx8mI2c::DdkRelease() { delete this; }
-
-void Imx8mI2c::SetTimeout(zx::duration timeout) {
-  for (uint32_t id = 0; id < bus_count_; id++) {
-    buses_[id]->SetTimeout(timeout);
-  }
-}
-
-uint32_t GetBusBase(zx_device_t* parent, const uint32_t controller_count) {
-  if (controller_count != 1) {
-    return 0;
-  }
-
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
-      parent, DEVICE_METADATA_I2C_CHANNELS);
-  if (!decoded.is_ok()) {
-    if (decoded.status_value() != ZX_ERR_NOT_FOUND) {
-      zxlogf(WARNING, "Bus metadata could not be decoded: %s", decoded.status_string());
-    }
-    return 0;
-  }
-
-  // Prefer the top-level bus ID if present.
-  if (decoded->has_bus_id()) {
-    return decoded->bus_id();
-  }
-
-  if (!decoded->has_channels() || decoded->channels().empty()) {
-    zxlogf(WARNING, "No channels specified in bus metadata");
-    return 0;
-  }
-
-  const uint32_t bus_id = decoded->channels()[0].has_bus_id() ? decoded->channels()[0].bus_id() : 0;
-  for (const auto& channel : decoded->channels()) {
-    const uint32_t this_bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
-    if (this_bus_id != bus_id) {
-      return 0;
-    }
-  }
-
-  return bus_id;
-}
 
 zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
@@ -491,48 +434,32 @@ zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (info.mmio_count != info.irq_count) {
-    zxlogf(ERROR, "mmio_count %u does not matchirq_count %u", info.mmio_count, info.irq_count);
+  if (info.mmio_count != 1 || info.irq_count != 1) {
+    zxlogf(ERROR, "Invalid mmio_count (%u) or irq_count (%u)", info.mmio_count, info.irq_count);
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fbl::Vector<std::unique_ptr<Imx8mI2cBus>> bus_list;
-
   // TODO(fxbug.dev/121200): Enable and Set clock using clock fragment
-  for (uint32_t i = 0; i < info.mmio_count; i++) {
-    std::optional<ddk::MmioBuffer> mmio;
-    if ((status = pdev.MapMmio(i, &mmio)) != ZX_OK) {
-      zxlogf(ERROR, "pdev_map_mmio_buffer failed %s", zx_status_get_string(status));
-      return status;
-    }
-
-    zx::interrupt irq;
-    if ((status = pdev.GetInterrupt(i, 0, &irq)) != ZX_OK) {
-      return status;
-    }
-
-    auto i2c_bus = fbl::make_unique_checked<Imx8mI2cBus>(&ac, *std::move(mmio), irq);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    if ((status = i2c_bus->Init()) != ZX_OK) {
-      zxlogf(ERROR, "imx8m_i2c bus init failed %s", zx_status_get_string(status));
-      return ZX_ERR_INTERNAL;
-    }
-
-    bus_list.push_back(std::move(i2c_bus), &ac);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
+  std::optional<ddk::MmioBuffer> mmio;
+  if ((status = pdev.MapMmio(0, &mmio)) != ZX_OK) {
+    zxlogf(ERROR, "pdev_map_mmio_buffer failed %s", zx_status_get_string(status));
+    return status;
   }
 
-  const uint32_t bus_base = GetBusBase(parent, info.mmio_count);
+  zx::interrupt irq;
+  if ((status = pdev.GetInterrupt(0, 0, &irq)) != ZX_OK) {
+    return status;
+  }
 
-  auto dev = fbl::make_unique_checked<Imx8mI2c>(&ac, parent, std::move(bus_list), bus_base);
+  auto dev = fbl::make_unique_checked<Imx8mI2c>(&ac, parent, *std::move(mmio), irq);
   if (!ac.check()) {
     zxlogf(ERROR, "ZX_ERR_NO_MEMORY");
     return ZX_ERR_NO_MEMORY;
+  }
+
+  if ((status = dev->Init()) != ZX_OK) {
+    zxlogf(ERROR, "imx8m_i2c bus init failed %s", zx_status_get_string(status));
+    return ZX_ERR_INTERNAL;
   }
 
   status = dev->Bind();

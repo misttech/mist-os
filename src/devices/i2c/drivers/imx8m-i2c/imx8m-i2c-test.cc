@@ -4,7 +4,6 @@
 
 #include "imx8m-i2c.h"
 
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -185,83 +184,6 @@ TEST_F(Imx8mI2cTest, I2cImplTransact) {
   EXPECT_EQ(read_data, 0xbb);
 
   ASSERT_NO_FATAL_FAILURE(Destroy());
-}
-
-TEST_F(Imx8mI2cTest, BusBaseSetByChannelMetadata) {
-  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
-  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-
-  fidl::Arena arena;
-
-  fidl::VectorView<I2CChannel> channels(arena, 3);
-  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[2] = I2CChannel::Builder(arena).bus_id(2).Build();
-
-  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
-
-  auto result = fidl::Persist(metadata);
-  ASSERT_TRUE(result.is_ok());
-
-  fake_parent_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
-
-  ASSERT_NO_FATAL_FAILURE(CreateDut());
-
-  EXPECT_EQ(dut_->I2cImplGetBusBase(), 2);
-}
-
-TEST_F(Imx8mI2cTest, BusBaseSetByBusIdIgnoreChannels) {
-  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
-  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-
-  fidl::Arena arena;
-
-  fidl::VectorView<I2CChannel> channels(arena, 3);
-  channels[0] = I2CChannel::Builder(arena).bus_id(1).Build();
-  channels[1] = I2CChannel::Builder(arena).bus_id(1).Build();
-  channels[2] = I2CChannel::Builder(arena).bus_id(1).Build();
-
-  // Set top-level bus ID to something different.
-  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).bus_id(2).Build();
-
-  auto result = fidl::Persist(metadata);
-  ASSERT_TRUE(result.is_ok());
-
-  fake_parent_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
-
-  ASSERT_NO_FATAL_FAILURE(CreateDut());
-
-  // Top-level bus ID should be preferred over channel bus ID(s).
-  EXPECT_EQ(dut_->I2cImplGetBusBase(), 2);
-}
-
-TEST_F(Imx8mI2cTest, BusMetadataIgnoredMultipleBusIds) {
-  using fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata;
-  using fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-
-  fidl::Arena arena;
-
-  fidl::VectorView<I2CChannel> channels(arena, 3);
-  channels[0] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[1] = I2CChannel::Builder(arena).bus_id(2).Build();
-  channels[2] = I2CChannel::Builder(arena).bus_id(5).Build();
-
-  auto metadata = I2CBusMetadata::Builder(arena).channels(channels).Build();
-
-  auto result = fidl::Persist(metadata);
-  ASSERT_TRUE(result.is_ok());
-
-  fake_parent_->SetMetadata(DEVICE_METADATA_I2C_CHANNELS, result->data(), result->size());
-
-  ASSERT_NO_FATAL_FAILURE(CreateDut());
-
-  // Bus IDs were ignored, default to zero base.
-  EXPECT_EQ(dut_->I2cImplGetBusBase(), 0);
-}
-
-TEST_F(Imx8mI2cTest, NoBusMetadata) {
-  ASSERT_NO_FATAL_FAILURE(CreateDut());
-  EXPECT_EQ(dut_->I2cImplGetBusBase(), 0);
 }
 
 }  // namespace imx8m_i2c
