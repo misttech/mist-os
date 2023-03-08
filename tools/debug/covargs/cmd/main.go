@@ -481,7 +481,7 @@ func createLLVMCovResponseFile(tempDir string, modules *[]symbolize.FileCloser) 
 	}
 
 	if len(srcFiles) > 0 {
-		fmt.Fprintf(covFile, "-sources\n")
+		fmt.Fprintln(covFile, "-sources")
 		for _, srcFile := range srcFiles {
 			fmt.Fprintf(covFile, "%s\n", srcFile)
 		}
@@ -491,8 +491,8 @@ func createLLVMCovResponseFile(tempDir string, modules *[]symbolize.FileCloser) 
 	return covFile.Name(), nil
 }
 
-// setDebugInfodEnvironmentVariables sets the necessary environment variables for debuginfod.
-func setDebugInfodEnvironmentVariables(cmd *exec.Cmd) {
+// setDebuginfodEnv sets the environment variables for debuginfod.
+func setDebuginfodEnv(cmd *exec.Cmd) {
 	// When debuginfod server is provided, set the DEBUGINFOD_URLS environment variable that is a string of a space-separated URLs.
 	if len(debuginfodServers) > 0 {
 		debuginfodUrls := strings.Join(debuginfodServers, " ")
@@ -530,7 +530,7 @@ func showCoverageData(ctx context.Context, mergedProfileFile string, covFile str
 	args = append(args, "@"+covFile)
 	showCmd := exec.Command(llvmCov, args...)
 	logger.Debugf(ctx, "%s\n", showCmd)
-	setDebugInfodEnvironmentVariables(showCmd)
+	setDebuginfodEnv(showCmd)
 	data, err := showCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v:\n%s", err, string(data))
@@ -573,7 +573,7 @@ func exportCoverageData(ctx context.Context, mergedProfileFile string, covFile s
 	exportCmd := exec.Command(llvmCov, args...)
 	exportCmd.Stdout = &b
 	exportCmd.Stderr = stderrFile
-	setDebugInfodEnvironmentVariables(exportCmd)
+	setDebuginfodEnv(exportCmd)
 
 	if err := exportCmd.Run(); err != nil {
 		return fmt.Errorf("failed to export: %w", err)
