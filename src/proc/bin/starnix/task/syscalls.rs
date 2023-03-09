@@ -757,10 +757,12 @@ pub fn sys_arch_prctl(
     addr: UserAddress,
 ) -> Result<(), Errno> {
     match code {
+        #[cfg(target_arch = "x86_64")]
         ARCH_SET_FS => {
             current_task.registers.fs_base = addr.ptr() as u64;
             Ok(())
         }
+        #[cfg(target_arch = "x86_64")]
         ARCH_SET_GS => {
             current_task.registers.gs_base = addr.ptr() as u64;
             Ok(())

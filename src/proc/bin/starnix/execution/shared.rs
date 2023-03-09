@@ -213,9 +213,10 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
     let instructions = {
         const INTERRUPT_AND_JUMP: [u8; 8] = [
             0x00, 0x00, 0x20, 0xd4, // 0xd4200000 = brk 0 (the argument is ignored by us).
-            // TODO Write this code. This issues an undefined instruction so it's obvious something
-            // is not implemented. As of this writing, ARM doesn't compile so this code can't be
-            // tested so I didn't want to write something that looked correct but was wrong.
+            // TODO(fxbug.dev/121659): Write this code. This issues an undefined instruction so it's
+            // obvious something is not implemented. As of this writing, ARM doesn't compile so this
+            // code can't be tested so I didn't want to write something that looked correct but was
+            // wrong.
             //
             // I believe ARM lacks a single indirect-from-memory jump instruction like x86 so this
             // will need some research on what registers we can clobber.
@@ -249,7 +250,7 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
         .set_break_on_load(&(instruction_pointer.ptr() as u64))
         .map_err(|err| from_status_like_fdio!(err))?;
 
-    current_task.registers.rip = instruction_pointer.ptr() as u64;
+    current_task.registers.set_instruction_pointer_register(instruction_pointer.ptr() as u64);
     current_task
         .thread_group
         .process

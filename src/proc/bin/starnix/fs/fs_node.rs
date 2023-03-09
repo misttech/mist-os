@@ -72,10 +72,10 @@ pub struct FsNodeInfo {
     pub mode: FileMode,
     pub size: usize,
     pub storage_size: usize,
-    pub blksize: i64,
+    pub blksize: blksize_t,
     pub uid: uid_t,
     pub gid: gid_t,
-    pub link_count: u64,
+    pub link_count: nlink_t,
     pub time_create: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
@@ -119,7 +119,7 @@ impl FlockInfo {
 }
 
 /// st_blksize is measured in units of 512 bytes.
-const DEFAULT_BYTES_PER_BLOCK: i64 = 512;
+const DEFAULT_BYTES_PER_BLOCK: blksize_t = 512;
 
 pub struct FlockOperation {
     operation: u32,
@@ -829,11 +829,16 @@ impl FsNode {
 
     pub fn stat(&self) -> Result<stat_t, Errno> {
         let info = self.ops().update_info(self)?;
+
+        // The blksize cast is necessary depending on the architecture.
+        #[allow(clippy::unnecessary_cast)]
+        let blocks = info.storage_size as i64 / info.blksize as i64;
+
         Ok(stat_t {
             st_ino: self.inode_num,
             st_mode: info.mode.bits(),
             st_size: info.size as off_t,
-            st_blocks: info.storage_size as i64 / info.blksize,
+            st_blocks: blocks,
             st_nlink: info.link_count,
             st_uid: info.uid,
             st_gid: info.gid,

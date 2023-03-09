@@ -1249,12 +1249,33 @@ impl RegisterState {
     /// Sets the register on this task that indicates the single-machine-word return value from a
     /// function call.
     #[cfg(target_arch = "x86_64")]
+    pub fn set_instruction_pointer_register(&mut self, new_ip: u64) {
+        self.real_registers.rip = new_ip;
+    }
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_instruction_pointer_register(&mut self, new_ip: u64) {
+        self.real_registers.pc = new_ip;
+    }
+
+    /// Sets the register on this task that indicates the single-machine-word return value from a
+    /// function call.
+    #[cfg(target_arch = "x86_64")]
     pub fn set_return_register(&mut self, return_value: u64) {
         self.real_registers.rax = return_value;
     }
     #[cfg(target_arch = "aarch64")]
     pub fn set_return_register(&mut self, return_value: u64) {
         self.real_registers.r[0] = return_value;
+    }
+
+    /// Gets the register on this task that indicates the current stack pointer.
+    #[cfg(target_arch = "x86_64")]
+    pub fn stack_pointer_register(&self) -> u64 {
+        self.real_registers.rsp
+    }
+    #[cfg(target_arch = "aarch64")]
+    pub fn stack_pointer_register(&self) -> u64 {
+        self.real_registers.sp
     }
 
     /// Sets the register on this task that indicates the current stack pointer.
@@ -1293,8 +1314,14 @@ impl std::ops::DerefMut for RegisterState {
 }
 
 impl From<zx::sys::zx_thread_state_general_regs_t> for RegisterState {
+    #[cfg(target_arch = "x86_64")]
     fn from(regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
         RegisterState { real_registers: regs, orig_rax: 0 }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn from(regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
+        RegisterState { real_registers: regs }
     }
 }
 

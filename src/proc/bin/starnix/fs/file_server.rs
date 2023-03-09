@@ -259,12 +259,17 @@ impl StarnixNodeConnection {
     /// `vfs::File::get_attrs`.
     fn get_attrs(&self) -> fio::NodeAttributes {
         let info = self.file.node().info();
+
+        // This cast is necessary depending on the architecture.
+        #[allow(clippy::unnecessary_cast)]
+        let link_count = info.link_count as u64;
+
         fio::NodeAttributes {
             mode: info.mode.bits(),
             id: self.file.fs.dev_id.bits(),
             content_size: info.size as u64,
             storage_size: info.storage_size as u64,
-            link_count: info.link_count,
+            link_count,
             creation_time: info.time_create.into_nanos() as u64,
             modification_time: info.time_modify.into_nanos() as u64,
         }

@@ -198,7 +198,7 @@ impl FsNodeOps for TmpfsDirectory {
             let mut node_info = node.info_write();
             node_info.rdev = dev;
             // blksize is PAGE_SIZE for in memory node.
-            node_info.blksize = *PAGE_SIZE as i64;
+            node_info.blksize = *PAGE_SIZE as blksize_t;
         }
 
         Ok(node)

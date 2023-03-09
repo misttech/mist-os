@@ -106,13 +106,13 @@ pub fn create_fuchsia_pipe(
 
 fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     /// st_blksize is measured in units of 512 bytes.
-    const BYTES_PER_BLOCK: i64 = 512;
+    const BYTES_PER_BLOCK: blksize_t = 512;
 
     // TODO - store these in FsNodeState and convert on fstat
     info.size = attrs.content_size as usize;
     info.storage_size = attrs.storage_size as usize;
     info.blksize = BYTES_PER_BLOCK;
-    info.link_count = attrs.link_count;
+    info.link_count = attrs.link_count as nlink_t;
 }
 
 fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {

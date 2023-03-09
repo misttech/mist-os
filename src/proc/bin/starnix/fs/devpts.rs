@@ -23,7 +23,7 @@ const DEVPTS_MAJOR_COUNT: u32 = 4;
 pub const DEVPTS_COUNT: u32 = DEVPTS_MAJOR_COUNT * 256;
 // The block size of the node in the devpts file system. Value has been taken from
 // https://github.com/google/gvisor/blob/master/test/syscalls/linux/pty.cc
-const BLOCK_SIZE: i64 = 1024;
+const BLOCK_SIZE: blksize_t = 1024;
 
 // The inode of the different node in the devpts filesystem.
 const ROOT_INODE: ino_t = 1;

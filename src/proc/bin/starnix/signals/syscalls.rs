@@ -19,12 +19,6 @@ use zerocopy::FromBytes;
 
 pub use super::signal_handling::sys_restart_syscall;
 
-/// The minimum allowed size for the sigaltstack.
-#[cfg(target_arch = "x86_64")]
-const MINSIGSTKSZ: usize = 0x800;
-#[cfg(target_arch = "aarch_64")]
-const MINSIGSTKSZ: usize = 0x1400;
-
 pub fn sys_rt_sigaction(
     current_task: &CurrentTask,
     signum: UncheckedSignal,
@@ -122,7 +116,9 @@ pub fn sys_sigaltstack(
     let mut signal_state = &mut state.signals;
     let on_signal_stack = signal_state
         .alt_stack
-        .map(|signal_stack| signal_stack.contains_pointer(current_task.registers.rsp))
+        .map(|signal_stack| {
+            signal_stack.contains_pointer(current_task.registers.stack_pointer_register())
+        })
         .unwrap_or(false);
 
     let mut ss = sigaltstack_t::default();
@@ -134,7 +130,7 @@ pub fn sys_sigaltstack(
         if (ss.ss_flags & !(SS_AUTODISARM | SS_DISABLE)) != 0 {
             return error!(EINVAL);
         }
-        if ss.ss_flags & SS_DISABLE == 0 && ss.ss_size < MINSIGSTKSZ {
+        if ss.ss_flags & SS_DISABLE == 0 && ss.ss_size < MINSIGSTKSZ as usize {
             return error!(ENOMEM);
         }
     }
@@ -702,12 +698,12 @@ mod tests {
 
         // Try to install a sigaltstack with an invalid size.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ).expect("failed to round up");
+            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr =
             map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
         ss.ss_sp = sigaltstack_addr;
         ss.ss_flags = 0;
-        ss.ss_size = MINSIGSTKSZ - 1;
+        ss.ss_size = MINSIGSTKSZ as usize - 1;
         current_task.mm.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(sys_sigaltstack(&current_task, user_ss, nullptr), error!(ENOMEM));
     }
@@ -727,7 +723,7 @@ mod tests {
 
         // Try to install a sigaltstack.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ).expect("failed to round up");
+            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr =
             map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
         ss.ss_sp = sigaltstack_addr;
@@ -766,7 +762,7 @@ mod tests {
 
         // Try to install a sigaltstack that takes the whole memory.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ).expect("failed to round up");
+            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr =
             map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
         ss.ss_sp = sigaltstack_addr;
