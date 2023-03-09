@@ -30,8 +30,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:d/display/amlogic-display/display-controller",
       "sys/platform/05:06:2b/aml-hdmi",
       "sys/platform/05:06:1d",  // pwm
-      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-0-regulator",
-      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-9-regulator",
+      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/aml_pwm_regulator/pwm-0-regulator",
+      "sys/platform/05:06:1d/aml-pwm-device/pwm-9/aml_pwm_regulator/pwm-9-regulator",
       "sys/platform/05:06:26/aml-power-impl-composite",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-little-core",

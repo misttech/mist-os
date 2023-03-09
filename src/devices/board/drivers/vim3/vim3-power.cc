@@ -15,6 +15,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <ddk/metadata/pwm.h>
 #include <ddktl/device.h>
@@ -32,37 +33,21 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 namespace {
 
-const zx_device_prop_t vreg_props[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
-    {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_PWM_VREG},
-};
+const ddk::BindRule kPwmAODRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_AO_D))};
 
-constexpr zx_bind_inst_t pwm_ao_d_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_PWM),
-    BI_MATCH_IF(EQ, BIND_PWM_ID, A311D_PWM_AO_D),
-};
+const device_bind_prop_t kPwmAODProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+    ddk::MakeProperty(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_AO_D))};
 
-constexpr zx_bind_inst_t pwm_a_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_PWM),
-    BI_MATCH_IF(EQ, BIND_PWM_ID, A311D_PWM_A),
-};
+const ddk::BindRule kPwmARules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+    ddk::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_A))};
 
-constexpr device_fragment_part_t pwm_ao_d_fragment[] = {
-    {std::size(pwm_ao_d_match), pwm_ao_d_match},
-};
-
-constexpr device_fragment_part_t pwm_a_fragment[] = {
-    {std::size(pwm_a_match), pwm_a_match},
-};
-#define PWM_ID(x) #x
-#define PWM_FRAGMENT_NAME(x) ("pwm-" PWM_ID(x))
-constexpr device_fragment_t vreg_fragments[] = {
-    {PWM_FRAGMENT_NAME(A311D_PWM_AO_D), std::size(pwm_ao_d_fragment), pwm_ao_d_fragment},
-    {PWM_FRAGMENT_NAME(A311D_PWM_A), std::size(pwm_a_fragment), pwm_a_fragment},
-};
-#undef PWM_FRAGMENT_NAME
-#undef PWM_ID
+const device_bind_prop_t kPwmAProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+    ddk::MakeProperty(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_A))};
 
 constexpr voltage_pwm_period_ns_t kA311dPwmPeriodNs = 1500;
 
@@ -248,22 +233,11 @@ zx_status_t Vim3::PowerInit() {
       },
   };
 
-  static composite_device_desc_t vreg_desc = []() {
-    composite_device_desc_t dev = {};
-    dev.props = vreg_props;
-    dev.props_count = std::size(vreg_props);
-    dev.fragments = vreg_fragments;
-    dev.fragments_count = std::size(vreg_fragments);
-    dev.primary_fragment = vreg_fragments[0].name;  // ???
-    dev.spawn_colocated = true;
-    dev.metadata_list = vreg_metadata;
-    dev.metadata_count = std::size(vreg_metadata);
-    return dev;
-  }();
-
-  st = DdkAddComposite("vreg", &vreg_desc);
+  st = DdkAddCompositeNodeSpec("vreg", ddk::CompositeNodeSpec(kPwmAODRules, kPwmAODProperties)
+                                           .AddParentSpec(kPwmARules, kPwmAProperties)
+                                           .set_metadata(vreg_metadata));
   if (st != ZX_OK) {
-    zxlogf(ERROR, "DdkAddComposite for vreg failed, st = %d", st);
+    zxlogf(ERROR, "DdkAddCompositeNodeSpec for vreg failed, st = %d", st);
     return st;
   }
 

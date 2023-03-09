@@ -76,9 +76,11 @@ zx_status_t AmlPwmRegulator::Create(void* ctx, zx_device_t* parent) {
     uint32_t idx = pwm_vreg.pwm_index();
     char name[20];
     snprintf(name, sizeof(name), "pwm-%u", idx);
-    ddk::PwmProtocolClient pwm(parent, name);
-    if (!pwm.is_valid()) {
-      zxlogf(ERROR, "Invalid PWM %u", idx);
+    ddk::PwmProtocolClient pwm;
+    if (auto status = ddk::PwmProtocolClient::CreateFromDevice(parent, name, &pwm);
+        status != ZX_OK) {
+      zxlogf(ERROR, "Failed to create PWM protocol client for %s: %s", name,
+             zx_status_get_string(status));
       return ZX_ERR_INTERNAL;
     }
     auto status = pwm.Enable();

@@ -2,10 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.platform;
+composite aml_pwm_regulator;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.PWM_VREG;
+using fuchsia.pwm;
+using fuchsia.amlogic.platform.t931;
 
+primary node "pwm-9" {
+    fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+    fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.t931.GPIOZ_PIN_ID.PIN_9;
+}
+
+node "pwm-0" {
+    fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+    fuchsia.BIND_PWM_ID == fuchsia.amlogic.platform.t931.GPIOZ_PIN_ID.PIN_0;
+}
