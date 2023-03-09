@@ -20,8 +20,6 @@ std::string NameLibrary(const std::vector<std::unique_ptr<raw::Identifier>>& com
 std::string NameLibrary(const std::vector<std::string_view>& library_name);
 std::string NameLibraryCHeader(const std::vector<std::string_view>& library_name);
 
-std::string NamePrimitiveCType(types::PrimitiveSubtype subtype);
-std::string NamePrimitiveIntegerCConstantMacro(types::PrimitiveSubtype type);
 std::string NameHandleSubtype(types::HandleSubtype subtype);
 std::string NameHandleRights(types::RightsWrappedType rights);
 std::string NameHandleZXObjType(types::HandleSubtype subtype);
@@ -35,7 +33,6 @@ std::string NameUnionTag(std::string_view union_name, const flat::Union::Member:
 std::string NameFlatConstant(const flat::Constant* constant);
 std::string NameFlatBinaryOperator(flat::BinaryOperatorConstant::Operator op);
 std::string NameFlatType(const flat::Type* type);
-std::string NameFlatCType(const flat::Type* type);
 std::string NameDiscoverable(const flat::Protocol& protocol);
 std::string NameMethod(std::string_view protocol_name, const flat::Protocol::Method& method);
 std::string NameOrdinal(std::string_view method_name);
