@@ -2750,6 +2750,19 @@
   submitted: '2022-11-07'
   reviewed: '2023-02-23'
 
+- name: 'RFC-0211'
+  title: 'Fuchsia on RISC-V'
+  short_description: 'Add support for 64-bits RISC-V CPUs.'
+  authors: ['cpu@google.com', 'curtisgalloway@google.com', 'revest@google.com', 'rogerta@google.com', 'travisg@google.com']
+  file: '0211_fuchsia_on_risc-v.md'
+  area: ['Build', 'Devices', 'Drivers', 'EngProd/Infra', 'Firmware', 'General', 'Kernel', 'Languages and Libraries', 'Security', 'Toolchain']
+  issue: ['']
+  gerrit_change_id: ['802787']
+  status: 'Accepted'
+  reviewers: ['cpu@google.com', 'travisg@google.com', 'mcgrathr@google.com', 'rogerta@google.com', 'maruel@google.com', 'mvanotti@google.com', 'shayba@google.com', 'curtisgalloway@google.com', 'mkearney@google.com', 'keir@google.com', 'jamesr@google.com', 'phosek@google.com', 'dpursell@google.com', 'jyotiraju@google.com']
+  submitted: '2023-02-14'
+  reviewed: '2023-03-07'
+
 - name: 'RFC-0212'
   title: 'Package Sets'
   short_description: 'Proposes a series of changes to the definition and menu of package sets on Fuchsia'
