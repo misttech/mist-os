@@ -9,12 +9,16 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/status.h>
 
 #include <cstring>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <ddk/usb-peripheral-config.h>
+#include <ddktl/device.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <usb/cdc.h>
@@ -23,6 +27,7 @@
 #include <usb/peripheral.h>
 #include <usb/usb.h>
 
+#include "bind/fuchsia/registers/cpp/bind.h"
 #include "src/devices/board/drivers/vim3/vim3-gpios.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
@@ -82,7 +87,7 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
 
 static const fpbus::Node usb_phy_dev = []() {
   fpbus::Node dev = {};
-  dev.name() = "vim3-usb-phy";
+  dev.name() = "vim3_usb_phy";
   dev.pid() = PDEV_PID_VIM3;
   dev.vid() = PDEV_VID_AMLOGIC;
   dev.did() = PDEV_DID_VIM3_USB_PHY;
@@ -92,6 +97,18 @@ static const fpbus::Node usb_phy_dev = []() {
   dev.metadata() = usb_phy_metadata;
   return dev;
 }();
+
+const std::vector<fuchsia_driver_framework::BindRule> kResetRegisterRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
+
+const std::vector<fuchsia_driver_framework::NodeProperty> kResetRegisterProperties = {
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
+
+const std::vector<fuchsia_driver_framework::ParentSpec> kUsbPhyDevParents = {
+    fuchsia_driver_framework::ParentSpec{
+        {.bind_rules = kResetRegisterRules, .properties = kResetRegisterProperties}}};
 
 static const std::vector<fpbus::Mmio> dwc2_mmios{
     {{
@@ -203,16 +220,6 @@ static fpbus::Node dwc2_dev = []() {
   return dev;
 }();
 
-static const zx_bind_inst_t reset_register_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_REGISTERS),
-    BI_MATCH_IF(EQ, BIND_REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET),
-};
-static const device_fragment_part_t reset_register_fragment[] = {
-    {std::size(reset_register_match), reset_register_match},
-};
-static const device_fragment_t usb_phy_fragments[] = {
-    {"register-reset", std::size(reset_register_fragment), reset_register_fragment},
-};
 static const zx_bind_inst_t dwc2_phy_match[] = {
     BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_USB_PHY),
     BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_GENERIC),
@@ -245,20 +252,19 @@ zx_status_t Vim3::UsbInit() {
   // Create USB Phy Device
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('USB_');
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, usb_phy_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, usb_phy_fragments,
-                                               std::size(usb_phy_fragments)),
-      {});
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(usb_phy_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
-    return result.status();
+  auto spec = fuchsia_driver_framework::CompositeNodeSpec{
+      {.name = "vim3_usb_phy", .parents = kUsbPhyDevParents}};
+  fdf::WireUnownedResult usb_phy_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, usb_phy_dev), fidl::ToWire(fidl_arena, spec));
+  if (!usb_phy_result.ok()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Usb(usb_phy_dev) request failed: %s", __func__,
+           usb_phy_result.FormatDescription().data());
+    return usb_phy_result.status();
   }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Usb(usb_phy_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  if (usb_phy_result->is_error()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Usb(usb_phy_dev) failed: %s", __func__,
+           zx_status_get_string(usb_phy_result->error_value()));
+    return usb_phy_result->error_value();
   }
 
   // Create DWC2 Device
@@ -271,7 +277,7 @@ zx_status_t Vim3::UsbInit() {
 
   dwc2_dev.metadata().value()[0].data().emplace(peripheral_config->config_data());
 
-  result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
       fidl::ToWire(fidl_arena, dwc2_dev),
       platform_bus_composite::MakeFidlFragment(fidl_arena, dwc2_fragments,
                                                std::size(dwc2_fragments)),

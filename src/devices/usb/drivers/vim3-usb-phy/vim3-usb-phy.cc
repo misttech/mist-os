@@ -444,7 +444,7 @@ zx_status_t Vim3UsbPhy::Init() {
     return status;
   }
 
-  return DdkAdd("vim3-usb-phy", DEVICE_ADD_NON_BINDABLE);
+  return DdkAdd("vim3_usb_phy", DEVICE_ADD_NON_BINDABLE);
 }
 
 void Vim3UsbPhy::DdkInit(ddk::InitTxn txn) {

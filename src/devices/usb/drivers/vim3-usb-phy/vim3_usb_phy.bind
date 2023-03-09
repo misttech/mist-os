@@ -2,10 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.khadas.platform;
-using fuchsia.amlogic.platform;
+composite vim3_usb_phy;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.khadas.platform.BIND_PLATFORM_DEV_PID.VIM3;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.VIM3_USB_PHY;
+using fuchsia.amlogic.platform;
+using fuchsia.khadas.platform;
+using fuchsia.platform;
+using fuchsia.registers;
+
+primary node "pdev" {
+    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.khadas.platform.BIND_PLATFORM_DEV_PID.VIM3;
+    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.VIM3_USB_PHY;
+    fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+}
+
+node "register-reset" {
+  fuchsia.BIND_PROTOCOL == fuchsia.registers.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_REGISTER_ID == fuchsia.amlogic.platform.BIND_REGISTER_ID.USB_PHY_V2_RESET;
+}
