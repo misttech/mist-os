@@ -780,13 +780,6 @@
                 "RtSignalTest.SignoMatch",
                 "RtSignalTest.ValueDelivered",
 
-                // sched_test
-                "SchedGetparamTest.InvalidPIDReturnsEINVAL",
-                "SchedGetparamTest.ImpossiblePIDReturnsESRCH",
-                "SchedGetschedulerTest.ReturnsESRCH",
-                "SchedGetparamTest.NullParamReturnsEINVAL",
-                "SchedGetschedulerTest.ReturnsEINVAL",
-
                 // seccomp_test
                 "SeccompTest.SeccompRejectsUnknownFlags",
                 "SeccompTest.RetErrnoReturnsErrno",

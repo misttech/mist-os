@@ -107,6 +107,74 @@ impl ExitStatus {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub enum SchedulerPolicy {
+    #[default]
+    Normal,
+    Batch,
+    Idle,
+    Fifo {
+        priority: u32,
+    },
+    RoundRobin {
+        priority: u32,
+    },
+}
+
+impl SchedulerPolicy {
+    pub fn from_raw(policy: u32, params: sched_param) -> Result<Self, Errno> {
+        let valid_priorities =
+            min_priority_for_sched_policy(policy)?..=max_priority_for_sched_policy(policy)?;
+        if !valid_priorities.contains(&params.sched_priority) {
+            return error!(EINVAL);
+        }
+        // ok to cast i32->u32, above range excludes negatives
+        match (policy, params.sched_priority as u32) {
+            (SCHED_NORMAL, 0) => Ok(Self::Normal),
+            (SCHED_BATCH, 0) => Ok(Self::Batch),
+            (SCHED_IDLE, 0) => Ok(Self::Idle),
+            (SCHED_FIFO, priority) => Ok(Self::Fifo { priority }),
+            (SCHED_RR, priority) => Ok(Self::RoundRobin { priority }),
+            _ => error!(EINVAL),
+        }
+    }
+
+    pub fn raw_policy(&self) -> u32 {
+        match self {
+            Self::Normal => SCHED_NORMAL,
+            Self::Batch => SCHED_BATCH,
+            Self::Idle => SCHED_IDLE,
+            Self::Fifo { .. } => SCHED_FIFO,
+            Self::RoundRobin { .. } => SCHED_RR,
+        }
+    }
+
+    pub fn raw_params(&self) -> sched_param {
+        match self {
+            Self::Normal | Self::Batch | Self::Idle => sched_param { sched_priority: 0 },
+            Self::Fifo { priority } | Self::RoundRobin { priority } => {
+                sched_param { sched_priority: *priority as i32 }
+            }
+        }
+    }
+}
+
+pub fn min_priority_for_sched_policy(policy: u32) -> Result<i32, Errno> {
+    match policy {
+        SCHED_NORMAL | SCHED_BATCH | SCHED_IDLE => Ok(0),
+        SCHED_FIFO | SCHED_RR => Ok(1),
+        _ => error!(EINVAL),
+    }
+}
+
+pub fn max_priority_for_sched_policy(policy: u32) -> Result<i32, Errno> {
+    match policy {
+        SCHED_NORMAL | SCHED_BATCH | SCHED_IDLE => Ok(0),
+        SCHED_FIFO | SCHED_RR => Ok(99),
+        _ => error!(EINVAL),
+    }
+}
+
 pub struct TaskMutableState {
     // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
     pub clear_child_tid: UserRef<pid_t>,
@@ -121,6 +189,9 @@ pub struct TaskMutableState {
     /// Whether the executor should dump the stack of this task when it exits. Currently used to
     /// implement ExitStatus::CoreDump.
     pub dump_on_exit: bool,
+
+    /// Desired scheduler policy for the task.
+    pub scheduler_policy: SchedulerPolicy,
 }
 
 pub enum ExceptionResult {
@@ -240,6 +311,7 @@ impl Task {
                 signals: Default::default(),
                 exit_status: None,
                 dump_on_exit: false,
+                scheduler_policy: Default::default(),
             }),
         };
         #[cfg(any(test, debug_assertions))]

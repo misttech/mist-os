@@ -397,8 +397,43 @@ pub fn sys_exit_group(current_task: &CurrentTask, code: i32) -> Result<(), Errno
     Ok(())
 }
 
-pub fn sys_sched_getscheduler(_ctx: &CurrentTask, _pid: i32) -> Result<u32, Errno> {
-    Ok(SCHED_NORMAL)
+pub fn sys_sched_getscheduler(current_task: &CurrentTask, pid: pid_t) -> Result<u32, Errno> {
+    if pid < 0 {
+        return error!(EINVAL);
+    }
+
+    let target = if pid == 0 {
+        current_task.task.clone()
+    } else {
+        current_task.task.get_task(pid).ok_or(errno!(ESRCH))?
+    };
+
+    let current_policy = target.read().scheduler_policy;
+    Ok(current_policy.raw_policy())
+}
+
+pub fn sys_sched_setscheduler(
+    current_task: &CurrentTask,
+    pid: pid_t,
+    policy: u32,
+    param: UserAddress,
+) -> Result<(), Errno> {
+    if pid < 0 || param.is_null() {
+        return error!(EINVAL);
+    }
+
+    let target = if pid == 0 {
+        current_task.task.clone()
+    } else {
+        current_task.task.get_task(pid).ok_or(errno!(ESRCH))?
+    };
+
+    let param: sched_param = current_task.mm.read_object(param.into())?;
+    let policy = SchedulerPolicy::from_raw(policy, param)?;
+    // TODO(https://fxbug.dev/123174) make zircon aware of this update
+    target.write().scheduler_policy = policy;
+
+    Ok(())
 }
 
 pub fn sys_sched_getaffinity(
@@ -435,13 +470,29 @@ pub fn sys_sched_setaffinity(
 
 pub fn sys_sched_getparam(
     current_task: &CurrentTask,
-    _pid: pid_t,
+    pid: pid_t,
     param: UserAddress,
 ) -> Result<(), Errno> {
-    // Scheduling parameter cannot be changed right now. Always return 0.
-    let param_value = sched_param { sched_priority: 0 };
+    if pid < 0 || param.is_null() {
+        return error!(EINVAL);
+    }
+
+    let target = if pid == 0 {
+        current_task.task.clone()
+    } else {
+        current_task.task.get_task(pid).ok_or(errno!(ESRCH))?
+    };
+    let param_value = target.read().scheduler_policy.raw_params();
     current_task.mm.write_object(param.into(), &param_value)?;
     Ok(())
+}
+
+pub fn sys_sched_get_priority_min(_ctx: &CurrentTask, policy: u32) -> Result<i32, Errno> {
+    min_priority_for_sched_policy(policy)
+}
+
+pub fn sys_sched_get_priority_max(_ctx: &CurrentTask, policy: u32) -> Result<i32, Errno> {
+    max_priority_for_sched_policy(policy)
 }
 
 pub fn sys_timer_create(
@@ -1114,6 +1165,50 @@ mod tests {
 
         current_task.mm.read_memory(mapped_address, &mut out_name).unwrap();
         assert_eq!(name.as_bytes(), &out_name);
+    }
+
+    #[::fuchsia::test]
+    fn test_sched_get_priority_min_max() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let non_rt_min = sys_sched_get_priority_min(&current_task, SCHED_NORMAL).unwrap();
+        assert_eq!(non_rt_min, 0);
+        let non_rt_max = sys_sched_get_priority_max(&current_task, SCHED_NORMAL).unwrap();
+        assert_eq!(non_rt_max, 0);
+
+        let rt_min = sys_sched_get_priority_min(&current_task, SCHED_FIFO).unwrap();
+        assert_eq!(rt_min, 1);
+        let rt_max = sys_sched_get_priority_max(&current_task, SCHED_FIFO).unwrap();
+        assert_eq!(rt_max, 99);
+
+        let min_bad_policy_error =
+            sys_sched_get_priority_min(&current_task, std::u32::MAX).unwrap_err();
+        assert_eq!(min_bad_policy_error, errno!(EINVAL));
+
+        let max_bad_policy_error =
+            sys_sched_get_priority_max(&current_task, std::u32::MAX).unwrap_err();
+        assert_eq!(max_bad_policy_error, errno!(EINVAL));
+    }
+
+    #[::fuchsia::test]
+    fn test_sched_setscheduler() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let scheduler = sys_sched_getscheduler(&current_task, 0).unwrap();
+        assert_eq!(scheduler, SCHED_NORMAL, "tasks should have normal scheduler by default");
+
+        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let requested_params = sched_param { sched_priority: 15 };
+        current_task.mm.write_object(mapped_address.into(), &requested_params).unwrap();
+
+        sys_sched_setscheduler(&current_task, 0, SCHED_FIFO, mapped_address).unwrap();
+
+        let new_scheduler = sys_sched_getscheduler(&current_task, 0).unwrap();
+        assert_eq!(new_scheduler, SCHED_FIFO, "task should have been assigned fifo scheduler");
+
+        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        sys_sched_getparam(&current_task, 0, mapped_address).expect("sched_getparam");
+        let param_value: sched_param =
+            current_task.mm.read_object(mapped_address.into()).expect("read_object");
+        assert_eq!(param_value.sched_priority, 15);
     }
 
     #[::fuchsia::test]
