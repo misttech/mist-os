@@ -93,7 +93,7 @@ impl InspectRepository {
                         let mut guard = this.inner.write().await;
 
                         if let Some((_, container)) =
-                            guard.diagnostics_containers.get(&identity_clone.unique_key())
+                            guard.diagnostics_containers.get_mut(&identity_clone.unique_key())
                         {
                             if container.remove_handle(koid_to_remove).await != 0 {
                                 return;

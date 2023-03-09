@@ -8,7 +8,6 @@ use crate::{
     identity::ComponentIdentity,
     inspect::collector::{self as collector, InspectData},
 };
-use async_lock::RwLock;
 use diagnostics_data as schema;
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
@@ -67,7 +66,7 @@ impl From<fio::DirectoryProxy> for InspectHandle {
 pub struct InspectArtifactsContainer {
     /// DirectoryProxy for the out directory that this
     /// data packet is configured for.
-    diagnostics_proxy: RwLock<HashMap<zx::Koid, Arc<InspectHandle>>>,
+    diagnostics_proxy: HashMap<zx::Koid, Arc<InspectHandle>>,
     _on_closed_task: fasync::Task<()>,
 }
 
@@ -88,14 +87,13 @@ impl InspectArtifactsContainer {
             }
             let _ = snd.send(koid);
         });
-        (Self { diagnostics_proxy: RwLock::new(diagnostics_proxy), _on_closed_task }, rcv)
+        (Self { diagnostics_proxy, _on_closed_task }, rcv)
     }
 
     /// Remove a handle via its `koid` from the set of proxies managed by `self`.
-    pub async fn remove_handle(&self, koid: zx::Koid) -> usize {
-        let mut lock_guard = self.diagnostics_proxy.write().await;
-        lock_guard.remove(&koid);
-        lock_guard.len()
+    pub async fn remove_handle(&mut self, koid: zx::Koid) -> usize {
+        self.diagnostics_proxy.remove(&koid);
+        self.diagnostics_proxy.len()
     }
 
     /// Generate an `UnpopulatedInspectDataContainer` from the proxies managed by `self`.
@@ -106,17 +104,16 @@ impl InspectArtifactsContainer {
         identity: &Arc<ComponentIdentity>,
         matcher: Option<Arc<HierarchyMatcher>>,
     ) -> Option<UnpopulatedInspectDataContainer> {
-        let lock_guard = self.diagnostics_proxy.read().await;
-        if lock_guard.len() == 0 {
+        if self.diagnostics_proxy.is_empty() {
             return None;
         }
 
         // we know there is at least 1
-        let (_koid, handle) = lock_guard.iter().next().unwrap();
+        let (_koid, handle) = self.diagnostics_proxy.iter().next().unwrap();
 
         match handle.as_ref() {
             // there can only be one Directory, semantically
-            InspectHandle::Directory(dir) if lock_guard.len() == 1 => {
+            InspectHandle::Directory(dir) if self.diagnostics_proxy.len() == 1 => {
                 fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
                     UnpopulatedInspectDataContainer {
                         identity: Arc::clone(identity),
