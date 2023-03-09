@@ -205,6 +205,7 @@ executable("pcie_test") {
   deps = [
     ":sim_library",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
@@ -217,7 +218,6 @@ executable("pcie_test") {
     "//zircon/system/public",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
