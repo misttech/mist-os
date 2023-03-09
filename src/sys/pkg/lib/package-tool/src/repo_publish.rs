@@ -21,7 +21,6 @@ use {
         collections::BTreeSet,
         fs::File,
         io::{BufReader, BufWriter, Write},
-        path::Path,
     },
     tracing::{error, info, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
@@ -82,8 +81,17 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
     Ok(())
 }
 
-async fn lock_repository(lock_path: &Path) -> Result<Lockfile> {
-    Ok(Lockfile::lock_for(lock_path, std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
+async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
+    let lock_path = dir.join(REPOSITORY_LOCK_FILENAME).into_std_path_buf();
+    let _log_warning_task = fasync::Task::local({
+        let lock_path = lock_path.clone();
+        async move {
+            fasync::Timer::new(fasync::Duration::from_secs(30)).await;
+            warn!("Obtaining a lock at {} not complete after 30s", &lock_path.display());
+        }
+    });
+
+    Ok(Lockfile::lock_for(&lock_path, std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
         .await
         .map_err(|e| {
             error!(
@@ -104,17 +112,7 @@ async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
     if !dir.exists() {
         std::fs::create_dir(&dir).expect("creating repository dir");
     }
-    let lock_path = dir.join(REPOSITORY_LOCK_FILENAME).into_std_path_buf();
-    let lock_file = {
-        let _log_warning_task = fasync::Task::local({
-            let lock_path = lock_path.clone();
-            async move {
-                fasync::Timer::new(fasync::Duration::from_secs(30)).await;
-                warn!("Obtaining a lock at {} not complete after 30s", &lock_path.display());
-            }
-        });
-        lock_repository(&lock_path).await?
-    };
+    let lock_file = lock_repository(&dir).await?;
     let publish_result = repo_publish_oneshot(cmd).await;
     lock_file.unlock()?;
     publish_result
@@ -435,7 +433,7 @@ mod tests {
     // Waits for the repo to be unlocked.
     async fn ensure_repo_unlocked(repo_path: &Utf8Path) {
         fasync::Timer::new(fasync::Duration::from_millis(100)).await;
-        lock_repository(repo_path.as_std_path()).await.unwrap().unlock().unwrap();
+        lock_repository(repo_path).await.unwrap().unlock().unwrap();
     }
 
     #[fuchsia::test]
