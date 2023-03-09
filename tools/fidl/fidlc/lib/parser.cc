@@ -23,18 +23,6 @@ namespace fidl {
 
 #define CASE_IDENTIFIER(K) Token::KindAndSubkind(Token::Kind::kIdentifier, K).combined()
 
-#define TOKEN_TYPE_CASES                          \
-  case CASE_IDENTIFIER(Token::Subkind::kNone):    \
-  case CASE_IDENTIFIER(Token::Subkind::kArray):   \
-  case CASE_IDENTIFIER(Token::Subkind::kVector):  \
-  case CASE_IDENTIFIER(Token::Subkind::kString):  \
-  case CASE_IDENTIFIER(Token::Subkind::kRequest): \
-  case CASE_IDENTIFIER(Token::Subkind::kZxExperimentalPointer)
-
-#define TOKEN_ATTR_CASES         \
-  case Token::Kind::kDocComment: \
-  case Token::Kind::kLeftSquare
-
 #define TOKEN_LITERAL_CASES                      \
   case CASE_IDENTIFIER(Token::Subkind::kTrue):   \
   case CASE_IDENTIFIER(Token::Subkind::kFalse):  \
