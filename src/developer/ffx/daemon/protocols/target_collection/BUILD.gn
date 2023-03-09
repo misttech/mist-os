@@ -13,9 +13,12 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/daemon/events:lib",
     "//src/developer/ffx/daemon/target:lib",
     "//src/developer/ffx/lib/diagnostics:lib",
+    "//src/developer/ffx/lib/emulator_instance:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/protocols:lib",
     "//src/developer/ffx/lib/rcs:lib",
@@ -29,7 +32,7 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:notify",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -44,9 +47,11 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
+    "src/emulator_targets.rs",
     "src/lib.rs",
     "src/reboot.rs",
     "src/target_handle.rs",
