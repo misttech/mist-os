@@ -103,7 +103,7 @@ impl AsRef<str> for EventType {
 }
 
 /// An event that is emitted and consumed.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Event {
     /// The contents of the event.
     pub payload: EventPayload,
@@ -120,7 +120,7 @@ impl Event {
 }
 
 /// The contents of the event depending on the type of event.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum EventPayload {
     DiagnosticsReady(DiagnosticsReadyPayload),
     LogSinkRequested(LogSinkRequestedPayload),
@@ -132,13 +132,7 @@ pub struct DiagnosticsReadyPayload {
     /// The component which diagnostics directory is available.
     pub component: Arc<ComponentIdentity>,
     /// The `out/diagnostics` directory of the component.
-    pub directory: Option<fio::DirectoryProxy>,
-}
-
-impl Clone for DiagnosticsReadyPayload {
-    fn clone(&self) -> Self {
-        Self { component: Arc::clone(&self.component), directory: None }
-    }
+    pub directory: fio::DirectoryProxy,
 }
 
 /// Payload for a connection to the `LogSink` protocol.
@@ -146,13 +140,7 @@ pub struct LogSinkRequestedPayload {
     /// The component that is connecting to `LogSink`.
     pub component: Arc<ComponentIdentity>,
     /// The stream containing requests made on the `LogSink` channel by the component.
-    pub request_stream: Option<flogger::LogSinkRequestStream>,
-}
-
-impl Clone for LogSinkRequestedPayload {
-    fn clone(&self) -> Self {
-        Self { component: Arc::clone(&self.component), request_stream: None }
-    }
+    pub request_stream: flogger::LogSinkRequestStream,
 }
 
 impl std::fmt::Debug for LogSinkRequestedPayload {
@@ -325,7 +313,7 @@ impl TryFrom<fcomponent::Event> for Event {
                         timestamp: zx::Time::from_nanos(event.header.timestamp),
                         payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                             component: Arc::new(identity),
-                            directory: Some(directory),
+                            directory,
                         }),
                     })
                 }
@@ -353,7 +341,7 @@ impl TryFrom<fcomponent::Event> for Event {
                         timestamp: zx::Time::from_nanos(event.header.timestamp),
                         payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                             component: Arc::new(identity),
-                            request_stream: Some(request_stream),
+                            request_stream,
                         }),
                     })
                 }

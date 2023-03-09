@@ -19,13 +19,13 @@ pub struct UnattributedLogSinkSource {
 }
 
 impl UnattributedLogSinkSource {
-    pub async fn new_connection(&mut self, stream: flogger::LogSinkRequestStream) {
+    pub async fn new_connection(&mut self, request_stream: flogger::LogSinkRequestStream) {
         self.dispatcher
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                     component: Arc::new(ComponentIdentity::unknown()),
-                    request_stream: Some(stream),
+                    request_stream,
                 }),
             })
             .ok();
@@ -70,7 +70,7 @@ mod tests {
         match event.payload {
             EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                 component,
-                request_stream: Some(_),
+                request_stream: _,
             }) => {
                 assert_eq!(*component, expected_identity);
             }

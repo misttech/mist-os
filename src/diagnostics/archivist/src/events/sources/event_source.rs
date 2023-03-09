@@ -126,10 +126,9 @@ pub mod tests {
         // Assert the third received event was a DirectoryReady event for diagnostics.
         let event = event_stream.next().await.unwrap();
         match event.payload {
-            EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                component,
-                directory: Some(_),
-            }) => assert_eq!(*component, expected_identity),
+            EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, directory: _ }) => {
+                assert_eq!(*component, expected_identity)
+            }
             other => panic!("unexpected event payload: {other:?}"),
         }
 

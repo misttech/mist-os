@@ -123,27 +123,25 @@ impl EventRouter {
                         inspect_logger.log(&event);
 
                         let event_type = event.ty();
-                        let weak_consumers = match consumers.get_mut(&event_type) {
+                        let weak_consumers = match consumers.remove(&event_type) {
                             Some(c) => c,
                             None => continue,
                         };
 
-                        let event_without_singleton_data = event.clone();
-                        let mut event_with_singleton_data = Some(event);
+                        let mut singleton_event = Some(event);
 
                         // Consumers which weak reference could be upgraded will be stored here.
                         let mut active_consumers = vec![];
-                        for consumer in weak_consumers.iter_mut().filter_map(|c| c.upgrade()) {
-                            active_consumers.push(Arc::downgrade(&consumer));
-                            let e = event_with_singleton_data
-                                .take()
-                                .unwrap_or_else(|| event_without_singleton_data.clone());
-                            consumer.handle(e).await;
+                        for weak_consumer in weak_consumers {
+                            if let Some(consumer) = weak_consumer.upgrade() {
+                                active_consumers.push(weak_consumer);
+                                if let Some(e) = singleton_event.take() {
+                                    consumer.handle(e).await;
+                                };
+                            }
                         }
 
-                        // We insert the list of active consumers in the map at the key for this
-                        // event type. This leads to dropping the previous list of weak references
-                        // which contains consumers which aren't active anymore.
+                        // We insert the list of active consumers back in the map.
                         consumers.insert(event_type, active_consumers);
                     }
                 }
@@ -399,10 +397,13 @@ mod tests {
     use super::*;
     use crate::events::types::ComponentIdentifier;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_logger::LogSinkMarker;
+    use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_io as fio;
+    use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_async as fasync;
     use fuchsia_inspect::assert_data_tree;
     use fuchsia_zircon as zx;
+    use fuchsia_zircon::AsHandleRef;
     use futures::{lock::Mutex, FutureExt, SinkExt};
     use lazy_static::lazy_static;
 
@@ -432,20 +433,28 @@ mod tests {
     impl TestEventProducer {
         async fn emit(&mut self, event_type: EventType, identity: Arc<ComponentIdentity>) {
             let event = match event_type {
-                EventType::DiagnosticsReady => Event {
-                    timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
-                    payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component: identity,
-                        directory: None,
-                    }),
-                },
-                EventType::LogSinkRequested => Event {
-                    timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
-                    payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
-                        component: identity,
-                        request_stream: None,
-                    }),
-                },
+                EventType::DiagnosticsReady => {
+                    let (directory, _) =
+                        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+                    Event {
+                        timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
+                        payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
+                            component: identity,
+                            directory,
+                        }),
+                    }
+                }
+                EventType::LogSinkRequested => {
+                    let (_, request_stream) =
+                        fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
+                    Event {
+                        timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
+                        payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+                            component: identity,
+                            request_stream,
+                        }),
+                    }
+                }
             };
             let _ = self.dispatcher.emit(event);
         }
@@ -546,8 +555,11 @@ mod tests {
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
-        let (_, request_stream) =
-            fidl::endpoints::create_request_stream::<LogSinkMarker>().unwrap();
+        let (_, server_end) = fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
+        let request_stream_koid = server_end.as_handle_ref().get_koid().unwrap();
+        let request_stream = LogSinkRequestStream::from_channel(
+            fidl::AsyncChannel::from_channel(server_end.into_channel()).unwrap(),
+        );
         let timestamp = zx::Time::get_monotonic();
         producer
             .dispatcher
@@ -555,29 +567,24 @@ mod tests {
                 timestamp,
                 payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                     component: IDENTITY.clone(),
-                    request_stream: Some(request_stream),
+                    request_stream,
                 }),
             })
             .unwrap();
 
-        // The first consumer that was registered must receive the request stream. The second one
-        // must receive no payload, but still receive the event.
+        // The first consumer that was registered receives the request stream. The second one
+        // receives nothing.
         let first_event = first_receiver.next().await.unwrap();
         assert_matches!(first_event, Event {
             payload: EventPayload::LogSinkRequested(payload),
             ..
         } => {
             assert_eq!(payload.component, *IDENTITY);
-            assert!(payload.request_stream.is_some());
+            let actual_koid = payload.request_stream
+                .into_inner().0.channel().as_handle_ref().get_koid().unwrap();
+            assert_eq!(actual_koid, request_stream_koid);
         });
-        let second_event = second_receiver.next().await.unwrap();
-        assert_matches!(second_event, Event {
-            payload: EventPayload::LogSinkRequested(payload),
-            ..
-        } => {
-            assert_eq!(payload.component, *IDENTITY);
-            assert!(payload.request_stream.is_none());
-        });
+        assert!(second_receiver.next().now_or_never().is_none());
     }
 
     #[fuchsia::test]
@@ -611,13 +618,14 @@ mod tests {
         let _router_task = fasync::Task::spawn(fut);
 
         // Emit an event
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         producer
             .dispatcher
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: IDENTITY.clone(),
-                    directory: None,
+                    directory,
                 }),
             })
             .unwrap();
@@ -629,13 +637,14 @@ mod tests {
         assert!(third_receiver.next().now_or_never().unwrap().is_none());
 
         // We see additional events in the second receiver which remains alive.
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         producer
             .dispatcher
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: IDENTITY.clone(),
-                    directory: None,
+                    directory,
                 }),
             })
             .unwrap();
@@ -800,11 +809,12 @@ mod tests {
     }
 
     fn diagnostics_ready(identity: Arc<ComponentIdentity>) -> Event {
+        let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         Event {
             timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
             payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                 component: identity,
-                directory: None,
+                directory,
             }),
         }
     }

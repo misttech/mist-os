@@ -80,7 +80,7 @@ impl ComponentEventProvider {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component,
-                    directory: Some(directory),
+                    directory,
                 }),
             })?;
         }
@@ -172,7 +172,7 @@ mod tests {
         match event.payload {
             EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                 component: observed_identity,
-                directory: Some(_),
+                directory: _,
             }) => {
                 assert_eq!(
                     observed_identity.relative_moniker.to_string(),

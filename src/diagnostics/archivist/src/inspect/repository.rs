@@ -132,13 +132,11 @@ impl InspectRepository {
     async fn handle_diagnostics_ready(
         self: &Arc<Self>,
         component: Arc<ComponentIdentity>,
-        handle: Option<impl Into<InspectHandle>>,
+        handle: impl Into<InspectHandle>,
     ) {
         debug!(identity = %component, "Diagnostics directory is ready.");
-        if let Some(handle) = handle {
-            // Update the central repository to reference the new diagnostics source.
-            self.add_inspect_artifacts(Arc::clone(&component), handle).await;
-        }
+        // Update the central repository to reference the new diagnostics source.
+        self.add_inspect_artifacts(Arc::clone(&component), handle).await;
     }
 
     #[cfg(test)]
@@ -285,7 +283,7 @@ mod tests {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: Arc::clone(&identity),
-                    directory: Some(proxy),
+                    directory: proxy,
                 }),
             })
             .await;
@@ -298,7 +296,7 @@ mod tests {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: Arc::clone(&identity),
-                    directory: Some(proxy),
+                    directory: proxy,
                 }),
             })
             .await;
@@ -322,7 +320,7 @@ mod tests {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: Arc::clone(&identity),
-                    directory: Some(proxy),
+                    directory: proxy,
                 }),
             })
             .await;
@@ -349,7 +347,7 @@ mod tests {
                     timestamp: zx::Time::get_monotonic(),
                     payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                         component: Arc::clone(&identity),
-                        directory: Some(proxy),
+                        directory: proxy,
                     }),
                 })
                 .await;
@@ -380,7 +378,7 @@ mod tests {
                     timestamp: zx::Time::get_monotonic(),
                     payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                         component: Arc::clone(&identity),
-                        directory: Some(proxy),
+                        directory: proxy,
                     }),
                 })
                 .await;
@@ -425,13 +423,11 @@ mod tests {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: Arc::clone(&identity),
-                    directory: Some(
-                        fuchsia_fs::directory::open_in_namespace(
-                            "/tmp",
-                            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-                        )
-                        .expect("open root"),
-                    ),
+                    directory: fuchsia_fs::directory::open_in_namespace(
+                        "/tmp",
+                        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                    )
+                    .expect("open root"),
                 }),
             })
             .await;
@@ -450,13 +446,11 @@ mod tests {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: Arc::clone(&identity2),
-                    directory: Some(
-                        fuchsia_fs::directory::open_in_namespace(
-                            "/tmp",
-                            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-                        )
-                        .expect("open root"),
-                    ),
+                    directory: fuchsia_fs::directory::open_in_namespace(
+                        "/tmp",
+                        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                    )
+                    .expect("open root"),
                 }),
             })
             .await;

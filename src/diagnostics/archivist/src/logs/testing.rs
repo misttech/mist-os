@@ -336,7 +336,7 @@ impl EventStreamLogReader {
                 other => unreachable!("should never see {:?} here", other),
             };
         let container = log_manager.get_log_container(component).await;
-        container.handle_log_sink(request_stream.unwrap(), sender).await;
+        container.handle_log_sink(request_stream, sender).await;
     }
 }
 

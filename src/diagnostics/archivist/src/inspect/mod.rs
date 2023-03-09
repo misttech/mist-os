@@ -734,7 +734,7 @@ mod tests {
                             timestamp: zx::Time::get_monotonic(),
                             payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                                 component: Arc::clone(&identity),
-                                directory: Some(proxy),
+                                directory: proxy,
                             }),
                         })
                         .await;
@@ -884,7 +884,7 @@ mod tests {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                     component: Arc::clone(&identity),
-                    directory: Some(out_dir_proxy),
+                    directory: out_dir_proxy,
                 }),
             })
             .await;

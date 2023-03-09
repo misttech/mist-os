@@ -220,12 +220,10 @@ impl EventConsumer for LogsRepository {
                 request_stream,
             }) => {
                 debug!(identity = %component, "LogSink requested.");
-                if let Some(request_stream) = request_stream {
-                    let container = self.get_log_container(component).await;
-                    container
-                        .handle_log_sink(request_stream, self.log_sender.read().await.clone())
-                        .await;
-                }
+                let container = self.get_log_container(component).await;
+                container
+                    .handle_log_sink(request_stream, self.log_sender.read().await.clone())
+                    .await;
             }
             _ => unreachable!("Archivist state just subscribes to log sink requested"),
         }
