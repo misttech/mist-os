@@ -571,6 +571,7 @@ func exportCoverageData(ctx context.Context, mergedProfileFile string, covFile s
 
 	args = append(args, "@"+covFile)
 	exportCmd := exec.Command(llvmCov, args...)
+	logger.Debugf(ctx, "%s\n", exportCmd)
 	exportCmd.Stdout = &b
 	exportCmd.Stderr = stderrFile
 	setDebuginfodEnv(exportCmd)
@@ -640,7 +641,9 @@ func process(ctx context.Context) error {
 		defer os.RemoveAll(tempDir)
 	}
 
+	start := time.Now()
 	mergedProfileFile, err := mergeProfiles(ctx, tempDir, versionedProfiles, llvmProfDataVersions)
+	logger.Debugf(ctx, "time to merge profiles: %.2f minutes\n", time.Since(start).Minutes())
 	if err != nil {
 		return fmt.Errorf("failed to merge profiles: %w", err)
 	}
@@ -657,7 +660,10 @@ func process(ctx context.Context) error {
 		}
 	}
 
+	start = time.Now()
 	modules, err := fetchFromSymbolServer(ctx, mergedProfileFile, tempDir, &entries)
+	logger.Debugf(ctx, "time to fetch from symbol server: %.2f minutes\n", time.Since(start).Minutes())
+
 	// Delete all the binary files that are fetched from symbol server.
 	// Symbolize.FileCloser holds a reference to a file and deletes it after Close() is called.
 	for _, f := range modules {
@@ -673,15 +679,19 @@ func process(ctx context.Context) error {
 	}
 
 	if outputDir != "" {
+		start = time.Now()
 		if err = showCoverageData(ctx, mergedProfileFile, covFile); err != nil {
 			return fmt.Errorf("failed to show coverage data: %w", err)
 		}
+		logger.Debugf(ctx, "time to show coverage: %.2f minutes\n", time.Since(start).Minutes())
 	}
 
 	if reportDir != "" {
+		start = time.Now()
 		if err = exportCoverageData(ctx, mergedProfileFile, covFile, tempDir); err != nil {
 			return fmt.Errorf("failed to export coverage data: %w", err)
 		}
+		logger.Debugf(ctx, "time to export coverage: %.2f minutes\n", time.Since(start).Minutes())
 	}
 
 	return nil
