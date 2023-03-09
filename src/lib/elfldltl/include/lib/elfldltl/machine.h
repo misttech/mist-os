@@ -207,7 +207,7 @@ struct RelocationTraits<ElfMachine::kRiscv> {
     kAbsolute = 2,      // R_RISCV_64
     kGot = kAbsolute,   // R_RISCV_64
     kPlt = 5,           // R_RISCV_JUMP_SLOT
-    kTlsAbsolute = 10,  // R_RISCV_TPRELF64
+    kTlsAbsolute = 11,  // R_RISCV_TPREL64
     kTlsRelative = 9,   // R_RISCV_DTPREL64
     kTlsModule = 7,     // R_RISCV_DTPMOD64
   };
