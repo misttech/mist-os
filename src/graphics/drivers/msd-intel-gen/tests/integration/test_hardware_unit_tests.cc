@@ -42,8 +42,7 @@ TEST(HardwareUnitTests, All) {
   test_base.reset();
 
   // Reload the production driver so later tests shouldn't be affected.
-  const char* kDriverPath = "fuchsia-pkg://fuchsia.com/msd-intel-gen#driver/libmsd_intel.so";
-  magma::TestDeviceBase::BindDriver(parent_device, kDriverPath);
+  magma::TestDeviceBase::AutobindDriver(parent_device);
 #else
   GTEST_SKIP();
 #endif
