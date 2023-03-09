@@ -49,7 +49,6 @@ class Driver : public fdf::DriverBase {
   // this method will schedule its work on that dispatcher then block until it
   // is done.
   zx_status_t AddDevice(Device* parent, device_add_args_t* args, zx_device_t** out);
-  zx::result<zx::profile> GetSchedulerProfile(uint32_t priority, const char* name);
   zx::result<> SetProfileByRole(zx::unowned_thread thread, std::string_view role);
   zx::result<std::string> GetVariable(const char* name);
 

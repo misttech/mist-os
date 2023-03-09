@@ -164,14 +164,7 @@ class TestDevice : public fidl::WireServer<fuchsia_driver_compat::Device> {
 class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler::ProfileProvider> {
  public:
   void GetProfile(GetProfileRequestView request, GetProfileCompleter::Sync& completer) override {
-    if (get_profile_callback_) {
-      get_profile_callback_(request->priority,
-                            std::string_view(request->name.data(), request->name.size()));
-    }
-    completer.Reply(ZX_OK, zx::profile());
-  }
-  void SetGetProfileCallback(std::function<void(uint32_t, std::string_view)> cb) {
-    get_profile_callback_ = std::move(cb);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, zx::profile());
   }
 
   void GetDeadlineProfile(GetDeadlineProfileRequestView request,
@@ -195,7 +188,6 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
   }
 
  private:
-  std::function<void(uint32_t, std::string_view)> get_profile_callback_;
   std::function<void(SetProfileByRoleRequestView&)> set_profile_by_role_callback_;
 };
 
@@ -679,29 +671,6 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
     fdf_testing_run_until_idle();
   }
   ASSERT_TRUE(was_called);
-
-  UnbindAndFreeDriver(std::move(driver));
-}
-
-TEST_F(DriverTest, GetProfile) {
-  profile_provider_.SetGetProfileCallback([](uint32_t priority, std::string_view name) {
-    ASSERT_EQ(10u, priority);
-    ASSERT_EQ("test-profile", name);
-  });
-
-  zx_protocol_device_t ops{
-      .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-  };
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops);
-  // Verify that v1_test.so has added a child device.
-  WaitForChildDeviceAdded();
-
-  // Verify that v1_test.so has set a context.
-  std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
-  ASSERT_NE(nullptr, v1_test.get());
-
-  zx_handle_t out_profile;
-  ASSERT_EQ(ZX_OK, device_get_profile(v1_test->zxdev, 10, "test-profile", &out_profile));
 
   UnbindAndFreeDriver(std::move(driver));
 }

@@ -630,27 +630,6 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
   });
 }
 
-zx::result<zx::profile> Driver::GetSchedulerProfile(uint32_t priority, const char* name) {
-  auto profile_client = context().incoming()->Connect<fuchsia_scheduler::ProfileProvider>();
-  if (!profile_client.is_ok()) {
-    return profile_client.take_error();
-  }
-
-  if (!profile_client->is_valid()) {
-    return zx::error(ZX_ERR_NOT_CONNECTED);
-  }
-  fidl::WireResult result =
-      fidl::WireCall(*profile_client)->GetProfile(priority, fidl::StringView::FromExternal(name));
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  fidl::WireResponse response = std::move(result.value());
-  if (response.status != ZX_OK) {
-    return zx::error(response.status);
-  }
-  return zx::ok(std::move(response.profile));
-}
-
 zx::result<> Driver::SetProfileByRole(zx::unowned_thread thread, std::string_view role) {
   auto profile_client = context().incoming()->Connect<fuchsia_scheduler::ProfileProvider>();
   if (profile_client.is_error()) {

@@ -28,20 +28,6 @@ zx_status_t connect_scheduler_profile_provider() {
   return client_end.status_value();
 }
 
-zx_status_t get_scheduler_profile(uint32_t priority, const char* name, zx_handle_t* profile) {
-  fidl::WireResult result = fidl::WireCall(scheduler_profile_provider)
-                                ->GetProfile(priority, fidl::StringView::FromExternal(name));
-  if (!result.ok()) {
-    return result.status();
-  }
-  fidl::WireResponse response = std::move(result.value());
-  if (response.status != ZX_OK) {
-    return response.status;
-  }
-  *profile = response.profile.release();
-  return ZX_OK;
-}
-
 zx_status_t set_scheduler_profile_by_role(zx_handle_t thread, const char* role, size_t role_size) {
   zx::unowned_thread original_thread{thread};
   zx::thread duplicate_thread;

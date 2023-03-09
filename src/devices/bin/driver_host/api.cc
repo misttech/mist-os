@@ -276,15 +276,6 @@ __EXPORT void device_resume_reply(zx_device_t* dev, zx_status_t status, uint8_t 
   internal::ContextForApi()->DeviceResumeReply(dev_ref, status, out_power_state, out_perf_state);
 }
 
-__EXPORT zx_status_t device_get_profile(zx_device_t* dev, uint32_t priority, const char* name,
-                                        zx_handle_t* out_profile) {
-  if (dev) {
-    DEBUG_ASSERT_VALID_DEVICE(dev);
-  }
-
-  return internal::get_scheduler_profile(priority, name, out_profile);
-}
-
 __EXPORT zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread,
                                                 const char* role, size_t role_size) {
   if (device) {

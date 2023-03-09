@@ -79,14 +79,6 @@ zx_status_t device_get_fragment_metadata(zx_device_t* device, const char* name, 
 }
 
 __EXPORT
-zx_status_t device_get_profile(zx_device_t* device, uint32_t priority, const char* name,
-                               zx_handle_t* out_profile) {
-  // This is currently a no-op.
-  *out_profile = ZX_HANDLE_INVALID;
-  return ZX_OK;
-}
-
-__EXPORT
 zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, const char* role,
                                        size_t role_size) {
   // This is currently a no-op.
