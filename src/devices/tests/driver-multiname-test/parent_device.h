@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_TESTS_DRIVER_CHILD_DEVICE_TEST_PARENT_DEVICE_H_
-#define SRC_DEVICES_TESTS_DRIVER_CHILD_DEVICE_TEST_PARENT_DEVICE_H_
+#ifndef SRC_DEVICES_TESTS_DRIVER_MULTINAME_TEST_PARENT_DEVICE_H_
+#define SRC_DEVICES_TESTS_DRIVER_MULTINAME_TEST_PARENT_DEVICE_H_
 
 #include <fidl/driver.multiname.test/cpp/wire.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -18,16 +18,15 @@ using DeviceType = ddk::Device<ParentDevice, ddk::Initializable,
 class ParentDevice : public DeviceType {
  public:
   explicit ParentDevice(zx_device_t* parent) : DeviceType(parent) {}
-  virtual ~ParentDevice() = default;
+  ~ParentDevice() override = default;
 
-  static zx_status_t Bind(void* ctx, zx_device_t* dev);
-  zx_status_t Bind();
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
+ private:
   void AddDevice(AddDeviceCompleter::Sync& completer) override;
 };
 
 }  // namespace parent_device
 
-#endif  // SRC_DEVICES_TESTS_DRIVER_CHILD_DEVICE_TEST_PARENT_DEVICE_H_
+#endif  // SRC_DEVICES_TESTS_DRIVER_MULTINAME_TEST_PARENT_DEVICE_H_

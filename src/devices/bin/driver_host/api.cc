@@ -87,9 +87,6 @@ namespace {
 
 __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* parent,
                                             device_add_args_t* args, zx_device_t** out) {
-  zx_status_t r;
-  fbl::RefPtr<zx_device_t> dev;
-
   if (!parent) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -136,9 +133,11 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
     driver = parent->driver;
   }
 
-  r = api_ctx->DeviceCreate(std::move(driver), args->name, args->ctx, args->ops, &dev);
-  if (r != ZX_OK) {
-    return r;
+  fbl::RefPtr<zx_device_t> dev;
+  if (zx_status_t status =
+          api_ctx->DeviceCreate(std::move(driver), args->name, args->ctx, args->ops, &dev);
+      status != ZX_OK) {
+    return status;
   }
   if (args->proto_id) {
     dev->set_protocol_id(args->proto_id);
@@ -164,31 +163,37 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
   if (!args->power_states) {
     // TODO(fxbug.dev/34081): Remove when all drivers declare power states
     // Temporarily allocate working and non-working power states
-    r = dev->SetPowerStates(internal::kDeviceDefaultPowerStates,
-                            std::size(internal::kDeviceDefaultPowerStates));
+    if (zx_status_t status = dev->SetPowerStates(internal::kDeviceDefaultPowerStates,
+                                                 std::size(internal::kDeviceDefaultPowerStates));
+        status != ZX_OK) {
+      return status;
+    }
   } else {
-    r = dev->SetPowerStates(args->power_states, args->power_state_count);
-  }
-  if (r != ZX_OK) {
-    return r;
+    if (zx_status_t status = dev->SetPowerStates(args->power_states, args->power_state_count);
+        status != ZX_OK) {
+      return status;
+    }
   }
 
   if (args->performance_states && (args->performance_state_count != 0)) {
-    r = dev->SetPerformanceStates(args->performance_states, args->performance_state_count);
+    if (zx_status_t status =
+            dev->SetPerformanceStates(args->performance_states, args->performance_state_count);
+        status != ZX_OK) {
+      return status;
+    }
   } else {
-    r = dev->SetPerformanceStates(internal::kDeviceDefaultPerfStates,
-                                  std::size(internal::kDeviceDefaultPerfStates));
-  }
-
-  if (r != ZX_OK) {
-    return r;
+    if (zx_status_t status = dev->SetPerformanceStates(
+            internal::kDeviceDefaultPerfStates, std::size(internal::kDeviceDefaultPerfStates));
+        status != ZX_OK) {
+      return status;
+    }
   }
 
   // Set default system to device power state mapping. This can be later
   // updated by the system power manager.
-  r = dev->SetSystemPowerStateMapping(internal::kDeviceDefaultStateMapping);
-  if (r != ZX_OK) {
-    return r;
+  if (zx_status_t status = dev->SetSystemPowerStateMapping(internal::kDeviceDefaultStateMapping);
+      status != ZX_OK) {
+    return status;
   }
 
   fidl::ClientEnd<fio::Directory> outgoing_dir(zx::channel(args->outgoing_dir_channel));
@@ -218,19 +223,17 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
   if (out) {
     *out = dev.get();
   }
-  if (zx_status_t status =
-          api_ctx->DeviceAdd(dev, parent_ref, args, std::move(inspect), std::move(outgoing_dir));
-      status != ZX_OK) {
+  zx_status_t status =
+      api_ctx->DeviceAdd(dev, parent_ref, args, std::move(inspect), std::move(outgoing_dir));
+  if (status == ZX_OK) {
+    // Leak the reference that was written to |out|, it will be recovered in device_remove().
+    [[maybe_unused]] auto ptr = fbl::ExportToRawPtr(&dev);
+  } else {
     if (out) {
       *out = nullptr;
     }
-    dev.reset();
   }
-
-  // Leak the reference that was written to |out|, it will be recovered in device_remove().
-  [[maybe_unused]] auto ptr = fbl::ExportToRawPtr(&dev);
-
-  return r;
+  return status;
 }
 
 __EXPORT void device_init_reply(zx_device_t* dev, zx_status_t status,

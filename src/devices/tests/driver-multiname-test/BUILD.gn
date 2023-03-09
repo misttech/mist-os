@@ -21,14 +21,12 @@ rustc_test("driver_multiname_test") {
   sources = [ "test.rs" ]
   deps = [
     ":driver.multiname.test_rust",
-    "//sdk/fidl/fuchsia.device.test:fuchsia.device.test_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
-    "//third_party/rust_crates:anyhow",
+    "//src/lib/zircon/rust:fuchsia-zircon",
   ]
 }
 

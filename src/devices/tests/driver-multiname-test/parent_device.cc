@@ -9,43 +9,32 @@
 
 namespace parent_device {
 
-zx_status_t ParentDevice::Bind(void* ctx, zx_device_t* dev) {
-  auto driver = std::make_unique<ParentDevice>(dev);
-  zx_status_t status = driver->Bind();
-  if (status != ZX_OK) {
-    return status;
-  }
-  // The DriverFramework now owns the driver.
-  [[maybe_unused]] auto ptr = driver.release();
-  return ZX_OK;
-}
-
-zx_status_t ParentDevice::Bind() { return DdkAdd(ddk::DeviceAddArgs("parent_device")); }
-
 void ParentDevice::DdkInit(ddk::InitTxn txn) { txn.Reply(ZX_OK); }
 
 void ParentDevice::DdkRelease() { delete this; }
 
 void ParentDevice::AddDevice(AddDeviceCompleter::Sync& completer) {
-  auto child = std::make_unique<child_device::ChildDevice>(zxdev());
+  std::unique_ptr child = std::make_unique<child_device::ChildDevice>(zxdev());
 
-  zx_status_t status;
-  if ((status = child->DdkAdd("duplicate")) != ZX_OK) {
-    completer.ReplyError(status);
+  zx_status_t status = child->DdkAdd("duplicate");
+  if (status == ZX_OK) {
+    [[maybe_unused]] child_device::ChildDevice* ptr = child.release();
   }
-
-  // Release the child as it is owned by the framework now.
-  child.release()->DdkRelease();
-
-  completer.ReplySuccess();
+  completer.Reply(zx::make_result(status));
 }
 
-static zx_driver_ops_t parent_device_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = ParentDevice::Bind;
-  return ops;
-}();
+static zx_driver_ops_t parent_device_driver_ops = {
+    .version = DRIVER_OPS_VERSION,
+    .bind =
+        [](void* ctx, zx_device_t* dev) {
+          std::unique_ptr device = std::make_unique<ParentDevice>(dev);
+          zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("parent_device"));
+          if (status == ZX_OK) {
+            [[maybe_unused]] ParentDevice* ptr = device.release();
+          }
+          return status;
+        },
+};
 
 }  // namespace parent_device
 
