@@ -343,15 +343,12 @@ fuchsia_component("setui_service_with_camera") {
 }
 
 fuchsia_package("setui_service") {
-  visibility = []
   visibility = [
     ":*",
-    "//:additional_base_packages",
     "//:developer_base_packages",
     "//:legacy_base_packages",
     "//build/images/recovery:*",
     "//src/developer/forensics/feedback/tests/*",
-    "//src/intl/intl_services/tests/*",
     "//vendor/google/*",
   ]
   deps = [
