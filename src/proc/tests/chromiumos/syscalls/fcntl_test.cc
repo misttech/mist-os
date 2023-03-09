@@ -49,6 +49,25 @@ int OpenTestFile() {
   return fd;
 }
 
+// Test that exiting a processes releases locks on a file.
+TEST(FcntlLockTest, ChildProcessReleaseLock) {
+  for (int i = 0; i < 10; ++i) {
+    ForkHelper helper;
+    helper.RunInForkedProcess([] {
+      int fd = OpenTestFile();
+
+      struct flock fl;
+      fl.l_type = F_WRLCK;
+      fl.l_whence = SEEK_SET;
+      fl.l_start = 0;
+      fl.l_len = 3000;
+      // This should succeed since the previous process that held the lock exited (as reported by
+      // wait(2)) and thus should no longer be holding a lock on the file.
+      SAFE_SYSCALL(fcntl(fd, F_SETLK, &fl));
+    });
+  }
+}
+
 TEST(FcntlLockTest, ReleaseLockInMiddleOfAnotherLock) {
   ForkHelper helper;
   helper.RunInForkedProcess([&] {

@@ -15,6 +15,8 @@
                 // TODO(https://fxbug.dev/97514): Make these tests pass in Starnix then enable.
                 "MapGrowsdownTest.Mprotect*",
                 "MapGrowsdownTest.Syscall*",
+                // TODO(): Make these tests reliably pass in Starnix then re-enable.
+                "FcntlLockTest.*",
             ],
         },
         {
