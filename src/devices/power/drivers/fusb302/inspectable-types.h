@@ -6,6 +6,7 @@
 #define SRC_DEVICES_POWER_DRIVERS_FUSB302_INSPECTABLE_TYPES_H_
 
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/vmo/types.h>
 
 #include "src/devices/power/drivers/fusb302/usb-pd.h"
 
@@ -18,35 +19,54 @@ using PowerDataObject = usb::pd::DataPdMessage::PowerDataObject;
 template <typename T>
 class InspectableBool {
  public:
-  InspectableBool(inspect::Node* parent, const std::string& name, T init_val)
-      : value_(init_val), inspect_(parent->CreateBool(name, init_val)) {}
+  InspectableBool(inspect::Node* parent, const std::string& name, T initial_value)
+      : value_(initial_value), inspect_(parent->CreateBool(name, initial_value)) {}
 
-  T get() { return value_; }
-  void set(T val) {
-    value_ = val;
-    inspect_.Set(val);
+  T get() const { return value_; }
+  void set(T value) {
+    value_ = value;
+    inspect_.Set(value);
   }
 
  private:
   T value_;
-  inspect::internal::Property<bool> inspect_;
+  inspect::BoolProperty inspect_;
 };
 
 template <typename T>
 class InspectableUint {
  public:
-  InspectableUint(inspect::Node* parent, const std::string& name, T init_val)
-      : value_(init_val), inspect_(parent->CreateUint(name, init_val)) {}
+  InspectableUint(inspect::Node* parent, const std::string& name, T initial_value)
+      : value_(initial_value),
+        inspect_(parent->CreateUint(name, static_cast<uint64_t>(initial_value))) {}
 
-  T get() { return value_; }
-  void set(T val) {
-    value_ = val;
-    inspect_.Set(val);
+  T get() const { return value_; }
+  void set(T value) {
+    value_ = value;
+    inspect_.Set(static_cast<uint64_t>(value));
   }
 
  private:
   T value_;
-  inspect::internal::NumericProperty<uint64_t> inspect_;
+  inspect::UintProperty inspect_;
+};
+
+template <typename T>
+class InspectableInt {
+ public:
+  InspectableInt(inspect::Node* parent, const std::string& name, T initial_value)
+      : value_(initial_value),
+        inspect_(parent->CreateInt(name, static_cast<int64_t>(initial_value))) {}
+
+  T get() const { return value_; }
+  void set(T value) {
+    value_ = value;
+    inspect_.Set(static_cast<int64_t>(value));
+  }
+
+ private:
+  T value_;
+  inspect::IntProperty inspect_;
 };
 
 class InspectablePdoArray {
@@ -59,9 +79,9 @@ class InspectablePdoArray {
     ZX_DEBUG_ASSERT(i < kMaxObjects);
     return array_[i];
   }
-  void emplace_back(uint32_t val) {
-    array_.emplace_back(val);
-    inspect_.Set(array_.size() - 1, val);
+  void emplace_back(uint32_t value) {
+    array_.emplace_back(value);
+    inspect_.Set(array_.size() - 1, value);
   }
   void clear() {
     array_.clear();
