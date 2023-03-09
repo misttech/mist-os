@@ -1252,6 +1252,7 @@ dependencies = [
  "atty",
  "base64",
  "bincode",
+ "bit-vec",
  "bitfield",
  "bitflags",
  "blocking",
