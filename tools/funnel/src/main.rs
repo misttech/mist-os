@@ -8,9 +8,15 @@ use anyhow::Result;
 use argh::FromArgs;
 use mdns_discovery::{discover_targets, MDNS_PORT};
 use std::time::Duration;
+use tracing_subscriber::filter::LevelFilter;
 
+mod logging;
 mod ssh;
 mod target;
+
+fn default_log_level() -> LevelFilter {
+    LevelFilter::ERROR
+}
 
 fn default_repository_port() -> u32 {
     8082
@@ -30,12 +36,18 @@ struct Funnel {
     /// the repository port to forward to the remote host
     #[argh(option, short = 'r', default = "default_repository_port()")]
     repository_port: u32,
+
+    /// the level to log at.
+    #[argh(option, short = 'l', default = "default_log_level()")]
+    log_level: LevelFilter,
     // TODO(colnnelson): Add additional port forwards
 }
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<()> {
     let args: Funnel = argh::from_env();
+
+    logging::init(args.log_level)?;
 
     tracing::trace!("Discoving targets...");
     let targets = discover_targets(Duration::from_secs(1), MDNS_PORT).await?;

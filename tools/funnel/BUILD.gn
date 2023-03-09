@@ -8,6 +8,7 @@ import("//build/rust/rustc_binary.gni")
 rustc_binary("funnel_bin") {
   edition = "2021"
   sources = [
+    "src/logging.rs",
     "src/main.rs",
     "src/ssh.rs",
     "src/target.rs",
@@ -16,11 +17,15 @@ rustc_binary("funnel_bin") {
   deps = [
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
+    "//src/developer/ffx/lib/logging:lib",
     "//src/developer/ffx/lib/mdns_discovery:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-subscriber",
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
