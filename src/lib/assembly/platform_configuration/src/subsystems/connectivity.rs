@@ -35,7 +35,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
             }
 
-            let PlatformNetworkConfig { force_netstack3 } = connectivity_config.network;
+            let PlatformNetworkConfig { force_netstack3, .. } = connectivity_config.network;
             if context.board_info.provides_feature("fuchsia::network_require_netstack3")
                 || force_netstack3
             {

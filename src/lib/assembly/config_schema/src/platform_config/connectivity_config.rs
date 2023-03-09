@@ -18,8 +18,23 @@ pub struct PlatformConnectivityConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformNetworkConfig {
+    /// Only used to control networking for the `utility` and `minimal`
+    /// feature_set_levels.
+    pub networking: Option<NetworkingConfig>,
+
     #[serde(default)]
     pub force_netstack3: bool,
+}
+
+/// Which networking type to use (standard or basic).
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+pub enum NetworkingConfig {
+    /// The standard network configuration
+    #[default]
+    Standard,
+
+    /// A more-basic networking configuration for constrained devices
+    Basic,
 }
 
 /// Platform configuration options for the wlan area.
