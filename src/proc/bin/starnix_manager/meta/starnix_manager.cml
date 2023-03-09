@@ -10,7 +10,7 @@
     children: [
         {
             name: "bionic",
-            url: "fuchsia-pkg://fuchsia.com/starbionic#meta/bionic_galaxy.cm",
+            url: "fuchsia-pkg://fuchsia.com/starbionic#meta/bionic_container.cm",
             environment: "#container-env",
         },
         {
@@ -20,7 +20,7 @@
         },
         {
             name: "chromiumos",
-            url: "fuchsia-pkg://fuchsia.com/starmium#meta/chromiumos_galaxy.cm",
+            url: "fuchsia-pkg://fuchsia.com/starmium#meta/chromiumos_container.cm",
             environment: "#container-env",
         },
         {
