@@ -10,7 +10,7 @@ use humansize::{file_size_opts, FileSize};
 use prettytable::{cell, row, Table};
 use std::fs::File;
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_list(cmd: ListCommand) -> Result<()> {
     let file = File::open(&cmd.far_file)
         .with_context(|| format!("failed to open file: {}", cmd.far_file.display()))?;

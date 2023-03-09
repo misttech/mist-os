@@ -9,7 +9,7 @@ use fuchsia_archive as far;
 use std::{collections::BTreeMap, fs::File, io::Read};
 use walkdir::WalkDir;
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_create(cmd: CreateCommand) -> Result<()> {
     let mut entries = BTreeMap::new();
 

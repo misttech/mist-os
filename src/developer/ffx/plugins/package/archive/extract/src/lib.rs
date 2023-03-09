@@ -9,7 +9,7 @@ use package_tool::cmd_package_archive_extract;
 
 pub use ffx_package_archive_extract_args::PackageArchiveExtractCommand;
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_package(cmd: PackageArchiveExtractCommand) -> Result<()> {
     cmd_package_archive_extract(cmd).await.map_err(|err| ffx_error!(err))?;
     Ok(())

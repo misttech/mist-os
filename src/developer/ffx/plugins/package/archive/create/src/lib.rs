@@ -9,7 +9,7 @@ use package_tool::cmd_package_archive_create;
 
 pub use ffx_package_archive_create_args::PackageArchiveCreateCommand;
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_package(cmd: PackageArchiveCreateCommand) -> Result<()> {
     cmd_package_archive_create(cmd).await.map_err(|err| ffx_error!(err))?;
     Ok(())

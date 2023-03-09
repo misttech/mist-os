@@ -11,7 +11,7 @@ use std::{
     io::{self, Write as _},
 };
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_cat(cmd: CatCommand) -> Result<()> {
     let far_file = File::open(&cmd.far_file)
         .with_context(|| format!("failed to open file: {}", cmd.far_file.display()))?;

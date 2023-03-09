@@ -9,7 +9,7 @@ use ffx_package_far_extract_args::ExtractCommand;
 use fuchsia_archive as far;
 use std::fs::{self, File};
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_extract(cmd: ExtractCommand) -> Result<()> {
     let far_file = File::open(&cmd.far_file)
         .with_context(|| format!("failed to open file: {}", cmd.far_file.display()))?;

@@ -9,7 +9,7 @@ use ffx_package_archive_cat_args::CatCommand;
 use ffx_package_archive_utils::{read_file_entries, FarArchiveReader, FarListReader};
 use ffx_writer::Writer;
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_cat(cmd: CatCommand, mut writer: Writer) -> Result<()> {
     let mut archive_reader: Box<dyn FarListReader> = Box::new(FarArchiveReader::new(&cmd.archive)?);
 

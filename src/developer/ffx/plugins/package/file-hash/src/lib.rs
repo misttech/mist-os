@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 use std::{fs::File, io::prelude::*, path::PathBuf};
 
-#[ffx_plugin("ffx_package")]
+#[ffx_plugin()]
 pub async fn cmd_file_hash(
     cmd: FileHashCommand,
     #[ffx(machine = Vec<FileHashEntry>)] mut writer: Writer,
