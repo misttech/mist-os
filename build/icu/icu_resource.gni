@@ -1,0 +1,41 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+import("config.gni")  # icu_flavors
+
+# An ICU-aware resource.
+#
+# All args are forwarded verbatim from `resource`.
+#
+# Refer to icu_source_set.gni for detailed comments on some constructs below,
+# the ideas of which are commonly reused in all icu_* templates.
+template("icu_resource") {
+  foreach(icu_flavor, icu_flavors) {
+    resource("${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+
+      foreach(source, sources) {
+        sources -= [ source ]
+        sources += [ string_replace(source,
+                                    icu_root,
+                                    "//third_party/icu/${icu_flavor.name}") ]
+      }
+    }
+  }
+
+  resource(target_name) {
+    forward_variables_from(invoker, "*")
+  }
+}

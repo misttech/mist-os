@@ -1,0 +1,37 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/assembly_input_bundle.gni")
+import("config.gni")  # icu_flavors
+
+# An ICU-aware assembly_input_bundle.
+#
+# Args:
+#
+#   - icu_base_packages: same as `base_packages` from assembly_input_bundle,
+#     but needs ICU adaptation.
+#   - all other args are the same as in `assembly_input_bundle`
+#
+# Refer to icu_source_set.gni for detailed comments on some constructs below,
+# the ideas of which are commonly reused in all icu_* templates.
+template("icu_assembly_input_bundle") {
+  foreach(icu_flavor, icu_flavors) {
+    assembly_input_bundle(
+        "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
+      forward_variables_from(invoker, "*", [ "icu_base_packages" ])
+
+      if (defined(invoker.icu_base_packages)) {
+        if (!defined(base_packages)) {
+          base_packages = []
+        }
+
+        foreach(icu_base_package, invoker.icu_base_packages) {
+          base_packages += [ "${icu_base_package}.icu_${icu_flavor.name}_${icu_flavor.commit_id}" ]
+        }
+      }
+
+      # Add ICU variations of other parameters if needed.
+    }
+  }
+}
