@@ -101,6 +101,139 @@ TEST(FastbootTest, UnknownCommand) {
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
 }
 
+const char kNewLineMessage[] =
+    "message\n"
+    "0123456789abcdef";
+const size_t kNewLineMessageSplits = 2ULL;
+
+TEST(FastbootResponseTest, FailNewLineMessageNotSplit) {
+  Fastboot fastboot(0x40000);
+  std::string_view message(kNewLineMessage);
+  TestTransport transport;
+  auto res = fastboot.SendResponse(Fastboot::ResponseType::kFail, message, &transport, zx::ok());
+  ASSERT_TRUE(res.is_ok());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 1ULL);
+  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
+  const std::string msg = sent_packets[0].substr(4);
+  EXPECT_STREQ(msg, std::string(kNewLineMessage, msg.size()));
+}
+
+TEST(FastbootResponseTest, OkayNewLineMessageNotSplit) {
+  Fastboot fastboot(0x40000);
+  std::string_view message(kNewLineMessage);
+  TestTransport transport;
+  auto res = fastboot.SendResponse(Fastboot::ResponseType::kOkay, message, &transport, zx::ok());
+  ASSERT_TRUE(res.is_ok());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 1ULL);
+  ASSERT_EQ(sent_packets[0].compare(0, 4, "OKAY"), 0);
+  const std::string msg = sent_packets[0].substr(4);
+  EXPECT_STREQ(msg, std::string(kNewLineMessage, msg.size()));
+}
+
+TEST(FastbootResponseTest, InfoNewLineMessageSplitAtNewLine) {
+  Fastboot fastboot(0x40000);
+  std::string_view message(kNewLineMessage);
+  TestTransport transport;
+  auto res = fastboot.SendResponse(Fastboot::ResponseType::kInfo, message, &transport, zx::ok());
+  ASSERT_TRUE(res.is_ok());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), kNewLineMessageSplits);
+  std::string res_message;
+  for (auto& pkt : sent_packets) {
+    EXPECT_EQ(pkt.compare(0, 4, "INFO"), 0);
+    res_message += pkt.substr(4) + "\n";
+  }
+  res_message.pop_back();
+  EXPECT_STREQ(res_message, kNewLineMessage);
+}
+
+const char kLongMessage[] =
+    "0123456789abcdef"
+    "1123456789abcdef"
+    "2123456789abcdef"
+    "3123456789abcdef"
+    "4123456789abcdef"
+    "5123456789abcdef"
+    "6123456789abcdef"
+    "7123456789abcdef";
+const size_t kLongMessageSplits = 3ULL;
+
+TEST(FastbootResponseTest, FailLongMessageNotSplit) {
+  Fastboot fastboot(0x40000);
+  std::string_view message(kLongMessage);
+  TestTransport transport;
+  auto res = fastboot.SendResponse(Fastboot::ResponseType::kFail, message, &transport, zx::ok());
+  ASSERT_TRUE(res.is_ok());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 1ULL);
+  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
+  const std::string msg = sent_packets[0].substr(4);
+  EXPECT_STREQ(msg, std::string(kLongMessage, msg.size()));
+}
+
+TEST(FastbootResponseTest, OkayLongMessageNotSplit) {
+  Fastboot fastboot(0x40000);
+  std::string_view message(kLongMessage);
+  TestTransport transport;
+  auto res = fastboot.SendResponse(Fastboot::ResponseType::kOkay, message, &transport, zx::ok());
+  ASSERT_TRUE(res.is_ok());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 1ULL);
+  ASSERT_EQ(sent_packets[0].compare(0, 4, "OKAY"), 0);
+  const std::string msg = sent_packets[0].substr(4);
+  EXPECT_STREQ(msg, std::string(kLongMessage, msg.size()));
+}
+
+TEST(FastbootResponseTest, InfoLongMessageSplitAtNewLine) {
+  Fastboot fastboot(0x40000);
+  std::string_view message(kLongMessage);
+  TestTransport transport;
+  auto res = fastboot.SendResponse(Fastboot::ResponseType::kInfo, message, &transport, zx::ok());
+  ASSERT_TRUE(res.is_ok());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), kLongMessageSplits);
+  std::string res_message;
+  for (auto& pkt : sent_packets) {
+    EXPECT_EQ(pkt.compare(0, 4, "INFO"), 0);
+    res_message += pkt.substr(4);
+  }
+  EXPECT_STREQ(res_message, kLongMessage);
+}
+
+TEST(FastbootResponseTest, InfoLongMessageErrorAdded) {
+  Fastboot fastboot(0x40000);
+  const int error = ZX_ERR_NOT_SUPPORTED;
+  const std::string error_str = "(ZX_ERR_NOT_SUPPORTED)";
+  std::string_view message(kLongMessage);
+  TestTransport transport;
+  auto res =
+      fastboot.SendResponse(Fastboot::ResponseType::kInfo, message, &transport, zx::error(error));
+  ASSERT_TRUE(res.is_error());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), kLongMessageSplits);
+  std::string res_message;
+  for (auto& pkt : sent_packets) {
+    EXPECT_EQ(pkt.compare(0, 4, "INFO"), 0);
+    res_message += pkt.substr(4);
+  }
+  EXPECT_STREQ(res_message, kLongMessage + error_str);
+}
+
+TEST(FastbootResponseTest, BadType) {
+  Fastboot fastboot(0x40000);
+  const int expected_error = ZX_ERR_INVALID_ARGS;
+  std::string_view message("");
+  Fastboot::ResponseType bad_type = static_cast<Fastboot::ResponseType>(123);
+  TestTransport transport;
+  auto res = fastboot.SendResponse(bad_type, message, &transport, zx::ok());
+  ASSERT_TRUE(res.is_error());
+  EXPECT_EQ(res.error_value(), expected_error);
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), 0ULL);
+}
+
 }  // namespace
 
 class FastbootDownloadTest : public zxtest::Test {
@@ -971,8 +1104,8 @@ TEST_F(FastbootRebootTest, RebootBootloader) {
   zx::result<> ret = fastboot.ProcessPacket(&transport);
   ASSERT_TRUE(ret.is_ok());
 
-  // One info message plus one OKAY message
-  ASSERT_EQ(transport.GetOutPackets().size(), 2ULL);
+  // Two info messages plus one OKAY message
+  ASSERT_EQ(transport.GetOutPackets().size(), 3ULL);
   ASSERT_EQ(transport.GetOutPackets().back(), "OKAY");
   ASSERT_TRUE(state().reboot_triggered());
   ASSERT_TRUE(state().one_shot_recovery());

@@ -5,6 +5,7 @@
 #include "lib/fastboot/fastboot_base.h"
 
 #include <assert.h>
+#include <lib/stdcompat/span.h>
 #include <stdio.h>
 
 #include <string>
@@ -27,33 +28,57 @@ bool FastbootBase::MatchCommand(std::string_view cmd, std::string_view ref) {
 zx::result<> FastbootBase::SendResponse(ResponseType resp_type, std::string_view message,
                                         Transport* transport, zx::result<> status_code) {
   const char* type = nullptr;
+  bool multi_message_split = false;
   if (resp_type == ResponseType::kOkay) {
     type = "OKAY";
   } else if (resp_type == ResponseType::kInfo) {
     type = "INFO";
+    multi_message_split = true;
   } else if (resp_type == ResponseType::kFail) {
     type = "FAIL";
   } else {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  char resp_buffer[kMaxCommandPacketSize + 1] = {0};
-  if (status_code.is_ok()) {
-    snprintf(resp_buffer, sizeof(resp_buffer), "%s%s", type, message.data());
-  } else {
-#if defined(__Fuchsia__)
-    snprintf(resp_buffer, sizeof(resp_buffer), "%s%s(%s)", type, message.data(),
-             status_code.status_string());
-#else
-    snprintf(resp_buffer, sizeof(resp_buffer), "%s%s(%d)", type, message.data(),
-             status_code.error_value());
-#endif
-  }
+  char resp_buffer[kMaxCommandPacketSize + 1] = {};
+  cpp20::span<char> buf(resp_buffer, kMaxCommandPacketSize);
 
-  if (zx::result<> ret = transport->Send(std::string_view{resp_buffer, strlen(resp_buffer)});
-      ret.is_error()) {
-    return zx::error(ret.status_value());
+  // Print type
+  size_t s = snprintf(buf.data(), buf.size(), "%s", type);
+  if (s >= buf.size()) {
+    return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
   }
+  buf = buf.subspan(s);
+
+  // Print message to the buffer and send it to host.
+  // If `multi_message_split` is set, message is not truncated. It is split and send back in
+  // multiple messages.
+  std::string_view msg_left = message;
+  do {
+    auto line_end = multi_message_split ? msg_left.find('\n') : std::string_view::npos;
+    auto line_left = msg_left.substr(0, line_end);
+    msg_left.remove_prefix(std::min(line_left.size() + 1, msg_left.size()));
+    do {
+      auto print_len = std::min(buf.size(), line_left.size());
+      snprintf(buf.data(), print_len + 1, "%s", line_left.data());
+      line_left.remove_prefix(print_len);
+
+      // If error status set then append it to the last message
+      // Can be truncated due to buffer length limitation.
+      if (msg_left.empty() && line_left.empty() && status_code.is_error()) {
+        buf = buf.subspan(print_len);
+#if defined(__Fuchsia__)
+        snprintf(buf.data(), buf.size(), "(%s)", status_code.status_string());
+#else
+        snprintf(buf.data(), buf.size(), "(%d)", status_code.error_value());
+#endif
+      }
+
+      if (zx::result<> ret = transport->Send(std::string_view(resp_buffer)); ret.is_error()) {
+        return zx::error(ret.status_value());
+      }
+    } while (multi_message_split && !line_left.empty());
+  } while (multi_message_split && !msg_left.empty());
 
   return status_code;
 }
