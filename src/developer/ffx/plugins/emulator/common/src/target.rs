@@ -2,112 +2,76 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
 use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_net as net;
-use std::{net::Ipv4Addr, time::Duration};
+use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+use std::time::Duration;
 use timeout::timeout;
 
-// This is the duration for which the FFX daemon's target collection will retain the manual entry
-// for this emulator before it's allowed to expire. The value of this timeout is based on these
-// requirements:
-//   A typical FEMU boot time is on the order of 30-60 seconds.
-//   The manual entry should not expire while the emulator is still booting.
-//   Once the emulator makes an RCS connection with the daemon, it should be allowed to expire on
-//       disconnect.
-//   If the emulator fails to boot, the entry should expire in a reasonable amount of time.
-// Based on these, we provide a timeout of 120 seconds, to allow for unexpectedly long boot times
-// while also removing it promptly on failure.
-const TARGET_LIFETIME: Duration = Duration::from_secs(120);
-
-/// Address of the target to work with.
-pub enum TargetAddress {
-    Loopback,
-    Ipv4(Ipv4Addr),
-}
-
-/// Equivalent to a call to `ffx target add`. This adds a target at `<local_addr>:ssh_port`.
-/// At this time, this is restricted to IPV4 only, as QEMU's DHCP server gets in the way of port
-/// mapping on IPV6.
-pub async fn add_target(
-    proxy: &ffx::TargetCollectionProxy,
-    local_addr: TargetAddress,
-    ssh_port: u16,
-    lifetime: Duration,
-) -> Result<()> {
-    let addr_ip = match local_addr {
-        TargetAddress::Loopback => Ipv4Addr::new(127, 0, 0, 1),
-        TargetAddress::Ipv4(addr) => addr,
-    };
-
-    let mut addr = ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
-        ip: net::IpAddress::Ipv4(net::Ipv4Address { addr: addr_ip.octets() }),
-        port: ssh_port,
-        scope_id: 0,
-    });
-
-    let expiration = if lifetime.is_zero() {
-        // A target with zero lifetime doesn't make sense, so we revert to the default.
-        TARGET_LIFETIME
-    } else {
-        lifetime
-    };
-    proxy.add_ephemeral_target(&mut addr, expiration.as_secs()).await?;
-    tracing::debug!("[emulator] Added target {:?}", &addr);
-    Ok(())
-}
-
-/// Equivalent to a call to `ffx target remove`. This removes the emulator with the name which
-/// matches the target_id parameter from the target list. If no such target exists, the function
-/// logs a warning.
-pub async fn remove_target(proxy: &ffx::TargetCollectionProxy, target_id: &str) -> Result<()> {
-    if proxy.remove_target(target_id).await? {
-        tracing::debug!("[emulator] Removed target {:?}", target_id);
-    } else {
-        tracing::warn!("[emulator] No matching target found for {:?}", target_id);
-    }
-    Ok(())
-}
-
-/// Makes a call to the TargetCollection (similar to `ffx target show`) to see if it has a target
-/// that matches the specified emulator. If the emulator responds to the request, such that a
-/// handle is returned, it's considered "active".
+/// Makes a call to the TargetCollection (similar to `ffx target show`) to get the target
+/// that matches the specified emulator. From the target, the RCS connection is opened.
+/// If an RCS connection can be made, it is considered "active".
 ///
 /// The request documentation indicates that the call to OpenTarget will hang until the device
 /// responds, possibly indefinitely. We wrap the call in a timeout of 1 second, so this function
 /// will not hang indefinitely. If the caller expects the response to take longer (such as during
 /// Fuchsia bootup), it's safe to call the function repeatedly with a longer local timeout.
 pub async fn is_active(collection_proxy: &ffx::TargetCollectionProxy, name: &str) -> bool {
-    let (_proxy, handle) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
+    let (target_proxy, handle) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
     let target = Some(name.to_string());
     let res = timeout(Duration::from_secs(1), async {
-        collection_proxy
+        let open_call_result = collection_proxy
             .open_target(
                 ffx::TargetQuery { string_matcher: target, ..ffx::TargetQuery::EMPTY },
                 handle,
             )
-            .await
+            .await;
+        tracing::trace!("open_target result: {:?}", &open_call_result);
+        if let Ok(open_result) = open_call_result {
+            match open_result {
+                Ok(()) => {
+                    let (_remote_control_proxy, remote_control_handle) =
+                        fidl::endpoints::create_proxy::<RemoteControlMarker>().unwrap();
+                    let rcs_call_result =
+                        target_proxy.open_remote_control(remote_control_handle).await;
+                    tracing::trace!("open_remote_control result: {:?}", &rcs_call_result);
+                    match rcs_call_result {
+                        Ok(rcs_result) => match rcs_result {
+                            Ok(()) => true,
+                            Err(_) => false,
+                        },
+                        Err(_) => false,
+                    }
+                }
+                Err(_) => false,
+            }
+        } else {
+            false
+        }
     })
     .await;
-    return res.is_ok()                    // It didn't time out...
-        && res.as_ref().unwrap().is_ok()  // The call was issued successfully...
-        && res.unwrap().unwrap().is_ok(); // And the actual return value was Ok(_).
+
+    return res.unwrap_or_else(|_| false);
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetCollectionRequest};
+    use fidl::endpoints::ServerEnd;
     use futures::TryStreamExt;
 
-    fn setup_fake_target_proxy<R: 'static>(mut handle_request: R) -> TargetCollectionProxy
+    // Sets up a TargetCollectionProxy that handles the requests via the callback.
+    fn setup_fake_target_collection_proxy<R: 'static>(
+        mut handle_request: R,
+    ) -> ffx::TargetCollectionProxy
     where
         R: FnMut(
-            fidl::endpoints::Request<<TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol>,
+            fidl::endpoints::Request<
+                <ffx::TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+            >,
         ),
     {
         let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<
-            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+            <ffx::TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
         >()
         .unwrap();
         fuchsia_async::Task::local(async move {
@@ -119,95 +83,91 @@ mod test {
         proxy
     }
 
-    fn setup_fake_target_server_add<T: 'static + Fn(ffx::TargetAddrInfo) + Send>(
-        test: T,
-    ) -> TargetCollectionProxy {
-        setup_fake_target_proxy(move |req| match req {
-            TargetCollectionRequest::AddEphemeralTarget {
-                ip,
-                connect_timeout_seconds,
-                responder,
-            } => {
-                test(ip);
-                assert_eq!(connect_timeout_seconds, TARGET_LIFETIME.as_secs());
-                responder.send().unwrap();
+    // Sets up the handling of OpenTarget requests which are passed to the handler. all others are ignored.
+    fn setup_target_collection<F>(open_target_handler: F) -> ffx::TargetCollectionProxy
+    where
+        F: Fn(ffx::TargetQuery, ServerEnd<ffx::TargetMarker>) -> Result<(), ffx::OpenTargetError>
+            + Clone
+            + 'static,
+    {
+        setup_fake_target_collection_proxy(move |req| match req {
+            ffx::TargetCollectionRequest::OpenTarget { query, target_handle, responder } => {
+                let mut res = (open_target_handler)(query, target_handle);
+                responder.send(&mut res).unwrap();
             }
-            _ => assert!(false),
+            _ => {}
         })
     }
 
-    fn setup_fake_target_server_remove<T: 'static + Fn(String) + Send>(
-        test: T,
-    ) -> TargetCollectionProxy {
-        setup_fake_target_proxy(move |req| match req {
-            TargetCollectionRequest::RemoveTarget { target_id, responder } => {
-                test(target_id);
-                responder.send(true).unwrap();
+    // Sets up the Target Request handler. The target_handle is passed in and is the same handle used
+    // when responding to OpenTarget.
+    fn spawn_target_handler(
+        target_handle: ServerEnd<ffx::TargetMarker>,
+        handler: impl Fn(ffx::TargetRequest) -> () + 'static,
+    ) {
+        fuchsia_async::Task::local(async move {
+            let mut stream = target_handle.into_stream().unwrap();
+            while let Ok(Some(req)) = stream.try_next().await {
+                handler(req)
             }
-            _ => assert!(false),
         })
-    }
-
-    fn setup_fake_target_server_open<T: 'static + Fn(String) -> bool + Send>(
-        test: T,
-    ) -> TargetCollectionProxy {
-        setup_fake_target_proxy(move |req| match req {
-            TargetCollectionRequest::OpenTarget { query, responder, .. } => {
-                assert!(query.string_matcher.is_some());
-                if !test(query.string_matcher.unwrap()) {
-                    assert!(responder.send(&mut Err(ffx::OpenTargetError::TargetNotFound)).is_ok());
-                } else {
-                    assert!(responder.send(&mut Ok(())).is_ok());
-                }
-            }
-            _ => assert!(false),
-        })
-    }
-
-    fn setup_fake_target_server_open_timeout() -> TargetCollectionProxy {
-        setup_fake_target_proxy(move |req| match req {
-            TargetCollectionRequest::OpenTarget { .. } => {
-                // We just don't send a response. This thread terminates right away, but the caller
-                // will still timeout waiting for a response that never comes.
-            }
-            _ => assert!(false),
-        })
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_remove() {
-        let server = setup_fake_target_server_remove(|id| assert_eq!(id, "target_id".to_owned()));
-        remove_target(&server, "target_id").await.unwrap();
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_add() {
-        let ssh_port = 12345;
-        let server = setup_fake_target_server_add(move |addr| {
-            assert_eq!(
-                addr,
-                ffx::TargetAddrInfo::IpPort(ffx::TargetIpPort {
-                    ip: net::IpAddress::Ipv4(net::Ipv4Address {
-                        addr: Ipv4Addr::new(127, 0, 0, 1).octets()
-                    }),
-                    port: ssh_port,
-                    scope_id: 0,
-                }),
-            )
-        });
-        add_target(&server, TargetAddress::Loopback, ssh_port, TARGET_LIFETIME).await.unwrap();
+        .detach();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_is_active() {
-        let server = setup_fake_target_server_open(|id| id == *"target_id");
+        // This handles the OpenTarget request. If the target is opened successfully,
+        // the TargetRequest handler is set up so TargetRequest::OpenRemoteControlResponder can be
+        // handled.
+        let handler = |query: ffx::TargetQuery, _handle: ServerEnd<ffx::TargetMarker>| {
+            {
+                if let Some(string_matcher) = &query.string_matcher {
+                    if string_matcher.contains("good_target_id") {
+                        // Open the RCS without any problem
+                        spawn_target_handler(_handle, |req| match req {
+                            ffx::TargetRequest::OpenRemoteControl {
+                                responder,
+                                remote_control: _,
+                            } => {
+                                responder.send(&mut Ok(())).unwrap();
+                            }
+                            r => panic!("unexpected request: {:?}", r),
+                        });
+                    } else {
+                        return Err(ffx::OpenTargetError::TargetNotFound);
+                    }
+                } else {
+                    return Err(ffx::OpenTargetError::QueryAmbiguous);
+                }
+            }
+            Ok(())
+        };
+        let server = setup_target_collection(handler);
         // The "target" that we expect is "active".
-        assert!(is_active(&server, "target_id").await);
+        assert!(is_active(&server, "good_target_id").await);
         // The "target" that we don't expect is "inactive".
-        assert!(!is_active(&server, "bad_target").await);
+        assert!(!is_active(&server, "unknown_target_id").await);
+    }
 
-        // This should timeout waiting for a response, which is indicated as "inactive".
-        let timeout_server = setup_fake_target_server_open_timeout();
-        assert!(!is_active(&timeout_server, "target").await);
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_connection_error_for_rcs() {
+        // This handler returns connection refused for open rcs requests.
+        let handler = |_query: ffx::TargetQuery, _handle: ServerEnd<ffx::TargetMarker>| {
+            {
+                // Open the RCS and return connection refused
+                spawn_target_handler(_handle, |req| match req {
+                    ffx::TargetRequest::OpenRemoteControl { responder, remote_control: _ } => {
+                        responder
+                            .send(&mut Err(ffx::TargetConnectionError::ConnectionRefused))
+                            .unwrap();
+                    }
+                    r => panic!("unexpected request: {:?}", r),
+                });
+            }
+            Ok(())
+        };
+
+        let server = setup_target_collection(handler);
+        assert!(!is_active(&server, "target").await);
     }
 }

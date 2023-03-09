@@ -24,11 +24,12 @@ use ffx_emulator_common::{
     config,
     config::EMU_START_TIMEOUT,
     dump_log_to_out, host_is_mac, process,
-    target::{add_target, is_active, remove_target, TargetAddress},
+    target::is_active,
     tuntap::{tap_ready, TAP_INTERFACE_NAME},
 };
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fidl_fuchsia_developer_ffx as ffx;
+use fuchsia_async::Timer;
 use serde::Serialize;
 use shared_child::SharedChild;
 use std::{
@@ -36,12 +37,11 @@ use std::{
     fs::{self, File},
     io::{stderr, Write},
     net::{IpAddr, Ipv4Addr, Shutdown},
-    ops::Sub,
     path::{Path, PathBuf},
     process::Command,
     str,
     sync::{mpsc::channel, Arc},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[cfg(test)]
@@ -433,21 +433,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             .await
             .context("Failed to write the emulation configuration file to disk.")?;
 
-        let ssh = self.emu_config().host.port_map.get("ssh");
-        let ssh_port = if let Some(ssh) = ssh { ssh.host } else { None };
-        if self.emu_config().host.networking == NetworkingMode::User {
-            // We only need to do this if we're running in user net mode.
-            let timeout = self.emu_config().runtime.startup_timeout;
-            if let Some(ssh_port) = ssh_port {
-                let local_ip = TargetAddress::Loopback;
-
-                // TODO(fxbug.dev/114597): Remove manually added target when obsolete.
-                add_target(proxy, local_ip, ssh_port, timeout)
-                    .await
-                    .context("Failed to add the emulator to the ffx target collection.")?;
-            }
-        }
-
         if self.emu_config().runtime.debugger {
             println!("The emulator will wait for a debugger to attach before starting up.");
             println!("Attach to process {} to continue launching the emulator.", self.get_pid());
@@ -465,11 +450,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     return Ok(0);
                 }
                 Err(e) => {
-                    let name = &self.emu_config().runtime.name;
-                    if let Err(e) = remove_target(proxy, name).await {
-                        // Even if we can't remove it, still continue shutting down.
-                        tracing::warn!("Couldn't remove target from ffx during shutdown: {:?}", e);
-                    }
                     if let Some(stop_error) = self.stop_emulator().await.err() {
                         tracing::debug!(
                             "Error encountered in stop when handling failed launch: {:?}",
@@ -481,127 +461,104 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             }
         } else if !self.emu_config().runtime.startup_timeout.is_zero() {
             // Wait until the emulator is considered "active" before returning to the user.
-            let mut time_left = self.emu_config().runtime.startup_timeout;
-            print!("Waiting for Fuchsia to start (up to {} seconds).", &time_left.as_secs());
-            tracing::debug!(
-                "Waiting for Fuchsia to start (up to {} seconds)...",
-                &time_left.as_secs()
-            );
+            let startup_timeout = self.emu_config().runtime.startup_timeout.as_secs();
+            print!("Waiting for Fuchsia to start (up to {} seconds).", startup_timeout);
+            tracing::debug!("Waiting for Fuchsia to start (up to {} seconds)...", startup_timeout);
             let name = self.emu_config().runtime.name.clone();
-            while !time_left.is_zero() {
+            let start = Instant::now();
+
+            while start.elapsed().as_secs() <= startup_timeout {
                 if is_active(proxy, &name).await {
                     println!("\nEmulator is ready.");
                     tracing::debug!("Emulator is ready.");
-                    break;
-                } else {
-                    // Output a little status indicator to show we haven't gotten stuck.
-                    // Note that we discard the result on the flush call; it's not important enough
-                    // that we flushed the output stream to derail the launch.
-                    print!(".");
-                    std::io::stdout().flush().ok();
-
-                    // Perform a check to make sure the process is still alive, otherwise report
-                    // failure to launch.
-                    if !self.is_running().await {
-                        tracing::error!(
-                            "Emulator process failed to launch, but we don't know the cause. \
-                            Check the emulator log, or look for a crash log."
-                        );
-                        eprintln!(
-                            "\nEmulator process failed to launch, but we don't know the cause. \
-                            Printing the contents of the emulator log...\n"
-                        );
-                        match dump_log_to_out(&self.emu_config().host.log, &mut stderr()) {
-                            Ok(_) => (),
-                            Err(e) => eprintln!("Couldn't print the log: {:?}", e),
-                        };
-                        if self.emu_config().host.networking == NetworkingMode::User {
-                            // We only need to do this if we're running in user net mode.
-                            if let Some(ssh_port) = ssh_port {
-                                // TODO(fxbug.dev/114597): Remove manually added target when obsolete.
-                                if let Err(e) =
-                                    remove_target(proxy, &format!("127.0.0.1:{}", ssh_port)).await
-                                {
-                                    // A failure here probably means it was never added.
-                                    // Just log the error and quit.
-                                    tracing::warn!(
-                                        "Couldn't remove target from ffx during shutdown: {:?}",
-                                        e
-                                    );
-                                }
-                            }
-                        }
-
-                        self.set_engine_state(EngineState::Staged);
-                        self.save_to_disk()
-                            .await
-                            .context("Failed to write the emulation configuration file to disk.")?;
-
-                        return Ok(1);
-                    }
-
-                    time_left = time_left.sub(Duration::from_secs(1));
-                    if time_left.is_zero() {
-                        eprintln!();
-                        eprintln!(
-                            "After {} seconds, the emulator has not responded to network queries.",
-                            self.emu_config().runtime.startup_timeout.as_secs()
-                        );
-                        if self.is_running().await {
-                            eprintln!(
-                                "The emulator process is still running (pid {}).",
-                                self.get_pid()
-                            );
-                            eprintln!(
-                                "The emulator is configured to {} network access.",
-                                match self.emu_config().host.networking {
-                                    NetworkingMode::Tap => "use tun/tap-based",
-                                    NetworkingMode::User => "use user-mode/port-mapped",
-                                    NetworkingMode::None => "disable all",
-                                    NetworkingMode::Auto => bail!(
-                                        "Auto Networking mode should not be possible after staging \
-                                        is complete. Configuration is corrupt; bailing out."
-                                    ),
-                                }
-                            );
-                            eprintln!(
-                                "Hardware acceleration is {}.",
-                                if self.emu_config().host.acceleration == AccelerationMode::Hyper {
-                                    "enabled"
-                                } else {
-                                    "disabled, which significantly slows down the emulator"
-                                }
-                            );
-                            eprintln!(
-                                "You can execute `ffx target list` to keep monitoring the device, \
-                                or `ffx emu stop` to terminate it."
-                            );
-                            eprintln!(
-                                "You can also change the timeout if you keep encountering this \
-                                message by executing `ffx config set {} <seconds>`.",
-                                EMU_START_TIMEOUT
-                            );
-                        } else {
-                            eprintln!();
-                            eprintln!(
-                                "Emulator process failed to launch, but we don't know the cause. \
-                                Printing the contents of the emulator log...\n"
-                            );
-                            match dump_log_to_out(
-                                &self.emu_config().host.log,
-                                &mut std::io::stderr(),
-                            ) {
-                                Ok(_) => (),
-                                Err(e) => eprintln!("Couldn't print the log: {:?}", e),
-                            };
-                        }
-
-                        tracing::warn!(
-                            "Emulator did not respond to a health check before timing out."
-                        );
-                    }
+                    return Ok(0);
                 }
+
+                // Perform a check to make sure the process is still alive, otherwise report
+                // failure to launch.
+                if !self.is_running().await {
+                    tracing::error!(
+                        "Emulator process failed to launch, but we don't know the cause. \
+                        Check the emulator log, or look for a crash log."
+                    );
+                    eprintln!(
+                        "\nEmulator process failed to launch, but we don't know the cause. \
+                        Printing the contents of the emulator log...\n"
+                    );
+                    match dump_log_to_out(&self.emu_config().host.log, &mut stderr()) {
+                        Ok(_) => (),
+                        Err(e) => eprintln!("Couldn't print the log: {:?}", e),
+                    };
+                    self.set_engine_state(EngineState::Staged);
+                    self.save_to_disk()
+                        .await
+                        .context("Failed to write the emulation configuration file to disk.")?;
+
+                    return Ok(1);
+                }
+
+                // Output a little status indicator to show we haven't gotten stuck.
+                // Note that we discard the result on the flush call; it's not important enough
+                // that we flushed the output stream to derail the launch.
+                print!(".");
+                std::io::stdout().flush().ok();
+
+                // Sleep for a bit to allow the instance to make progress
+                Timer::new(Duration::from_secs(1)).await;
             }
+
+            // If we're here, it means the emulator did not start within the timeout.
+
+            eprintln!();
+            eprintln!(
+                "After {} seconds, the emulator has not responded to network queries.",
+                self.emu_config().runtime.startup_timeout.as_secs()
+            );
+            if self.is_running().await {
+                eprintln!("The emulator process is still running (pid {}).", self.get_pid());
+                eprintln!(
+                    "The emulator is configured to {} network access.",
+                    match self.emu_config().host.networking {
+                        NetworkingMode::Tap => "use tun/tap-based",
+                        NetworkingMode::User => "use user-mode/port-mapped",
+                        NetworkingMode::None => "disable all",
+                        NetworkingMode::Auto => bail!(
+                            "Auto Networking mode should not be possible after staging \
+                            is complete. Configuration is corrupt; bailing out."
+                        ),
+                    }
+                );
+                eprintln!(
+                    "Hardware acceleration is {}.",
+                    if self.emu_config().host.acceleration == AccelerationMode::Hyper {
+                        "enabled"
+                    } else {
+                        "disabled, which significantly slows down the emulator"
+                    }
+                );
+                eprintln!(
+                    "You can execute `ffx target list` to keep monitoring the device, \
+                    or `ffx emu stop` to terminate it."
+                );
+                eprintln!(
+                    "You can also change the timeout if you keep encountering this \
+                    message by executing `ffx config set {} <seconds>`.",
+                    EMU_START_TIMEOUT
+                );
+            } else {
+                eprintln!();
+                eprintln!(
+                    "Emulator process failed to launch, but we don't know the cause. \
+                    Printing the contents of the emulator log...\n"
+                );
+                match dump_log_to_out(&self.emu_config().host.log, &mut std::io::stderr()) {
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Couldn't print the log: {:?}", e),
+                };
+            }
+
+            tracing::warn!("Emulator did not respond to a health check before timing out.");
+            return Ok(1);
         }
         Ok(0)
     }
