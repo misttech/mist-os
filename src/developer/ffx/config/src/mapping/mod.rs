@@ -7,6 +7,7 @@ use regex::{Captures, Regex};
 use serde_json::Value;
 use std::path::PathBuf;
 
+mod build;
 mod cache;
 mod config;
 mod data;
@@ -17,6 +18,7 @@ mod flatten;
 mod home;
 mod runtime;
 
+pub(crate) use self::build::build;
 pub(crate) use self::home::home;
 pub(crate) use cache::cache;
 pub(crate) use config::config;

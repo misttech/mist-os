@@ -59,6 +59,7 @@ if (is_host) {
       "src/keys.rs",
       "src/lib.rs",
       "src/logging.rs",
+      "src/mapping/build.rs",
       "src/mapping/cache.rs",
       "src/mapping/config.rs",
       "src/mapping/data.rs",
