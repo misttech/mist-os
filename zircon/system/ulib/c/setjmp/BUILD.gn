@@ -5,10 +5,13 @@
 import("//build/config/clang/clang_cpu.gni")
 
 source_set("setjmp") {
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "${clang_cpu}/longjmp.S",
     "${clang_cpu}/setjmp.S",
     "setjmp.c",
+  ]
+  deps = [
+    "//zircon/kernel/lib/arch",
+    "//zircon/third_party/ulib/musl:musl_internal",
   ]
 }

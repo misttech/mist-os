@@ -27,6 +27,7 @@
 ///       - `local`: The symbol is visible only within this assembly file.
 ///       - `global`: The symbol is visible throughout this linked module.
 ///       - `export`: The symbol is exported for dynamic linking (user mode).
+///       - `weak`: Like `export`, but can be overridden.
 ///     - Default: `local`
 ///
 ///   * type
@@ -58,8 +59,12 @@
       .hidden \name
 #endif
     .else
-      .ifnc \scope, global
-	.error "`scope` argument `\scope` not `local`, `global`, or `export`"
+      .ifnc \scope, weak
+        .weak \name
+      .else
+        .ifnc \scope, global
+	.error "`scope` argument `\scope` not `local`, `global`, `export`, or `weak`"
+        .endif
       .endif
     .endif
   .endif
