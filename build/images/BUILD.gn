@@ -207,13 +207,7 @@ compiled_action("uefi-disk") {
   if (use_bringup_assembly) {
     args += [ "--ramdisk-only" ]
   } else {
-    inputs += [
-      fvm_tool_path,
-
-      # TODO(fxbug.dev/82077): Switch this to the new path the uefi script is
-      # switched over to using it (or taking it as an argument).
-      files.old_blobfs_path,
-    ]
+    inputs += [ fvm_tool_path ]
     deps += [ "//src/storage/bin/fvm:fvm($host_toolchain)" ]
   }
 

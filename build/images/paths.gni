@@ -54,9 +54,6 @@ files = {
   if (!use_bringup_assembly) {
     blobfs = "${assembly_outdir}/blob.blk"
 
-    # TODO(fxbug.dev/82077): Remove this once clients switch to the new path
-    old_blobfs_path = "${root_out_dir}/obj/build/images/blob.blk"
-
     flash_manifest = "${images_outdir}/flash_manifest/flash.json"
 
     if (use_gigaboot) {

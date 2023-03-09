@@ -263,15 +263,6 @@ if (is_fuchsia) {
   # Fuchsia
   ##################################################
 
-  # Copy the blob.blk to the old location for assembled images.
-  # TODO(fxbug.dev/82077): Delete this once clients do not depend on the old path.
-  copy("copy_blobfs") {
-    testonly = fuchsia_zbi_testonly
-    sources = [ "${target_out_dir}/fuchsia/blob.blk" ]
-    outputs = [ old_blobfs_path ]
-    deps = [ ":fuchsia_assembly" ]
-  }
-
   # Copy the fvm.blob.sparse.blk to the old location for assembled images.
   # TODO(fxbug.dev/82077): Delete this once clients do not depend on the old path.
   copy("copy_fvm_blob_sparse") {
@@ -294,7 +285,6 @@ if (is_fuchsia) {
     testonly = fuchsia_zbi_testonly
     public_deps = [
       ":assembly_inputs",
-      ":copy_blobfs",
       ":fuchsia_assembly",
       ":product_bundle",
       ":scrutiny_x_smoke_test",
