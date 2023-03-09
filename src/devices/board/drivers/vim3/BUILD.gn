@@ -136,6 +136,7 @@ fuchsia_driver("vim3-driver") {
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.registers:fuchsia.registers_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",

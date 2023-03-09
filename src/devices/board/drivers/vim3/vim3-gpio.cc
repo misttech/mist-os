@@ -4,12 +4,14 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddk/metadata/gpio.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -98,23 +100,18 @@ static const fpbus::Node gpio_dev = []() {
   return dev;
 }();
 
-const zx_device_prop_t gpio_expander_props[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TCA6408A},
-};
+const ddk::BindRule kI2cRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, 0x20u)};
 
-constexpr zx_bind_inst_t gpio_expander_i2c_match[] = {
-    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_I2C),
-    BI_ABORT_IF(NE, BIND_I2C_BUS_ID, 0),
-    BI_MATCH_IF(EQ, BIND_I2C_ADDRESS, 0x20),
-};
-
-constexpr device_fragment_part_t gpio_expander_i2c_fragment[] = {
-    {std::size(gpio_expander_i2c_match), gpio_expander_i2c_match},
-};
-
-constexpr device_fragment_t gpio_expander_fragments[] = {
-    {"i2c", std::size(gpio_expander_i2c_fragment), gpio_expander_i2c_fragment},
+const device_bind_prop_t kI2cProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                      bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
+    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                      bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TCA6408A),
 };
 
 static const gpio_pin_t gpio_expander_pins[] = {
@@ -135,19 +132,6 @@ static const device_metadata_t gpio_expander_metadata[] = {
         .length = sizeof(gpio_expander_pin_offset),
     },
 };
-
-static composite_device_desc_t gpio_expander_dev = []() {
-  composite_device_desc_t dev = {};
-  dev.props = gpio_expander_props;
-  dev.props_count = std::size(gpio_expander_props);
-  dev.fragments = gpio_expander_fragments;
-  dev.fragments_count = std::size(gpio_expander_fragments);
-  dev.primary_fragment = gpio_expander_fragments[0].name;
-  dev.spawn_colocated = false;
-  dev.metadata_list = gpio_expander_metadata;
-  dev.metadata_count = std::size(gpio_expander_metadata);
-  return dev;
-}();
 
 zx_status_t Vim3::GpioInit() {
   fidl::Arena<> fidl_arena;
@@ -171,7 +155,9 @@ zx_status_t Vim3::GpioInit() {
     return ZX_ERR_INTERNAL;
   }
 
-  zx_status_t status = DdkAddComposite("gpio-expander", &gpio_expander_dev);
+  zx_status_t status = DdkAddCompositeNodeSpec(
+      "gpio-expander",
+      ddk::CompositeNodeSpec(kI2cRules, kI2cProperties).set_metadata(gpio_expander_metadata));
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddComposite for gpio-expander failed %d", status);
     return status;

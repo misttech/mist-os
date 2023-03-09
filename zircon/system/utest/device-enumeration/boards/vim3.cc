@@ -58,7 +58,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "class/thermal/000",
 
       // GPIO
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-107",
+      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/ti_tca6408a/ti-tca6408a/gpio-107",
 
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-24/vim3-mcu",
   };
