@@ -4,14 +4,14 @@
 
 use crate::blob_json_generator::BlobJsonGenerator;
 use crate::operations::size_check::{PackageBlobSizeInfo, PackageSizeInfo};
-use crate::util::read_config;
-use crate::util::write_json_file;
 use anyhow::anyhow;
 use anyhow::format_err;
 use anyhow::Context;
 use anyhow::Result;
 use assembly_tool::SdkToolProvider;
 use assembly_tool::ToolProvider;
+use assembly_util::read_config;
+use assembly_util::write_json_file;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::PackageSizeCheckArgs;
 use fuchsia_hash::Hash;
@@ -500,11 +500,11 @@ mod tests {
         compute_budget_results, verify_budgets_with_tools, BlobInstance, BlobSizeAndCount,
         BudgetBlobs, BudgetConfig, BudgetResult, PackageBlobSizeInfo, PackageSizeInfo,
     };
-    use crate::util::read_config;
-    use crate::util::write_json_file;
     use anyhow::Result;
     use assembly_images_config::BlobFSLayout;
     use assembly_tool::testing::FakeToolProvider;
+    use assembly_util::read_config;
+    use assembly_util::write_json_file;
     use camino::Utf8PathBuf;
     use errors::IntoExitCode;
     use ffx_assembly_args::PackageSizeCheckArgs;

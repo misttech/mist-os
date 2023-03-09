@@ -33,7 +33,6 @@ ffx_plugin("ffx_assembly") {
     "src/operations/size_check.rs",
     "src/operations/size_check_package.rs",
     "src/operations/size_check_product.rs",
-    "src/util.rs",
     "src/vbmeta.rs",
     "src/vfs.rs",
     "src/zbi.rs",

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::compiled_package::CompiledPackageBuilder;
-use crate::util;
 use anyhow::{anyhow, ensure, Context, Result};
 use assembly_config_data::ConfigDataBuilder;
 use assembly_config_schema::{
@@ -18,6 +17,7 @@ use assembly_platform_configuration::{ComponentConfigs, PackageConfigs, PackageC
 use assembly_shell_commands::ShellCommandsBuilder;
 use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
+use assembly_util as util;
 use assembly_util::{DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;

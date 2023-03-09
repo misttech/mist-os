@@ -683,12 +683,12 @@ mod tests {
         merge_package_and_product_diffs, PackageBlobSizeInfo, PackageLevelDiff, PackageSizeInfo,
         PackageSizeInfos, ProductLevelDiff, TOTAL_BLOBFS_GERRIT_COMPONENT_NAME,
     };
-    use crate::util::write_json_file;
     use anyhow::Result;
     use assembly_manifest::{
         AssemblyManifest, BlobfsContents, Image, PackageMetadata, PackageSetMetadata,
         PackagesMetadata,
     };
+    use assembly_util::write_json_file;
     use camino::{Utf8Path, Utf8PathBuf};
     use ffx_assembly_args::AuthMode;
     use ffx_assembly_args::ProductSizeCheckArgs;

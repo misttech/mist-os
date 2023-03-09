@@ -17,7 +17,6 @@ mod compiled_package;
 mod extra_hash_descriptor;
 mod fvm;
 mod operations;
-mod util;
 mod zbi;
 use assembly_components as _;
 

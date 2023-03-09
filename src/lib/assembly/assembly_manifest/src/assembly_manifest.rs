@@ -123,7 +123,7 @@ impl Image {
 impl AssemblyManifest {
     /// Return a new Assembly Manifest with all the paths relativized to a
     /// target path
-    pub fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
+    fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
         // Change the images list in-place so fields can be added to the AssemblyManifest without
         // changing this method
         let mut images = Vec::default();
@@ -164,7 +164,7 @@ impl AssemblyManifest {
 
     /// Return a new Assembly manifest with all the paths made joined to the
     /// provided directory where the manifest is located
-    pub fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
+    fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<AssemblyManifest> {
         // Change the images list in-place so fields can be added to the AssemblyManifest without
         // changing this method
         let mut images = Vec::default();
@@ -204,13 +204,7 @@ impl AssemblyManifest {
     /// Load an AssemblyManifest from a path on disk, handling path
     /// relativization
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
-        let file = File::open(path.as_ref()).with_context(|| {
-            format!("Failed to open the assembly manifest file: {}", path.as_ref())
-        })?;
-        let deserialized: SerializationHelper =
-            serde_json::from_reader(file).with_context(|| {
-                format!("Failed to parse the assembly manifest file: {}", path.as_ref())
-            })?;
+        let deserialized: SerializationHelper = assembly_util::read_config(path.as_ref())?;
         let manifest = AssemblyManifest { images: deserialized.images };
         manifest.derelativize(path.as_ref().parent().context("Invalid path")?)
     }

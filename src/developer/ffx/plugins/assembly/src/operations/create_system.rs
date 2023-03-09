@@ -4,7 +4,6 @@
 
 use crate::base_package::{construct_base_package, BasePackage};
 use crate::fvm::construct_fvm;
-use crate::util;
 use crate::vbmeta;
 use crate::zbi;
 
@@ -14,6 +13,7 @@ use assembly_images_config::{Fvm, Image, ImagesConfig, VBMeta, Zbi};
 use assembly_manifest::AssemblyManifest;
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
+use assembly_util as util;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::{CreateSystemArgs, PackageMode};
 use fuchsia_pkg::{PackageManifest, PackagePath};

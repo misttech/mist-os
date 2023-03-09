@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use crate::operations::size_check_package::BlobJsonEntry;
-use crate::util::read_config;
 use anyhow::{Context, Result};
 use assembly_images_config::BlobFSLayout;
 use assembly_tool::ToolProvider;
+use assembly_util::read_config;
 use camino::Utf8Path;
 use tempfile::NamedTempFile;
 use tempfile::TempDir;
@@ -55,9 +55,9 @@ impl BlobJsonGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::write_json_file;
     use assembly_images_config::BlobFSLayout;
     use assembly_tool::testing::FakeToolProvider;
+    use assembly_util::write_json_file;
     use camino::Utf8Path;
     use fuchsia_hash::Hash;
     use serde_json::json;
