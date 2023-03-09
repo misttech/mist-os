@@ -18,7 +18,9 @@ use netstack3_core::{
     Ctx,
 };
 
-use crate::bindings::{interfaces_admin, util::NeedsDataNotifier, Netstack, StackTime};
+use crate::bindings::{
+    interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Netstack,
+};
 
 pub const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
@@ -162,7 +164,7 @@ impl DeviceSpecificInfo {
 pub(crate) fn spawn_rx_task(
     notifier: &NeedsDataNotifier,
     ns: &Netstack,
-    device_id: DeviceId<StackTime>,
+    device_id: DeviceId<BindingsNonSyncCtxImpl>,
 ) {
     let mut watcher = notifier.watcher();
 

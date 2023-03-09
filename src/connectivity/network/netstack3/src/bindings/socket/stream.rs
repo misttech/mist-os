@@ -67,7 +67,7 @@ use crate::bindings::{
         ConversionContext, DeviceNotFoundError, NeedsDataNotifier, NeedsDataWatcher,
         TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, NetstackContext, StackTime,
+    BindingsNonSyncCtxImpl, NetstackContext,
 };
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
@@ -479,9 +479,9 @@ impl CloseResponder for fposix_socket::StreamSocketCloseResponder {
 #[async_trait]
 impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
 where
-    DeviceId<StackTime>:
+    DeviceId<BindingsNonSyncCtxImpl>:
         TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
-    WeakDeviceId<StackTime>:
+    WeakDeviceId<BindingsNonSyncCtxImpl>:
         TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
 {
     type Request = fposix_socket::StreamSocketRequest;
@@ -536,7 +536,7 @@ pub(super) async fn spawn_worker(
     ctx: crate::bindings::NetstackContext,
     request_stream: fposix_socket::StreamSocketRequestStream,
 ) where
-    DeviceId<StackTime>: TryFromFidlWithContext<Never, Error = DeviceNotFoundError>
+    DeviceId<BindingsNonSyncCtxImpl>: TryFromFidlWithContext<Never, Error = DeviceNotFoundError>
         + TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     match (domain, proto) {
@@ -623,9 +623,9 @@ struct RequestHandler<'a, I: IpExt> {
 
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
 where
-    DeviceId<StackTime>:
+    DeviceId<BindingsNonSyncCtxImpl>:
         TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
-    WeakDeviceId<StackTime>:
+    WeakDeviceId<BindingsNonSyncCtxImpl>:
         TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
 {
     async fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {

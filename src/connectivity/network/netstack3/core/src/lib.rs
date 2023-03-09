@@ -173,9 +173,9 @@ impl StackStateBuilder {
 /// The state associated with the network stack.
 pub struct StackState<C: NonSyncContext> {
     transport: TransportLayerState<C>,
-    ipv4: Ipv4State<C::Instant, DeviceId<C::Instant>>,
-    ipv6: Ipv6State<C::Instant, DeviceId<C::Instant>>,
-    device: DeviceLayerState<C::Instant>,
+    ipv4: Ipv4State<C::Instant, DeviceId<C>>,
+    ipv6: Ipv6State<C::Instant, DeviceId<C>>,
+    device: DeviceLayerState<C>,
 }
 
 impl<C: NonSyncContext + Default> Default for StackState<C> {
@@ -216,13 +216,13 @@ pub trait NonSyncContext:
     + BufferNonSyncContextInner<Buf<Vec<u8>>>
     + BufferNonSyncContextInner<EmptyBuf>
     + RngContext
-    + TimerContext<TimerId<<Self as InstantContext>::Instant>>
-    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self::Instant>, Ipv4>>
-    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self::Instant>, Ipv6>>
-    + EventContext<ip::IpLayerEvent<DeviceId<Self::Instant>, Ipv4>>
-    + EventContext<ip::IpLayerEvent<DeviceId<Self::Instant>, Ipv6>>
-    + EventContext<ip::device::dad::DadEvent<DeviceId<Self::Instant>>>
-    + EventContext<ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self::Instant>>>
+    + TimerContext<TimerId<Self>>
+    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4>>
+    + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6>>
+    + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
+    + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
+    + EventContext<ip::device::dad::DadEvent<DeviceId<Self>>>
+    + EventContext<ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self>>>
     + transport::udp::NonSyncContext<Ipv4>
     + transport::udp::NonSyncContext<Ipv6>
     + IcmpContext<Ipv4>
@@ -236,15 +236,14 @@ impl<
             + BufferNonSyncContextInner<Buf<Vec<u8>>>
             + BufferNonSyncContextInner<EmptyBuf>
             + RngContext
-            + TimerContext<TimerId<<Self as InstantContext>::Instant>>
-            + EventContext<ip::device::IpDeviceEvent<DeviceId<Self::Instant>, Ipv4>>
-            + EventContext<ip::device::IpDeviceEvent<DeviceId<Self::Instant>, Ipv6>>
-            + EventContext<ip::IpLayerEvent<DeviceId<Self::Instant>, Ipv4>>
-            + EventContext<ip::IpLayerEvent<DeviceId<Self::Instant>, Ipv6>>
-            + EventContext<ip::device::dad::DadEvent<DeviceId<Self::Instant>>>
-            + EventContext<
-                ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self::Instant>>,
-            > + transport::udp::NonSyncContext<Ipv4>
+            + TimerContext<TimerId<Self>>
+            + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4>>
+            + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6>>
+            + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
+            + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
+            + EventContext<ip::device::dad::DadEvent<DeviceId<Self>>>
+            + EventContext<ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self>>>
+            + transport::udp::NonSyncContext<Ipv4>
             + transport::udp::NonSyncContext<Ipv6>
             + IcmpContext<Ipv4>
             + IcmpContext<Ipv6>
@@ -313,7 +312,7 @@ impl<NonSyncCtx: NonSyncContext + Default> Ctx<NonSyncCtx> {
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub struct TimerId<I: Instant>(TimerIdInner<I>);
+pub struct TimerId<C: NonSyncContext>(TimerIdInner<C>);
 
 #[derive(Derivative)]
 #[derivative(
@@ -323,78 +322,83 @@ pub struct TimerId<I: Instant>(TimerIdInner<I>);
     Hash(bound = ""),
     Debug(bound = "")
 )]
-enum TimerIdInner<I: Instant> {
+enum TimerIdInner<C: NonSyncContext> {
     /// A timer event in the device layer.
-    DeviceLayer(DeviceLayerTimerId<I>),
+    DeviceLayer(DeviceLayerTimerId<C::Instant>),
     /// A timer event in the transport layer.
     TransportLayer(TransportLayerTimerId),
     /// A timer event in the IP layer.
     IpLayer(IpLayerTimerId),
     /// A timer event for an IPv4 device.
-    Ipv4Device(Ipv4DeviceTimerId<DeviceId<I>>),
+    Ipv4Device(Ipv4DeviceTimerId<DeviceId<C>>),
     /// A timer event for an IPv6 device.
-    Ipv6Device(Ipv6DeviceTimerId<DeviceId<I>>),
+    Ipv6Device(Ipv6DeviceTimerId<DeviceId<C>>),
     /// A no-op timer event (used for tests)
     #[cfg(test)]
     Nop(usize),
 }
 
-impl<I: Instant> From<DeviceLayerTimerId<I>> for TimerId<I> {
-    fn from(id: DeviceLayerTimerId<I>) -> TimerId<I> {
+impl<C: NonSyncContext> From<DeviceLayerTimerId<C::Instant>> for TimerId<C> {
+    fn from(id: DeviceLayerTimerId<C::Instant>) -> TimerId<C> {
         TimerId(TimerIdInner::DeviceLayer(id))
     }
 }
 
-impl<I: Instant> From<Ipv4DeviceTimerId<DeviceId<I>>> for TimerId<I> {
-    fn from(id: Ipv4DeviceTimerId<DeviceId<I>>) -> TimerId<I> {
+impl<C: NonSyncContext> From<Ipv4DeviceTimerId<DeviceId<C>>> for TimerId<C> {
+    fn from(id: Ipv4DeviceTimerId<DeviceId<C>>) -> TimerId<C> {
         TimerId(TimerIdInner::Ipv4Device(id))
     }
 }
 
-impl<I: Instant> From<Ipv6DeviceTimerId<DeviceId<I>>> for TimerId<I> {
-    fn from(id: Ipv6DeviceTimerId<DeviceId<I>>) -> TimerId<I> {
+impl<C: NonSyncContext> From<Ipv6DeviceTimerId<DeviceId<C>>> for TimerId<C> {
+    fn from(id: Ipv6DeviceTimerId<DeviceId<C>>) -> TimerId<C> {
         TimerId(TimerIdInner::Ipv6Device(id))
     }
 }
 
-impl<I: Instant> From<IpLayerTimerId> for TimerId<I> {
-    fn from(id: IpLayerTimerId) -> TimerId<I> {
+impl<C: NonSyncContext> From<IpLayerTimerId> for TimerId<C> {
+    fn from(id: IpLayerTimerId) -> TimerId<C> {
         TimerId(TimerIdInner::IpLayer(id))
     }
 }
 
-impl<I: Instant> From<TransportLayerTimerId> for TimerId<I> {
+impl<C: NonSyncContext> From<TransportLayerTimerId> for TimerId<C> {
     fn from(id: TransportLayerTimerId) -> Self {
         TimerId(TimerIdInner::TransportLayer(id))
     }
 }
 
 impl_timer_context!(
-    TimerId<<C as InstantContext>::Instant>,
+    C: NonSyncContext,
+    TimerId<C>,
     DeviceLayerTimerId<<C as InstantContext>::Instant>,
     TimerId(TimerIdInner::DeviceLayer(id)),
     id
 );
 impl_timer_context!(
-    TimerId<<C as InstantContext>::Instant>,
+    C: NonSyncContext,
+    TimerId<C>,
     IpLayerTimerId,
     TimerId(TimerIdInner::IpLayer(id)),
     id
 );
 impl_timer_context!(
-    TimerId<<C as InstantContext>::Instant>,
-    Ipv4DeviceTimerId<DeviceId<<C as InstantContext>::Instant>>,
+    C: NonSyncContext,
+    TimerId<C>,
+    Ipv4DeviceTimerId<DeviceId<C>>,
     TimerId(TimerIdInner::Ipv4Device(id)),
     id
 );
 impl_timer_context!(
-    TimerId<<C as InstantContext>::Instant>,
-    Ipv6DeviceTimerId<DeviceId<<C as InstantContext>::Instant>>,
+    C: NonSyncContext,
+    TimerId<C>,
+    Ipv6DeviceTimerId<DeviceId<C>>,
     TimerId(TimerIdInner::Ipv6Device(id)),
     id
 );
 impl_timer_context!(
-    TimerId<<C as InstantContext>::Instant>,
+    C: NonSyncContext,
+    TimerId<C>,
     TransportLayerTimerId,
     TimerId(TimerIdInner::TransportLayer(id)),
     id
@@ -404,7 +408,7 @@ impl_timer_context!(
 pub fn handle_timer<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    id: TimerId<NonSyncCtx::Instant>,
+    id: TimerId<NonSyncCtx>,
 ) {
     trace!("handle_timer: dispatching timerid: {:?}", id);
 
@@ -458,7 +462,7 @@ pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync {
 /// Get all IPv4 and IPv6 address/subnet pairs configured on a device
 pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
     ctx: &SyncCtx<NonSyncCtx>,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
 ) -> Vec<AddrSubnetEither> {
     DualStackDeviceHandler::get_all_ip_addr_subnets(&ctx, device)
 }
@@ -467,7 +471,7 @@ pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
 pub fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     addr_sub: AddrSubnetEither,
 ) -> Result<(), error::ExistsError> {
     map_addr_version!(
@@ -480,7 +484,7 @@ pub fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
 pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     addr: SpecifiedAddr<IpAddr>,
 ) -> Result<(), error::NotFoundError> {
     let addr = addr.into();
@@ -494,7 +498,7 @@ pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
 pub fn add_route<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    entry: ip::types::AddableEntryEither<DeviceId<NonSyncCtx::Instant>>,
+    entry: ip::types::AddableEntryEither<DeviceId<NonSyncCtx>>,
 ) -> Result<(), ip::forwarding::AddRouteError> {
     let (subnet, device, gateway) = entry.into_subnet_device_gateway();
     match (device, gateway) {

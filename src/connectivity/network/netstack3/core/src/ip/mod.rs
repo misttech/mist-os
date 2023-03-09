@@ -1282,9 +1282,9 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStatePmtuCache<Ipv6>> fo
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv4>> for SyncCtx<C> {
-    type ReadData<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv4, DeviceId<C::Instant>>>
+    type ReadData<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv4, DeviceId<C>>>
         where Self: 'l;
-    type WriteData<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv4, DeviceId<C::Instant>>>
+    type WriteData<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv4, DeviceId<C>>>
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadData<'_> {
@@ -1297,9 +1297,9 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv4
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv6>> for SyncCtx<C> {
-    type ReadData<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv6, DeviceId<C::Instant>>>
+    type ReadData<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv6, DeviceId<C>>>
         where Self: 'l;
-    type WriteData<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv6, DeviceId<C::Instant>>>
+    type WriteData<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv6, DeviceId<C>>>
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadData<'_> {
@@ -1707,7 +1707,7 @@ macro_rules! try_parse_ip_packet {
 pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>, I: Ip>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     frame_dst: FrameDestination,
     buffer: B,
 ) {
@@ -2542,10 +2542,7 @@ pub(crate) fn del_device_routes<
 fn with_ipv4_and_ipv6_routing_tables<
     C: NonSyncContext,
     O,
-    F: FnOnce(
-        &ForwardingTable<Ipv4, DeviceId<C::Instant>>,
-        &ForwardingTable<Ipv6, DeviceId<C::Instant>>,
-    ) -> O,
+    F: FnOnce(&ForwardingTable<Ipv4, DeviceId<C>>, &ForwardingTable<Ipv6, DeviceId<C>>) -> O,
 >(
     sync_ctx: &SyncCtx<C>,
     cb: F,
@@ -2556,7 +2553,7 @@ fn with_ipv4_and_ipv6_routing_tables<
 /// Get all the routes.
 pub fn get_all_routes<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
-) -> Vec<types::EntryEither<DeviceId<NonSyncCtx::Instant>>> {
+) -> Vec<types::EntryEither<DeviceId<NonSyncCtx>>> {
     with_ipv4_and_ipv6_routing_tables(&mut sync_ctx, |ipv4, ipv6| {
         ipv4.iter_table()
             .cloned()
@@ -2751,7 +2748,7 @@ impl<C: NonSyncContext> InnerIcmpContext<Ipv4, C> for &'_ SyncCtx<C> {
     fn receive_icmp_error(
         &mut self,
         ctx: &mut C,
-        device: &DeviceId<C::Instant>,
+        device: &DeviceId<C>,
         original_src_ip: Option<SpecifiedAddr<Ipv4Addr>>,
         original_dst_ip: SpecifiedAddr<Ipv4Addr>,
         original_proto: Ipv4Proto,
@@ -2816,7 +2813,7 @@ impl<C: NonSyncContext> InnerIcmpContext<Ipv6, C> for &'_ SyncCtx<C> {
     fn receive_icmp_error(
         &mut self,
         ctx: &mut C,
-        device: &DeviceId<C::Instant>,
+        device: &DeviceId<C>,
         original_src_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         original_dst_ip: SpecifiedAddr<Ipv6Addr>,
         original_next_header: Ipv6Proto,
@@ -2897,7 +2894,7 @@ pub(crate) mod testutil {
     use crate::{
         context::testutil::FakeInstant,
         ip::{device::state::IpDeviceStateIpExt, socket::testutil::FakeIpSocketCtx},
-        testutil::FakeSyncCtx,
+        testutil::{FakeNonSyncCtx, FakeSyncCtx},
     };
 
     pub(crate) trait FakeStrongIpDeviceId:
@@ -3075,7 +3072,7 @@ pub(crate) mod testutil {
 
     pub(crate) fn is_in_ip_multicast<A: IpAddress>(
         mut sync_ctx: &FakeSyncCtx,
-        device: &DeviceId<FakeInstant>,
+        device: &DeviceId<FakeNonSyncCtx>,
         addr: MulticastAddr<A>,
     ) -> bool {
         match addr.into() {
@@ -3286,7 +3283,7 @@ mod tests {
     fn process_ip_fragment<I: Ip, NonSyncCtx: NonSyncContext>(
         sync_ctx: &mut &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -3319,7 +3316,7 @@ mod tests {
     fn process_ipv4_fragment<NonSyncCtx: NonSyncContext>(
         sync_ctx: &mut &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -3347,7 +3344,7 @@ mod tests {
     fn process_ipv6_fragment<NonSyncCtx: NonSyncContext>(
         sync_ctx: &mut &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -4919,7 +4916,7 @@ mod tests {
         expected_result: Result<IpSockRoute<I, Device>, IpSockRouteError>,
     ) where
         for<'a> &'a SyncCtx<FakeNonSyncCtx>:
-            IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeInstant>>,
+            IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
         set_logger_for_test();
 
@@ -4992,14 +4989,14 @@ mod tests {
 
         fn take_ip_layer_events<I: Ip>(
             non_sync_ctx: &mut FakeNonSyncCtx,
-        ) -> Vec<IpLayerEvent<DeviceId<FakeInstant>, I>> {
+        ) -> Vec<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>> {
             non_sync_ctx
                 .take_events()
                 .into_iter()
                 .filter_map(|event| {
                     use crate::testutil::DispatchedEvent;
                     #[derive(GenericOverIp)]
-                    struct EventHolder<I: Ip>(IpLayerEvent<DeviceId<FakeInstant>, I>);
+                    struct EventHolder<I: Ip>(IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>);
                     let EventHolder(event) = I::map_ip(
                         IpInvariant(event),
                         |IpInvariant(event)| match event {

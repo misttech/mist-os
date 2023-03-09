@@ -45,31 +45,38 @@ macro_rules! impl_timer_context {
         impl<C: crate::context::TimerContext<$outer_timer_id>>
             crate::context::TimerContext<$inner_timer_id> for C
         {
-            impl_timer_context!(@inner $inner_timer_id, $pat, $bound_variable);
+            impl_timer_context!(@inner $outer_timer_id, $inner_timer_id, $pat, $bound_variable);
+        }
+    };
+    (C: $c_bound:ident, $outer_timer_id:ty, $inner_timer_id:ty, $pat:pat, $bound_variable:ident) => {
+        impl<C: $c_bound + crate::context::TimerContext<$outer_timer_id>>
+            crate::context::TimerContext<$inner_timer_id> for C
+        {
+            impl_timer_context!(@inner $outer_timer_id, $inner_timer_id, $pat, $bound_variable);
         }
     };
     ($other_type_arg:ident, $outer_timer_id:ty, $inner_timer_id:ty, $pat:pat, $bound_variable:ident) => {
         impl<$other_type_arg, C: crate::context::TimerContext<$outer_timer_id>>
             crate::context::TimerContext<$inner_timer_id> for C
         {
-            impl_timer_context!(@inner $inner_timer_id, $pat, $bound_variable);
+            impl_timer_context!(@inner $outer_timer_id, $inner_timer_id, $pat, $bound_variable);
         }
     };
-    (@inner $inner_timer_id:ty, $pat:pat, $bound_variable:ident) => {
+    (@inner $outer_timer_id:ty, $inner_timer_id:ty, $pat:pat, $bound_variable:ident) => {
         fn schedule_timer_instant(
             &mut self,
             time: Self::Instant,
             id: $inner_timer_id,
         ) -> Option<Self::Instant> {
-            self.schedule_timer_instant(time, id.into())
+            crate::context::TimerContext::<$outer_timer_id>::schedule_timer_instant(self, time, id.into())
         }
 
         fn cancel_timer(&mut self, id: $inner_timer_id) -> Option<Self::Instant> {
-            self.cancel_timer(id.into())
+            crate::context::TimerContext::<$outer_timer_id>::cancel_timer(self, id.into())
         }
 
         fn cancel_timers_with<F: FnMut(&$inner_timer_id) -> bool>(&mut self, mut f: F) {
-            self.cancel_timers_with(|id| match id {
+            crate::context::TimerContext::<$outer_timer_id>::cancel_timers_with(self, |id| match id {
                 $pat => f($bound_variable),
                 #[allow(unreachable_patterns)]
                 _ => false,
@@ -77,7 +84,7 @@ macro_rules! impl_timer_context {
         }
 
         fn scheduled_instant(&self, id: $inner_timer_id) -> Option<Self::Instant> {
-            self.scheduled_instant(id.into())
+            crate::context::TimerContext::<$outer_timer_id>::scheduled_instant(self, id.into())
         }
     };
 }

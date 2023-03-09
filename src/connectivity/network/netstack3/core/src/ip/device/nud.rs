@@ -556,7 +556,7 @@ impl<
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
-    use core::{convert::TryInto as _, num::NonZeroU64};
+    use core::num::NonZeroU64;
 
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};

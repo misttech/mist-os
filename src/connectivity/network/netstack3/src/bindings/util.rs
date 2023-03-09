@@ -41,7 +41,7 @@ use netstack3_core::{
 
 use crate::bindings::{
     socket::{IntoErrno, IpSockAddrExt, SockAddr},
-    StackTime,
+    BindingsNonSyncCtxImpl,
 };
 
 /// A signal used between Core and Bindings, whenever Bindings receive a
@@ -577,12 +577,12 @@ pub(crate) trait ConversionContext {
     /// identifier `DeviceId`.
     ///
     /// Returns `None` if there is no core mapping equivalent for `binding_id`.
-    fn get_core_id(&self, binding_id: u64) -> Option<DeviceId<StackTime>>;
+    fn get_core_id(&self, binding_id: u64) -> Option<DeviceId<BindingsNonSyncCtxImpl>>;
     /// Converts a core identifier `DeviceId` to a FIDL-compatible `u64`
     /// identifier.
     ///
     /// Returns `None` if there is no FIDL mapping equivalent for `core_id`.
-    fn get_binding_id(&self, core_id: DeviceId<StackTime>) -> Option<u64>;
+    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> Option<u64>;
 }
 
 /// A core type which can be fallibly converted from the FIDL type `F` given a
@@ -672,13 +672,13 @@ impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {
 #[derive(Debug, PartialEq)]
 pub struct DeviceNotFoundError;
 
-impl TryFromFidlWithContext<u64> for DeviceId<StackTime> {
+impl TryFromFidlWithContext<u64> for DeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_from_fidl_with_ctx<C: ConversionContext>(
         ctx: &C,
         fidl: u64,
-    ) -> Result<DeviceId<StackTime>, DeviceNotFoundError> {
+    ) -> Result<DeviceId<BindingsNonSyncCtxImpl>, DeviceNotFoundError> {
         ctx.get_core_id(fidl).ok_or(DeviceNotFoundError)
     }
 }
@@ -834,7 +834,7 @@ where
     }
 }
 
-impl TryFromFidlWithContext<Never> for DeviceId<StackTime> {
+impl TryFromFidlWithContext<Never> for DeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_from_fidl_with_ctx<C: ConversionContext>(
@@ -845,7 +845,7 @@ impl TryFromFidlWithContext<Never> for DeviceId<StackTime> {
     }
 }
 
-impl TryIntoFidlWithContext<Never> for DeviceId<StackTime> {
+impl TryIntoFidlWithContext<Never> for DeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(self, _ctx: &C) -> Result<Never, Self::Error> {
@@ -853,7 +853,7 @@ impl TryIntoFidlWithContext<Never> for DeviceId<StackTime> {
     }
 }
 
-impl TryFromFidlWithContext<NonZeroU64> for DeviceId<StackTime> {
+impl TryFromFidlWithContext<NonZeroU64> for DeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_from_fidl_with_ctx<C: ConversionContext>(
@@ -864,7 +864,7 @@ impl TryFromFidlWithContext<NonZeroU64> for DeviceId<StackTime> {
     }
 }
 
-impl TryIntoFidlWithContext<u64> for DeviceId<StackTime> {
+impl TryIntoFidlWithContext<u64> for DeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
@@ -875,7 +875,7 @@ impl TryIntoFidlWithContext<u64> for DeviceId<StackTime> {
     }
 }
 
-impl TryIntoFidlWithContext<NonZeroU64> for DeviceId<StackTime> {
+impl TryIntoFidlWithContext<NonZeroU64> for DeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
@@ -886,7 +886,7 @@ impl TryIntoFidlWithContext<NonZeroU64> for DeviceId<StackTime> {
     }
 }
 
-impl TryIntoFidlWithContext<Never> for WeakDeviceId<StackTime> {
+impl TryIntoFidlWithContext<Never> for WeakDeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(self, _ctx: &C) -> Result<Never, Self::Error> {
@@ -894,7 +894,7 @@ impl TryIntoFidlWithContext<Never> for WeakDeviceId<StackTime> {
     }
 }
 
-impl TryIntoFidlWithContext<u64> for WeakDeviceId<StackTime> {
+impl TryIntoFidlWithContext<u64> for WeakDeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
@@ -905,7 +905,7 @@ impl TryIntoFidlWithContext<u64> for WeakDeviceId<StackTime> {
     }
 }
 
-impl TryIntoFidlWithContext<NonZeroU64> for WeakDeviceId<StackTime> {
+impl TryIntoFidlWithContext<NonZeroU64> for WeakDeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
@@ -963,14 +963,15 @@ impl From<ForwardingConversionError> for fidl_net_stack::Error {
 }
 
 impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
-    for AddableEntryEither<DeviceId<StackTime>>
+    for AddableEntryEither<DeviceId<BindingsNonSyncCtxImpl>>
 {
     type Error = ForwardingConversionError;
 
     fn try_from_fidl_with_ctx<C: ConversionContext>(
         ctx: &C,
         fidl: fidl_net_stack::ForwardingEntry,
-    ) -> Result<AddableEntryEither<DeviceId<StackTime>>, ForwardingConversionError> {
+    ) -> Result<AddableEntryEither<DeviceId<BindingsNonSyncCtxImpl>>, ForwardingConversionError>
+    {
         let fidl_net_stack::ForwardingEntry { subnet, device_id, next_hop, metric: _ } = fidl;
         let subnet = subnet.try_into_core()?;
         let device =
@@ -993,7 +994,9 @@ impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
     }
 }
 
-impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry> for EntryEither<DeviceId<StackTime>> {
+impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
+    for EntryEither<DeviceId<BindingsNonSyncCtxImpl>>
+{
     type Error = DeviceNotFoundError;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
@@ -1046,8 +1049,8 @@ mod tests {
 
     struct FakeConversionContext {
         binding: u64,
-        core: DeviceId<StackTime>,
-        invalid_core: DeviceId<StackTime>,
+        core: DeviceId<BindingsNonSyncCtxImpl>,
+        invalid_core: DeviceId<BindingsNonSyncCtxImpl>,
     }
 
     impl FakeConversionContext {
@@ -1072,7 +1075,7 @@ mod tests {
     }
 
     impl ConversionContext for FakeConversionContext {
-        fn get_core_id(&self, binding_id: u64) -> Option<DeviceId<StackTime>> {
+        fn get_core_id(&self, binding_id: u64) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
             if binding_id == self.binding {
                 Some(self.core.clone())
             } else {
@@ -1080,7 +1083,7 @@ mod tests {
             }
         }
 
-        fn get_binding_id(&self, core_id: DeviceId<StackTime>) -> Option<u64> {
+        fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> Option<u64> {
             if self.core == core_id {
                 Some(self.binding)
             } else {
@@ -1091,11 +1094,11 @@ mod tests {
 
     struct EmptyFakeConversionContext;
     impl ConversionContext for EmptyFakeConversionContext {
-        fn get_core_id(&self, _binding_id: u64) -> Option<DeviceId<StackTime>> {
+        fn get_core_id(&self, _binding_id: u64) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
             None
         }
 
-        fn get_binding_id(&self, _core_id: DeviceId<StackTime>) -> Option<u64> {
+        fn get_binding_id(&self, _core_id: DeviceId<BindingsNonSyncCtxImpl>) -> Option<u64> {
             None
         }
     }
@@ -1220,10 +1223,11 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sock_addr_into_core_err<A: SockAddr>(addr: A, expected: SocketAddressError)
     where
-        (Option<ZonedAddr<A::AddrType, DeviceId<StackTime>>>, u16):
+        (Option<ZonedAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
             TryFromFidlWithContext<A, Error = SocketAddressError>,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
-        DeviceId<StackTime>: TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
+        DeviceId<BindingsNonSyncCtxImpl>:
+            TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
     {
         let ctx = FakeConversionContext::new();
 
@@ -1274,10 +1278,12 @@ mod tests {
         addr: A,
         (zoned, port): (Option<ZonedAddr<A::AddrType, ReplaceWithCoreId>>, u16),
     ) where
-        (Option<ZonedAddr<A::AddrType, DeviceId<StackTime>>>, u16): TryFromFidlWithContext<A, Error = SocketAddressError>
-            + TryIntoFidlWithContext<A, Error = DeviceNotFoundError>,
+        (Option<ZonedAddr<A::AddrType, DeviceId<BindingsNonSyncCtxImpl>>>, u16):
+            TryFromFidlWithContext<A, Error = SocketAddressError>
+                + TryIntoFidlWithContext<A, Error = DeviceNotFoundError>,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
-        DeviceId<StackTime>: TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
+        DeviceId<BindingsNonSyncCtxImpl>:
+            TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
     {
         let ctx = FakeConversionContext::new();
         let zoned = zoned.map(|z| match z {

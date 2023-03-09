@@ -1325,7 +1325,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{FakeFrameCtx, FakeInstant},
+        context::testutil::FakeFrameCtx,
         device::DeviceId,
         error::{ExistsError, NotFoundError},
         ip::{
@@ -1526,7 +1526,7 @@ mod tests {
 
     fn contains_addr<A: IpAddress>(
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-        device: &DeviceId<FakeInstant>,
+        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr: SpecifiedAddr<A>,
     ) -> bool {
         match addr.into() {
@@ -1708,7 +1708,7 @@ mod tests {
 
     fn is_routing_enabled<I: Ip>(
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-        device: &DeviceId<FakeInstant>,
+        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) -> bool {
         match I::VERSION {
             IpVersion::V4 => is_ip_routing_enabled::<Ipv4, _, _>(sync_ctx, device),
@@ -1720,7 +1720,7 @@ mod tests {
     fn test_set_ip_routing<I: Ip + TestIpExt>() {
         fn check_other_is_routing_enabled<I: Ip>(
             sync_ctx: &mut &crate::testutil::FakeSyncCtx,
-            device: &DeviceId<FakeInstant>,
+            device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
             expected: bool,
         ) {
             let enabled = match I::VERSION {
@@ -2019,7 +2019,7 @@ mod tests {
     fn receive_simple_ip_packet_test<A: IpAddress>(
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
-        device: &DeviceId<FakeInstant>,
+        device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         src_ip: A,
         dst_ip: A,
         expected: usize,
@@ -2173,7 +2173,7 @@ mod tests {
     fn join_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
         mut sync_ctx: &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {
@@ -2195,7 +2195,7 @@ mod tests {
     fn leave_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
         mut sync_ctx: &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {

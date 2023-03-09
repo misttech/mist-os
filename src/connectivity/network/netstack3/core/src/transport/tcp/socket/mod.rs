@@ -2089,7 +2089,7 @@ pub fn set_unbound_device<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
-    device: Option<DeviceId<C::Instant>>,
+    device: Option<DeviceId<C>>,
 ) where
     I: IpExt,
     C: crate::NonSyncContext,
@@ -2125,7 +2125,7 @@ pub fn set_listener_device<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
-    device: Option<DeviceId<C::Instant>>,
+    device: Option<DeviceId<C>>,
 ) -> Result<(), SetDeviceError>
 where
     I: IpExt,
@@ -2152,7 +2152,7 @@ pub fn set_bound_device<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: BoundId<I>,
-    device: Option<DeviceId<C::Instant>>,
+    device: Option<DeviceId<C>>,
 ) -> Result<(), SetDeviceError>
 where
     I: IpExt,
@@ -2178,7 +2178,7 @@ pub fn set_connection_device<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ConnectionId<I>,
-    device: Option<DeviceId<C::Instant>>,
+    device: Option<DeviceId<C>>,
 ) -> Result<(), SetDeviceError>
 where
     I: IpExt,
@@ -2206,7 +2206,7 @@ pub fn bind<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
-    local_ip: Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>,
+    local_ip: Option<ZonedAddr<I::Addr, DeviceId<C>>>,
     port: Option<NonZeroU16>,
 ) -> Result<BoundId<I>, LocalAddressError>
 where
@@ -2275,10 +2275,7 @@ pub fn accept<I: Ip, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
-) -> Result<
-    (ConnectionId<I>, SocketAddr<I::Addr, WeakDeviceId<C::Instant>>, C::ReturnedBuffers),
-    AcceptError,
->
+) -> Result<(ConnectionId<I>, SocketAddr<I::Addr, WeakDeviceId<C>>, C::ReturnedBuffers), AcceptError>
 where
     C: crate::NonSyncContext,
 {
@@ -2319,7 +2316,7 @@ pub fn connect_bound<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: BoundId<I>,
-    remote: SocketAddr<I::Addr, DeviceId<C::Instant>>,
+    remote: SocketAddr<I::Addr, DeviceId<C>>,
     netstack_buffers: C::ProvidedBuffers,
 ) -> Result<ConnectionId<I>, ConnectError>
 where
@@ -2348,7 +2345,7 @@ pub fn connect_unbound<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
-    remote_ip: ZonedAddr<I::Addr, DeviceId<C::Instant>>,
+    remote_ip: ZonedAddr<I::Addr, DeviceId<C>>,
     remote_port: NonZeroU16,
     netstack_buffers: C::ProvidedBuffers,
 ) -> Result<ConnectionId<I>, ConnectError>
@@ -2690,7 +2687,7 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>> for Co
 pub fn get_unbound_info<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     id: UnboundId<I>,
-) -> UnboundInfo<WeakDeviceId<C::Instant>> {
+) -> UnboundInfo<WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -2703,7 +2700,7 @@ pub fn get_unbound_info<I: Ip, C: crate::NonSyncContext>(
 pub fn get_bound_info<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     id: BoundId<I>,
-) -> BoundInfo<I::Addr, WeakDeviceId<C::Instant>> {
+) -> BoundInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -2716,7 +2713,7 @@ pub fn get_bound_info<I: Ip, C: crate::NonSyncContext>(
 pub fn get_listener_info<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     id: ListenerId<I>,
-) -> BoundInfo<I::Addr, WeakDeviceId<C::Instant>> {
+) -> BoundInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),
@@ -2729,7 +2726,7 @@ pub fn get_listener_info<I: Ip, C: crate::NonSyncContext>(
 pub fn get_connection_info<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     id: ConnectionId<I>,
-) -> ConnectionInfo<I::Addr, WeakDeviceId<C::Instant>> {
+) -> ConnectionInfo<I::Addr, WeakDeviceId<C>> {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant(&mut sync_ctx), id),

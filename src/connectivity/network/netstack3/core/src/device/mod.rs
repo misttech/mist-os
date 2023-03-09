@@ -230,7 +230,7 @@ fn with_ip_device_state<
     L,
 >(
     ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     cb: F,
 ) -> O {
     match device.inner() {
@@ -241,7 +241,7 @@ fn with_ip_device_state<
 
 fn get_mtu<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>(
     ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
 ) -> Mtu {
     match device.inner() {
         DeviceIdInner::Ethernet(id) => self::ethernet::get_mtu(ctx, &id),
@@ -256,7 +256,7 @@ fn join_link_multicast_group<
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
-    device_id: &DeviceId<NonSyncCtx::Instant>,
+    device_id: &DeviceId<NonSyncCtx>,
     multicast_addr: MulticastAddr<A>,
 ) {
     match device_id.inner() {
@@ -277,7 +277,7 @@ fn leave_link_multicast_group<
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
-    device_id: &DeviceId<NonSyncCtx::Instant>,
+    device_id: &DeviceId<NonSyncCtx>,
     multicast_addr: MulticastAddr<A>,
 ) {
     match device_id.inner() {
@@ -311,16 +311,16 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx> for &'_ Sync
 
 /// Iterator over devices.
 ///
-/// Implements `Iterator<Item=DeviceId<I>>` by pulling from provided loopback
+/// Implements `Iterator<Item=DeviceId<C>>` by pulling from provided loopback
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
-pub(crate) struct DevicesIter<'s, I: Instant> {
-    ethernet: id_map::Iter<'s, PrimaryRc<IpLinkDeviceState<I, EthernetDeviceState>>>,
-    loopback: core::option::Iter<'s, PrimaryRc<IpLinkDeviceState<I, LoopbackDeviceState>>>,
+pub(crate) struct DevicesIter<'s, C: DeviceLayerEventDispatcher> {
+    ethernet: id_map::Iter<'s, PrimaryRc<IpLinkDeviceState<C::Instant, EthernetDeviceState>>>,
+    loopback: core::option::Iter<'s, PrimaryRc<IpLinkDeviceState<C::Instant, LoopbackDeviceState>>>,
 }
 
-impl<'s, I: Instant> Iterator for DevicesIter<'s, I> {
-    type Item = DeviceId<I>;
+impl<'s, C: DeviceLayerEventDispatcher> Iterator for DevicesIter<'s, C> {
+    type Item = DeviceId<C>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, loopback } = self;
@@ -410,7 +410,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv4, NonSyncCtx::Instant
 {
     fn with_ip_device_state<O, F: FnOnce(&Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
         &mut self,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
         IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(&mut Locked::new(*self), device, cb)
@@ -420,7 +420,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv4, NonSyncCtx::Instant
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>
     IpDeviceContext<Ipv4, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
-    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx::Instant>;
+    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx>;
 
     type DeviceStateAccessor<'s> =
         Locked<'s, SyncCtx<NonSyncCtx>, crate::lock_ordering::DeviceLayerState>;
@@ -495,7 +495,7 @@ impl<
 {
     fn with_ip_device_state<O, F: FnOnce(&Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
         &mut self,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
         with_ip_device_state(self, device, |mut state| {
@@ -515,7 +515,7 @@ fn send_ip_frame<
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     local_addr: SpecifiedAddr<A>,
     body: S,
 ) -> Result<(), S>
@@ -553,7 +553,7 @@ where
     fn handle_neighbor_probe(
         &mut self,
         ctx: &mut C,
-        device_id: &DeviceId<C::Instant>,
+        device_id: &DeviceId<C>,
         neighbor: SpecifiedAddr<I::Addr>,
         link_addr: &[u8],
     ) {
@@ -577,7 +577,7 @@ where
     fn handle_neighbor_confirmation(
         &mut self,
         ctx: &mut C,
-        device_id: &DeviceId<C::Instant>,
+        device_id: &DeviceId<C>,
         neighbor: SpecifiedAddr<I::Addr>,
         link_addr: &[u8],
     ) {
@@ -598,7 +598,7 @@ where
         }
     }
 
-    fn flush_neighbor_table(&mut self, ctx: &mut C, device_id: &DeviceId<C::Instant>) {
+    fn flush_neighbor_table(&mut self, ctx: &mut C, device_id: &DeviceId<C>) {
         match device_id.inner() {
             DeviceIdInner::Ethernet(id) => {
                 NudHandler::<I, EthernetLinkDevice, _>::flush(self, ctx, &id)
@@ -615,7 +615,7 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>> BufferIpDeviceContext<Ip
     fn send_ip_frame<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         local_addr: SpecifiedAddr<Ipv4Addr>,
         body: S,
     ) -> Result<(), S> {
@@ -638,7 +638,7 @@ impl<
     fn send_ip_frame<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         local_addr: SpecifiedAddr<Ipv4Addr>,
         body: S,
     ) -> Result<(), S> {
@@ -720,7 +720,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>
     IpDeviceContext<Ipv6, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
-    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx::Instant>;
+    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx>;
 
     type DeviceStateAccessor<'s> =
         Locked<'s, SyncCtx<NonSyncCtx>, crate::lock_ordering::DeviceLayerState>;
@@ -793,7 +793,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv6, NonSyncCtx::Instant
 {
     fn with_ip_device_state<O, F: FnOnce(&Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
         &mut self,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
         IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(&mut Locked::new(*self), device, cb)
@@ -807,7 +807,7 @@ impl<
 {
     fn with_ip_device_state<O, F: FnOnce(&Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
         &mut self,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
         with_ip_device_state(self, device, |mut state| {
@@ -895,7 +895,7 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>> BufferIpDeviceContext<Ip
     fn send_ip_frame<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         local_addr: SpecifiedAddr<Ipv6Addr>,
         body: S,
     ) -> Result<(), S> {
@@ -918,7 +918,7 @@ impl<
     fn send_ip_frame<S: Serializer<Buffer = B>>(
         &mut self,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
         local_addr: SpecifiedAddr<Ipv6Addr>,
         body: S,
     ) -> Result<(), S> {
@@ -974,15 +974,14 @@ impl<I: Instant> Eq for EthernetDeviceId<I> {}
 
 impl<I: Instant> Debug for EthernetDeviceId<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let device: DeviceId<I> = self.clone().into();
-        write!(f, "{:?}", device)
+        Display::fmt(self, f)
     }
 }
 
 impl<I: Instant> Display for EthernetDeviceId<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let device: DeviceId<I> = self.clone().into();
-        write!(f, "{}", device)
+        let EthernetDeviceId(id, _ptr) = self;
+        write!(f, "Ethernet({})", id)
     }
 }
 
@@ -1047,48 +1046,48 @@ pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-enum WeakDeviceIdInner<I: Instant> {
-    Ethernet(EthernetWeakDeviceId<I>),
-    Loopback(LoopbackWeakDeviceId<I>),
+enum WeakDeviceIdInner<C: DeviceLayerEventDispatcher> {
+    Ethernet(EthernetWeakDeviceId<C::Instant>),
+    Loopback(LoopbackWeakDeviceId<C::Instant>),
 }
 
-impl<I: Instant> PartialEq<DeviceId<I>> for WeakDeviceId<I> {
-    fn eq(&self, other: &DeviceId<I>) -> bool {
-        <DeviceId<I> as PartialEq<WeakDeviceId<I>>>::eq(other, self)
+impl<C: DeviceLayerEventDispatcher> PartialEq<DeviceId<C>> for WeakDeviceId<C> {
+    fn eq(&self, other: &DeviceId<C>) -> bool {
+        <DeviceId<C> as PartialEq<WeakDeviceId<C>>>::eq(other, self)
     }
 }
 
 /// A weak ID identifying a device.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-pub struct WeakDeviceId<I: Instant>(WeakDeviceIdInner<I>);
+pub struct WeakDeviceId<C: DeviceLayerEventDispatcher>(WeakDeviceIdInner<C>);
 
-impl<I: Instant> From<WeakDeviceIdInner<I>> for WeakDeviceId<I> {
-    fn from(id: WeakDeviceIdInner<I>) -> WeakDeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> From<WeakDeviceIdInner<C>> for WeakDeviceId<C> {
+    fn from(id: WeakDeviceIdInner<C>) -> WeakDeviceId<C> {
         WeakDeviceId(id)
     }
 }
 
-impl<I: Instant> From<EthernetWeakDeviceId<I>> for WeakDeviceId<I> {
-    fn from(id: EthernetWeakDeviceId<I>) -> WeakDeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> From<EthernetWeakDeviceId<C::Instant>> for WeakDeviceId<C> {
+    fn from(id: EthernetWeakDeviceId<C::Instant>) -> WeakDeviceId<C> {
         WeakDeviceIdInner::Ethernet(id).into()
     }
 }
 
-impl<I: Instant> From<LoopbackWeakDeviceId<I>> for WeakDeviceId<I> {
-    fn from(id: LoopbackWeakDeviceId<I>) -> WeakDeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> From<LoopbackWeakDeviceId<C::Instant>> for WeakDeviceId<C> {
+    fn from(id: LoopbackWeakDeviceId<C::Instant>) -> WeakDeviceId<C> {
         WeakDeviceIdInner::Loopback(id).into()
     }
 }
 
-impl<I: Instant> WeakDeviceId<I> {
-    fn inner(&self) -> &WeakDeviceIdInner<I> {
+impl<C: DeviceLayerEventDispatcher> WeakDeviceId<C> {
+    fn inner(&self) -> &WeakDeviceIdInner<C> {
         let WeakDeviceId(id) = self;
         id
     }
 
     /// Attempts to upgrade the ID.
-    pub fn upgrade(&self) -> Option<DeviceId<I>> {
+    pub fn upgrade(&self) -> Option<DeviceId<C>> {
         match self.inner() {
             WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(id, ptr)) => {
                 ptr.upgrade().map(|ptr| DeviceIdInner::Ethernet(EthernetDeviceId(*id, ptr)))
@@ -1101,7 +1100,7 @@ impl<I: Instant> WeakDeviceId<I> {
     }
 }
 
-impl<I: Instant> IpDeviceId for WeakDeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> IpDeviceId for WeakDeviceId<C> {
     fn is_loopback(&self) -> bool {
         match self.inner() {
             WeakDeviceIdInner::Loopback(LoopbackWeakDeviceId(_)) => true,
@@ -1110,11 +1109,11 @@ impl<I: Instant> IpDeviceId for WeakDeviceId<I> {
     }
 }
 
-impl<I: Instant> WeakIpDeviceId for WeakDeviceId<I> {
-    type Strong = DeviceId<I>;
+impl<C: DeviceLayerEventDispatcher> WeakIpDeviceId for WeakDeviceId<C> {
+    type Strong = DeviceId<C>;
 }
 
-impl<I: Instant> Display for WeakDeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> Display for WeakDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self.inner() {
             WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(id, _ptr)) => {
@@ -1125,7 +1124,7 @@ impl<I: Instant> Display for WeakDeviceId<I> {
     }
 }
 
-impl<I: Instant> Debug for WeakDeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> Debug for WeakDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         Display::fmt(self, f)
     }
@@ -1133,18 +1132,18 @@ impl<I: Instant> Debug for WeakDeviceId<I> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-enum DeviceIdInner<I: Instant> {
-    Ethernet(EthernetDeviceId<I>),
-    Loopback(LoopbackDeviceId<I>),
+enum DeviceIdInner<C: DeviceLayerEventDispatcher> {
+    Ethernet(EthernetDeviceId<C::Instant>),
+    Loopback(LoopbackDeviceId<C::Instant>),
 }
 
 /// An ID identifying a device.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
-pub struct DeviceId<I: Instant>(DeviceIdInner<I>);
+pub struct DeviceId<C: DeviceLayerEventDispatcher>(DeviceIdInner<C>);
 
-impl<I: Instant> PartialEq<WeakDeviceId<I>> for DeviceId<I> {
-    fn eq(&self, other: &WeakDeviceId<I>) -> bool {
+impl<C: DeviceLayerEventDispatcher> PartialEq<WeakDeviceId<C>> for DeviceId<C> {
+    fn eq(&self, other: &WeakDeviceId<C>) -> bool {
         match (self.inner(), other.inner()) {
             (DeviceIdInner::Ethernet(strong), WeakDeviceIdInner::Ethernet(weak)) => strong == weak,
             (DeviceIdInner::Loopback(strong), WeakDeviceIdInner::Loopback(weak)) => strong == weak,
@@ -1154,31 +1153,31 @@ impl<I: Instant> PartialEq<WeakDeviceId<I>> for DeviceId<I> {
     }
 }
 
-impl<I: Instant> From<DeviceIdInner<I>> for DeviceId<I> {
-    fn from(id: DeviceIdInner<I>) -> DeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> From<DeviceIdInner<C>> for DeviceId<C> {
+    fn from(id: DeviceIdInner<C>) -> DeviceId<C> {
         DeviceId(id)
     }
 }
 
-impl<I: Instant> From<EthernetDeviceId<I>> for DeviceId<I> {
-    fn from(id: EthernetDeviceId<I>) -> DeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> From<EthernetDeviceId<C::Instant>> for DeviceId<C> {
+    fn from(id: EthernetDeviceId<C::Instant>) -> DeviceId<C> {
         DeviceIdInner::Ethernet(id).into()
     }
 }
 
-impl<I: Instant> From<LoopbackDeviceId<I>> for DeviceId<I> {
-    fn from(id: LoopbackDeviceId<I>) -> DeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> From<LoopbackDeviceId<C::Instant>> for DeviceId<C> {
+    fn from(id: LoopbackDeviceId<C::Instant>) -> DeviceId<C> {
         DeviceIdInner::Loopback(id).into()
     }
 }
 
-impl<I: Instant> DeviceId<I> {
-    fn inner(&self) -> &DeviceIdInner<I> {
+impl<C: DeviceLayerEventDispatcher> DeviceId<C> {
+    fn inner(&self) -> &DeviceIdInner<C> {
         let DeviceId(id) = self;
         id
     }
 
-    pub(crate) fn downgrade(&self) -> WeakDeviceId<I> {
+    pub(crate) fn downgrade(&self) -> WeakDeviceId<C> {
         match self.inner() {
             DeviceIdInner::Ethernet(EthernetDeviceId(id, ptr)) => {
                 WeakDeviceIdInner::Ethernet(EthernetWeakDeviceId(*id, StrongRc::downgrade(ptr)))
@@ -1200,7 +1199,7 @@ impl<I: Instant> DeviceId<I> {
     }
 }
 
-impl<I: Instant> IpDeviceId for DeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> IpDeviceId for DeviceId<C> {
     fn is_loopback(&self) -> bool {
         match self.inner() {
             DeviceIdInner::Loopback(LoopbackDeviceId(_)) => true,
@@ -1209,28 +1208,26 @@ impl<I: Instant> IpDeviceId for DeviceId<I> {
     }
 }
 
-impl<I: Instant> StrongIpDeviceId for DeviceId<I> {
-    type Weak = WeakDeviceId<I>;
+impl<C: DeviceLayerEventDispatcher> StrongIpDeviceId for DeviceId<C> {
+    type Weak = WeakDeviceId<C>;
 }
 
-impl<I: Instant> Display for DeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> Display for DeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self.inner() {
-            DeviceIdInner::Ethernet(EthernetDeviceId(id, _ptr)) => {
-                write!(f, "Ethernet({})", id)
-            }
-            DeviceIdInner::Loopback(LoopbackDeviceId(_)) => write!(f, "Loopback"),
+            DeviceIdInner::Ethernet(id) => Display::fmt(id, f),
+            DeviceIdInner::Loopback(id) => Display::fmt(id, f),
         }
     }
 }
 
-impl<I: Instant> Debug for DeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> Debug for DeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         Display::fmt(self, f)
     }
 }
 
-impl<I: Instant> IdMapCollectionKey for DeviceId<I> {
+impl<C: DeviceLayerEventDispatcher> IdMapCollectionKey for DeviceId<C> {
     const VARIANT_COUNT: usize = 2;
 
     fn get_id(&self) -> usize {
@@ -1285,24 +1282,24 @@ impl FrameDestination {
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct Devices<I: Instant> {
-    ethernet: IdMap<PrimaryRc<IpLinkDeviceState<I, EthernetDeviceState>>>,
-    loopback: Option<PrimaryRc<IpLinkDeviceState<I, LoopbackDeviceState>>>,
+pub(crate) struct Devices<C: DeviceLayerEventDispatcher> {
+    ethernet: IdMap<PrimaryRc<IpLinkDeviceState<C::Instant, EthernetDeviceState>>>,
+    loopback: Option<PrimaryRc<IpLinkDeviceState<C::Instant, LoopbackDeviceState>>>,
 }
 
 /// The state associated with the device layer.
-pub(crate) struct DeviceLayerState<I: Instant> {
-    devices: RwLock<Devices<I>>,
+pub(crate) struct DeviceLayerState<C: DeviceLayerEventDispatcher> {
+    devices: RwLock<Devices<C>>,
     origin: OriginTracker,
 }
 
 impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerState>
     for SyncCtx<NonSyncCtx>
 {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Devices<NonSyncCtx::Instant>>
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Devices<NonSyncCtx>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Devices<NonSyncCtx::Instant>>
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Devices<NonSyncCtx>>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadData<'_> {
@@ -1313,11 +1310,13 @@ impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerStat
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::DeviceLayerState> for DeviceLayerState<I> {
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Devices<I>>
+impl<C: DeviceLayerEventDispatcher> RwLockFor<crate::lock_ordering::DeviceLayerState>
+    for DeviceLayerState<C>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Devices<C>>
         where
             Self: 'l ;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Devices<I>>
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Devices<C>>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadData<'_> {
@@ -1359,7 +1358,7 @@ impl OriginTracker {
     }
 }
 
-impl<I: Instant> DeviceLayerState<I> {
+impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
     /// Creates a new [`DeviceLayerState`] instance.
     pub(crate) fn new() -> Self {
         Self { devices: Default::default(), origin: OriginTracker::new() }
@@ -1374,7 +1373,7 @@ impl<I: Instant> DeviceLayerState<I> {
         &self,
         mac: UnicastAddr<Mac>,
         max_frame_size: ethernet::MaxFrameSize,
-    ) -> DeviceId<I> {
+    ) -> DeviceId<C> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
         let ptr = PrimaryRc::new(IpLinkDeviceState::new(
@@ -1388,7 +1387,7 @@ impl<I: Instant> DeviceLayerState<I> {
     }
 
     /// Adds a new loopback device to the device layer.
-    pub(crate) fn add_loopback_device(&self, mtu: Mtu) -> Result<DeviceId<I>, ExistsError> {
+    pub(crate) fn add_loopback_device(&self, mtu: Mtu) -> Result<DeviceId<C>, ExistsError> {
         let Devices { ethernet: _, loopback } = &mut *self.devices.write();
 
         if let Some(_) = loopback {
@@ -1412,14 +1411,14 @@ impl<I: Instant> DeviceLayerState<I> {
 /// An event dispatcher for the device layer.
 ///
 /// See the `EventDispatcher` trait in the crate root for more details.
-pub trait DeviceLayerEventDispatcher: InstantContext {
+pub trait DeviceLayerEventDispatcher: InstantContext + Sized {
     /// Signals to the dispatcher that RX frames are available and ready to be
     /// handled by [`handle_queued_rx_packets`].
     ///
     /// Implementations must make sure that [`handle_queued_rx_packets`] is
     /// scheduled to be called as soon as possible so that enqueued RX frames
     /// are promptly handled.
-    fn wake_rx_task(&mut self, device: &DeviceId<Self::Instant>);
+    fn wake_rx_task(&mut self, device: &DeviceId<Self>);
 
     /// Signals to the dispatcher that TX frames are available and ready to be
     /// sent by [`transmit_queued_tx_frames`].
@@ -1427,7 +1426,7 @@ pub trait DeviceLayerEventDispatcher: InstantContext {
     /// Implementations must make sure that [`transmit_queued_tx_frames`] is
     /// scheduled to be called as soon as possible so that enqueued TX frames
     /// are promptly sent.
-    fn wake_tx_task(&mut self, device: &DeviceId<Self::Instant>);
+    fn wake_tx_task(&mut self, device: &DeviceId<Self>);
 
     /// Send a frame to a device driver.
     ///
@@ -1437,7 +1436,7 @@ pub trait DeviceLayerEventDispatcher: InstantContext {
     /// reported as success.
     fn send_frame(
         &mut self,
-        device: &DeviceId<Self::Instant>,
+        device: &DeviceId<Self>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>>;
 }
@@ -1453,7 +1452,7 @@ pub enum DeviceSendFrameError<T> {
 pub fn set_tx_queue_configuration<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     config: TransmitQueueConfiguration,
 ) {
     let sync_ctx = &mut Locked::new(sync_ctx);
@@ -1473,7 +1472,7 @@ pub fn set_tx_queue_configuration<NonSyncCtx: NonSyncContext>(
 pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
 ) -> Result<(), DeviceSendFrameError<()>> {
     let sync_ctx = &mut Locked::new(sync_ctx);
     match device.inner() {
@@ -1495,7 +1494,7 @@ pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
 pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
 ) {
     match device.inner() {
         DeviceIdInner::Ethernet(id) => {
@@ -1519,7 +1518,7 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
 pub fn remove_device<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: DeviceId<NonSyncCtx::Instant>,
+    device: DeviceId<NonSyncCtx>,
 ) {
     // Start cleaning up the device by disabling IP state. This removes timers
     // for the device that would otherwise hold references to defunct device
@@ -1556,7 +1555,7 @@ pub fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
     max_frame_size: ethernet::MaxFrameSize,
-) -> DeviceId<NonSyncCtx::Instant> {
+) -> DeviceId<NonSyncCtx> {
     sync_ctx.state.device.add_ethernet_device(mac, max_frame_size)
 }
 
@@ -1568,7 +1567,7 @@ pub fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
 pub fn add_loopback_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
-) -> Result<DeviceId<NonSyncCtx::Instant>, crate::error::ExistsError> {
+) -> Result<DeviceId<NonSyncCtx>, crate::error::ExistsError> {
     sync_ctx.state.device.add_loopback_device(mtu)
 }
 
@@ -1576,7 +1575,7 @@ pub fn add_loopback_device<NonSyncCtx: NonSyncContext>(
 pub fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     buffer: B,
 ) -> Result<(), NotSupportedError> {
     match device.inner() {
@@ -1593,7 +1592,7 @@ pub fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
 pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     enabled: bool,
 ) -> Result<(), NotSupportedError> {
     match device.inner() {
@@ -1611,7 +1610,7 @@ pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
 pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext, A: IpAddress>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     addr_sub: AddrSubnet<A>,
 ) -> Result<(), ExistsError> {
     trace!("add_ip_addr_subnet: adding addr {:?} to device {:?}", addr_sub, device);
@@ -1636,7 +1635,7 @@ pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext, A: IpAddress>(
 pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     addr: &SpecifiedAddr<A>,
 ) -> Result<(), NotFoundError> {
     trace!("del_ip_addr: removing addr {:?} from device {:?}", addr, device);
@@ -1655,7 +1654,7 @@ pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
 
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> DualStackDeviceIdContext for &'_ SyncCtx<NonSyncCtx> {
-    type DualStackDeviceId = DeviceId<NonSyncCtx::Instant>;
+    type DualStackDeviceId = DeviceId<NonSyncCtx>;
 }
 
 impl<'a, NonSyncCtx: NonSyncContext, L> DualStackDeviceIdContext
@@ -1669,24 +1668,21 @@ impl<'a, NonSyncCtx: NonSyncContext, L> DualStackDeviceIdContext
 // the `context` module.
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext, I: Ip> IpDeviceIdContext<I> for &'_ SyncCtx<NonSyncCtx> {
-    type DeviceId = DeviceId<NonSyncCtx::Instant>;
-    type WeakDeviceId = WeakDeviceId<NonSyncCtx::Instant>;
+    type DeviceId = DeviceId<NonSyncCtx>;
+    type WeakDeviceId = WeakDeviceId<NonSyncCtx>;
 
-    fn downgrade_device_id(
-        &self,
-        device_id: &DeviceId<NonSyncCtx::Instant>,
-    ) -> WeakDeviceId<NonSyncCtx::Instant> {
+    fn downgrade_device_id(&self, device_id: &DeviceId<NonSyncCtx>) -> WeakDeviceId<NonSyncCtx> {
         device_id.downgrade()
     }
 
     fn upgrade_weak_device_id(
         &self,
-        weak_device_id: &WeakDeviceId<NonSyncCtx::Instant>,
-    ) -> Option<DeviceId<NonSyncCtx::Instant>> {
+        weak_device_id: &WeakDeviceId<NonSyncCtx>,
+    ) -> Option<DeviceId<NonSyncCtx>> {
         weak_device_id.upgrade()
     }
 
-    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx::Instant>) -> bool {
+    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx>) -> bool {
         !device_id.removed()
     }
 }
@@ -1697,21 +1693,18 @@ impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
     type DeviceId = <&'a SyncCtx<NonSyncCtx> as IpDeviceIdContext<I>>::DeviceId;
     type WeakDeviceId = <&'a SyncCtx<NonSyncCtx> as IpDeviceIdContext<I>>::WeakDeviceId;
 
-    fn downgrade_device_id(
-        &self,
-        device_id: &DeviceId<NonSyncCtx::Instant>,
-    ) -> WeakDeviceId<NonSyncCtx::Instant> {
+    fn downgrade_device_id(&self, device_id: &DeviceId<NonSyncCtx>) -> WeakDeviceId<NonSyncCtx> {
         device_id.downgrade()
     }
 
     fn upgrade_weak_device_id(
         &self,
-        weak_device_id: &WeakDeviceId<NonSyncCtx::Instant>,
-    ) -> Option<DeviceId<NonSyncCtx::Instant>> {
+        weak_device_id: &WeakDeviceId<NonSyncCtx>,
+    ) -> Option<DeviceId<NonSyncCtx>> {
         weak_device_id.upgrade()
     }
 
-    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx::Instant>) -> bool {
+    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx>) -> bool {
         !device_id.removed()
     }
 }
@@ -1726,7 +1719,7 @@ impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
 pub(super) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     addr: Ipv4Addr,
     mac: UnicastAddr<Mac>,
 ) -> Result<(), NotSupportedError> {
@@ -1752,7 +1745,7 @@ pub(super) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
 pub(crate) fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     addr: UnicastAddr<Ipv6Addr>,
     mac: Mac,
 ) -> Result<(), NotSupportedError> {
@@ -1767,7 +1760,7 @@ pub(crate) fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
 /// Gets the IPv4 Configuration for a `device`.
 pub fn get_ipv4_configuration<NonSyncCtx: NonSyncContext>(
     mut ctx: &SyncCtx<NonSyncCtx>,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
 ) -> Ipv4DeviceConfiguration {
     crate::ip::device::get_ipv4_configuration(&mut ctx, device)
 }
@@ -1775,7 +1768,7 @@ pub fn get_ipv4_configuration<NonSyncCtx: NonSyncContext>(
 /// Gets the IPv6 Configuration for a `device`.
 pub fn get_ipv6_configuration<NonSyncCtx: NonSyncContext>(
     mut ctx: &SyncCtx<NonSyncCtx>,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
 ) -> Ipv6DeviceConfiguration {
     crate::ip::device::get_ipv6_configuration(&mut ctx, device)
 }
@@ -1787,7 +1780,7 @@ pub fn update_ipv4_configuration<
 >(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     update_cb: F,
 ) {
     crate::ip::device::update_ipv4_configuration(&mut sync_ctx, ctx, device, update_cb)
@@ -1800,7 +1793,7 @@ pub fn update_ipv6_configuration<
 >(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
     update_cb: F,
 ) {
     crate::ip::device::update_ipv6_configuration(&mut sync_ctx, ctx, device, update_cb)
@@ -1814,7 +1807,7 @@ pub(crate) mod testutil {
     /// Calls [`receive_frame`], panicking on error.
     pub(crate) fn receive_frame_or_panic<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
         Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<NonSyncCtx>,
-        device: DeviceId<NonSyncCtx::Instant>,
+        device: DeviceId<NonSyncCtx>,
         buffer: B,
     ) {
         crate::device::receive_frame(sync_ctx, non_sync_ctx, &device, buffer).unwrap()
@@ -1823,7 +1816,7 @@ pub(crate) mod testutil {
     pub fn enable_device<NonSyncCtx: NonSyncContext>(
         mut sync_ctx: &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
     ) {
         crate::ip::device::update_ipv4_configuration(&mut sync_ctx, ctx, device, |config| {
             config.ip_config.ip_enabled = true;
@@ -1845,7 +1838,6 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::FakeInstant,
         testutil::{
             FakeEventDispatcherConfig, FakeSyncCtx, TestIpExt as _, FAKE_CONFIG_V4,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
@@ -1869,7 +1861,10 @@ mod tests {
         let Ctx { sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
 
-        fn check(sync_ctx: &mut &FakeSyncCtx, expected: &[DeviceId<FakeInstant>]) {
+        fn check(
+            sync_ctx: &mut &FakeSyncCtx,
+            expected: &[DeviceId<crate::testutil::FakeNonSyncCtx>],
+        ) {
             assert_eq!(
                 IpDeviceContext::<Ipv4, _>::with_devices(sync_ctx, |devices| devices
                     .collect::<Vec<_>>()),
@@ -1904,7 +1899,7 @@ mod tests {
 
     fn get_routes<NonSyncCtx: NonSyncContext>(
         sync_ctx: &SyncCtx<NonSyncCtx>,
-        device: &DeviceId<NonSyncCtx::Instant>,
+        device: &DeviceId<NonSyncCtx>,
     ) -> HashMap<SubnetEither, Option<IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>>>
     {
         crate::ip::get_all_routes(&sync_ctx)
@@ -1975,7 +1970,7 @@ mod tests {
     fn add_ethernet(
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         _non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
-    ) -> DeviceId<FakeInstant> {
+    ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
         crate::device::add_ethernet_device(
             sync_ctx,
             Ipv6::FAKE_CONFIG.local_mac,
@@ -1986,7 +1981,7 @@ mod tests {
     fn add_loopback(
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
-    ) -> DeviceId<FakeInstant> {
+    ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
         let device = crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap();
         crate::device::add_ip_addr_subnet(
             sync_ctx,
@@ -2001,7 +1996,7 @@ mod tests {
 
     fn check_transmitted_ethernet(
         non_sync_ctx: &crate::testutil::FakeNonSyncCtx,
-        _device_id: &DeviceId<FakeInstant>,
+        _device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         count: usize,
     ) {
         assert_eq!(non_sync_ctx.frames_sent().len(), count);
@@ -2009,7 +2004,7 @@ mod tests {
 
     fn check_transmitted_loopback(
         non_sync_ctx: &crate::testutil::FakeNonSyncCtx,
-        device_id: &DeviceId<FakeInstant>,
+        device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         count: usize,
     ) {
         // Loopback frames leave the stack; outgoing frames land in
@@ -2029,8 +2024,12 @@ mod tests {
         add_device: fn(
             &mut &crate::testutil::FakeSyncCtx,
             &mut crate::testutil::FakeNonSyncCtx,
-        ) -> DeviceId<FakeInstant>,
-        check_transmitted: fn(&crate::testutil::FakeNonSyncCtx, &DeviceId<FakeInstant>, usize),
+        ) -> DeviceId<crate::testutil::FakeNonSyncCtx>,
+        check_transmitted: fn(
+            &crate::testutil::FakeNonSyncCtx,
+            &DeviceId<crate::testutil::FakeNonSyncCtx>,
+            usize,
+        ),
         with_tx_queue: bool,
     ) {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();

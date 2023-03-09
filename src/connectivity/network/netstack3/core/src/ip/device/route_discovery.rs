@@ -586,9 +586,11 @@ mod tests {
             .unwrap_b()
     }
 
-    fn setup(
-    ) -> (crate::testutil::FakeCtx, DeviceId<FakeInstant>, FakeEventDispatcherConfig<Ipv6Addr>)
-    {
+    fn setup() -> (
+        crate::testutil::FakeCtx,
+        DeviceId<crate::testutil::FakeNonSyncCtx>,
+        FakeEventDispatcherConfig<Ipv6Addr>,
+    ) {
         let FakeEventDispatcherConfig {
             local_mac,
             remote_mac: _,
@@ -621,8 +623,8 @@ mod tests {
 
     fn timer_id(
         route: Ipv6DiscoveredRoute,
-        device_id: DeviceId<FakeInstant>,
-    ) -> TimerId<FakeInstant> {
+        device_id: DeviceId<crate::testutil::FakeNonSyncCtx>,
+    ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::RouteDiscovery(
             Ipv6DiscoveredRouteTimerId { device_id, route },
         )))
@@ -630,7 +632,7 @@ mod tests {
 
     fn take_route_discovery_events(
         non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
-    ) -> HashSet<Ipv6RouteDiscoveryEvent<DeviceId<FakeInstant>>> {
+    ) -> HashSet<Ipv6RouteDiscoveryEvent<DeviceId<crate::testutil::FakeNonSyncCtx>>> {
         non_sync_ctx
             .take_events()
             .into_iter()

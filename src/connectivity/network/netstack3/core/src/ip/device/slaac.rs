@@ -1575,7 +1575,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{
-            FakeCtx, FakeInstant, FakeInstantRange as _v, FakeNonSyncCtx, FakeSyncCtx,
+            FakeCtx, FakeInstant, FakeInstantRange as _, FakeNonSyncCtx, FakeSyncCtx,
             FakeTimerCtxExt as _,
         },
         device::FrameDestination,

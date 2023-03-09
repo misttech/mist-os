@@ -29,15 +29,15 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, NonSyncContext,
-    StackTime, SyncCtx,
+    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, DeviceId, Netstack,
+    NetstackContext, NonSyncContext, SyncCtx,
 };
 
 #[derive(Clone)]
 struct Inner {
     device: netdevice_client::Client,
     session: netdevice_client::Session,
-    state: Arc<Mutex<netdevice_client::PortSlab<DeviceId<StackTime>>>>,
+    state: Arc<Mutex<netdevice_client::PortSlab<DeviceId<BindingsNonSyncCtxImpl>>>>,
 }
 
 /// The worker that receives messages from the ethernet device, and passes them
@@ -339,7 +339,7 @@ impl DeviceHandler {
 fn add_default_routes<NonSyncCtx: NonSyncContext>(
     sync_ctx: &mut SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx::Instant>,
+    device: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
     use netstack3_core::ip::types::AddableEntry;
     use netstack3_core::ip::types::AddableEntryEither;

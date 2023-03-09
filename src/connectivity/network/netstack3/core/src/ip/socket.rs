@@ -1318,7 +1318,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::{self, testutil::FakeInstant, EventContext},
+        context::{testutil::FakeInstant, EventContext},
         device::DeviceId,
         ip::{
             device::{
@@ -1329,7 +1329,7 @@ mod tests {
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
         },
         testutil::*,
-        Ctx, TimerContext, TimerId,
+        Ctx, TimerContext,
     };
 
     enum AddressType {
@@ -1393,8 +1393,8 @@ mod tests {
         ctx: &mut FakeNonSyncCtx,
     ) where
         for<'a> &'a FakeSyncCtx:
-            DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeInstant>>,
-        FakeNonSyncCtx: IpDeviceNonSyncContext<I, DeviceId<FakeInstant>, Instant = FakeInstant>,
+            DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        FakeNonSyncCtx: IpDeviceNonSyncContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
     {
         let devices = DeviceIpDeviceContext::<I, _>::with_devices(sync_ctx, |devices| {
             devices.collect::<Vec<_>>()
@@ -1498,14 +1498,10 @@ mod tests {
     fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
     where
         for<'a> &'a FakeSyncCtx: IpSocketHandler<I, FakeNonSyncCtx>
-            + IpDeviceIdContext<I, DeviceId = DeviceId<FakeInstant>>
-            + DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeInstant>>,
-        FakeNonSyncCtx: TimerContext<I::Timer<DeviceId<FakeInstant>>>,
-        context::testutil::FakeNonSyncCtx<
-            TimerId<FakeInstant>,
-            DispatchedEvent,
-            FakeNonSyncCtxState,
-        >: EventContext<IpDeviceEvent<DeviceId<FakeInstant>, I>>,
+            + IpDeviceIdContext<I, DeviceId = DeviceId<FakeNonSyncCtx>>
+            + DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+        FakeNonSyncCtx: TimerContext<I::Timer<DeviceId<FakeNonSyncCtx>>>
+            + EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>,
     {
         let cfg = I::FAKE_CONFIG;
         let proto = I::ICMP_IP_PROTO;
@@ -1629,7 +1625,7 @@ mod tests {
         to_addr_type: AddressType,
     ) where
         for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
-            + IpDeviceIdContext<I, DeviceId = DeviceId<FakeInstant>>,
+            + IpDeviceIdContext<I, DeviceId = DeviceId<FakeNonSyncCtx>>,
         IcmpEchoReply: IcmpMessage<I, &'static [u8], Code = IcmpUnusedCode>,
     {
         set_logger_for_test();
@@ -1750,13 +1746,9 @@ mod tests {
     fn test_send<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
         for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
-            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeInstant>>
+            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, <FakeNonSyncCtx as InstantContext>::Instant>,
-        context::testutil::FakeNonSyncCtx<
-            TimerId<FakeInstant>,
-            DispatchedEvent,
-            FakeNonSyncCtxState,
-        >: EventContext<IpLayerEvent<DeviceId<FakeInstant>, I>>,
+        FakeNonSyncCtx: EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>,
     {
         // Test various edge cases of the
         // `BufferIpSocketContext::send_ip_packet` method.
@@ -1892,7 +1884,7 @@ mod tests {
     fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
         for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
-            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeInstant>>
+            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, <FakeNonSyncCtx as InstantContext>::Instant>,
     {
         set_logger_for_test();
@@ -2020,7 +2012,7 @@ mod tests {
     fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpLayerIpExt>(remove_device: bool)
     where
         for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
-            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeInstant>>
+            + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, <FakeNonSyncCtx as InstantContext>::Instant>
             + DeviceIpSocketHandler<I, FakeNonSyncCtx>,
     {

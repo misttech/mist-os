@@ -1456,7 +1456,6 @@ mod tests {
     use net_types::{ip::Ipv6, LinkLocalAddr};
 
     use crate::{
-        context::testutil::FakeInstant,
         device::{ethernet, DeviceId},
         ip::gmp::GmpDelayedReportTimerId,
         testutil::{
@@ -1569,7 +1568,7 @@ mod tests {
     fn enable_ipv6_device(
         sync_ctx: &mut &FakeSyncCtx,
         non_sync_ctx: &mut FakeNonSyncCtx,
-        device_id: &DeviceId<FakeInstant>,
+        device_id: &DeviceId<FakeNonSyncCtx>,
         ll_addr: AddrSubnet<Ipv6Addr, LinkLocalAddr<UnicastAddr<Ipv6Addr>>>,
     ) {
         update_ipv6_configuration(sync_ctx, non_sync_ctx, device_id, |config| {

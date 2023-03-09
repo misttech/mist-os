@@ -296,7 +296,7 @@ where
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::TcpSockets<Ipv4>> for SyncCtx<C> {
-    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv4, WeakDeviceId<C::Instant>, C>>
+    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv4, WeakDeviceId<C>, C>>
         where Self: 'l;
 
     fn lock(&self) -> Self::Data<'_> {
@@ -305,7 +305,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::TcpSockets<Ipv4>> for Sync
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::TcpSockets<Ipv6>> for SyncCtx<C> {
-    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv6, WeakDeviceId<C::Instant>, C>>
+    type Data<'l> = crate::sync::LockGuard<'l, tcp::socket::Sockets<Ipv6, WeakDeviceId<C>, C>>
         where Self: 'l;
 
     fn lock(&self) -> Self::Data<'_> {

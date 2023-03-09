@@ -95,34 +95,34 @@ type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
 #[derive(Default)]
 pub(crate) struct BindingsNonSyncCtxImpl {
     rng: OsRng,
-    timers: timers::TimerDispatcher<TimerId<StackTime>>,
-    devices: Devices<DeviceId<StackTime>>,
+    timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
+    devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     icmp_echo_sockets: IcmpEchoSockets,
     udp_sockets: UdpSockets,
     tcp_v4_listeners: IdMap<zx::Socket>,
     tcp_v6_listeners: IdMap<zx::Socket>,
 }
 
-impl AsRef<timers::TimerDispatcher<TimerId<StackTime>>> for BindingsNonSyncCtxImpl {
-    fn as_ref(&self) -> &TimerDispatcher<TimerId<StackTime>> {
+impl AsRef<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
+    fn as_ref(&self) -> &TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
         &self.timers
     }
 }
 
-impl AsMut<timers::TimerDispatcher<TimerId<StackTime>>> for BindingsNonSyncCtxImpl {
-    fn as_mut(&mut self) -> &mut TimerDispatcher<TimerId<StackTime>> {
+impl AsMut<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
+    fn as_mut(&mut self) -> &mut TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
         &mut self.timers
     }
 }
 
-impl AsRef<Devices<DeviceId<StackTime>>> for BindingsNonSyncCtxImpl {
-    fn as_ref(&self) -> &Devices<DeviceId<StackTime>> {
+impl AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
+    fn as_ref(&self) -> &Devices<DeviceId<BindingsNonSyncCtxImpl>> {
         &self.devices
     }
 }
 
-impl AsMut<Devices<DeviceId<StackTime>>> for BindingsNonSyncCtxImpl {
-    fn as_mut(&mut self) -> &mut Devices<DeviceId<StackTime>> {
+impl AsMut<Devices<DeviceId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
+    fn as_mut(&mut self) -> &mut Devices<DeviceId<BindingsNonSyncCtxImpl>> {
         &mut self.devices
     }
 }
@@ -159,30 +159,32 @@ impl AsMut<UdpSockets> for BindingsNonSyncCtxImpl {
     }
 }
 
-impl timers::TimerHandler<TimerId<StackTime>> for Ctx<BindingsNonSyncCtxImpl> {
-    fn handle_expired_timer(&mut self, timer: TimerId<StackTime>) {
+impl timers::TimerHandler<TimerId<BindingsNonSyncCtxImpl>> for Ctx<BindingsNonSyncCtxImpl> {
+    fn handle_expired_timer(&mut self, timer: TimerId<BindingsNonSyncCtxImpl>) {
         let Ctx { sync_ctx, non_sync_ctx } = self;
         handle_timer(sync_ctx, non_sync_ctx, timer)
     }
 
-    fn get_timer_dispatcher(&mut self) -> &mut timers::TimerDispatcher<TimerId<StackTime>> {
+    fn get_timer_dispatcher(
+        &mut self,
+    ) -> &mut timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>> {
         self.non_sync_ctx.as_mut()
     }
 }
 
-impl timers::TimerContext<TimerId<StackTime>> for Netstack {
+impl timers::TimerContext<TimerId<BindingsNonSyncCtxImpl>> for Netstack {
     type Handler = Ctx<BindingsNonSyncCtxImpl>;
 }
 
 impl<D> ConversionContext for D
 where
-    D: AsRef<Devices<DeviceId<StackTime>>>,
+    D: AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>>,
 {
-    fn get_core_id(&self, binding_id: u64) -> Option<DeviceId<StackTime>> {
+    fn get_core_id(&self, binding_id: u64) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
         self.as_ref().get_core_id(binding_id)
     }
 
-    fn get_binding_id(&self, core_id: DeviceId<StackTime>) -> Option<u64> {
+    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> Option<u64> {
         self.as_ref().get_binding_id(core_id)
     }
 }
@@ -235,30 +237,30 @@ impl RngContext for BindingsNonSyncCtxImpl {
     }
 }
 
-impl TimerContext<TimerId<StackTime>> for BindingsNonSyncCtxImpl {
+impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
     fn schedule_timer_instant(
         &mut self,
         time: StackTime,
-        id: TimerId<StackTime>,
+        id: TimerId<BindingsNonSyncCtxImpl>,
     ) -> Option<StackTime> {
         self.timers.schedule_timer(id, time)
     }
 
-    fn cancel_timer(&mut self, id: TimerId<StackTime>) -> Option<StackTime> {
+    fn cancel_timer(&mut self, id: TimerId<BindingsNonSyncCtxImpl>) -> Option<StackTime> {
         self.timers.cancel_timer(&id)
     }
 
-    fn cancel_timers_with<F: FnMut(&TimerId<StackTime>) -> bool>(&mut self, f: F) {
+    fn cancel_timers_with<F: FnMut(&TimerId<BindingsNonSyncCtxImpl>) -> bool>(&mut self, f: F) {
         self.timers.cancel_timers_with(f);
     }
 
-    fn scheduled_instant(&self, id: TimerId<StackTime>) -> Option<StackTime> {
+    fn scheduled_instant(&self, id: TimerId<BindingsNonSyncCtxImpl>) -> Option<StackTime> {
         self.timers.scheduled_time(&id)
     }
 }
 
 impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
-    fn wake_rx_task(&mut self, device: &DeviceId<StackTime>) {
+    fn wake_rx_task(&mut self, device: &DeviceId<BindingsNonSyncCtxImpl>) {
         match self.devices.get_core_device_mut(device) {
             Some(dev) => match dev.info_mut() {
                 DeviceSpecificInfo::Netdevice(_) => {
@@ -274,13 +276,13 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
         }
     }
 
-    fn wake_tx_task(&mut self, device: &DeviceId<StackTime>) {
+    fn wake_tx_task(&mut self, device: &DeviceId<BindingsNonSyncCtxImpl>) {
         unimplemented!("TODO(https://fxbug.dev/105615): wake_tx_task(_, {})", device);
     }
 
     fn send_frame(
         &mut self,
-        device: &DeviceId<StackTime>,
+        device: &DeviceId<BindingsNonSyncCtxImpl>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         // TODO(wesleyac): Error handling
@@ -385,8 +387,10 @@ where
     }
 }
 
-impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<StackTime>, I>> for BindingsNonSyncCtxImpl {
-    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<StackTime>, I>) {
+impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I>>
+    for BindingsNonSyncCtxImpl
+{
+    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<BindingsNonSyncCtxImpl>, I>) {
         match event {
             IpDeviceEvent::AddressAdded { device, addr, state } => {
                 self.notify_interface_update(
@@ -426,10 +430,13 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<StackTime>, I>> for BindingsNonS
     }
 }
 
-impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<StackTime>, I>>
+impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSyncCtxImpl>, I>>
     for BindingsNonSyncCtxImpl
 {
-    fn on_event(&mut self, event: netstack3_core::ip::IpLayerEvent<DeviceId<StackTime>, I>) {
+    fn on_event(
+        &mut self,
+        event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSyncCtxImpl>, I>,
+    ) {
         let (device, subnet, route_is_present) =
             match event {
                 netstack3_core::ip::IpLayerEvent::RouteAdded(
@@ -453,10 +460,13 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<StackTime>, I
     }
 }
 
-impl EventContext<netstack3_core::ip::device::dad::DadEvent<DeviceId<StackTime>>>
+impl EventContext<netstack3_core::ip::device::dad::DadEvent<DeviceId<BindingsNonSyncCtxImpl>>>
     for BindingsNonSyncCtxImpl
 {
-    fn on_event(&mut self, event: netstack3_core::ip::device::dad::DadEvent<DeviceId<StackTime>>) {
+    fn on_event(
+        &mut self,
+        event: netstack3_core::ip::device::dad::DadEvent<DeviceId<BindingsNonSyncCtxImpl>>,
+    ) {
         match event {
             netstack3_core::ip::device::dad::DadEvent::AddressAssigned { device, addr } => self
                 .on_event(
@@ -472,13 +482,15 @@ impl EventContext<netstack3_core::ip::device::dad::DadEvent<DeviceId<StackTime>>
 
 impl
     EventContext<
-        netstack3_core::ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<StackTime>>,
+        netstack3_core::ip::device::route_discovery::Ipv6RouteDiscoveryEvent<
+            DeviceId<BindingsNonSyncCtxImpl>,
+        >,
     > for BindingsNonSyncCtxImpl
 {
     fn on_event(
         &mut self,
         _event: netstack3_core::ip::device::route_discovery::Ipv6RouteDiscoveryEvent<
-            DeviceId<StackTime>,
+            DeviceId<BindingsNonSyncCtxImpl>,
         >,
     ) {
         // TODO(https://fxbug.dev/97203): Update forwarding table in response to
@@ -487,7 +499,11 @@ impl
 }
 
 impl BindingsNonSyncCtxImpl {
-    fn notify_interface_update(&self, device: &DeviceId<StackTime>, event: InterfaceUpdate) {
+    fn notify_interface_update(
+        &self,
+        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        event: InterfaceUpdate,
+    ) {
         self.devices
             .get_core_device(device)
             .unwrap_or_else(|| panic!("issued event {:?} for deleted device {:?}", event, device))
@@ -501,7 +517,7 @@ impl BindingsNonSyncCtxImpl {
     /// Notify `AddressStateProvider.WatchAddressAssignmentState` watchers.
     fn notify_address_update(
         &self,
-        device: &DeviceId<StackTime>,
+        device: &DeviceId<BindingsNonSyncCtxImpl>,
         address: SpecifiedAddr<IpAddr>,
         state: netstack3_core::ip::device::IpAddressState,
     ) {
@@ -523,7 +539,11 @@ impl BindingsNonSyncCtxImpl {
         }
     }
 
-    fn notify_dad_failed(&mut self, device: &DeviceId<StackTime>, address: SpecifiedAddr<IpAddr>) {
+    fn notify_dad_failed(
+        &mut self,
+        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        address: SpecifiedAddr<IpAddr>,
+    ) {
         if let Some(address_info) = self
             .devices
             .get_core_device_mut(device)
@@ -593,7 +613,7 @@ fn set_interface_enabled(
 fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
     sync_ctx: &mut SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
-    loopback: &DeviceId<NonSyncCtx::Instant>,
+    loopback: &DeviceId<NonSyncCtx>,
 ) -> Result<(), NetstackError> {
     for addr_subnet in [
         AddrSubnetEither::V4(
@@ -617,7 +637,7 @@ fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
 fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
     sync_ctx: &mut SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
-    loopback: &DeviceId<NonSyncCtx::Instant>,
+    loopback: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
     use netstack3_core::ip::types::AddableEntry;
     use netstack3_core::ip::types::AddableEntryEither;

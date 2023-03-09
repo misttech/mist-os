@@ -35,7 +35,7 @@ use crate::{
         DeviceLayerEventDispatcher, DeviceSendFrameError, FrameDestination,
     },
     sync::{StrongRc, WeakRc},
-    DeviceId, Instant, NonSyncContext, SyncCtx,
+    Instant, NonSyncContext, SyncCtx,
 };
 
 #[derive(Derivative)]
@@ -83,15 +83,13 @@ impl<I: Instant> Eq for LoopbackDeviceId<I> {}
 
 impl<I: Instant> Debug for LoopbackDeviceId<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let device: DeviceId<I> = self.clone().into();
-        write!(f, "{:?}", device)
+        Display::fmt(self, f)
     }
 }
 
 impl<I: Instant> Display for LoopbackDeviceId<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let device: DeviceId<I> = self.clone().into();
-        write!(f, "{}", device)
+        write!(f, "Loopback")
     }
 }
 
@@ -400,10 +398,10 @@ mod tests {
         fn test<I: TestIpExt + IpDeviceStateIpExt, NonSyncCtx: NonSyncContext>(
             sync_ctx: &mut &SyncCtx<NonSyncCtx>,
             ctx: &mut NonSyncCtx,
-            device: &DeviceId<NonSyncCtx::Instant>,
+            device: &DeviceId<NonSyncCtx>,
             get_addrs: fn(
                 &mut &SyncCtx<NonSyncCtx>,
-                &DeviceId<NonSyncCtx::Instant>,
+                &DeviceId<NonSyncCtx>,
             ) -> Vec<SpecifiedAddr<I::Addr>>,
         ) {
             assert_eq!(get_addrs(sync_ctx, device), []);

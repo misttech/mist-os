@@ -75,7 +75,7 @@ use crate::{
         tcp::TcpState,
         udp::{UdpState, UdpStateBuilder},
     },
-    NonSyncContext, RngContext, SyncCtx,
+    NonSyncContext, SyncCtx,
 };
 
 /// A builder for transport layer state.
@@ -91,10 +91,7 @@ impl TransportStateBuilder {
         &mut self.udp
     }
 
-    pub(crate) fn build_with_ctx<C: tcp::socket::NonSyncContext + RngContext>(
-        self,
-        ctx: &mut C,
-    ) -> TransportLayerState<C> {
+    pub(crate) fn build_with_ctx<C: NonSyncContext>(self, ctx: &mut C) -> TransportLayerState<C> {
         TransportLayerState {
             udpv4: self.udp.clone().build(),
             udpv6: self.udp.build(),
@@ -105,18 +102,18 @@ impl TransportStateBuilder {
 }
 
 /// The state associated with the transport layer.
-pub(crate) struct TransportLayerState<C: tcp::socket::NonSyncContext> {
-    udpv4: UdpState<Ipv4, WeakDeviceId<C::Instant>>,
-    udpv6: UdpState<Ipv6, WeakDeviceId<C::Instant>>,
-    tcpv4: TcpState<Ipv4, WeakDeviceId<C::Instant>, C>,
-    tcpv6: TcpState<Ipv6, WeakDeviceId<C::Instant>, C>,
+pub(crate) struct TransportLayerState<C: NonSyncContext> {
+    udpv4: UdpState<Ipv4, WeakDeviceId<C>>,
+    udpv6: UdpState<Ipv6, WeakDeviceId<C>>,
+    tcpv4: TcpState<Ipv4, WeakDeviceId<C>, C>,
+    tcpv6: TcpState<Ipv6, WeakDeviceId<C>, C>,
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSockets<Ipv4>> for SyncCtx<C> {
     type ReadData<'l> = RwLockReadGuard<'l,
-        udp::Sockets<Ipv4, WeakDeviceId<C::Instant>>> where Self: 'l;
+        udp::Sockets<Ipv4, WeakDeviceId<C>>> where Self: 'l;
     type WriteData<'l> = RwLockWriteGuard<'l,
-        udp::Sockets<Ipv4, WeakDeviceId<C::Instant>>> where Self: 'l;
+        udp::Sockets<Ipv4, WeakDeviceId<C>>> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadData<'_> {
         self.state.transport.udpv4.sockets.read()
@@ -128,9 +125,9 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSockets<Ipv4>> for Sy
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSockets<Ipv6>> for SyncCtx<C> {
     type ReadData<'l> = RwLockReadGuard<'l,
-        udp::Sockets<Ipv6, WeakDeviceId<C::Instant>>> where Self: 'l;
+        udp::Sockets<Ipv6, WeakDeviceId<C>>> where Self: 'l;
     type WriteData<'l> = RwLockWriteGuard<'l,
-        udp::Sockets<Ipv6, WeakDeviceId<C::Instant>>> where Self: 'l;
+        udp::Sockets<Ipv6, WeakDeviceId<C>>> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadData<'_> {
         self.state.transport.udpv6.sockets.read()

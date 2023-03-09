@@ -982,7 +982,7 @@ pub(crate) mod testutil {
         rng: FakeCryptoRng<XorShiftRng>,
         timers: FakeTimerCtx<TimerId>,
         events: FakeEventCtx<Event>,
-        frames: FakeFrameCtx<DeviceId<FakeInstant>>,
+        frames: FakeFrameCtx<DeviceId<crate::testutil::FakeNonSyncCtx>>,
         counters: FakeCounterCtx,
         state: State,
     }
@@ -1023,11 +1023,13 @@ pub(crate) mod testutil {
             self.events.take()
         }
 
-        pub(crate) fn frame_ctx(&self) -> &FakeFrameCtx<DeviceId<FakeInstant>> {
+        pub(crate) fn frame_ctx(&self) -> &FakeFrameCtx<DeviceId<crate::testutil::FakeNonSyncCtx>> {
             &self.frames
         }
 
-        pub(crate) fn frame_ctx_mut(&mut self) -> &mut FakeFrameCtx<DeviceId<FakeInstant>> {
+        pub(crate) fn frame_ctx_mut(
+            &mut self,
+        ) -> &mut FakeFrameCtx<DeviceId<crate::testutil::FakeNonSyncCtx>> {
             &mut self.frames
         }
 
@@ -1639,10 +1641,20 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<CtxId, Links> FakeNetwork<CtxId, DeviceId<FakeInstant>, crate::testutil::FakeCtx, Links>
+    impl<CtxId, Links>
+        FakeNetwork<
+            CtxId,
+            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            crate::testutil::FakeCtx,
+            Links,
+        >
     where
         CtxId: Eq + Hash + Copy + Debug,
-        Links: FakeNetworkLinks<DeviceId<FakeInstant>, DeviceId<FakeInstant>, CtxId>,
+        Links: FakeNetworkLinks<
+            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            CtxId,
+        >,
     {
         pub(crate) fn with_context<
             K: Into<CtxId>,
@@ -1719,24 +1731,31 @@ pub(crate) mod testutil {
     pub(crate) fn new_legacy_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
         a_id: CtxId,
         a: crate::testutil::FakeCtx,
-        a_device_id: DeviceId<FakeInstant>,
+        a_device_id: DeviceId<crate::testutil::FakeNonSyncCtx>,
         b_id: CtxId,
         b: crate::testutil::FakeCtx,
-        b_device_id: DeviceId<FakeInstant>,
+        b_device_id: DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) -> FakeNetwork<
         CtxId,
-        DeviceId<FakeInstant>,
+        DeviceId<crate::testutil::FakeNonSyncCtx>,
         crate::testutil::FakeCtx,
-        impl FakeNetworkLinks<DeviceId<FakeInstant>, DeviceId<FakeInstant>, CtxId>,
+        impl FakeNetworkLinks<
+            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            CtxId,
+        >,
     > {
         let contexts = vec![(a_id, a), (b_id, b)].into_iter();
-        FakeNetwork::new(contexts, move |net, _device_id: DeviceId<FakeInstant>| {
-            if net == a_id {
-                vec![(b_id, b_device_id.clone(), None)]
-            } else {
-                vec![(a_id, a_device_id.clone(), None)]
-            }
-        })
+        FakeNetwork::new(
+            contexts,
+            move |net, _device_id: DeviceId<crate::testutil::FakeNonSyncCtx>| {
+                if net == a_id {
+                    vec![(b_id, b_device_id.clone(), None)]
+                } else {
+                    vec![(a_id, a_device_id.clone(), None)]
+                }
+            },
+        )
     }
 
     mod tests {
