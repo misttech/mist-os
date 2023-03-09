@@ -8,11 +8,11 @@
         binary: "bin/heapdump-collector",
     },
     capabilities: [
-        { protocol: "fuchsia.heapdump.process.Registry" },
+        { protocol: "fuchsia.memory.heapdump.process.Registry" },
     ],
     expose: [
         {
-            protocol: "fuchsia.heapdump.process.Registry",
+            protocol: "fuchsia.memory.heapdump.process.Registry",
             from: "self",
         },
     ],

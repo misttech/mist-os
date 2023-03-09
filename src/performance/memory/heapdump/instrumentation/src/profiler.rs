@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::{create_endpoints, ServerEnd};
-use fidl_fuchsia_heapdump_process as fheapdump_process;
+use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_zircon as zx;
 use std::sync::Mutex;
 

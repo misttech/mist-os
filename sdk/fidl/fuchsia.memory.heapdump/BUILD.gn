@@ -4,7 +4,7 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.heapdump.process") {
+fidl("fuchsia.memory.heapdump.process") {
   sdk_category = "internal"
   sources = [ "process.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]

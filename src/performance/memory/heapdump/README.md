@@ -48,7 +48,7 @@ keep supporting processes linked against older instrumentation libraries.
 
 The instrumentation library implicitly communicates the version of its data
 structures when it registers to the collector over the
-`fuchsia.heapdump.process.Registry` FIDL protocol. In particular:
+`fuchsia.memory.heapdump.process.Registry` FIDL protocol. In particular:
 
 * calling `RegisterV1` corresponds to `allocations_table_v1`
 

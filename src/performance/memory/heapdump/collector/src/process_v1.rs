@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_heapdump_process as fheapdump_process;
+use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_zircon::{self as zx, AsHandleRef, Koid};
 use futures::{lock::Mutex, StreamExt};
 

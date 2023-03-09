@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_heapdump_process as fheapdump_process;
+use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use tracing::warn;
@@ -15,7 +15,7 @@ use registry::Registry;
 
 /// All FIDL services that are exposed by this component's ServiceFs.
 enum Service {
-    /// The `fuchsia.heapdump.process.Registry` protocol.
+    /// The `fuchsia.memory.heapdump.process.Registry` protocol.
     Process(fheapdump_process::RegistryRequestStream),
 }
 

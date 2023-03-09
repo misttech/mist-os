@@ -23,7 +23,7 @@ rustc_binary("bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.heapdump:fuchsia.heapdump.process_rust",
+    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.process_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

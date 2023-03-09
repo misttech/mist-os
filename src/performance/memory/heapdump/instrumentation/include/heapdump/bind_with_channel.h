@@ -12,7 +12,7 @@ __BEGIN_CDECLS
 
 // Binds the current process to the process registry.
 //
-// `registry_channel` must be connected to the `fuchsia.heapdump.process.Registry` server.
+// `registry_channel` must be connected to the `fuchsia.memory.heapdump.process.Registry` server.
 void heapdump_bind_with_channel(zx_handle_t registry_channel);
 
 __END_CDECLS

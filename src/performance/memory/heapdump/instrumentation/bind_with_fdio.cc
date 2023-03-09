@@ -4,13 +4,13 @@
 
 #include "heapdump/bind_with_fdio.h"
 
-#include <fidl/fuchsia.heapdump.process/cpp/wire.h>
+#include <fidl/fuchsia.memory.heapdump.process/cpp/wire.h>
 #include <lib/fdio/directory.h>
 
 #include "heapdump/bind_with_channel.h"
 
 static constexpr const char *kServicePath =
-    fidl::DiscoverableProtocolDefaultPath<fuchsia_heapdump_process::Registry>;
+    fidl::DiscoverableProtocolDefaultPath<fuchsia_memory_heapdump_process::Registry>;
 
 __EXPORT void heapdump_bind_with_fdio(void) {
   zx::channel local, remote;

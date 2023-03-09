@@ -21,7 +21,7 @@ rustc_staticlib("core") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.heapdump:fuchsia.heapdump.process_rust",
+    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.process_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
@@ -39,7 +39,7 @@ shared_library("instrumentation") {
 
   deps = [
     ":core",
-    "//sdk/fidl/fuchsia.heapdump:fuchsia.heapdump.process_cpp_wire",
+    "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.process_cpp_wire",
     "//sdk/lib/fdio",
     "//src/zircon/lib/zircon",
   ]

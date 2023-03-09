@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.heapdump.process/cpp/wire.h>
+#include <fidl/fuchsia.memory.heapdump.process/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
@@ -27,8 +27,8 @@ TEST(BindTest, Success) {
     ASSERT_EQ(ZX_OK, zx::channel::create(0, &client, &server));
     heapdump_bind_with_channel(client.release());
 
-    class FakeRegistry : public fidl::WireServer<fuchsia_heapdump_process::Registry> {
-      void RegisterV1(fuchsia_heapdump_process::wire::RegistryRegisterV1Request*,
+    class FakeRegistry : public fidl::WireServer<fuchsia_memory_heapdump_process::Registry> {
+      void RegisterV1(fuchsia_memory_heapdump_process::wire::RegistryRegisterV1Request*,
                       RegisterV1Completer::Sync&) override {
         _exit(99);  // Test passed: exit with a known exit code.
       }
@@ -36,7 +36,7 @@ TEST(BindTest, Success) {
 
     async::Loop loop = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
     fidl::BindServer(loop.dispatcher(),
-                     fidl::ServerEnd<fuchsia_heapdump_process::Registry>(std::move(server)),
+                     fidl::ServerEnd<fuchsia_memory_heapdump_process::Registry>(std::move(server)),
                      std::make_unique<FakeRegistry>());
     loop.Run();
   };
