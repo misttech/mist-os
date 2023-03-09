@@ -90,6 +90,7 @@ def normalize_product(
                     extra_files_read.append(p)
                     new_config_data.append(config_data)
 
+                new_config_data.sort(key=lambda x: x["destination"])
                 pkg["config_data"] = new_config_data
 
             packages[pkg_set].sort(key=lambda x: x["name"])
