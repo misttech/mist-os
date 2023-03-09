@@ -159,11 +159,12 @@ class MagmaExecuteMsdVsi : public testing::Test {
   void ExecuteCommand(std::shared_ptr<EtnaCommandStream> command_stream, uint32_t timeout_ms) {
     uint32_t length = command_stream->index * sizeof(uint32_t);
     magma_semaphore_t semaphore;
+    uint64_t semaphore_id;
 
     ASSERT_NE(length, 0u);
-    ASSERT_EQ(magma_connection_create_semaphore(magma_vsi_.GetConnection(), &semaphore),
-              MAGMA_STATUS_OK);
-    uint64_t semaphore_id = magma_semaphore_get_id(semaphore);
+    ASSERT_EQ(
+        magma_connection_create_semaphore2(magma_vsi_.GetConnection(), &semaphore, &semaphore_id),
+        MAGMA_STATUS_OK);
 
     std::vector<magma_exec_resource> resources;
     resources.push_back(command_stream->etna_buffer->resource_);

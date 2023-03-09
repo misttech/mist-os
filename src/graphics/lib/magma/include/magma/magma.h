@@ -157,15 +157,6 @@ MAGMA_EXPORT magma_status_t magma_connection_import_buffer2(
     magma_buffer_id_t* id_out);
 
 ///
-/// \brief DEPRECATED. Creates a semaphore.
-/// \param connection An open connection.
-/// \param semaphore_out The returned semaphore.
-///
-MAGMA_EXPORT magma_status_t magma_connection_create_semaphore(
-    magma_connection_t connection,
-    magma_semaphore_t* semaphore_out);
-
-///
 /// \brief Creates a semaphore.
 /// \param connection An open connection.
 /// \param semaphore_out The returned semaphore.
@@ -184,17 +175,6 @@ MAGMA_EXPORT magma_status_t magma_connection_create_semaphore2(
 MAGMA_EXPORT void magma_connection_release_semaphore(
     magma_connection_t connection,
     magma_semaphore_t semaphore);
-
-///
-/// \brief DEPRECATED. Imports and takes ownership of the semaphore referred to by the given handle.
-/// \param connection An open connection.
-/// \param semaphore_handle A valid semaphore handle.
-/// \param semaphore_out The returned semaphore.
-///
-MAGMA_EXPORT magma_status_t magma_connection_import_semaphore(
-    magma_connection_t connection,
-    magma_handle_t semaphore_handle,
-    magma_semaphore_t* semaphore_out);
 
 ///
 /// \brief Imports and takes ownership of the semaphore referred to by the given handle.
@@ -384,13 +364,6 @@ MAGMA_EXPORT magma_status_t magma_buffer_get_handle(
 MAGMA_EXPORT magma_status_t magma_buffer_export(
     magma_buffer_t buffer,
     magma_handle_t* buffer_handle_out);
-
-///
-/// \brief DEPRECATED. Returns a unique id for the given semaphore.
-/// \param semaphore A valid semaphore.
-///
-MAGMA_EXPORT uint64_t magma_semaphore_get_id(
-    magma_semaphore_t semaphore);
 
 ///
 /// \brief Signals the given semaphore.

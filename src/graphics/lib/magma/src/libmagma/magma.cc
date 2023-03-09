@@ -291,12 +291,6 @@ magma_status_t magma_connection_execute_immediate_commands(
       ->ExecuteImmediateCommands(context_id, command_count, command_buffers, &messages_sent);
 }
 
-magma_status_t magma_connection_create_semaphore(magma_connection_t connection,
-                                                 magma_semaphore_t* semaphore_out) {
-  magma_semaphore_id_t unused;
-  return magma_connection_create_semaphore2(connection, semaphore_out, &unused);
-}
-
 magma_status_t magma_connection_create_semaphore2(magma_connection_t connection,
                                                   magma_semaphore_t* semaphore_out,
                                                   magma_semaphore_id_t* id_out) {
@@ -328,10 +322,6 @@ void magma_connection_release_semaphore(magma_connection_t connection,
   magma::PlatformConnectionClient::cast(connection)
       ->ReleaseObject(platform_semaphore->id(), magma::PlatformObject::SEMAPHORE);
   delete platform_semaphore;
-}
-
-uint64_t magma_semaphore_get_id(magma_semaphore_t semaphore) {
-  return reinterpret_cast<magma::PlatformSemaphore*>(semaphore)->id();
 }
 
 void magma_semaphore_signal(magma_semaphore_t semaphore) {
@@ -443,13 +433,6 @@ magma_status_t magma_semaphore_export(magma_semaphore_t semaphore, uint32_t* sem
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "duplicate_handle failed");
 
   return MAGMA_STATUS_OK;
-}
-
-magma_status_t magma_connection_import_semaphore(magma_connection_t connection,
-                                                 uint32_t semaphore_handle,
-                                                 magma_semaphore_t* semaphore_out) {
-  magma_semaphore_id_t unused;
-  return magma_connection_import_semaphore2(connection, semaphore_handle, semaphore_out, &unused);
 }
 
 magma_status_t magma_connection_import_semaphore2(magma_connection_t connection,

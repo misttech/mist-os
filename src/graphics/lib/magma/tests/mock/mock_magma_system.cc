@@ -115,33 +115,14 @@ magma_status_t magma_connection_import_buffer2(magma_connection_t connection,
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_connection_create_semaphore(magma_connection_t connection,
-                                                 magma_semaphore_t* semaphore_out) {
-  *semaphore_out =
-      reinterpret_cast<magma_semaphore_t>(magma::PlatformSemaphore::Create().release());
-  return MAGMA_STATUS_OK;
-}
-
 void magma_connection_release_semaphore(magma_connection_t connection,
                                         magma_semaphore_t semaphore) {
   delete reinterpret_cast<magma::PlatformSemaphore*>(semaphore);
 }
 
-uint64_t magma_semaphore_get_id(magma_semaphore_t semaphore) {
-  return reinterpret_cast<magma::PlatformSemaphore*>(semaphore)->id();
-}
-
 void magma_semaphore_signal(magma_semaphore_t semaphore) {}
 
 void magma_semaphore_reset(magma_semaphore_t semaphore) {}
-
-magma_status_t magma_connection_import_semaphore(magma_connection_t connection,
-                                                 uint32_t semaphore_handle,
-                                                 magma_semaphore_t* semaphore_out) {
-  *semaphore_out = reinterpret_cast<magma_semaphore_t>(exported_semaphores[semaphore_handle]);
-  exported_semaphores.erase(semaphore_handle);
-  return MAGMA_STATUS_OK;
-}
 
 magma_status_t magma_connection_map_buffer(magma_connection_t connection, uint64_t hw_va,
                                            magma_buffer_t buffer, uint64_t offset, uint64_t length,

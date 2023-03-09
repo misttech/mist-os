@@ -30,7 +30,6 @@ Symbols:
   - { Name: magma_connection_create_buffer2, Type: Func }
   - { Name: magma_connection_create_context, Type: Func }
   - { Name: magma_connection_create_performance_counter_buffer_pool, Type: Func }
-  - { Name: magma_connection_create_semaphore, Type: Func }
   - { Name: magma_connection_create_semaphore2, Type: Func }
   - { Name: magma_connection_dump_performance_counters, Type: Func }
   - { Name: magma_connection_enable_performance_counter_access, Type: Func }
@@ -41,7 +40,6 @@ Symbols:
   - { Name: magma_connection_get_error, Type: Func }
   - { Name: magma_connection_get_notification_channel_handle, Type: Func }
   - { Name: magma_connection_import_buffer2, Type: Func }
-  - { Name: magma_connection_import_semaphore, Type: Func }
   - { Name: magma_connection_import_semaphore2, Type: Func }
   - { Name: magma_connection_map_buffer, Type: Func }
   - { Name: magma_connection_perform_buffer_op, Type: Func }
@@ -62,7 +60,6 @@ Symbols:
   - { Name: magma_initialize_tracing, Type: Func }
   - { Name: magma_poll, Type: Func }
   - { Name: magma_semaphore_export, Type: Func }
-  - { Name: magma_semaphore_get_id, Type: Func }
   - { Name: magma_semaphore_reset, Type: Func }
   - { Name: magma_semaphore_signal, Type: Func }
   - { Name: magma_sysmem_connection_allocate_buffer, Type: Func }

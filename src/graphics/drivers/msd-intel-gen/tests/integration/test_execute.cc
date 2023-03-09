@@ -303,6 +303,7 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       magma_buffer_id_t result_buffer_id;
       std::vector<magma_semaphore_t> wait_semaphores;
       std::vector<magma_semaphore_t> signal_semaphores;
+      std::vector<magma_semaphore_id_t> semaphore_ids;
       uint64_t command_buffer_flags;
     };
     std::vector<Submit> submits;
@@ -337,12 +338,21 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
 
       for (int i = 0; i < semaphore_count; i++) {
         magma_semaphore_t semaphore;
+        magma_semaphore_id_t id;
 
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore));
+        EXPECT_EQ(MAGMA_STATUS_OK,
+                  magma_connection_create_semaphore2(connection_, &semaphore, &id));
         submit.wait_semaphores.push_back(semaphore);
+        submit.semaphore_ids.push_back(id);
+      }
+      for (int i = 0; i < semaphore_count; i++) {
+        magma_semaphore_t semaphore;
+        magma_semaphore_id_t id;
 
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore));
+        EXPECT_EQ(MAGMA_STATUS_OK,
+                  magma_connection_create_semaphore2(connection_, &semaphore, &id));
         submit.signal_semaphores.push_back(semaphore);
+        submit.semaphore_ids.push_back(id);
       }
 
       // Alternate between engines
@@ -365,17 +375,9 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       InitCommand(&descriptor, &command_buffer, &exec_resources, submits[i].batch_buffer_id, kSize,
                   submits[i].result_buffer_id, kSize);
 
-      std::vector<uint64_t> semaphore_ids;
-      for (auto& semaphore : submits[i].wait_semaphores) {
-        semaphore_ids.push_back(magma_semaphore_get_id(semaphore));
-      }
-      for (auto& semaphore : submits[i].signal_semaphores) {
-        semaphore_ids.push_back(magma_semaphore_get_id(semaphore));
-      }
-      descriptor.wait_semaphore_count = static_cast<uint32_t>(submits[i].wait_semaphores.size());
-      descriptor.signal_semaphore_count =
-          static_cast<uint32_t>(submits[i].signal_semaphores.size());
-      descriptor.semaphore_ids = semaphore_ids.data();
+      descriptor.wait_semaphore_count = semaphore_count;
+      descriptor.signal_semaphore_count = semaphore_count;
+      descriptor.semaphore_ids = submits[i].semaphore_ids.data();
       descriptor.flags = submits[i].command_buffer_flags;
 
       {
