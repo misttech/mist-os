@@ -23,6 +23,8 @@
     "fuchsia.devices.usb.audio": { "capacity": "250us", "deadline": "1ms", "period": "1ms" },
     "fuchsia.graphics.display.drivers.display.controller": { "capacity": "500us", "deadline": "8ms", "period": "8ms" },
     "fuchsia.graphics.display.drivers.amlogic-display.vsync": { "capacity": "500us", "deadline": "8ms", "period": "8ms" },
+    "fuchsia.graphics.display.drivers.intel-i915.interrupt": { "priority": 24 },
+    "fuchsia.media.audio.drivers.intel-hda.controller": { "priority": 24 },
     "fuchsia.storage.blobfs.pager": { "capacity": "1800us", "deadline": "2800us", "period": "2800us" },
     "fuchsia.storage.blobfs.compression.decompressor": { "capacity": "1ms", "deadline": "2ms", "period": "2ms" },
     "fuchsia.ui.input.drivers.gt6853.device": { "capacity": "200us", "deadline": "1ms", "period": "1ms" },

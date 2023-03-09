@@ -392,20 +392,11 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
     irq_thread_ = thread;
   }
 
-  zx_handle_t profile;
-  status = device_get_profile(dev, ZX_PRIORITY_HIGH, "i915-interrupt", &profile);
+  const char* role_name = "fuchsia.graphics.display.drivers.intel-i915.interrupt";
+  status = device_set_profile_by_role(dev, thrd_get_zx_handle(*irq_thread_), role_name,
+                                      strlen(role_name));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "i915: device_get_profile failed: %d", status);
-    irq_.reset();
-    return status;
-  }
-  status = zx_object_set_profile(thrd_get_zx_handle(*irq_thread_), profile, 0u);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "i915: zx_object_set_profile failed: %d", status);
-    // TODO(fxbug.dev/86042): This syscall is guaranteed to return an error in unit tests since
-    // mock-ddk currently does not fully support `device_get_profile` (it returns ZX_HANDLE_INVALID
-    // for `profile` even when reporting success). A failure here should become an error condition
-    // and abort initialization when this can be faked, e.g. using lib/fake-object.
+    zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
   }
 
   Resume();

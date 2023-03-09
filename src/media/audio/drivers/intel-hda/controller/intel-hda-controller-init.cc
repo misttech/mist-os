@@ -587,14 +587,6 @@ zx_status_t IntelHDAController::InitInternal(zx_device_t* pci_dev) {
   // this system are running at boosted priority, we can come back here and
   // split the IRQ handler to run its own dedicated exeuction domain instead
   // of using the default domain.
-
-  zx::profile profile;
-  zx_status_t res = device_get_profile(pci_dev, 24 /* HIGH_PRIORITY */,
-                                       "src/media/audio/drivers/intel-hda/controller",
-                                       profile.reset_and_get_address());
-  if (res != ZX_OK) {
-    return ZX_ERR_INTERNAL;
-  }
   async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
   config.irq_support = true;
   loop_.emplace(&config);
@@ -602,11 +594,11 @@ zx_status_t IntelHDAController::InitInternal(zx_device_t* pci_dev) {
   thrd_t out_thread;
   loop_->StartThread("intel-hda-controller-loop", &out_thread);
 
-  zx::unowned_thread thread{thrd_get_zx_handle(out_thread)};
-  res = thread->set_profile(profile, 0u);
+  const char* role_name = "fuchsia.media.audio.drivers.intel-hda.controller";
+  zx_status_t res = device_set_profile_by_role(pci_dev, thrd_get_zx_handle(out_thread), role_name,
+                                               strlen(role_name));
   if (res != ZX_OK) {
-    zxlogf(ERROR, "zx_object_set_profile failed: %d", res);
-    return res;
+    zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(res));
   }
 
   res = SetupPCIDevice(pci_dev);
