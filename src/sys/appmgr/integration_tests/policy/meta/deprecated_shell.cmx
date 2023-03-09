@@ -1,13 +1,13 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/echo_server_for_test"
     },
     "sandbox": {
         "features": [
             "deprecated-shell"
+        ],
+        "services": [
+            "fuchsia.logger.LogSink"
         ]
     }
 }

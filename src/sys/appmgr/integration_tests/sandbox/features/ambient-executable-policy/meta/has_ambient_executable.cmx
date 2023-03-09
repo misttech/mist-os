@@ -1,7 +1,4 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/has_ambient_executable"
     },
@@ -10,6 +7,7 @@
             "deprecated-ambient-replace-as-executable"
         ],
         "services": [
+            "fuchsia.logger.LogSink",
             "fuchsia.sys.Environment"
         ]
     }

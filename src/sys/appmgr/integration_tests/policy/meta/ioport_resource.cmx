@@ -1,13 +1,11 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/echo_server_for_test"
     },
     "sandbox": {
         "services": [
-            "fuchsia.kernel.IoportResource"
+            "fuchsia.kernel.IoportResource",
+            "fuchsia.logger.LogSink"
         ]
     }
 }

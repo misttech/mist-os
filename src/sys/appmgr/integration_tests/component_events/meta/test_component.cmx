@@ -1,8 +1,10 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/test_component"
+    },
+    "sandbox": {
+        "services": [
+            "fuchsia.logger.LogSink"
+        ]
     }
 }

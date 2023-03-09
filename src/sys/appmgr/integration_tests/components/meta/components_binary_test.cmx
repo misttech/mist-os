@@ -1,7 +1,4 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/components_binary_test"
     },
@@ -10,6 +7,7 @@
             "isolated-temp"
         ],
         "services": [
+            "fuchsia.logger.LogSink",
             "fuchsia.sys.Environment",
             "fuchsia.sys.Loader"
         ]

@@ -1,7 +1,4 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "args": [
             "FOO",
@@ -11,6 +8,11 @@
         "env_vars": [
             "BAR=baz",
             "FOO=bar"
+        ]
+    },
+    "sandbox": {
+        "services": [
+            "fuchsia.logger.LogSink"
         ]
     }
 }

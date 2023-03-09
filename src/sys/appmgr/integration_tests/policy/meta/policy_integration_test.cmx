@@ -1,13 +1,11 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/policy_integration_test"
     },
     "sandbox": {
         "services": [
             "fuchsia.examples.echo.Echo",
+            "fuchsia.logger.LogSink",
             "fuchsia.sys.Launcher"
         ]
     }

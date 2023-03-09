@@ -1,13 +1,13 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/test_component_using_storage"
     },
     "sandbox": {
         "features": [
             "isolated-persistent-storage"
+        ],
+        "services": [
+            "fuchsia.logger.LogSink"
         ]
     }
 }

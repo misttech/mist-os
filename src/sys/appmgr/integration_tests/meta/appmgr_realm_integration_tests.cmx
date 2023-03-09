@@ -6,9 +6,6 @@
             ]
         }
     },
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/appmgr_realm_integration_tests"
     },
@@ -18,7 +15,7 @@
             "isolated-temp"
         ],
         "services": [
-            "fuchsia.log.LogSink",
+            "fuchsia.logger.LogSink",
             "fuchsia.process.Launcher",
             "fuchsia.sys.Environment",
             "fuchsia.sys.Loader",

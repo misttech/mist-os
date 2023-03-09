@@ -6,15 +6,13 @@
             ]
         }
     },
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/test_with_system_service"
     },
     "sandbox": {
         "services": [
             "fuchsia.device.NameProvider",
+            "fuchsia.logger.LogSink",
             "fuchsia.sys.Environment"
         ]
     }

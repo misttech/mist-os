@@ -1,11 +1,13 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "args": [
             "helloworld"
         ],
         "binary": "bin/echo2"
+    },
+    "sandbox": {
+        "services": [
+            "fuchsia.logger.LogSink"
+        ]
     }
 }

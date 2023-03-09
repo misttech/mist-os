@@ -1,12 +1,10 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/appmgr_mock_runner"
     },
     "sandbox": {
         "services": [
+            "fuchsia.logger.LogSink",
             "test.component.mockrunner.MockRunnerRegistry"
         ]
     }

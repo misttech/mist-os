@@ -1,7 +1,4 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/sessionmgr"
     },
@@ -11,6 +8,7 @@
         ],
         "services": [
             "fuchsia.intl.PropertyProvider",
+            "fuchsia.logger.LogSink",
             "fuchsia.metrics.MetricEventLoggerFactory",
             "fuchsia.net.name.Lookup",
             "fuchsia.posix.socket.Provider",

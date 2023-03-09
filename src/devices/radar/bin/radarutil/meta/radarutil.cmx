@@ -1,13 +1,11 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
-        "binary": "bin/radarutil",
+        "binary": "bin/radarutil"
     },
     "sandbox": {
         "services": [
-            "fuchsia.hardware.radar.RadarBurstReaderProvider"
-        ],
+            "fuchsia.hardware.radar.RadarBurstReaderProvider",
+            "fuchsia.logger.LogSink"
+        ]
     }
 }

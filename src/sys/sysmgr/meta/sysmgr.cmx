@@ -1,7 +1,4 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/sysmgr"
     },
@@ -13,6 +10,7 @@
             "packages"
         ],
         "services": [
+            "fuchsia.logger.LogSink",
             "fuchsia.sys.Environment",
             "fuchsia.sys.Loader"
         ],

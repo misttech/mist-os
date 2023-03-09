@@ -6,15 +6,13 @@
             }
         }
     },
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "bin/echo_test"
     },
     "sandbox": {
         "services": [
-            "fidl.examples.routing.echo.Echo"
+            "fidl.examples.routing.echo.Echo",
+            "fuchsia.logger.LogSink"
         ]
     }
 }

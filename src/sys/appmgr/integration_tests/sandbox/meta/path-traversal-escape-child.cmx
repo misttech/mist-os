@@ -1,7 +1,4 @@
 {
-    "include": [
-        "syslog/client.shard.cmx"
-    ],
     "program": {
         "binary": "test/path_traversal_escape"
     },
@@ -10,6 +7,7 @@
             "../boot"
         ],
         "services": [
+            "fuchsia.logger.LogSink",
             "fuchsia.sys.Environment"
         ]
     }
