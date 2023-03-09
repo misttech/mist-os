@@ -152,7 +152,7 @@ class IntelHDAStream : public fbl::RefCounted<IntelHDAStream>,
 
   // Parameters determined after stream format configuration.
   uint16_t encoded_fmt_ = 0;
-  uint16_t fifo_depth_ = 0;
+  uint16_t driver_transfer_bytes_ = 0;
   bool delay_info_updated_ = false;
   int64_t internal_delay_nsec_ = 0;
   uint32_t bytes_per_frame_ TA_GUARDED(channel_lock_) = 0;

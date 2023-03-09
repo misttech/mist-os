@@ -185,7 +185,7 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
     format.range.flags = ASF_RANGE_FLAG_FPS_48000_FAMILY;
     supported_formats_.push_back(std::move(format));
 
-    fifo_depth_ = 16;
+    driver_transfer_bytes_ = 16;
 
     SetInitialPlugState(AUDIO_PDNF_CAN_NOTIFY);
 
@@ -1579,7 +1579,7 @@ struct AmlG12I2sInTest : public AmlG12TdmStream {
     format.range.flags = ASF_RANGE_FLAG_FPS_48000_FAMILY;
     supported_formats_.push_back(std::move(format));
 
-    fifo_depth_ = 16;
+    driver_transfer_bytes_ = 16;
 
     cur_gain_state_ = {};
 

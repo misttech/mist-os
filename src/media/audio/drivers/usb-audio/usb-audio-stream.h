@@ -256,17 +256,6 @@ class UsbAudioStream : public UsbAudioStreamBase,
   zx_status_t ProcessRingBufferChannel(Channel* channel);
   void DeactivateRingBufferChannelLocked(const Channel* channel) __TA_REQUIRES(lock_);
 
-  // Stream command handlers
-  // Ring buffer command handlers
-  zx_status_t OnGetFifoDepthLocked(Channel* channel, const audio_proto::RingBufGetFifoDepthReq& req)
-      __TA_REQUIRES(lock_);
-  zx_status_t OnGetBufferLocked(Channel* channel, const audio_proto::RingBufGetBufferReq& req)
-      __TA_REQUIRES(lock_);
-  zx_status_t OnStartLocked(Channel* channel, const audio_proto::RingBufStartReq& req)
-      __TA_REQUIRES(lock_);
-  zx_status_t OnStopLocked(Channel* channel, const audio_proto::RingBufStopReq& req)
-      __TA_REQUIRES(lock_);
-
   void RequestComplete(usb_request_t* req);
   void QueueRequestLocked() __TA_REQUIRES(req_lock_);
   void CompleteRequestLocked(usb_request_t* req) __TA_REQUIRES(req_lock_);

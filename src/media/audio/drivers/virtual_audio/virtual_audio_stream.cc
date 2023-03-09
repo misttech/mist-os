@@ -56,7 +56,7 @@ zx_status_t VirtualAudioStream::Init() {
     supported_formats_.push_back(std::move(format));
   }
 
-  fifo_depth_ = config_.fifo_depth_bytes;
+  driver_transfer_bytes_ = config_.fifo_depth_bytes;
   external_delay_nsec_ = config_.external_delay.to_nsecs();
 
   clock_domain_ = config_.clock.domain;
@@ -340,7 +340,7 @@ zx_status_t VirtualAudioStream::ChangeFormat(const audio::audio_proto::StreamSet
   num_channels_ = req.channels;
   bytes_per_sec_ = frame_rate_ * frame_size_;
 
-  // (Re)set external_delay_nsec_ and fifo_depth_ before leaving, if needed.
+  // (Re)set external_delay_nsec_ and driver_transfer_bytes_ before leaving, if needed.
 
   auto parent = parent_.lock();
   ZX_ASSERT(parent);
@@ -377,8 +377,8 @@ zx_status_t VirtualAudioStream::Start(uint64_t* out_start_time) {
   zx_status_t status = reference_clock_.read(ref_start_time_.get_address());
   ZX_ASSERT_MSG(status == ZX_OK, "reference_clock::read returned error (%d)", status);
 
-  // Incorporate delay caused by fifo_depth_
-  ref_start_time_ += zx::duration((zx::sec(1) * fifo_depth_) / bytes_per_sec_);
+  // Incorporate delay caused by driver_transfer_bytes_
+  ref_start_time_ += zx::duration((zx::sec(1) * driver_transfer_bytes_) / bytes_per_sec_);
 
   ref_time_to_running_frame_ =
       affine::Transform(ref_start_time_.get(), 0, affine::Ratio(frame_rate_, ZX_SEC(1)));

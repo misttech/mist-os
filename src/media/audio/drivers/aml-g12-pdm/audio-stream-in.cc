@@ -191,7 +191,7 @@ void AudioStreamIn::InitHw() {
 }
 
 zx_status_t AudioStreamIn::ChangeFormat(const audio_proto::StreamSetFmtReq& req) {
-  fifo_depth_ = lib_->fifo_depth();
+  driver_transfer_bytes_ = lib_->fifo_depth();
   external_delay_nsec_ = 0;
 
   if (req.channels != metadata_.number_of_channels) {

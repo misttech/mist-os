@@ -402,8 +402,9 @@ void SimpleAudioStream::CreateRingBuffer(
     return;
   }
 
-  uint32_t fifo_depth_frames = (fifo_depth_ + bytes_per_frame - 1) / bytes_per_frame;
-  internal_delay_nsec_ = static_cast<uint64_t>(fifo_depth_frames) * 1'000'000'000 /
+  uint32_t driver_transfer_frames =
+      (driver_transfer_bytes_ + bytes_per_frame - 1) / bytes_per_frame;
+  internal_delay_nsec_ = static_cast<uint64_t>(driver_transfer_frames) * 1'000'000'000 /
                          static_cast<uint64_t>(pcm_format.frame_rate);
 
   number_of_channels_.Set(pcm_format.number_of_channels);
@@ -720,8 +721,8 @@ void SimpleAudioStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ScopedToken t(domain_token());
   fidl::Arena allocator;
   audio_fidl::wire::RingBufferProperties ring_buffer_properties(allocator);
-  ring_buffer_properties.set_fifo_depth(fifo_depth_)
-      .set_driver_transfer_bytes(fifo_depth_)
+  ring_buffer_properties.set_fifo_depth(driver_transfer_bytes_)
+      .set_driver_transfer_bytes(driver_transfer_bytes_)
       .set_external_delay(allocator, external_delay_nsec_)
       .set_needs_cache_flush_or_invalidate(true)
       .set_turn_on_delay(allocator, turn_on_delay_nsec_);

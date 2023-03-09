@@ -583,8 +583,8 @@ void UsbAudioStream::CreateRingBuffer(StreamChannel* channel, audio_fidl::wire::
     return;
   }
 
-  uint32_t fifo_depth_frames = (fifo_bytes_ + frame_size - 1) / frame_size;
-  internal_delay_nsec_ = static_cast<uint64_t>(fifo_depth_frames) * 1'000'000'000 /
+  uint32_t driver_transfer_frames = (fifo_bytes_ + frame_size - 1) / frame_size;
+  internal_delay_nsec_ = static_cast<uint64_t>(driver_transfer_frames) * 1'000'000'000 /
                          static_cast<uint64_t>(req.frame_rate);
 
   // Create a new ring buffer channel which can be used to move bulk data and

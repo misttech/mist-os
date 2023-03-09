@@ -186,7 +186,7 @@ class SimpleAudioStream : public SimpleAudioStreamBase,
   // involve configuring hardware and starting clocks, or may simply involve
   // deferring such operations until later.
   //
-  // Upon success, drivers *must* have filled out the fifo_depth_ and
+  // Upon success, drivers *must* have filled out the driver_transfer_bytes_ and
   // external_delay_nsec fields with appropriate values.
   //
   virtual zx_status_t ChangeFormat(const audio_proto::StreamSetFmtReq& req)
@@ -306,7 +306,7 @@ class SimpleAudioStream : public SimpleAudioStreamBase,
   int32_t clock_domain_ __TA_GUARDED(domain_token()) = 0;
 
   uint32_t frame_size_ __TA_GUARDED(domain_token()) = 0;
-  uint32_t fifo_depth_ __TA_GUARDED(domain_token()) = 0;
+  uint32_t driver_transfer_bytes_ __TA_GUARDED(domain_token()) = 0;
   uint64_t external_delay_nsec_ __TA_GUARDED(domain_token()) = 0;
   audio_pd_notify_flags_t pd_flags_ __TA_GUARDED(domain_token()) =
       AUDIO_PDNF_HARDWIRED | AUDIO_PDNF_PLUGGED;

@@ -359,8 +359,9 @@ void AmlG12TdmDai::CreateRingBuffer(
   });
   dai_format_ = std::move(dai_format);
 
-  uint32_t fifo_depth_frames = (aml_audio_->fifo_depth() + bytes_per_frame - 1) / bytes_per_frame;
-  internal_delay_nsec_ = static_cast<uint64_t>(fifo_depth_frames) * 1'000'000'000 /
+  uint32_t driver_transfer_frames =
+      (aml_audio_->fifo_depth() + bytes_per_frame - 1) / bytes_per_frame;
+  internal_delay_nsec_ = static_cast<uint64_t>(driver_transfer_frames) * 1'000'000'000 /
                          static_cast<uint64_t>(ring_buffer_format.pcm_format().frame_rate);
 
   Reset([]() {});

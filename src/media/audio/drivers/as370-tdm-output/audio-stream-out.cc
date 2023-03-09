@@ -202,7 +202,7 @@ void As370AudioStreamOut::ProcessRingNotification() {
 }
 
 zx_status_t As370AudioStreamOut::ChangeFormat(const audio_proto::StreamSetFmtReq& req) {
-  fifo_depth_ = lib_->fifo_depth();
+  driver_transfer_bytes_ = lib_->fifo_depth();
   external_delay_nsec_ = 0;
 
   // At this time only one format is supported, and hardware is initialized

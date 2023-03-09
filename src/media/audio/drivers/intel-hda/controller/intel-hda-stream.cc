@@ -195,9 +195,10 @@ zx_status_t IntelHDAStream::SetStreamFormat(async_dispatcher_t* dispatcher, uint
   encoded_fmt_ = encoded_fmt;
   REG_WR(&regs_->fmt, encoded_fmt_);
   hw_mb();
-  fifo_depth_ = REG_RD(&regs_->fifod);
+  driver_transfer_bytes_ = REG_RD(&regs_->fifod);
 
-  LOG(DEBUG, "Stream format set 0x%04hx; fifo is %hu bytes deep", encoded_fmt_, fifo_depth_);
+  LOG(DEBUG, "Stream format set 0x%04hx; fifo is %hu bytes deep", encoded_fmt_,
+      driver_transfer_bytes_);
 
   // Record our new client channel
   bytes_per_frame_ = StreamFormat(encoded_fmt).bytes_per_frame();
@@ -210,8 +211,9 @@ zx_status_t IntelHDAStream::SetStreamFormat(async_dispatcher_t* dispatcher, uint
     return ZX_ERR_INVALID_ARGS;
   }
 
-  uint32_t fifo_depth_frames = (fifo_depth_ + bytes_per_frame_ - 1) / bytes_per_frame_;
-  internal_delay_nsec_ = static_cast<uint64_t>(fifo_depth_frames) * 1'000'000'000 /
+  uint32_t driver_transfer_frames =
+      (driver_transfer_bytes_ + bytes_per_frame_ - 1) / bytes_per_frame_;
+  internal_delay_nsec_ = static_cast<uint64_t>(driver_transfer_frames) * 1'000'000'000 /
                          static_cast<uint64_t>(StreamFormat(encoded_fmt).sample_rate());
 
   return ZX_OK;
@@ -281,7 +283,7 @@ void IntelHDAStream::DeactivateLocked() {
   // We are now stopped and unconfigured.
   running_ = false;
   delay_info_updated_ = false;
-  fifo_depth_ = 0;
+  driver_transfer_bytes_ = 0;
   bytes_per_frame_ = 0;
 
   // Release any assigned ring buffer.
@@ -295,9 +297,8 @@ void IntelHDAStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   fbl::AutoLock channel_lock(&channel_lock_);
   fidl::Arena allocator;
   audio_fidl::wire::RingBufferProperties properties(allocator);
-  // We don't know what our FIFO depth is going to be if our format has not been set yet.
-  properties.set_fifo_depth(bytes_per_frame_ ? fifo_depth_ : 0);
-  properties.set_driver_transfer_bytes(bytes_per_frame_ ? fifo_depth_ : 0);
+  properties.set_fifo_depth(driver_transfer_bytes_);
+  properties.set_driver_transfer_bytes(driver_transfer_bytes_);
   // Report this properly based on the codec path delay.
   properties.set_external_delay(allocator, 0).set_needs_cache_flush_or_invalidate(true);
   completer.Reply(std::move(properties));

@@ -50,7 +50,7 @@ class MockSimpleAudio : public SimpleAudioStream {
  public:
   static constexpr uint32_t kTestFrameRate = 48000;
   static constexpr uint8_t kTestNumberOfChannels = 2;
-  static constexpr uint32_t kTestFifoDepth = 16;
+  static constexpr uint32_t kTestDriverTransferBytes = 16;
   static constexpr int64_t kTestExternalDelay = 123456789;
   static constexpr uint32_t kTestClockDomain = audio_fidl::wire::kClockDomainExternal;
   static constexpr uint32_t kTestPositionNotify = 4;
@@ -96,7 +96,7 @@ class MockSimpleAudio : public SimpleAudioStream {
     supported_formats_.push_back(std::move(format));
 
     external_delay_nsec_ = kTestExternalDelay;
-    fifo_depth_ = kTestFifoDepth;
+    driver_transfer_bytes_ = kTestDriverTransferBytes;
     clock_domain_ = kTestClockDomain;
 
     // Set our gain capabilities.
@@ -532,7 +532,8 @@ TEST_F(SimpleAudioTest, CreateRingBuffer1) {
 
   auto result1 = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(result1.status());
-  ASSERT_EQ(result1.value().properties.fifo_depth(), MockSimpleAudio::kTestFifoDepth);
+  ASSERT_EQ(result1.value().properties.driver_transfer_bytes(),
+            MockSimpleAudio::kTestDriverTransferBytes);
   loop_.Shutdown();
   server->DdkAsyncRemove();
   mock_ddk::ReleaseFlaggedDevices(root_.get());
@@ -579,7 +580,8 @@ TEST_F(SimpleAudioTest, CreateRingBuffer2) {
 
   auto result1 = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(result1.status());
-  ASSERT_EQ(result1.value().properties.fifo_depth(), MockSimpleAudio::kTestFifoDepth);
+  ASSERT_EQ(result1.value().properties.driver_transfer_bytes(),
+            MockSimpleAudio::kTestDriverTransferBytes);
   loop_.Shutdown();
   server->DdkAsyncRemove();
   mock_ddk::ReleaseFlaggedDevices(root_.get());
@@ -1212,7 +1214,8 @@ TEST_F(SimpleAudioTest, GetDriverTransferBytes) {
 
   auto result1 = fidl::WireCall(local)->GetProperties();
   ASSERT_OK(result1.status());
-  ASSERT_EQ(result1.value().properties.driver_transfer_bytes(), MockSimpleAudio::kTestFifoDepth);
+  ASSERT_EQ(result1.value().properties.driver_transfer_bytes(),
+            MockSimpleAudio::kTestDriverTransferBytes);
 
   loop_.Shutdown();
   server->DdkAsyncRemove();
@@ -1237,7 +1240,7 @@ TEST_F(SimpleAudioTest, WatchDelays) {
   ASSERT_OK(rb.status());
   auto delay_info = fidl::WireCall(local)->WatchDelayInfo();
   ASSERT_OK(delay_info.status());
-  // Based on MockSimpleAudio::kTestFifoDepth = 16 and
+  // Based on MockSimpleAudio::kTestDriverTransferBytes = 16 and
   // GetDefaultPcmFormat() = frame size of 4 bytes (4 frames per fifo) and frame rate 48'000;
   // Hence a delay 4 / 48'000 = 83 usecs.
   ASSERT_EQ(delay_info->delay_info.internal_delay(), 83'333);

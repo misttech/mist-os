@@ -443,7 +443,7 @@ zx_status_t AmlG12TdmStream::ChangeFormat(const audio_proto::StreamSetFmtReq& re
     codecs_turn_on_delay_nsec_ = old_codecs_turn_on_delay_nsec;
     codecs_turn_off_delay_nsec_ = old_codecs_turn_off_delay_nsec;
   });
-  fifo_depth_ = aml_audio_->fifo_depth();
+  driver_transfer_bytes_ = aml_audio_->fifo_depth();
   codecs_turn_on_delay_nsec_ = 0;
   codecs_turn_off_delay_nsec_ = 0;
   for (size_t i = 0; i < metadata_.codecs.number_of_external_delays; ++i) {
