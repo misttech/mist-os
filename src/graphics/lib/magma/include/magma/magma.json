@@ -1,6 +1,6 @@
 {
     "magma-interface": {
-        "next-free-ordinal": 91,
+        "next-free-ordinal": 96,
         "exports": [
             {
                 "ordinal": 46,
@@ -143,7 +143,7 @@
             },
             {
                 "ordinal": 85,
-                "name": "magma_connection_create_buffer2",
+                "name": "magma_connection_create_buffer",
                 "type": "magma_status_t",
                 "description": "Creates a memory buffer of at least the given size.",
                 "arguments": [
@@ -194,7 +194,7 @@
             },
             {
                 "ordinal": 84,
-                "name": "magma_connection_import_buffer2",
+                "name": "magma_connection_import_buffer",
                 "type": "magma_status_t",
                 "description": "Imports and takes ownership of the buffer referred to by the given handle.",
                 "arguments": [
@@ -227,7 +227,7 @@
             },
             {
                 "ordinal": 89,
-                "name": "magma_connection_create_semaphore2",
+                "name": "magma_connection_create_semaphore",
                 "type": "magma_status_t",
                 "description": "Creates a semaphore.",
                 "arguments": [
@@ -268,7 +268,7 @@
             },
             {
                 "ordinal": 90,
-                "name": "magma_connection_import_semaphore2",
+                "name": "magma_connection_import_semaphore",
                 "type": "magma_status_t",
                 "description": "Imports and takes ownership of the semaphore referred to by the given handle.",
                 "arguments": [
@@ -951,7 +951,7 @@
             },
             {
                 "ordinal": 86,
-                "name": "magma_virt_connection_create_image2",
+                "name": "magma_virt_connection_create_image",
                 "type": "magma_status_t",
                 "description": "Creates an image buffer backed by a buffer collection given a DRM format and optional modifier, as specified in the create info.",
                 "arguments": [
@@ -1004,6 +1004,156 @@
                         "description": "Output parameters describing the image."
                     }
                 ]
+            },
+            {
+                "ordinal": 91,
+                "name": "magma_connection_create_buffer2",
+                "type": "magma_status_t",
+                "description": "TODO(fxbug.dev/108279) remove after soft transition.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "size",
+                        "type": "uint64_t",
+                        "description": "Requested buffer size."
+                    },
+                    {
+                        "name": "size_out",
+                        "type": "uint64_t*",
+                        "description": "The returned buffer's actual size."
+                    },
+                    {
+                        "name": "buffer_out",
+                        "type": "magma_buffer_t*",
+                        "description": "The returned buffer."
+                    },
+                    {
+                        "name": "id_out",
+                        "type": "magma_buffer_id_t*",
+                        "description": "The buffer id of the buffer."
+                    }
+                ]
+            },
+            {
+                "ordinal": 92,
+                "name": "magma_connection_import_buffer2",
+                "type": "magma_status_t",
+                "description": "TODO(fxbug.dev/108279) remove after soft transition.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "buffer_handle",
+                        "type": "magma_handle_t",
+                        "description": "A valid handle."
+                    },
+                    {
+                        "name": "size_out",
+                        "type": "uint64_t*",
+                        "description": "The size of the buffer in bytes."
+                    },
+                    {
+                        "name": "buffer_out",
+                        "type": "magma_buffer_t*",
+                        "description": "The returned buffer."
+                    },
+                    {
+                        "name": "id_out",
+                        "type": "magma_buffer_id_t*",
+                        "description": "The buffer id of the buffer."
+                    }
+                ]
+            },
+            {
+                "ordinal": 93,
+                "name": "magma_connection_create_semaphore2",
+                "type": "magma_status_t",
+                "description": "TODO(fxbug.dev/108279) remove after soft transition.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "semaphore_out",
+                        "type": "magma_semaphore_t*",
+                        "description": "The returned semaphore."
+                    },
+                    {
+                        "name": "id_out",
+                        "type": "magma_semaphore_id_t*",
+                        "description": "The id of the semaphore."
+                    }
+                ]
+            },
+            {
+                "ordinal": 94,
+                "name": "magma_connection_import_semaphore2",
+                "type": "magma_status_t",
+                "description": "TODO(fxbug.dev/108279) remove after soft transition.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "semaphore_handle",
+                        "type": "magma_handle_t",
+                        "description": "A valid semaphore handle."
+                    },
+                    {
+                        "name": "semaphore_out",
+                        "type": "magma_semaphore_t*",
+                        "description": "The returned semaphore."
+                    },
+                    {
+                        "name": "id_out",
+                        "type": "magma_semaphore_id_t*",
+                        "description": "The id of the semaphore."
+                    }
+                ]
+            },
+            {
+                "ordinal": 95,
+                "name": "magma_virt_connection_create_image2",
+                "type": "magma_status_t",
+                "description": "TODO(fxbug.dev/108279) remove after soft transition.",
+                "arguments": [
+                    {
+                        "name": "connection",
+                        "type": "magma_connection_t",
+                        "description": "An open connection."
+                    },
+                    {
+                        "name": "create_info",
+                        "type": "magma_image_create_info_t*",
+                        "description": "Input parameters describing the image."
+                    },
+                    {
+                        "name": "size_out",
+                        "type": "uint64_t*",
+                        "description": "The size of the image buffer in bytes"
+                    },
+                    {
+                        "name": "image_out",
+                        "type": "magma_buffer_t*",
+                        "description": "The image buffer."
+                    },
+                    {
+                        "name": "buffer_id_out",
+                        "type": "magma_buffer_id_t*",
+                        "description": "The ID of the image buffer."
+                    }
+                ]
             }
         ],
         "virtmagma-internal": [
@@ -1022,7 +1172,7 @@
             },
             {
                 "ordinal": 77,
-                "name": "magma_internal_map2",
+                "name": "magma_internal_map",
                 "type": "magma_status_t",
                 "description": "Maps the given buffer handle into the virtmagma VMAR.",
                 "arguments": [
@@ -1045,7 +1195,7 @@
             },
             {
                 "ordinal": 78,
-                "name": "magma_internal_unmap2",
+                "name": "magma_internal_unmap",
                 "type": "magma_status_t",
                 "description": "Releases the VMAR mapping for the given buffer handle. Should be paired with each call to magma_internal_map2.",
                 "arguments": [

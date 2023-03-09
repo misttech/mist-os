@@ -160,13 +160,13 @@ impl FileOps for MagmaFile {
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE2 => {
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE => {
                 let (control, mut response): (
-                    virtio_magma_virt_connection_create_image2_ctrl_t,
-                    virtio_magma_virt_connection_create_image2_resp_t,
+                    virtio_magma_virt_connection_create_image_ctrl_t,
+                    virtio_magma_virt_connection_create_image_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
-                let buffer = create_image2(current_task, control, &mut response)?;
+                let buffer = create_image(current_task, control, &mut response)?;
                 self.add_buffer_info(control.connection, response.image_out, buffer);
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
@@ -262,10 +262,10 @@ impl FileOps for MagmaFile {
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_BUFFER2 => {
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_BUFFER => {
                 let (control, mut response): (
-                    virtio_magma_connection_import_buffer2_ctrl_t,
-                    virtio_magma_connection_import_buffer2_resp_t,
+                    virtio_magma_connection_import_buffer_ctrl_t,
+                    virtio_magma_connection_import_buffer_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
                 let buffer_fd = FdNumber::from_raw(control.buffer_handle as i32);
@@ -275,7 +275,7 @@ impl FileOps for MagmaFile {
                 let mut size_out = 0u64;
                 let mut id_out = magma_buffer_id_t::default();
                 response.result_return = unsafe {
-                    magma_connection_import_buffer2(
+                    magma_connection_import_buffer(
                         control.connection as magma_connection_t,
                         vmo.into_raw(),
                         &mut size_out,
@@ -293,7 +293,7 @@ impl FileOps for MagmaFile {
                 response.size_out = size_out;
                 response.id_out = id_out;
                 response.hdr.type_ =
-                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER2 as u32;
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_NOTIFICATION_CHANNEL_HANDLE => {
@@ -348,17 +348,17 @@ impl FileOps for MagmaFile {
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_CONTEXT as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_BUFFER2 => {
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_BUFFER => {
                 let (control, mut response): (
-                    virtio_magma_connection_create_buffer2_ctrl_t,
-                    virtio_magma_connection_create_buffer2_resp_t,
+                    virtio_magma_connection_create_buffer_ctrl_t,
+                    virtio_magma_connection_create_buffer_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
                 let mut size_out = 0;
                 let mut buffer_out = 0;
                 let mut id_out = 0;
                 response.result_return = unsafe {
-                    magma_connection_create_buffer2(
+                    magma_connection_create_buffer(
                         control.connection as magma_connection_t,
                         control.size,
                         &mut size_out,
@@ -376,19 +376,19 @@ impl FileOps for MagmaFile {
                 );
 
                 response.hdr.type_ =
-                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_BUFFER2 as u32;
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_BUFFER as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_SEMAPHORE2 => {
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_SEMAPHORE => {
                 let (control, mut response): (
-                    virtio_magma_connection_create_semaphore2_ctrl_t,
-                    virtio_magma_connection_create_semaphore2_resp_t,
+                    virtio_magma_connection_create_semaphore_ctrl_t,
+                    virtio_magma_connection_create_semaphore_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
                 let mut semaphore_out = 0;
                 let mut semaphore_id = 0;
                 response.result_return = unsafe {
-                    magma_connection_create_semaphore2(
+                    magma_connection_create_semaphore(
                         control.connection as magma_connection_t,
                         &mut semaphore_out,
                         &mut semaphore_id,
@@ -398,7 +398,7 @@ impl FileOps for MagmaFile {
                 response.semaphore_out = semaphore_out;
                 response.id_out = semaphore_id;
                 response.hdr.type_ =
-                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_SEMAPHORE2 as u32;
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_SEMAPHORE as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_GET_ERROR => {
@@ -415,16 +415,16 @@ impl FileOps for MagmaFile {
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_GET_ERROR as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
-            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE2 => {
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE => {
                 let (control, mut response): (
-                    virtio_magma_connection_import_semaphore2_ctrl_t,
-                    virtio_magma_connection_import_semaphore2_resp_t,
+                    virtio_magma_connection_import_semaphore_ctrl_t,
+                    virtio_magma_connection_import_semaphore_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
                 let mut semaphore_out = 0;
                 let mut semaphore_id = 0;
                 response.result_return = unsafe {
-                    magma_connection_import_semaphore2(
+                    magma_connection_import_semaphore(
                         control.connection as magma_connection_t,
                         control.semaphore_handle,
                         &mut semaphore_out,
@@ -435,7 +435,7 @@ impl FileOps for MagmaFile {
                 response.id_out = semaphore_id;
 
                 response.hdr.type_ =
-                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE2 as u32;
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_SEMAPHORE => {

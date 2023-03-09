@@ -65,7 +65,7 @@ void AtomHelper::SubmitCommandBuffer(How how, uint8_t atom_number, uint8_t atom_
   magma_buffer_t job_buffer;
   magma_buffer_id_t buffer_id;
 
-  ASSERT_EQ(magma_connection_create_buffer2(connection_, PAGE_SIZE, &size, &job_buffer, &buffer_id),
+  ASSERT_EQ(magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &job_buffer, &buffer_id),
             0);
   uint64_t job_va;
   InitJobBuffer(job_buffer, how == JOB_FAULT ? JobBufferType::kInvalid : JobBufferType::kValid,

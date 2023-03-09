@@ -75,6 +75,12 @@ void magma_connection_release_context(magma_connection_t connection, uint32_t co
 magma_status_t magma_connection_create_buffer2(magma_connection_t connection, uint64_t size,
                                                uint64_t* size_out, magma_buffer_t* buffer_out,
                                                magma_buffer_id_t* id_out) {
+  return magma_connection_create_buffer(connection, size, size_out, buffer_out, id_out);
+}
+
+magma_status_t magma_connection_create_buffer(magma_connection_t connection, uint64_t size,
+                                              uint64_t* size_out, magma_buffer_t* buffer_out,
+                                              magma_buffer_id_t* id_out) {
   auto buffer = magma::PlatformBuffer::Create(size, "magma-alloc");
   *id_out = buffer->id();
   *buffer_out = reinterpret_cast<magma_buffer_t>(buffer.release());
@@ -103,10 +109,9 @@ magma_status_t magma_connection_execute_immediate_commands(
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_connection_import_buffer2(magma_connection_t connection,
-                                               uint32_t buffer_handle, uint64_t* size_out,
-                                               magma_buffer_t* buffer_out,
-                                               magma_buffer_id_t* id_out) {
+magma_status_t magma_connection_import_buffer(magma_connection_t connection, uint32_t buffer_handle,
+                                              uint64_t* size_out, magma_buffer_t* buffer_out,
+                                              magma_buffer_id_t* id_out) {
   auto buffer = reinterpret_cast<magma::PlatformBuffer*>(exported_buffers[buffer_handle]);
   *id_out = buffer->id();
   *size_out = buffer->size();

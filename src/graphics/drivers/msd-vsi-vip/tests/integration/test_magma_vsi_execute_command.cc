@@ -65,8 +65,8 @@ class MagmaExecuteMsdVsi : public testing::Test {
     magma_buffer_id_t buffer_id;
 
     if (MAGMA_STATUS_OK !=
-        magma_connection_create_buffer2(magma_vsi_.GetConnection(), size, &actual_size,
-                                        &(etna_buffer->magma_buffer_), &buffer_id))
+        magma_connection_create_buffer(magma_vsi_.GetConnection(), size, &actual_size,
+                                       &(etna_buffer->magma_buffer_), &buffer_id))
       return nullptr;
 
     EXPECT_EQ(actual_size, size);
@@ -163,7 +163,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
 
     ASSERT_NE(length, 0u);
     ASSERT_EQ(
-        magma_connection_create_semaphore2(magma_vsi_.GetConnection(), &semaphore, &semaphore_id),
+        magma_connection_create_semaphore(magma_vsi_.GetConnection(), &semaphore, &semaphore_id),
         MAGMA_STATUS_OK);
 
     std::vector<magma_exec_resource> resources;

@@ -54,20 +54,20 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
     magma_buffer_t wait_batch_buffer;
     magma_buffer_id_t wait_batch_buffer_id;
     ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer2(connection_, kSize, &size, &wait_batch_buffer,
-                                              &wait_batch_buffer_id));
+              magma_connection_create_buffer(connection_, kSize, &size, &wait_batch_buffer,
+                                             &wait_batch_buffer_id));
 
     magma_buffer_t signal_batch_buffer;
     magma_buffer_id_t signal_batch_buffer_id;
     ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer2(connection_, kSize, &size, &signal_batch_buffer,
-                                              &signal_batch_buffer_id));
+              magma_connection_create_buffer(connection_, kSize, &size, &signal_batch_buffer,
+                                             &signal_batch_buffer_id));
 
     magma_buffer_t semaphore_buffer;
     magma_buffer_id_t semaphore_buffer_id;
     ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer2(connection_, kSize, &size, &semaphore_buffer,
-                                              &semaphore_buffer_id));
+              magma_connection_create_buffer(connection_, kSize, &size, &semaphore_buffer,
+                                             &semaphore_buffer_id));
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_addr_,
                                                            wait_batch_buffer, 0, size, kMapFlags));
@@ -195,15 +195,15 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
       uint64_t size;
       magma_buffer_t batch_buffer;
       magma_buffer_id_t batch_buffer_id;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, kSize, &size,
-                                                                 &batch_buffer, &batch_buffer_id));
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, kSize, &size,
+                                                                &batch_buffer, &batch_buffer_id));
       batch_buffers.push_back(batch_buffer);
       batch_buffer_ids.push_back(batch_buffer_id);
 
       magma_buffer_t result_buffer;
       magma_buffer_id_t result_buffer_id;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(
-                                     connection_, kSize, &size, &result_buffer, &result_buffer_id));
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, kSize, &size,
+                                                                &result_buffer, &result_buffer_id));
       result_buffers.push_back(result_buffer);
       result_buffer_ids.push_back(result_buffer_id);
 
@@ -313,12 +313,12 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
 
       uint64_t size;
       ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer2(connection_, kSize, &size, &submit.batch_buffer,
-                                                &submit.batch_buffer_id));
+                magma_connection_create_buffer(connection_, kSize, &size, &submit.batch_buffer,
+                                               &submit.batch_buffer_id));
 
       ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_connection_create_buffer2(connection_, kSize, &size, &submit.result_buffer,
-                                                &submit.result_buffer_id));
+                magma_connection_create_buffer(connection_, kSize, &size, &submit.result_buffer,
+                                               &submit.result_buffer_id));
 
       EXPECT_EQ(MAGMA_STATUS_OK,
                 magma_connection_map_buffer(connection_, gpu_addr_, submit.batch_buffer, 0, size,
@@ -340,8 +340,7 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
         magma_semaphore_t semaphore;
         magma_semaphore_id_t id;
 
-        EXPECT_EQ(MAGMA_STATUS_OK,
-                  magma_connection_create_semaphore2(connection_, &semaphore, &id));
+        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore, &id));
         submit.wait_semaphores.push_back(semaphore);
         submit.semaphore_ids.push_back(id);
       }
@@ -349,8 +348,7 @@ class TestExecuteWithCount : public testing::TestWithParam<uint32_t> {
         magma_semaphore_t semaphore;
         magma_semaphore_id_t id;
 
-        EXPECT_EQ(MAGMA_STATUS_OK,
-                  magma_connection_create_semaphore2(connection_, &semaphore, &id));
+        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore, &id));
         submit.signal_semaphores.push_back(semaphore);
         submit.semaphore_ids.push_back(id);
       }

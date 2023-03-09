@@ -305,12 +305,12 @@ zx_status_t VirtioMagma::Handle_connection_release_buffer(
   return ZX_OK;
 }
 
-zx_status_t VirtioMagma::Handle_internal_map2(const virtio_magma_internal_map2_ctrl_t* request,
-                                              virtio_magma_internal_map2_resp_t* response) {
-  FX_DCHECK(request->hdr.type == VIRTIO_MAGMA_CMD_INTERNAL_MAP2);
+zx_status_t VirtioMagma::Handle_internal_map(const virtio_magma_internal_map_ctrl_t* request,
+                                             virtio_magma_internal_map_resp_t* response) {
+  FX_DCHECK(request->hdr.type == VIRTIO_MAGMA_CMD_INTERNAL_MAP);
 
   response->address_out = 0;
-  response->hdr.type = VIRTIO_MAGMA_RESP_INTERNAL_MAP2;
+  response->hdr.type = VIRTIO_MAGMA_RESP_INTERNAL_MAP;
 
   zx::unowned_vmo vmo(static_cast<zx_handle_t>(request->buffer));
 
@@ -339,11 +339,11 @@ zx_status_t VirtioMagma::Handle_internal_map2(const virtio_magma_internal_map2_c
   return ZX_OK;
 }
 
-zx_status_t VirtioMagma::Handle_internal_unmap2(const virtio_magma_internal_unmap2_ctrl_t* request,
-                                                virtio_magma_internal_unmap2_resp_t* response) {
-  FX_DCHECK(request->hdr.type == VIRTIO_MAGMA_CMD_INTERNAL_UNMAP2);
+zx_status_t VirtioMagma::Handle_internal_unmap(const virtio_magma_internal_unmap_ctrl_t* request,
+                                               virtio_magma_internal_unmap_resp_t* response) {
+  FX_DCHECK(request->hdr.type == VIRTIO_MAGMA_CMD_INTERNAL_UNMAP);
 
-  response->hdr.type = VIRTIO_MAGMA_RESP_INTERNAL_UNMAP2;
+  response->hdr.type = VIRTIO_MAGMA_RESP_INTERNAL_UNMAP;
 
   const uintptr_t address = request->address;
   const uint64_t buffer = request->buffer;
@@ -500,12 +500,12 @@ zx_status_t VirtioMagma::Handle_buffer_export(const virtio_magma_buffer_export_c
   return ZX_OK;
 }
 
-zx_status_t VirtioMagma::Handle_connection_import_buffer2(
-    const virtio_magma_connection_import_buffer2_ctrl_t* request,
-    virtio_magma_connection_import_buffer2_resp_t* response) {
+zx_status_t VirtioMagma::Handle_connection_import_buffer(
+    const virtio_magma_connection_import_buffer_ctrl_t* request,
+    virtio_magma_connection_import_buffer_resp_t* response) {
   if (!wayland_importer_) {
     LOG_VERBOSE("driver attempted to import a buffer without wayland present");
-    response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER2;
+    response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER;
     response->result_return = MAGMA_STATUS_UNIMPLEMENTED;
     return ZX_OK;
   }
@@ -533,10 +533,10 @@ zx_status_t VirtioMagma::Handle_connection_import_buffer2(
   InitFromVirtioImage(*image.get(), &vmo, &info);
 
   {
-    virtio_magma_connection_import_buffer2_ctrl_t request_copy = *request;
+    virtio_magma_connection_import_buffer_ctrl_t request_copy = *request;
     request_copy.buffer_handle = vmo.release();
 
-    status = VirtioMagmaGeneric::Handle_connection_import_buffer2(&request_copy, response);
+    status = VirtioMagmaGeneric::Handle_connection_import_buffer(&request_copy, response);
     if (status != ZX_OK)
       return status;
   }
@@ -620,14 +620,14 @@ zx_status_t VirtioMagma::Handle_connection_execute_command(VirtioDescriptor* req
 }
 
 // Image create info comes after the request struct.
-zx_status_t VirtioMagma::Handle_virt_connection_create_image2(VirtioDescriptor* request_desc,
-                                                              VirtioDescriptor* response_desc,
-                                                              uint32_t* used_out) {
+zx_status_t VirtioMagma::Handle_virt_connection_create_image(VirtioDescriptor* request_desc,
+                                                             VirtioDescriptor* response_desc,
+                                                             uint32_t* used_out) {
   magma_connection_t connection{};
   magma_image_create_info_t image_create_info{};
   {
     auto request =
-        reinterpret_cast<virtio_magma_virt_connection_create_image2_ctrl_t*>(request_desc->addr);
+        reinterpret_cast<virtio_magma_virt_connection_create_image_ctrl_t*>(request_desc->addr);
 
     connection = reinterpret_cast<magma_connection_t>(request->connection);
     image_create_info = *reinterpret_cast<magma_image_create_info_t*>(request + 1);
@@ -641,8 +641,8 @@ zx_status_t VirtioMagma::Handle_virt_connection_create_image2(VirtioDescriptor* 
   ImageInfoWithToken image_info;
   zx::vmo vmo;
 
-  virtio_magma_virt_connection_create_image2_resp_t response = {
-      .hdr = {.type = VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE2}};
+  virtio_magma_virt_connection_create_image_resp_t response = {
+      .hdr = {.type = VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE}};
 
   // Assuming the current connection is on the one and only physical device.
   uint32_t physical_device_index = 0;
@@ -654,7 +654,7 @@ zx_status_t VirtioMagma::Handle_virt_connection_create_image2(VirtioDescriptor* 
     uint64_t size;
     magma_buffer_id_t buffer_id;
     response.result_return =
-        magma_connection_import_buffer2(connection, vmo.release(), &size, &image, &buffer_id);
+        magma_connection_import_buffer(connection, vmo.release(), &size, &image, &buffer_id);
 
     if (response.result_return == MAGMA_STATUS_OK) {
       response.image_out = image;

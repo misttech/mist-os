@@ -81,10 +81,10 @@ pub fn create_connection(
 ///
 /// SAFETY: Makes an FFI call which takes ownership of a raw VMO handle. Invalid parameters are
 /// dealt with by magma.
-pub fn create_image2(
+pub fn create_image(
     current_task: &CurrentTask,
-    control: virtio_magma_virt_connection_create_image2_ctrl_t,
-    response: &mut virtio_magma_virt_connection_create_image2_resp_t,
+    control: virtio_magma_virt_connection_create_image_ctrl_t,
+    response: &mut virtio_magma_virt_connection_create_image_resp_t,
 ) -> Result<BufferInfo, Errno> {
     let create_info_address = UserAddress::from(control.create_info);
     let create_info_ptr = current_task.mm.read_object(UserRef::new(create_info_address))?;
@@ -101,7 +101,7 @@ pub fn create_image2(
     let mut buffer_id_out = magma_buffer_id_t::default();
     let mut size_out = 0u64;
     response.result_return = unsafe {
-        magma_connection_import_buffer2(
+        magma_connection_import_buffer(
             control.connection as magma_connection_t,
             vmo.into_raw(),
             &mut size_out,
@@ -114,7 +114,7 @@ pub fn create_image2(
     response.buffer_id_out = buffer_id_out;
     response.size_out = size_out;
     response.hdr.type_ =
-        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE2 as u32;
+        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE as u32;
 
     Ok(BufferInfo::Image(ImageInfo { info, token }))
 }

@@ -51,10 +51,10 @@ class TestConnection : public magma::TestDeviceBase {
     magma_buffer_t result_buffer;
     magma_buffer_id_t result_buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, PAGE_SIZE, &size,
-                                                               &batch_buffer, &batch_buffer_id));
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, PAGE_SIZE, &size,
-                                                               &result_buffer, &result_buffer_id));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, PAGE_SIZE, &size,
+                                                              &batch_buffer, &batch_buffer_id));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, PAGE_SIZE, &size,
+                                                              &result_buffer, &result_buffer_id));
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_addr_, batch_buffer, 0,
                                                            magma::page_size(), kMapFlags));

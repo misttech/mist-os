@@ -125,7 +125,7 @@ MAGMA_EXPORT void magma_connection_release_context(
 /// \param buffer_out The returned buffer.
 /// \param id_out The buffer id of the buffer.
 ///
-MAGMA_EXPORT magma_status_t magma_connection_create_buffer2(
+MAGMA_EXPORT magma_status_t magma_connection_create_buffer(
     magma_connection_t connection,
     uint64_t size,
     uint64_t* size_out,
@@ -149,7 +149,7 @@ MAGMA_EXPORT void magma_connection_release_buffer(
 /// \param buffer_out The returned buffer.
 /// \param id_out The buffer id of the buffer.
 ///
-MAGMA_EXPORT magma_status_t magma_connection_import_buffer2(
+MAGMA_EXPORT magma_status_t magma_connection_import_buffer(
     magma_connection_t connection,
     magma_handle_t buffer_handle,
     uint64_t* size_out,
@@ -162,7 +162,7 @@ MAGMA_EXPORT magma_status_t magma_connection_import_buffer2(
 /// \param semaphore_out The returned semaphore.
 /// \param id_out The id of the semaphore.
 ///
-MAGMA_EXPORT magma_status_t magma_connection_create_semaphore2(
+MAGMA_EXPORT magma_status_t magma_connection_create_semaphore(
     magma_connection_t connection,
     magma_semaphore_t* semaphore_out,
     magma_semaphore_id_t* id_out);
@@ -183,7 +183,7 @@ MAGMA_EXPORT void magma_connection_release_semaphore(
 /// \param semaphore_out The returned semaphore.
 /// \param id_out The id of the semaphore.
 ///
-MAGMA_EXPORT magma_status_t magma_connection_import_semaphore2(
+MAGMA_EXPORT magma_status_t magma_connection_import_semaphore(
     magma_connection_t connection,
     magma_handle_t semaphore_handle,
     magma_semaphore_t* semaphore_out,
@@ -558,7 +558,7 @@ MAGMA_EXPORT magma_status_t magma_connection_read_performance_counter_completion
 /// \param image_out The image buffer.
 /// \param buffer_id_out The ID of the image buffer.
 ///
-MAGMA_EXPORT magma_status_t magma_virt_connection_create_image2(
+MAGMA_EXPORT magma_status_t magma_virt_connection_create_image(
     magma_connection_t connection,
     magma_image_create_info_t* create_info,
     uint64_t* size_out,
@@ -575,6 +575,75 @@ MAGMA_EXPORT magma_status_t magma_virt_connection_get_image_info(
     magma_connection_t connection,
     magma_buffer_t image,
     magma_image_info_t* image_info_out);
+
+///
+/// \brief TODO(fxbug.dev/108279) remove after soft transition.
+/// \param connection An open connection.
+/// \param size Requested buffer size.
+/// \param size_out The returned buffer's actual size.
+/// \param buffer_out The returned buffer.
+/// \param id_out The buffer id of the buffer.
+///
+MAGMA_EXPORT magma_status_t magma_connection_create_buffer2(
+    magma_connection_t connection,
+    uint64_t size,
+    uint64_t* size_out,
+    magma_buffer_t* buffer_out,
+    magma_buffer_id_t* id_out);
+
+///
+/// \brief TODO(fxbug.dev/108279) remove after soft transition.
+/// \param connection An open connection.
+/// \param buffer_handle A valid handle.
+/// \param size_out The size of the buffer in bytes.
+/// \param buffer_out The returned buffer.
+/// \param id_out The buffer id of the buffer.
+///
+MAGMA_EXPORT magma_status_t magma_connection_import_buffer2(
+    magma_connection_t connection,
+    magma_handle_t buffer_handle,
+    uint64_t* size_out,
+    magma_buffer_t* buffer_out,
+    magma_buffer_id_t* id_out);
+
+///
+/// \brief TODO(fxbug.dev/108279) remove after soft transition.
+/// \param connection An open connection.
+/// \param semaphore_out The returned semaphore.
+/// \param id_out The id of the semaphore.
+///
+MAGMA_EXPORT magma_status_t magma_connection_create_semaphore2(
+    magma_connection_t connection,
+    magma_semaphore_t* semaphore_out,
+    magma_semaphore_id_t* id_out);
+
+///
+/// \brief TODO(fxbug.dev/108279) remove after soft transition.
+/// \param connection An open connection.
+/// \param semaphore_handle A valid semaphore handle.
+/// \param semaphore_out The returned semaphore.
+/// \param id_out The id of the semaphore.
+///
+MAGMA_EXPORT magma_status_t magma_connection_import_semaphore2(
+    magma_connection_t connection,
+    magma_handle_t semaphore_handle,
+    magma_semaphore_t* semaphore_out,
+    magma_semaphore_id_t* id_out);
+
+///
+/// \brief TODO(fxbug.dev/108279) remove after soft transition.
+/// \param connection An open connection.
+/// \param create_info Input parameters describing the image.
+/// \param size_out The size of the image buffer in bytes
+/// \param image_out The image buffer.
+/// \param buffer_id_out The ID of the image buffer.
+///
+MAGMA_EXPORT magma_status_t magma_virt_connection_create_image2(
+    magma_connection_t connection,
+    magma_image_create_info_t* create_info,
+    uint64_t* size_out,
+    magma_buffer_t* image_out,
+    magma_buffer_id_t* buffer_id_out);
 
 #if defined(__cplusplus)
 }

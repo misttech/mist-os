@@ -65,9 +65,8 @@ class TestConnection : public magma::TestDeviceBase {
     uint64_t buffer_size;
     magma_buffer_id_t buffer_id;
     constexpr uint32_t kPerfCountBufferSize = 2048;
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_connection_create_buffer2(connection_, kPerfCountBufferSize * 2, &buffer_size,
-                                              &buffer, &buffer_id));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, kPerfCountBufferSize * 2,
+                                                              &buffer_size, &buffer, &buffer_id));
 
     magma_perf_count_pool_t pool;
     magma_handle_t notification_handle;

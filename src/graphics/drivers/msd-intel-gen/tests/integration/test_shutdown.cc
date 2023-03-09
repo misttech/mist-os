@@ -55,8 +55,8 @@ class TestConnection : public magma::TestDeviceBase {
     uint64_t size;
     magma_buffer_t batch_buffer;
     magma_buffer_id_t batch_buffer_id;
-    status = magma_connection_create_buffer2(connection_, PAGE_SIZE, &size, &batch_buffer,
-                                             &batch_buffer_id);
+    status = magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer,
+                                            &batch_buffer_id);
     if (!status.ok()) {
       magma_connection_release_context(connection_, context_id);
       return DRET(status.get());

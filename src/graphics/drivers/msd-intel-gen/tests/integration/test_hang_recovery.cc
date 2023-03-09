@@ -61,8 +61,8 @@ class TestConnection : public magma::TestDeviceBase {
     magma_buffer_t batch_buffer;
     magma_buffer_id_t batch_buffer_id;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer2(connection_, PAGE_SIZE, &buffer_size,
-                                                               &batch_buffer, &batch_buffer_id));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, PAGE_SIZE, &buffer_size,
+                                                              &batch_buffer, &batch_buffer_id));
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(batch_buffer, 0 /*offset*/, buffer_size, &vaddr));
 
@@ -213,8 +213,8 @@ class TestConnection : public magma::TestDeviceBase {
     magma_buffer_t batch_buffer;
     magma_buffer_id_t batch_buffer_id;
 
-    ASSERT_EQ(magma_connection_create_buffer2(connection_, PAGE_SIZE, &size, &batch_buffer,
-                                              &batch_buffer_id),
+    ASSERT_EQ(magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer,
+                                             &batch_buffer_id),
               0);
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(batch_buffer, 0 /*offset*/, size, &vaddr));
