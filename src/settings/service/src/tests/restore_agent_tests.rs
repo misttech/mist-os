@@ -125,7 +125,7 @@ async fn test_unimplemented() {
     let mut event_receptor = receptor.lock().await.take().expect("Should have captured receptor");
 
     loop {
-        let payload = event_receptor.next_of::<event::Payload>().await;
+        let payload = event_receptor.next_of_type::<event::Payload>().await;
         if let Ok((
             event::Payload::Event(Event::Restore(restore::Event::NoOp(SettingType::Setup))),
             _,

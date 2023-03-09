@@ -80,16 +80,38 @@ impl Receptor {
     {
         let (payload, client) = self.next_payload().await?;
 
-        let converted_payload = T::try_from(payload)
+        let converted_payload = T::try_from(payload.clone())
             .map(move |converted_payload| (converted_payload, client))
             .map_err(|err| format_err!("conversion failed: {:?}", err));
 
         // Treat any conversion failures as fatal.
         if converted_payload.is_err() {
-            panic!("did not receive payload of expected type");
+            panic!("did not receive payload of expected type {payload:?}");
         }
 
         converted_payload
+    }
+
+    /// Loops until a message of the given type is received ignoring unmatched messages.
+    #[cfg(test)]
+    pub(crate) async fn next_of_type<T: TryFrom<crate::Payload>>(
+        &mut self,
+    ) -> Result<(T, MessageClient), Error>
+    where
+        <T as std::convert::TryFrom<crate::Payload>>::Error: std::fmt::Debug,
+    {
+        loop {
+            let (payload, client) = self.next_payload().await?;
+            let converted_payload = T::try_from(payload.clone())
+                .map(move |converted_payload| (converted_payload, client))
+                .map_err(|err| format_err!("conversion failed: {:?}", err));
+
+            if converted_payload.is_ok() {
+                return converted_payload;
+            }
+
+            // Just go on to the next message if not matched.
+        }
     }
 
     #[cfg(test)]
