@@ -14,13 +14,6 @@ wlanphy_sources = [
   "driver.h",
 ]
 
-wlanphy_dfv2_sources = [
-  "device_dfv2.cc",
-  "device_dfv2.h",
-  "driver.h",
-  "driver_dfv2.cc",
-]
-
 wlanphy_deps = [
   ":wlanphy_bind",
   "//sdk/banjo/fuchsia.hardware.wlanphyimpl:fuchsia.hardware.wlanphyimpl_banjo_cpp",
@@ -62,7 +55,7 @@ fuchsia_driver("wlanphy_driver-driver") {
 # migrated to DFv2.
 fuchsia_driver("wlanphy_driver_dfv2-driver") {
   output_name = "wlanphy_dfv2"
-  sources = wlanphy_dfv2_sources
+  sources = wlanphy_sources
 
   deps = wlanphy_deps
 
@@ -77,8 +70,6 @@ fuchsia_driver_component("wlanphy_driver") {
   manifest = "meta/wlanphy_driver.cml"
 }
 
-# TODO(https://fxbug.dev/100036): Remove it when all the drivers that wlanphy driver binds to gets
-# migrated to DFv2.
 fuchsia_driver_component("wlanphy_driver_dfv2") {
   component_name = "wlanphy_dfv2"
   deps = [ ":wlanphy_driver_dfv2-driver" ]
@@ -90,37 +81,16 @@ fuchsia_driver_package("wlanphy") {
   driver_components = [ ":wlanphy_driver" ]
 }
 
-# TODO(https://fxbug.dev/100036): Remove it when all the drivers that wlanphy driver binds to gets
-# migrated to DFv2.
 fuchsia_driver_package("wlanphy_dfv2") {
   driver_components = [ ":wlanphy_driver_dfv2" ]
 }
 
 # unit tests start here
 
-# TODO(https://fxbug.dev/100036): Remove it when all the drivers that wlanphy driver binds to gets
-# migrated to DFv2.
 executable("wlanphy_device_test") {
   testonly = true
   output_name = "wlanphy_device_test"
   sources = wlanphy_sources + [ "tests/wlanphy_device_test.cc" ]
-
-  deps = wlanphy_deps + [
-           "//src/devices/testing/driver-runtime-main:zxtest",
-           "//zircon/system/ulib/zxtest",
-         ]
-
-  configs +=
-      [ "//src/connectivity/wlan/lib/mlme/cpp/tests:wlan_mlme_tests_config" ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
-executable("wlanphy_device_test_dfv2") {
-  testonly = true
-  output_name = "wlanphy_device_test_dfv2"
-  sources = wlanphy_dfv2_sources + [ "tests/wlanphy_device_test_dfv2.cc" ]
 
   deps = wlanphy_deps + [
            "//src/devices/testing/driver-runtime-main:zxtest",
@@ -140,15 +110,8 @@ fuchsia_unittest_component("wlanphy_device_test_component") {
   deps = [ ":wlanphy_device_test" ]
 }
 
-fuchsia_unittest_component("wlanphy_device_test_dfv2_component") {
-  deps = [ ":wlanphy_device_test_dfv2" ]
-}
-
 fuchsia_test_package("wlanphy-unittests") {
-  test_components = [
-    ":wlanphy_device_test_dfv2_component",
-    ":wlanphy_device_test_component",
-  ]
+  test_components = [ ":wlanphy_device_test_component" ]
 }
 
 group("tests") {
