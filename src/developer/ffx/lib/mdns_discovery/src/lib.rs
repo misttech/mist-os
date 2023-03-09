@@ -28,6 +28,9 @@ use std::{
 };
 use zerocopy::ByteSlice;
 
+/// Default mDNS port
+pub const MDNS_PORT: u16 = 5353;
+
 pub const MDNS_BROADCAST_INTERVAL: Duration = Duration::from_secs(10);
 pub const MDNS_INTERFACE_DISCOVERY_INTERVAL: Duration = Duration::from_secs(1);
 pub const MDNS_TTL: u32 = 255;

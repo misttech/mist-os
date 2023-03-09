@@ -1,0 +1,4 @@
+# Tool is maintained by the ffx team
+include /src/developer/ffx/OWNERS
+
+# COMPONENT: Tools>ffx
