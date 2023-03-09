@@ -1,35 +1,29 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.ETH_MAC",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE"
-        },
-        "expected": "match",
-        "name": "All Match"
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.ETH_MAC",
+                    "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.ETH_MAC",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE"
-        },
-        "expected": "abort",
-        "name": "Missing Protocol"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.ETH_MAC"
-        },
-        "expected": "abort",
-        "name": "Missing Platform Device VID"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE"
-        },
-        "expected": "abort",
-        "name": "Missing Platform Device DID"
+        "node": "eth-board",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.ethboard.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]

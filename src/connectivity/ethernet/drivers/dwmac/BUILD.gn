@@ -9,7 +9,11 @@ driver_bind_rules("dwmac_bind") {
   rules = "dwmac.bind"
   header_output = "dwmac-bind.h"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.designware.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.designware.platform",
+    "//src/devices/bind/fuchsia.ethboard",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 fuchsia_driver("dwmac-driver") {
