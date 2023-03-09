@@ -18,7 +18,6 @@ test("display-core-unittests") {
   include_dirs = [ ".." ]
   deps = [
     ":base",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire_testing",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
@@ -38,7 +37,6 @@ static_library("base") {
     "fidl_client.h",
   ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fsl",

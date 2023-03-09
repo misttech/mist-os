@@ -25,7 +25,6 @@ fuchsia_driver("syn-dma-driver") {
   sources = [ "syn-dhub.cc" ]
   deps = [
     ":syn_dhub_bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.shareddma:fuchsia.hardware.shareddma_banjo_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/as370",
@@ -52,7 +51,6 @@ executable("syn-dhub-test-bin") {
   ]
   deps = [
     ":syn_dhub_bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.shareddma:fuchsia.hardware.shareddma_banjo_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",

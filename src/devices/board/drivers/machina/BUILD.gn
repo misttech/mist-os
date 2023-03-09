@@ -32,7 +32,6 @@ fuchsia_driver("machina-driver") {
   ]
   deps = [
     ":machina_board_bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//src/devices/lib/driver",

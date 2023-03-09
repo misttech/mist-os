@@ -29,7 +29,6 @@ fuchsia_driver("nelson-usb-phy-driver") {
   sources = [ "nelson-usb-phy.cc" ]
   deps = [
     ":nelson_usb_phy_bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",

@@ -22,7 +22,6 @@ fuchsia_driver("aml-cpu-legacy-driver") {
   sources = [ "aml-cpu.cc" ]
   deps = [
     ":aml-cpu-legacy-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_wire",
@@ -60,7 +59,6 @@ test("aml-cpu-legacy-test-bin") {
   output_name = "aml-cpu-legacy-test"
   deps = [
     ":aml-cpu-legacy-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_wire",

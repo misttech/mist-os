@@ -38,7 +38,6 @@ fuchsia_driver("aml-securemem-driver") {
 
   deps = [
     ":aml-securemem-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.tee:fuchsia.hardware.tee_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp_wire",
@@ -80,7 +79,6 @@ test("aml-securemem-test-bin") {
   include_dirs = [ "." ]
   deps = [
     ":aml-securemem-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.tee:fuchsia.hardware.tee_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp_wire",

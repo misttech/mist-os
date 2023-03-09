@@ -8,4 +8,17 @@ fidl("fuchsia.hardware.platform.device") {
   sources = [ "platform-device.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_banjo = true
+
+  # Please do not add to this list!
+  # Use //sdk/fidl/fuchsia.hardware.platform.device instead.
+  # TODO(https://fxbug.dev/110796): Remove items from this list.
+  visibility = [
+    "//sdk/banjo/*",
+    "//src/devices/bus/drivers/pci:*",
+    "//src/devices/bus/drivers/platform/*",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/internal/drivers/fragment:*",
+    "//src/devices/misc/drivers/cpu-trace:*",
+    "//vendor/*",
+  ]
 }

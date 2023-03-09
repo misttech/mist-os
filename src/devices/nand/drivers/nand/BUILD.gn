@@ -20,10 +20,7 @@ source_set("common") {
     "nand.cc",
     "read_cache.cc",
   ]
-  deps = [
-    ":nand-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-  ]
+  deps = [ ":nand-bind" ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.rawnand:fuchsia.hardware.rawnand_banjo_cpp",

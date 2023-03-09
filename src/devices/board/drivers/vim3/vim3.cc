@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
 #include <fuchsia/hardware/gpio/c/banjo.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>

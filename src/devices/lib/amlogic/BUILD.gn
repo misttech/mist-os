@@ -83,7 +83,6 @@ zx_library("amlogic") {
     "s905d2-pll-rates.c",
   ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
