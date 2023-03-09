@@ -17,6 +17,7 @@
 #include <zxtest/zxtest.h>
 
 namespace radarutil {
+namespace {
 
 using BurstReaderProvider = fuchsia_hardware_radar::RadarBurstReaderProvider;
 using BurstReader = fuchsia_hardware_radar::RadarBurstReader;
@@ -240,7 +241,7 @@ class FakeRadarDevice : public fidl::WireServer<BurstReader> {
   FakeBurstReaderProvider provider_;
   std::optional<fidl::ServerBindingRef<BurstReader>> server_;
   fbl::Mutex lock_;
-  std::map<uint32_t, RegisteredVmo> registered_vmos_ TA_GUARDED(lock_);
+  std::map<uint32_t, RegisteredVmo> registered_vmos_ __TA_GUARDED(lock_);
   std::atomic<bool> run_ = true;
   thrd_t worker_thread_;
   sync_completion_t worker_thread_notify_;
@@ -361,4 +362,5 @@ TEST(RadarUtilTest, BurstPeriod) {
       device.RunRadarUtil({"radarutil", "--burst-count", "300", "--burst-period-ns", "33333000"}));
 }
 
+}  // namespace
 }  // namespace radarutil

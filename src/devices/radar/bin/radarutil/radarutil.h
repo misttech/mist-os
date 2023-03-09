@@ -4,10 +4,10 @@
 
 #include <fidl/fuchsia.hardware.radar/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <stdio.h>
+#include <zircon/compiler.h>
 #include <zircon/threads.h>
 
 #include <optional>
@@ -76,7 +76,7 @@ class RadarUtil : public fidl::WireAsyncEventHandler<fuchsia_hardware_radar::Rad
   fbl::Mutex lock_;
   fbl::ConditionVariable worker_event_;
   std::vector<zx::vmo> burst_vmos_;
-  std::queue<uint32_t> burst_vmo_ids_ TA_GUARDED(lock_);
+  std::queue<uint32_t> burst_vmo_ids_ __TA_GUARDED(lock_);
   std::atomic_bool run_ = true;
 
   uint64_t bursts_received_ = 0;

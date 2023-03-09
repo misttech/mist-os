@@ -4,17 +4,12 @@
 #
 import("//build/components.gni")
 
-group("common") {
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp_wire",
-    "//sdk/lib/fdio",
-    "//src/lib/ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-}
+common_deps = [
+  "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp_wire",
+  "//sdk/lib/component/incoming/cpp",
+  "//zircon/system/ulib/async-loop:async-loop-cpp",
+  "//zircon/system/ulib/fbl",
+]
 
 executable("radarutil-bin") {
   output_name = "radarutil"
@@ -23,7 +18,7 @@ executable("radarutil-bin") {
     "main.cc",
     "radarutil.cc",
   ]
-  deps = [ ":common" ]
+  deps = common_deps
 }
 
 fuchsia_package_with_single_component("radarutil") {
@@ -43,10 +38,7 @@ executable("radarutil-test-bin") {
     "radarutil-test.cc",
     "radarutil.cc",
   ]
-  deps = [
-    ":common",
-    "//zircon/system/ulib/zxtest",
-  ]
+  deps = common_deps + [ "//zircon/system/ulib/zxtest" ]
 }
 
 fuchsia_unittest_package("radarutil-test") {
