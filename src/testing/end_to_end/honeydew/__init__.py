@@ -9,12 +9,12 @@ import inspect
 import logging
 import os
 import pkgutil
-from typing import Optional, Set, Type
+from typing import List, Optional, Set, Type
 
 from honeydew import device_classes
 from honeydew.device_classes import generic_fuchsia_device
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.utils import ffx_cli
+from honeydew.utils import ffx_cli, properties
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,59 +53,38 @@ def create_device(
     Raises:
         errors.FuchsiaDeviceError: Failed to create Fuchsia device object.
     """
-    product_type = ffx_cli.get_target_type(device_name)
+    device_class = _get_device_class(device_name)
     device_class_args = (
         device_name, ssh_private_key, ssh_user, device_ip_address)
-    for device_class in _get_all_register_device_classes():
-        if product_type.lower() == device_class.__name__.lower():
-            _LOGGER.info(
-                "Found matching device class implementation for '%s' as '%s'",
-                device_name, device_class.__name__)
-            return device_class(*device_class_args)
-    # If no specific fuchsia device class found then return generic
-    # GenericFuchsiaDevice.
-    _LOGGER.info(
-        "Didn't find any matching device class implementation for '%s'. "
-        "So returning '%s'", device_name,
-        generic_fuchsia_device.GenericFuchsiaDevice.__name__)
-    return generic_fuchsia_device.GenericFuchsiaDevice(*device_class_args)
+
+    return device_class(*device_class_args)
 
 
-def register_device_classes(
-        fuchsia_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]]
-) -> None:
-    """Registers a custom fuchsia device classes implementation.
+def get_all_affordances(device_name: str) -> List[str]:
+    """Returns list of all affordances implemented for this device class.
+
+    Please note that this method returns list of affordances implemented for
+    this device class. This is not same as affordances supported by the device.
 
     Args:
-        fuchsia_device_classes (Set): Set of fuchsia device class modules
-    """
-    _LOGGER.info(
-        "Registering device classes '%s' with HoneyDew", fuchsia_device_classes)
-    _REGISTERED_DEVICE_CLASSES.update(fuchsia_device_classes)
-
-
-# List all the private methods in alphabetical order
-def _get_all_register_device_classes(
-) -> Set[Type[fuchsia_device.FuchsiaDevice]]:
-    """Get list of all custom fuchsia device class implementations registered
-    with HoneyDew.
+        device_name: Device name returned by `ffx target list`.
 
     Returns:
-        Set of all the registered device classes
+        List of affordances implemented for this device class.
     """
-    device_classes_path = os.path.dirname(device_classes.__file__)
-    this_package_device_classes = _get_device_classes(
-        device_classes_path, _DEVICE_CLASSES_MODULE)
+    device_class = _get_device_class(device_name)
 
-    all_device_classes = _REGISTERED_DEVICE_CLASSES.union(
-        this_package_device_classes)
+    affordances: List[str] = []
+    for attr in dir(device_class):
+        if attr.startswith("_"):
+            continue
+        attr_type = getattr(device_class, attr, None)
+        if isinstance(attr_type, properties.Affordance):
+            affordances.append(attr)
+    return affordances
 
-    _LOGGER.info(
-        "Registered device classes with HoneyDew '%s'", all_device_classes)
-    return all_device_classes
 
-
-def _get_device_classes(
+def get_device_classes(
         device_classes_path,
         device_classes_module_name) -> Set[Type[fuchsia_device.FuchsiaDevice]]:
     """Get set of all device classes located in specified path and module name.
@@ -153,3 +132,61 @@ def _get_device_classes(
             if device_classes_module_name in value.__module__:
                 fuchsia_device_classes.add(value)
     return fuchsia_device_classes
+
+
+def register_device_classes(
+        fuchsia_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]]
+) -> None:
+    """Registers a custom fuchsia device classes implementation.
+
+    Args:
+        fuchsia_device_classes (Set): Set of fuchsia device class modules
+    """
+    _LOGGER.info(
+        "Registering device classes '%s' with HoneyDew", fuchsia_device_classes)
+    _REGISTERED_DEVICE_CLASSES.update(fuchsia_device_classes)
+
+
+# List all the private methods in alphabetical order
+def _get_all_register_device_classes(
+) -> Set[Type[fuchsia_device.FuchsiaDevice]]:
+    """Get list of all custom fuchsia device class implementations registered
+    with HoneyDew.
+
+    Returns:
+        Set of all the registered device classes
+    """
+    device_classes_path = os.path.dirname(device_classes.__file__)
+    this_package_device_classes = get_device_classes(
+        device_classes_path, _DEVICE_CLASSES_MODULE)
+
+    all_device_classes = _REGISTERED_DEVICE_CLASSES.union(
+        this_package_device_classes)
+
+    _LOGGER.info(
+        "Registered device classes with HoneyDew '%s'", all_device_classes)
+    return all_device_classes
+
+
+def _get_device_class(device_name: str) -> Type[fuchsia_device.FuchsiaDevice]:
+    """Returns device class associated with the device.
+
+    Args:
+        device_name: Device name returned by `ffx target list`.
+
+    Returns:
+        Device class type.
+    """
+    product_type = ffx_cli.get_target_type(device_name)
+
+    for device_class in _get_all_register_device_classes():
+        if product_type.lower() == device_class.__name__.lower():
+            _LOGGER.info(
+                "Found matching device class implementation for '%s' as '%s'",
+                device_name, device_class.__name__)
+            return device_class
+    _LOGGER.info(
+        "Didn't find any matching device class implementation for '%s'. "
+        "So returning '%s'", device_name,
+        generic_fuchsia_device.GenericFuchsiaDevice.__name__)
+    return generic_fuchsia_device.GenericFuchsiaDevice

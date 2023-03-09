@@ -172,14 +172,15 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         return get_version_resp["result"]
 
     # List all the affordances in alphabetical order
-    @property
+    @properties.Affordance
     def component(self) -> component_interface.Component:
         """Returns a component affordance object.
 
         Returns:
             component.Component object
         """
-        return self._component
+        return component_default.ComponentDefault(
+            device_name=self.name, sl4f=self)
 
     # List all the public methods in alphabetical order
     def close(self) -> None:
@@ -387,17 +388,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             raise errors.FuchsiaDeviceError(
                 f"Failed to connect to '{self.name}' via SSH.")
         _LOGGER.info("%s is available via ssh.", self.name)
-
-    @property
-    @lru_cache
-    def _component(self) -> component_interface.Component:
-        """Returns a component affordance object.
-
-        Returns:
-            component.Component object
-        """
-        return component_default.ComponentDefault(
-            device_name=self.name, sl4f=self)
 
     def _get_device_ip_address(self, timeout: float):
         """Returns the device IP(V4|V6) address used for SSHing from host.

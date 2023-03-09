@@ -106,7 +106,7 @@ class FuchsiaDevice(abc.ABC):
         """
 
     # List all the affordances in alphabetical order
-    @property
+    @properties.Affordance
     @abc.abstractmethod
     def component(self) -> component.Component:
         """Returns a component affordance object.

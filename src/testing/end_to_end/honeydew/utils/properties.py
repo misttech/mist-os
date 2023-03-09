@@ -32,3 +32,11 @@ class PersistentProperty(property):
     def __init__(self, fget: Callable[[Any], Any]):
         super().__init__(lru_cache()(fget), doc=fget.__doc__)
         self.name = fget.__name__
+
+
+class Affordance(property):
+    """A property that represents an affordance."""
+
+    def __init__(self, fget: Callable[[Any], Any]):
+        super().__init__(lru_cache()(fget), doc=fget.__doc__)
+        self.name = fget.__name__
