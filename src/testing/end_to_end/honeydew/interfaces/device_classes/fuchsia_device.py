@@ -10,6 +10,7 @@ from typing import Optional
 
 from honeydew import custom_types, errors
 from honeydew.interfaces.affordances import component
+from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
 from honeydew.utils import ffx_cli, properties
 
 DEFAULT_SSH_USER = "fuchsia"
@@ -135,6 +136,19 @@ class FuchsiaDevice(abc.ABC):
         Args:
             message: Message that need to logged.
             level: Log message level.
+        """
+
+    @abc.abstractmethod
+    def power_cycle(
+            self,
+            power_switch: PowerSwitch,
+            outlet: Optional[int] = None) -> None:
+        """Power cycle (power off, wait for delay, power on) the device.
+
+        Args:
+            power_switch: Implementation of PowerSwitch interface.
+            outlet (int): If required by power switch hardware, outlet on
+                power switch hardware where this fuchsia device is connected.
         """
 
     @abc.abstractmethod

@@ -51,6 +51,7 @@ def _custom_test_name_func(testcase_func, _, param):
     return f"{test_func_name}_with_{test_label}"
 
 
+# pylint: disable=too-many-public-methods
 class FuchsiaDeviceBaseTests(unittest.TestCase):
     """Unit tests for honeydew.device_classes.fuchsia_device_base.py."""
 
@@ -315,6 +316,26 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             method=fuchsia_device_base._SL4F_METHODS[
                 parameterized_dict["sl4f_method"]],
             params={"message": parameterized_dict["log_message"]})
+
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_wait_for_bootup_complete",
+        autospec=True)
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_wait_for_offline",
+        autospec=True)
+    def test_power_cycle(
+            self, mock_wait_for_offline, mock_wait_for_bootup_complete):
+        """Testcase for FuchsiaDeviceBase.power_cycle()"""
+        power_switch = mock.MagicMock(spec=fuchsia_device_base.PowerSwitch)
+        self.fd_obj.power_cycle(power_switch=power_switch, outlet=5)
+
+        power_switch.power_off.assert_called_once()
+        mock_wait_for_offline.assert_called_once()
+
+        power_switch.power_on.assert_called_once()
+        mock_wait_for_bootup_complete.assert_called_once()
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,

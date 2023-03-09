@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, Optional, Type
 from honeydew import custom_types, errors
 from honeydew.affordances import component_default
 from honeydew.interfaces.affordances import component as component_interface
+from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
 from honeydew.interfaces.device_classes import (
     component_capable_device, fuchsia_device)
 from honeydew.interfaces.transports import sl4f
@@ -198,6 +199,27 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         self.send_sl4f_command(
             method=_SL4F_METHODS[f"Log{level.name.capitalize()}"],
             params={"message": message})
+
+    def power_cycle(
+            self,
+            power_switch: PowerSwitch,
+            outlet: Optional[int] = None) -> None:
+        """Power cycle (power off, wait for delay, power on) the device.
+
+        Args:
+            power_switch: Implementation of PowerSwitch interface.
+            outlet (int): If required by power switch hardware, outlet on
+                power switch hardware where this fuchsia device is connected.
+        """
+        _LOGGER.info("Power cycling %s...", self.name)
+
+        _LOGGER.info("Powering off %s...", self.name)
+        power_switch.power_off(outlet)
+        self._wait_for_offline()
+
+        _LOGGER.info("Powering on %s...", self.name)
+        power_switch.power_on(outlet)
+        self._wait_for_bootup_complete()
 
     def reboot(self) -> None:
         """Soft reboot the device.
