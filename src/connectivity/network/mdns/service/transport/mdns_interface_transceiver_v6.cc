@@ -105,24 +105,9 @@ int MdnsInterfaceTransceiverV6::SetOptionMulticastTtl() {
 }
 
 int MdnsInterfaceTransceiverV6::SetOptionFamilySpecific() {
-  // Set hop limit.
-  int param = 1;
-  int result = setsockopt(socket_fd().get(), IPPROTO_IPV6, IPV6_HOPLIMIT, &param, sizeof(param));
-  if (result < 0) {
-    if (errno == ENOPROTOOPT) {
-      // TODO(fxbug.dev/41358): remove the bug reference when the bug is fixed.
-      FX_LOGS(WARNING)
-          << "fxbug.dev/41358: IPV6_HOPLIMIT not supported (ENOPROTOOPT), continuing anyway";
-      result = 0;
-    } else {
-      FX_LOGS(ERROR) << "Failed to set socket option IPV6_HOPLIMIT, " << strerror(errno);
-    }
-    return result;
-  }
-
   // Receive V6 packets only.
-  param = 1;
-  result = setsockopt(socket_fd().get(), IPPROTO_IPV6, IPV6_V6ONLY, &param, sizeof(param));
+  int param = 1;
+  int result = setsockopt(socket_fd().get(), IPPROTO_IPV6, IPV6_V6ONLY, &param, sizeof(param));
   if (result < 0) {
     FX_LOGS(ERROR) << "Failed to set socket option IPV6_V6ONLY, " << strerror(errno);
     return false;
