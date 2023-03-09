@@ -4,10 +4,10 @@
 
 use {
     crate::{
-        BlobEntry, MetaContents, MetaPackage, MetaSubpackages, Package, PackageManifestError,
-        PackageName, PackagePath, PackageVariant,
+        BlobEntry, MetaContents, MetaPackage, MetaPackageError, MetaSubpackages, Package,
+        PackageManifestError, PackageName, PackagePath, PackageVariant,
     },
-    anyhow::{anyhow, Context, Result},
+    anyhow::{Context, Result},
     camino::Utf8Path,
     fuchsia_archive::{self, Utf8Reader},
     fuchsia_hash::Hash,
@@ -74,27 +74,30 @@ impl PackageManifest {
         let root_dir = root_dir.as_ref();
 
         let mut contents: BTreeMap<_, (_, Box<dyn Read>)> = BTreeMap::new();
-        for blob in self.into_blobs() {
-            let source_path = root_dir.join(blob.source_path);
-            if blob.path == Self::META_FAR_BLOB_PATH {
-                let mut meta_far_blob = File::open(&source_path).map_err(|err| {
-                    PackageManifestError::IoErrorWithPath { cause: err, path: source_path }
-                })?;
-                meta_far_blob.seek(SeekFrom::Start(0))?;
-                contents.insert(
-                    "meta.far".to_string(),
-                    (meta_far_blob.metadata()?.len(), Box::new(meta_far_blob)),
-                );
-            } else {
-                let blob_file = File::open(&source_path).map_err(|err| {
-                    PackageManifestError::IoErrorWithPath { cause: err, path: source_path }
-                })?;
-                contents.insert(
-                    blob.merkle.to_string(),
-                    (blob_file.metadata()?.len(), Box::new(blob_file)),
-                );
-            }
+        let (meta_far_blob_info, all_blobs) = Self::package_and_subpackage_blobs(self)?;
+
+        let source_path = root_dir.join(&meta_far_blob_info.source_path);
+        let mut meta_far_blob = File::open(&source_path).map_err(|err| {
+            PackageManifestError::IoErrorWithPath { cause: err, path: source_path }
+        })?;
+        meta_far_blob.seek(SeekFrom::Start(0))?;
+        contents.insert(
+            "meta.far".to_string(),
+            (meta_far_blob.metadata()?.len(), Box::new(meta_far_blob)),
+        );
+
+        for (_merkle_key, blob_info) in all_blobs.iter() {
+            let source_path = root_dir.join(&blob_info.source_path);
+
+            let blob_file = File::open(&source_path).map_err(|err| {
+                PackageManifestError::IoErrorWithPath { cause: err, path: source_path }
+            })?;
+            contents.insert(
+                blob_info.merkle.to_string(),
+                (blob_file.metadata()?.len(), Box::new(blob_file)),
+            );
         }
+
         fuchsia_archive::write(out, contents)?;
         Ok(())
     }
@@ -364,7 +367,7 @@ impl PackageManifest {
         contents: &mut HashMap<String, BlobInfo>,
         visited_subpackages: &mut HashSet<String>,
         package_manifest: Self,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), PackageManifestError> {
         let (blobs, subpackages) = package_manifest.into_blobs_and_subpackages();
         for blob in blobs {
             contents.insert(blob.merkle.to_string(), blob);
@@ -373,7 +376,12 @@ impl PackageManifest {
             let key = sp.merkle.to_string();
             if !visited_subpackages.contains(&key) {
                 visited_subpackages.insert(key);
-                let package_manifest = Self::try_load_from(&sp.manifest_path)?;
+                let package_manifest = Self::try_load_from(&sp.manifest_path).map_err(|_| {
+                    PackageManifestError::InvalidSubpackagePath {
+                        merkle: sp.merkle,
+                        path: sp.manifest_path.into(),
+                    }
+                })?;
                 Self::package_and_subpackage_blobs_impl(
                     contents,
                     visited_subpackages,
@@ -384,8 +392,9 @@ impl PackageManifest {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn package_and_subpackage_blobs(self) -> anyhow::Result<(BlobInfo, HashMap<String, BlobInfo>)> {
+    fn package_and_subpackage_blobs(
+        self,
+    ) -> Result<(BlobInfo, HashMap<String, BlobInfo>), PackageManifestError> {
         let mut contents = HashMap::new();
         let mut visited_subpackages = HashSet::new();
         Self::package_and_subpackage_blobs_impl(
@@ -402,7 +411,7 @@ impl PackageManifest {
                 return Ok((blob, contents));
             }
         }
-        Err(anyhow!("missing meta.far in top level package manifest!!"))
+        Err(PackageManifestError::MetaPackage(MetaPackageError::MetaPackageMissing))
     }
 }
 
@@ -1271,7 +1280,10 @@ mod tests {
         let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
 
         let result = loaded_manifest.package_and_subpackage_blobs();
-        assert_matches!(result, Err(_));
+        assert_matches!(
+            result,
+            Err(PackageManifestError::MetaPackage(MetaPackageError::MetaPackageMissing))
+        );
     }
 
     #[test]
