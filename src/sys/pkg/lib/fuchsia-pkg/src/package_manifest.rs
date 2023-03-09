@@ -7,7 +7,7 @@ use {
         BlobEntry, MetaContents, MetaPackage, MetaSubpackages, Package, PackageManifestError,
         PackageName, PackagePath, PackageVariant,
     },
-    anyhow::{Context, Result},
+    anyhow::{anyhow, Context, Result},
     camino::Utf8Path,
     fuchsia_archive::{self, Utf8Reader},
     fuchsia_hash::Hash,
@@ -15,7 +15,7 @@ use {
     fuchsia_url::{RepositoryUrl, UnpinnedAbsolutePackageUrl},
     serde::{Deserialize, Serialize},
     std::{
-        collections::BTreeMap,
+        collections::{BTreeMap, HashMap, HashSet},
         fs::{self, File},
         io,
         io::{BufReader, Read, Seek, SeekFrom, Write},
@@ -359,6 +359,51 @@ impl PackageManifest {
         }
         inner(manifest_path.as_ref(), reader)
     }
+
+    fn package_and_subpackage_blobs_impl(
+        contents: &mut HashMap<String, BlobInfo>,
+        visited_subpackages: &mut HashSet<String>,
+        package_manifest: Self,
+    ) -> anyhow::Result<()> {
+        let (blobs, subpackages) = package_manifest.into_blobs_and_subpackages();
+        for blob in blobs {
+            contents.insert(blob.merkle.to_string(), blob);
+        }
+        for sp in subpackages {
+            let key = sp.merkle.to_string();
+            if !visited_subpackages.contains(&key) {
+                visited_subpackages.insert(key);
+                let package_manifest = Self::try_load_from(&sp.manifest_path)?;
+                Self::package_and_subpackage_blobs_impl(
+                    contents,
+                    visited_subpackages,
+                    package_manifest,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    fn package_and_subpackage_blobs(self) -> anyhow::Result<(BlobInfo, HashMap<String, BlobInfo>)> {
+        let mut contents = HashMap::new();
+        let mut visited_subpackages = HashSet::new();
+        Self::package_and_subpackage_blobs_impl(
+            &mut contents,
+            &mut visited_subpackages,
+            self.clone(),
+        )?;
+
+        let blobs = self.into_blobs();
+        for blob in blobs {
+            if blob.path == Self::META_FAR_BLOB_PATH
+                && contents.remove(&blob.merkle.to_string()).is_some()
+            {
+                return Ok((blob, contents));
+            }
+        }
+        Err(anyhow!("missing meta.far in top level package manifest!!"))
+    }
 }
 
 pub struct PackageManifestBuilder {
@@ -621,6 +666,7 @@ mod tests {
     use {
         super::*,
         crate::PackageBuildManifest,
+        assert_matches::assert_matches,
         camino::Utf8Path,
         fuchsia_merkle::Hash,
         pretty_assertions::assert_eq,
@@ -1158,6 +1204,374 @@ mod tests {
         let subpackage = subpackages.first().unwrap();
         assert_eq!(subpackage.name, "subpackage0");
         assert_eq!(subpackage.manifest_path, expected_subpackage_manifest_path);
+    }
+
+    #[test]
+    fn test_package_and_subpackage_blobs_meta_far_error() {
+        let temp = TempDir::new().unwrap();
+        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+
+        let data_dir = temp_dir.join("data_source");
+        let subpackage_dir = temp_dir.join("subpackage_manifests");
+        let manifest_dir = temp_dir.join("manifest_dir");
+        let manifest_path = manifest_dir.join("package_manifest.json");
+
+        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
+
+        std::fs::create_dir_all(data_dir).unwrap();
+        std::fs::create_dir_all(&subpackage_dir).unwrap();
+        std::fs::create_dir_all(&manifest_dir).unwrap();
+
+        let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+            package: PackageMetadata {
+                name: "example".parse().unwrap(),
+                version: "0".parse().unwrap(),
+            },
+            blobs: vec![BlobInfo {
+                source_path: "../data_source/p1".into(),
+                path: "data/p1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }],
+            subpackages: vec![SubpackageInfo {
+                manifest_path: "../subpackage_manifests/0000000000000000000000000000000000000000000000000000000000000000".into(),
+                name: "subpackage0".into(),
+                merkle: zeros_hash(),
+            }],
+            repository: None,
+            blob_sources_relative: RelativeTo::File,
+        }));
+
+        let manifest_file = File::create(&manifest_path).unwrap();
+        serde_json::to_writer(manifest_file, &manifest).unwrap();
+
+        let sub_manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+            package: PackageMetadata {
+                name: "sub_manifest".parse().unwrap(),
+                version: "0".parse().unwrap(),
+            },
+            blobs: vec![BlobInfo {
+                source_path: "../data_source/p2".into(),
+                path: "data/p2".into(),
+                merkle: "1111111111111111111111111111111111111111111111111111111111111111"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }],
+            subpackages: vec![],
+            repository: None,
+            blob_sources_relative: RelativeTo::File,
+        }));
+
+        let sub_manifest_file = File::create(expected_subpackage_manifest_path).unwrap();
+        serde_json::to_writer(sub_manifest_file, &sub_manifest).unwrap();
+
+        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+
+        let result = loaded_manifest.package_and_subpackage_blobs();
+        assert_matches!(result, Err(_));
+    }
+
+    #[test]
+    fn test_package_and_subpackage_blobs() {
+        let temp = TempDir::new().unwrap();
+        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+
+        let data_dir = temp_dir.join("data_source");
+        let subpackage_dir = temp_dir.join("subpackage_manifests");
+        let subsubpackage_dir = temp_dir.join("subsubpackage_manifests");
+
+        let manifest_dir = temp_dir.join("manifest_dir");
+        let manifest_path = manifest_dir.join("package_manifest.json");
+        let expected_meta_far_source_path = data_dir.join("p2").to_string();
+        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
+        let expected_subsubpackage_manifest_path =
+            subsubpackage_dir.join(zeros_hash_str()).to_string();
+
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&subpackage_dir).unwrap();
+        std::fs::create_dir_all(&subsubpackage_dir).unwrap();
+        std::fs::create_dir_all(&manifest_dir).unwrap();
+
+        let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+            package: PackageMetadata {
+                name: "example".parse().unwrap(),
+                version: "0".parse().unwrap(),
+            },
+            blobs: vec![BlobInfo {
+                source_path: "../data_source/p1".into(),
+                path: "data/p1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }, BlobInfo {
+                source_path: "../data_source/p2".into(),
+                path: "meta/".into(),
+                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }],
+            subpackages: vec![SubpackageInfo {
+                manifest_path: "../subpackage_manifests/0000000000000000000000000000000000000000000000000000000000000000".into(),
+                name: "subpackage0".into(),
+                merkle: ones_hash(),
+            }],
+            repository: None,
+            blob_sources_relative: RelativeTo::File,
+        }));
+
+        let manifest_file = File::create(&manifest_path).unwrap();
+        serde_json::to_writer(manifest_file, &manifest).unwrap();
+
+        let sub_manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+            package: PackageMetadata {
+                name: "sub_manifest".parse().unwrap(),
+                version: "0".parse().unwrap(),
+            },
+            blobs: vec![BlobInfo {
+                source_path: "../data_source/p3".into(),
+                path: "data/p3".into(),
+                merkle: "3333333333333333333333333333333333333333333333333333333333333333"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }, BlobInfo {
+                source_path: "../data_source/p4".into(),
+                path: "meta/".into(),
+                merkle: "4444444444444444444444444444444444444444444444444444444444444444"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }],
+            subpackages: vec![SubpackageInfo {
+                manifest_path: "../subsubpackage_manifests/0000000000000000000000000000000000000000000000000000000000000000".into(),
+                name: "subsubpackage0".into(),
+                merkle: "4444444444444444444444444444444444444444444444444444444444444444".parse()
+                .unwrap(),
+            }],
+            repository: None,
+            blob_sources_relative: RelativeTo::File,
+        }));
+
+        let sub_manifest_file = File::create(expected_subpackage_manifest_path).unwrap();
+        serde_json::to_writer(sub_manifest_file, &sub_manifest).unwrap();
+
+        let sub_sub_manifest =
+            PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+                package: PackageMetadata {
+                    name: "sub_sub_manifest".parse().unwrap(),
+                    version: "0".parse().unwrap(),
+                },
+                blobs: vec![BlobInfo {
+                    source_path: "../data_source/p5".into(),
+                    path: "meta/".into(),
+                    merkle: "5555555555555555555555555555555555555555555555555555555555555555"
+                        .parse()
+                        .unwrap(),
+                    size: 1,
+                }],
+                subpackages: vec![],
+                repository: None,
+                blob_sources_relative: RelativeTo::File,
+            }));
+
+        let sub_sub_manifest_file = File::create(expected_subsubpackage_manifest_path).unwrap();
+        serde_json::to_writer(sub_sub_manifest_file, &sub_sub_manifest).unwrap();
+
+        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+
+        let (meta_far, contents) = loaded_manifest.package_and_subpackage_blobs().unwrap();
+        assert_eq!(
+            meta_far,
+            BlobInfo {
+                source_path: expected_meta_far_source_path,
+                path: "meta/".into(),
+                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }
+        );
+
+        // Does not contain top level meta.far
+        assert_eq!(contents.len(), 4);
+        assert_eq!(
+            contents.get("0000000000000000000000000000000000000000000000000000000000000000"),
+            Some(&BlobInfo {
+                source_path: data_dir.join("p1").to_string(),
+                path: "data/p1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            })
+        );
+        assert_eq!(
+            contents.get("3333333333333333333333333333333333333333333333333333333333333333"),
+            Some(&BlobInfo {
+                source_path: data_dir.join("p3").to_string(),
+                path: "data/p3".into(),
+                merkle: "3333333333333333333333333333333333333333333333333333333333333333"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            })
+        );
+        assert_eq!(
+            contents.get("4444444444444444444444444444444444444444444444444444444444444444"),
+            Some(&BlobInfo {
+                source_path: data_dir.join("p4").to_string(),
+                path: "meta/".into(),
+                merkle: "4444444444444444444444444444444444444444444444444444444444444444"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            })
+        );
+        assert_eq!(
+            contents.get("5555555555555555555555555555555555555555555555555555555555555555"),
+            Some(&BlobInfo {
+                source_path: data_dir.join("p5").to_string(),
+                path: "meta/".into(),
+                merkle: "5555555555555555555555555555555555555555555555555555555555555555"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn test_package_and_subpackage_blobs_deduped() {
+        let temp = TempDir::new().unwrap();
+        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+
+        let data_dir = temp_dir.join("data_source");
+        let subpackage_dir = temp_dir.join("subpackage_manifests");
+        let manifest_dir = temp_dir.join("manifest_dir");
+        let manifest_path = manifest_dir.join("package_manifest.json");
+        let expected_blob_source_path_1 = data_dir.join("p1").to_string();
+        let expected_meta_far_source_path = data_dir.join("p2").to_string();
+        let expected_blob_source_path_2 = data_dir.join("p3").to_string();
+
+        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
+
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&subpackage_dir).unwrap();
+        std::fs::create_dir_all(&manifest_dir).unwrap();
+
+        let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+            package: PackageMetadata {
+                name: "example".parse().unwrap(),
+                version: "0".parse().unwrap(),
+            },
+            blobs: vec![BlobInfo {
+                source_path: "../data_source/p1".into(),
+                path: "data/p1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }, BlobInfo {
+                source_path: "../data_source/p2".into(),
+                path: "meta/".into(),
+                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }],
+            subpackages: vec![SubpackageInfo {
+                manifest_path: "../subpackage_manifests/0000000000000000000000000000000000000000000000000000000000000000".into(),
+                name: "subpackage0".into(),
+                merkle: ones_hash(),
+            },
+            SubpackageInfo {
+                manifest_path: "../subpackage_manifests/0000000000000000000000000000000000000000000000000000000000000001".into(),
+                name: "subpackage1".into(),
+                merkle: ones_hash(),
+            }
+            ],
+            repository: None,
+            blob_sources_relative: RelativeTo::File,
+        }));
+
+        let manifest_file = File::create(&manifest_path).unwrap();
+        serde_json::to_writer(manifest_file, &manifest).unwrap();
+
+        let sub_manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
+            package: PackageMetadata {
+                name: "sub_manifest".parse().unwrap(),
+                version: "0".parse().unwrap(),
+            },
+            blobs: vec![
+                BlobInfo {
+                    source_path: "../data_source/p3".into(),
+                    path: "data/p3".into(),
+                    merkle: "3333333333333333333333333333333333333333333333333333333333333333"
+                        .parse()
+                        .unwrap(),
+                    size: 1,
+                },
+                BlobInfo {
+                    source_path: "../data_source/p4".into(),
+                    path: "meta/".into(),
+                    merkle: "4444444444444444444444444444444444444444444444444444444444444444"
+                        .parse()
+                        .unwrap(),
+                    size: 1,
+                },
+            ],
+            subpackages: vec![],
+            repository: None,
+            blob_sources_relative: RelativeTo::File,
+        }));
+
+        let sub_manifest_file = File::create(expected_subpackage_manifest_path).unwrap();
+        serde_json::to_writer(sub_manifest_file, &sub_manifest).unwrap();
+
+        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+
+        let (meta_far, contents) = loaded_manifest.package_and_subpackage_blobs().unwrap();
+        assert_eq!(
+            meta_far,
+            BlobInfo {
+                source_path: expected_meta_far_source_path,
+                path: "meta/".into(),
+                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            }
+        );
+
+        // Does not contain meta.far
+        assert_eq!(contents.len(), 3);
+        assert_eq!(
+            contents.get("0000000000000000000000000000000000000000000000000000000000000000"),
+            Some(&BlobInfo {
+                source_path: expected_blob_source_path_1,
+                path: "data/p1".into(),
+                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            })
+        );
+        assert_eq!(
+            contents.get("3333333333333333333333333333333333333333333333333333333333333333"),
+            Some(&BlobInfo {
+                source_path: expected_blob_source_path_2,
+                path: "data/p3".into(),
+                merkle: "3333333333333333333333333333333333333333333333333333333333333333"
+                    .parse()
+                    .unwrap(),
+                size: 1,
+            })
+        );
     }
 }
 
