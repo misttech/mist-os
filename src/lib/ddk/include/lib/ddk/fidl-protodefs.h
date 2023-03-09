@@ -32,5 +32,6 @@ DDK_FIDL_PROTOCOL_DEF(PLATFORM_DEVICE, 13, "fuchsia.hardware.platform.device.Ser
 DDK_FIDL_PROTOCOL_DEF(DSP,             14, "fuchsia.hardware.dsp.Service")
 DDK_FIDL_PROTOCOL_DEF(HDMI,            15, "fuchsia.hardware.hdmi.Service")
 DDK_FIDL_PROTOCOL_DEF(POWER_SENSOR,    16, "fuchsia.hardware.power.sensor.Service")
+DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
 #undef DDK_FIDL_PROTOCOL_DEF
 #endif

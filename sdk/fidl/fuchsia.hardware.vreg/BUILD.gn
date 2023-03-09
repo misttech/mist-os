@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.vreg") {
-  sources = [ "metadata.fidl" ]
+  sources = [
+    "metadata.fidl",
+    "vreg.fidl",
+  ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

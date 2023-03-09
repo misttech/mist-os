@@ -40,7 +40,6 @@ class TestBoard : public TestBoardType {
   zx_status_t PowerInit();
   zx_status_t ClockInit();
   zx_status_t PwmInit();
-  zx_status_t VregInit();
   zx_status_t CompositeNodeSpecInit();
   zx_status_t TestInit();
   int Thread();

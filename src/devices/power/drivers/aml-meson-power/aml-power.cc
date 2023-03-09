@@ -51,8 +51,9 @@ bool IsSortedDescending(const std::vector<aml_voltage_table_t>& vt) {
   return true;
 }
 
-uint32_t CalculateVregVoltage(const vreg_params_t params, const uint32_t idx) {
-  return params.min_uv + idx * params.step_size_uv;
+uint32_t CalculateVregVoltage(const uint32_t min_uv, const uint32_t step_size_uv,
+                              const uint32_t idx) {
+  return min_uv + idx * step_size_uv;
 }
 
 }  // namespace
@@ -126,10 +127,14 @@ zx_status_t AmlPower::PowerImplGetSupportedVoltageRange(uint32_t index, uint32_t
   auto args = result.value();
 
   if (args.vreg.is_valid()) {
-    vreg_params_t params;
-    args.vreg.GetRegulatorParams(&params);
-    *min_voltage = CalculateVregVoltage(params, 0);
-    *max_voltage = CalculateVregVoltage(params, params.num_steps);
+    fidl::WireResult params = args.vreg->GetRegulatorParams();
+    if (!params.ok()) {
+      zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+      return params.status();
+    }
+
+    *min_voltage = CalculateVregVoltage(params->min_uv, params->step_size_uv, 0);
+    *max_voltage = CalculateVregVoltage(params->min_uv, params->step_size_uv, params->num_steps);
     zxlogf(DEBUG, "%s: Getting %s Cluster VReg Range max = %u, min = %u", __func__,
            index ? "Little" : "Big", *max_voltage, *min_voltage);
 
@@ -209,16 +214,21 @@ zx_status_t AmlPower::GetTargetIndex(const ddk::PwmProtocolClient& pwm, uint32_t
   return ZX_OK;
 }
 
-zx_status_t AmlPower::GetTargetIndex(const ddk::VregProtocolClient& vreg, uint32_t u_volts,
-                                     uint32_t* target_index) {
+zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg,
+                                     uint32_t u_volts, uint32_t* target_index) {
   if (!target_index) {
     return ZX_ERR_INTERNAL;
   }
 
-  vreg_params_t params;
-  vreg.GetRegulatorParams(&params);
-  const auto min_voltage_uv = CalculateVregVoltage(params, 0);
-  const auto max_voltage_uv = CalculateVregVoltage(params, params.num_steps);
+  fidl::WireResult params = vreg->GetRegulatorParams();
+  if (!params.ok()) {
+    zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+    return params.status();
+  }
+
+  const auto min_voltage_uv = CalculateVregVoltage(params->min_uv, params->step_size_uv, 0);
+  const auto max_voltage_uv =
+      CalculateVregVoltage(params->min_uv, params->step_size_uv, params->num_steps);
   // Find the step value that achieves the requested voltage.
   if (u_volts < min_voltage_uv || u_volts > max_voltage_uv) {
     zxlogf(ERROR, "%s: Voltage must be between %u and %u microvolts", __func__, min_voltage_uv,
@@ -226,8 +236,8 @@ zx_status_t AmlPower::GetTargetIndex(const ddk::VregProtocolClient& vreg, uint32
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  *target_index = (u_volts - min_voltage_uv) / params.step_size_uv;
-  ZX_ASSERT(*target_index <= params.num_steps);
+  *target_index = (u_volts - min_voltage_uv) / params->step_size_uv;
+  ZX_ASSERT(*target_index <= params->num_steps);
 
   return ZX_OK;
 }
@@ -239,8 +249,18 @@ zx_status_t AmlPower::Update(const ddk::PwmProtocolClient& pwm, uint32_t idx) {
   return pwm.SetConfig(&cfg);
 }
 
-zx_status_t AmlPower::Update(const ddk::VregProtocolClient& vreg, uint32_t idx) {
-  return vreg.SetVoltageStep(idx);
+zx_status_t AmlPower::Update(const fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg,
+                             uint32_t idx) {
+  fidl::WireResult step = vreg->SetVoltageStep(idx);
+  if (!step.ok()) {
+    zxlogf(ERROR, "Failed to send request to set voltage step: %s", step.status_string());
+    return step.status();
+  }
+  if (step->is_error()) {
+    zxlogf(ERROR, "Failed to set voltage step: %s", step.error().status_string());
+    return step->error_value();
+  }
+  return ZX_OK;
 }
 
 template <class ProtocolClient>
@@ -324,9 +344,14 @@ zx_status_t AmlPower::PowerImplRequestVoltage(uint32_t index, uint32_t voltage,
   if (args.vreg.is_valid()) {
     zx_status_t st = RequestVoltage(args.vreg, voltage, args.current_voltage_index);
     if ((st == ZX_OK) && actual_voltage) {
-      vreg_params_t params;
-      args.vreg.GetRegulatorParams(&params);
-      *actual_voltage = CalculateVregVoltage(params, *args.current_voltage_index);
+      fidl::WireResult params = args.vreg->GetRegulatorParams();
+      if (!params.ok()) {
+        zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+        return params.status();
+      }
+
+      *actual_voltage =
+          CalculateVregVoltage(params->min_uv, params->step_size_uv, *args.current_voltage_index);
     }
     return st;
   }
@@ -358,9 +383,14 @@ zx_status_t AmlPower::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* curre
       return ZX_ERR_BAD_STATE;
     *current_voltage = voltage_table_[*(args.current_voltage_index)].microvolt;
   } else if (args.vreg.is_valid()) {
-    vreg_params_t params;
-    args.vreg.GetRegulatorParams(&params);
-    *current_voltage = CalculateVregVoltage(params, *(args.current_voltage_index));
+    fidl::WireResult params = args.vreg->GetRegulatorParams();
+    if (!params.ok()) {
+      zxlogf(ERROR, "Failed to send request to get regulator params: %s", params.status_string());
+      return params.status();
+    }
+
+    *current_voltage =
+        CalculateVregVoltage(params->min_uv, params->step_size_uv, *(args.current_voltage_index));
   } else {
     return ZX_ERR_INTERNAL;
   }
@@ -426,9 +456,11 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
     return st;
   }
 
-  ddk::VregProtocolClient first_cluster_vreg(parent, "vreg-pwm-a");
-  ddk::VregProtocolClient second_cluster_vreg(
-      parent, (device_info.pid == PDEV_PID_LUIS) ? "vreg-pp1000-cpu-a" : "vreg-pwm-ao-d");
+  zx::result first_cluster_vreg =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_vreg::Service::Vreg>(parent, "vreg-pwm-a");
+  zx::result second_cluster_vreg =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_vreg::Service::Vreg>(
+          parent, (device_info.pid == PDEV_PID_LUIS) ? "vreg-pp1000-cpu-a" : "vreg-pwm-ao-d");
 
   std::unique_ptr<AmlPower> power_impl_device;
 
@@ -444,15 +476,15 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
       break;
     case PDEV_PID_LUIS:
       if (!first_cluster_pwm.is_valid() || !voltage_table.is_ok() || !pwm_period.is_ok() ||
-          !second_cluster_vreg.is_valid()) {
+          second_cluster_vreg.is_error()) {
         zxlogf(ERROR,
                "Invalid args. Luis requires first cluster pwm, voltage table, pwm period, and "
                "second cluster vreg");
         return ZX_ERR_INTERNAL;
       }
-      power_impl_device =
-          std::make_unique<AmlPower>(parent, second_cluster_vreg, first_cluster_pwm,
-                                     std::move(*voltage_table), *(pwm_period.value().get()));
+      power_impl_device = std::make_unique<AmlPower>(parent, std::move(second_cluster_vreg.value()),
+                                                     first_cluster_pwm, std::move(*voltage_table),
+                                                     *(pwm_period.value().get()));
       break;
     case PDEV_PID_SHERLOCK:
       if (!first_cluster_pwm.is_valid() || !voltage_table.is_ok() || !pwm_period.is_ok() ||
@@ -467,12 +499,12 @@ zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
                                      std::move(*voltage_table), *(pwm_period.value().get()));
       break;
     case PDEV_PID_AMLOGIC_A311D:
-      if (!first_cluster_vreg.is_valid() || !second_cluster_vreg.is_valid()) {
+      if (first_cluster_vreg.is_error() || second_cluster_vreg.is_error()) {
         zxlogf(ERROR, "Invalid args. Sherlock requires first cluster vreg and second cluster vreg");
         return ZX_ERR_INTERNAL;
       }
-      power_impl_device =
-          std::make_unique<AmlPower>(parent, first_cluster_vreg, second_cluster_vreg);
+      power_impl_device = std::make_unique<AmlPower>(parent, std::move(first_cluster_vreg.value()),
+                                                     std::move(second_cluster_vreg.value()));
       break;
     case PDEV_PID_AMLOGIC_A5:
       first_cluster_pwm = ddk::PwmProtocolClient(parent, "pwm-f");

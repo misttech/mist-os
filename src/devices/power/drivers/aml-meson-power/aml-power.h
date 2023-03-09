@@ -5,10 +5,9 @@
 #ifndef SRC_DEVICES_POWER_DRIVERS_AML_MESON_POWER_AML_POWER_H_
 #define SRC_DEVICES_POWER_DRIVERS_AML_MESON_POWER_AML_POWER_H_
 
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.vreg/cpp/wire.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
-#include <fuchsia/hardware/vreg/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/result.h>
 #include <threads.h>
@@ -60,11 +59,11 @@ class AmlPower : public AmlPowerType, public ddk::PowerImplProtocol<AmlPower, dd
         pwm_period_(pwm_period),
         num_domains_(2) {}
 
-  AmlPower(zx_device_t* parent, ddk::VregProtocolClient big_cluster_vreg,
+  AmlPower(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> big_cluster_vreg,
            ddk::PwmProtocolClient little_cluster_pwm,
            const std::vector<aml_voltage_table_t> voltage_table, voltage_pwm_period_ns_t pwm_period)
       : AmlPowerType(parent),
-        big_cluster_vreg_(big_cluster_vreg),
+        big_cluster_vreg_(std::move(big_cluster_vreg)),
         little_cluster_pwm_(little_cluster_pwm),
         current_big_cluster_voltage_index_(kInvalidIndex),
         current_little_cluster_voltage_index_(kInvalidIndex),
@@ -73,11 +72,11 @@ class AmlPower : public AmlPowerType, public ddk::PowerImplProtocol<AmlPower, dd
         num_domains_(2) {}
 
   // Constructor for Vim3.
-  AmlPower(zx_device_t* parent, ddk::VregProtocolClient big_cluster_vreg,
-           ddk::VregProtocolClient little_cluster_vreg)
+  AmlPower(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> big_cluster_vreg,
+           fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> little_cluster_vreg)
       : AmlPowerType(parent),
-        big_cluster_vreg_(big_cluster_vreg),
-        little_cluster_vreg_(little_cluster_vreg),
+        big_cluster_vreg_(std::move(big_cluster_vreg)),
+        little_cluster_vreg_(std::move(little_cluster_vreg)),
         current_big_cluster_voltage_index_(kInvalidIndex),
         current_little_cluster_voltage_index_(kInvalidIndex),
         voltage_table_({}),  // not used
@@ -119,26 +118,26 @@ class AmlPower : public AmlPowerType, public ddk::PowerImplProtocol<AmlPower, dd
  private:
   struct ClusterArgs {
     ddk::PwmProtocolClient pwm;
-    ddk::VregProtocolClient vreg;
+    fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg;
     int* current_voltage_index = nullptr;
   };
   zx::result<ClusterArgs> GetClusterArgs(uint32_t cluster_index);
 
   zx_status_t GetTargetIndex(const ddk::PwmProtocolClient& pwm, uint32_t u_volts,
                              uint32_t* target_index);
-  zx_status_t GetTargetIndex(const ddk::VregProtocolClient& vreg, uint32_t u_volts,
-                             uint32_t* target_index);
+  zx_status_t GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg,
+                             uint32_t u_volts, uint32_t* target_index);
   zx_status_t Update(const ddk::PwmProtocolClient& pwm, uint32_t idx);
-  zx_status_t Update(const ddk::VregProtocolClient& vreg, uint32_t idx);
+  zx_status_t Update(const fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg, uint32_t idx);
 
   template <class ProtocolClient>
   zx_status_t RequestVoltage(const ProtocolClient& pwm, uint32_t u_volts,
                              int* current_voltage_index);
 
   ddk::PwmProtocolClient big_cluster_pwm_;
-  ddk::VregProtocolClient big_cluster_vreg_;
+  fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg> big_cluster_vreg_;
   ddk::PwmProtocolClient little_cluster_pwm_;
-  ddk::VregProtocolClient little_cluster_vreg_;
+  fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg> little_cluster_vreg_;
 
   int current_big_cluster_voltage_index_;
   int current_little_cluster_voltage_index_;

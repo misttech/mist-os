@@ -64,12 +64,12 @@ enum VregIdx {
 };
 
 constexpr zx_bind_inst_t vreg_pwm_ao_d_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_VREG),
+    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_VREG),
     BI_MATCH_IF(EQ, BIND_PWM_ID, A311D_PWM_AO_D),
 };
 
 constexpr zx_bind_inst_t vreg_pwm_a_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_VREG),
+    BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_VREG),
     BI_MATCH_IF(EQ, BIND_PWM_ID, A311D_PWM_A),
 };
 

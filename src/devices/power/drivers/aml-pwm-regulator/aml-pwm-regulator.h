@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.vreg/cpp/wire.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
-#include <fuchsia/hardware/vreg/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 
 #include <ddktl/device.h>
@@ -17,11 +17,11 @@
 namespace aml_pwm_regulator {
 
 class AmlPwmRegulator;
-using AmlPwmRegulatorType = ddk::Device<AmlPwmRegulator>;
+using AmlPwmRegulatorType = ddk::Device<AmlPwmRegulator, ddk::Initializable>;
 using fuchsia_hardware_vreg::wire::PwmVregMetadataEntry;
 
 class AmlPwmRegulator : public AmlPwmRegulatorType,
-                        public ddk::VregProtocol<AmlPwmRegulator, ddk::base_protocol> {
+                        public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
  public:
   explicit AmlPwmRegulator(zx_device_t* parent, const PwmVregMetadataEntry& vreg_range,
                            ddk::PwmProtocolClient pwm)
@@ -36,12 +36,14 @@ class AmlPwmRegulator : public AmlPwmRegulatorType,
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   // Device Protocol Implementation
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease() { delete this; }
 
   // Vreg Implementation.
-  zx_status_t VregSetVoltageStep(uint32_t step);
-  uint32_t VregGetVoltageStep();
-  void VregGetRegulatorParams(vreg_params_t* out_params);
+  void SetVoltageStep(SetVoltageStepRequestView request,
+                      SetVoltageStepCompleter::Sync& completer) override;
+  void GetVoltageStep(GetVoltageStepCompleter::Sync& completer) override;
+  void GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) override;
 
  private:
   friend class FakePwmRegulator;
@@ -55,6 +57,10 @@ class AmlPwmRegulator : public AmlPwmRegulatorType,
   uint32_t current_step_;
 
   ddk::PwmProtocolClient pwm_;
+
+  std::optional<component::OutgoingDirectory> outgoing_;
+  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
+  fidl::ServerBindingGroup<fuchsia_hardware_vreg::Vreg> bindings_;
 };
 
 }  // namespace aml_pwm_regulator

@@ -129,7 +129,6 @@
 //src/devices/bus/drivers/platform/test:test-power-driver
 //src/devices/bus/drivers/platform/test:test-pwm-driver
 //src/devices/bus/drivers/platform/test:test-spi-driver
-//src/devices/bus/drivers/platform/test:test-vreg-driver
 //src/devices/bus/drivers/platform:platform-bus-driver
 //src/devices/bus/drivers/platform:platform-bus.proxy-driver
 //src/devices/clock/drivers/amlogic-clk:amlogic-clk-driver

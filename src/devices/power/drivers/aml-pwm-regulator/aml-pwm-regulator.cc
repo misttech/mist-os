@@ -5,47 +5,74 @@
 #include "src/devices/power/drivers/aml-pwm-regulator/aml-pwm-regulator.h"
 
 #include <lib/ddk/metadata.h>
+#include <lib/fdf/dispatcher.h>
 
 #include "src/devices/power/drivers/aml-pwm-regulator/aml-pwm-regulator-bind.h"
 
 namespace aml_pwm_regulator {
 
-zx_status_t AmlPwmRegulator::VregSetVoltageStep(uint32_t step) {
-  if (step >= num_steps_) {
-    zxlogf(ERROR, "Requested step (%u) is larger than allowed (total number of steps %u).", step,
-           num_steps_);
-    return ZX_ERR_INVALID_ARGS;
+void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
+                                     SetVoltageStepCompleter::Sync& completer) {
+  if (request->step >= num_steps_) {
+    zxlogf(ERROR, "Requested step (%u) is larger than allowed (total number of steps %u).",
+           request->step, num_steps_);
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
   }
 
-  if (step == current_step_) {
-    return ZX_OK;
+  if (request->step == current_step_) {
+    completer.ReplySuccess();
+    return;
   }
 
   aml_pwm::mode_config on = {aml_pwm::ON, {}};
   pwm_config_t cfg = {
       false, period_ns_,
-      static_cast<float>((num_steps_ - 1 - step) * 100.0 / ((num_steps_ - 1) * 1.0)),
+      static_cast<float>((num_steps_ - 1 - request->step) * 100.0 / ((num_steps_ - 1) * 1.0)),
       reinterpret_cast<uint8_t*>(&on), sizeof(on)};
   auto status = pwm_.SetConfig(&cfg);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Unable to configure PWM. %d", status);
-    return status;
+    completer.ReplyError(status);
+    return;
   }
-  current_step_ = step;
+  current_step_ = request->step;
 
-  return ZX_OK;
+  completer.ReplySuccess();
 }
 
-uint32_t AmlPwmRegulator::VregGetVoltageStep() { return current_step_; }
+void AmlPwmRegulator::GetVoltageStep(GetVoltageStepCompleter::Sync& completer) {
+  completer.Reply(current_step_);
+}
 
-void AmlPwmRegulator::VregGetRegulatorParams(vreg_params_t* out_params) {
-  if (!out_params) {
+void AmlPwmRegulator::GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) {
+  completer.Reply(min_voltage_uv_, voltage_step_uv_, num_steps_);
+}
+
+void AmlPwmRegulator::DdkInit(ddk::InitTxn txn) {
+  fdf_dispatcher_t* fdf_dispatcher = fdf_dispatcher_get_current_dispatcher();
+  ZX_ASSERT(fdf_dispatcher);
+  async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
+  outgoing_ = component::OutgoingDirectory(dispatcher);
+
+  fuchsia_hardware_vreg::Service::InstanceHandler handler({
+      .vreg = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_->AddService<fuchsia_hardware_vreg::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    txn.Reply(result.status_value());
     return;
   }
 
-  out_params->min_uv = min_voltage_uv_;
-  out_params->num_steps = num_steps_;
-  out_params->step_size_uv = voltage_step_uv_;
+  result = outgoing_->Serve(std::move(outgoing_server_end_));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve the outgoing directory");
+    txn.Reply(result.status_value());
+    return;
+  }
+
+  txn.Reply(ZX_OK);
 }
 
 zx_status_t AmlPwmRegulator::Create(void* ctx, zx_device_t* parent) {
@@ -100,8 +127,23 @@ zx_status_t AmlPwmRegulator::Create(void* ctx, zx_device_t* parent) {
     zx_device_prop_t props[] = {
         {BIND_PWM_ID, 0, idx},
     };
-    status = device->DdkAdd(
-        ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE).set_props(props));
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      return endpoints.status_value();
+    }
+
+    std::array offers = {
+        fuchsia_hardware_vreg::Service::Name,
+    };
+
+    device->outgoing_server_end_ = std::move(endpoints->server);
+
+    status = device->DdkAdd(ddk::DeviceAddArgs(name)
+                                .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                                .set_props(props)
+                                .set_fidl_service_offers(offers)
+                                .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status != ZX_OK) {
       zxlogf(ERROR, "DdkAdd failed, status = %d", status);
     }

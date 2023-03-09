@@ -26,7 +26,6 @@ group("drivers") {
     "drivers/platform/test:test-power",
     "drivers/platform/test:test-pwm",
     "drivers/platform/test:test-spi",
-    "drivers/platform/test:test-vreg",
   ]
 }
 

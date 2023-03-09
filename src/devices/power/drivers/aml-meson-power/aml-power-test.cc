@@ -4,10 +4,15 @@
 
 #include "aml-power.h"
 
+#include <fidl/fuchsia.hardware.vreg/cpp/wire_test_base.h>
 #include <fuchsia/hardware/pwm/cpp/banjo-mock.h>
-#include <fuchsia/hardware/vreg/cpp/banjo-mock.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <memory>
 #include <optional>
 
 #include <soc/aml-common/aml-pwm-regs.h>
@@ -43,18 +48,19 @@ class AmlPowerTestWrapper : public AmlPower {
       : AmlPower(nullptr, mock_big_pwm.GetProto(), mock_little_pwm.GetProto(), voltage_table,
                  pwm_period) {}
 
-  AmlPowerTestWrapper(ddk::MockVreg& mock_big_vreg, ddk::MockPwm& mock_little_pwm,
-                      std::vector<aml_voltage_table_t> voltage_table,
+  AmlPowerTestWrapper(fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg,
+                      ddk::MockPwm& mock_little_pwm, std::vector<aml_voltage_table_t> voltage_table,
                       voltage_pwm_period_ns_t pwm_period)
-      : AmlPower(nullptr, mock_big_vreg.GetProto(), mock_little_pwm.GetProto(), voltage_table,
+      : AmlPower(nullptr, std::move(mock_big_vreg), mock_little_pwm.GetProto(), voltage_table,
                  pwm_period) {}
 
   AmlPowerTestWrapper(ddk::MockPwm& mock_big_pwm, std::vector<aml_voltage_table_t> voltage_table,
                       voltage_pwm_period_ns_t pwm_period)
       : AmlPower(nullptr, mock_big_pwm.GetProto(), voltage_table, pwm_period) {}
 
-  AmlPowerTestWrapper(ddk::MockVreg& mock_big_vreg, ddk::MockVreg& mock_little_vreg)
-      : AmlPower(nullptr, mock_big_vreg.GetProto(), mock_little_vreg.GetProto()) {}
+  AmlPowerTestWrapper(fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg,
+                      fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_little_vreg)
+      : AmlPower(nullptr, std::move(mock_big_vreg), std::move(mock_little_vreg)) {}
 
   static std::unique_ptr<AmlPowerTestWrapper> Create(ddk::MockPwm& mock_big_pwm,
                                                      std::vector<aml_voltage_table_t> voltage_table,
@@ -63,11 +69,10 @@ class AmlPowerTestWrapper : public AmlPower {
     return result;
   }
 
-  static std::unique_ptr<AmlPowerTestWrapper> Create(ddk::MockVreg& mock_big_vreg,
-                                                     ddk::MockPwm& mock_little_pwm,
-                                                     std::vector<aml_voltage_table_t> voltage_table,
-                                                     voltage_pwm_period_ns_t pwm_period) {
-    auto result = std::make_unique<AmlPowerTestWrapper>(mock_big_vreg, mock_little_pwm,
+  static std::unique_ptr<AmlPowerTestWrapper> Create(
+      fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg, ddk::MockPwm& mock_little_pwm,
+      std::vector<aml_voltage_table_t> voltage_table, voltage_pwm_period_ns_t pwm_period) {
+    auto result = std::make_unique<AmlPowerTestWrapper>(std::move(mock_big_vreg), mock_little_pwm,
                                                         voltage_table, pwm_period);
     return result;
   }
@@ -81,13 +86,59 @@ class AmlPowerTestWrapper : public AmlPower {
     return result;
   }
 
-  static std::unique_ptr<AmlPowerTestWrapper> Create(ddk::MockVreg& mock_big_vreg,
-                                                     ddk::MockVreg& mock_little_vreg) {
-    auto result = std::make_unique<AmlPowerTestWrapper>(mock_big_vreg, mock_little_vreg);
+  static std::unique_ptr<AmlPowerTestWrapper> Create(
+      fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_big_vreg,
+      fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> mock_little_vreg) {
+    auto result = std::make_unique<AmlPowerTestWrapper>(std::move(mock_big_vreg),
+                                                        std::move(mock_little_vreg));
     return result;
   }
 
  private:
+};
+
+class FakeVregServer final : public fidl::testing::WireTestBase<fuchsia_hardware_vreg::Vreg> {
+ public:
+  void SetRegulatorParams(uint32_t min_uv, uint32_t step_size_uv, uint32_t num_steps) {
+    min_uv_ = min_uv;
+    step_size_uv_ = step_size_uv;
+    num_steps_ = num_steps;
+  }
+
+  void GetRegulatorParams(GetRegulatorParamsCompleter::Sync& completer) override {
+    completer.Reply(min_uv_, step_size_uv_, num_steps_);
+  }
+
+  void SetVoltageStep(::fuchsia_hardware_vreg::wire::VregSetVoltageStepRequest* request,
+                      SetVoltageStepCompleter::Sync& completer) override {
+    voltage_step_ = request->step;
+    completer.Reply(fit::success());
+  }
+
+  void GetVoltageStep(GetVoltageStepCompleter::Sync& completer) override {
+    completer.Reply(voltage_step_);
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  uint32_t voltage_step() const { return voltage_step_; }
+
+  fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> BindServer() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_vreg::Vreg>();
+    EXPECT_TRUE(endpoints.is_ok());
+    binding_ref_ =
+        fidl::BindServer(async_get_default_dispatcher(), std::move(endpoints->server), this);
+    return std::move(endpoints->client);
+  }
+
+ private:
+  uint32_t min_uv_;
+  uint32_t step_size_uv_;
+  uint32_t num_steps_;
+  uint32_t voltage_step_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_vreg::Vreg>> binding_ref_;
 };
 
 class AmlPowerTest : public zxtest::Test {
@@ -95,12 +146,14 @@ class AmlPowerTest : public zxtest::Test {
   void TearDown() override {
     big_cluster_pwm_.VerifyAndClear();
     little_cluster_pwm_.VerifyAndClear();
-    big_cluster_vreg_.VerifyAndClear();
-    little_cluster_vreg_.VerifyAndClear();
+    vreg_loop_.Shutdown();
   }
 
   zx_status_t Create(uint32_t pid, std::vector<aml_voltage_table_t> voltage_table,
                      voltage_pwm_period_ns_t pwm_period) {
+    EXPECT_OK(vreg_loop_.StartThread("vreg-servers"));
+    auto big_cluster_vreg_client = big_cluster_vreg_.SyncCall(&FakeVregServer::BindServer);
+    auto little_cluster_vreg_client = little_cluster_vreg_.SyncCall(&FakeVregServer::BindServer);
     switch (pid) {
       case PDEV_PID_ASTRO: {
         aml_power_ = AmlPowerTestWrapper::Create(big_cluster_pwm_, voltage_table, pwm_period);
@@ -112,12 +165,13 @@ class AmlPowerTest : public zxtest::Test {
         return ZX_OK;
       }
       case PDEV_PID_LUIS: {
-        aml_power_ = AmlPowerTestWrapper::Create(big_cluster_vreg_, little_cluster_pwm_,
-                                                 voltage_table, pwm_period);
+        aml_power_ = AmlPowerTestWrapper::Create(std::move(big_cluster_vreg_client),
+                                                 little_cluster_pwm_, voltage_table, pwm_period);
         return ZX_OK;
       }
       case PDEV_PID_AMLOGIC_A311D: {
-        aml_power_ = AmlPowerTestWrapper::Create(big_cluster_vreg_, little_cluster_vreg_);
+        aml_power_ = AmlPowerTestWrapper::Create(std::move(big_cluster_vreg_client),
+                                                 std::move(little_cluster_vreg_client));
         return ZX_OK;
       }
       default:
@@ -129,12 +183,15 @@ class AmlPowerTest : public zxtest::Test {
 
  protected:
   std::unique_ptr<AmlPowerTestWrapper> aml_power_;
+  async::Loop vreg_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   // Mmio Regs and Regions
   ddk::MockPwm big_cluster_pwm_;
   ddk::MockPwm little_cluster_pwm_;
-  ddk::MockVreg big_cluster_vreg_;
-  ddk::MockVreg little_cluster_vreg_;
+  async_patterns::TestDispatcherBound<FakeVregServer> big_cluster_vreg_{vreg_loop_.dispatcher(),
+                                                                        std::in_place};
+  async_patterns::TestDispatcherBound<FakeVregServer> little_cluster_vreg_{vreg_loop_.dispatcher(),
+                                                                           std::in_place};
 };
 
 TEST_F(AmlPowerTest, SetVoltage) {
@@ -351,36 +408,25 @@ TEST_F(AmlPowerTest, GetDomainStatus) {
 TEST_F(AmlPowerTest, LuisSetBigCluster) {
   EXPECT_OK(Create(PDEV_PID_LUIS));
 
-  vreg_params_t outparams;
-  outparams.min_uv = 100;
-  outparams.num_steps = 10;
-  outparams.step_size_uv = 10;
-
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
-  big_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 5);
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
+  big_cluster_vreg_.SyncCall(&FakeVregServer::SetRegulatorParams, 100, 10, 10);
   const uint32_t kTestVoltage = 155;
   uint32_t actual;
   EXPECT_OK(aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain,
                                                 kTestVoltage, &actual));
   EXPECT_EQ(actual, 150);
+  EXPECT_EQ(big_cluster_vreg_.SyncCall(&FakeVregServer::voltage_step), 5);
 
   // Voltage is too low.
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_NOT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain, 99, &actual));
 
   // Set voltage to the threshold.
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
-  big_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 8);
-  big_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 10);
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain, 200, &actual));
   EXPECT_EQ(actual, 200);
+  EXPECT_EQ(big_cluster_vreg_.SyncCall(&FakeVregServer::voltage_step), 10);
 
   // Set voltage beyond the threshold.
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_NOT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain, 300, &actual));
 }
@@ -388,12 +434,7 @@ TEST_F(AmlPowerTest, LuisSetBigCluster) {
 TEST_F(AmlPowerTest, LuisGetSupportedVoltageRange) {
   EXPECT_OK(Create(PDEV_PID_LUIS));
 
-  vreg_params_t outparams;
-  outparams.min_uv = 100;
-  outparams.num_steps = 10;
-  outparams.step_size_uv = 10;
-
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
+  big_cluster_vreg_.SyncCall(&FakeVregServer::SetRegulatorParams, 100, 10, 10);
 
   uint32_t max, min;
   EXPECT_OK(aml_power_->PowerImplGetSupportedVoltageRange(AmlPowerTestWrapper::kBigClusterDomain,
@@ -410,36 +451,25 @@ TEST_F(AmlPowerTest, LuisGetSupportedVoltageRange) {
 TEST_F(AmlPowerTest, Vim3SetBigCluster) {
   EXPECT_OK(Create(PDEV_PID_AMLOGIC_A311D));
 
-  vreg_params_t outparams;
-  outparams.min_uv = 100;
-  outparams.num_steps = 10;
-  outparams.step_size_uv = 10;
-
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
-  big_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 5);
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
+  big_cluster_vreg_.SyncCall(&FakeVregServer::SetRegulatorParams, 100, 10, 10);
   const uint32_t kTestVoltage = 155;
   uint32_t actual;
   EXPECT_OK(aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain,
                                                 kTestVoltage, &actual));
   EXPECT_EQ(actual, 150);
+  EXPECT_EQ(big_cluster_vreg_.SyncCall(&FakeVregServer::voltage_step), 5);
 
   // Voltage is too low.
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_NOT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain, 99, &actual));
 
   // Set voltage to the threshold.
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
-  big_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 8);
-  big_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 10);
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain, 200, &actual));
   EXPECT_EQ(actual, 200);
+  EXPECT_EQ(big_cluster_vreg_.SyncCall(&FakeVregServer::voltage_step), 10);
 
   // Set voltage beyond the threshold.
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_NOT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kBigClusterDomain, 300, &actual));
 }
@@ -447,36 +477,25 @@ TEST_F(AmlPowerTest, Vim3SetBigCluster) {
 TEST_F(AmlPowerTest, Vim3SetLittleCluster) {
   EXPECT_OK(Create(PDEV_PID_AMLOGIC_A311D));
 
-  vreg_params_t outparams;
-  outparams.min_uv = 100;
-  outparams.num_steps = 10;
-  outparams.step_size_uv = 10;
-
-  little_cluster_vreg_.ExpectGetRegulatorParams(outparams);
-  little_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 5);
-  little_cluster_vreg_.ExpectGetRegulatorParams(outparams);
+  little_cluster_vreg_.SyncCall(&FakeVregServer::SetRegulatorParams, 100, 10, 10);
   const uint32_t kTestVoltage = 155;
   uint32_t actual;
   EXPECT_OK(aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kLittleClusterDomain,
                                                 kTestVoltage, &actual));
   EXPECT_EQ(actual, 150);
+  EXPECT_EQ(little_cluster_vreg_.SyncCall(&FakeVregServer::voltage_step), 5);
 
   // Voltage is too low.
-  little_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_NOT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kLittleClusterDomain, 99, &actual));
 
   // Set voltage to the threshold.
-  little_cluster_vreg_.ExpectGetRegulatorParams(outparams);
-  little_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 8);
-  little_cluster_vreg_.ExpectSetVoltageStep(ZX_OK, 10);
-  little_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kLittleClusterDomain, 200, &actual));
   EXPECT_EQ(actual, 200);
+  EXPECT_EQ(little_cluster_vreg_.SyncCall(&FakeVregServer::voltage_step), 10);
 
   // Set voltage beyond the threshold.
-  little_cluster_vreg_.ExpectGetRegulatorParams(outparams);
   EXPECT_NOT_OK(
       aml_power_->PowerImplRequestVoltage(AmlPowerTestWrapper::kLittleClusterDomain, 300, &actual));
 }
@@ -484,12 +503,7 @@ TEST_F(AmlPowerTest, Vim3SetLittleCluster) {
 TEST_F(AmlPowerTest, Vim3GetSupportedVoltageRange) {
   EXPECT_OK(Create(PDEV_PID_AMLOGIC_A311D));
 
-  vreg_params_t outparams;
-  outparams.min_uv = 100;
-  outparams.num_steps = 10;
-  outparams.step_size_uv = 10;
-
-  big_cluster_vreg_.ExpectGetRegulatorParams(outparams);
+  big_cluster_vreg_.SyncCall(&FakeVregServer::SetRegulatorParams, 100, 10, 10);
 
   uint32_t max, min;
   EXPECT_OK(aml_power_->PowerImplGetSupportedVoltageRange(AmlPowerTestWrapper::kBigClusterDomain,
@@ -497,9 +511,7 @@ TEST_F(AmlPowerTest, Vim3GetSupportedVoltageRange) {
   EXPECT_EQ(max, 200);
   EXPECT_EQ(min, 100);
 
-  outparams.num_steps = 5;
-  outparams.step_size_uv = 20;
-  little_cluster_vreg_.ExpectGetRegulatorParams(outparams);
+  little_cluster_vreg_.SyncCall(&FakeVregServer::SetRegulatorParams, 100, 20, 5);
 
   EXPECT_OK(aml_power_->PowerImplGetSupportedVoltageRange(AmlPowerTestWrapper::kLittleClusterDomain,
                                                           &min, &max));

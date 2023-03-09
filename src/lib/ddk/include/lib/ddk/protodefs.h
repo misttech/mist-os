@@ -160,7 +160,7 @@ DDK_PROTOCOL_DEF(AMLOGIC_RAM,             142, "aml-ram", 0)
 DDK_PROTOCOL_DEF(GPU_PERFORMANCE_COUNTERS, 143, "gpu-performance-counters", 0)
 DDK_PROTOCOL_DEF(DISPLAY_CLAMP_RGB_IMPL,  144, "display-clamprgb-impl", PF_NOPUB)
 DDK_PROTOCOL_DEF(TEMPERATURE,             145, "temperature", 0)
-DDK_PROTOCOL_DEF(VREG,                    146, "vreg", 0)
+// 146 was vreg
 DDK_PROTOCOL_DEF(ADC,                     147, "adc", 0)
 // 148 was dsi
 DDK_PROTOCOL_DEF(BT_VENDOR,               149, "bt-vendor", 0)

@@ -18,7 +18,6 @@
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/hardware/tee/cpp/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
-#include <fuchsia/hardware/vreg/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -47,8 +46,7 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::SpiProtocol<FragmentProxy>,
                       public ddk::SysmemProtocol<FragmentProxy>,
                       public ddk::TeeProtocol<FragmentProxy>,
-                      public ddk::UsbModeSwitchProtocol<FragmentProxy>,
-                      public ddk::VregProtocol<FragmentProxy> {
+                      public ddk::UsbModeSwitchProtocol<FragmentProxy> {
  public:
   FragmentProxy(zx_device_t* parent, zx::channel rpc)
       : FragmentProxyBase(parent), rpc_(std::move(rpc)) {}
@@ -126,9 +124,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t SysmemUnregisterSecureMem();
   zx_status_t TeeConnectToApplication(const uuid_t* application_uuid, zx::channel tee_app_request,
                                       zx::channel service_provider);
-  zx_status_t VregSetVoltageStep(uint32_t step);
-  uint32_t VregGetVoltageStep();
-  void VregGetRegulatorParams(vreg_params_t* out_params);
 
   // USB Mode Switch
   zx_status_t UsbModeSwitchSetMode(usb_mode_t mode);

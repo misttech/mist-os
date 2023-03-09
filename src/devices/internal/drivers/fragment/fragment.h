@@ -30,7 +30,6 @@
 #include <fuchsia/hardware/thermal/cpp/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
-#include <fuchsia/hardware/vreg/cpp/banjo.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
@@ -95,7 +94,6 @@ class Fragment : public FragmentBase {
         ge2d_client_(parent, ZX_PROTOCOL_GE2D),
         scpi_client_(parent, ZX_PROTOCOL_SCPI),
         registers_client_(parent, ZX_PROTOCOL_REGISTERS),
-        vreg_client_(parent, ZX_PROTOCOL_VREG),
         dispatcher_(dispatcher),
         outgoing_(dispatcher) {}
 
@@ -160,9 +158,7 @@ class Fragment : public FragmentBase {
                            uint32_t* out_resp_size, zx::handle* req_handles,
                            uint32_t req_handle_count, zx::handle* resp_handles,
                            uint32_t* resp_handle_count);
-  zx_status_t RpcVreg(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                      uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
-                      zx::handle* resp_handles, uint32_t* resp_handle_count);
+
   ProtocolClient<ddk::AmlogicCanvasProtocolClient, amlogic_canvas_protocol_t> canvas_client_;
   ProtocolClient<ddk::ClockProtocolClient, clock_protocol_t> clock_client_;
   ProtocolClient<ddk::EthBoardProtocolClient, eth_board_protocol_t> eth_board_client_;
@@ -190,7 +186,6 @@ class Fragment : public FragmentBase {
   ProtocolClient<ddk::Ge2dProtocolClient, ge2d_protocol_t> ge2d_client_;
   ProtocolClient<ddk::ScpiProtocolClient, scpi_protocol_t> scpi_client_;
   ProtocolClient<ddk::RegistersProtocolClient, registers_protocol_t> registers_client_;
-  ProtocolClient<ddk::VregProtocolClient, vreg_protocol_t> vreg_client_;
 
   async::Wait rpc_wait_;
   zx::channel rpc_channel_;

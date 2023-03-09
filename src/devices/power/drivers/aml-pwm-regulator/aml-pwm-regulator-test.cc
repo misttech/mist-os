@@ -5,8 +5,18 @@
 #include "src/devices/power/drivers/aml-pwm-regulator/aml-pwm-regulator.h"
 
 #include <fuchsia/hardware/pwm/cpp/banjo-mock.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/ddk/metadata.h>
 
+#include <iterator>
+#include <vector>
+
+#include "fidl/fuchsia.hardware.vreg/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire/wire_messaging_declarations.h"
+#include "lib/fidl/cpp/wire/wire_types.h"
 #include "src/devices/lib/metadata/llcpp/vreg.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 bool operator==(const pwm_config_t& lhs, const pwm_config_t& rhs) {
   return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
@@ -17,31 +27,52 @@ bool operator==(const pwm_config_t& lhs, const pwm_config_t& rhs) {
 
 namespace aml_pwm_regulator {
 
-class TestPwmRegulator : public AmlPwmRegulator {
- public:
-  static std::unique_ptr<TestPwmRegulator> Create(PwmVregMetadataEntry vreg_range,
-                                                  const pwm_protocol_t* pwm) {
-    return std::make_unique<TestPwmRegulator>(vreg_range, ddk::PwmProtocolClient(pwm));
-  }
+void set_and_expect_voltage_step(fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg_client,
+                                 uint32_t value) {
+  fidl::WireResult result = vreg_client->SetVoltageStep(value);
+  EXPECT_OK(result.status());
+  EXPECT_TRUE(result->is_ok());
 
-  explicit TestPwmRegulator(PwmVregMetadataEntry vreg_range, ddk::PwmProtocolClient pwm)
-      : AmlPwmRegulator(nullptr, vreg_range, pwm) {}
-};
+  fidl::WireResult voltage_step = vreg_client->GetVoltageStep();
+  EXPECT_TRUE(voltage_step.ok());
+  EXPECT_EQ(voltage_step->result, value);
+}
 
 TEST(AmlPwmRegulatorTest, RegulatorTest) {
+  // Create regulator device
+  std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
+  ddk::MockPwm pwm;
+  fake_parent->AddProtocol(ZX_PROTOCOL_PWM, pwm.GetProto()->ops, pwm.GetProto()->ctx, "pwm-0");
   fidl::Arena<2048> allocator;
-  ddk::MockPwm pwm_;
-  auto regulator_ = TestPwmRegulator::Create(
-      vreg::BuildMetadata(allocator, 0, 1250, 690'000, 1'000, 11), pwm_.GetProto());
-  ASSERT_NOT_NULL(regulator_);
+  fuchsia_hardware_vreg::wire::PwmVregMetadataEntry pwm_entries[] = {
+      vreg::BuildMetadata(allocator, 0, 1250, 690'000, 1'000, 11)};
+  auto metadata = vreg::BuildMetadata(
+      allocator, fidl::VectorView<fuchsia_hardware_vreg::wire::PwmVregMetadataEntry>::FromExternal(
+                     pwm_entries));
+  auto encoded = fidl::Persist(metadata);
+  ASSERT_TRUE(encoded.is_ok());
+  pwm.ExpectEnable(ZX_OK);
+  fake_parent->SetMetadata(DEVICE_METADATA_VREG, encoded.value().data(), encoded.value().size());
+  EXPECT_OK(AmlPwmRegulator::Create(nullptr, fake_parent.get()));
+  MockDevice* child_dev = fake_parent->GetLatestChild();
+  AmlPwmRegulator* regulator = child_dev->GetDeviceContext<AmlPwmRegulator>();
 
-  vreg_params_t params;
-  regulator_->VregGetRegulatorParams(&params);
-  EXPECT_EQ(params.min_uv, 690'000);
-  EXPECT_EQ(params.num_steps, 11);
-  EXPECT_EQ(params.step_size_uv, 1'000);
+  // Get vreg client
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_vreg::Vreg>();
+  auto vreg_server = fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), regulator);
+  loop.StartThread("vreg-server");
+  fidl::WireSyncClient vreg_client{std::move(endpoints->client)};
 
-  EXPECT_EQ(regulator_->VregGetVoltageStep(), 11);
+  fidl::WireResult params = vreg_client->GetRegulatorParams();
+  EXPECT_TRUE(params.ok());
+  EXPECT_EQ(params->min_uv, 690'000);
+  EXPECT_EQ(params->num_steps, 11);
+  EXPECT_EQ(params->step_size_uv, 1'000);
+
+  fidl::WireResult voltage_step = vreg_client->GetVoltageStep();
+  EXPECT_TRUE(voltage_step.ok());
+  EXPECT_EQ(voltage_step->result, 11);
 
   aml_pwm::mode_config mode = {
       .mode = aml_pwm::ON,
@@ -54,18 +85,19 @@ TEST(AmlPwmRegulatorTest, RegulatorTest) {
       .mode_config_buffer = reinterpret_cast<uint8_t*>(&mode),
       .mode_config_size = sizeof(mode),
   };
-  pwm_.ExpectSetConfig(ZX_OK, cfg);
-  EXPECT_OK(regulator_->VregSetVoltageStep(3));
-  EXPECT_EQ(regulator_->VregGetVoltageStep(), 3);
+  pwm.ExpectSetConfig(ZX_OK, cfg);
+  set_and_expect_voltage_step(vreg_client, 3);
 
   cfg.duty_cycle = 10;
-  pwm_.ExpectSetConfig(ZX_OK, cfg);
-  EXPECT_OK(regulator_->VregSetVoltageStep(9));
-  EXPECT_EQ(regulator_->VregGetVoltageStep(), 9);
+  pwm.ExpectSetConfig(ZX_OK, cfg);
+  set_and_expect_voltage_step(vreg_client, 9);
 
-  EXPECT_NOT_OK(regulator_->VregSetVoltageStep(14));
+  fidl::WireResult result = vreg_client->SetVoltageStep(14);
+  EXPECT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_error());
+  EXPECT_EQ(result->error_value(), ZX_ERR_INVALID_ARGS);
 
-  pwm_.VerifyAndClear();
+  pwm.VerifyAndClear();
 }
 
 }  // namespace aml_pwm_regulator

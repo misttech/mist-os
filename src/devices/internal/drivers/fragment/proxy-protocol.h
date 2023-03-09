@@ -11,7 +11,6 @@
 #include <fuchsia/hardware/pwm/c/banjo.h>
 #include <fuchsia/hardware/tee/c/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/c/banjo.h>
-#include <fuchsia/hardware/vreg/c/banjo.h>
 
 namespace fragment {
 
@@ -247,25 +246,6 @@ struct TeeProxyRequest {
   ProxyRequest header;
   TeeOp op;
   uuid_t application_uuid;
-};
-
-// ZX_PROTOCOL_VREG proxy support.
-enum class VregOp {
-  SET_VOLTAGE_STEP,
-  GET_VOLTAGE_STEP,
-  GET_REGULATOR_PARAMS,
-};
-
-struct VregProxyRequest {
-  ProxyRequest header;
-  VregOp op;
-  uint32_t step;
-};
-
-struct VregProxyResponse {
-  ProxyResponse header;
-  vreg_params_t params;
-  uint32_t step;
 };
 
 // ZX_PROTOCOL_AMLOGIC_CANVAS proxy support.

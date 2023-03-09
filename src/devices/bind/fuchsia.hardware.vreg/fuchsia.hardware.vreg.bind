@@ -4,6 +4,6 @@
 
 library fuchsia.hardware.vreg;
 
-extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 146,
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  DEVICE = 17,
 };

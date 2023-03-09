@@ -21,9 +21,10 @@ group("common") {
   public_deps = [
     ":aml-pwm-regulator-bind",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.vreg:fuchsia.hardware.vreg_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp_wire",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/amlogic",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
@@ -56,7 +57,9 @@ test("aml-pwm-regulator-test-bin") {
     ":common",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp_mock",
     "//src/devices/lib/metadata:llcpp",
-    "//src/devices/testing/no_ddk",
+    "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
@@ -67,6 +70,11 @@ test("aml-pwm-regulator-test-bin") {
 }
 
 fuchsia_unittest_package("aml-pwm-regulator-test") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [ ":aml-pwm-regulator-test-bin" ]
 }
 
