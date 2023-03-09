@@ -34,7 +34,6 @@
     device_connect_fragment_fidl_protocol2;
     device_service_connect;
     device_connect_runtime_protocol;
-    device_get_dispatcher;
   local:
     *;
 };

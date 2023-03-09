@@ -236,8 +236,4 @@ __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const cha
                                                      fdf_handle_t request) {
   return dev->ConnectRuntime(service_name, protocol_name, fdf::Channel(request));
 }
-
-__EXPORT async_dispatcher_t* device_get_dispatcher(zx_device_t* dev) {
-  return dev->driver()->dispatcher();
-}
 }
