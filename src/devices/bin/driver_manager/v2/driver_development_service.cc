@@ -250,22 +250,23 @@ void DriverDevelopmentService::IsDfv2(IsDfv2Completer::Sync& completer) { comple
 
 void DriverDevelopmentService::AddTestNode(AddTestNodeRequestView request,
                                            AddTestNodeCompleter::Sync& completer) {
-  fidl::Arena<128> arena;
-  auto builder = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena);
-  if (request->args.has_name()) {
-    builder.name(request->args.name());
-  }
-  if (request->args.has_properties()) {
-    builder.properties(request->args.properties());
-  }
-  auto node =
-      driver_runner_.root_node()->AddChild(builder.Build(), /* controller */ {}, /* node */ {});
-  if (node.is_error()) {
-    completer.Reply(node.take_error());
-    return;
-  }
-  test_nodes_[node.value()->name()] = node.value();
-  completer.ReplySuccess();
+  fuchsia_driver_framework::NodeAddArgs args;
+  args.name(fidl::ToNatural(request->args.name()));
+  args.properties(fidl::ToNatural(request->args.properties()));
+
+  driver_runner_.root_node()->AddChild(
+      std::move(args), /* controller */ {}, /* node */ {},
+      [this, completer = completer.ToAsync()](
+          fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<dfv2::Node>>
+              result) mutable {
+        if (result.is_error()) {
+          completer.Reply(result.take_error());
+        } else {
+          auto node = result.value();
+          test_nodes_[node->name()] = node;
+          completer.ReplySuccess();
+        }
+      });
 }
 
 void DriverDevelopmentService::RemoveTestNode(RemoveTestNodeRequestView request,

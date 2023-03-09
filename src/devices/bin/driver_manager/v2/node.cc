@@ -21,6 +21,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
 namespace fdecl = fuchsia_component_decl;
+namespace fcomponent = fuchsia_component;
 
 namespace dfv2 {
 
@@ -36,6 +37,8 @@ const char* State2String(NodeState state) {
       return "kWaitingOnChildren";
     case NodeState::kWaitingOnDriver:
       return "kWaitingOnDriver";
+    case NodeState::kWaitingOnDriverComponent:
+      return "kWaitingOnDriverComponent";
     case NodeState::kStopping:
       return "kStopping";
   }
@@ -82,6 +85,19 @@ const char* CollectionName(Collection collection) {
   }
 }
 
+bool NodeStateIsExiting(NodeState node_state) {
+  switch (node_state) {
+    case NodeState::kRunning:
+      return false;
+    case NodeState::kPrestop:
+    case NodeState::kWaitingOnChildren:
+    case NodeState::kWaitingOnDriver:
+    case NodeState::kWaitingOnDriverComponent:
+    case NodeState::kStopping:
+      return true;
+  }
+}
+
 fit::result<fdf::wire::NodeError, fdecl::Offer> AddOfferToNodeOffer(fdecl::Offer add_offer,
                                                                     fdecl::Ref source) {
   auto has_source_name =
@@ -117,22 +133,20 @@ void UnbindAndReset(std::optional<fidl::ServerBindingRef<T>>& ref) {
   }
 }
 
-fit::result<fdf::wire::NodeError> ValidateSymbols(fidl::VectorView<fdf::wire::NodeSymbol> symbols) {
+fit::result<fdf::wire::NodeError> ValidateSymbols(std::vector<fdf::NodeSymbol>& symbols) {
   std::unordered_set<std::string_view> names;
   for (auto& symbol : symbols) {
-    if (!symbol.has_name()) {
+    if (!symbol.name().has_value()) {
       LOGF(ERROR, "SymbolError: a symbol is missing a name");
       return fit::error(fdf::wire::NodeError::kSymbolNameMissing);
     }
-    if (!symbol.has_address()) {
-      LOGF(ERROR, "SymbolError: symbol '%.*s' is missing an address",
-           static_cast<int>(symbol.name().size()), symbol.name().data());
+    if (!symbol.address().has_value()) {
+      LOGF(ERROR, "SymbolError: symbol '%s' is missing an address", symbol.name().value().c_str());
       return fit::error(fdf::wire::NodeError::kSymbolAddressMissing);
     }
-    auto [_, inserted] = names.emplace(symbol.name().get());
+    auto [_, inserted] = names.emplace(symbol.name().value());
     if (!inserted) {
-      LOGF(ERROR, "SymbolError: symbol '%.*s' already exists",
-           static_cast<int>(symbol.name().size()), symbol.name().data());
+      LOGF(ERROR, "SymbolError: symbol '%s' already exists", symbol.name().value().c_str());
       return fit::error(fdf::wire::NodeError::kSymbolAlreadyExists);
     }
   }
@@ -489,17 +503,17 @@ void Node::CheckForRemoval() {
          result.FormatDescription().data());
     // We'd better continue to close, since we can't talk to the driver.
   }
-  // No driver, go straight to full shutdown
-  FinishRemoval();
+
+  ScheduleStopComponent();
 }
 
 void Node::FinishRemoval() {
   LOGF(DEBUG, "Node: %s Finishing removal", name().c_str());
   // Get an extra shared_ptr to ourselves so we are not freed halfway through this function.
   auto this_node = shared_from_this();
-  ZX_ASSERT(node_state_ == NodeState::kWaitingOnDriver);
+  ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
+                "FinishRemoval called in invalid node state: %s", State2String(node_state_));
   node_state_ = NodeState::kStopping;
-  StopComponent();
   driver_component_.reset();
   for (auto& parent : parents()) {
     parent->RemoveChild(shared_from_this());
@@ -511,6 +525,9 @@ void Node::FinishRemoval() {
   UnbindAndReset(node_ref_);
   if (removal_tracker_ && removal_id_.has_value()) {
     removal_tracker_->Notify(removal_id_.value(), node_state_);
+  }
+  if (remove_complete_callback_) {
+    remove_complete_callback_();
   }
 }
 // State table for package driver:
@@ -595,19 +612,23 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   CheckForRemoval();
 }
 
-fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> Node::AddChild(
-    fuchsia_driver_framework::wire::NodeAddArgs args,
+fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> Node::AddChildHelper(
+    fuchsia_driver_framework::NodeAddArgs args,
     fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
     fidl::ServerEnd<fuchsia_driver_framework::Node> node) {
   if (node_manager_ == nullptr) {
     LOGF(WARNING, "Failed to add Node, as this Node '%s' was removed", name().data());
     return fit::as_error(fdf::wire::NodeError::kNodeRemoved);
   }
-  if (!args.has_name()) {
+  if (NodeStateIsExiting(node_state_)) {
+    LOGF(WARNING, "Failed to add Node, as this Node '%s' is being removed", name().c_str());
+    return fit::as_error(fdf::wire::NodeError::kNodeRemoved);
+  }
+  if (!args.name().has_value()) {
     LOGF(ERROR, "Failed to add Node, a name must be provided");
     return fit::as_error(fdf::wire::NodeError::kNameMissing);
   }
-  std::string_view name = args.name().get();
+  std::string_view name = args.name().value();
   for (auto& child : children_) {
     if (child->name() == name) {
       LOGF(ERROR, "Failed to add Node '%.*s', name already exists among siblings",
@@ -617,8 +638,8 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   };
   auto child = std::make_shared<Node>(name, std::vector<Node*>{this}, *node_manager_, dispatcher_);
 
-  if (args.has_offers()) {
-    child->offers_.reserve(args.offers().count());
+  if (args.offers().has_value()) {
+    child->offers_.reserve(args.offers().value().size());
 
     // Find a parent node with a collection. This indicates that a driver has
     // been bound to the node, and the driver is running within the collection.
@@ -631,8 +652,8 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
                                   .name(source_node->MakeComponentMoniker())
                                   .collection(CollectionName(source_node->collection_)));
 
-    for (auto& offer : args.offers()) {
-      fit::result new_offer = AddOfferToNodeOffer(fidl::ToNatural(offer), source_ref);
+    for (auto& offer : args.offers().value()) {
+      fit::result new_offer = AddOfferToNodeOffer(offer, source_ref);
       if (new_offer.is_error()) {
         LOGF(ERROR, "Failed to add Node '%s': Bad add offer: %d",
              child->MakeTopologicalPath().c_str(), new_offer.error_value());
@@ -642,10 +663,10 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     }
   }
 
-  if (args.has_properties()) {
-    child->properties_.reserve(args.properties().count() + 1);  // + 1 for DFv2 prop.
-    for (auto& property : args.properties()) {
-      child->properties_.emplace_back(fidl::ToWire(child->arena_, fidl::ToNatural(property)));
+  if (args.properties().has_value()) {
+    child->properties_.reserve(args.properties()->size() + 1);  // + 1 for DFv2 prop.
+    for (auto& property : args.properties().value()) {
+      child->properties_.emplace_back(fidl::ToWire(child->arena_, property));
     }
   }
 
@@ -653,19 +674,19 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   child->properties_.emplace_back(
       fdf::MakeProperty(child->arena_, "fuchsia.driver.framework.dfv2", true));
 
-  if (args.has_symbols()) {
-    auto is_valid = ValidateSymbols(args.symbols());
+  if (args.symbols().has_value()) {
+    auto is_valid = ValidateSymbols(args.symbols().value());
     if (is_valid.is_error()) {
       LOGF(ERROR, "Failed to add Node '%.*s', bad symbols", static_cast<int>(name.size()),
            name.data());
       return fit::as_error(is_valid.error_value());
     }
 
-    child->symbols_.reserve(args.symbols().count());
-    for (auto& symbol : args.symbols()) {
+    child->symbols_.reserve(args.symbols().value().size());
+    for (auto& symbol : args.symbols().value()) {
       child->symbols_.emplace_back(fdf::wire::NodeSymbol::Builder(child->arena_)
-                                       .name(child->arena_, symbol.name().get())
-                                       .address(symbol.address())
+                                       .name(child->arena_, symbol.name().value())
+                                       .address(symbol.address().value())
                                        .Build());
     }
   }
@@ -687,6 +708,56 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   return fit::ok(child);
 }
 
+void Node::WaitForChildToExit(
+    std::string_view name,
+    fit::callback<void(fit::result<fuchsia_driver_framework::wire::NodeError>)> callback) {
+  for (auto& child : children_) {
+    if (child->name() != name) {
+      continue;
+    }
+    if (!NodeStateIsExiting(child->node_state_)) {
+      LOGF(ERROR, "Failed to add Node '%.*s', name already exists among siblings",
+           static_cast<int>(name.size()), name.data());
+      callback(fit::as_error(fdf::wire::NodeError::kNameAlreadyExists));
+      return;
+    }
+    if (child->remove_complete_callback_) {
+      LOGF(ERROR,
+           "Failed to add Node '%.*s': Node with name already exists and is marked to be replaced.",
+           static_cast<int>(name.size()), name.data());
+      callback(fit::as_error(fdf::wire::NodeError::kNameAlreadyExists));
+      return;
+    }
+    child->remove_complete_callback_ = [callback = std::move(callback)]() mutable {
+      callback(fit::success());
+    };
+    return;
+  };
+  callback(fit::success());
+}
+
+void Node::AddChild(fuchsia_driver_framework::NodeAddArgs args,
+                    fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller,
+                    fidl::ServerEnd<fuchsia_driver_framework::Node> node,
+                    AddNodeResultCallback callback) {
+  if (!args.name().has_value()) {
+    LOGF(ERROR, "Failed to add Node, a name must be provided");
+    callback(fit::as_error(fdf::wire::NodeError::kNameMissing));
+    return;
+  }
+  std::string name = args.name().value();
+  WaitForChildToExit(
+      name, [self = shared_from_this(), args = std::move(args), controller = std::move(controller),
+             node = std::move(node), callback = std::move(callback)](
+                fit::result<fuchsia_driver_framework::wire::NodeError> result) mutable {
+        if (result.is_error()) {
+          callback(result.take_error());
+          return;
+        }
+        callback(self->AddChildHelper(std::move(args), std::move(controller), std::move(node)));
+      });
+}
+
 bool Node::IsComposite() const { return parents_.size() > 1; }
 
 void Node::Remove(RemoveCompleter::Sync& completer) {
@@ -695,12 +766,16 @@ void Node::Remove(RemoveCompleter::Sync& completer) {
 }
 
 void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
-  auto node = AddChild(request->args, std::move(request->controller), std::move(request->node));
-  if (node.is_error()) {
-    completer.Reply(node.take_error());
-    return;
-  }
-  completer.ReplySuccess();
+  AddChild(fidl::ToNatural(request->args), std::move(request->controller), std::move(request->node),
+           [completer = completer.ToAsync()](
+               fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>>
+                   result) mutable {
+             if (result.is_error()) {
+               completer.Reply(result.take_error());
+             } else {
+               completer.ReplySuccess();
+             }
+           });
 }
 
 zx::result<> Node::StartDriver(
@@ -758,14 +833,38 @@ zx::result<> Node::StartDriver(
   return zx::ok();
 }
 
-void Node::StopComponent() {
+void Node::ScheduleStopComponent() {
+  ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriver,
+                "ScheduleStopComponent called in invalid node state: %s",
+                State2String(node_state_));
+  node_state_ = NodeState::kWaitingOnDriverComponent;
   if (!driver_component_) {
+    FinishRemoval();
     return;
   }
   // Send an epitaph to the component manager and close the connection. The
   // server of a `ComponentController` protocol is expected to send an epitaph
   // before closing the associated connection.
+  auto this_node = shared_from_this();
   driver_component_->component_controller_ref.Close(ZX_OK);
+  if (!node_manager_.has_value()) {
+    return;
+  }
+  node_manager_.value()->DestroyDriverComponent(
+      *this_node,
+      [self = this_node](fidl::WireUnownedResult<fcomponent::Realm::DestroyChild>& result) {
+        if (!result.ok()) {
+          auto error = result.error().FormatDescription();
+          LOGF(ERROR, "Node: %s: Failed to send request to destroy component: %.*s",
+               self->name_.c_str(), static_cast<int>(error.size()), error.data());
+        }
+        if (result->is_error() &&
+            result->error_value() != fcomponent::wire::Error::kInstanceNotFound) {
+          LOGF(ERROR, "Node: %.*s: Failed to destroy driver component: %u",
+               static_cast<int>(self->name_.size()), self->name_.data(), result->error_value());
+        }
+        self->FinishRemoval();
+      });
 }
 
 void Node::on_fidl_error(fidl::UnbindInfo info) {
@@ -779,6 +878,9 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
          info.FormatDescription().data());
   }
   if (node_state_ == NodeState::kWaitingOnDriver) {
+    LOGF(DEBUG, "Node: %s: realm channel had expected shutdown.", name().c_str());
+    ScheduleStopComponent();
+  } else if (node_state_ == NodeState::kWaitingOnDriverComponent) {
     LOGF(DEBUG, "Node: %s: driver channel had expected shutdown.", name().c_str());
     FinishRemoval();
   } else {
