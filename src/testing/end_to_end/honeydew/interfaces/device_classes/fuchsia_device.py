@@ -5,16 +5,14 @@
 """Abstract base class for Fuchsia device."""
 
 import abc
-import os
 from typing import Optional
 
-from honeydew import custom_types, errors
+from honeydew import custom_types
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
 from honeydew.utils import ffx_cli, properties
 
 DEFAULT_SSH_USER = "fuchsia"
-DEFAULT_SSH_PKEY = os.environ.get("SSH_PRIVATE_KEY_FILE")
 
 
 class FuchsiaDevice(abc.ABC):
@@ -26,9 +24,8 @@ class FuchsiaDevice(abc.ABC):
     Args:
         device_name: Device name returned by `ffx target list`.
 
-        ssh_pkey: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device. Either pass the value here or set value in
-            'SSH_PRIVATE_KEY_FILE' environmental variable.
+        ssh_private_key: Absolute path to the SSH private key file needed to SSH
+            into fuchsia device.
 
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
@@ -43,17 +40,11 @@ class FuchsiaDevice(abc.ABC):
     def __init__(
             self,
             device_name: str,
-            ssh_pkey: Optional[str] = DEFAULT_SSH_PKEY,
+            ssh_private_key: str,
             ssh_user: str = DEFAULT_SSH_USER,
             device_ip_address: Optional[str] = None) -> None:
-        if not ssh_pkey:
-            raise errors.FuchsiaDeviceError(
-                "ssh_pkey arg is not valid. This is needed to SSH into fuchsia "
-                "device. Please either pass ssh_pkey or set this value in "
-                "'SSH_PRIVATE_KEY_FILE' environmental variable")
-
         self.name = device_name
-        self._ssh_pkey = ssh_pkey
+        self._ssh_private_key = ssh_private_key
         self._ssh_user = ssh_user
         self._ip_address = device_ip_address or ffx_cli.get_target_address(
             self.name)

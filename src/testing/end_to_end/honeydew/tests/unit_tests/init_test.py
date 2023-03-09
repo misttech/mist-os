@@ -47,7 +47,7 @@ class InitTests(unittest.TestCase):
         fuchsia device object."""
         device_name = "fuchsia-emulator"
         fd_obj = honeydew.create_device(
-            device_name=device_name, ssh_pkey="/tmp/pkey")
+            device_name=device_name, ssh_private_key="/tmp/pkey")
 
         self.assertIsInstance(
             fd_obj, generic_fuchsia_device.GenericFuchsiaDevice)
@@ -78,7 +78,7 @@ class InitTests(unittest.TestCase):
         fuchsia device object."""
         device_name = "fuchsia-emulator"
         fd_obj = honeydew.create_device(
-            device_name=device_name, ssh_pkey="/tmp/pkey")
+            device_name=device_name, ssh_private_key="/tmp/pkey")
 
         self.assertIsInstance(fd_obj, x64.X64)
 

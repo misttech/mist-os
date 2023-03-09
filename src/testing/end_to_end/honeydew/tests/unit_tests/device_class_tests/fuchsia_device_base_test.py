@@ -17,7 +17,7 @@ from parameterized import parameterized
 # pylint: disable=protected-access
 _INPUT_ARGS = {
     "device_name": "fuchsia-emulator",
-    "ssh_pkey": "/tmp/.ssh/pkey",
+    "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
     "device_ip_address": "11.22.33.44"
 }
@@ -77,7 +77,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
         self.fd_obj = fuchsia_device_base.FuchsiaDeviceBase(
             device_name=_INPUT_ARGS["device_name"],
-            ssh_pkey=_INPUT_ARGS["ssh_pkey"])
+            ssh_private_key=_INPUT_ARGS["ssh_private_key"])
 
         mock_get_target_address.assert_called_once()
 
@@ -93,11 +93,13 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             (
                 {
                     "label": "all_optional_params",
-                    "device_name": _INPUT_ARGS["device_name"],
+                    "mandatory_params":
+                        {
+                            "device_name": _INPUT_ARGS["device_name"],
+                            "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
+                        },
                     "optional_params":
                         {
-                            "ssh_pkey":
-                                _INPUT_ARGS["ssh_pkey"],
                             "ssh_user":
                                 _INPUT_ARGS["ssh_user"],
                             "device_ip_address":
@@ -107,21 +109,27 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             (
                 {
                     "label": "no_ssh_user",
-                    "device_name": _INPUT_ARGS["device_name"],
+                    "mandatory_params":
+                        {
+                            "device_name": _INPUT_ARGS["device_name"],
+                            "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
+                        },
                     "optional_params":
                         {
-                            "ssh_pkey":
-                                _INPUT_ARGS["ssh_pkey"],
                             "device_ip_address":
                                 _INPUT_ARGS["device_ip_address"]
                         },
                 },),
             (
                 {
-                    "label": "just_ssh_key",
-                    "device_name": _INPUT_ARGS["device_name"],
+                    "label": "no_device_ip_address",
+                    "mandatory_params":
+                        {
+                            "device_name": _INPUT_ARGS["device_name"],
+                            "ssh_private_key": _INPUT_ARGS["ssh_private_key"],
+                        },
                     "optional_params": {
-                        "ssh_pkey": _INPUT_ARGS["ssh_pkey"],
+                        "ssh_user": _INPUT_ARGS["ssh_user"],
                     },
                 },),
         ],
@@ -145,12 +153,16 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         """Verify FuchsiaDeviceBase class instantiation."""
         optional_params = parameterized_dict["optional_params"]
 
-        device_name = parameterized_dict["device_name"]
+        device_name = parameterized_dict["mandatory_params"]["device_name"]
+        ssh_private_key = parameterized_dict["mandatory_params"][
+            "ssh_private_key"]
 
         mock_send_sl4f_command.return_value = {"result": device_name}
 
         fd_obj = fuchsia_device_base.FuchsiaDeviceBase(
-            device_name=device_name, **optional_params)
+            device_name=device_name,
+            ssh_private_key=ssh_private_key,
+            **optional_params)
 
         self.assertIsInstance(fd_obj, fuchsia_device_base.FuchsiaDeviceBase)
 
@@ -163,13 +175,6 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             mock_get_target_address.assert_called_once()
         else:
             mock_get_target_address.assert_not_called()
-
-    def test_fuchsia_device_base_init_exception_when_no_ssh_pkey(self):
-        """Test case for FuchsiaDeviceBase class instantiation when ssh_pkey
-        arg is None."""
-        with self.assertRaises(errors.FuchsiaDeviceError):
-            fuchsia_device_base.FuchsiaDeviceBase(
-                device_name=_INPUT_ARGS["device_name"], ssh_pkey=None)
 
     # List all the tests related to static properties in alphabetical order
     @mock.patch.object(

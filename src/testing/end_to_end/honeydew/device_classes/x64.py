@@ -14,9 +14,8 @@ class X64(fuchsia_device_base.FuchsiaDeviceBase):
     Args:
         device_name: Device name returned by `ffx target list`.
 
-        ssh_pkey: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device. Either pass the value here or set value in
-            'SSH_PRIVATE_KEY_FILE' environmental variable.
+        ssh_private_key: Absolute path to the SSH private key file needed to SSH
+            into fuchsia device.
 
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".

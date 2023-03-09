@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 
 import honeydew
 from honeydew.interfaces.device_classes.fuchsia_device import (
-    DEFAULT_SSH_PKEY, DEFAULT_SSH_USER, FuchsiaDevice)
+    DEFAULT_SSH_USER, FuchsiaDevice)
 from honeydew.utils.properties import DynamicProperty, PersistentProperty
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
@@ -38,7 +38,7 @@ def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:
         fuchsia_devices.append(
             honeydew.create_device(
                 device_name=config["name"],
-                ssh_pkey=config.get("ssh_key", DEFAULT_SSH_PKEY),
+                ssh_private_key=config["ssh_private_key"],
                 ssh_user=config.get("ssh_user", DEFAULT_SSH_USER),
                 device_ip_address=config.get("ip_address")))
     return fuchsia_devices

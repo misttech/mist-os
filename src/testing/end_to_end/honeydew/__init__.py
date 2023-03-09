@@ -25,7 +25,7 @@ _REGISTERED_DEVICE_CLASSES: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
 # List all the public methods in alphabetical order
 def create_device(
         device_name: str,
-        ssh_pkey: Optional[str] = fuchsia_device.DEFAULT_SSH_PKEY,
+        ssh_private_key: str,
         ssh_user: str = fuchsia_device.DEFAULT_SSH_USER,
         device_ip_address: Optional[str] = None
 ) -> fuchsia_device.FuchsiaDevice:
@@ -38,9 +38,8 @@ def create_device(
     Args:
         device_name: Device name returned by `ffx target list`.
 
-        ssh_pkey: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device. Either pass the value here or set value in
-            'SSH_PRIVATE_KEY_FILE' environmental variable.
+        ssh_private_key: Absolute path to the SSH private key file needed to SSH
+            into fuchsia device.
 
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
@@ -55,7 +54,8 @@ def create_device(
         errors.FuchsiaDeviceError: Failed to create Fuchsia device object.
     """
     product_type = ffx_cli.get_target_type(device_name)
-    device_class_args = (device_name, ssh_pkey, ssh_user, device_ip_address)
+    device_class_args = (
+        device_name, ssh_private_key, ssh_user, device_ip_address)
     for device_class in _get_all_register_device_classes():
         if product_type.lower() == device_class.__name__.lower():
             _LOGGER.info(

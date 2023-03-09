@@ -8,7 +8,8 @@ provides Host-(Fuchsia)Target interaction.
 ### Device object creation
 ```python
 
-In [1]: import logging
+In [1]: import os
+   ...: import logging
    ...: logging.basicConfig(level=logging.INFO)
 
 In [2]: import honeydew
@@ -19,7 +20,7 @@ In [2]: import honeydew
 #   * "fuchsia-d88c-79a3-aa1d" is Google's 1p device whose implementation is not present in HoneyDew. Hence returning a generic_fuchsia_device.GenericFuchsiaDevice object.
 #   * "fuchsia-emulator" is an emulator device whose implementation is not present in HoneyDew. Hence returning a generic_fuchsia_device.GenericFuchsiaDevice object.
 
-In [3]: fd_1p = honeydew.create_device("fuchsia-ac67-847a-2e50")
+In [3]: fd_1p = honeydew.create_device("fuchsia-ac67-847a-2e50", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>}'
 INFO:honeydew:Didn't find any matching device class implementation for 'fuchsia-ac67-847a-2e50'. So returning 'GenericFuchsiaDevice'
 INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-ac67-847a-2e50...
@@ -27,7 +28,7 @@ INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia
 In [4]: type(fd_1p)
 Out[4]: honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice
 
-In [5]: ws = honeydew.create_device("fuchsia-54b2-038b-6e90")
+In [5]: ws = honeydew.create_device("fuchsia-54b2-038b-6e90", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>}'
 INFO:honeydew:Found matching device class implementation for 'fuchsia-54b2-038b-6e90' as 'X64'
 INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-54b2-038b-6e90...
@@ -35,7 +36,7 @@ INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia
 In [6]: type(ws)
 Out[6]: honeydew.device_classes.x64.X64
 
-In [7]: emu = honeydew.create_device("fuchsia-emulator")
+In [7]: emu = honeydew.create_device("fuchsia-emulator", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>}'
 INFO:honeydew:Didn't find any matching device class implementation for 'fuchsia-emulator'. So returning 'GenericFuchsiaDevice'
 INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-emulator...

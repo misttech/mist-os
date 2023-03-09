@@ -56,7 +56,7 @@ _SSH_OPTIONS_TUPLE = (
     f"-oConnectTimeout={_TIMEOUTS['SSH_COMMAND_ARG']}")
 _SSH_OPTIONS = " ".join(_SSH_OPTIONS_TUPLE)
 _SSH_COMMAND = \
-    "ssh {ssh_options} -i {ssh_pkey} {ssh_user}@{ip_address} {command}"
+    "ssh {ssh_options} -i {ssh_private_key} {ssh_user}@{ip_address} {command}"
 
 
 # pylint: disable=attribute-defined-outside-init, too-many-instance-attributes
@@ -70,9 +70,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
     Args:
         device_name: Device name returned by `ffx target list`.
 
-        ssh_pkey: Absolute path to the SSH private key file needed to SSH
-            into fuchsia device. Either pass the value here or set value in
-            'SSH_PRIVATE_KEY_FILE' environmental variable.
+        ssh_private_key: Absolute path to the SSH private key file needed to SSH
+            into fuchsia device.
 
         ssh_user: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
@@ -87,10 +86,11 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
     def __init__(
             self,
             device_name: str,
-            ssh_pkey: Optional[str] = fuchsia_device.DEFAULT_SSH_PKEY,
+            ssh_private_key: str,
             ssh_user: str = fuchsia_device.DEFAULT_SSH_USER,
             device_ip_address: Optional[str] = None) -> None:
-        super().__init__(device_name, ssh_pkey, ssh_user, device_ip_address)
+        super().__init__(
+            device_name, ssh_private_key, ssh_user, device_ip_address)
         self._start_sl4f_server()
 
     # List all the persistent properties in alphabetical order
@@ -474,7 +474,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         """
         ssh_command = _SSH_COMMAND.format(
             ssh_options=_SSH_OPTIONS,
-            ssh_pkey=self._ssh_pkey,
+            ssh_private_key=self._ssh_private_key,
             ssh_user=self._ssh_user,
             ip_address=self._ip_address,
             command=command)
