@@ -7,7 +7,7 @@
 
 use {
     crate::{data_fs_name, data_fs_spec, data_fs_zxcrypt, new_builder},
-    device_watcher::recursive_wait_and_open_node,
+    device_watcher::recursive_wait,
     fidl::endpoints::{create_proxy, Proxy as _},
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::BlockProxy,
@@ -52,17 +52,19 @@ async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) 
     let ramdisk = fixture.ramdisks.first().unwrap();
     let gpt_path = "/part-000/block";
     let ramdisk_dir = ramdisk.as_dir().expect("invalid directory proxy");
-    recursive_wait_and_open_node(ramdisk_dir, &gpt_path).await.unwrap();
     if has_formatted_fvm {
         // TODO(https://fxbug.dev/121274): Remove hardcoded paths
         let blobfs_path = format!("{}/fvm/blobfs-p-1/block", gpt_path);
-        recursive_wait_and_open_node(ramdisk_dir, &blobfs_path).await.unwrap();
+        recursive_wait(ramdisk_dir, &blobfs_path).await.unwrap();
         let data_path = format!("{}/fvm/data-p-2/block", gpt_path);
-        recursive_wait_and_open_node(ramdisk_dir, &data_path).await.unwrap();
         if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
             let zxcrypt_path = format!("{}/zxcrypt/unsealed/block", data_path);
-            recursive_wait_and_open_node(ramdisk_dir, &zxcrypt_path).await.unwrap();
+            recursive_wait(ramdisk_dir, &zxcrypt_path).await.unwrap();
+        } else {
+            recursive_wait(ramdisk_dir, &data_path).await.unwrap();
         }
+    } else {
+        recursive_wait(ramdisk_dir, &gpt_path).await.unwrap();
     }
 }
 

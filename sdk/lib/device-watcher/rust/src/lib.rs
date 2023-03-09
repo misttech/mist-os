@@ -140,21 +140,12 @@ async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
     }
 }
 
-/// Open the path `name` within `dir`. This function waits for each directory to
-/// be available before it opens it. If the path never appears this function
-/// will wait forever.
-pub async fn recursive_wait_and_open_node(
-    dir: &fio::DirectoryProxy,
-    name: &str,
-) -> Result<fio::NodeProxy> {
-    recursive_wait_and_open::<fio::NodeMarker>(dir, name).await
-}
-
 /// Wait for `name` to be available in `dir`. This function waits for each directory along
 /// the path and returns once it has waited on the final component in the path. If the path
 /// never appears this function will wait forever.
 pub async fn recursive_wait(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
-    let _proxy = recursive_wait_and_open_node(dir, name).await?;
+    // TODO(https://fxbug.dev/120890): Eventually, we want to avoid even opening the end node here.
+    let _proxy: fio::NodeProxy = recursive_wait_and_open::<fio::NodeMarker>(dir, name).await?;
     Ok(())
 }
 

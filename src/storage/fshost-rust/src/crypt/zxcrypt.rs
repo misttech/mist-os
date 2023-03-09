@@ -6,9 +6,8 @@ use {
     super::{format_sources, get_policy, unseal_sources, KeyConsumer},
     crate::device::Device,
     anyhow::{anyhow, bail, Context, Error},
-    device_watcher::recursive_wait_and_open_node,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_hardware_block_encrypted::DeviceManagerProxy,
+    device_watcher::recursive_wait_and_open,
+    fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy},
     fidl_fuchsia_io as fio,
     fs_management::format::DiskFormat,
     fuchsia_zircon as zx,
@@ -59,12 +58,11 @@ async fn unseal(zxcrypt: &DeviceManagerProxy) -> Result<UnsealOutcome, Error> {
 pub async fn unseal_or_format(device: &mut dyn Device) -> Result<(), Error> {
     let controller = fuchsia_fs::directory::open_in_namespace(
         device.topological_path(),
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     )?;
-    let zxcrypt = recursive_wait_and_open_node(&controller, "zxcrypt")
+    let zxcrypt = recursive_wait_and_open::<DeviceManagerMarker>(&controller, "zxcrypt")
         .await
         .context("waiting for zxcrypt device")?;
-    let zxcrypt = DeviceManagerProxy::new(zxcrypt.into_channel().unwrap());
 
     // Try to unseal if the detected disk format is DiskFormat::Zxcrypt
     if device.content_format().await? == DiskFormat::Zxcrypt {

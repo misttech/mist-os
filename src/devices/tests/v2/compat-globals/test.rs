@@ -4,7 +4,6 @@
 
 use {
     anyhow::Result,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
     fuchsia_component_test::RealmBuilder,
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -31,8 +30,12 @@ async fn test_adding_children() -> Result<()> {
 
     // Connect to our root-a/leaf driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-a/leaf").await?;
-    let driver = fidl_fuchsia_hardware_compat::LeafProxy::new(node.into_channel().unwrap());
+    let driver =
+        device_watcher::recursive_wait_and_open::<fidl_fuchsia_hardware_compat::LeafMarker>(
+            &dev,
+            "sys/test/root-a/leaf",
+        )
+        .await?;
 
     // Make sure we can add a child.
     let response = driver.add_child("child").await.unwrap();
@@ -40,8 +43,12 @@ async fn test_adding_children() -> Result<()> {
 
     // Connect to our root-b/leaf driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-b/leaf").await?;
-    let driver = fidl_fuchsia_hardware_compat::LeafProxy::new(node.into_channel().unwrap());
+    let driver =
+        device_watcher::recursive_wait_and_open::<fidl_fuchsia_hardware_compat::LeafMarker>(
+            &dev,
+            "sys/test/root-b/leaf",
+        )
+        .await?;
 
     // Make sure we can add a child with the *same name* that we added
     // to root-a/leaf.
@@ -49,8 +56,8 @@ async fn test_adding_children() -> Result<()> {
     assert_eq!(response, zx::Status::OK.into_raw());
 
     // Check that both children are in /dev/.
-    device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-a/leaf/child").await?;
-    device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-b/leaf/child").await?;
+    device_watcher::recursive_wait(&dev, "sys/test/root-a/leaf/child").await?;
+    device_watcher::recursive_wait(&dev, "sys/test/root-b/leaf/child").await?;
 
     Ok(())
 }
@@ -74,8 +81,12 @@ async fn test_sharing_globals() -> Result<()> {
 
     // Connect to our root-a/leaf driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-a/leaf").await?;
-    let driver = fidl_fuchsia_hardware_compat::LeafProxy::new(node.into_channel().unwrap());
+    let driver =
+        device_watcher::recursive_wait_and_open::<fidl_fuchsia_hardware_compat::LeafMarker>(
+            &dev,
+            "sys/test/root-a/leaf",
+        )
+        .await?;
 
     // Our global should be 0, and we are incrementing it to 1.
     let counter = driver.global_counter().await.unwrap();
@@ -83,8 +94,12 @@ async fn test_sharing_globals() -> Result<()> {
 
     // Connect to our root-b/leaf driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-b/leaf").await?;
-    let driver = fidl_fuchsia_hardware_compat::LeafProxy::new(node.into_channel().unwrap());
+    let driver =
+        device_watcher::recursive_wait_and_open::<fidl_fuchsia_hardware_compat::LeafMarker>(
+            &dev,
+            "sys/test/root-b/leaf",
+        )
+        .await?;
 
     // Our global should be 1 (since root-a incremented it).
     let counter = driver.global_counter().await.unwrap();

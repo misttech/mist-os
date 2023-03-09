@@ -141,7 +141,9 @@ async fn set_up_test_driver_realm(
 
     // Make sure we wait until all the drivers are bound before returning.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let _ = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/sample_driver").await;
+    device_watcher::recursive_wait(&dev, "sys/test/sample_driver")
+        .await
+        .expect("recursive wait failed");
 
     Ok((instance, driver_dev))
 }
@@ -643,7 +645,7 @@ async fn test_add_test_node_dfv2() -> Result<()> {
         .unwrap();
 
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let _ = device_watcher::recursive_wait_and_open_node(&dev, "sample_driver").await;
+    device_watcher::recursive_wait(&dev, "sample_driver").await?;
 
     driver_dev.remove_test_node("test_sample").await?.unwrap();
     assert_eq!(

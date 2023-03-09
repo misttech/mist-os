@@ -4,7 +4,6 @@
 
 use {
     anyhow::{Context, Result},
-    fidl::endpoints::Proxy,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio, fidl_fuchsia_rebind_test as frt,
     fuchsia_async as fasync,
     fuchsia_component_test::{RealmBuilder, RealmInstance},
@@ -95,13 +94,14 @@ async fn test_rebind() -> Result<()> {
     let instance = start_driver_test_realm().await?;
     let dev = instance.driver_test_realm_connect_to_dev()?;
 
-    let parent_node = device_watcher::recursive_wait_and_open_node(&dev, PARENT_DEV_PATH).await?;
-    let parent = frt::RebindParentProxy::new(parent_node.into_channel().unwrap());
+    let parent =
+        device_watcher::recursive_wait_and_open::<frt::RebindParentMarker>(&dev, PARENT_DEV_PATH)
+            .await?;
     parent.add_child().await?.map_err(|e| zx::Status::from_raw(e))?;
-    device_watcher::recursive_wait_and_open_node(&dev, CHILD_DEV_PATH).await?;
+    device_watcher::recursive_wait(&dev, CHILD_DEV_PATH).await?;
     parent.remove_child().await?.map_err(|e| zx::Status::from_raw(e))?;
     wait_for_path_to_not_exist(&dev, CHILD_DEV_PATH).await?;
     parent.add_child().await?.map_err(|e| zx::Status::from_raw(e))?;
-    device_watcher::recursive_wait_and_open_node(&dev, CHILD_DEV_PATH).await?;
+    device_watcher::recursive_wait(&dev, CHILD_DEV_PATH).await?;
     Ok(())
 }

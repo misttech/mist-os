@@ -9,7 +9,7 @@
 use {
     anyhow::{anyhow, Context as _, Result},
     async_trait::async_trait,
-    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_node},
+    device_watcher::{recursive_wait, recursive_wait_and_open},
     fidl_fuchsia_blackout_test::{ControllerRequest, ControllerRequestStream},
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_hardware_block::BlockMarker,
@@ -322,12 +322,9 @@ pub async fn find_partition(
                         ControllerMarker,
                     >(device_dir, ".")?;
                 fvm::bind_fvm_driver(&device_controller).await?;
-                recursive_wait_and_open_node(
-                    device_dir,
-                    &format!("/fvm/{}-p-1/block", partition_label),
-                )
-                .await
-                .context("recursive_wait on expected fvm path failed")?;
+                recursive_wait(device_dir, &format!("/fvm/{}-p-1/block", partition_label))
+                    .await
+                    .context("recursive_wait on expected fvm path failed")?;
             }
             Err(err) => return Err(err).context("failed to open fvm path"),
         }

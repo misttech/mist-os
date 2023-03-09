@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    fidl::endpoints::{Proxy, ServerEnd},
+    fidl::endpoints::ServerEnd,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -252,14 +252,10 @@ async fn load_package_firmware_test() -> Result<(), Error> {
         .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_device_manager::AdministratorMarker>()?;
 
     let out_dir = instance.root.get_exposed_dir();
-    let driver_service = device_watcher::recursive_wait_and_open_node(
-        &out_dir,
-        "dev/sys/test/ddk-firmware-test-device-0",
-    )
+    let driver_proxy = device_watcher::recursive_wait_and_open::<
+        fidl_fuchsia_device_firmware_test::TestDeviceMarker,
+    >(&out_dir, "dev/sys/test/ddk-firmware-test-device-0")
     .await?;
-    let driver_proxy = fidl_fuchsia_device_firmware_test::TestDeviceProxy::from_channel(
-        driver_service.into_channel().unwrap(),
-    );
 
     // Check that we can load firmware out of /boot.
     driver_proxy.load_firmware("test-firmware").await?.unwrap();
@@ -297,12 +293,10 @@ async fn load_package_firmware_test_dfv2() -> Result<(), Error> {
 
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let driver_service =
-        device_watcher::recursive_wait_and_open_node(&dev, "sys/test/ddk-firmware-test-device-0")
-            .await?;
-    let driver_proxy = fidl_fuchsia_device_firmware_test::TestDeviceProxy::from_channel(
-        driver_service.into_channel().unwrap(),
-    );
+    let driver_proxy = device_watcher::recursive_wait_and_open::<
+        fidl_fuchsia_device_firmware_test::TestDeviceMarker,
+    >(&dev, "sys/test/ddk-firmware-test-device-0")
+    .await?;
 
     // Check that we can load firmware from our package.
     driver_proxy.load_firmware("test-firmware").await?.unwrap();

@@ -7,7 +7,6 @@ use {
     anyhow::Error,
     anyhow::Result,
     diagnostics_reader::{assert_data_tree, ArchiveReader, DiagnosticsHierarchy, Inspect},
-    fidl::endpoints::Proxy,
     fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
     fuchsia_component_test::RealmBuilder,
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -41,7 +40,10 @@ async fn test_driver_inspect() -> Result<()> {
 
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-driver").await?;
+    let driver = device_watcher::recursive_wait_and_open::<
+        fidl_fuchsia_inspect_test::HandshakeMarker,
+    >(&dev, "sys/test/root-driver")
+    .await?;
 
     let moniker = format!(
         "realm_builder\\:{}/driver_test_realm/realm_builder\\:0/boot-drivers\\:dev.sys.test",
@@ -56,7 +58,6 @@ async fn test_driver_inspect() -> Result<()> {
     });
 
     // Do the request and check the inspect metrics again.
-    let driver = fidl_fuchsia_inspect_test::HandshakeProxy::new(node.into_channel().unwrap());
     driver.r#do().await.unwrap();
 
     hierarchy = get_inspect_hierarchy(moniker).await?;

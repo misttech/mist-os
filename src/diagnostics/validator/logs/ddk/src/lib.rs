@@ -5,7 +5,7 @@
 use anyhow::Error;
 use diagnostics_log_encoding::{Argument, Record, Severity, Value};
 use diagnostics_reader::{ArchiveReader, Logs, SubscriptionResultsStream};
-use fidl_fuchsia_device::ControllerProxy;
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_validate_logs::{LogSinkPuppetProxy, PuppetInfo, RecordSpec};
 use fuchsia_async::Task;
 use futures::StreamExt;
@@ -173,7 +173,6 @@ mod tests {
     use super::*;
 
     use {
-        fidl::endpoints::Proxy,
         fidl_fuchsia_driver_test as fdt,
         fuchsia_component_test::RealmBuilder,
         fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -187,18 +186,17 @@ mod tests {
         realm.driver_test_realm_start(fdt::RealmArgs::EMPTY).await.unwrap();
         let out_dir = realm.driver_test_realm_connect_to_dev().unwrap();
 
-        let driver_service =
-            device_watcher::recursive_wait_and_open_node(&out_dir, "sys/test/virtual-logsink")
-                .await
-                .unwrap();
-        let driver_proxy = fidl_fuchsia_validate_logs::LogSinkPuppetProxy::from_channel(
-            driver_service.into_channel().unwrap(),
-        );
-        let driver_service =
-            device_watcher::recursive_wait_and_open_node(&out_dir, "sys/test/virtual-logsink")
-                .await
-                .unwrap();
-        let device_proxy = ControllerProxy::from_channel(driver_service.into_channel().unwrap());
+        let driver_proxy = device_watcher::recursive_wait_and_open::<
+            fidl_fuchsia_validate_logs::LogSinkPuppetMarker,
+        >(&out_dir, "sys/test/virtual-logsink")
+        .await
+        .unwrap();
+        let device_proxy = device_watcher::recursive_wait_and_open::<ControllerMarker>(
+            &out_dir,
+            "sys/test/virtual-logsink",
+        )
+        .await
+        .unwrap();
         let mut puppet = Puppet::launch(driver_proxy, device_proxy).await.unwrap();
         puppet.test().await.unwrap();
     }

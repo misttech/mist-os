@@ -4,7 +4,7 @@
 
 use {
     blackout_target::{find_partition, set_up_partition},
-    device_watcher::recursive_wait_and_open_node,
+    device_watcher::recursive_wait,
     fuchsia_async as fasync,
     ramdevice_client::RamdiskClient,
     storage_isolated_driver_manager::fvm,
@@ -32,12 +32,9 @@ async fn setup_then_find_no_path() {
         )
         .await
         .expect("failed to create fvm volume");
-        recursive_wait_and_open_node(
-            ramdisk.as_dir().expect("invalid directory proxy"),
-            "/fvm/blobfs-p-1/block",
-        )
-        .await
-        .expect("failed to wait for device");
+        recursive_wait(ramdisk.as_dir().expect("invalid directory proxy"), "/fvm/blobfs-p-1/block")
+            .await
+            .expect("failed to wait for device");
     }
 
     let setup_controller =

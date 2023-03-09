@@ -25,7 +25,5 @@ async fn test_init() {
     instance.driver_test_realm_start(args).await.expect("Starting DriverTestRealm");
 
     let dev = instance.driver_test_realm_connect_to_dev().expect("Connecting to devfs");
-    let _node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root/child")
-        .await
-        .expect("Opening node");
+    device_watcher::recursive_wait(&dev, "sys/test/root/child").await.expect("Opening node");
 }

@@ -50,8 +50,8 @@ async fn wait_for_ramdisk() -> Result<(), Error> {
         syslog::fx_log_info!("{} doesn't exist. Assuming none ext4 test", FACTORY_DEVICE_CONFIG);
         return Ok(());
     }
-    let dev = fuchsia_fs::directory::open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE)?;
-    device_watcher::recursive_wait_and_open_node(&dev, RAMDISK_DEV_BLOCK_PATH).await?;
+    let dev = fuchsia_fs::directory::open_in_namespace("/dev", fio::OpenFlags::empty())?;
+    device_watcher::recursive_wait(&dev, RAMDISK_DEV_BLOCK_PATH).await?;
     Ok(())
 }
 

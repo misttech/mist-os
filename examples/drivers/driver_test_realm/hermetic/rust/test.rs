@@ -4,7 +4,6 @@
 
 use {
     anyhow::Result,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
     fuchsia_component_test::RealmBuilder,
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -23,16 +22,18 @@ async fn test_sample_driver() -> Result<()> {
 
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/sample_driver").await?;
-
-    // Turn the Node connection into the driver's FIDL.
-    let driver = fidl_fuchsia_hardware_sample::EchoProxy::new(node.into_channel().unwrap());
+    let driver =
+        device_watcher::recursive_wait_and_open::<fidl_fuchsia_hardware_sample::EchoMarker>(
+            &dev,
+            "sys/test/sample_driver",
+        )
+        .await?;
 
     // Call a FIDL method on the driver.
     let response = driver.echo_string("Hello world!").await.unwrap();
 
     // Verify the response.
-    assert!(response == "Hello world!");
+    assert_eq!(response, "Hello world!");
     Ok(())
 }
 
@@ -51,7 +52,7 @@ async fn test_platform_bus() -> Result<()> {
     instance.driver_test_realm_start(args).await?;
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    device_watcher::recursive_wait_and_open_node(&dev, "sys/platform").await?;
+    device_watcher::recursive_wait(&dev, "sys/platform").await?;
     Ok(())
 }
 // [END example]

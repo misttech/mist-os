@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
-    fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
+    fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
     fidl_fuchsia_io::{self as fio, DirectoryMarker, OpenFlags},
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fs_management::{
@@ -143,18 +143,17 @@ async fn wipe_storage(
     tracing::info!("Binding and waiting for FVM driver.");
     fvm_proxy.bind(constants::FVM_DRIVER_PATH).await?.map_err(zx::Status::from_raw)?;
 
-    let fvm_dir = fuchsia_fs::directory::open_in_namespace(&fvm_path, OpenFlags::RIGHT_READABLE)
+    let fvm_dir = fuchsia_fs::directory::open_in_namespace(&fvm_path, OpenFlags::empty())
         .context("Failed to open the fvm directory")?;
 
-    let fvm_device = device_watcher::recursive_wait_and_open_node(&fvm_dir, "fvm")
-        .await
-        .context("waiting for FVM driver")?;
+    let fvm_volume_manager_proxy =
+        device_watcher::recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "fvm")
+            .await
+            .context("waiting for FVM driver")?;
 
     tracing::info!("Allocating new partitions");
     // Volumes will be dynamically resized.
     const INITIAL_SLICE_COUNT: u64 = 1;
-
-    let fvm_volume_manager_proxy = VolumeManagerProxy::new(fvm_device.into_channel().unwrap());
 
     // Generate FVM layouts and new GUIDs for the blob/data volumes.
     let blobfs_path = fvm_allocate_partition(

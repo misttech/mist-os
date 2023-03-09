@@ -97,7 +97,7 @@ async fn test_pkg_dir() -> Result<()> {
     assert!(info.iter().any(|d| d.url == Some("fuchsia-boot:///#meta/test.cm".to_string())));
 
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    device_watcher::recursive_wait_and_open_node(&dev, "sys/test/test").await?;
+    device_watcher::recursive_wait(&dev, "sys/test/test").await?;
 
     Ok(())
 }
@@ -116,7 +116,7 @@ async fn test_root_driver() -> Result<()> {
     instance.driver_test_realm_start(args).await?;
 
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    device_watcher::recursive_wait_and_open_node(&dev, "sys/platform").await?;
+    device_watcher::recursive_wait(&dev, "sys/platform").await?;
 
     Ok(())
 }

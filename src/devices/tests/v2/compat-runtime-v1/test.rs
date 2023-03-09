@@ -4,7 +4,6 @@
 
 use {
     anyhow::Result,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
     fuchsia_component_test::RealmBuilder,
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -27,8 +26,12 @@ async fn test_sample_driver() -> Result<()> {
 
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root/leaf").await?;
-    let driver = fidl_fuchsia_compat_runtime::LeafProxy::new(node.into_channel().unwrap());
+    let driver =
+        device_watcher::recursive_wait_and_open::<fidl_fuchsia_compat_runtime::LeafMarker>(
+            &dev,
+            "sys/test/root/leaf",
+        )
+        .await?;
     let response = driver.get_string().await.unwrap();
     assert_eq!(response, "hello world!");
     Ok(())

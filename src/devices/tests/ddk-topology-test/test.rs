@@ -28,20 +28,11 @@ async fn do_test(dfv2: bool) -> Result<(), Error> {
 
     let dev = instance.driver_test_realm_connect_to_dev()?;
     println!("dfv2: {}, wait for grandparent", dfv2);
-    let _node =
-        device_watcher::recursive_wait_and_open_node(&dev, "sys/test/topology-grandparent").await;
+    device_watcher::recursive_wait(&dev, "sys/test/topology-grandparent").await?;
     println!("dfv2: {}, wait for child 1", dfv2);
-    let _node = device_watcher::recursive_wait_and_open_node(
-        &dev,
-        "sys/test/topology-grandparent/parent1/child",
-    )
-    .await;
+    device_watcher::recursive_wait(&dev, "sys/test/topology-grandparent/parent1/child").await?;
     println!("dfv2: {}, wait for child 2", dfv2);
-    let _node = device_watcher::recursive_wait_and_open_node(
-        &dev,
-        "sys/test/topology-grandparent/parent2/child",
-    )
-    .await;
+    device_watcher::recursive_wait(&dev, "sys/test/topology-grandparent/parent2/child").await?;
     println!("dfv2: {}, all done!", dfv2);
 
     Ok(())

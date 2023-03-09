@@ -90,7 +90,6 @@ rustc_test("rebind_test") {
     "//sdk/lib/device-watcher/rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",

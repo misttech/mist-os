@@ -4,7 +4,6 @@
 
 use {
     anyhow::Result,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_lifecycle_test as ft, fuchsia_async as fasync,
     fuchsia_component_test::RealmBuilder,
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -22,9 +21,11 @@ async fn test_devfs_exporter() -> Result<()> {
     instance.driver_test_realm_start(args).await?;
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root/lifecycle-device")
-        .await?;
-    let device = ft::DeviceProxy::new(node.into_channel().unwrap());
+    let device = device_watcher::recursive_wait_and_open::<ft::DeviceMarker>(
+        &dev,
+        "sys/test/root/lifecycle-device",
+    )
+    .await?;
     device.ping().await?;
 
     let response = device.get_string().await.unwrap();
