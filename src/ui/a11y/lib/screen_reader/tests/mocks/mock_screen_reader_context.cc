@@ -14,7 +14,7 @@ fpromise::promise<> MockScreenReaderContext::MockSpeaker::SpeakNodePromise(
   received_speak_ = true;
   speak_node_ids_.push_back(node->node_id());
   speak_node_options_.push_back(options);
-  speak_node_message_contexts_.push_back(message_context);
+  speak_node_message_contexts_.push_back(std::move(message_context));
   return fpromise::make_ok_promise();
 }
 

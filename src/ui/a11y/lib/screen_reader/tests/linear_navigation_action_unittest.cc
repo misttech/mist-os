@@ -357,7 +357,7 @@ TEST_F(LinearNavigationActionTest, NextActionEntersTable) {
       mock_speaker()->speak_node_message_contexts()[0].changed_table_cell_context->column_header,
       "column 1 header");
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers.size(), 1u);
-  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers[0]->node_id(), 2u);
+  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers[0].node_id(), 2u);
   ASSERT_TRUE(mock_speaker()->speak_node_message_contexts()[0].exited_containers.empty());
 
   // Navigate to the next table cell.
@@ -438,7 +438,7 @@ TEST_F(LinearNavigationActionTest, PreviousActionExitsTable) {
   EXPECT_EQ(mock_speaker()->speak_node_ids()[0], 1u);
   ASSERT_TRUE(mock_speaker()->speak_node_message_contexts()[0].entered_containers.empty());
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers.size(), 1u);
-  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers[0]->node_id(), 2u);
+  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers[0].node_id(), 2u);
 }
 
 TEST_F(LinearNavigationActionTest, NextActionEntersNestedTable) {
@@ -508,7 +508,7 @@ TEST_F(LinearNavigationActionTest, NextActionEntersNestedTable) {
   EXPECT_EQ(mock_speaker()->speak_node_ids().size(), 1u);
   EXPECT_EQ(mock_speaker()->speak_node_ids()[0], 5u);
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers.size(), 1u);
-  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers[0]->node_id(), 4u);
+  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers[0].node_id(), 4u);
   ASSERT_TRUE(mock_speaker()->speak_node_message_contexts()[0].exited_containers.empty());
 }
 
@@ -580,7 +580,7 @@ TEST_F(LinearNavigationActionTest, PreviousActionExitsNestedTable) {
   EXPECT_EQ(mock_speaker()->speak_node_ids()[0], 3u);
   ASSERT_TRUE(mock_speaker()->speak_node_message_contexts()[0].entered_containers.empty());
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers.size(), 1u);
-  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers[0]->node_id(), 4u);
+  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers[0].node_id(), 4u);
 }
 
 TEST_F(LinearNavigationActionTest, NextActionEntersList) {
@@ -640,7 +640,7 @@ TEST_F(LinearNavigationActionTest, NextActionEntersList) {
   EXPECT_EQ(mock_speaker()->speak_node_ids()[0], 4u);
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts().size(), 1u);
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers.size(), 1u);
-  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers[0]->node_id(), 2u);
+  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].entered_containers[0].node_id(), 2u);
   ASSERT_TRUE(mock_speaker()->speak_node_message_contexts()[0].exited_containers.empty());
 }
 
@@ -705,7 +705,7 @@ TEST_F(LinearNavigationActionTest, NextActionExitsList) {
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts().size(), 1u);
   ASSERT_TRUE(mock_speaker()->speak_node_message_contexts()[0].entered_containers.empty());
   ASSERT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers.size(), 1u);
-  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers[0]->node_id(), 2u);
+  EXPECT_EQ(mock_speaker()->speak_node_message_contexts()[0].exited_containers[0].node_id(), 2u);
 }
 
 }  // namespace

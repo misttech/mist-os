@@ -212,9 +212,16 @@ ScreenReaderMessageGenerator::ScreenReaderMessageContext ScreenReaderAction::Get
     // (At time of writing, we clear the old navigation context when changing views anyway:
     // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/a11y/lib/screen_reader/screen_reader_action.cc;drc=183bd4d4b67728b9220a8bb5ee68acdf0d5deb43;l=129-135)
     while (previous_containers_iter < old_navigation_context.containers.end()) {
-      exited_containers.push_back(action_context_->semantics_source->GetSemanticNode(
-          *old_navigation_context.view_ref_koid, previous_containers_iter->node_id));
+      auto* node = action_context_->semantics_source->GetSemanticNode(
+          *old_navigation_context.view_ref_koid, previous_containers_iter->node_id);
       previous_containers_iter++;
+
+      if (!node) {
+        continue;
+      }
+      fuchsia::accessibility::semantics::Node copy;
+      node->Clone(&copy);
+      exited_containers.push_back(std::move(copy));
     }
     // (Reversed to give 'deepest-first' order.)
     std::reverse(exited_containers.begin(), exited_containers.end());
@@ -222,9 +229,15 @@ ScreenReaderMessageGenerator::ScreenReaderMessageContext ScreenReaderAction::Get
 
   // Report the containers that were just entered.
   while (current_containers_iter < new_navigation_context.containers.end()) {
-    entered_containers.push_back(action_context_->semantics_source->GetSemanticNode(
-        *new_navigation_context.view_ref_koid, current_containers_iter->node_id));
+    auto* node = action_context_->semantics_source->GetSemanticNode(
+        *new_navigation_context.view_ref_koid, current_containers_iter->node_id);
     current_containers_iter++;
+    if (!node) {
+      continue;
+    }
+    fuchsia::accessibility::semantics::Node copy;
+    node->Clone(&copy);
+    entered_containers.push_back(std::move(copy));
   }
 
   // Report table-related changes, but only if the navigation ended directly inside a table

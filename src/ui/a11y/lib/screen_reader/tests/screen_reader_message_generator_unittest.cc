@@ -740,13 +740,15 @@ TEST_F(ScreenReaderMessageGeneratorTest, EnteredTable) {
   table.mutable_attributes()->mutable_table_attributes()->set_number_of_columns(3);
 
   a11y::ScreenReaderMessageGenerator::ScreenReaderMessageContext message_context;
-  message_context.entered_containers = {&table};
+  Node table_copy;
+  table.Clone(&table_copy);
+  message_context.entered_containers.push_back(std::move(table_copy));
 
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ENTERED_TABLE),
                                                "entered table");
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::TABLE_DIMENSIONS),
                                                "dimensions");
-  auto result = screen_reader_message_generator_->DescribeNode(&node, message_context);
+  auto result = screen_reader_message_generator_->DescribeNode(&node, std::move(message_context));
   ASSERT_EQ(result.size(), 4u);
   ASSERT_TRUE(result[0].utterance.has_message());
   EXPECT_EQ(result[0].utterance.message(), "entered table");
@@ -766,12 +768,13 @@ TEST_F(ScreenReaderMessageGeneratorTest, ExitedTable) {
   table.set_role(Role::TABLE);
 
   a11y::ScreenReaderMessageGenerator::ScreenReaderMessageContext message_context;
-  message_context.entered_containers = {};
-  message_context.exited_containers = {&table};
+  Node table_copy;
+  table.Clone(&table_copy);
+  message_context.exited_containers.push_back(std::move(table_copy));
 
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::EXITED_TABLE),
                                                "exited table");
-  auto result = screen_reader_message_generator_->DescribeNode(&node, message_context);
+  auto result = screen_reader_message_generator_->DescribeNode(&node, std::move(message_context));
   ASSERT_EQ(result.size(), 2u);
   ASSERT_TRUE(result[0].utterance.has_message());
   EXPECT_EQ(result[0].utterance.message(), "exited table");
@@ -790,11 +793,15 @@ TEST_F(ScreenReaderMessageGeneratorTest, ExitedNestedTables) {
   table_2.set_role(Role::TABLE);
 
   a11y::ScreenReaderMessageGenerator::ScreenReaderMessageContext message_context;
-  message_context.exited_containers = {&table, &table_2};
+  Node table_copy, table_copy_2;
+  table.Clone(&table_copy);
+  table_2.Clone(&table_copy_2);
+  message_context.exited_containers.push_back(std::move(table_copy));
+  message_context.exited_containers.push_back(std::move(table_copy_2));
 
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::EXITED_TABLE),
                                                "exited table");
-  auto result = screen_reader_message_generator_->DescribeNode(&node, message_context);
+  auto result = screen_reader_message_generator_->DescribeNode(&node, std::move(message_context));
   ASSERT_EQ(result.size(), 3u);
   ASSERT_TRUE(result[0].utterance.has_message());
   EXPECT_EQ(result[0].utterance.message(), "exited table");
@@ -813,11 +820,13 @@ TEST_F(ScreenReaderMessageGeneratorTest, EnteredList) {
   list.mutable_attributes()->set_label("list label");
 
   a11y::ScreenReaderMessageGenerator::ScreenReaderMessageContext message_context;
-  message_context.entered_containers = {&list};
+  Node list_copy;
+  list.Clone(&list_copy);
+  message_context.entered_containers.push_back(std::move(list_copy));
 
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ENTERED_LIST),
                                                "entered list");
-  auto result = screen_reader_message_generator_->DescribeNode(&node, message_context);
+  auto result = screen_reader_message_generator_->DescribeNode(&node, std::move(message_context));
   ASSERT_EQ(result.size(), 3u);
   ASSERT_TRUE(result[0].utterance.has_message());
   EXPECT_EQ(result[0].utterance.message(), "entered list");
@@ -837,11 +846,13 @@ TEST_F(ScreenReaderMessageGeneratorTest, EnteredListWithNumberOfItems) {
   list.mutable_attributes()->mutable_list_attributes()->set_size(3);
 
   a11y::ScreenReaderMessageGenerator::ScreenReaderMessageContext message_context;
-  message_context.entered_containers = {&list};
+  Node list_copy;
+  list.Clone(&list_copy);
+  message_context.entered_containers.push_back(std::move(list_copy));
 
   mock_message_formatter_ptr_->SetMessageForId(
       static_cast<uint64_t>(MessageIds::ENTERED_LIST_DETAIL), "entered list with N items");
-  auto result = screen_reader_message_generator_->DescribeNode(&node, message_context);
+  auto result = screen_reader_message_generator_->DescribeNode(&node, std::move(message_context));
   ASSERT_EQ(result.size(), 3u);
   ASSERT_TRUE(result[0].utterance.has_message());
   EXPECT_EQ(result[0].utterance.message(), "entered list with N items");
@@ -869,11 +880,13 @@ TEST_F(ScreenReaderMessageGeneratorTest, ExitedList) {
   list.mutable_attributes()->mutable_list_attributes()->set_size(3);
 
   a11y::ScreenReaderMessageGenerator::ScreenReaderMessageContext message_context;
-  message_context.exited_containers = {&list};
+  Node list_copy;
+  list.Clone(&list_copy);
+  message_context.exited_containers.push_back(std::move(list_copy));
 
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::EXITED_LIST),
                                                "exited list");
-  auto result = screen_reader_message_generator_->DescribeNode(&node, message_context);
+  auto result = screen_reader_message_generator_->DescribeNode(&node, std::move(message_context));
   ASSERT_EQ(result.size(), 2u);
   ASSERT_TRUE(result[0].utterance.has_message());
   EXPECT_EQ(result[0].utterance.message(), "exited list");
@@ -896,8 +909,10 @@ TEST_F(ScreenReaderMessageGeneratorTest, EnterAndExitListsAndTables) {
   exited_table.set_role(Role::TABLE);
 
   a11y::ScreenReaderMessageGenerator::ScreenReaderMessageContext message_context;
-  message_context.exited_containers = {&exited_list, &exited_table};
-  message_context.entered_containers = {&entered_list, &entered_table};
+  message_context.exited_containers.push_back(std::move(exited_list));
+  message_context.exited_containers.push_back(std::move(exited_table));
+  message_context.entered_containers.push_back(std::move(entered_list));
+  message_context.entered_containers.push_back(std::move(entered_table));
 
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ENTERED_LIST),
                                                "entered list");
@@ -907,7 +922,7 @@ TEST_F(ScreenReaderMessageGeneratorTest, EnterAndExitListsAndTables) {
                                                "entered table");
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::EXITED_TABLE),
                                                "exited table");
-  auto result = screen_reader_message_generator_->DescribeNode(&node, message_context);
+  auto result = screen_reader_message_generator_->DescribeNode(&node, std::move(message_context));
   ASSERT_EQ(result.size(), 5u);
   ASSERT_TRUE(result[0].utterance.has_message());
   EXPECT_EQ(result[0].utterance.message(), "exited list");

@@ -44,10 +44,10 @@ class ScreenReaderMessageGenerator {
   // required to describe the node.
   struct ScreenReaderMessageContext {
     // All containers from which we just exited, sorted 'deepest-last'.
-    std::vector<const fuchsia::accessibility::semantics::Node*> exited_containers;
+    std::vector<fuchsia::accessibility::semantics::Node> exited_containers;
 
     // All containers which we just entered, sorted 'deepest-first'.
-    std::vector<const fuchsia::accessibility::semantics::Node*> entered_containers;
+    std::vector<fuchsia::accessibility::semantics::Node> entered_containers;
 
     // If the focused node's nearest ancestor container is a table, this holds extra
     // information required to describe it. Only holds information that has changed since the
@@ -143,7 +143,7 @@ class ScreenReaderMessageGenerator {
   // The message will be:
   //
   // <label>, <row count> rows, <column count> columns, table
-  void DescribeTable(const fuchsia::accessibility::semantics::Node* node,
+  void DescribeTable(const fuchsia::accessibility::semantics::Node& node,
                      std::vector<UtteranceAndContext>& description);
 
   // Helper method to describe a node that represents a table cell.
@@ -171,7 +171,7 @@ class ScreenReaderMessageGenerator {
   //
   // Entered list with [0 items / 1 item / n items], <label>.
   // *If present.
-  void DescribeEnteredList(const fuchsia::accessibility::semantics::Node* node,
+  void DescribeEnteredList(const fuchsia::accessibility::semantics::Node& node,
                            std::vector<UtteranceAndContext>& description);
 
   // Add the node's label to its description, if present.

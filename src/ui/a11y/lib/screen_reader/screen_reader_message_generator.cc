@@ -122,20 +122,20 @@ void ScreenReaderMessageGenerator::DescribeContainerChanges(
     const ScreenReaderMessageContext& message_context,
     std::vector<UtteranceAndContext>& description) {
   // Give hints for exited containers.
-  for (auto container : message_context.exited_containers) {
-    if (container->has_role() && container->role() == Role::TABLE) {
+  for (auto& container : message_context.exited_containers) {
+    if (container.has_role() && container.role() == Role::TABLE) {
       description.emplace_back(GenerateUtteranceByMessageId(MessageIds::EXITED_TABLE));
-    } else if (container->has_role() && container->role() == Role::LIST) {
+    } else if (container.has_role() && container.role() == Role::LIST) {
       description.emplace_back(GenerateUtteranceByMessageId(MessageIds::EXITED_LIST));
     }
   }
 
   // Give hints for entered containers.
-  for (auto container : message_context.entered_containers) {
-    if (container->has_role() && container->role() == Role::TABLE) {
+  for (auto& container : message_context.entered_containers) {
+    if (container.has_role() && container.role() == Role::TABLE) {
       description.emplace_back(GenerateUtteranceByMessageId(MessageIds::ENTERED_TABLE));
       DescribeTable(container, description);
-    } else if (container->has_role() && container->role() == Role::LIST) {
+    } else if (container.has_role() && container.role() == Role::LIST) {
       DescribeEnteredList(container, description);
     }
   }
@@ -427,12 +427,12 @@ ScreenReaderMessageGenerator::DescribeListElementMarkerLabel(const std::string& 
 }
 
 void ScreenReaderMessageGenerator::DescribeTable(
-    const fuchsia::accessibility::semantics::Node* node,
+    const fuchsia::accessibility::semantics::Node& node,
     std::vector<UtteranceAndContext>& description) {
-  FX_DCHECK(node->has_role() && node->role() == fuchsia::accessibility::semantics::Role::TABLE);
+  FX_DCHECK(node.has_role() && node.role() == fuchsia::accessibility::semantics::Role::TABLE);
 
-  if (node->has_attributes()) {
-    const auto& attributes = node->attributes();
+  if (node.has_attributes()) {
+    const auto& attributes = node.attributes();
 
     // Add the table label to the description.
     std::string label;
@@ -595,24 +595,24 @@ void ScreenReaderMessageGenerator::DescribeRowOrColumnHeader(
 }
 
 void ScreenReaderMessageGenerator::DescribeEnteredList(
-    const fuchsia::accessibility::semantics::Node* node,
+    const fuchsia::accessibility::semantics::Node& node,
     std::vector<UtteranceAndContext>& description) {
-  FX_DCHECK(node->has_role() && node->role() == fuchsia::accessibility::semantics::Role::LIST);
+  FX_DCHECK(node.has_role() && node.role() == fuchsia::accessibility::semantics::Role::LIST);
 
-  if (node->has_attributes() && node->attributes().has_list_attributes() &&
-      node->attributes().list_attributes().has_size()) {
+  if (node.has_attributes() && node.attributes().has_list_attributes() &&
+      node.attributes().list_attributes().has_size()) {
     description.emplace_back(
         GenerateUtteranceByMessageId(MessageIds::ENTERED_LIST_DETAIL, zx::msec(0), {"num_items"},
-                                     {node->attributes().list_attributes().size()}));
+                                     {node.attributes().list_attributes().size()}));
   } else {
     description.emplace_back(GenerateUtteranceByMessageId(MessageIds::ENTERED_LIST));
   }
 
   // Add the list label to the description, if it's present.
-  if (node->has_attributes() && node->attributes().has_label() &&
-      !node->attributes().label().empty()) {
+  if (node.has_attributes() && node.attributes().has_label() &&
+      !node.attributes().label().empty()) {
     Utterance utterance;
-    utterance.set_message(node->attributes().label());
+    utterance.set_message(node.attributes().label());
     description.emplace_back(UtteranceAndContext{.utterance = std::move(utterance)});
   }
 }
