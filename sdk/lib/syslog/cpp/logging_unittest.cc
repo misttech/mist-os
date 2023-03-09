@@ -31,15 +31,9 @@
 #include <cinttypes>
 
 #include <rapidjson/document.h>
+#include <src/diagnostics/lib/cpp-log-tester/log_tester.h>
 
 #include "fuchsia/logger/cpp/fidl.h"
-#include "lib/fdio/directory.h"
-#include "lib/fidl/cpp/binding_set.h"
-#include "lib/zx/vmo.h"
-#include "src/diagnostics/lib/cpp-log-decoder/log_decoder.h"
-#include "src/lib/diagnostics/accessor2logger/log_message.h"
-#include "src/lib/fsl/vmo/sized_vmo.h"
-#include "src/lib/fsl/vmo/strings.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #endif
@@ -60,104 +54,7 @@ class LoggingFixture : public ::testing::Test {
 };
 
 using LoggingFixtureDeathTest = LoggingFixture;
-
 #ifdef __Fuchsia__
-class FakeLogSink : public fuchsia::logger::LogSink {
- public:
-  explicit FakeLogSink(async_dispatcher_t* dispatcher, zx::channel channel)
-      : dispatcher_(dispatcher) {
-    fidl::InterfaceRequest<fuchsia::logger::LogSink> request(std::move(channel));
-    bindings_.AddBinding(this, std::move(request), dispatcher);
-  }
-
-  /// Send this socket to be drained.
-  ///
-  /// See //zircon/system/ulib/syslog/include/lib/syslog/wire_format.h for what
-  /// is expected to be received over the socket.
-  void Connect(::zx::socket socket) override {
-    // Not supported by this test.
-    abort();
-  }
-
-  void WaitForInterestChange(WaitForInterestChangeCallback callback) override {
-    // Ignored.
-  }
-
-  struct Wait : async_wait_t {
-    FakeLogSink* this_ptr;
-    Wait* next = this;
-    Wait* prev = this;
-  };
-
-  std::string rust_decode_message_to_string(uint8_t* data, size_t len) {
-    auto raw_message = fuchsia_decode_log_message_to_json(data, len);
-    std::string ret = raw_message;
-    fuchsia_free_decoded_log_message(raw_message);
-    return ret;
-  }
-
-  void OnDataAvailable(zx_handle_t socket) {
-    constexpr size_t kSize = 65536;
-    std::unique_ptr<unsigned char[]> data = std::make_unique<unsigned char[]>(kSize);
-    size_t actual = 0;
-    zx_socket_read(socket, 0, data.get(), kSize, &actual);
-    std::string msg = rust_decode_message_to_string(data.get(), actual);
-    fsl::SizedVmo vmo;
-    fsl::VmoFromString(msg, &vmo);
-    fuchsia::diagnostics::FormattedContent content;
-    fuchsia::mem::Buffer buffer;
-    buffer.vmo = std::move(vmo.vmo());
-    buffer.size = msg.size();
-    content.set_json(std::move(buffer));
-    callback_.value()(std::move(content));
-  }
-
-  static void OnDataAvailable_C(async_dispatcher_t* dispatcher, async_wait_t* raw,
-                                zx_status_t status, const zx_packet_signal_t* signal) {
-    switch (status) {
-      case ZX_OK:
-        static_cast<Wait*>(raw)->this_ptr->OnDataAvailable(raw->object);
-        async_begin_wait(dispatcher, raw);
-        break;
-      case ZX_ERR_PEER_CLOSED:
-        zx_handle_close(raw->object);
-        break;
-    }
-  }
-
-  /// Send this socket to be drained, using the structured logs format.
-  ///
-  /// See //docs/reference/diagnostics/logs/encoding.md for what is expected to
-  /// be received over the socket.
-  void ConnectStructured(::zx::socket socket) override {
-    Wait* wait = new Wait();
-    waits_.push_back(wait);
-    wait->this_ptr = this;
-    wait->object = socket.release();
-    wait->handler = OnDataAvailable_C;
-    wait->options = 0;
-    wait->trigger = ZX_SOCKET_PEER_CLOSED | ZX_SOCKET_READABLE;
-    async_begin_wait(dispatcher_, wait);
-  }
-
-  void Collect(std::function<void(fuchsia::diagnostics::FormattedContent content)> callback) {
-    callback_ = std::move(callback);
-  }
-
-  ~FakeLogSink() {
-    for (auto& wait : waits_) {
-      async_cancel_wait(dispatcher_, wait);
-      delete wait;
-    }
-  }
-
- private:
-  std::vector<Wait*> waits_;
-  fidl::BindingSet<fuchsia::logger::LogSink> bindings_;
-  std::optional<std::function<void(fuchsia::diagnostics::FormattedContent content)>> callback_;
-  async_dispatcher_t* dispatcher_;
-};
-
 std::string SeverityToString(const int32_t severity) {
   if (severity == syslog::LOG_TRACE) {
     return "TRACE";
@@ -185,56 +82,49 @@ std::string Format(const fuchsia::logger::LogMessage& message) {
                            SeverityToString(message.severity).c_str(), message.msg.c_str());
 }
 
-static std::string RetrieveLogs(std::string guid, zx::channel remote) {
-  FX_LOGS(ERROR) << guid;
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  std::stringstream s;
-  bool in_log = true;
-  bool exit = false;
-  auto log_service = std::make_unique<FakeLogSink>(loop.dispatcher(), std::move(remote));
-  log_service->Collect([&](fuchsia::diagnostics::FormattedContent content) {
-    if (exit) {
-      return;
-    }
-    auto chunk_result =
-        diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content));
-    auto messages = chunk_result.take_value();  // throws exception if conversion fails.
-    for (auto& msg : messages) {
-      std::string formatted = Format(msg.value());
-      if (formatted.find(guid) != std::string::npos) {
-        if (in_log) {
-          exit = true;
-          loop.Quit();
-          return;
-        } else {
-          in_log = true;
-        }
-      }
-      if (in_log) {
-        s << formatted << std::endl;
-      }
-    }
-  });
-  loop.Run();
-  return s.str();
+static std::string RetrieveLogs(zx::channel channel) {
+  auto logs = log_tester::RetrieveLogsAsLogMessage(std::move(channel));
+  std::stringstream stream;
+  for (const auto& log : logs) {
+    stream << Format(log);
+  }
+  return stream.str();
+}
+#endif
+
+#ifdef __Fuchsia__
+using LogState = zx::channel;
+static LogState SetupLogs(LogSettings new_settings = LogSettings()) {
+  return log_tester::SetupFakeLog(new_settings);
+}
+
+static std::string ReadLogs(zx::channel& remote) { return RetrieveLogs(std::move(remote)); }
+#else
+
+struct TestLogState {
+  files::ScopedTempDir temp_dir;
+  std::string log_file;
+};
+
+using LogState = std::unique_ptr<TestLogState>;
+
+static LogState SetupLogs(LogSettings new_settings = LogSettings()) {
+  auto state = std::make_unique<TestLogState>();
+  state->temp_dir.NewTempFile(&new_settings.log_file);
+  state->log_file = new_settings.log_file;
+  SetLogSettings(new_settings);
+  return state;
+}
+
+static std::string ReadLogs(LogState& state) {
+  std::string log;
+  files::ReadFileToString(state->log_file, &log);
+  return log;
 }
 #endif
 
 TEST_F(LoggingFixture, Log) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs();
 
   int error_line = __LINE__ + 1;
   FX_LOGS(ERROR) << "something at error";
@@ -242,12 +132,7 @@ TEST_F(LoggingFixture, Log) {
   int info_line = __LINE__ + 1;
   FX_LOGS(INFO) << "and some other at info level";
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
+  std::string log = ReadLogs(state);
 
   EXPECT_THAT(log, testing::HasSubstr("ERROR: [sdk/lib/syslog/cpp/logging_unittest.cc(" +
                                       std::to_string(error_line) + ")] something at error"));
@@ -262,31 +147,13 @@ TEST_F(LoggingFixture, LogFirstN) {
   constexpr const char* kLogMessage = "Hello";
   static_assert(kCycles > kLimit);
 
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs();
 
   for (int i = 0; i < kCycles; ++i) {
     FX_LOGS_FIRST_N(ERROR, kLimit) << kLogMessage;
   }
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
+  std::string log = ReadLogs(state);
 
   int count = 0;
   size_t pos = 0;
@@ -298,20 +165,7 @@ TEST_F(LoggingFixture, LogFirstN) {
 }
 
 TEST_F(LoggingFixture, LogT) {
-  LogSettings new_settings;
-  new_settings.wait_for_initial_interest = false;
-  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs();
 
   int error_line = __LINE__ + 1;
   FX_LOGST(ERROR, "first") << "something at error";
@@ -319,12 +173,7 @@ TEST_F(LoggingFixture, LogT) {
   int info_line = __LINE__ + 1;
   FX_LOGST(INFO, "second") << "and some other at info level";
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
+  std::string log = ReadLogs(state);
 
   EXPECT_THAT(log, testing::HasSubstr("first] ERROR: [sdk/lib/syslog/cpp/logging_unittest.cc(" +
                                       std::to_string(error_line) + ")] something at error"));
@@ -338,29 +187,14 @@ TEST_F(LoggingFixture, VLogT) {
   LogSettings new_settings;
   new_settings.min_log_level = (LOG_INFO - 2);  // verbosity = 2
   new_settings.wait_for_initial_interest = false;
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings, {});
+  LogState state = SetupLogs(new_settings);
 
   int line = __LINE__ + 1;
   FX_VLOGST(1, "first") << "First message";
   FX_VLOGST(2, "second") << "ABCD";
   FX_VLOGST(3, "third") << "EFGH";
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
+  std::string log = ReadLogs(state);
   EXPECT_THAT(log, testing::HasSubstr("[first] VLOG(1): [logging_unittest.cc(" +
                                       std::to_string(line) + ")] First message"));
   EXPECT_THAT(log, testing::HasSubstr("second"));
@@ -378,17 +212,17 @@ TEST_F(LoggingFixture, VlogVerbosity) {
   EXPECT_EQ(0, GetVlogVerbosity());
 
   new_settings.min_log_level = LOG_INFO - 1;
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs(new_settings);
 
   EXPECT_EQ(1, GetVlogVerbosity());
 
   new_settings.min_log_level = LOG_INFO - 15;
-  SetLogSettings(new_settings);
+  state = SetupLogs(new_settings);
 
   EXPECT_EQ(15, GetVlogVerbosity());
 
   new_settings.min_log_level = LOG_DEBUG;
-  SetLogSettings(new_settings);
+  state = SetupLogs(new_settings);
 
   EXPECT_EQ(0, GetVlogVerbosity());
 }
@@ -397,27 +231,11 @@ TEST_F(LoggingFixture, DVLogNoMinLevel) {
   LogSettings new_settings;
   new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs(new_settings);
 
   FX_DVLOGS(1) << "hello";
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
-
+  std::string log = ReadLogs(state);
   EXPECT_EQ(log, "");
 }
 
@@ -426,27 +244,11 @@ TEST_F(LoggingFixture, DVLogWithMinLevel) {
   new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
   new_settings.min_log_level = (LOG_INFO - 1);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs(new_settings);
 
   FX_DVLOGS(1) << "hello";
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
-
+  std::string log = ReadLogs(state);
 #if defined(NDEBUG)
   EXPECT_EQ(log, "");
 #else
@@ -461,27 +263,12 @@ TEST_F(LoggingFixture, Plog) {
   LogSettings new_settings;
   new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  auto remote = log_tester::SetupFakeLog(new_settings);
 
   FX_PLOGS(ERROR, ZX_OK) << "should be ok";
   FX_PLOGS(ERROR, ZX_ERR_ACCESS_DENIED) << "got access denied";
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
+  std::string log = RetrieveLogs(std::move(remote));
 
   EXPECT_THAT(log, testing::HasSubstr("should be ok: 0 (ZX_OK)"));
   EXPECT_THAT(log, testing::HasSubstr("got access denied: -30 (ZX_ERR_ACCESS_DENIED)"));
@@ -491,17 +278,7 @@ TEST_F(LoggingFixture, PlogT) {
   LogSettings new_settings;
   new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  auto remote = log_tester::SetupFakeLog(new_settings);
 
   int line1 = __LINE__ + 1;
   FX_PLOGST(ERROR, "abcd", ZX_OK) << "should be ok";
@@ -509,12 +286,7 @@ TEST_F(LoggingFixture, PlogT) {
   int line2 = __LINE__ + 1;
   FX_PLOGST(ERROR, "qwerty", ZX_ERR_ACCESS_DENIED) << "got access denied";
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
+  std::string log = RetrieveLogs(std::move(remote));
 
   EXPECT_THAT(log, testing::HasSubstr("abcd] ERROR: [sdk/lib/syslog/cpp/logging_unittest.cc(" +
                                       std::to_string(line1) + ")] should be ok: 0 (ZX_OK)"));
@@ -528,17 +300,7 @@ TEST_F(LoggingFixture, SLog) {
   LogSettings new_settings;
   new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs(new_settings);
   std::string log_id = uuid::Generate();
 
   int line1 = __LINE__ + 1;
@@ -559,12 +321,7 @@ TEST_F(LoggingFixture, SLog) {
   int line7 = __LINE__ + 1;
   FX_SLOG(ERROR, "String with quotes", "value", "char is '\"'");
 
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
+  std::string log = ReadLogs(state);
   EXPECT_THAT(
       log, testing::HasSubstr("ERROR: [" + std::string("sdk/lib/syslog/cpp/logging_unittest.cc") +
                               "(" + std::to_string(line1) + ")] some_msg=\"String log\""));
@@ -590,17 +347,8 @@ TEST_F(LoggingFixture, BackendDirect) {
   LogSettings new_settings;
   new_settings.wait_for_initial_interest = false;
   EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
-  files::ScopedTempDir temp_dir;
-  ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
-  SetLogSettings(new_settings);
+  LogState state = SetupLogs(new_settings);
+
   syslog_backend::LogBuffer buffer;
   syslog_backend::BeginRecord(&buffer, syslog::LOG_ERROR, "foo.cc", 42, "Log message", "condition");
   syslog_backend::WriteKeyValue(&buffer, "tag", "fake tag");
@@ -612,13 +360,8 @@ TEST_F(LoggingFixture, BackendDirect) {
   syslog_backend::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
   syslog_backend::EndRecord(&buffer);
   syslog_backend::FlushRecord(&buffer);
-#ifdef __Fuchsia__
-  std::string log = RetrieveLogs(guid, std::move(remote));
-#else
-  std::string log;
-  ASSERT_TRUE(files::ReadFileToString(new_settings.log_file, &log));
-#endif
 
+  std::string log = ReadLogs(state);
   EXPECT_THAT(log,
               testing::HasSubstr("ERROR: [foo.cc(42)] Check failed: condition. Log message\n"));
   EXPECT_THAT(log, testing::HasSubstr(
@@ -651,16 +394,8 @@ TEST(StructuredLogging, LOGS) {
 TEST(StructuredLogging, Remaining) {
   LogSettings new_settings;
   new_settings.wait_for_initial_interest = false;
-#ifdef __Fuchsia__
-  auto guid = uuid::Generate();
-  zx::channel local;
-  zx::channel remote;
-  zx::channel::create(0, &local, &remote);
-  new_settings.log_sink = local.release();
-#else
   files::ScopedTempDir temp_dir;
   ASSERT_TRUE(temp_dir.NewTempFile(&new_settings.log_file));
-#endif
   SetLogSettings(new_settings);
   syslog_backend::LogBuffer buffer;
   syslog_backend::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
