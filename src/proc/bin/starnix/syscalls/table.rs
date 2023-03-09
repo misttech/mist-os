@@ -108,6 +108,7 @@ pub fn dispatch_syscall(
         fsync[1],
         ftruncate[2],
         futex[6],
+        getcpu[2],
         getcwd[2],
         getdents64[3],
         #[cfg(target_arch = "x86_64")] getdents[3],

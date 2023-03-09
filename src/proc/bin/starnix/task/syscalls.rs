@@ -155,6 +155,18 @@ pub fn sys_execve(
     Ok(())
 }
 
+pub fn sys_getcpu(
+    current_task: &CurrentTask,
+    cpu_out: UserRef<u32>,
+    node_out: UserRef<u32>,
+) -> Result<(), Errno> {
+    // TODO(https://fxbug.dev/76948) make this a real implementation
+    let fake_cpu_and_node = std::u32::MAX;
+    current_task.mm.write_object(cpu_out, &fake_cpu_and_node)?;
+    current_task.mm.write_object(node_out, &fake_cpu_and_node)?;
+    Ok(())
+}
+
 pub fn sys_getpid(current_task: &CurrentTask) -> Result<pid_t, Errno> {
     Ok(current_task.get_pid())
 }
