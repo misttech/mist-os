@@ -166,12 +166,9 @@ class IntelI2cController : public IntelI2cControllerType,
   void SetAddressingMode(const uint32_t addr_mode_bit);
   void SetTargetAddress(const uint32_t addr_mode_bit, const uint32_t address);
 
-  uint32_t I2cImplGetBusBase();
-  uint32_t I2cImplGetBusCount();
-  zx_status_t I2cImplGetMaxTransferSize(const uint32_t bus_id, size_t* out_size);
-  zx_status_t I2cImplSetBitrate(const uint32_t bus_id, const uint32_t bitrate);
-  zx_status_t I2cImplTransact(const uint32_t bus_id, const i2c_impl_op_t* op_list,
-                              const size_t op_count);
+  zx_status_t I2cImplGetMaxTransferSize(size_t* out_size);
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count);
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();

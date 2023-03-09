@@ -94,14 +94,12 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   zx_status_t OnDisplaysChanged(added_display_info_t& info);
 
   // Required functions for I2cImpl
-  uint32_t I2cImplGetBusBase() { return 0; }
-  uint32_t I2cImplGetBusCount() { return 1; }
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
+  zx_status_t I2cImplGetMaxTransferSize(size_t* out_size) {
     *out_size = UINT32_MAX;
     return ZX_OK;
   }
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) { return ZX_OK; }  // no-op
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count);
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate) { return ZX_OK; }  // no-op
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count);
 
   // Attempt to turn off all connected displays, and disable clocks. This will
   // also stop vsync interrupts. This is aligned with the interface for

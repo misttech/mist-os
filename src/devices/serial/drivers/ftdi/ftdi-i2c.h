@@ -51,18 +51,15 @@ class FtdiI2c : public DeviceType, public ddk::I2cImplProtocol<FtdiI2c, ddk::bas
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease() { delete this; }
 
-  uint32_t I2cImplGetBusBase() { return 0; }
-  uint32_t I2cImplGetBusCount() { return 1; }
-
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
+  zx_status_t I2cImplGetMaxTransferSize(size_t* out_size) {
     *out_size = kFtdiI2cMaxTransferSize;
     return ZX_OK;
   }
 
   // Sets the bitrate for the i2c bus in KHz units.
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate) { return ZX_ERR_NOT_SUPPORTED; }
 
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count);
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count);
 
   zx_status_t Ping(uint8_t bus_address);
   zx_status_t Transact(uint8_t bus_address, std::vector<uint8_t> write_data,

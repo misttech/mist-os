@@ -43,15 +43,13 @@ class FakeI2cImpl : public DeviceType,
     auto impl = new FakeI2cImpl(parent, std::move(bytes.value()));
     return impl;
   }
-  uint32_t I2cImplGetBusBase() { return 0; }
-  uint32_t I2cImplGetBusCount() { return 1; }
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size) {
+  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size) {
     *out_size = 64;
     return ZX_OK;
   }
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) { return ZX_OK; }
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate) { return ZX_OK; }
 
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count) {
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

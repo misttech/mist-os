@@ -241,21 +241,17 @@ zx_status_t AmlI2c::SetClockDelay(zx_device_t* parent, const fdf::MmioBuffer& re
   return ZX_OK;
 }
 
-uint32_t AmlI2c::I2cImplGetBusCount() { return 1; }
-
-uint32_t AmlI2c::I2cImplGetBusBase() { return 0; }
-
-zx_status_t AmlI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
+zx_status_t AmlI2c::I2cImplGetMaxTransferSize(size_t* out_size) {
   *out_size = kMaxTransferSize;
   return ZX_OK;
 }
 
-zx_status_t AmlI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
+zx_status_t AmlI2c::I2cImplSetBitrate(uint32_t bitrate) {
   // TODO(hollande,voydanoff) implement this
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t AmlI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, size_t count) {
+zx_status_t AmlI2c::I2cImplTransact(const i2c_impl_op_t* rws, size_t count) {
   TRACE_DURATION("i2c", "aml-i2c Transact");
   for (size_t i = 0; i < count; ++i) {
     if (rws[i].data_size > kMaxTransferSize) {

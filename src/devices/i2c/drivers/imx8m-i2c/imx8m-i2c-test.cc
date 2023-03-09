@@ -139,16 +139,10 @@ TEST_F(Imx8mI2cTest, DdkLifecycle) {
   ASSERT_NO_FATAL_FAILURE(Destroy());
 }
 
-TEST_F(Imx8mI2cTest, I2cImplGetBusCount) {
-  ASSERT_NO_FATAL_FAILURE(CreateDut());
-  EXPECT_EQ(dut_->I2cImplGetBusCount(), 1);
-  ASSERT_NO_FATAL_FAILURE(Destroy());
-}
-
 TEST_F(Imx8mI2cTest, I2cImplGetMaxTransferSize) {
   ASSERT_NO_FATAL_FAILURE(CreateDut());
   size_t out_size;
-  ASSERT_OK(dut_->I2cImplGetMaxTransferSize(0, &out_size));
+  ASSERT_OK(dut_->I2cImplGetMaxTransferSize(&out_size));
   EXPECT_EQ(out_size, kMaxTransferSize);
   ASSERT_NO_FATAL_FAILURE(Destroy());
 }
@@ -179,7 +173,7 @@ TEST_F(Imx8mI2cTest, I2cImplTransact) {
     InjectInterrupt();
   });
 
-  ASSERT_OK(dut_->I2cImplTransact(0, &impl_op, 1));
+  ASSERT_OK(dut_->I2cImplTransact(&impl_op, 1));
 
   EXPECT_EQ(read_data, 0xbb);
 

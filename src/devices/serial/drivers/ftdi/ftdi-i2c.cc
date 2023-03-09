@@ -339,8 +339,7 @@ zx_status_t FtdiI2c::WriteTransactionEndToBuf(size_t index, std::vector<uint8_t>
   return ZX_OK;
 }
 
-zx_status_t FtdiI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list,
-                                     size_t op_count) {
+zx_status_t FtdiI2c::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
   zx_status_t status;
   std::vector<uint8_t> write_data(kFtdiI2cMaxTransferSize);
   std::vector<uint8_t> read_data(kFtdiI2cMaxTransferSize);

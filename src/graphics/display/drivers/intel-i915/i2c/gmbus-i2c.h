@@ -19,11 +19,9 @@ class GMBusI2c : public ddk::I2cImplProtocol<GMBusI2c> {
  public:
   GMBusI2c(DdiId ddi_id, registers::Platform platform, fdf::MmioBuffer* mmio_space);
 
-  uint32_t I2cImplGetBusBase() { return 0; }
-  uint32_t I2cImplGetBusCount() { return 1; }
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count);
+  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* ops, size_t count);
 
   ddk::I2cImplProtocolClient i2c() {
     const i2c_impl_protocol_t i2c{.ops = &i2c_impl_protocol_ops_, .ctx = this};

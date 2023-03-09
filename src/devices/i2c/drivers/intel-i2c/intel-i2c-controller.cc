@@ -239,7 +239,7 @@ void IntelI2cController::DdkInit(ddk::InitTxn txn) {
   txn.Reply(ZX_OK);
 }
 
-zx_status_t IntelI2cController::I2cImplTransact(const uint32_t bus_id, const i2c_impl_op_t* op_list,
+zx_status_t IntelI2cController::I2cImplTransact(const i2c_impl_op_t* op_list,
                                                 const size_t op_count) {
   if (op_count == 0) {
     return ZX_OK;
@@ -281,21 +281,12 @@ zx_status_t IntelI2cController::I2cImplTransact(const uint32_t bus_id, const i2c
   return status;
 }
 
-uint32_t IntelI2cController::I2cImplGetBusBase() {
-  auto result = acpi_->GetBusId();
-  if (result.ok() && result->is_ok()) {
-    return result->value()->bus_id;
-  }
-  return UINT32_MAX;
-}
-uint32_t IntelI2cController::I2cImplGetBusCount() { return 1; }
-
-zx_status_t IntelI2cController::I2cImplGetMaxTransferSize(const uint32_t bus_id, size_t* out_size) {
+zx_status_t IntelI2cController::I2cImplGetMaxTransferSize(size_t* out_size) {
   *out_size = MAX_TRANSFER_SIZE;
   return ZX_OK;
 }
 
-zx_status_t IntelI2cController::I2cImplSetBitrate(const uint32_t bus_id, const uint32_t bitrate) {
+zx_status_t IntelI2cController::I2cImplSetBitrate(const uint32_t bitrate) {
   // TODO: implement
   return ZX_ERR_NOT_SUPPORTED;
 }

@@ -26,23 +26,12 @@ type I2cImplOp = struct {
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 protocol I2cImpl {
-    /// First bus ID that this I2cImpl controls, zero-indexed.
-    GetBusBase() -> (struct {
-        base uint32;
-    });
-    /// Number of buses that this I2cImpl supports.
-    GetBusCount() -> (struct {
-        count uint32;
-    });
-    GetMaxTransferSize(struct {
-        bus_id uint32;
-    }) -> (struct {
+    GetMaxTransferSize() -> (struct {
         s zx.status;
         size uint64;
     });
     /// Sets the bitrate for the i2c bus in KHz units.
     SetBitrate(struct {
-        bus_id uint32;
         bitrate uint32;
     }) -> (struct {
         s zx.status;
@@ -51,7 +40,6 @@ protocol I2cImpl {
     /// |Transact| assumes that all ops length are not zero.
     /// |Transact| assumes that at least the last op has stop set to true.
     Transact(struct {
-        bus_id uint32;
         op vector<I2cImplOp>:MAX;
     }) -> (struct {
         status zx.status;

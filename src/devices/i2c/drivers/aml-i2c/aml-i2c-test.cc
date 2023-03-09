@@ -240,7 +240,7 @@ TEST_F(AmlI2cTest, SmallWrite) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_OK(i2c.Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -283,7 +283,7 @@ TEST_F(AmlI2cTest, BigWrite) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_OK(i2c.Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -345,7 +345,7 @@ TEST_F(AmlI2cTest, SmallRead) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_OK(i2c.Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -388,7 +388,7 @@ TEST_F(AmlI2cTest, BigRead) {
       .stop = true,
   };
 
-  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_OK(i2c.Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -444,7 +444,7 @@ TEST_F(AmlI2cTest, NoStopFlag) {
       .stop = false,
   };
 
-  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_OK(i2c.Transact(&op, 1));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 1);
@@ -469,7 +469,7 @@ TEST_F(AmlI2cTest, TransferError) {
 
   mmio()[kControlReg / sizeof(uint32_t)] = 1 << 3;
 
-  EXPECT_NOT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(&op, 1));
 }
 
 TEST_F(AmlI2cTest, ManyTransactions) {
@@ -526,7 +526,7 @@ TEST_F(AmlI2cTest, ManyTransactions) {
       },
   };
 
-  EXPECT_OK(i2c.Transact(0, ops, std::size(ops)));
+  EXPECT_OK(i2c.Transact(ops, std::size(ops)));
 
   const std::vector transfers = controller_->GetTransfers();
   ASSERT_EQ(transfers.size(), 4);
@@ -615,10 +615,10 @@ TEST_F(AmlI2cTest, TransactionTooBig) {
       .data_size = 512,
       .is_read = false,
   };
-  EXPECT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_OK(i2c.Transact(&op, 1));
 
   op.data_size = 513;
-  EXPECT_NOT_OK(i2c.Transact(0, &op, 1));
+  EXPECT_NOT_OK(i2c.Transact(&op, 1));
 }
 
 TEST_F(AmlI2cTest, Metadata) {

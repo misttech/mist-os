@@ -27,23 +27,21 @@ constexpr uint8_t kTestRead2 = 0x56;
 
 class FakeI2cImpl : public ddk::I2cImplProtocol<FakeI2cImpl> {
  public:
-  explicit FakeI2cImpl(std::function<zx_status_t(uint32_t, const i2c_impl_op_t*, size_t)> transact)
+  explicit FakeI2cImpl(std::function<zx_status_t(const i2c_impl_op_t*, size_t)> transact)
       : transact_(std::move(transact)) {}
   FakeI2cImpl()
-      : transact_([](uint32_t, const i2c_impl_op_t*, size_t) {
+      : transact_([](const i2c_impl_op_t*, size_t) {
           ADD_FATAL_FAILURE();
           return ZX_ERR_INTERNAL;
         }) {}
 
-  uint32_t I2cImplGetBusBase() { return 0; }
-  uint32_t I2cImplGetBusCount() { return 1; }
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size) {
+  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size) {
     *out_size = 1024;
     return ZX_OK;
   }
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count) {
-    return transact_(bus_id, op_list, op_count);
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
+    return transact_(op_list, op_count);
   }
 
   ddk::I2cImplProtocolClient GetClient() {
@@ -52,7 +50,7 @@ class FakeI2cImpl : public ddk::I2cImplProtocol<FakeI2cImpl> {
   }
 
  private:
-  std::function<zx_status_t(uint32_t, const i2c_impl_op_t*, size_t)> transact_;
+  std::function<zx_status_t(const i2c_impl_op_t*, size_t)> transact_;
 };
 
 class I2cChildTest : public zxtest::Test {
@@ -142,7 +140,7 @@ class I2cChildTest : public zxtest::Test {
 };
 
 TEST_F(I2cChildTest, Write3BytesOnce) {
-  FakeI2cImpl i2c([](uint32_t, const i2c_impl_op_t* op_list, size_t op_count) {
+  FakeI2cImpl i2c([](const i2c_impl_op_t* op_list, size_t op_count) {
     if (op_count != 1) {
       return ZX_ERR_INTERNAL;
     }
@@ -179,7 +177,7 @@ TEST_F(I2cChildTest, Write3BytesOnce) {
 }
 
 TEST_F(I2cChildTest, Read3BytesOnce) {
-  FakeI2cImpl i2c([](uint32_t, const i2c_impl_op_t* op_list, size_t op_count) {
+  FakeI2cImpl i2c([](const i2c_impl_op_t* op_list, size_t op_count) {
     if (op_count != 1) {
       return ZX_ERR_INTERNAL;
     }
@@ -217,7 +215,7 @@ TEST_F(I2cChildTest, Read3BytesOnce) {
 }
 
 TEST_F(I2cChildTest, Write1ByteOnceRead1Byte3Times) {
-  FakeI2cImpl i2c([](uint32_t, const i2c_impl_op_t* op_list, size_t op_count) {
+  FakeI2cImpl i2c([](const i2c_impl_op_t* op_list, size_t op_count) {
     if (op_count != 4) {
       return ZX_ERR_INTERNAL;
     }
@@ -276,7 +274,7 @@ TEST_F(I2cChildTest, Write1ByteOnceRead1Byte3Times) {
 }
 
 TEST_F(I2cChildTest, StopFlagPropagates) {
-  FakeI2cImpl i2c([](uint32_t, const i2c_impl_op_t* op_list, size_t op_count) {
+  FakeI2cImpl i2c([](const i2c_impl_op_t* op_list, size_t op_count) {
     if (op_count != 4) {
       return ZX_ERR_INTERNAL;
     }
@@ -426,7 +424,7 @@ TEST_F(I2cChildTest, GetEmptyNameTest) {
 }
 
 TEST_F(I2cChildTest, HugeTransfer) {
-  FakeI2cImpl i2c([](uint32_t, const i2c_impl_op_t* op_list, size_t op_count) {
+  FakeI2cImpl i2c([](const i2c_impl_op_t* op_list, size_t op_count) {
     for (size_t i = 0; i < op_count; i++) {
       cpp20::span data(op_list[i].data_buffer, op_list[i].data_size);
       if (op_list[i].is_read) {
@@ -467,31 +465,6 @@ TEST_F(I2cChildTest, HugeTransfer) {
   ASSERT_EQ(read->value()->read_data[0].count(), 1024);
   cpp20::span data(read->value()->read_data[0].data(), read->value()->read_data[0].count());
   EXPECT_TRUE(std::all_of(data.begin(), data.end(), [](uint8_t b) { return b == 'r'; }));
-}
-
-TEST_F(I2cChildTest, BusId) {
-  uint32_t actual_bus_id = 0;
-  FakeI2cImpl i2c([&actual_bus_id](uint32_t bus_id, const i2c_impl_op_t*, size_t) {
-    actual_bus_id = bus_id;
-    return ZX_OK;
-  });
-
-  auto client_wrap = GetI2cChildClient(i2c.GetClient(), "", 3);
-  ASSERT_TRUE(client_wrap.is_valid());
-
-  fidl::Arena arena;
-  auto read_transfer = fidl_i2c::wire::DataTransfer::WithReadSize(1);
-
-  auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 1);
-  transactions[0] =
-      fidl_i2c::wire::Transaction::Builder(arena).data_transfer(read_transfer).Build();
-
-  auto read = client_wrap->Transfer(transactions);
-
-  ASSERT_OK(read.status());
-  ASSERT_FALSE(read->is_error());
-
-  EXPECT_EQ(actual_bus_id, 0);
 }
 
 }  // namespace i2c

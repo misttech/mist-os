@@ -83,20 +83,12 @@ TEST(DwI2cTest, DdkLifecyle) {
   EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(dut_ptr->zxdev()));
 }
 
-TEST(DwI2cTest, I2cImplGetBusCount) {
-  DwI2cTester tester;
-  auto dut = tester.GetDUT();
-  ASSERT_OK(dut->Init());
-  EXPECT_EQ(dut->I2cImplGetBusCount(), 2, "");
-  tester.VerifyAll();
-}
-
 TEST(DwI2cTest, I2cImplGetMaxTransferSize) {
   DwI2cTester tester;
   auto dut = tester.GetDUT();
   ASSERT_OK(dut->Init());
   size_t out_size;
-  ASSERT_OK(dut->I2cImplGetMaxTransferSize(0, &out_size));
+  ASSERT_OK(dut->I2cImplGetMaxTransferSize(&out_size));
   EXPECT_TRUE(out_size == DwI2cTester::kBufferDepth);
   tester.VerifyAll();
 }

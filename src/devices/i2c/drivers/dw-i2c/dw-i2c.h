@@ -44,11 +44,9 @@ class DwI2c : public DeviceType, public ddk::I2cImplProtocol<DwI2c, ddk::base_pr
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
-  uint32_t I2cImplGetBusBase();
-  uint32_t I2cImplGetBusCount();
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count);
+  zx_status_t I2cImplGetMaxTransferSize(size_t* out_size);
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* ops, size_t count);
 
  private:
   static constexpr uint32_t kErrorSignal = ZX_USER_SIGNAL_0;

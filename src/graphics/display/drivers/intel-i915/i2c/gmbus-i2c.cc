@@ -148,17 +148,17 @@ bool GMBusI2c::SetDdcSegment(uint8_t segment_num) {
 }
 
 static constexpr size_t kMaxTransferSize = 255;
-zx_status_t GMBusI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size) {
+zx_status_t GMBusI2c::I2cImplGetMaxTransferSize(uint64_t* out_size) {
   *out_size = kMaxTransferSize;
   return ZX_OK;
 }
 
-zx_status_t GMBusI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
+zx_status_t GMBusI2c::I2cImplSetBitrate(uint32_t bitrate) {
   // no-op for now
   return ZX_OK;
 }
 
-zx_status_t GMBusI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t size) {
+zx_status_t GMBusI2c::I2cImplTransact(const i2c_impl_op_t* ops, size_t size) {
   ZX_ASSERT(gmbus_pin_pair_.has_value());
   ZX_ASSERT(gpio_port_.has_value());
 

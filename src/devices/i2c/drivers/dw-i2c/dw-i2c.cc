@@ -221,7 +221,7 @@ void DwI2c::SetOpsHelper(const i2c_impl_op_t* ops, size_t count) {
   rx_pending_ = 0;
 }
 
-zx_status_t DwI2c::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, size_t count) {
+zx_status_t DwI2c::I2cImplTransact(const i2c_impl_op_t* rws, size_t count) {
   for (uint32_t i = 0; i < count; ++i) {
     if (rws[i].data_size > kMaxTransfer) {
       return ZX_ERR_OUT_OF_RANGE;
@@ -574,18 +574,12 @@ int DwI2c::TestThread() {
 }
 #endif
 
-zx_status_t DwI2c::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
+zx_status_t DwI2c::I2cImplSetBitrate(uint32_t bitrate) {
   // TODO: currently supports FAST_MODE - 400kHz
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-uint32_t DwI2c::I2cImplGetBusBase() { return static_cast<uint32_t>(0); }
-// TODO(fxbug.dev/120971): This hack satisfies checks made by the I2C core driver, but it doesn't
-// matter here because bus ID values are ignored. Remove this when the core driver no longer checks
-// bus IDs.
-uint32_t DwI2c::I2cImplGetBusCount() { return 2; }
-
-zx_status_t DwI2c::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
+zx_status_t DwI2c::I2cImplGetMaxTransferSize(size_t* out_size) {
   *out_size = kMaxTransfer;
   return ZX_OK;
 }

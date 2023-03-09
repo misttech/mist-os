@@ -125,7 +125,7 @@ bool HdmiDisplay::Query() {
         .stop = 1,
     };
     registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
-    if (i2c().Transact(0, &op, 1) == ZX_OK) {
+    if (i2c().Transact(&op, 1) == ZX_OK) {
       zxlogf(TRACE, "Found a hdmi/dvi monitor");
       return true;
     }

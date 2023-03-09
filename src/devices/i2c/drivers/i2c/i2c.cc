@@ -39,7 +39,7 @@ zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   uint64_t max_transfer_size = 0;
-  if (zx_status_t status = i2c.GetMaxTransferSize(0, &max_transfer_size); status != ZX_OK) {
+  if (zx_status_t status = i2c.GetMaxTransferSize(&max_transfer_size); status != ZX_OK) {
     zxlogf(ERROR, "Failed to get max transfer size: %s", zx_status_get_string(status));
     return status;
   }
@@ -104,7 +104,7 @@ void I2cDevice::Transact(const uint16_t address, TransferRequestView request,
   }
   impl_ops_[transactions.count() - 1].stop = true;
 
-  zx_status_t status = i2c_.Transact(0, impl_ops_.data(), transactions.count());
+  zx_status_t status = i2c_.Transact(impl_ops_.data(), transactions.count());
   if (status == ZX_OK) {
     completer.ReplySuccess(
         fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_.data(), read_ops));

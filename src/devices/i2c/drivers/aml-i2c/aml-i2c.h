@@ -38,11 +38,9 @@ class AmlI2c : public DeviceType, public ddk::I2cImplProtocol<AmlI2c, ddk::base_
 
   void DdkRelease() { delete this; }
 
-  uint32_t I2cImplGetBusBase();
-  uint32_t I2cImplGetBusCount();
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* rws, size_t count);
+  zx_status_t I2cImplGetMaxTransferSize(uint64_t* out_size);
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* rws, size_t count);
 
  private:
   friend class AmlI2cTest;

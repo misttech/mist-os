@@ -364,17 +364,17 @@ zx_status_t DpAux::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const uint8_t* buf
 }
 
 static constexpr size_t kMaxTransferSize = 255;
-zx_status_t DpAux::I2cImplGetMaxTransferSize(uint32_t bus_id, uint64_t* out_size) {
+zx_status_t DpAux::I2cImplGetMaxTransferSize(uint64_t* out_size) {
   *out_size = kMaxTransferSize;
   return ZX_OK;
 }
 
-zx_status_t DpAux::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
+zx_status_t DpAux::I2cImplSetBitrate(uint32_t bitrate) {
   // no-op for now
   return ZX_OK;
 }
 
-zx_status_t DpAux::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* ops, size_t count) {
+zx_status_t DpAux::I2cImplTransact(const i2c_impl_op_t* ops, size_t count) {
   for (unsigned i = 0; i < count; i++) {
     if (ops[i].data_size > kMaxTransferSize) {
       return ZX_ERR_INVALID_ARGS;

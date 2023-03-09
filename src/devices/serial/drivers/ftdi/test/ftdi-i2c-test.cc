@@ -228,7 +228,7 @@ TEST_F(FtdiI2cTest, ReadTest) {
   op_list[1].data_buffer = &read_data;
   op_list[1].data_size = sizeof(read_data);
 
-  zx_status_t status = device.I2cImplTransact(0, op_list, 2);
+  zx_status_t status = device.I2cImplTransact(op_list, 2);
   ASSERT_OK(status);
   ASSERT_EQ(0xDE, read_data);
 }
@@ -258,7 +258,7 @@ TEST_F(FtdiI2cTest, NackReadTest) {
   op_list[1].data_buffer = &read_data;
   op_list[1].data_size = sizeof(read_data);
 
-  zx_status_t status = device.I2cImplTransact(0, op_list, 2);
+  zx_status_t status = device.I2cImplTransact(op_list, 2);
   ASSERT_EQ(ZX_ERR_INTERNAL, status);
 }
 

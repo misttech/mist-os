@@ -25,21 +25,16 @@ class TestI2cDevice : public DeviceType,
  public:
   static zx_status_t Create(zx_device_t* parent);
 
-  TestI2cDevice(zx_device_t* parent, uint32_t bus_base) : DeviceType(parent), bus_base_(bus_base) {}
+  explicit TestI2cDevice(zx_device_t* parent) : DeviceType(parent) {}
 
   zx_status_t Create(std::unique_ptr<TestI2cDevice>* out);
 
-  uint32_t I2cImplGetBusBase() { return bus_base_; }
-  uint32_t I2cImplGetBusCount();
-  zx_status_t I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size);
-  zx_status_t I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate);
-  zx_status_t I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list, size_t op_count);
+  zx_status_t I2cImplGetMaxTransferSize(size_t* out_size);
+  zx_status_t I2cImplSetBitrate(uint32_t bitrate);
+  zx_status_t I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count);
 
   // Methods required by the ddk mixins
   void DdkRelease();
-
- private:
-  const uint32_t bus_base_;
 };
 
 zx_status_t TestI2cDevice::Create(zx_device_t* parent) {
@@ -57,14 +52,7 @@ zx_status_t TestI2cDevice::Create(zx_device_t* parent) {
     return status;
   }
 
-  // TODO(fxbug.dev/120971): Remove this once bus ID fields are no longer needed.
-  uint32_t bus_base = 0;
-  if (sscanf(dev_info.name, "i2c-%u", &bus_base) != 1) {
-    zxlogf(ERROR, "Unexpected name format \"%s\"", dev_info.name);
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  auto dev = std::make_unique<TestI2cDevice>(parent, bus_base);
+  auto dev = std::make_unique<TestI2cDevice>(parent);
 
   zxlogf(INFO, "TestI2cDevice::Create: %s ", DRIVER_NAME);
 
@@ -81,18 +69,14 @@ zx_status_t TestI2cDevice::Create(zx_device_t* parent) {
 
 void TestI2cDevice::DdkRelease() { delete this; }
 
-uint32_t TestI2cDevice::I2cImplGetBusCount() { return 1; }
-zx_status_t TestI2cDevice::I2cImplGetMaxTransferSize(uint32_t bus_id, size_t* out_size) {
+zx_status_t TestI2cDevice::I2cImplGetMaxTransferSize(size_t* out_size) {
   *out_size = 1024;
   return ZX_OK;
 }
 
-zx_status_t TestI2cDevice::I2cImplSetBitrate(uint32_t bus_id, uint32_t bitrate) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
+zx_status_t TestI2cDevice::I2cImplSetBitrate(uint32_t bitrate) { return ZX_ERR_NOT_SUPPORTED; }
 
-zx_status_t TestI2cDevice::I2cImplTransact(uint32_t bus_id, const i2c_impl_op_t* op_list,
-                                           size_t op_count) {
+zx_status_t TestI2cDevice::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 

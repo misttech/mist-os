@@ -25,7 +25,7 @@ edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_
     ops[i].is_read = msgs[i].is_read;
     ops[i].stop = i == (count - 1);
   }
-  return i2c->Transact(0, ops, count) == ZX_OK;
+  return i2c->Transact(ops, count) == ZX_OK;
 };
 
 }  // namespace
