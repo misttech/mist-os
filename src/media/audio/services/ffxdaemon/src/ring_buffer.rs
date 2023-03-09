@@ -49,8 +49,8 @@ impl RingBuffer {
         let driver_bytes = ring_buffer_client
             .get_properties()
             .await?
-            .fifo_depth
-            .ok_or(anyhow::anyhow!("Internal delay unavailable"))?
+            .driver_transfer_bytes
+            .ok_or(anyhow::anyhow!("driver transfer bytes unavailable"))?
             as u64;
 
         let base_address = vmar_root_self()
