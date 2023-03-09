@@ -22,6 +22,8 @@ use tracing_subscriber::{
     Layer,
 };
 
+use crate::EnvironmentContext;
+
 const LOG_DIR: &str = "log.dir";
 const LOG_ROTATIONS: &str = "log.rotations";
 const LOG_ROTATE_SIZE: &str = "log.rotate_size";
@@ -45,9 +47,9 @@ fn generate_id() -> u64 {
     rand::thread_rng().gen::<u64>()
 }
 
-pub async fn log_file(name: &str, rotate: bool) -> Result<std::fs::File> {
-    let mut log_path: PathBuf = super::query(LOG_DIR).get().await?;
-    let log_rotations: Option<u64> = super::query(LOG_ROTATIONS).get().await?;
+pub async fn log_file(ctx: &EnvironmentContext, name: &str, rotate: bool) -> Result<std::fs::File> {
+    let mut log_path: PathBuf = ctx.query(LOG_DIR).get().await?;
+    let log_rotations: Option<u64> = ctx.query(LOG_ROTATIONS).get().await?;
     let log_rotations = log_rotations.unwrap_or(0);
     create_dir_all(&log_path)?;
     log_path.push(format!("{}.log", name));
@@ -55,7 +57,7 @@ pub async fn log_file(name: &str, rotate: bool) -> Result<std::fs::File> {
     if rotate && log_rotations > 0 {
         let mut rot_path = log_path.clone();
 
-        let log_rotate_size: Option<u64> = super::query(LOG_ROTATE_SIZE).get().await?;
+        let log_rotate_size: Option<u64> = ctx.query(LOG_ROTATE_SIZE).get().await?;
         if let Some(log_rotate_size) = log_rotate_size {
             // log.rotate_size was set. We only rotate if the current file is bigger than that size,
             // so open the current file and, if it's smaller than that size, return it.
@@ -140,12 +142,12 @@ pub async fn log_file(name: &str, rotate: bool) -> Result<std::fs::File> {
         .context("opening log file")
 }
 
-pub async fn is_enabled() -> bool {
-    super::query(LOG_ENABLED).get().await.unwrap_or(false)
+pub async fn is_enabled(ctx: &EnvironmentContext) -> bool {
+    ctx.query(LOG_ENABLED).get().await.unwrap_or(false)
 }
 
-async fn filter_level() -> LevelFilter {
-    super::query(LOG_LEVEL)
+async fn filter_level(ctx: &EnvironmentContext) -> LevelFilter {
+    ctx.query(LOG_LEVEL)
         .get::<String>()
         .await
         .ok()
@@ -156,16 +158,17 @@ async fn filter_level() -> LevelFilter {
         .unwrap_or(LevelFilter::INFO)
 }
 
-pub async fn init(log_to_stdio: bool, log_to_file: bool) -> Result<()> {
-    let file: Option<File> = if log_to_file && is_enabled().await {
-        Some(log_file(LOG_PREFIX, true).await?)
+pub async fn init(ctx: &EnvironmentContext, log_to_stdio: bool, log_to_file: bool) -> Result<()> {
+    let file: Option<File> = if log_to_file && is_enabled(ctx).await {
+        #[allow(deprecated)]
+        Some(log_file(ctx, LOG_PREFIX, true).await?)
     } else {
         None
     };
 
-    let level = filter_level().await;
+    let level = filter_level(ctx).await;
 
-    configure_subscribers(log_to_stdio, file, level).await;
+    configure_subscribers(ctx, log_to_stdio, file, level).await;
 
     Ok(())
 }
@@ -182,11 +185,11 @@ impl<S> tracing_subscriber::layer::Filter<S> for DisableableFilter {
     }
 }
 
-async fn target_levels() -> Vec<(String, LevelFilter)> {
+async fn target_levels(ctx: &EnvironmentContext) -> Vec<(String, LevelFilter)> {
     // Parse the targets from the config. Ideally we'd log errors, but since there might be no log
     // sink, filter out any unexpected values.
 
-    if let Ok(targets) = super::query(LOG_TARGET_LEVELS).get::<serde_json::Value>().await {
+    if let Ok(targets) = ctx.query(LOG_TARGET_LEVELS).get::<serde_json::Value>().await {
         if let serde_json::Value::Object(o) = targets {
             return o
                 .into_iter()
@@ -205,15 +208,20 @@ async fn target_levels() -> Vec<(String, LevelFilter)> {
     vec![]
 }
 
-async fn include_spans() -> bool {
-    super::query(LOG_INCLUDE_SPANS).get().await.unwrap_or(false)
+async fn include_spans(ctx: &EnvironmentContext) -> bool {
+    ctx.query(LOG_INCLUDE_SPANS).get().await.unwrap_or(false)
 }
 
-async fn configure_subscribers(stdio: bool, file: Option<File>, level: LevelFilter) {
+async fn configure_subscribers(
+    ctx: &EnvironmentContext,
+    stdio: bool,
+    file: Option<File>,
+    level: LevelFilter,
+) {
     let filter_targets =
-        filter::Targets::new().with_targets(target_levels().await).with_default(level);
+        filter::Targets::new().with_targets(target_levels(ctx).await).with_default(level);
 
-    let include_spans = include_spans().await;
+    let include_spans = include_spans(ctx).await;
     let stdio_layer = if stdio {
         let event_format = LogFormat::new(*LOGGING_ID, include_spans);
         let format = tracing_subscriber::fmt::layer()

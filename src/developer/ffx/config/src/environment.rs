@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{query, BuildOverride, ConfigLevel, ConfigMap};
+use crate::{
+    api::{value::ValueStrategy, ConfigError, ConfigValue},
+    BuildOverride, ConfigLevel, ConfigMap, ConfigQuery,
+};
 use anyhow::{bail, Context, Result};
 use errors::ffx_error;
 use fuchsia_lockfile::{Lockfile, LockfileCreateError};
@@ -171,7 +174,7 @@ impl EnvironmentContext {
             false
         } else {
             // note: double negative to turn this into an affirmative
-            !crate::get("ffx.analytics.disabled").await.unwrap_or(false)
+            !self.get("ffx.analytics.disabled").await.unwrap_or(false)
         }
     }
 
@@ -228,6 +231,53 @@ impl EnvironmentContext {
         }
     }
 
+    /// Creates a [`ConfigQuery`] against the global config cache and
+    /// this environment.
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// use ffx_config::ConfigLevel;
+    /// use ffx_config::BuildSelect;
+    /// use ffx_config::SelectMode;
+    ///
+    /// let ctx = EnvironmentContext::default();
+    /// let query = ctx.build()
+    ///     .name("testing")
+    ///     .level(Some(ConfigLevel::Build))
+    ///     .build(Some(BuildSelect::Path("/tmp/build.json")))
+    ///     .select(SelectMode::All);
+    /// let value = query.get().await?;
+    /// ```
+    pub fn build<'a>(&'a self) -> ConfigQuery<'a> {
+        ConfigQuery::default().context(Some(self))
+    }
+
+    /// Creates a [`ConfigQuery`] against the global config cache and this
+    /// environment, using the provided value converted in to a base query.
+    ///
+    /// Example:
+    ///
+    /// ```no_run
+    /// let ctx = EnvironmentContext::default();
+    /// ctx.query("a_key").get();
+    /// ctx.query(ffx_config::ConfigLevel::User).get();
+    /// ```
+    pub fn query<'a>(&'a self, with: impl Into<ConfigQuery<'a>>) -> ConfigQuery<'a> {
+        with.into().context(Some(self))
+    }
+
+    /// A shorthand for the very common case of querying a value from the global config
+    /// cache and this environment, using the provided value converted into a query.
+    pub async fn get<'a, T, U>(&'a self, with: U) -> std::result::Result<T, T::Error>
+    where
+        T: TryFrom<ConfigValue> + ValueStrategy,
+        <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
+        U: Into<ConfigQuery<'a>>,
+    {
+        self.query(with).get().await
+    }
+
     /// Find the appropriate sdk root for this invocation of ffx, looking at configuration
     /// values and the current environment context to determine the correct place to find it.
     pub async fn get_sdk_root(&self) -> Result<SdkRoot> {
@@ -236,18 +286,18 @@ impl EnvironmentContext {
         // Out of tree, we will always want to pull the config from the normal config path, which
         // we can defer to the SdkRoot's mechanisms for.
         let runtime_root: Option<PathBuf> =
-            query("sdk.root").build(Some(BuildOverride::NoBuild)).get().await.ok();
+            self.query("sdk.root").build(Some(BuildOverride::NoBuild)).get().await.ok();
 
         match (&self.kind, runtime_root) {
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
                 let manifest = build_dir.clone();
-                let module = query("sdk.module").get().await.ok();
+                let module = self.query("sdk.module").get().await.ok();
                 match module {
                     Some(module) => Ok(SdkRoot::Modular { manifest, module }),
                     None => Ok(SdkRoot::Full(manifest)),
                 }
             }
-            (_, runtime_root) => sdk_from_config(runtime_root.as_deref()).await,
+            (_, runtime_root) => self.sdk_from_config(runtime_root.as_deref()).await,
         }
     }
 
@@ -343,6 +393,42 @@ impl EnvironmentContext {
             Ok(None)
         }
     }
+
+    /// Gets the basic information about the sdk as configured, without diving deeper into the sdk's own configuration.
+    async fn sdk_from_config(&self, sdk_root: Option<&Path>) -> Result<SdkRoot> {
+        // All gets in this function should declare that they don't want the build directory searched, because
+        // if there is a build directory it *is* generally the sdk.
+        let manifest = match sdk_root {
+            Some(root) => root.to_owned(),
+            _ => {
+                let path = std::env::current_exe().map_err(|e| {
+                    errors::ffx_error!(
+                        "{}Error was: failed to get current ffx exe path for SDK root: {:?}",
+                        SDK_NOT_FOUND_HELP,
+                        e
+                    )
+                })?;
+
+                match find_sdk_root(&path) {
+                    Ok(Some(root)) => root,
+                    Ok(None) => {
+                        errors::ffx_bail!(
+                            "{}Could not find an SDK manifest in any parent of ffx's directory.",
+                            SDK_NOT_FOUND_HELP,
+                        );
+                    }
+                    Err(e) => {
+                        errors::ffx_bail!("{}Error was: {:?}", SDK_NOT_FOUND_HELP, e);
+                    }
+                }
+            }
+        };
+        let module = self.query("sdk.module").build(Some(BuildOverride::NoBuild)).get().await.ok();
+        match module {
+            Some(module) => Ok(SdkRoot::Modular { manifest, module }),
+            _ => Ok(SdkRoot::Full(manifest)),
+        }
+    }
 }
 
 fn find_sdk_root(start_path: &Path) -> Result<Option<PathBuf>> {
@@ -359,42 +445,6 @@ fn find_sdk_root(start_path: &Path) -> Result<Option<PathBuf>> {
         if SdkRoot::is_sdk_root(&path) {
             return Ok(Some(path));
         }
-    }
-}
-
-/// Gets the basic information about the sdk as configured, without diving deeper into the sdk's own configuration.
-async fn sdk_from_config(sdk_root: Option<&Path>) -> Result<SdkRoot> {
-    // All gets in this function should declare that they don't want the build directory searched, because
-    // if there is a build directory it *is* generally the sdk.
-    let manifest = match sdk_root {
-        Some(root) => root.to_owned(),
-        _ => {
-            let path = std::env::current_exe().map_err(|e| {
-                errors::ffx_error!(
-                    "{}Error was: failed to get current ffx exe path for SDK root: {:?}",
-                    SDK_NOT_FOUND_HELP,
-                    e
-                )
-            })?;
-
-            match find_sdk_root(&path) {
-                Ok(Some(root)) => root,
-                Ok(None) => {
-                    errors::ffx_bail!(
-                        "{}Could not find an SDK manifest in any parent of ffx's directory.",
-                        SDK_NOT_FOUND_HELP,
-                    );
-                }
-                Err(e) => {
-                    errors::ffx_bail!("{}Error was: {:?}", SDK_NOT_FOUND_HELP, e);
-                }
-            }
-        }
-    };
-    let module = query("sdk.module").build(Some(BuildOverride::NoBuild)).get().await.ok();
-    match module {
-        Some(module) => Ok(SdkRoot::Modular { manifest, module }),
-        _ => Ok(SdkRoot::Full(manifest)),
     }
 }
 

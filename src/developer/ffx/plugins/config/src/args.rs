@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use ffx_config::{api::query::SelectMode, ConfigLevel, ConfigQuery};
+use ffx_config::{api::query::SelectMode, ConfigLevel, ConfigQuery, EnvironmentContext};
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 
@@ -52,12 +52,13 @@ pub struct SetCommand {
 }
 
 impl SetCommand {
-    pub fn query<'a>(&'a self) -> ConfigQuery<'a> {
+    pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
         ConfigQuery::new(
             Some(self.name.as_str()),
             Some(self.level),
             self.build_dir.as_deref().map(|dir| dir.into()),
             SelectMode::default(),
+            Some(ctx),
         )
     }
 }
@@ -105,12 +106,13 @@ pub struct GetCommand {
 }
 
 impl GetCommand {
-    pub fn query<'a>(&'a self) -> ConfigQuery<'a> {
+    pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
         ConfigQuery::new(
             self.name.as_deref(),
             None,
             self.build_dir.as_deref().map(|dir| dir.into()),
             self.select,
+            Some(ctx),
         )
     }
 }
@@ -141,12 +143,13 @@ pub struct RemoveCommand {
 }
 
 impl RemoveCommand {
-    pub fn query<'a>(&'a self) -> ConfigQuery<'a> {
+    pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
         ConfigQuery::new(
             Some(self.name.as_str()),
             Some(self.level),
             self.build_dir.as_deref().map(|dir| dir.into()),
             SelectMode::default(),
+            Some(ctx),
         )
     }
 }
@@ -182,12 +185,13 @@ pub struct AddCommand {
 }
 
 impl AddCommand {
-    pub fn query<'a>(&'a self) -> ConfigQuery<'a> {
+    pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
         ConfigQuery::new(
             Some(self.name.as_str()),
             Some(self.level),
             self.build_dir.as_deref().map(|dir| dir.into()),
             SelectMode::default(),
+            Some(ctx),
         )
     }
 }

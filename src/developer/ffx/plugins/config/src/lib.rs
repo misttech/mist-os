@@ -5,8 +5,8 @@
 use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::{
-    api::ConfigError, get, print_config, set_metrics_status, show_metrics_status, BuildOverride,
-    ConfigLevel,
+    api::ConfigError, global_env_context, print_config, set_metrics_status, show_metrics_status,
+    BuildOverride, ConfigLevel, EnvironmentContext,
 };
 use ffx_config_plugin_args::{
     AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
@@ -21,13 +21,14 @@ use std::{
 
 #[ffx_plugin()]
 pub async fn exec_config(config: ConfigCommand) -> Result<()> {
+    let ctx = global_env_context().context("Global environment context")?;
     let writer = Box::new(std::io::stdout());
     match &config.sub {
-        SubCommand::Env(env) => exec_env(env, writer).await,
-        SubCommand::Get(get_cmd) => exec_get(get_cmd, writer).await,
-        SubCommand::Set(set_cmd) => exec_set(set_cmd).await,
-        SubCommand::Remove(remove_cmd) => exec_remove(remove_cmd).await,
-        SubCommand::Add(add_cmd) => exec_add(add_cmd).await,
+        SubCommand::Env(env) => exec_env(&ctx, env, writer).await,
+        SubCommand::Get(get_cmd) => exec_get(&ctx, get_cmd, writer).await,
+        SubCommand::Set(set_cmd) => exec_set(&ctx, set_cmd).await,
+        SubCommand::Remove(remove_cmd) => exec_remove(&ctx, remove_cmd).await,
+        SubCommand::Add(add_cmd) => exec_add(&ctx, add_cmd).await,
         SubCommand::Analytics(analytics_cmd) => exec_analytics(analytics_cmd).await,
     }
 }
@@ -62,46 +63,53 @@ fn output_array<W: Write + Sync>(
     }
 }
 
-async fn exec_get<W: Write + Sync>(get_cmd: &GetCommand, writer: W) -> Result<()> {
+async fn exec_get<W: Write + Sync>(
+    ctx: &EnvironmentContext,
+    get_cmd: &GetCommand,
+    writer: W,
+) -> Result<()> {
     match get_cmd.name.as_ref() {
         Some(_) => match get_cmd.process {
             MappingMode::Raw => {
-                let value: Option<Value> = get_cmd.query().get_raw().await?;
+                let value: Option<Value> = get_cmd.query(ctx).get_raw().await?;
                 output(writer, value)
             }
             MappingMode::Substitute => {
-                let value: std::result::Result<Vec<Value>, _> = get(get_cmd.query()).await;
+                let value: std::result::Result<Vec<Value>, _> = get_cmd.query(ctx).get().await;
                 output_array(writer, value)
             }
             MappingMode::File => {
-                let value = get_cmd.query().get_file().await?;
+                let value = get_cmd.query(ctx).get_file().await?;
                 output(writer, value)
             }
         },
         None => {
-            print_config(writer /*, get_cmd.query().get_build_dir().await.as_deref()*/).await
+            print_config(ctx, writer /*, get_cmd.query().get_build_dir().await.as_deref()*/).await
         }
     }
 }
 
-async fn exec_set(set_cmd: &SetCommand) -> Result<()> {
-    set_cmd.query().set(set_cmd.value.clone()).await
+async fn exec_set(ctx: &EnvironmentContext, set_cmd: &SetCommand) -> Result<()> {
+    set_cmd.query(ctx).set(set_cmd.value.clone()).await
 }
 
-async fn exec_remove(remove_cmd: &RemoveCommand) -> Result<()> {
-    remove_cmd.query().remove().await
+async fn exec_remove(ctx: &EnvironmentContext, remove_cmd: &RemoveCommand) -> Result<()> {
+    remove_cmd.query(ctx).remove().await
 }
 
-async fn exec_add(add_cmd: &AddCommand) -> Result<()> {
-    add_cmd.query().add(Value::String(format!("{}", add_cmd.value))).await
+async fn exec_add(ctx: &EnvironmentContext, add_cmd: &AddCommand) -> Result<()> {
+    add_cmd.query(ctx).add(Value::String(format!("{}", add_cmd.value))).await
 }
 
-async fn exec_env_set<W: Write + Sync>(mut writer: W, s: &EnvSetCommand) -> Result<()> {
+async fn exec_env_set<W: Write + Sync>(
+    env_context: &EnvironmentContext,
+    mut writer: W,
+    s: &EnvSetCommand,
+) -> Result<()> {
     let build_dir = match (s.level, s.build_dir.as_deref()) {
         (ConfigLevel::Build, Some(build_dir)) => Some(BuildOverride::Path(build_dir)),
         _ => None,
     };
-    let env_context = ffx_config::global_env_context().context("Discovering ffx context")?;
     let env_file = env_context.env_file_path().context("Getting ffx environment file path")?;
 
     if !env_file.exists() {
@@ -125,18 +133,19 @@ async fn exec_env_set<W: Write + Sync>(mut writer: W, s: &EnvSetCommand) -> Resu
     env.save().await
 }
 
-async fn exec_env<W: Write + Sync>(env_command: &EnvCommand, mut writer: W) -> Result<()> {
+async fn exec_env<W: Write + Sync>(
+    ctx: &EnvironmentContext,
+    env_command: &EnvCommand,
+    mut writer: W,
+) -> Result<()> {
     match &env_command.access {
         Some(a) => match a {
-            EnvAccessCommand::Set(s) => exec_env_set(writer, s).await,
+            EnvAccessCommand::Set(s) => exec_env_set(ctx, writer, s).await,
             EnvAccessCommand::Get(g) => {
                 writeln!(
                     writer,
                     "{}",
-                    &ffx_config::global_env()
-                        .await
-                        .context("Loading environment file")?
-                        .display(&g.level)
+                    &ctx.load().await.context("Loading environment file")?.display(&g.level)
                 )?;
                 Ok(())
             }
@@ -145,7 +154,7 @@ async fn exec_env<W: Write + Sync>(env_command: &EnvCommand, mut writer: W) -> R
             writeln!(
                 writer,
                 "{}",
-                &ffx_config::global_env().await.context("Loading environment file")?.display(&None)
+                &ctx.load().await.context("Loading environment file")?.display(&None)
             )?;
             Ok(())
         }
@@ -176,7 +185,7 @@ mod test {
         let writer = Vec::<u8>::new();
         let cmd =
             EnvSetCommand { file: "test.json".into(), level: ConfigLevel::User, build_dir: None };
-        exec_env_set(writer, &cmd).await?;
+        exec_env_set(&test_env.context, writer, &cmd).await?;
         assert_eq!(cmd.file, test_env.load().await.get_user().unwrap());
         Ok(())
     }

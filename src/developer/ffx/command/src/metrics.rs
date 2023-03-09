@@ -40,7 +40,7 @@ impl std::fmt::Display for CommandStats {
 
 impl MetricsSession {
     pub async fn start(context: &EnvironmentContext) -> Result<Self> {
-        let invoker = ffx_config::get("fuchsia.analytics.ffx_invoker").await.unwrap_or(None);
+        let invoker = context.get("fuchsia.analytics.ffx_invoker").await.unwrap_or(None);
         let build_info = context.build_info();
         let enabled = context.analytics_enabled().await;
 

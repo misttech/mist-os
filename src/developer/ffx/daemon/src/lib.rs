@@ -133,11 +133,11 @@ pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
     let mut stdout = Stdio::null();
     let mut stderr = Stdio::null();
 
-    if ffx_config::logging::is_enabled().await {
-        stdout = Stdio::from(ffx_config::logging::log_file(LOG_FILE_PREFIX, true).await?);
+    if ffx_config::logging::is_enabled(context).await {
+        stdout = Stdio::from(ffx_config::logging::log_file(context, LOG_FILE_PREFIX, true).await?);
         // Second argument is false, meaning don't perform log rotation. We rotated the logs once
         // for the call above, we shouldn't do it again.
-        stderr = Stdio::from(ffx_config::logging::log_file(LOG_FILE_PREFIX, false).await?);
+        stderr = Stdio::from(ffx_config::logging::log_file(context, LOG_FILE_PREFIX, false).await?);
     }
 
     cmd.stdin(Stdio::null()).stdout(stdout).stderr(stderr).env("RUST_BACKTRACE", "full");

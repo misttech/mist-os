@@ -255,7 +255,7 @@ impl Ffx {
 
         let target = match self.target().await? {
             Some(t) => {
-                if ffx_config::get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
+                if env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
                     Some(TargetKind::FastbootInline(t))
                 } else {
                     Some(TargetKind::Normal(t))

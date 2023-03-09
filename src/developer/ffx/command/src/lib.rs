@@ -68,7 +68,7 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     let tool = tools.try_from_args(&cmd).await?;
 
     let log_to_stdio = tool.as_ref().map(|tool| tool.forces_stdout_log()).unwrap_or(false);
-    ffx_config::logging::init(log_to_stdio || app.verbose, !log_to_stdio).await?;
+    ffx_config::logging::init(&context, log_to_stdio || app.verbose, !log_to_stdio).await?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
 
     // Since this is invoking the config, this must be run _after_ ffx_config::init.

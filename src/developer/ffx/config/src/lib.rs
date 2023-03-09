@@ -128,8 +128,8 @@ where
     query(with).get().await
 }
 
-pub async fn print_config<W: Write>(mut writer: W) -> Result<()> {
-    let config = load_config(global_env().await?, None).await?;
+pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
+    let config = load_config(ctx.load().await?, None).await?;
     let read_guard = config.read().await;
     writeln!(writer, "{}", *read_guard).context("displaying config")
 }
@@ -337,19 +337,21 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_config_backed_attribute() {
-        let _env = ffx_config::test_init().await.expect("create test config");
+        let env = ffx_config::test_init().await.expect("create test config");
         let mut empty_config_struct = TestConfigBackedStruct::default();
         assert!(empty_config_struct.value.is_none());
         assert_eq!(empty_config_struct.value().await.unwrap(), "thing");
         assert!(empty_config_struct.reverse_value.is_none());
         assert_eq!(empty_config_struct.reverse_value().await.unwrap(), "what");
 
-        ffx_config::query("test.test.thing")
+        env.context
+            .query("test.test.thing")
             .level(Some(ConfigLevel::User))
             .set(Value::String("config_value_thingy".to_owned()))
             .await
             .unwrap();
-        ffx_config::query("other.test.thing")
+        env.context
+            .query("other.test.thing")
             .level(Some(ConfigLevel::User))
             .set(Value::Number(serde_json::Number::from_f64(2f64).unwrap()))
             .await
@@ -361,7 +363,8 @@ mod test {
         empty_config_struct.value = None;
         assert_eq!(empty_config_struct.value().await.unwrap(), "config_value_thingy");
         assert_eq!(empty_config_struct.other_value().await.unwrap().unwrap(), 2f64);
-        ffx_config::query("other.test.thing")
+        env.context
+            .query("other.test.thing")
             .level(Some(ConfigLevel::User))
             .set(Value::String("oaiwhfoiwh".to_owned()))
             .await

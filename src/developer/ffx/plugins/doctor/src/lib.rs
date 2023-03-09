@@ -386,9 +386,9 @@ fn get_abi_revision(v: VersionInfo) -> String {
     }
 }
 
-async fn get_user_config() -> Result<String> {
+async fn get_user_config(ctx: &EnvironmentContext) -> Result<String> {
     let mut writer = BufWriter::new(Vec::new());
-    print_config(&mut writer).await?;
+    print_config(ctx, &mut writer).await?;
     let config_str = String::from_utf8(writer.into_inner()?)?;
     Ok(config_str)
 }
@@ -426,13 +426,14 @@ async fn doctor<W: Write>(
         let mut record_view = RecordLedgerView::new();
         let data = ledger.write_all(&mut record_view)?;
         step_handler.record(StepType::Output(data)).await?;
-        doctor_record(step_handler, record_params).await?;
+        doctor_record(env_context, step_handler, record_params).await?;
     }
 
     Ok(())
 }
 
 async fn doctor_record(
+    ctx: &EnvironmentContext,
     step_handler: &mut impl DoctorStepHandler,
     record_params: DoctorRecorderParameters,
 ) -> Result<()> {
@@ -459,7 +460,7 @@ async fn doctor_record(
         r.add_content(PLATFORM_INFO_FILENAME, platform_info);
 
         if record_params.user_config_enabled {
-            let config_str = match get_user_config().await {
+            let config_str = match get_user_config(ctx).await {
                 Ok(s) => s,
                 Err(e) => format!("Could not get config data output: {}", e),
             };

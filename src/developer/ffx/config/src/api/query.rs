@@ -3,11 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    api::ConfigResult,
-    cache::{global_env, load_config},
-    global_env_context,
-    nested::RecursiveMap,
-    validate_type, ConfigError, ConfigLevel, ConfigValue, Environment, ValueStrategy,
+    api::ConfigResult, cache::load_config, nested::RecursiveMap, validate_type, ConfigError,
+    ConfigLevel, ConfigValue, Environment, EnvironmentContext, ValueStrategy,
 };
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
@@ -44,6 +41,7 @@ pub struct ConfigQuery<'a> {
     pub level: Option<ConfigLevel>,
     pub build: Option<BuildOverride<'a>>,
     pub select: SelectMode,
+    pub ctx: Option<&'a EnvironmentContext>,
 }
 
 impl<'a> ConfigQuery<'a> {
@@ -52,8 +50,9 @@ impl<'a> ConfigQuery<'a> {
         level: Option<ConfigLevel>,
         build: Option<BuildOverride<'a>>,
         select: SelectMode,
+        ctx: Option<&'a EnvironmentContext>,
     ) -> Self {
-        Self { name, level, build, select }
+        Self { ctx, name, level, build, select }
     }
 
     /// Adds the given name to the query and returns a new composed query.
@@ -71,6 +70,25 @@ impl<'a> ConfigQuery<'a> {
     /// Adds the given select mode to the query and returns a new composed query.
     pub fn select(self, select: SelectMode) -> Self {
         Self { select, ..self }
+    }
+    /// Use the given environment context instead of the global one and returns
+    /// a new composed query.
+    pub fn context(self, ctx: Option<&'a EnvironmentContext>) -> Self {
+        Self { ctx, ..self }
+    }
+
+    async fn get_env_context(&self) -> Result<EnvironmentContext> {
+        match self.ctx {
+            Some(ctx) => Ok(ctx.clone()),
+            None => crate::global_env_context().context("No configured global environment"),
+        }
+    }
+
+    async fn get_env(&self) -> Result<Environment> {
+        match self.ctx {
+            Some(ctx) => ctx.load().await,
+            None => crate::global_env().await.context("No configured global environment"),
+        }
     }
 
     async fn get_config(&self, env: Environment) -> ConfigResult {
@@ -95,9 +113,7 @@ impl<'a> ConfigQuery<'a> {
         T: TryFrom<ConfigValue> + ValueStrategy,
         <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
     {
-        let ctx = global_env_context()
-            .context("No configured global environment")
-            .map_err(|e| e.into())?;
+        let ctx = self.get_env_context().await.map_err(|e| e.into())?;
         T::validate_query(self)?;
         self.get_config(ctx.load().await.map_err(|e| e.into())?)
             .await
@@ -114,9 +130,7 @@ impl<'a> ConfigQuery<'a> {
     {
         use crate::mapping::*;
 
-        let ctx = global_env_context()
-            .context("No configured global environment")
-            .map_err(|e| e.into())?;
+        let ctx = self.get_env_context().await.map_err(|e| e.into())?;
         T::validate_query(self)?;
 
         self.get_config(ctx.load().await.map_err(|e| e.into())?)
@@ -141,9 +155,7 @@ impl<'a> ConfigQuery<'a> {
     {
         use crate::mapping::*;
 
-        let ctx = global_env_context()
-            .context("No configured global environment")
-            .map_err(|e| e.into())?;
+        let ctx = self.get_env_context().await.map_err(|e| e.into())?;
         T::validate_query(self)?;
         self.get_config(ctx.load().await.map_err(|e| e.into())?)
             .await
@@ -177,7 +189,7 @@ impl<'a> ConfigQuery<'a> {
     /// Set the queried location to the given Value.
     pub async fn set(&self, value: Value) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
-        let mut env = global_env().await?;
+        let mut env = self.get_env().await?;
         env.populate_defaults(&level).await?;
         let config = load_config(env, self.build).await?;
         let mut write_guard = config.write().await;
@@ -188,7 +200,7 @@ impl<'a> ConfigQuery<'a> {
     /// Remove the value at the queried location.
     pub async fn remove(&self) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
-        let config = load_config(global_env().await?, self.build).await?;
+        let config = load_config(self.get_env().await?, self.build).await?;
         let mut write_guard = config.write().await;
         write_guard.remove(key, level)?;
         write_guard.save().await
@@ -198,7 +210,7 @@ impl<'a> ConfigQuery<'a> {
     /// if necessary.
     pub async fn add(&self, value: Value) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
-        let mut env = global_env().await?;
+        let mut env = self.get_env().await?;
         env.populate_defaults(&level).await?;
         let config = load_config(env, self.build).await?;
         let mut write_guard = config.write().await;
