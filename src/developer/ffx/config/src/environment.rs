@@ -8,7 +8,6 @@ use errors::ffx_error;
 use fuchsia_lockfile::{Lockfile, LockfileCreateError};
 use sdk::{Sdk, SdkRoot};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{
     collections::HashMap,
     fmt,
@@ -21,7 +20,6 @@ use std::{
 use thiserror::Error;
 use tracing::{error, info};
 
-const SDK_TYPE_IN_TREE: &str = "in-tree";
 const SDK_NOT_FOUND_HELP: &str = "\
 SDK directory could not be found. Please set with
 `ffx sdk set root <PATH_TO_SDK_DIR>`\n
@@ -95,8 +93,6 @@ pub struct EnvironmentContext {
 pub enum EnvironmentDetectError {
     #[error("Error reading metadata or data from the filesystem")]
     FileSystem(#[from] std::io::Error),
-    #[error("Configuration specified that 'sdk.type' is 'in-tree', but could not find a fuchsia.git tree from {path}.", path=.0.display())]
-    NoTreeRoot(PathBuf),
 }
 
 impl EnvironmentContext {
@@ -159,16 +155,9 @@ impl EnvironmentContext {
         // strong signals that we're running...
         // - in-tree: we found a jiri root, and...
         if let Some(tree_root) = Self::find_jiri_root(current_dir)? {
-            let runtime_sdk = runtime_args.get("sdk").and_then(Value::as_object);
-            let runtime_type = runtime_sdk.and_then(|sdk| sdk.get("type")).and_then(Value::as_str);
+            // look for a .fx-build-dir file and use that instead.
+            let build_dir = Self::load_fx_build_dir(&tree_root)?;
 
-            let build_dir = if runtime_type == Some(SDK_TYPE_IN_TREE) {
-                // if we were told a location of an "in-tree" sdk, that's our build directory.
-                Self::load_build_dir(&runtime_args, &tree_root)?
-            } else {
-                // otherwise, look for a .fx-build-dir file and use that instead.
-                Self::load_fx_build_dir(&tree_root)?
-            };
             Ok(Self::in_tree(tree_root, build_dir, runtime_args, env_file_path))
         } else {
             // - no particular context: any other situation
@@ -253,7 +242,10 @@ impl EnvironmentContext {
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
                 let manifest = build_dir.clone();
                 let module = query("sdk.module").get().await.ok();
-                Ok(SdkRoot::InTree { manifest, module })
+                match module {
+                    Some(module) => Ok(SdkRoot::Modular { manifest, module }),
+                    None => Ok(SdkRoot::Full(manifest)),
+                }
             }
             (_, runtime_root) => sdk_from_config(runtime_root.as_deref()).await,
         }
@@ -351,27 +343,6 @@ impl EnvironmentContext {
             Ok(None)
         }
     }
-
-    /// Find the build directory given the runtime args and the tree root
-    fn load_build_dir(
-        runtime_args: &ConfigMap,
-        tree_root: &Path,
-    ) -> Result<Option<PathBuf>, EnvironmentDetectError> {
-        let runtime_build_dir =
-            runtime_args.get("sdk.root").and_then(serde_json::Value::as_str).map(PathBuf::from);
-        // we assume that if one is specified by the runtime, we should give it precedence and not even try to discover a build directory
-        // even if the runtime-given sdk path doesn't exist.
-        let found = match runtime_build_dir {
-            Some(runtime) => Some(runtime),
-            None => Self::load_fx_build_dir(&tree_root)?,
-        };
-
-        // but check that what we found exists and is a directory.
-        match found {
-            Some(found) if found.is_dir() => Ok(Some(found)),
-            _ => Ok(None),
-        }
-    }
 }
 
 fn find_sdk_root(start_path: &Path) -> Result<Option<PathBuf>> {
@@ -385,7 +356,7 @@ fn find_sdk_root(start_path: &Path) -> Result<Option<PathBuf>> {
             return Ok(None);
         };
 
-        if path.join("meta").join("manifest.json").exists() {
+        if SdkRoot::is_sdk_root(&path) {
             return Ok(Some(path));
         }
     }
@@ -420,14 +391,10 @@ async fn sdk_from_config(sdk_root: Option<&Path>) -> Result<SdkRoot> {
             }
         }
     };
-    let sdk_type: Option<String> =
-        query("sdk.type").build(Some(BuildOverride::NoBuild)).get().await.ok();
-    match sdk_type.as_deref() {
-        Some(SDK_TYPE_IN_TREE) => {
-            let module = query("sdk.module").build(Some(BuildOverride::NoBuild)).get().await.ok();
-            Ok(SdkRoot::InTree { manifest, module })
-        }
-        _ => Ok(SdkRoot::Packaged(manifest)),
+    let module = query("sdk.module").build(Some(BuildOverride::NoBuild)).get().await.ok();
+    match module {
+        Some(module) => Ok(SdkRoot::Modular { manifest, module }),
+        _ => Ok(SdkRoot::Full(manifest)),
     }
 }
 

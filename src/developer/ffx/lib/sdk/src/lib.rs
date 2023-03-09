@@ -13,6 +13,9 @@ use std::{
 };
 use tracing::warn;
 
+pub const SDK_MANIFEST_PATH: &str = "meta/manifest.json";
+pub const SDK_BUILD_MANIFEST_PATH: &str = "sdk/manifest/core";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum SdkVersion {
     Version(String),
@@ -36,8 +39,8 @@ pub struct FfxToolFiles {
 
 #[derive(Clone, Debug)]
 pub enum SdkRoot {
-    InTree { manifest: PathBuf, module: Option<String> },
-    Packaged(PathBuf),
+    Modular { manifest: PathBuf, module: String },
+    Full(PathBuf),
 }
 
 #[derive(Deserialize)]
@@ -71,22 +74,38 @@ struct File {
 }
 
 impl SdkRoot {
+    /// Returns true if the given path appears to be an sdk root.
+    pub fn is_sdk_root(path: &Path) -> bool {
+        path.join(SDK_MANIFEST_PATH).exists() || path.join(SDK_BUILD_MANIFEST_PATH).exists()
+    }
+
     /// Does a full load of the sdk configuration.
     pub fn get_sdk(self) -> Result<Sdk> {
         tracing::debug!("get_sdk");
         match self {
-            Self::InTree { manifest, module } => Sdk::from_build_dir(&manifest, module.as_ref()),
-            Self::Packaged(manifest) => Sdk::from_sdk_dir(&manifest),
+            Self::Modular { manifest, module } => {
+                // Modular only ever makes sense as part of a build directory
+                // sdk, so there's no need to figure out what kind it is.
+                Sdk::from_build_dir(&manifest, Some(&module))
+            }
+            Self::Full(manifest) if manifest.join(SDK_MANIFEST_PATH).exists() => {
+                // If the packaged sdk manifest exists, use that.
+                Sdk::from_sdk_dir(&manifest)
+            }
+            Self::Full(manifest) => {
+                // Otherwise assume this is a build manifest, but with no module.
+                Sdk::from_build_dir(&manifest, None)
+            }
         }
     }
 }
 
 impl Sdk {
-    fn from_build_dir(path: &Path, module_manifest: Option<impl AsRef<str>>) -> Result<Self> {
+    fn from_build_dir(path: &Path, module_manifest: Option<&str>) -> Result<Self> {
         let path = std::fs::canonicalize(path)
             .with_context(|| format!("canonicalizing sdk path prefix {}", path.display()))?;
         let manifest_path = match module_manifest {
-            None => path.join("sdk/manifest/core"),
+            None => path.join(SDK_BUILD_MANIFEST_PATH),
             Some(module) => if cfg!(target_arch = "x86_64") {
                 path.join("host_x64")
             } else if cfg!(target_arch = "aarch64") {
@@ -95,7 +114,7 @@ impl Sdk {
                 bail!("Host architecture not supported")
             }
             .join("sdk/manifest")
-            .join(module.as_ref()),
+            .join(module),
         };
 
         let file = fs::File::open(&manifest_path)
@@ -125,7 +144,7 @@ impl Sdk {
         tracing::debug!("from_sdk_dir {:?}", path_prefix);
         let path_prefix = std::fs::canonicalize(path_prefix)
             .with_context(|| format!("canonicalizing sdk path prefix {}", path_prefix.display()))?;
-        let manifest_path = path_prefix.join("meta/manifest.json");
+        let manifest_path = path_prefix.join(SDK_MANIFEST_PATH);
 
         let manifest = Self::parse_sdk_manifest(BufReader::new(
             fs::File::open(&manifest_path)
@@ -356,7 +375,7 @@ mod test {
         let manifest_path = root.path();
         let atoms = Sdk::atoms_from_core_manifest(
             &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join("sdk/manifest/core")).unwrap()),
+            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
         )
         .unwrap();
 
@@ -395,7 +414,7 @@ mod test {
         let manifest_path = root.path();
         let atoms = Sdk::atoms_from_core_manifest(
             &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join("sdk/manifest/core")).unwrap()),
+            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
         )
         .unwrap();
 
@@ -416,7 +435,7 @@ mod test {
         let manifest_path = root.path();
         let atoms = Sdk::atoms_from_core_manifest(
             &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join("sdk/manifest/core")).unwrap()),
+            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
         )
         .unwrap();
 
@@ -433,7 +452,7 @@ mod test {
         let manifest_path = root.path();
         let atoms = Sdk::atoms_from_core_manifest(
             &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join("sdk/manifest/core")).unwrap()),
+            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
         )
         .unwrap();
 
@@ -449,7 +468,7 @@ mod test {
         let manifest_path = root.path();
         let atoms = Sdk::atoms_from_core_manifest(
             &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join("sdk/manifest/core")).unwrap()),
+            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
         )
         .unwrap();
 
@@ -466,7 +485,7 @@ mod test {
         let root = sdk_test_data_root();
         let sdk_root = root.path();
         let manifest = Sdk::parse_sdk_manifest(BufReader::new(
-            fs::File::open(sdk_root.join("meta/manifest.json")).unwrap(),
+            fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
 
@@ -484,7 +503,7 @@ mod test {
         let root = sdk_test_data_root();
         let sdk_root = root.path();
         let manifest = Sdk::parse_sdk_manifest(BufReader::new(
-            fs::File::open(sdk_root.join("meta/manifest.json")).unwrap(),
+            fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
 
@@ -504,7 +523,7 @@ mod test {
         let root = sdk_test_data_root();
         let sdk_root = root.path();
         let manifest = Sdk::parse_sdk_manifest(BufReader::new(
-            fs::File::open(sdk_root.join("meta/manifest.json")).unwrap(),
+            fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
 
