@@ -1367,6 +1367,7 @@ template("assembled_system") {
       package_barrier = []
       assembly_package_barrier = []
       driver_package_barrier = []
+      shell_commands_barrier = []
       system_image_package_barrier = []
       system_image_extra_package_manifest_barrier = []
       test_component_manifest_barrier = []

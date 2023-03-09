@@ -718,6 +718,7 @@ template("assembly_input_bundle") {
       distribution_entries_barrier = []
       driver_package_component_files_barrier = []
       system_image_package_barrier = []
+      shell_commands_barrier = []
     }
   }
 
