@@ -397,8 +397,9 @@ impl Ip for Ipv4 {
     /// [RFC 1122 Section 3.2.1.3]: https://www.rfc-editor.org/rfc/rfc1122.html#section-3.2.1.3
     const LOOPBACK_SUBNET: Subnet<Ipv4Addr> =
         Subnet { network: Ipv4Addr::new([127, 0, 0, 0]), prefix: 8 };
-    // TODO(https://fxbug.dev/83331): Document the standard in which this
-    // constant is defined.
+    /// The IPv4 Multicast subnet, defined in [RFC 1112 Section 4].
+    ///
+    /// [RFC 1112 Section 4]: https://www.rfc-editor.org/rfc/rfc1112.html#section-4
     const MULTICAST_SUBNET: Subnet<Ipv4Addr> =
         Subnet { network: Ipv4Addr::new([224, 0, 0, 0]), prefix: 4 };
     /// The subnet of link-local unicast IPv4 addresses, outlined in [RFC 3927
