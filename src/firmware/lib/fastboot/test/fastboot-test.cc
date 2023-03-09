@@ -102,8 +102,8 @@ TEST(FastbootTest, UnknownCommand) {
 }
 
 const char kNewLineMessage[] =
-    "message\n"
-    "0123456789abcdef";
+    "test line 1\n"
+    "test line 2";
 const size_t kNewLineMessageSplits = 2ULL;
 
 TEST(FastbootResponseTest, FailNewLineMessageNotSplit) {
@@ -114,9 +114,7 @@ TEST(FastbootResponseTest, FailNewLineMessageNotSplit) {
   ASSERT_TRUE(res.is_ok());
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
-  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
-  const std::string msg = sent_packets[0].substr(4);
-  EXPECT_STREQ(msg, std::string(kNewLineMessage, msg.size()));
+  ASSERT_EQ(sent_packets[0], std::string("FAIL") + kNewLineMessage);
 }
 
 TEST(FastbootResponseTest, OkayNewLineMessageNotSplit) {
@@ -127,9 +125,7 @@ TEST(FastbootResponseTest, OkayNewLineMessageNotSplit) {
   ASSERT_TRUE(res.is_ok());
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
-  ASSERT_EQ(sent_packets[0].compare(0, 4, "OKAY"), 0);
-  const std::string msg = sent_packets[0].substr(4);
-  EXPECT_STREQ(msg, std::string(kNewLineMessage, msg.size()));
+  ASSERT_EQ(sent_packets[0], std::string("OKAY") + kNewLineMessage);
 }
 
 TEST(FastbootResponseTest, InfoNewLineMessageSplitAtNewLine) {
@@ -140,13 +136,8 @@ TEST(FastbootResponseTest, InfoNewLineMessageSplitAtNewLine) {
   ASSERT_TRUE(res.is_ok());
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), kNewLineMessageSplits);
-  std::string res_message;
-  for (auto& pkt : sent_packets) {
-    EXPECT_EQ(pkt.compare(0, 4, "INFO"), 0);
-    res_message += pkt.substr(4) + "\n";
-  }
-  res_message.pop_back();
-  EXPECT_STREQ(res_message, kNewLineMessage);
+  ASSERT_EQ(sent_packets[0], std::string("INFO") + "test line 1");
+  ASSERT_EQ(sent_packets[1], std::string("INFO") + "test line 2");
 }
 
 const char kLongMessage[] =
@@ -168,9 +159,7 @@ TEST(FastbootResponseTest, FailLongMessageNotSplit) {
   ASSERT_TRUE(res.is_ok());
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
-  ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
-  const std::string msg = sent_packets[0].substr(4);
-  EXPECT_STREQ(msg, std::string(kLongMessage, msg.size()));
+  ASSERT_EQ(sent_packets[0], (std::string("FAIL") + kLongMessage).substr(0, kMaxCommandPacketSize));
 }
 
 TEST(FastbootResponseTest, OkayLongMessageNotSplit) {
@@ -181,9 +170,7 @@ TEST(FastbootResponseTest, OkayLongMessageNotSplit) {
   ASSERT_TRUE(res.is_ok());
   const std::vector<std::string>& sent_packets = transport.GetOutPackets();
   ASSERT_EQ(sent_packets.size(), 1ULL);
-  ASSERT_EQ(sent_packets[0].compare(0, 4, "OKAY"), 0);
-  const std::string msg = sent_packets[0].substr(4);
-  EXPECT_STREQ(msg, std::string(kLongMessage, msg.size()));
+  ASSERT_EQ(sent_packets[0], (std::string("OKAY") + kLongMessage).substr(0, kMaxCommandPacketSize));
 }
 
 TEST(FastbootResponseTest, InfoLongMessageSplitAtNewLine) {
@@ -219,6 +206,27 @@ TEST(FastbootResponseTest, InfoLongMessageErrorAdded) {
     res_message += pkt.substr(4);
   }
   EXPECT_STREQ(res_message, kLongMessage + error_str);
+}
+
+// Test to cover error string at the end of the message that can be truncated (it doesn't wrap as
+// message)
+TEST(FastbootResponseTest, InfoLongMessageErrorAddedTruncated) {
+  Fastboot fastboot(0x40000);
+  const int error = ZX_ERR_NOT_SUPPORTED;
+  const std::string error_str = "(ZX_ERR_";  // NOT_SUPPORTED)"; Truncated error message
+  std::string message = std::string(kLongMessage) + "padding                                    ";
+  TestTransport transport;
+  auto res =
+      fastboot.SendResponse(Fastboot::ResponseType::kInfo, message, &transport, zx::error(error));
+  ASSERT_TRUE(res.is_error());
+  const std::vector<std::string>& sent_packets = transport.GetOutPackets();
+  ASSERT_EQ(sent_packets.size(), kLongMessageSplits);
+  std::string res_message;
+  for (auto& pkt : sent_packets) {
+    EXPECT_EQ(pkt.compare(0, 4, "INFO"), 0);
+    res_message += pkt.substr(4);
+  }
+  EXPECT_STREQ(res_message, message + error_str);
 }
 
 TEST(FastbootResponseTest, BadType) {
