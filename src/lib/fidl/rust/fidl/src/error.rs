@@ -260,6 +260,23 @@ pub enum Error {
     #[error("A FIDL client encountered an IO error issuing a channel call: {0}")]
     ClientEvent(#[source] zx_status::Status),
 
+    #[cfg(not(target_os = "fuchsia"))]
+    /// A FIDL client's channel was closed. Contains an epitaph if one was sent by the server, or
+    /// `zx_status::Status::PEER_CLOSED` otherwise.
+    #[error("A FIDL client's channel to the service {protocol_name} was closed: {status} reason: {}",
+        .reason.as_ref().map(String::as_str).unwrap_or("not given")
+    )]
+    ClientChannelClosed {
+        /// The epitaph or `zx_status::Status::PEER_CLOSED`.
+        #[source]
+        status: zx_status::Status,
+        /// The name of the service at the other end of the channel.
+        protocol_name: &'static str,
+        /// Further details on why exactly the channel closed.
+        reason: Option<String>,
+    },
+
+    #[cfg(target_os = "fuchsia")]
     /// A FIDL client's channel was closed. Contains an epitaph if one was sent by the server, or
     /// `zx_status::Status::PEER_CLOSED` otherwise.
     #[error("A FIDL client's channel to the service {protocol_name} was closed: {status}")]

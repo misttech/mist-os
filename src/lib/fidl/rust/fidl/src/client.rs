@@ -601,6 +601,8 @@ impl ClientInner {
                 Poll::Ready(Err(Error::ClientChannelClosed {
                     status,
                     protocol_name: self.protocol_name,
+                    #[cfg(not(target_os = "fuchsia"))]
+                    reason: self.channel.closed_reason(),
                 }))
             } else {
                 Poll::Pending
@@ -644,6 +646,8 @@ impl ClientInner {
                 Poll::Ready(Err(Error::ClientChannelClosed {
                     status,
                     protocol_name: self.protocol_name,
+                    #[cfg(not(target_os = "fuchsia"))]
+                    reason: self.channel.closed_reason(),
                 }))
             } else {
                 Poll::Pending

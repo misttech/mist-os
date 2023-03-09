@@ -80,10 +80,11 @@ pub fn get_peer_closed(
 ) -> Option<fidl::Error> {
     for result in results.iter() {
         match result {
-            Err(fidl::Error::ClientChannelClosed { status, protocol_name }) => {
+            Err(fidl::Error::ClientChannelClosed { status, protocol_name, reason }) => {
                 return Some(fidl::Error::ClientChannelClosed {
                     status: *status,
                     protocol_name: *protocol_name,
+                    reason: reason.clone(),
                 })
             }
             _ => {}

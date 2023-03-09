@@ -439,6 +439,8 @@ mod test {
             [Err(AddressStateProviderError::Fidl(fidl::Error::ClientChannelClosed {
                 status: fidl::Status::INTERNAL,
                 protocol_name: _,
+                #[cfg(not(target_os = "fuchsia"))]
+                reason: None
             }))]
         );
     }
@@ -541,7 +543,9 @@ mod test {
                     control.get_id().await,
                     Err(super::TerminalError::Fidl(fidl::Error::ClientChannelClosed {
                         status: zx::Status::PEER_CLOSED,
-                        protocol_name: fidl_fuchsia_net_interfaces_admin::ControlMarker::DEBUG_NAME
+                        protocol_name: fidl_fuchsia_net_interfaces_admin::ControlMarker::DEBUG_NAME,
+                        #[cfg(not(target_os = "fuchsia"))]
+                        reason: None
                     }))
                 );
             },
