@@ -23,13 +23,11 @@ std::shared_ptr<const FidlThread> CreateMainThread(async_dispatcher_t* dispatche
   // We receive audio payloads over FIDL, which means the FIDL thread has real time requirements
   // just like the mixing threads.
   // TODO(fxbug.dev/98652): the mixer service's graph threads should do this too
-  auto profile = media::audio::AcquireAudioCoreImplProfile();
-  if (!profile.is_ok()) {
-    FX_PLOGS(ERROR, profile.status_value())
-        << "Unable to acquire profile for the audio_core FIDL thread";
-  } else {
-    auto status = zx::thread::self()->set_profile(*profile, 0);
-    FX_CHECK(status == ZX_OK) << status;
+  auto result =
+      media::audio::AcquireSchedulerRole(zx::thread::self(), "fuchsia.media.audio.core.dispatch");
+  if (result.is_error()) {
+    FX_PLOGS(ERROR, result.status_value())
+        << "Unable to acquire scheduler role for the audio_core FIDL thread";
   }
 
   return fidl_thread;

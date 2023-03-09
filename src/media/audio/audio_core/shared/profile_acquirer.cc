@@ -30,8 +30,8 @@ zx::result<fidl::SyncClient<fuchsia_scheduler::ProfileProvider>> ConnectToProfil
 
 }  // namespace
 
-zx::result<zx::profile> AcquireHighPriorityProfile(const MixProfileConfig& mix_profile_config) {
-  TRACE_DURATION("audio", "AcquireHighPriorityProfile");
+zx::result<> AcquireSchedulerRole(zx::unowned_thread thread, const std::string& role) {
+  TRACE_DURATION("audio", "AcquireSchedulerRole", "role", TA_STRING(role.c_str()));
 
   auto client = ConnectToProfileProvider();
   if (!client.is_ok()) {
@@ -40,56 +40,23 @@ zx::result<zx::profile> AcquireHighPriorityProfile(const MixProfileConfig& mix_p
     return zx::error(client.status_value());
   }
 
-  auto result = (*client)->GetDeadlineProfile({{
-      .capacity = static_cast<uint64_t>(mix_profile_config.capacity.get()),
-      .deadline = static_cast<uint64_t>(mix_profile_config.deadline.get()),
-      .period = static_cast<uint64_t>(mix_profile_config.period.get()),
-      .name = "src/media/audio/audio_core",
-  }});
+  zx::thread dup_thread;
+  const zx_status_t dup_status = thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_thread);
+  if (dup_status != ZX_OK) {
+    FX_PLOGS(ERROR, dup_status) << "Failed to connect to duplicate thread handle";
+    return zx::error(dup_status);
+  }
+  auto result = (*client)->SetProfileByRole({{.thread = std::move(dup_thread), .role = role}});
   if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Failed to call GetDeadlineProfile, error=" << result.error_value();
+    FX_LOGS(ERROR) << "Failed to call SetProfileByRole, error=" << result.error_value();
     return zx::error(result.error_value().status());
   }
   if (result->status() != ZX_OK) {
-    FX_PLOGS(ERROR, result->status()) << "Failed to get deadline profile";
+    FX_PLOGS(ERROR, result->status()) << "Failed to get set role";
     return zx::error(result->status());
   }
 
-  return zx::ok(std::move(result->profile()));
-}
-
-zx::result<zx::profile> AcquireRelativePriorityProfile(uint32_t priority) {
-  auto nonce = TRACE_NONCE();
-  TRACE_DURATION("audio", "AcquireRelativePriorityProfile");
-
-  auto client = ConnectToProfileProvider();
-  if (!client.is_ok()) {
-    FX_PLOGS(ERROR, client.status_value())
-        << "Failed to connect to fuchsia.scheduler.ProfileProvider";
-    return zx::error(client.status_value());
-  }
-
-  TRACE_FLOW_BEGIN("audio", "GetProfile", nonce);
-  auto result = (*client)->GetProfile({{
-      .priority = priority,
-      .name = "src/media/audio/audio_core",
-  }});
-  TRACE_FLOW_END("audio", "GetProfile", nonce);
-
-  if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Failed to call GetProfile, error=" << result.error_value();
-    return zx::error(result.error_value().status());
-  }
-  if (result->status() != ZX_OK) {
-    FX_PLOGS(ERROR, result->status()) << "Failed to get profile";
-    return zx::error(result->status());
-  }
-
-  return zx::ok(std::move(result->profile()));
-}
-
-zx::result<zx::profile> AcquireAudioCoreImplProfile() {
-  return AcquireRelativePriorityProfile(/* HIGH_PRIORITY in zircon */ 24);
+  return zx::ok();
 }
 
 }  // namespace media::audio

@@ -4,6 +4,8 @@
   "profiles": {
     // Fuchsia platform profiles.
     "fuchsia.scenic.main": { "capacity": "16ms", "deadline": "16ms", "period": "16ms" },
+    "fuchsia.media.audio.core.dispatch": { "priority": 24 },
+    "fuchsia.media.audio.core.mixer": { "capacity": "4400us", "deadline": "10ms", "period": "10ms" },
     "fuchsia.netstack.go-worker": { "priority": 25 },
 
     // Msd Arm Mali / Vsi Vip profiles.
