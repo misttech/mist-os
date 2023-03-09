@@ -17,15 +17,6 @@ import("kernel_elf_interp.gni")
 import("zbi_executable.gni")
 
 declare_args() {
-  # Use the physload ZBI kernel and the ELF physboot module rather than
-  # monolithic physboot ZBI kernel.
-  #
-  # **TODO(mcgrathr):** This switch will be removed soon and the ELF-based
-  # physboot will be the only build.
-  use_elf_physboot = true
-}
-
-declare_args() {
   # Cause //zircon/kernel/phys:boot_tests to generate the phys boot tests
   # for all supported CPUs, not just $target_cpu.
   all_cpu_phys_boot_tests = false
@@ -635,36 +626,12 @@ group("boot_tests") {
   }
 }
 
-zbi_executable("zbi-physboot") {
-  sources = [ "physboot-zbi-main.cc" ]
-  deps = [
-    ":allocation",
-    ":boot-zbi",
-    ":handoff",
-    ":kernel-package",
-    ":log",
-    ":main",
-    ":physboot-main",
-    ":symbolize",
-    ":uart",
-    "//zircon/kernel/lib/ktl",
-    "//zircon/kernel/lib/libc",
-  ]
-}
-
-# TODO(mcgrathr): When the switch is removed, rename physboot.package to
-# physboot and remove this group.
-group("physboot") {
-  if (use_elf_physboot) {
-    public_deps = [ ":physboot.package" ]
-  } else {
-    public_deps = [ ":zbi-physboot" ]
-  }
-}
-
-kernel_package("physboot.package") {
-  visibility = [ ":*" ]
-
+# The elf-physboot target provides the distribution_entries metadata via
+# kernel_elf_binary() for "physboot".  This target reifies that to be directly
+# in the root of the STORAGE_KERNEL filesystem layout, whereas if another
+# kernel_package() took a dependency on the kernel_elf_binary() target, then it
+# would wind up under "package_name/physboot" instead.
+kernel_package("physboot") {
   # Just "physboot" at top level is the default for `kernel.phys.next`.
   prefix = ""
   deps = [ ":elf-physboot(:kernel.phys_$current_cpu)" ]
