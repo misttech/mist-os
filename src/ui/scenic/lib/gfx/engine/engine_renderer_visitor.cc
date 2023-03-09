@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/gfx/engine/engine_renderer_visitor.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 #include "src/ui/lib/escher/paper/paper_renderer.h"
 #include "src/ui/scenic/lib/gfx/resources/camera.h"
@@ -50,6 +51,8 @@ void EngineRendererVisitor::Visit(Buffer* r) { FX_CHECK(false); }
 void EngineRendererVisitor::Visit(View* r) { FX_CHECK(false); }
 
 void EngineRendererVisitor::Visit(ViewNode* r) {
+  TRACE_DURATION("gfx", "Visit(ViewNode)");
+
   const size_t previous_count = draw_call_count_;
   const bool previous_should_render_debug_bounds = should_render_debug_bounds_;
   if (auto view = r->GetView()) {
@@ -77,8 +80,11 @@ void EngineRendererVisitor::Visit(ViewNode* r) {
 
 void EngineRendererVisitor::Visit(ViewHolder* r) {
   escher::PaperTransformStack* transform_stack = renderer_->transform_stack();
-  transform_stack->PushTransform(static_cast<escher::mat4>(r->transform()));
-  transform_stack->AddClipPlanes(r->clip_planes());
+  {
+    TRACE_DURATION("gfx", "Visit(ViewHolder) push transform");
+    transform_stack->PushTransform(static_cast<escher::mat4>(r->transform()));
+    transform_stack->AddClipPlanes(r->clip_planes());
+  }
 
   // A view holder should render its bounds if either its embedding view has
   // debug rendering turned on (which will mean should_render_debug_bounds_=true)
@@ -92,13 +98,24 @@ void EngineRendererVisitor::Visit(ViewHolder* r) {
     ++draw_call_count_;
   }
 
-  ForEachChildFrontToBack(*r, [this](Node* node) { node->Accept(this); });
-  transform_stack->Pop();
+  {
+    TRACE_DURATION("gfx", "Visit(ViewHolder) children");
+    ForEachChildFrontToBack(*r, [this](Node* node) { node->Accept(this); });
+  }
+  {
+    TRACE_DURATION("gfx", "Visit(ViewHolder) pop transform");
+    transform_stack->Pop();
+  }
 }
 
-void EngineRendererVisitor::Visit(EntityNode* r) { VisitNode(r); }
+void EngineRendererVisitor::Visit(EntityNode* r) {
+  TRACE_DURATION("gfx", "Visit(EntityNode)");
+  VisitNode(r);
+}
 
 void EngineRendererVisitor::Visit(OpacityNode* r) {
+  TRACE_DURATION("gfx", "Visit(OpacityNode)");
+
   if (r->opacity() == 0) {
     return;
   }
@@ -132,6 +149,8 @@ void EngineRendererVisitor::Visit(LayerStack* r) { FX_DCHECK(false); }
 void EngineRendererVisitor::Visit(Layer* r) { FX_DCHECK(false); }
 
 void EngineRendererVisitor::Visit(ShapeNode* r) {
+  TRACE_DURATION("gfx", "Visit(ShapeNode)");
+
   // We don't need to call |VisitNode| because shape nodes don't have children.
   FX_DCHECK(r->children().empty());
 
@@ -198,6 +217,7 @@ void EngineRendererVisitor::Visit(RoundedRectangleShape* r) { FX_CHECK(false); }
 void EngineRendererVisitor::Visit(MeshShape* r) { FX_CHECK(false); }
 
 void EngineRendererVisitor::Visit(Material* r) {
+  TRACE_DURATION("gfx", "Visit(Material)");
   r->UpdateEscherMaterial(gpu_uploader_, layout_updater_);
 }
 

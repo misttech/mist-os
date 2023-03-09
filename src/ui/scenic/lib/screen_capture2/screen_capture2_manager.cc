@@ -4,7 +4,7 @@
 
 #include "screen_capture2_manager.h"
 
-#include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 #include <memory>
 
@@ -41,6 +41,7 @@ void ScreenCapture2Manager::CreateClient(
 }
 
 void ScreenCapture2Manager::RenderPendingScreenCaptures() {
+  TRACE_DURATION("gfx", "ScreenCapture2Manager::RenderPendingScreenCaptures");
   // After the newest batch of renderables has been produced, loop through all of the bindings and
   // render into the client's buffer if they have requested one.
   for (const auto& binding : client_bindings_.bindings()) {

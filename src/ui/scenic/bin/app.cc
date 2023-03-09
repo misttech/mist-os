@@ -760,6 +760,7 @@ void App::InitializeHeartbeat(display::Display& display) {
       display.vsync_timing(),
       /*update_sessions*/
       [this](auto& sessions_to_update, auto trace_id, auto fences_from_previous_presents) {
+        TRACE_DURATION("gfx", "App update_sessions");
         if (config_values_.i_can_haz_flatland) {
           // Flatland doesn't pass release fences into the FrameScheduler. Instead, they are stored
           // in the FlatlandPresenter and pulled out by the flatland::Engine during rendering.
@@ -778,18 +779,21 @@ void App::InitializeHeartbeat(display::Display& display) {
       },
       /*on_cpu_work_done*/
       [this] {
+        TRACE_DURATION("gfx", "App on_cpu_work_done");
         flatland_manager_->SendHintsToStartRendering();
         screen_capture2_manager_->RenderPendingScreenCaptures();
         view_tree_snapshotter_->UpdateSnapshot();
       },
       /*on_frame_presented*/
       [this](auto latched_times, auto present_times) {
+        TRACE_DURATION("gfx", "App on_frame_presented");
         scenic_.OnFramePresented(latched_times, present_times);
         image_pipe_updater_->OnFramePresented(latched_times, present_times);
         flatland_manager_->OnFramePresented(latched_times, present_times);
       },
       /*render_scheduled_frame*/
       [this](auto frame_number, auto presentation_time, auto callback) {
+        TRACE_DURATION("gfx", "App render_scheduled_frame");
         FX_CHECK(flatland_frame_count_ + gfx_frame_count_ == frame_number - 1);
         if (auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering()) {
           flatland_engine_->RenderScheduledFrame(++flatland_frame_count_, presentation_time,

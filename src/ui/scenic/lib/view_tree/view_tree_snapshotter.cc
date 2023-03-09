@@ -6,6 +6,7 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 namespace view_tree {
 
@@ -121,6 +122,8 @@ ViewTreeSnapshotter::ViewTreeSnapshotter(std::vector<SubtreeSnapshotGenerator> s
 }
 
 void ViewTreeSnapshotter::UpdateSnapshot() const {
+  TRACE_DURATION("gfx", "ViewTreeSnapshotter::UpdateSnapshot");
+
   auto new_snapshot = std::make_shared<Snapshot>();
   std::multimap<zx_koid_t, zx_koid_t> tree_boundaries;
 
