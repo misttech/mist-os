@@ -7,7 +7,7 @@
 use crate::{constants, test_topology, utils};
 use component_events::events::*;
 use component_events::matcher::*;
-use diagnostics_data::{Inspect, Severity};
+use diagnostics_data::Severity;
 use diagnostics_reader::{ArchiveReader, Data, Logs};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_diagnostics as fdiagnostics;
@@ -16,7 +16,6 @@ use fuchsia_async as fasync;
 use fuchsia_component_test::RealmInstance;
 use fuchsia_component_test::ScopedInstanceFactory;
 use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
-use fuchsia_zircon::DurationNum;
 use futures::{channel::mpsc, StreamExt};
 
 const LOGGING_COMPONENT: &str = "logging_component";
@@ -46,12 +45,6 @@ async fn embedding_stop_api_for_log_listener() {
     let mut event_stream = EventStream::open().await.unwrap();
 
     run_logging_component(&instance, &mut event_stream).await;
-
-    // Assert that we see the CapabilityRequested for `logging_component`.
-    // TODO(fxbug.dev/117253): if we implement a way for flushing the logs or a blocking
-    // LogSink/Connect this won't be necessary.
-    wait_until_archivist_sees_capability_requested(&instance, &format!("coll:{LOGGING_COMPONENT}"))
-        .await;
 
     // this will trigger Lifecycle.Stop.
     drop(instance);
@@ -87,12 +80,6 @@ async fn embedding_stop_api_works_for_batch_iterator() {
 
     run_logging_component(&instance, &mut event_stream).await;
 
-    // Assert that we see the CapabilityRequested for `logging_component`.
-    // TODO(fxbug.dev/117253): if we implement a way for flushing the logs or a blocking
-    // LogSink/Connect this won't be necessary.
-    wait_until_archivist_sees_capability_requested(&instance, &format!("coll:{LOGGING_COMPONENT}"))
-        .await;
-
     // this will trigger Lifecycle.Stop.
     drop(instance);
 
@@ -114,40 +101,6 @@ async fn embedding_stop_api_works_for_batch_iterator() {
             (Severity::Warn, "my warn message.".to_owned()),
         ]
     );
-}
-
-async fn wait_until_archivist_sees_capability_requested(instance: &RealmInstance, component: &str) {
-    let instance_child_name = instance.root.child_name();
-    let component_moniker = format!("realm_builder:{instance_child_name}/test/{component}");
-
-    loop {
-        let accessor = instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
-            .unwrap();
-        let data = ArchiveReader::new()
-            .with_archive(accessor)
-            .add_selector("archivist:root/events/recent_events")
-            .retry_if_empty(true)
-            .with_minimum_schema_count(1)
-            .snapshot::<Inspect>()
-            .await
-            .expect("got inspect data");
-        if !data.is_empty() {
-            if let Some(recent_events) =
-                data[0].payload.as_ref().unwrap().get_child_by_path(&["events", "recent_events"])
-            {
-                for child in recent_events.children.iter() {
-                    let moniker = child.get_property("moniker").unwrap().string().unwrap();
-                    let event = child.get_property("event").unwrap().string().unwrap();
-                    if event == "log_sink_requested" && moniker == component_moniker {
-                        return;
-                    }
-                }
-            }
-        }
-        fuchsia_async::Timer::new(fuchsia_async::Time::after(100.millis())).await;
-    }
 }
 
 async fn initialize_topology() -> RealmInstance {
