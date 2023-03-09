@@ -585,12 +585,12 @@ bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
     filter_duplicates = ::pw::bluetooth::emboss::GenericEnableParam::DISABLE;
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::LESetScanEnableCommandParams);
-  auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetScanEnable, kPayloadSize);
-
-  auto params = packet->mutable_payload<::bt::hci_spec::LESetScanEnableCommandParams>();
-  params->scanning_enabled = ::pw::bluetooth::emboss::GenericEnableParam::ENABLE;
-  params->filter_duplicates = filter_duplicates;
+  auto packet =
+      ::bt::hci::EmbossCommandPacket::New<pw::bluetooth::emboss::LESetScanEnableCommandWriter>(
+          ::bt::hci_spec::kLESetScanEnable);
+  auto params = packet.view_t();
+  params.le_scan_enable().Write(pw::bluetooth::emboss::GenericEnableParam::ENABLE);
+  params.filter_duplicates().Write(filter_duplicates);
 
   // Event handler to log when we receive advertising reports
   auto le_adv_report_cb = [name_filter, addr_type_filter](const ::bt::hci::EventPacket& event) {
@@ -626,10 +626,12 @@ bool HandleLEScan(const CommandData* cmd_data, const fxl::CommandLine& cmd_line,
   // Delayed task that stops scanning.
   auto scan_disable_cb = [cleanup_cb = cleanup_cb.share(), final_cb = std::move(final_cb),
                           cmd_data]() mutable {
-    auto packet = ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetScanEnable, kPayloadSize);
-    auto params = packet->mutable_payload<::bt::hci_spec::LESetScanEnableCommandParams>();
-    params->scanning_enabled = ::pw::bluetooth::emboss::GenericEnableParam::DISABLE;
-    params->filter_duplicates = ::pw::bluetooth::emboss::GenericEnableParam::DISABLE;
+    auto packet =
+        ::bt::hci::EmbossCommandPacket::New<pw::bluetooth::emboss::LESetScanEnableCommandWriter>(
+            ::bt::hci_spec::kLESetScanEnable);
+    auto enable_params = packet.view_t();
+    enable_params.le_scan_enable().Write(pw::bluetooth::emboss::GenericEnableParam::DISABLE);
+    enable_params.filter_duplicates().Write(pw::bluetooth::emboss::GenericEnableParam::DISABLE);
 
     auto id = SendCommand(cmd_data, std::move(packet), std::move(final_cb), std::move(cleanup_cb));
 
