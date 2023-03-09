@@ -66,6 +66,7 @@ test("fusb302-test-bin") {
   sources = [
     "fusb302-test.cc",
     "fusb302.cc",
+    "registers-test.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
   ]

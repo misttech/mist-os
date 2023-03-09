@@ -12,7 +12,10 @@
 // The section and page numbers reference Revision 5, published August 2021.
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
+#include <lib/ddk/debug.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
+#include <zircon/types.h>
 
 #include <cstdint>
 
@@ -110,6 +113,40 @@ class Fusb302Register : public hwreg::I2cRegisterBase<RegType, uint8_t, 1> {
     auto reg = RegType::Get().FromValue(0);
     ZX_ASSERT(reg.I2cRegisterBase::ReadFrom(i2c) == ZX_OK);
     return reg;
+  }
+
+  // Only writes to the register if the mutation changes the value.
+  //
+  // Usage:
+  //     zx::result<> result = Control0Reg::ReadModifyWrite(
+  //           i2c_, [&](Control0Reg& control0) {
+  //       control0.set_flush_transmitter_fifo(true);
+  //     });
+  //     if (result.is_ok()) {
+  //        ...
+  //     }
+  template <typename F>
+  static zx::result<> ReadModifyWrite(fidl::ClientEnd<fuchsia_hardware_i2c::Device>& i2c,
+                                      F modify_function) {
+    auto reg = RegType::Get().FromValue(0);
+    const zx_status_t read_status = reg.I2cRegisterBase::ReadFrom(i2c);
+    if (read_status != ZX_OK) {
+      return zx::error_result(read_status);
+    }
+
+    const uint8_t old_value = reg.reg_value();
+    modify_function(reg);
+    if (reg.reg_value() == old_value) {
+      return zx::ok();
+    }
+
+    const zx_status_t write_status = reg.WriteTo(i2c);
+    if (write_status != ZX_OK) {
+      zxlogf(ERROR, "Failed to write register 0x%02x over I2C: %s", reg.reg_addr(),
+             zx_status_get_string(write_status));
+      return zx::error_result(write_status);
+    }
+    return zx::ok();
   }
 };
 
