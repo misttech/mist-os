@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Error},
+    anyhow::{anyhow, Context as _, Error},
     fidl::endpoints::{create_proxy, Proxy},
     fidl::HandleBased,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -13,10 +13,76 @@ use {
     frunner::ComponentNamespaceEntry,
     fuchsia_component::client as fclient,
     fuchsia_runtime as fruntime, fuchsia_zircon as zx,
+    fuchsiaperf::FuchsiaPerfBenchmarkResult,
     futures::StreamExt,
+    gtest_runner_lib::parser::read_file,
     kernel_config::generate_kernel_config,
     runner::component::ComponentNamespace,
 };
+
+pub async fn run_starnix_benchmark(
+    test: ftest::Invocation,
+    mut start_info: frunner::ComponentStartInfo,
+    run_listener_proxy: &ftest::RunListenerProxy,
+    starnix_kernel: &frunner::ComponentRunnerProxy,
+    test_data_path: &str,
+    converter: impl FnOnce(&str, &str) -> Result<Vec<FuchsiaPerfBenchmarkResult>, Error>,
+) -> Result<(), Error> {
+    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+    let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
+    start_info.numbered_handles = numbered_handles;
+
+    run_listener_proxy.on_test_case_started(
+        test,
+        ftest::StdHandles {
+            out: Some(stdout_client),
+            err: Some(stderr_client),
+            ..ftest::StdHandles::EMPTY
+        },
+        case_listener,
+    )?;
+
+    let program = start_info.program.as_ref().context("No program")?;
+    let test_suite = match runner::get_value(program, "test_suite_label") {
+        Some(fdata::DictionaryValue::Str(value)) => value.to_owned(),
+        _ => return Err(anyhow!("No test suite label.")),
+    };
+
+    // Save the custom_artifacts DirectoryProxy for result reporting.
+    let custom_artifacts =
+        get_custom_artifacts_directory(start_info.ns.as_mut().expect("No namespace."))?;
+
+    // Environment variables BENCHMARK_FORMAT and BENCHMARK_OUT should be set
+    // so the test writes json results to this directory.
+    let output_dir = add_output_dir_to_namespace(&mut start_info)?;
+
+    // Start the test component.
+    let component_controller = start_test_component(start_info, starnix_kernel)?;
+    let result = read_result(component_controller.take_event_stream()).await;
+
+    // Read the output it produced.
+    let test_data = read_file(&output_dir, test_data_path)
+        .await
+        .with_context(|| format!("reading {test_data_path} from test data"))?
+        .trim()
+        .to_owned();
+
+    let perfs =
+        converter(&test_data, &test_suite).context("converting test output to fuchsiaperf")?;
+
+    // Write JSON to custom artifacts directory where perf test infra expects it.
+    let file_proxy = fuchsia_fs::directory::open_file(
+        &custom_artifacts,
+        "results.fuchsiaperf.json",
+        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+    )
+    .await?;
+    fuchsia_fs::file::write(&file_proxy, serde_json::to_string(&perfs)?).await?;
+
+    case_listener_proxy.finished(result)?;
+
+    Ok(())
+}
 
 /// The name of the collection in which the starnix kernel is instantiated.
 pub const RUNNERS_COLLECTION: &str = "runners";
@@ -281,4 +347,21 @@ async fn open_exposed_directory(
             )
         })?;
     Ok(directory_proxy)
+}
+
+fn get_custom_artifacts_directory(
+    namespace: &mut Vec<frunner::ComponentNamespaceEntry>,
+) -> Result<fio::DirectoryProxy, Error> {
+    for entry in namespace {
+        if entry.path.as_ref().unwrap() == "/custom_artifacts" {
+            return entry
+                .directory
+                .take()
+                .unwrap()
+                .into_proxy()
+                .map_err(|_| anyhow!("Couldn't grab proxy."));
+        }
+    }
+
+    Err(anyhow!("Couldn't find /custom artifacts."))
 }

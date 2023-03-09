@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::binder_latency::run_binder_latency,
     crate::gbenchmark::*,
     crate::gtest::*,
     crate::helpers::*,
@@ -85,6 +86,15 @@ pub async fn handle_suite_requests(
                     }
                     TestType::Gbenchmark => {
                         run_gbenchmark(
+                            tests.get(0).unwrap().clone(),
+                            test_start_info,
+                            &run_listener_proxy,
+                            &starnix_kernel,
+                        )
+                        .await?
+                    }
+                    TestType::BinderLatency => {
+                        run_binder_latency(
                             tests.get(0).unwrap().clone(),
                             test_start_info,
                             &run_listener_proxy,

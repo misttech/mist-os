@@ -4,12 +4,10 @@
 
 use {
     crate::helpers::*,
-    anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    anyhow::{Context as _, Error},
+    fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_test::{self as ftest},
     fuchsiaperf::FuchsiaPerfBenchmarkResult,
-    gtest_runner_lib::parser::read_file,
     heck::CamelCase,
     serde::{Deserialize, Serialize},
 };
@@ -38,9 +36,7 @@ pub struct BenchmarkRunData {
     pub time_unit: String,
 }
 
-const TEST_SUITE_LABEL_KEY: &str = "test_suite_label";
 const GBENCHMARK_RESULT_FILE: &str = "benchmark.json";
-const FUCHSIA_PERF_RESULT_FILE: &str = "results.fuchsiaperf.json";
 
 /// The number of benchmark iterations to report.
 const MAX_BENCHMARK_COUNT: u8 = 5;
@@ -58,87 +54,24 @@ const MAX_BENCHMARK_COUNT: u8 = 5;
 /// - `starnix_kernel`: The kernel in which to run the test component.
 pub async fn run_gbenchmark(
     test: ftest::Invocation,
-    mut start_info: frunner::ComponentStartInfo,
+    start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
     starnix_kernel: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
-    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
-    let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
-    start_info.numbered_handles = numbered_handles;
-
-    run_listener_proxy.on_test_case_started(
+    run_starnix_benchmark(
         test,
-        ftest::StdHandles {
-            out: Some(stdout_client),
-            err: Some(stderr_client),
-            ..ftest::StdHandles::EMPTY
-        },
-        case_listener,
-    )?;
-
-    let test_suite = match runner::get_value(
-        start_info.program.as_ref().expect("No program"),
-        TEST_SUITE_LABEL_KEY,
-    ) {
-        Some(fdata::DictionaryValue::Str(value)) => value.to_owned(),
-        _ => return Err(anyhow!("No test suite label.")),
-    };
-
-    // Save the custom_artifacts DirectoryProxy for result reporting.
-    let custom_artifacts =
-        get_custom_artifacts_directory(start_info.ns.as_mut().expect("No namespace."))?;
-
-    // Environment variables BENCHMARK_FORMAT and BENCHMARK_OUT should be set
-    // so the test writes json results to this directory.
-    let output_dir = add_output_dir_to_namespace(&mut start_info)?;
-
-    // Start the test component.
-    let component_controller = start_test_component(start_info, starnix_kernel)?;
-    let result = read_result(component_controller.take_event_stream()).await;
-
-    // Parse test results.
-    let read_content = read_file(&output_dir, GBENCHMARK_RESULT_FILE)
-        .await
-        .expect("Failed to read test result file.")
-        .trim()
-        .to_owned();
-    let perfs = gbenchmark_to_fuchsiaperf(&read_content, test_suite)?;
-
-    // Write results to `/custom_artifacts`. The perf infrastructure looks
-    // for results in this file.
-    let file_proxy = fuchsia_fs::directory::open_file(
-        &custom_artifacts,
-        FUCHSIA_PERF_RESULT_FILE,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        start_info,
+        run_listener_proxy,
+        starnix_kernel,
+        GBENCHMARK_RESULT_FILE,
+        gbenchmark_to_fuchsiaperf,
     )
-    .await?;
-    fuchsia_fs::file::write(&file_proxy, serde_json::to_string(&perfs)?).await?;
-
-    case_listener_proxy.finished(result)?;
-
-    Ok(())
-}
-
-fn get_custom_artifacts_directory(
-    namespace: &mut Vec<frunner::ComponentNamespaceEntry>,
-) -> Result<fio::DirectoryProxy, Error> {
-    for entry in namespace {
-        if entry.path.as_ref().unwrap() == "/custom_artifacts" {
-            return entry
-                .directory
-                .take()
-                .unwrap()
-                .into_proxy()
-                .map_err(|_| anyhow!("Couldn't grab proxy."));
-        }
-    }
-
-    Err(anyhow!("Couldn't find /custom artifacts."))
+    .await
 }
 
 fn gbenchmark_to_fuchsiaperf(
     results: &str,
-    test_suite: String,
+    test_suite: &str,
 ) -> Result<Vec<FuchsiaPerfBenchmarkResult>, Error> {
     let benchmark_output: BenchmarkOutput =
         serde_json::from_str(results).context("Failed to parse benchmark results.")?;
@@ -172,7 +105,7 @@ fn gbenchmark_to_fuchsiaperf(
 
         perfs.push(FuchsiaPerfBenchmarkResult {
             label,
-            test_suite: test_suite.clone(),
+            test_suite: test_suite.to_owned(),
             unit: benchmark.time_unit,
             values: vec![benchmark.real_time],
         });
@@ -341,7 +274,7 @@ mod tests {
             },
         ];
 
-        let perfs = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE.to_owned())
+        let perfs = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE)
             .expect("Failed to convert gbenchmark results.");
         assert_eq!(perfs.len(), expected_perfs.len());
         for i in 0..perfs.len() {
@@ -361,7 +294,7 @@ mod tests {
               },
             ]
           }"#;
-        let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE.to_owned())
+        let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE)
             .expect_err("Failed to parse benchmark results.");
     }
 
@@ -378,7 +311,7 @@ mod tests {
             ]
           }"#;
 
-        let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE.to_owned())
+        let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE)
             .expect_err("Failed to parse benchmark results.");
     }
 
@@ -395,7 +328,7 @@ mod tests {
             ]
           }"#;
 
-        let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE.to_owned())
+        let _ = gbenchmark_to_fuchsiaperf(gbenchmark, TEST_SUITE)
             .expect_err("Failed to parse benchmark results.");
     }
 }

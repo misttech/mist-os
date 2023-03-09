@@ -45,6 +45,7 @@ rustc_binary("bin") {
   ]
 
   sources = [
+    "src/binder_latency.rs",
     "src/gbenchmark.rs",
     "src/gtest.rs",
     "src/helpers.rs",

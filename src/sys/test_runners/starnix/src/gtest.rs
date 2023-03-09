@@ -27,6 +27,7 @@ const OUTPUT_PATH: &str = "/test_data/";
 
 #[derive(PartialEq)]
 pub enum TestType {
+    BinderLatency,
     Gbenchmark,
     Gtest,
     Gunit,
@@ -50,6 +51,7 @@ pub fn test_type(program: &fdata::Dictionary) -> TestType {
     let test_type_val = runner::get_value(program, GTEST_KEY);
     match test_type_val {
         Some(fdata::DictionaryValue::Str(value)) => match value.as_str() {
+            "binder_latency" => TestType::BinderLatency,
             "gtest" => TestType::Gtest,
             "gunit" => TestType::Gunit,
             "gtest_xml_output" => TestType::GtestXmlOutput,
@@ -180,7 +182,9 @@ pub async fn run_gtest_cases(
     let output_format = match test_type {
         TestType::Gtest | TestType::Gunit => "json",
         TestType::GtestXmlOutput => "xml",
-        TestType::Gbenchmark | TestType::Unknown => panic!("unexpected type"),
+        TestType::Gbenchmark | TestType::BinderLatency | TestType::Unknown => {
+            panic!("unexpected type")
+        }
     };
     let output_arg = format_arg(
         &test_type,
@@ -243,7 +247,9 @@ fn format_arg(test_type: &TestType, test_arg: &str) -> Result<String, Error> {
     match test_type {
         TestType::Gtest | TestType::GtestXmlOutput => Ok(format!("--gtest_{}", test_arg)),
         TestType::Gunit => Ok(format!("--gunit_{}", test_arg)),
-        TestType::Gbenchmark | TestType::Unknown => Err(anyhow!("Unknown test type")),
+        TestType::Gbenchmark | TestType::BinderLatency | TestType::Unknown => {
+            Err(anyhow!("Unknown test type"))
+        }
     }
 }
 
