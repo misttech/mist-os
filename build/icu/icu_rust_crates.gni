@@ -1,0 +1,115 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("config.gni")  # icu_flavors
+
+# Apparently, defaults are set per rule name, regardless of what the rule may
+# expand to.
+set_defaults("icu_rust_library") {
+  configs = default_common_binary_configs
+}
+
+template("icu_group") {
+  foreach(icu_flavor, icu_flavors) {
+    group("${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "visibility",
+                               "testonly",
+                               "public_deps",
+                             ])
+      forward_variables_from(invoker,
+                             [
+                               "visibility",
+                               "testonly",
+                             ])
+
+      if (defined(invoker.public_deps)) {
+        public_deps = []
+      }
+      foreach(public_dep, invoker.public_deps) {
+        # Public deps for icu_group are all assumed to be ICU targets, so we can
+        # just fix them up unconditionally.
+        public_deps +=
+            [ "${public_dep}.icu_${icu_flavor.name}_${icu_flavor.commit_id}" ]
+      }
+    }
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    forward_variables_from(invoker,
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+  }
+}
+
+# An ICU-aware rust-library, for use in //third_party/rust_crates.
+template("icu_rust_library") {
+  foreach(icu_flavor, icu_flavors) {
+    rust_library(
+        "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "visibility",
+                               "testonly",
+                             ])
+      forward_variables_from(invoker,
+                             [
+                               "visibility",
+                               "testonly",
+                             ])
+
+      if (defined(output_name)) {
+        output_name = "${invoker.output_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
+      } else {
+        output_name =
+            "${target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}"
+      }
+
+      # Add the appropriate ICU rust configuration.
+      configs += [ "//src/lib/icu:version" ]
+      configs -= [ "//src/lib/icu:version" ]
+      configs += [ "//src/lib/icu:version_${icu_flavor.name}" ]
+
+      if (defined(deps)) {
+        deps_copy = deps
+        deps = []
+
+        # ":rust_icu_*" deps are the only ones that need to be flavored.
+        foreach(dep, deps_copy) {
+          if (string_replace(dep, "rust_icu_", "") != dep) {
+            deps += [ "${dep}.icu_${icu_flavor.name}_${icu_flavor.commit_id}" ]
+          } else {
+            deps += [ dep ]
+          }
+        }
+      }
+    }
+  }
+
+  rust_library(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    forward_variables_from(invoker,
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    output_name = invoker.output_name
+  }
+}
