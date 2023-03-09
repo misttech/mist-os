@@ -48,7 +48,7 @@ zx_status_t AmlCpuFrequency::Create(
   little_cluster_current_rate_ = thermal_info.initial_cluster_frequencies[static_cast<uint32_t>(
       fuchsia_hardware_thermal::wire::PowerDomain::kLittleClusterPowerDomain)];
 
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "aml-cpufreq: failed to get pdev protocol");
     return ZX_ERR_NOT_SUPPORTED;

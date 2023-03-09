@@ -24,7 +24,7 @@ namespace rtc {
 
 zx_status_t AmlRtc::Bind(void* ctx, zx_device_t* device) {
   uint32_t reg_val;
-  ddk::PDev pdev(device);
+  ddk::PDevFidl pdev(device);
   if (!pdev.is_valid()) {
     return ZX_ERR_NO_RESOURCES;
   }

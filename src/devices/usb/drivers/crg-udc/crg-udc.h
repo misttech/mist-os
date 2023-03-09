@@ -411,7 +411,7 @@ class CrgUdc : public CrgUdcType, public ddk::UsbDciProtocol<CrgUdc, ddk::base_p
   DeviceState device_state_ = DeviceState::kUsbStateNotattached;
   uint32_t device_speed_ = USB_SPEED_UNDEFINED;
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   std::optional<ddk::UsbDciInterfaceProtocolClient> dci_intf_;
   std::optional<ddk::UsbPhyProtocolClient> usb_phy_;
 

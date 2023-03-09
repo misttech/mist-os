@@ -1742,7 +1742,7 @@ zx_status_t CrgUdc::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t CrgUdc::Init() {
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "CrgUdc::Create: could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;

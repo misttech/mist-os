@@ -43,7 +43,7 @@ zx_status_t AmlThermistor::Create(void* ctx, zx_device_t* parent) {
 zx_status_t AmlThermistor::InitPdev() {
   zx_status_t status;
 
-  ddk::PDev pdev(parent());
+  ddk::PDevFidl pdev(parent());
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: failed to get pdev", __func__);
     return ZX_ERR_NO_RESOURCES;

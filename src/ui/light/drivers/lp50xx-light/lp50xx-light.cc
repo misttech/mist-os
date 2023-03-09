@@ -507,7 +507,7 @@ zx_status_t Lp50xxLight::InitHelper() {
 
   i2c_ = std::move(*i2c_client);
 
-  auto pdev = ddk::PDev::FromFragment(parent());
+  auto pdev = ddk::PDevFidl::FromFragment(parent());
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Get PBusProtocolClient failed");
     return ZX_ERR_NO_RESOURCES;

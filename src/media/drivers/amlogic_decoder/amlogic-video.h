@@ -222,7 +222,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
 
   Owner* owner_ = nullptr;
   zx_device_t* parent_ = nullptr;
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   ddk::SysmemProtocolClient sysmem_;
   ddk::AmlogicCanvasProtocolClient canvas_;
 

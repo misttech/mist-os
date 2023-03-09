@@ -60,7 +60,7 @@ class NelsonUsbPhy : public NelsonUsbPhyType,
   zx_status_t Init();
   int IrqThread();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   std::optional<fdf::MmioBuffer> reset_mmio_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy20_mmio_;

@@ -23,7 +23,7 @@
 namespace rtc {
 
 zx_status_t Pl031::Bind(void* /*unused*/, zx_device_t* dev) {
-  ddk::PDev pdev(dev);
+  ddk::PDevFidl pdev(dev);
   if (!pdev.is_valid()) {
     return ZX_ERR_NO_RESOURCES;
   }

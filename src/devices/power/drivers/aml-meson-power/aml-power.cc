@@ -372,7 +372,7 @@ void AmlPower::DdkRelease() { delete this; }
 
 zx_status_t AmlPower::Create(void* ctx, zx_device_t* parent) {
   zx_status_t st;
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: failed to get pdev protocol", __func__);
     return ZX_ERR_INTERNAL;

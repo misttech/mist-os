@@ -15,5 +15,6 @@
     },
     use: [
         { service: "fuchsia.hardware.i2c.Service" },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }

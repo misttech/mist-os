@@ -79,7 +79,7 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
 }  // namespace
 
 DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type)
-    : pdev_(ddk::PDev::FromFragment(parent)),
+    : pdev_(ddk::PDevFidl::FromFragment(parent)),
       dsiimpl_(parent, "dsi"),
       lcd_gpio_(parent, "gpio"),
       panel_type_(panel_type) {}

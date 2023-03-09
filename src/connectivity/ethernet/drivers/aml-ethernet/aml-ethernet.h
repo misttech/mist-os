@@ -52,7 +52,7 @@ class AmlEthernet : public DeviceType,
   zx_status_t InitPdev();
   zx_status_t Bind();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   ddk::I2cChannel i2c_;
   ddk::GpioProtocolClient gpios_[GPIO_COUNT];
 

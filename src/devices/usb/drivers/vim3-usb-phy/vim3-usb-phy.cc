@@ -382,7 +382,7 @@ void Vim3UsbPhy::RemoveDwc2Device(SetModeCompletion completion) {
 
 zx_status_t Vim3UsbPhy::Init() {
   zx_status_t status = ZX_OK;
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "Vim3UsbPhy::Init: could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;

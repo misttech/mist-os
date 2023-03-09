@@ -210,7 +210,7 @@ zx_status_t AmlLight::Init() {
     return ZX_ERR_INTERNAL;
   }
 
-  ddk::PDev pdev(parent(), "pdev");
+  ddk::PDevFidl pdev(parent(), "pdev");
   pdev_board_info_t board_info = {};
   status = ZX_OK;
   if (!pdev.is_valid() || (status = pdev.GetBoardInfo(&board_info)) != ZX_OK) {

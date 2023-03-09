@@ -353,7 +353,7 @@ zx_status_t AmlTSensor::GetStateChangePort(zx_handle_t* port) {
 
 zx_status_t AmlTSensor::Create(zx_device_t* parent,
                                fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config) {
-  ddk::PDev pdev{parent};
+  ddk::PDevFidl pdev{parent};
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "aml-thermal: failed to get platform device");
     return ZX_ERR_INTERNAL;

@@ -2203,7 +2203,7 @@ zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  zx::result pdev_result = ddk::PDevFidl::Create(parent, ddk::PDev::kFragmentName);
+  zx::result pdev_result = ddk::PDevFidl::Create(parent, ddk::PDevFidl::kFragmentName);
   if (pdev_result.is_ok()) {
     dev->pdev_ = std::move(pdev_result.value());
     // We need at least a PDEV, but the PHY is optional

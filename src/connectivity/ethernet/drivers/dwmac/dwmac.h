@@ -97,7 +97,7 @@ class EthMacFunction;
 
 class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable> {
  public:
-  DWMacDevice(zx_device_t* device, ddk::PDev pdev, ddk::EthBoardProtocolClient eth_board);
+  DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev, ddk::EthBoardProtocolClient eth_board);
 
   static zx_status_t Create(void* ctx, zx_device_t* device);
 
@@ -172,7 +172,7 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
   zx::bti bti_;
   zx::interrupt dma_irq_;
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   ddk::EthBoardProtocolClient eth_board_;
 
   std::optional<fdf::MmioBuffer> mmio_;

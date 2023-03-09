@@ -19,6 +19,7 @@
     ],
     use: [
         { service: "fuchsia.hardware.mailbox.Service" },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
     expose: [
         {

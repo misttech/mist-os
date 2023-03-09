@@ -72,7 +72,7 @@ zx_status_t AmlDsp::DspSmcCall(uint32_t func_id, uint8_t arg1, uint32_t arg2, ui
 zx_status_t AmlDsp::Init() {
   zx_status_t status;
 
-  auto pdev = ddk::PDev::FromFragment(parent());
+  auto pdev = ddk::PDevFidl::FromFragment(parent());
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Failed to get ZX_PROTOCOL_PDEV");
     return ZX_ERR_NO_RESOURCES;
@@ -371,7 +371,7 @@ zx_status_t AmlDsp::Bind() {
 zx_status_t AmlDsp::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
   fbl::AllocChecker ac;
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
 
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Failed to get ZX_PROTOCOL_PDEV");

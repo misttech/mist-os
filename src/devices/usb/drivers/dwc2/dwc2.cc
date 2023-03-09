@@ -118,7 +118,6 @@ void Dwc2::HandleEnumDone() {
 
 // Handler for inepintr interrupt.
 void Dwc2::HandleInEpInterrupt() {
-
   if (timeout_recovering_) {
     // TODO(105382) remove logging once timeout recovery has stabilized.
     zxlogf(ERROR, "(diepint.timeout) IN-ep interrupt with timeout_recovering_ = true");
@@ -258,7 +257,6 @@ void Dwc2::HandleInEpInterrupt() {
 
 // Handler for outepintr interrupt.
 void Dwc2::HandleOutEpInterrupt() {
-
   if (timeout_recovering_) {
     // TODO(105382) remove logging once timeout recovery has stabilized.
     zxlogf(ERROR, "(diepint.timeout) OUT-ep interrupt with timeout_recovering_ = true");
@@ -659,7 +657,7 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
       auto transfered = ReadTransfered(ep);
       ep->req_offset += transfered;
 
-      if (is_in) { // data direction is IN-type (to the host).
+      if (is_in) {  // data direction is IN-type (to the host).
         if (ep->req_offset == ep->req_length) {
           HandleEp0Status(false);
         } else {
@@ -676,12 +674,12 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
           fbl::AutoLock al(&ep->lock);
           StartTransfer(ep, length);
         }
-      } else { // data direction is OUT-type (from the host).
+      } else {  // data direction is OUT-type (from the host).
         if (ep->req_offset == ep->req_length) {
           if (dci_intf_) {
             size_t actual;
-            dci_intf_->Control(&cur_setup_, (uint8_t*)ep0_buffer_.virt(), ep->req_length, nullptr, 0,
-                               &actual);
+            dci_intf_->Control(&cur_setup_, (uint8_t*)ep0_buffer_.virt(), ep->req_length, nullptr,
+                               0, &actual);
           }
           HandleEp0Status(true);
         } else {
@@ -959,7 +957,7 @@ zx_status_t Dwc2::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t Dwc2::Init() {
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "Dwc2::Create: could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;
@@ -1073,7 +1071,6 @@ int Dwc2::IrqThread() {
     // It doesn't seem that this inner loop should be necessary,
     // but without it we miss interrupts on some versions of the IP.
     while (1) {
-
       auto gintsts = GINTSTS::Get().ReadFrom(mmio);
 
       // After experiencing a diepint.timeout interrupt, this (inner) loop whips back seemingly one

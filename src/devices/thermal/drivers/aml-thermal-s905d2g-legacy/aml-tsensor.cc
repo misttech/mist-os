@@ -345,7 +345,7 @@ zx_status_t AmlTSensor::GetStateChangePort(zx_handle_t* port) const {
 
 zx_status_t AmlTSensor::Create(zx_device_t* parent,
                                fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config) {
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "aml-voltage: failed to get pdev protocol");
     return ZX_ERR_NOT_SUPPORTED;

@@ -33,7 +33,7 @@ namespace thermal {
 using fuchsia_hardware_thermal::wire::OperatingPoint;
 
 zx_status_t As370Thermal::Create(void* ctx, zx_device_t* parent) {
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: Failed to get platform device protocol", __func__);
     return ZX_ERR_NO_RESOURCES;

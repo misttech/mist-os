@@ -31,7 +31,7 @@ constexpr int kInvalidIndex = -1;
 zx_status_t AmlVoltageRegulator::Create(
     zx_device_t* parent, const fuchsia_hardware_thermal::wire::ThermalDeviceInfo& thermal_config,
     const aml_thermal_info_t* thermal_info) {
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "aml-voltage: failed to get pdev protocol");
     return ZX_ERR_NOT_SUPPORTED;

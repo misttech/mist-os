@@ -815,7 +815,7 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   TRACE_DURATION("media", "AmlogicVideo::InitRegisters");
   parent_ = parent;
 
-  pdev_ = ddk::PDev::FromFragment(parent_);
+  pdev_ = ddk::PDevFidl::FromFragment(parent_);
   if (!pdev_.is_valid()) {
     DECODE_ERROR("Failed to get pdev protocol");
     return ZX_ERR_NO_RESOURCES;

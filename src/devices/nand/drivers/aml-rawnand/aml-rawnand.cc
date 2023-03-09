@@ -1020,7 +1020,7 @@ zx_status_t AmlRawNand::Bind() {
 zx_status_t AmlRawNand::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: ZX_PROTOCOL_PDEV not available", __FILE__);
     return ZX_ERR_NO_RESOURCES;

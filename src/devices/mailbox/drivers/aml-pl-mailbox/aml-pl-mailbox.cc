@@ -239,7 +239,7 @@ zx_status_t AmlPlMailbox::Bind() {
 zx_status_t AmlPlMailbox::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
   fbl::AllocChecker ac;
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Failed to get ZX_PROTOCOL_PDEV");
     return ZX_ERR_NO_RESOURCES;

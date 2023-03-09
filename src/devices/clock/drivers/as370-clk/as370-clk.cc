@@ -22,7 +22,7 @@
 namespace clk {
 
 zx_status_t As370Clk::Create(void* ctx, zx_device_t* parent) {
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: failed to get pdev", __FILE__);
     return ZX_ERR_NO_RESOURCES;

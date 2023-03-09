@@ -22,7 +22,7 @@
 namespace amlogic_display {
 
 // static
-zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDev* pdev,
+zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
                                                            inspect::Node* osd_node) {
   fbl::AllocChecker ac;
   std::unique_ptr<RdmaEngine> rdma(new (&ac) RdmaEngine(osd_node));

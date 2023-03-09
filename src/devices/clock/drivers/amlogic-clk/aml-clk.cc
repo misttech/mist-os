@@ -687,7 +687,7 @@ AmlClock::AmlClock(zx_device_t* device, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffe
       uint32_t chip_id = PDEV_PID_AMLOGIC_A5;
       zx::resource smc_resource;
 
-      ddk::PDev pdev(device);
+      ddk::PDevFidl pdev(device);
       if ((pdev.GetSmc(0, &smc_resource)) != ZX_OK) {
         zxlogf(ERROR, "pdev.GetSmc failed");
         return;
@@ -751,7 +751,7 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
   zx_status_t status;
 
   // Get the platform device protocol and try to map all the MMIO regions.
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "aml-clk: failed to get pdev protocol");
     return ZX_ERR_NO_RESOURCES;

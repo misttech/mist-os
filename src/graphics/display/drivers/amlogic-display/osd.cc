@@ -929,9 +929,10 @@ void Osd::Release() {
 }
 
 // static
-zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDev* pdev, bool supports_afbc, uint32_t fb_width,
-                                             uint32_t fb_height, uint32_t display_width,
-                                             uint32_t display_height, inspect::Node* osd_node) {
+zx::result<std::unique_ptr<Osd>> Osd::Create(ddk::PDevFidl* pdev, bool supports_afbc,
+                                             uint32_t fb_width, uint32_t fb_height,
+                                             uint32_t display_width, uint32_t display_height,
+                                             inspect::Node* osd_node) {
   std::optional<fdf::MmioBuffer> vpu_mmio;
   // Map vpu mmio used by the OSD object
   zx_status_t status = pdev->MapMmio(MMIO_VPU, &vpu_mmio);

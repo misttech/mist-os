@@ -557,7 +557,7 @@ zx_status_t Lp8556Device::ReadInitialState() {
 
 zx_status_t ti_lp8556_bind(void* ctx, zx_device_t* parent) {
   // Get platform device protocol
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     LOG_ERROR("Could not get PDEV protocol\n");
     return ZX_ERR_NO_RESOURCES;

@@ -97,7 +97,7 @@ class AmlMipiDevice : public DeviceType,
   std::optional<fdf::MmioBuffer> mipi_adap_mmio_;
   std::optional<fdf::MmioBuffer> hiu_mmio_;
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 
   zx::bti bti_;
   zx::interrupt adap_irq_;

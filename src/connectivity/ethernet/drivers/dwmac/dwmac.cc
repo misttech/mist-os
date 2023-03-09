@@ -164,7 +164,7 @@ zx_status_t DWMacDevice::InitPdev() {
 }
 
 zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
-  auto pdev = ddk::PDev::FromFragment(device);
+  auto pdev = ddk::PDevFidl::FromFragment(device);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s could not get ZX_PROTOCOL_PDEV", __func__);
     return ZX_ERR_NO_RESOURCES;
@@ -176,7 +176,7 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  auto mac_device = std::make_unique<DWMacDevice>(device, pdev, eth_board);
+  auto mac_device = std::make_unique<DWMacDevice>(device, std::move(pdev), eth_board);
 
   zx_status_t status = mac_device->InitPdev();
   if (status != ZX_OK) {
@@ -362,9 +362,10 @@ zx_status_t DWMacDevice::EthMacRegisterCallbacks(const eth_mac_callbacks_t* cbs)
   return ZX_OK;
 }
 
-DWMacDevice::DWMacDevice(zx_device_t* device, ddk::PDev pdev, ddk::EthBoardProtocolClient eth_board)
+DWMacDevice::DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev,
+                         ddk::EthBoardProtocolClient eth_board)
     : ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable>(device),
-      pdev_(pdev),
+      pdev_(std::move(pdev)),
       eth_board_(eth_board) {}
 
 void DWMacDevice::ReleaseBuffers() {

@@ -37,6 +37,9 @@ class PDevFidl {
 
   zx_status_t MapMmio(uint32_t index, std::optional<fdf::MmioBuffer>* mmio,
                       uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  zx_status_t GetInterrupt(uint32_t index, zx::interrupt* out) {
+    return GetInterrupt(index, 0, out);
+  }
 
   // The functions below get their signature from fuchsia.hardware.platform.device Banjo.
   zx_status_t GetMmio(uint32_t index, pdev_mmio_t* out_mmio) const;

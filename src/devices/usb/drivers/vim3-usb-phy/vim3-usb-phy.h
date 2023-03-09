@@ -74,7 +74,7 @@ class Vim3UsbPhy : public Vim3UsbPhyType,
   zx_status_t Init();
   int IrqThread();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy20_mmio_;

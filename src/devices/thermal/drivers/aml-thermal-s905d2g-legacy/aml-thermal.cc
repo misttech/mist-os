@@ -85,7 +85,7 @@ zx_status_t AmlThermal::SetTarget(uint32_t opp_idx,
 }
 
 zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
-  auto pdev = ddk::PDev::FromFragment(device);
+  auto pdev = ddk::PDevFidl::FromFragment(device);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "aml-thermal: failed to get pdev protocol");
     return ZX_ERR_NOT_SUPPORTED;

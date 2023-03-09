@@ -33,7 +33,7 @@ constexpr zx::duration kTransferInterval = zx::msec(20);
 namespace audio {
 namespace aml_g12 {
 
-AmlG12TdmDspStream::AmlG12TdmDspStream(zx_device_t* parent, bool is_input, ddk::PDev pdev,
+AmlG12TdmDspStream::AmlG12TdmDspStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
                                        const ddk::GpioProtocolClient enable_gpio)
     : SimpleAudioStream(parent, is_input),
       pdev_(std::move(pdev)),
@@ -793,7 +793,7 @@ static zx_status_t audio_bind(void* ctx, zx_device_t* device) {
   }
   if (metadata.is_input) {
     auto stream = audio::SimpleAudioStream::Create<audio::aml_g12::AmlG12TdmDspStream>(
-        device, true, ddk::PDev::FromFragment(device),
+        device, true, ddk::PDevFidl::FromFragment(device),
         ddk::GpioProtocolClient(device, "gpio-enable"));
     if (stream == nullptr) {
       zxlogf(ERROR, "Could not create aml-g12-tdm driver");
@@ -802,7 +802,7 @@ static zx_status_t audio_bind(void* ctx, zx_device_t* device) {
     [[maybe_unused]] auto unused = fbl::ExportToRawPtr(&stream);
   } else {
     auto stream = audio::SimpleAudioStream::Create<audio::aml_g12::AmlG12TdmDspStream>(
-        device, false, ddk::PDev::FromFragment(device),
+        device, false, ddk::PDevFidl::FromFragment(device),
         ddk::GpioProtocolClient(device, "gpio-enable"));
     if (stream == nullptr) {
       zxlogf(ERROR, "Could not create aml-g12-tdm driver");

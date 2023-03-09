@@ -124,7 +124,7 @@ template <typename T>
 zx_status_t RegistersDevice<T>::Init(zx_device_t* parent, Metadata metadata) {
   zx_status_t status = ZX_OK;
 
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   pdev_device_info_t device_info = {};
   if ((status = pdev.GetDeviceInfo(&device_info)) != ZX_OK) {
     zxlogf(ERROR, "%s: Could not get device info", __func__);

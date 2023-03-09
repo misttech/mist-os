@@ -429,7 +429,7 @@ zx_status_t Clock::Enable(const display_setting_t& d) {
 void Clock::SetVideoOn(bool on) { WRITE32_REG(VPU, ENCL_VIDEO_EN, on); }
 
 // static
-zx::result<std::unique_ptr<Clock>> Clock::Create(ddk::PDev& pdev, bool already_enabled) {
+zx::result<std::unique_ptr<Clock>> Clock::Create(ddk::PDevFidl& pdev, bool already_enabled) {
   fbl::AllocChecker ac;
   auto self = fbl::make_unique_checked<Clock>(&ac);
   if (!ac.check()) {

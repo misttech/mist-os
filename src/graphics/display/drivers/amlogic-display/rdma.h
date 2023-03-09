@@ -152,9 +152,10 @@ struct RdmaChannelContainer {
  */
 class RdmaEngine {
  public:
-  static zx::result<std::unique_ptr<RdmaEngine>> Create(ddk::PDev* pdev, inspect::Node* osd_node);
+  static zx::result<std::unique_ptr<RdmaEngine>> Create(ddk::PDevFidl* pdev,
+                                                        inspect::Node* osd_node);
   // This must be called before any other methods. Not included in the ctor
-  // because ddk::PDev provides std::optional<fdf::MmioBuffer> which means that
+  // because ddk::PDevFidl provides std::optional<fdf::MmioBuffer> which means that
   // move semantics will invalidate pointers.
   zx_status_t SetupRdma(fdf::MmioBuffer* vpu_mmio);
 

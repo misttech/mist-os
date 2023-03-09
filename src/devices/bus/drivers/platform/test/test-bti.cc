@@ -46,7 +46,7 @@ zx_status_t TestBti::Create(void*, zx_device_t* parent) {
   return ZX_OK;
 }
 void TestBti::GetKoid(GetKoidCompleter::Sync& completer) {
-  ddk::PDev pdev(parent());
+  ddk::PDevFidl pdev(parent());
   if (!pdev.is_valid()) {
     completer.Close(ZX_ERR_INTERNAL);
     return;

@@ -56,7 +56,7 @@ zx_status_t As370Gpio::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_INTERNAL;
   }
 
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: Failed to get ZX_PROTOCOL_PLATFORM_DEVICE", __FILE__);
     return ZX_ERR_NO_RESOURCES;

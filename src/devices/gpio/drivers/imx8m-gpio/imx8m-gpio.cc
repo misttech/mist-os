@@ -39,7 +39,7 @@ zx_status_t Imx8mGpio::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_INTERNAL;
   }
 
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "Failed to get ZX_PROTOCOL_PLATFORM_DEVICE");
     return ZX_ERR_NO_RESOURCES;

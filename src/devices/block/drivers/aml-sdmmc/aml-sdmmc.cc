@@ -1171,7 +1171,7 @@ zx_status_t AmlSdmmc::Bind() {
 }
 
 zx_status_t AmlSdmmc::Create(void* ctx, zx_device_t* parent) {
-  auto pdev = ddk::PDev::FromFragment(parent);
+  auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
     AML_SDMMC_ERROR("Could not get pdev.");
     return ZX_ERR_NO_RESOURCES;

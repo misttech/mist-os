@@ -38,7 +38,7 @@ enum class GammaChannel {
 
 class Osd {
  public:
-  static zx::result<std::unique_ptr<Osd>> Create(ddk::PDev* pdev, bool supports_afbc,
+  static zx::result<std::unique_ptr<Osd>> Create(ddk::PDevFidl* pdev, bool supports_afbc,
                                                  uint32_t fb_width, uint32_t fb_height,
                                                  uint32_t display_width, uint32_t display_height,
                                                  inspect::Node* parent_node);

@@ -175,7 +175,7 @@ class AmlogicDisplay
   thrd_t capture_thread_;
 
   // Protocol handles used in by this driver
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   ddk::AmlogicCanvasProtocolClient canvas_;
   ddk::SysmemProtocolClient sysmem_;
 

@@ -62,7 +62,7 @@ class DsiHost {
   std::optional<fdf::MmioBuffer> mipi_dsi_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 
   ddk::DsiImplProtocolClient dsiimpl_;
 

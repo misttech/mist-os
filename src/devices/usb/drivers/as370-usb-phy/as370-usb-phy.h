@@ -39,7 +39,7 @@ class UsbPhy : public UsbPhyType {
 
   zx_status_t Init();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   std::optional<ddk::MmioBuffer> usbphy_mmio_;
   std::optional<ddk::MmioBuffer> reset_mmio_;
 

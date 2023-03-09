@@ -878,7 +878,7 @@ zx_status_t DsiDw::SendCommand(const mipi_dsi_cmd_t& cmd) {
 void DsiDw::DdkRelease() { delete this; }
 
 zx_status_t DsiDw::Bind() {
-  ddk::PDev pdev{parent_};
+  ddk::PDevFidl pdev{parent_};
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "aml-thermal: failed to get platform device");
     return ZX_ERR_INTERNAL;

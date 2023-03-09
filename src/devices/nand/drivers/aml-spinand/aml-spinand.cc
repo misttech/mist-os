@@ -622,7 +622,7 @@ zx_status_t AmlSpiNand::Init() {
 zx_status_t AmlSpiNand::Create(void *ctx, zx_device_t *parent) {
   zx_status_t status = ZX_OK;
 
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");
     return ZX_ERR_NO_RESOURCES;

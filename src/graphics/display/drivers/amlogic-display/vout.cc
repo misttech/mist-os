@@ -61,8 +61,8 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   dsi_.dsi_host = std::move(dsi_host.value());
   ZX_ASSERT(dsi_.dsi_host);
 
-  ddk::PDev pdev;
-  auto status = ddk::PDev::FromFragment(parent, &pdev);
+  ddk::PDevFidl pdev;
+  auto status = ddk::PDevFidl::FromFragment(parent, &pdev);
   if (status != ZX_OK) {
     DISP_ERROR("Could not get PDEV protocol\n");
     return status;

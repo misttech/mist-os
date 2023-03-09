@@ -148,9 +148,9 @@ zx_status_t ResetAs370Emmc(const ddk::RegistersProtocolClient& reset) {
 namespace sdhci {
 
 zx_status_t As370Sdhci::Create(void* ctx, zx_device_t* parent) {
-  ddk::PDev pdev = ddk::PDev::FromFragment(parent);
+  ddk::PDevFidl pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
-    pdev = ddk::PDev(parent);
+    pdev = ddk::PDevFidl(parent);
   }
 
   if (!pdev.is_valid()) {

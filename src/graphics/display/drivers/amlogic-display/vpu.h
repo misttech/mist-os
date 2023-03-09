@@ -23,7 +23,7 @@ namespace amlogic_display {
 class Vpu {
  public:
   Vpu() {}
-  zx_status_t Init(ddk::PDev& pdev);
+  zx_status_t Init(ddk::PDevFidl& pdev);
   // This function powers on VPU related blocks. The function contains undocumented
   // register and/or power-on sequences.
   void PowerOn();

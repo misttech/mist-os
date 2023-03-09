@@ -153,7 +153,7 @@ void AmlCanvas::DdkRelease() {
 // static funtion to create the canvas object and initialize its members
 zx_status_t AmlCanvas::Setup(zx_device_t* parent) {
   // Get device protocol
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     CANVAS_ERROR("Could not get parent protocol\n");
     return ZX_ERR_NO_RESOURCES;

@@ -601,7 +601,7 @@ zx_status_t DwI2c::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
   fbl::AllocChecker ac;
 
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: Failed to get ZX_PROTOCOL_PDEV", __FILE__);
     return ZX_ERR_NO_RESOURCES;

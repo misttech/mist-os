@@ -100,7 +100,7 @@ struct hdmi_param {
 class HdmiHost {
  public:
   explicit HdmiHost(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi>&& chan)
-      : pdev_(ddk::PDev::FromFragment(parent)), hdmi_(std::move(chan)) {}
+      : pdev_(ddk::PDevFidl::FromFragment(parent)), hdmi_(std::move(chan)) {}
 
   zx_status_t Init();
   zx_status_t HostOn();
@@ -126,7 +126,7 @@ class HdmiHost {
   void ConfigureOd3Div(uint32_t div_sel);
   void WaitForPllLocked();
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
 
   fidl::WireSyncClient<fuchsia_hardware_hdmi::Hdmi> hdmi_;
 

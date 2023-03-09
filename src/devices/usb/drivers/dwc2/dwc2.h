@@ -142,7 +142,7 @@ class Dwc2 : public Dwc2Type, public ddk::UsbDciProtocol<Dwc2, ddk::base_protoco
   usb_setup_t cur_setup_ = {};
   Ep0State ep0_state_ = Ep0State::DISCONNECTED;
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   std::optional<ddk::UsbDciInterfaceProtocolClient> dci_intf_;
   std::optional<ddk::UsbPhyProtocolClient> usb_phy_;
 

@@ -128,7 +128,7 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
 
   void PrintReg(std::string name, uint8_t reg);
 
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   fbl::Mutex dw_lock_;
   std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw_ TA_GUARDED(dw_lock_);
 

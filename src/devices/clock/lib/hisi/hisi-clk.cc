@@ -156,7 +156,7 @@ void HisiClock::DeInit() {
 zx_status_t HisiClock::Init() {
   zx_status_t st;
 
-  ddk::PDev pdev(parent());
+  ddk::PDevFidl pdev(parent());
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "HisiClock::Init: failed to get pdev protocol");
     return ZX_ERR_NO_RESOURCES;

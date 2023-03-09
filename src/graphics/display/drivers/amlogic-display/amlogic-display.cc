@@ -976,7 +976,7 @@ zx_status_t AmlogicDisplay::Bind() {
   root_node_.CreateUint("panel_type", vout_->panel_type(), &inspector_);
   root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
 
-  if (zx_status_t status = ddk::PDev::FromFragment(parent_, &pdev_); status != ZX_OK) {
+  if (zx_status_t status = ddk::PDevFidl::FromFragment(parent_, &pdev_); status != ZX_OK) {
     DISP_ERROR("Could not get PDEV protocol %d\n", status);
     return status;
   }

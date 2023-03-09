@@ -66,7 +66,7 @@ constexpr uint32_t capture_yuv2rgb_offset[3] = {0, 0, 0};
 #define READ32_CBUS_REG(a) cbus_mmio_->Read32(a)
 #define WRITE32_CBUS_REG(a, v) cbus_mmio_->Write32(v, a)
 
-zx_status_t Vpu::Init(ddk::PDev& pdev) {
+zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
   if (initialized_) {
     return ZX_OK;
   }

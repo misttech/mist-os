@@ -41,7 +41,7 @@ zx_status_t AmlEthernet::EthBoardResetPhy() {
 }
 
 zx_status_t AmlEthernet::InitPdev() {
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "Could not get PDEV protocol");
     return ZX_ERR_NO_RESOURCES;

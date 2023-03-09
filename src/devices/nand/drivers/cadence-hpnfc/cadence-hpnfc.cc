@@ -85,7 +85,7 @@ namespace rawnand {
 // TODO(bradenkell): Use DMA.
 
 zx_status_t CadenceHpnfc::Create(void* ctx, zx_device_t* parent) {
-  ddk::PDev pdev(parent);
+  ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: Failed to get ZX_PROTOCOL_PLATFORM_DEVICE", __FILE__);
     return ZX_ERR_NO_RESOURCES;
