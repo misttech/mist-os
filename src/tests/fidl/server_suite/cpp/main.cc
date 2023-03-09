@@ -442,7 +442,6 @@ class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
           // functionality of the runner itself.
           return false;
 
-        case fidl_serversuite::Test::kEventSendingDoNotReportPeerClosed:
         case fidl_serversuite::Test::kOneWayWithNonZeroTxid:
         case fidl_serversuite::Test::kTwoWayNoPayloadWithZeroTxid:
           return false;

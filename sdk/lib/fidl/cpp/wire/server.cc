@@ -76,22 +76,48 @@ void Dispatch(void* impl, ::fidl::IncomingHeaderAndMessage& msg,
 }
 
 ::fidl::OneWayStatus WeakEventSenderInner::SendEvent(::fidl::OutgoingMessage& message) const {
-  if (auto binding = binding_.lock()) {
-    message.set_txid(0);
-    message.Write(binding->transport());
-    if (!message.ok()) {
-      HandleSendError(message.error());
-      return fidl::OneWayStatus{message.error()};
-    }
-    return fidl::OneWayStatus{fidl::OneWayStatus::Ok()};
-  }
-  return fidl::OneWayStatus{fidl::OneWayStatus::Unbound()};
+  return std::visit(
+      [&](auto&& binding_or_info) -> fidl::OneWayStatus {
+        using T = std::decay_t<decltype(binding_or_info)>;
+        if constexpr (std::is_same_v<T, std::shared_ptr<AsyncServerBinding>>) {
+          message.set_txid(0);
+          message.Write(binding_or_info->transport());
+          if (!message.ok()) {
+            HandleSendError(message.error());
+            return fidl::OneWayStatus{message.error()};
+          }
+          return fidl::OneWayStatus{fidl::OneWayStatus::Ok()};
+        } else if constexpr (std::is_same_v<T, fidl::UnbindInfo>) {
+          return OneWayErrorFromUnbindInfo(binding_or_info);
+        } else {
+          static_assert(std::is_same_v<T, WeakServerBindingRef::Invalid>);
+          // NOTE TO USER: if you see a crash at this line, it could mean
+          // the code sent an event on a moved-from server binding reference.
+          __builtin_abort();
+        }
+      },
+      binding_.lock_or_error());
 }
 
 void WeakEventSenderInner::HandleSendError(fidl::Status error) const {
   if (auto binding = binding_.lock()) {
-    binding->HandleError(std::move(binding), {UnbindInfo{error}, ErrorOrigin::kSend});
+    binding->HandleError(binding, {UnbindInfo{error}, ErrorOrigin::kSend});
   }
+}
+
+ServerBindingRefBase BindServerTypeErased(async_dispatcher_t* dispatcher, AnyTransport&& server_end,
+                                          IncomingMessageDispatcher* interface,
+                                          ThreadingPolicy threading_policy,
+                                          AnyOnUnboundFn on_unbound) {
+  std::shared_ptr<AsyncServerBinding> internal_binding = AsyncServerBinding::Create(
+      dispatcher, std::move(server_end), interface, threading_policy, std::move(on_unbound));
+  ServerBindingRefBase binding_ref(internal_binding, internal_binding->shared_unbind_info());
+  AsyncServerBinding* binding_ptr = internal_binding.get();
+  // The binding object keeps itself alive until unbinding, so dropping the
+  // shared pointer here is fine.
+  internal_binding.reset();
+  binding_ptr->BeginFirstWait();
+  return binding_ref;
 }
 
 }  // namespace internal

@@ -19,8 +19,6 @@ namespace fdf {
 template <typename Protocol>
 class ServerBindingRef : public fidl::internal::ServerBindingRefBase {
  public:
-  using ServerBindingRefBase::ServerBindingRefBase;
-
   // Triggers an asynchronous unbind operation. If specified, |on_unbound| will
   // be asynchronously run on a dispatcher thread, passing in the endpoint and
   // the unbind reason.
@@ -34,6 +32,10 @@ class ServerBindingRef : public fidl::internal::ServerBindingRefBase {
   // WARNING: While it is safe to invoke Unbind() from any thread, it is unsafe to wait on the
   // OnUnboundFn from a dispatcher thread, as that will likely deadlock.
   using ServerBindingRefBase::Unbind;
+
+  using ServerBindingRefBase::ServerBindingRefBase;
+  explicit ServerBindingRef(fidl::internal::ServerBindingRefBase&& base)
+      : ServerBindingRefBase(std::move(base)) {}
 };
 
 // |BindServer| starts handling message on |server_end| using implementation

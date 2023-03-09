@@ -234,8 +234,7 @@ struct ::fidl::IsProtocol<ProtocolMarker> : public std::true_type {};
 template <>
 class fidl::internal::WireWeakEventSender<ProtocolMarker> {
  public:
-  explicit WireWeakEventSender(std::weak_ptr<fidl::internal::AsyncServerBinding> binding)
-      : inner_(std::move(binding)) {}
+  explicit WireWeakEventSender(WeakServerBindingRef binding) : inner_(std::move(binding)) {}
   fidl::internal::WeakEventSenderInner inner_;
 };
 

@@ -303,8 +303,7 @@ class WeakEventSenderVeneer final {
       typename ::fidl::internal::CallerAllocatingImpl<SyncImpl, FidlProtocol>::Type;
 
  public:
-  explicit WeakEventSenderVeneer(std::weak_ptr<::fidl::internal::AsyncServerBinding> binding)
-      : binding_(std::move(binding)) {}
+  explicit WeakEventSenderVeneer(WeakServerBindingRef binding) : binding_(std::move(binding)) {}
 
   // Returns a veneer object for sending events with managed memory allocation.
   Arrow<SyncImpl<FidlProtocol>> operator->() { return Arrow<SyncImpl<FidlProtocol>>(binding_); }
@@ -319,7 +318,7 @@ class WeakEventSenderVeneer final {
   }
 
  private:
-  std::weak_ptr<::fidl::internal::AsyncServerBinding> binding_;
+  WeakServerBindingRef binding_;
 };
 
 }  // namespace internal

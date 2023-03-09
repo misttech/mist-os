@@ -60,20 +60,22 @@ void DeviceServer::Serve(zx::channel channel, fidl::internal::IncomingMessageDis
   fidl::ServerEnd<TypeErasedProtocol> server_end(std::move(channel));
   async::PostTask(dispatcher_, [this, server_end = std::move(server_end), impl]() mutable {
     const zx_handle_t key = server_end.channel().get();
-    const fidl::ServerBindingRef binding = fidl::internal::BindServerTypeErased<TypeErasedProtocol>(
-        dispatcher_, std::move(server_end), impl,
-        fidl::internal::ThreadingPolicy::kCreateAndTeardownFromDispatcherThread,
-        [this, key](fidl::internal::IncomingMessageDispatcher*, fidl::UnbindInfo,
-                    fidl::internal::AnyTransport) {
-          DeviceServer& self = *this;
-          size_t erased = self.bindings_.erase(key);
-          ZX_ASSERT_MSG(erased == 1, "erased=%zu", erased);
-          if (self.bindings_.empty()) {
-            if (std::optional callback = std::exchange(self.callback_, {}); callback.has_value()) {
-              callback.value()();
-            }
-          }
-        });
+    const auto binding =
+        fidl::ServerBindingRef<TypeErasedProtocol>{fidl::internal::BindServerTypeErased(
+            dispatcher_, fidl::internal::MakeAnyTransport(server_end.TakeHandle()), impl,
+            fidl::internal::ThreadingPolicy::kCreateAndTeardownFromDispatcherThread,
+            [this, key](fidl::internal::IncomingMessageDispatcher*, fidl::UnbindInfo,
+                        fidl::internal::AnyTransport) {
+              DeviceServer& self = *this;
+              size_t erased = self.bindings_.erase(key);
+              ZX_ASSERT_MSG(erased == 1, "erased=%zu", erased);
+              if (self.bindings_.empty()) {
+                if (std::optional callback = std::exchange(self.callback_, {});
+                    callback.has_value()) {
+                  callback.value()();
+                }
+              }
+            })};
 
     auto [it, inserted] = bindings_.try_emplace(key, binding);
     ZX_ASSERT_MSG(inserted, "handle=%d", key);

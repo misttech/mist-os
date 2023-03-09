@@ -44,11 +44,27 @@ bool DispatchError::RequiresImmediateTeardown() {
            info.reason() == fidl::Reason::kPeerClosedWhileReading);
 }
 
+void LockedUnbindInfo::Set(fidl::UnbindInfo info) {
+  std::scoped_lock lock(lock_);
+  ZX_DEBUG_ASSERT(!info_.has_value());
+  info_ = info;
+}
+
+fidl::UnbindInfo LockedUnbindInfo::Get() const {
+  std::scoped_lock lock(lock_);
+  ZX_DEBUG_ASSERT(info_.has_value());
+  // |info_| must hold a value under public usage of the bindings API.
+  // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+  fidl::UnbindInfo info = *info_;
+  return info;
+}
+
 AsyncBinding::AsyncBinding(async_dispatcher_t* dispatcher, AnyUnownedTransport transport,
                            ThreadingPolicy threading_policy)
     : dispatcher_(dispatcher),
       transport_(transport),
-      thread_checker_(dispatcher, threading_policy) {
+      thread_checker_(dispatcher, threading_policy),
+      shared_unbind_info_(std::make_shared<LockedUnbindInfo>()) {
   ZX_ASSERT(dispatcher_);
   ZX_ASSERT(transport_.is_valid());
   transport_.create_waiter(
@@ -149,6 +165,10 @@ void AsyncBinding::BeginFirstWait() {
     case Result::kOk:
       return;
   }
+}
+
+std::shared_ptr<LockedUnbindInfo> AsyncBinding::shared_unbind_info() const {
+  return shared_unbind_info_;
 }
 
 zx_status_t AsyncBinding::CheckForTeardownAndBeginNextWait() {
@@ -342,6 +362,7 @@ void AsyncBinding::PerformTeardown(std::optional<UnbindInfo> info) {
     stored_info = lifecycle_.TransitionToTorndown();
   }
 
+  shared_unbind_info_->Set(stored_info);
   FinishTeardown(std::move(binding), stored_info);
 }
 

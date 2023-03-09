@@ -21,42 +21,9 @@ enum class IgnoreBindingClosureType { kValue };
 
 class AsyncServerBinding;
 class ServerBindingRefBase;
-std::weak_ptr<AsyncServerBinding> BorrowBinding(const ServerBindingRefBase&);
 
 template <typename FidlProtocol>
 class ServerBindingBase;
-
-// |ServerBindingRefBase| controls a server binding that does not have
-// threading restrictions.
-class ServerBindingRefBase {
- public:
-  explicit ServerBindingRefBase(std::weak_ptr<AsyncServerBinding> binding)
-      : binding_(std::move(binding)) {}
-  ~ServerBindingRefBase() = default;
-
-  ServerBindingRefBase(const ServerBindingRefBase&) = default;
-  ServerBindingRefBase& operator=(const ServerBindingRefBase&) = default;
-
-  ServerBindingRefBase(ServerBindingRefBase&&) = default;
-  ServerBindingRefBase& operator=(ServerBindingRefBase&&) = default;
-
-  void Unbind() {
-    if (auto binding = binding_.lock())
-      binding->StartTeardown(std::move(binding));
-  }
-
- protected:
-  const std::weak_ptr<AsyncServerBinding>& binding() const { return binding_; }
-
- private:
-  friend std::weak_ptr<AsyncServerBinding> internal::BorrowBinding(const ServerBindingRefBase&);
-
-  std::weak_ptr<AsyncServerBinding> binding_;
-};
-
-inline std::weak_ptr<AsyncServerBinding> BorrowBinding(const ServerBindingRefBase& binding_ref) {
-  return binding_ref.binding();
-}
 
 // |UniqueServerBindingOwner| tears down the managed binding when it destructs.
 //
@@ -144,7 +111,7 @@ class ServerBindingBase {
 
  private:
   template <typename P>
-  friend std::weak_ptr<AsyncServerBinding> BorrowBinding(const ServerBindingBase<P>&);
+  friend WeakServerBindingRef BorrowBinding(const ServerBindingBase<P>&);
   struct Lifetime {};
 
   std::optional<internal::UniqueServerBindingOwner> binding_;
@@ -152,8 +119,7 @@ class ServerBindingBase {
 };
 
 template <typename FidlProtocol>
-inline std::weak_ptr<AsyncServerBinding> BorrowBinding(
-    const ServerBindingBase<FidlProtocol>& binding) {
+inline WeakServerBindingRef BorrowBinding(const ServerBindingBase<FidlProtocol>& binding) {
   return BorrowBinding(binding.binding_.value().ref());
 }
 

@@ -12,11 +12,13 @@
 #include <thread>
 #include <vector>
 
+#include <sanitizer/lsan_interface.h>
 #include <zxtest/zxtest.h>
 
 namespace {
 
 using ::test_basic_protocol::ValueEcho;
+using ::test_basic_protocol::ValueEvent;
 
 constexpr char kExpectedReply[] = "test";
 
@@ -77,6 +79,84 @@ TEST(Server, AsyncReply) {
   });
   EXPECT_STATUS(ZX_ERR_CANCELED, main_loop.Run());
   call.join();
+}
+
+TEST(Server, EventSendingAfterPeerClosed) {
+  struct Server : fidl::Server<ValueEvent> {};
+  Server server;
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  zx::result endpoints = fidl::CreateEndpoints<ValueEvent>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::ServerBinding<ValueEvent> binding{loop.dispatcher(), std::move(endpoints->server), &server,
+                                          fidl::kIgnoreBindingClosure};
+
+  // Close the peer endpoint.
+  endpoints->client.reset();
+
+  {
+    fit::result<fidl::OneWayError> result =
+        fidl::SendEvent(binding)->OnValueEvent({{.s = "hello"}});
+    EXPECT_TRUE(result.is_ok());
+  }
+
+  ASSERT_OK(loop.RunUntilIdle());
+
+  {
+    fit::result<fidl::OneWayError> result =
+        fidl::SendEvent(binding)->OnValueEvent({{.s = "hello"}});
+    EXPECT_TRUE(result.is_ok());
+  }
+}
+
+TEST(Server, EventSendingAfterUnrelatedError) {
+  struct Server : fidl::Server<ValueEvent> {};
+  Server server;
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  zx::result endpoints = fidl::CreateEndpoints<ValueEvent>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::ServerBinding<ValueEvent> binding{loop.dispatcher(), std::move(endpoints->server), &server,
+                                          fidl::kIgnoreBindingClosure};
+
+  // Send a 1 byte message which will cause the server binding to teardown.
+  uint8_t byte = 0;
+  endpoints->client.channel().write(0, &byte, sizeof(byte), nullptr, 0);
+
+  {
+    fit::result<fidl::OneWayError> result =
+        fidl::SendEvent(binding)->OnValueEvent({{.s = "hello"}});
+    EXPECT_TRUE(result.is_ok());
+  }
+
+  ASSERT_OK(loop.RunUntilIdle());
+
+  {
+    fit::result<fidl::OneWayError> result =
+        fidl::SendEvent(binding)->OnValueEvent({{.s = "hello"}});
+    ASSERT_FALSE(result.is_ok());
+    EXPECT_EQ(result.error_value().reason(), fidl::Reason::kCanceledDueToOtherError);
+    EXPECT_EQ(result.error_value().underlying_reason(), fidl::Reason::kUnexpectedMessage);
+  }
+}
+
+TEST(Server, EventSendingOnMovedFromBindingRef) {
+  struct Server : fidl::Server<ValueEvent> {};
+  Server server;
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  zx::result endpoints = fidl::CreateEndpoints<ValueEvent>();
+  ASSERT_OK(endpoints.status_value());
+
+  fidl::ServerBindingRef<ValueEvent> binding_ref =
+      fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
+  fidl::ServerBindingRef<ValueEvent> binding_ref_new = std::move(binding_ref);
+
+  ASSERT_DEATH([&] {
+#if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
+    // Disable LSAN for this thread while in scope. It is expected to leak by way
+    // of a crash.
+    __lsan::ScopedDisabler _;
+#endif
+    (void)fidl::SendEvent(binding_ref)->OnValueEvent({{.s = "hello"}});
+  });
 }
 
 }  // namespace

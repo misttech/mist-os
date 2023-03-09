@@ -42,12 +42,31 @@ bool IsFatalErrorUniversal(fidl::Reason error) {
     case Reason::kPeerClosedWhileReading:
     case Reason::kDispatcherError:
     case Reason::kTransportError:
-    case Reason::kUnexpectedMessage:
       return true;
+    case Reason::kUnexpectedMessage:
     case Reason::kEncodeError:
     case Reason::kDecodeError:
       return false;
   }
+}
+
+fidl::Status ErrorFromUnbindInfo(fidl::UnbindInfo info) {
+  // Depending on what kind of error caused teardown, we may want to propagate
+  // the error to all other outstanding contexts.
+  if (IsFatalErrorUniversal(info.reason())) {
+    return info.ToError();
+  }
+  // These errors are specific to one call, whose corresponding context
+  // would have been notified during |Dispatch| or making the call.
+  return fidl::Status::Canceled(info);
+}
+
+fidl::OneWayStatus OneWayErrorFromUnbindInfo(fidl::UnbindInfo info) {
+  fidl::Status error = ErrorFromUnbindInfo(info);
+  if (error.is_peer_closed()) {
+    return fidl::OneWayStatus{fidl::Status::Ok()};
+  }
+  return fidl::OneWayStatus{error};
 }
 
 }  // namespace internal

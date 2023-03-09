@@ -84,15 +84,7 @@ void ClientBase::ReleaseResponseContexts(fidl::UnbindInfo info) {
     auto* context = static_cast<ResponseContext*>(node);
     // |kClose| is never used on the client side.
     ZX_DEBUG_ASSERT(info.reason() != fidl::Reason::kClose);
-    // Depending on what kind of error caused teardown, we may want to propagate
-    // the error to all other outstanding contexts.
-    if (IsFatalErrorUniversal(info.reason())) {
-      context->OnError(info.ToError());
-    } else {
-      // These errors are specific to one call, whose corresponding context
-      // would have been notified during |Dispatch| or making the call.
-      context->OnError(fidl::Status::Canceled(info));
-    }
+    context->OnError(ErrorFromUnbindInfo(info));
   }
 }
 

@@ -110,14 +110,6 @@ zx::result<fidl::ClientEnd<Protocol>> CreateEndpoints(fidl::ServerEnd<Protocol>*
 template <typename Protocol>
 class ServerBindingRef : public internal::ServerBindingRefBase {
  public:
-  ~ServerBindingRef() = default;
-
-  ServerBindingRef(ServerBindingRef&&) noexcept = default;
-  ServerBindingRef& operator=(ServerBindingRef&&) noexcept = default;
-
-  ServerBindingRef(const ServerBindingRef&) = default;
-  ServerBindingRef& operator=(const ServerBindingRef&) = default;
-
   // Triggers an asynchronous unbind operation. If specified, |on_unbound| will
   // be asynchronously run on a dispatcher thread, passing in the endpoint and
   // the unbind reason.
@@ -147,22 +139,15 @@ class ServerBindingRef : public internal::ServerBindingRefBase {
   // get exclusive const access to it before passing it to a lambda for further introspection.
   template <typename ServerImpl>
   void AsImpl(fit::function<void(const ServerImpl*)> impl_handler) const {
-    if (auto held_binding = ServerBindingRefBase::binding().lock()) {
+    if (auto binding = ServerBindingRefBase::binding().lock()) {
       impl_handler(
-          internal::MessageDispatcherToServerImpl<Protocol, ServerImpl>(held_binding->interface()));
+          internal::MessageDispatcherToServerImpl<Protocol, ServerImpl>(binding->interface()));
     }
   }
 
- private:
-  // This is so that only |BindServerTypeErased| will be able to construct a
-  // new instance of |ServerBindingRef|.
-  friend internal::ServerBindingRefType<Protocol> internal::BindServerTypeErased<Protocol>(
-      async_dispatcher_t* dispatcher, fidl::internal::ServerEndType<Protocol> server_end,
-      internal::IncomingMessageDispatcher* interface, internal::ThreadingPolicy threading_policy,
-      internal::AnyOnUnboundFn on_unbound);
-
-  explicit ServerBindingRef(std::weak_ptr<internal::AsyncServerBinding> internal_binding)
-      : ServerBindingRefBase(std::move(internal_binding)) {}
+  using ServerBindingRefBase::ServerBindingRefBase;
+  explicit ServerBindingRef(internal::ServerBindingRefBase&& base)
+      : ServerBindingRefBase(std::move(base)) {}
 };
 
 // |BindServer| starts handling message on |server_end| using implementation
@@ -501,9 +486,9 @@ class ServerBinding final : public internal::ServerBindingBase<FidlProtocol> {
   // get exclusive const access to it before passing it to a lambda for further introspection.
   template <typename ServerImpl>
   void AsImpl(fit::function<void(const ServerImpl*)> impl_handler) const {
-    if (auto held_binding = fidl::internal::BorrowBinding(this->binding().ref()).lock()) {
-      impl_handler(internal::MessageDispatcherToServerImpl<FidlProtocol, ServerImpl>(
-          held_binding->interface()));
+    if (auto binding = fidl::internal::BorrowBinding(Base::binding().ref()).lock()) {
+      impl_handler(
+          internal::MessageDispatcherToServerImpl<FidlProtocol, ServerImpl>(binding->interface()));
     }
   }
 };

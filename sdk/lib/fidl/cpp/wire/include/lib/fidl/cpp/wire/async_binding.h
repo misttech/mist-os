@@ -58,6 +58,25 @@ struct DispatchError {
   bool RequiresImmediateTeardown();
 };
 
+class LockedUnbindInfo {
+ public:
+  LockedUnbindInfo() = default;
+
+  void Set(fidl::UnbindInfo);
+
+  // |Get| will panic unless |Set| was called.
+  fidl::UnbindInfo Get() const;
+
+ private:
+  LockedUnbindInfo(const LockedUnbindInfo&) = delete;
+  LockedUnbindInfo& operator=(const LockedUnbindInfo&) = delete;
+  LockedUnbindInfo(LockedUnbindInfo&&) noexcept = delete;
+  LockedUnbindInfo& operator=(LockedUnbindInfo&&) noexcept = delete;
+
+  std::optional<fidl::UnbindInfo> info_ __TA_GUARDED(lock_);
+  mutable std::mutex lock_;
+};
+
 // |AsyncBinding| objects implement the common logic for registering waits
 // on channels, and teardown. |AsyncBinding| itself composes |async_wait_t|
 // which borrows the channel to wait for messages. The actual responsibilities
@@ -73,6 +92,10 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
   ~AsyncBinding() __TA_EXCLUDES(lock_) = default;
 
   void BeginFirstWait() __TA_EXCLUDES(lock_);
+
+  // Gets a reference to the shared unbind info. It is only safe to get the
+  // |UnbindInfo| after the binding object is destroyed.
+  std::shared_ptr<LockedUnbindInfo> shared_unbind_info() const;
 
   // Checks for the need to teardown and registers the next wait in one critical
   // section:
@@ -227,6 +250,11 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
   virtual void FinishTeardown(std::shared_ptr<AsyncBinding>&& calling_ref, UnbindInfo info)
       __TA_RELEASE(thread_checker_) __TA_REQUIRES(thread_checker_) = 0;
 
+  AsyncBinding(const AsyncBinding&) = delete;
+  AsyncBinding& operator=(const AsyncBinding&) = delete;
+  AsyncBinding(AsyncBinding&&) noexcept = delete;
+  AsyncBinding& operator=(AsyncBinding&&) noexcept = delete;
+
   async_dispatcher_t* dispatcher_ = nullptr;
 
   // The bound transport.
@@ -247,6 +275,8 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
   // |thread_checker_| is no-op in release builds, and may be completely
   // optimized out.
   [[no_unique_address]] DebugOnlySynchronizationChecker thread_checker_;
+
+  std::shared_ptr<LockedUnbindInfo> shared_unbind_info_;
 
   // A lock protecting the binding |lifecycle|.
   //
@@ -316,6 +346,49 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
     // The reason for teardown. Only valid when |state_| is |kMustTeardown|.
     fidl::UnbindInfo info_ = {};
   } lifecycle_ __TA_GUARDED(lock_) = {};
+};
+
+// A valid |WeakBindingRef| either holds a reference to the |AsyncBinding|, or
+// holds a |fidl::UnbindInfo| containing the reason the binding has gone away.
+template <typename Binding>
+class WeakBindingRef {
+ public:
+  // Constructs an invalid |WeakBindingRef|.
+  WeakBindingRef() = default;
+
+  WeakBindingRef(std::weak_ptr<Binding> binding, std::shared_ptr<LockedUnbindInfo> info)
+      : binding_(std::move(binding)), info_(std::move(info)) {
+    ZX_DEBUG_ASSERT(info_);
+    static_assert(std::is_base_of_v<AsyncBinding, Binding>);
+  }
+
+  WeakBindingRef(const WeakBindingRef&) = default;
+  WeakBindingRef& operator=(const WeakBindingRef&) = default;
+  WeakBindingRef(WeakBindingRef&&) noexcept = default;
+  WeakBindingRef& operator=(WeakBindingRef&&) noexcept = default;
+
+  struct Invalid {};
+
+  // Attempt to get a strong |AsyncBinding| reference or returns the teardown
+  // reason if the binding object is already destroyed.
+  //
+  // Returns |Invalid| if the |WeakBindingRef| was only default constructed, or
+  // moved-from.
+  std::variant<Invalid, std::shared_ptr<Binding>, fidl::UnbindInfo> lock_or_error() const {
+    if (auto binding = binding_.lock(); binding) {
+      return binding;
+    }
+    if (info_) {
+      return info_->Get();
+    }
+    return Invalid{};
+  }
+
+  std::shared_ptr<Binding> lock() const { return binding_.lock(); }
+
+ private:
+  std::weak_ptr<Binding> binding_;
+  std::shared_ptr<LockedUnbindInfo> info_;
 };
 
 //
@@ -391,6 +464,8 @@ class AsyncServerBinding : public AsyncBinding {
   AnyOnUnboundFn on_unbound_fn_ = {};
 };
 
+using WeakServerBindingRef = WeakBindingRef<AsyncServerBinding>;
+
 //
 // Client binding specifics
 //
@@ -434,6 +509,8 @@ class AsyncClientBinding final : public AsyncBinding {
   AsyncEventHandler* error_handler_;
   AnyTeardownObserver teardown_observer_;
 };
+
+using WeakClientBindingRef = WeakBindingRef<AsyncClientBinding>;
 
 }  // namespace internal
 }  // namespace fidl

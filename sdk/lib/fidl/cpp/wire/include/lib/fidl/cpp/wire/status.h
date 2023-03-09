@@ -145,6 +145,10 @@ enum class ErrorOrigin {
   kSend,
 };
 
+class Status;
+class OneWayStatus;
+class UnbindInfo;
+
 namespace internal {
 
 // A sentinel value that indicates an uninitialized reason. It should never be
@@ -175,9 +179,15 @@ extern const char* const kUnsupportedTransportError;
 // universal and only specific to a particular operation that caused it.
 bool IsFatalErrorUniversal(fidl::Reason error);
 
-}  // namespace internal
+// When the binding is tearing down, obtain an error to fail all in-progress
+// and future operations with.
+fidl::Status ErrorFromUnbindInfo(fidl::UnbindInfo);
 
-class UnbindInfo;
+// When the binding is tearing down, obtain an error to fail all in-progress
+// and future operations with. Hides peer-closed errors.
+fidl::OneWayStatus OneWayErrorFromUnbindInfo(fidl::UnbindInfo);
+
+}  // namespace internal
 
 // |Status| represents the result of an operation.
 //
@@ -591,6 +601,8 @@ class UnbindInfo : private Status {
   constexpr bool did_send_epitaph() const { return reason() == Reason::kClose; }
 
   // Reinterprets the |UnbindInfo| as the cause of an operation failure.
+  //
+  // TODO(fxbug.dev/87788): Privatize this method since it's only used in tests and confusing.
   constexpr fidl::Error ToError() const {
     if (reason_ == Reason::kUnbind) {
       // See |UnbindInfo::Unbind| for reason behind this conversion.

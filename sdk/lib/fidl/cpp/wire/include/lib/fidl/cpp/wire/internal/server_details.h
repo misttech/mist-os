@@ -37,6 +37,8 @@ namespace internal {
 // Definitions supporting the dispatch of a FIDL message
 //
 
+class ServerBindingRefBase;
+
 // The interface for dispatching incoming FIDL messages. The code generator
 // will provide conforming implementations for relevant FIDL protocols.
 class IncomingMessageDispatcher {
@@ -119,8 +121,7 @@ void Dispatch(void* impl, ::fidl::IncomingHeaderAndMessage& msg,
 // reference to the binding by default and does not need weak pointer promotion.
 class WeakEventSenderInner {
  public:
-  explicit WeakEventSenderInner(std::weak_ptr<::fidl::internal::AsyncServerBinding>&& binding)
-      : binding_(std::move(binding)) {}
+  explicit WeakEventSenderInner(WeakServerBindingRef&& binding) : binding_(std::move(binding)) {}
 
   // Sends an event.
   //
@@ -132,17 +133,16 @@ class WeakEventSenderInner {
   // Handles errors in sending events. This may lead to binding teardown.
   void HandleSendError(fidl::Status error) const;
 
-  const std::weak_ptr<::fidl::internal::AsyncServerBinding>& binding() const { return binding_; }
+  const WeakServerBindingRef& binding() const { return binding_; }
 
  private:
-  std::weak_ptr<::fidl::internal::AsyncServerBinding> binding_;
+  WeakServerBindingRef binding_;
 };
 
 // Base class for all weak event senders with managed memory allocation.
 class WeakEventSenderBase {
  public:
-  explicit WeakEventSenderBase(std::weak_ptr<AsyncServerBinding> binding)
-      : inner_(std::move(binding)) {}
+  explicit WeakEventSenderBase(WeakServerBindingRef binding) : inner_(std::move(binding)) {}
 
  protected:
   WeakEventSenderInner& _inner() { return inner_; }
@@ -153,8 +153,7 @@ class WeakEventSenderBase {
 
 // Base class for all weak event senders with caller-controlled memory allocation.
 struct WeakBufferEventSenderBase {
-  explicit WeakBufferEventSenderBase(std::weak_ptr<AsyncServerBinding> binding,
-                                     AnyBufferAllocator&& allocator)
+  explicit WeakBufferEventSenderBase(WeakServerBindingRef binding, AnyBufferAllocator&& allocator)
       : inner_(std::move(binding)), allocator_(std::move(allocator)) {}
 
  protected:
@@ -222,6 +221,45 @@ class CompleterImplBase {
 // Definitions related to binding a connection to a dispatcher
 //
 
+WeakServerBindingRef BorrowBinding(const ServerBindingRefBase&);
+
+// |ServerBindingRefBase| controls a server binding that does not have
+// threading restrictions.
+class ServerBindingRefBase {
+ public:
+  explicit ServerBindingRefBase(WeakServerBindingRef ref) : ref_(std::move(ref)) {}
+
+  ServerBindingRefBase(std::weak_ptr<AsyncServerBinding> binding,
+                       std::shared_ptr<LockedUnbindInfo> info)
+      : ref_(std::move(binding), std::move(info)) {}
+
+  ~ServerBindingRefBase() = default;
+
+  ServerBindingRefBase(const ServerBindingRefBase&) = default;
+  ServerBindingRefBase& operator=(const ServerBindingRefBase&) = default;
+
+  ServerBindingRefBase(ServerBindingRefBase&&) = default;
+  ServerBindingRefBase& operator=(ServerBindingRefBase&&) = default;
+
+  void Unbind() {
+    if (auto binding = ref_.lock()) {
+      binding->StartTeardown(std::move(binding));
+    }
+  }
+
+ protected:
+  const WeakServerBindingRef& binding() const { return ref_; }
+
+ private:
+  friend WeakServerBindingRef internal::BorrowBinding(const ServerBindingRefBase&);
+
+  WeakServerBindingRef ref_;
+};
+
+inline WeakServerBindingRef BorrowBinding(const ServerBindingRefBase& binding_ref) {
+  return binding_ref.binding();
+}
+
 // Binds an implementation of some FIDL server protocol |interface| and
 // |server_end| to the |dispatcher|.
 //
@@ -235,23 +273,10 @@ class CompleterImplBase {
 // The public |fidl::BindServer| functions should translate |interface| back to
 // the user pointer type, possibly at an offset, before invoking the
 // user-provided on-unbound handler.
-template <typename Protocol>
-ServerBindingRefType<Protocol> BindServerTypeErased(async_dispatcher_t* dispatcher,
-                                                    ServerEndType<Protocol> server_end,
-                                                    IncomingMessageDispatcher* interface,
-                                                    ThreadingPolicy threading_policy,
-                                                    AnyOnUnboundFn on_unbound) {
-  std::shared_ptr<AsyncServerBinding> internal_binding =
-      AsyncServerBinding::Create(dispatcher, internal::MakeAnyTransport(server_end.TakeHandle()),
-                                 interface, threading_policy, std::move(on_unbound));
-  ServerBindingRefType<Protocol> binding_ref(internal_binding);
-  AsyncServerBinding* binding_ptr = internal_binding.get();
-  // The binding object keeps itself alive until unbinding, so dropping the
-  // shared pointer here is fine.
-  internal_binding.reset();
-  binding_ptr->BeginFirstWait();
-  return binding_ref;
-}
+ServerBindingRefBase BindServerTypeErased(async_dispatcher_t* dispatcher, AnyTransport&& server_end,
+                                          IncomingMessageDispatcher* interface,
+                                          ThreadingPolicy threading_policy,
+                                          AnyOnUnboundFn on_unbound);
 
 template <typename Protocol, typename ServerImpl>
 constexpr IncomingMessageDispatcher* ServerImplToMessageDispatcher(ServerImpl* impl) {
@@ -325,15 +350,15 @@ ServerBindingRefType<Protocol> BindServerImpl(
 
   IncomingMessageDispatcher* interface = ServerImplToMessageDispatcher<Protocol>(impl);
 
-  return BindServerTypeErased<Protocol>(
-      dispatcher, std::move(server_end), interface, threading_policy,
+  return ServerBindingRefType<Protocol>{BindServerTypeErased(
+      dispatcher, MakeAnyTransport(server_end.TakeHandle()), interface, threading_policy,
       [on_unbound = std::forward<OnUnbound>(on_unbound)](
           internal::IncomingMessageDispatcher* any_interface, UnbindInfo info,
           AnyTransport channel) mutable {
         ServerImpl* impl = MessageDispatcherToServerImpl<Protocol, ServerImpl>(any_interface);
         on_unbound(impl, info,
                    fidl::internal::ServerEndType<Protocol>(channel.release<Transport>()));
-      });
+      })};
 }
 
 // An |UnboundThunk| is a functor that delegates to an |OnUnbound| callable,
