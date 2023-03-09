@@ -9,34 +9,30 @@ const MAX_I2C_CHANNEL uint32 = 128; // Enough for every address to be used in 7-
 
 /// Used to inform the i2c driver about an attached i2c device.
 type I2CChannel = table {
-    /// ID of the bus that this device is on.
-    // TODO(fxbug.dev/120971): Remove this after all drivers have switched to
-    // the new bus_id field below.
-    1: bus_id uint32;
     /// Address of the device.
-    2: address uint16;
+    1: address uint16;
     /// Class of the device.
     /// TODO(fxbug.dev/78198): remove this once x86 uses ACPI properly.
-    3: i2c_class uint32;
+    2: i2c_class uint32;
 
     /// Vendor ID. Used when binding via platform bus device IDs.
-    4: vid uint32;
+    3: vid uint32;
     /// Product ID. Used when binding via platform bus device IDs.
-    5: pid uint32;
+    4: pid uint32;
     /// Device ID. Used when binding via platform bus device IDs.
-    6: did uint32;
+    5: did uint32;
 
     // Bus configuration.
     /// Are we in charge of the bus?
-    7: is_bus_controller bool;
+    6: is_bus_controller bool;
     /// Is this device using 10-bit addressing mode (if false, use 7-bit).
-    8: is_ten_bit bool;
+    7: is_ten_bit bool;
     /// Speed of the bus.
-    9: bus_speed uint32;
+    8: bus_speed uint32;
 
     /// Friendly name for this bus. Will default to the empty string if not
     /// specified.
-   10: name string:fuchsia.hardware.i2c.MAX_I2C_NAME_LEN;
+    9: name string:fuchsia.hardware.i2c.MAX_I2C_NAME_LEN;
 };
 
 /// Passed to the i2c driver in metadata as DEVICE_METADATA_I2C_CHANNELS.

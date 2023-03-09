@@ -824,9 +824,8 @@ zx_status_t IntelI2cController::AddSubordinates() {
 
   uint32_t bus_speed = 0;
   for (auto const& child : metadata.channels()) {
-    zxlogf(INFO, "i2c: got child bus_controller=%d ten_bit=%d address=0x%x bus_speed=%u, bus_id=%u",
-           child.is_bus_controller(), child.is_ten_bit(), child.address(), child.bus_speed(),
-           child.bus_id());
+    zxlogf(INFO, "i2c: got child bus_controller=%d ten_bit=%d address=0x%x bus_speed=%u",
+           child.is_bus_controller(), child.is_ten_bit(), child.address(), child.bus_speed());
 
     if (bus_speed && bus_speed != child.bus_speed()) {
       zxlogf(ERROR, "i2c: cannot add devices with different bus speeds (%u, %u)", bus_speed,

@@ -267,9 +267,6 @@ zx::result<std::vector<uint8_t>> DeviceBuilder::FidlEncodeMetadata() {
         } else if constexpr (std::is_same_v<T, std::vector<I2CChannel>>) {
           ZX_ASSERT(HasBusId());  // Bus ID should get set when a child device is added.
           fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata(allocator);
-          for (auto& chan : arg) {
-            chan.set_bus_id(GetBusId());
-          }
           auto channels = fidl::VectorView<I2CChannel>::FromExternal(arg);
           metadata.set_channels(allocator, channels);
           metadata.set_bus_id(GetBusId());

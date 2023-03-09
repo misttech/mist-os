@@ -299,14 +299,12 @@ TEST_F(FtdiI2cTest, MetadataTest) {
   ASSERT_TRUE(decoded->has_channels());
   ASSERT_EQ(decoded->channels().count(), 1);
 
-  ASSERT_TRUE(decoded->channels()[0].has_bus_id());
   ASSERT_TRUE(decoded->channels()[0].has_address());
   ASSERT_TRUE(decoded->channels()[0].has_vid());
   ASSERT_TRUE(decoded->channels()[0].has_pid());
   ASSERT_TRUE(decoded->channels()[0].has_did());
 
   // Should match the I2cDevice passed above.
-  EXPECT_EQ(decoded->channels()[0].bus_id(), 0);
   EXPECT_EQ(decoded->channels()[0].address(), 0x3c);
   EXPECT_EQ(decoded->channels()[0].vid(), 0);
   EXPECT_EQ(decoded->channels()[0].pid(), 0);

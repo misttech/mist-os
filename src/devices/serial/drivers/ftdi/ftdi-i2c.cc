@@ -77,7 +77,6 @@ void FtdiI2c::DdkInit(ddk::InitTxn txn) {
     auto& chan = i2c_channels[i];
     I2cDevice& dev = i2c_devices_[i];
     chan.Allocate(allocator);
-    chan.set_bus_id(0);
     chan.set_address(static_cast<uint16_t>(dev.address));
     chan.set_vid(dev.vid);
     chan.set_pid(dev.pid);
