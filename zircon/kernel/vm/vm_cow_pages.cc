@@ -2373,27 +2373,34 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
   out->num_pages = 0;
 
   // Helper to find contiguous runs of pages in a page list and add them to the output pages.
-  auto collect_pages = [out, pf_flags](VmCowPages* cow, uint64_t offset, uint64_t max_len) {
+  // |offset| is the offset of the page that has already been looked up and after which we should
+  // try and collect further pages upto max_len.
+  auto collect_pages_after = [out, pf_flags](VmCowPages* cow, uint64_t offset, uint64_t max_len) {
     DEBUG_ASSERT(max_len > 0);
+    uint64_t prev_offset = offset;
+    const uint64_t start_offset = CheckedAdd(offset, PAGE_SIZE);
 
     AssertHeld(cow->lock_ref());
-    cow->page_list_.ForEveryPageAndGapInRange(
-        [out, cow, pf_flags](const VmPageOrMarker* page, uint64_t off) {
+    cow->page_list_.ForEveryPageInRange(
+        [out, cow, pf_flags, &prev_offset](const VmPageOrMarker* page, uint64_t off) {
           // Only pre-map in ready content pages.
           if (!page->IsPage()) {
+            return ZX_ERR_STOP;
+          }
+          // Check if this page immediately follows the run we've accumulated so far.
+          // If it doesn't immediately follow, that means there's a gap, and we never want to
+          // pre-map in zero pages.
+          if (off != prev_offset + PAGE_SIZE) {
             return ZX_ERR_STOP;
           }
           vm_page_t* p = page->Page();
           AssertHeld(cow->lock_ref());
           cow->UpdateOnAccessLocked(p, pf_flags);
           out->add_page(p->paddr());
+          prev_offset = off;
           return ZX_ERR_NEXT;
         },
-        [](uint64_t start, uint64_t end) {
-          // This is a gap, and we never want to pre-map in zero pages.
-          return ZX_ERR_STOP;
-        },
-        offset, CheckedAdd(offset, max_len));
+        start_offset, CheckedAdd(start_offset, max_len));
   };
 
   // We perform an exact Lookup and not something more fancy as a trade off between three scenarios
@@ -2477,7 +2484,7 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
     UpdateOnAccessLocked(p, pf_flags);
     out->add_page(p->paddr());
     if (max_out_pages > 1) {
-      collect_pages(this, offset + PAGE_SIZE, (max_out_pages - 1) * PAGE_SIZE);
+      collect_pages_after(this, offset, (max_out_pages - 1) * PAGE_SIZE);
     }
 
     // If dirtiness was applicable i.e. we reached here after calling PrepareForWriteLocked, we
@@ -2655,7 +2662,7 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
     // grabbing any additional pages if visible.
     out->add_page(p->paddr());
     if (visible_length > PAGE_SIZE) {
-      collect_pages(page_owner, owner_offset + PAGE_SIZE, visible_length - PAGE_SIZE);
+      collect_pages_after(page_owner, owner_offset, visible_length - PAGE_SIZE);
     }
     LTRACEF("read only faulting in page %p, pa %#" PRIxPTR " from parent\n", p, p->paddr());
     return ZX_OK;
