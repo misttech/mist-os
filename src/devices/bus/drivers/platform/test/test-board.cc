@@ -74,11 +74,6 @@ int TestBoard::Thread() {
     zxlogf(ERROR, "%s: VregInit failed: %d", __func__, status);
   }
 
-  status = PowerSensorInit();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: PowerSensorInit failed: %d", __func__, status);
-  }
-
   status = CompositeNodeSpecInit();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: CompositeNodeSpecInit failed: %d", __func__, status);
@@ -164,9 +159,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   const zx_bind_inst_t vreg_match[] = {
       BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_VREG),
   };
-  const zx_bind_inst_t power_sensor_match[] = {
-      BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_POWER_SENSOR),
-  };
   device_fragment_part_t gpio_fragment[] = {
       {std::size(gpio_match), gpio_match},
   };
@@ -187,9 +179,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   };
   device_fragment_part_t vreg_fragment[] = {
       {std::size(vreg_match), vreg_match},
-  };
-  device_fragment_part_t power_sensor_fragment[] = {
-      {std::size(power_sensor_match), power_sensor_match},
   };
 
   device_fragment_t composite[] = {
@@ -260,7 +249,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
       {"spi", std::size(spi_fragment), spi_fragment},
       {"pwm", std::size(pwm_fragment), pwm_fragment},
       {"vreg", std::size(vreg_fragment), vreg_fragment},
-      {"power-sensor", std::size(power_sensor_fragment), power_sensor_fragment},
   };
 
   fuchsia_hardware_platform_bus::Node pdev2 = {};

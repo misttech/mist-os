@@ -6,7 +6,6 @@
 #define SRC_DEVICES_POWER_DRIVERS_TI_INA231_TI_INA231_H_
 
 #include <fidl/fuchsia.hardware.power.sensor/cpp/wire.h>
-#include <fuchsia/hardware/power/sensor/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -22,10 +21,10 @@ namespace power_sensor {
 namespace power_sensor_fidl = fuchsia_hardware_power_sensor;
 
 class Ina231Device;
-using DeviceType = ddk::Device<Ina231Device, ddk::Messageable<power_sensor_fidl::Device>::Mixin>;
+using DeviceType =
+    ddk::Device<Ina231Device, ddk::Messageable<fuchsia_hardware_power_sensor::Device>::Mixin>;
 
-class Ina231Device : public DeviceType,
-                     public ddk::PowerSensorProtocol<Ina231Device, ddk::base_protocol> {
+class Ina231Device : public DeviceType {
  public:
   Ina231Device(zx_device_t* parent, uint32_t shunt_resistor_uohms, ddk::I2cChannel i2c)
       : DeviceType(parent),
@@ -55,6 +54,7 @@ class Ina231Device : public DeviceType,
   async::Loop loop_;
   fbl::Mutex i2c_lock_;
   ddk::I2cChannel i2c_ TA_GUARDED(i2c_lock_);
+  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
 };
 
 }  // namespace power_sensor

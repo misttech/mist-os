@@ -4,9 +4,9 @@
 
 #include "nelson-brownout-protection.h"
 
+#include <fidl/fuchsia.hardware.power.sensor/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
-#include <fuchsia/hardware/power/sensor/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/zx/channel.h>
@@ -93,33 +93,22 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  ddk::PowerSensorProtocolClient power_sensor(parent, "power-sensor");
-  if (!power_sensor.is_valid()) {
-    zxlogf(ERROR, "No power sensor fragment");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_power_sensor::Service::Device>(
+          parent, "power-sensor");
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect to FIDL fragment: %s", client.status_string());
+    return client.status_value();
   }
 
-  zx::result power_sensor_endpoints =
-      fidl::CreateEndpoints<fuchsia_hardware_power_sensor::Device>();
-  if (!power_sensor_endpoints.is_ok()) {
-    zxlogf(ERROR, "Failed to create channel: %s", power_sensor_endpoints.status_string());
-    return power_sensor_endpoints.status_value();
-  }
-  fidl::WireSyncClient power_sensor_client =
-      fidl::WireSyncClient(std::move(power_sensor_endpoints->client));
-
-  zx_status_t status = power_sensor.ConnectServer(power_sensor_endpoints->server.TakeChannel());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to power_sensor driver: %s", zx_status_get_string(status));
-    return status;
-  }
+  fidl::WireSyncClient power_sensor_client(std::move(client.value()));
 
   ddk::GpioProtocolClient alert_gpio(parent, "alert-gpio");
   if (!alert_gpio.is_valid()) {
     zxlogf(ERROR, "No GPIO fragment");
     return ZX_ERR_NO_RESOURCES;
   }
-
+  zx_status_t status;
   // Pulled up externally.
   if ((status = alert_gpio.ConfigIn(GPIO_NO_PULL)) != ZX_OK) {
     zxlogf(ERROR, "Failed to configure alert GPIO: %s", zx_status_get_string(status));

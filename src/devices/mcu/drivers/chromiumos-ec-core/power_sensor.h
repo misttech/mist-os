@@ -51,6 +51,7 @@ class CrOsEcPowerSensorDevice : public CrOsEcPowerSensorDeviceType {
   ChromiumosEcCore* ec_;
 
   float power_;
+  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
 };
 
 }  // namespace chromiumos_ec_core::power_sensor

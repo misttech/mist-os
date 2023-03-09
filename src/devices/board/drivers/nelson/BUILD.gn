@@ -33,6 +33,7 @@ driver_bind_rules("nelson-bind") {
   deps = [
     "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.hardware.platform.bus",
+    "//src/devices/bind/fuchsia.hardware.power.sensor",
   ]
 }
 
@@ -117,6 +118,7 @@ driver_bind_rules("brownout_protection_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
     "//src/devices/bind/fuchsia.codec",
     "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.hardware.power.sensor",
     "//src/devices/bind/fuchsia.power",
     "//src/devices/bind/fuchsia.ti.platform",
   ]

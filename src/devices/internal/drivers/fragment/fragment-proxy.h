@@ -12,7 +12,6 @@
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/power/cpp/banjo.h>
-#include <fuchsia/hardware/power/sensor/cpp/banjo.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
@@ -49,8 +48,7 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::SysmemProtocol<FragmentProxy>,
                       public ddk::TeeProtocol<FragmentProxy>,
                       public ddk::UsbModeSwitchProtocol<FragmentProxy>,
-                      public ddk::VregProtocol<FragmentProxy>,
-                      public ddk::PowerSensorProtocol<FragmentProxy> {
+                      public ddk::VregProtocol<FragmentProxy> {
  public:
   FragmentProxy(zx_device_t* parent, zx::channel rpc)
       : FragmentProxyBase(parent), rpc_(std::move(rpc)) {}
@@ -137,9 +135,6 @@ class FragmentProxy : public FragmentProxyBase,
 
   zx_status_t CodecConnect(zx::channel chan);
   zx_status_t DaiConnect(zx::channel chan);
-
-  // Power sensor
-  zx_status_t PowerSensorConnectServer(zx::channel server);
 
  private:
   zx::channel rpc_;

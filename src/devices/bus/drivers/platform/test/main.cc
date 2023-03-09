@@ -90,7 +90,6 @@ TEST(PbusTest, Enumeration) {
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:8:1/test-i2c/i2c/i2c-1-5", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:8:1/test-i2c/i2c/i2c-1-6", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:f/composite-dev/composite", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:22/test-power-sensor", &st, 0), 0);
   EXPECT_EQ(
       fstatat(dirfd, "sys/platform/11:01:23/composite_node_spec/test-composite-node-spec", &st, 0),
       0);

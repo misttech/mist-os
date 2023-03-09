@@ -6,7 +6,6 @@
 #include <fuchsia/hardware/gpio/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/power/c/banjo.h>
-#include <fuchsia/hardware/power/sensor/c/banjo.h>
 #include <fuchsia/hardware/pwm/c/banjo.h>
 #include <fuchsia/hardware/spi/c/banjo.h>
 #include <fuchsia/hardware/vreg/c/banjo.h>
@@ -47,7 +46,6 @@ enum Fragments_2 {
   FRAGMENT_SPI_2,
   FRAGMENT_PWM_2,
   FRAGMENT_VREG_2,
-  FRAGMENT_POWER_SENSOR_2,
   FRAGMENT_COUNT_2,
 };
 
@@ -327,17 +325,6 @@ static zx_status_t test_vreg(vreg_protocol_t* vreg) {
   return ZX_OK;
 }
 
-static zx_status_t test_power_sensor(power_sensor_protocol_t* power_sensor) {
-  zx_handle_t client, server;
-  zx_status_t status = zx_channel_create(0, &client, &server);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  power_sensor_connect_server(power_sensor, server);
-  return zx_handle_close(client);
-}
-
 static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   zx_status_t status;
 
@@ -391,7 +378,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   spi_protocol_t spi;
   pwm_protocol_t pwm;
   vreg_protocol_t vreg;
-  power_sensor_protocol_t power_sensor;
 
   if (metadata.composite_device_id == PDEV_DID_TEST_COMPOSITE_1) {
     if (count != FRAGMENT_COUNT_1) {
@@ -513,17 +499,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_VREG", DRIVER_NAME);
       return status;
     }
-    if (strncmp(fragments[FRAGMENT_POWER_SENSOR_2].name, "power-sensor", 32)) {
-      zxlogf(ERROR, "%s: Unexpected name: %s", DRIVER_NAME,
-             fragments[FRAGMENT_POWER_SENSOR_2].name);
-      return ZX_ERR_INTERNAL;
-    }
-    status = device_get_protocol(fragments[FRAGMENT_POWER_SENSOR_2].device,
-                                 ZX_PROTOCOL_POWER_SENSOR, &power_sensor);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_POWER_SENSOR", DRIVER_NAME);
-      return status;
-    }
 
     if ((status = test_clock(&clock)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_clock failed: %d", DRIVER_NAME, status);
@@ -543,10 +518,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     }
     if ((status = test_vreg(&vreg)) != ZX_OK) {
       zxlogf(ERROR, "%s: test_vreg failed: %d", DRIVER_NAME, status);
-      return status;
-    }
-    if ((status = test_power_sensor(&power_sensor)) != ZX_OK) {
-      zxlogf(ERROR, "%s: test_power_sensor failed: %d", DRIVER_NAME, status);
       return status;
     }
   } else if (metadata.composite_device_id == PDEV_DID_TEST_GOLDFISH_CONTROL_COMPOSITE) {

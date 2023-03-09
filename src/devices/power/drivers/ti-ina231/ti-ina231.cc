@@ -81,10 +81,24 @@ zx_status_t Ina231Device::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_power_sensor::Service::Name,
+  };
+
   zx_device_prop_t props[] = {
       {BIND_POWER_SENSOR_DOMAIN, 0, metadata.power_sensor_domain},
   };
-  if ((status = dev->DdkAdd(ddk::DeviceAddArgs("ti-ina231").set_props(props))) != ZX_OK) {
+  dev->outgoing_server_end_ = std::move(endpoints->server);
+  status = dev->DdkAdd(ddk::DeviceAddArgs("ti-ina231")
+                           .set_props(props)
+                           .set_fidl_service_offers(offers)
+                           .set_outgoing_dir(endpoints->client.TakeChannel()));
+  if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed: %d", status);
     return status;
   }
@@ -108,14 +122,13 @@ void Ina231Device::GetPowerWatts(GetPowerWattsCompleter::Sync& completer) {
   }
 
   if (power_reg.is_error()) {
-    completer.ReplyError(power_reg.error_value());
+    completer.Close(power_reg.error_value());
     return;
   }
 
   const uint64_t power = (power_reg.value() * kPowerResolution) / shunt_resistor_uohms_;
   completer.ReplySuccess(static_cast<float>(power) / kFixedPointFactor);
 }
-
 void Ina231Device::GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) {
   zx::result<uint16_t> voltage_reg;
 
@@ -125,7 +138,7 @@ void Ina231Device::GetVoltageVolts(GetVoltageVoltsCompleter::Sync& completer) {
   }
 
   if (voltage_reg.is_error()) {
-    completer.ReplyError(voltage_reg.error_value());
+    completer.Close(voltage_reg.error_value());
     return;
   }
 

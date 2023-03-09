@@ -30,19 +30,26 @@ zx_status_t CrOsEcPowerSensorDevice::Bind(zx_device_t* parent, ChromiumosEcCore*
     return ZX_ERR_NO_MEMORY;
   }
 
-  ddk::DeviceAddArgs args("cros-ec-power-sensor");
-  args.set_proto_id(ZX_PROTOCOL_POWER_SENSOR);
-  zx_status_t status = dev->DdkAdd(args);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_power_sensor::Service::Name,
+  };
+
+  dev->outgoing_server_end_ = std::move(endpoints->server);
+  auto status = dev->DdkAdd(ddk::DeviceAddArgs("cross-ec-power-sensor")
+                                .set_flags(DEVICE_ADD_MUST_ISOLATE)
+                                .set_fidl_service_offers(offers)
+                                .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
+    zxlogf(ERROR, "failed to add device: %d", status);
     return status;
   }
 
-  // Ownership has transferred to the DDK, so release our unique_ptr, but
-  // let the caller have a pointer to it.
-  if (device != nullptr) {
-    *device = dev.get();
-  }
-  (void)dev.release();
+  [[maybe_unused]] auto* placeholder1 = dev.release();
 
   return ZX_OK;
 }

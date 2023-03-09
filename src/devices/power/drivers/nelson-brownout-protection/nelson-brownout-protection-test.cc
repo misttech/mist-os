@@ -5,16 +5,17 @@
 #include "nelson-brownout-protection.h"
 
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
-#include <fuchsia/hardware/power/sensor/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/simple-codec/simple-codec-server.h>
 
 #include <optional>
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-
 namespace brownout_protection {
 
 namespace audio_fidl = ::fuchsia::hardware::audio;
@@ -97,21 +98,8 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
   std::optional<fidl::Binding<signal_fidl::SignalProcessing>> signal_processing_binding_;
 };
 
-class FakePowerSensor : public ddk::PowerSensorProtocol<FakePowerSensor, ddk::base_protocol>,
-                        public fidl::WireServer<fuchsia_hardware_power_sensor::Device> {
+class FakePowerSensor : public fidl::WireServer<fuchsia_hardware_power_sensor::Device> {
  public:
-  explicit FakePowerSensor(async_dispatcher_t* dispatcher)
-      : proto_{.ops = &power_sensor_protocol_ops_, .ctx = this}, dispatcher_(dispatcher) {}
-
-  const power_sensor_protocol_t* GetProto() const { return &proto_; }
-
-  zx_status_t PowerSensorConnectServer(zx::channel server) {
-    binding_.emplace(fidl::BindServer(
-        dispatcher_, fidl::ServerEnd<fuchsia_hardware_power_sensor::Device>(std::move(server)),
-        this));
-    return ZX_OK;
-  }
-
   void set_voltage(float voltage) { voltage_ = voltage; }
 
   void GetPowerWatts(GetPowerWattsCompleter::Sync& completer) override {
@@ -123,22 +111,25 @@ class FakePowerSensor : public ddk::PowerSensorProtocol<FakePowerSensor, ddk::ba
   }
 
  private:
-  float voltage_ = 0.0f;
-  const power_sensor_protocol_t proto_;
-  async_dispatcher_t* const dispatcher_;
-  std::optional<fidl::ServerBindingRef<fuchsia_hardware_power_sensor::Device>> binding_;
+  std::atomic<float> voltage_ = 0.0f;
 };
+
+namespace {
+struct IncomingNamespace {
+  FakePowerSensor power_sensor;
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+  fidl::ServerBindingGroup<fuchsia_hardware_power_sensor::Device> bindings;
+};
+}  // namespace
 
 TEST(NelsonBrownoutProtectionTest, Test) {
   auto fake_parent = MockDevice::FakeRootParent();
-
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-
+  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming{loop.dispatcher(), std::in_place};
   ASSERT_OK(audio::SimpleCodecServer::CreateAndAddToDdk<FakeCodec>(fake_parent.get()));
   auto* child_dev = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   auto codec = child_dev->GetDeviceContext<FakeCodec>();
-  FakePowerSensor power_sensor(loop.dispatcher());
   ddk::MockGpio alert_gpio;
 
   zx::interrupt alert_gpio_interrupt;
@@ -151,28 +142,45 @@ TEST(NelsonBrownoutProtectionTest, Test) {
         .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(interrupt_dup));
   }
 
-  ASSERT_OK(loop.StartThread());
+  zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(outgoing_endpoints);
+
+  ASSERT_OK(loop.StartThread("incoming-ns-thread"));
+
+  incoming.SyncCall([server =
+                         std::move(outgoing_endpoints->server)](IncomingNamespace* ns) mutable {
+    fuchsia_hardware_power_sensor::Service::InstanceHandler handler({
+        .device = ns->bindings.CreateHandler(&ns->power_sensor, async_get_default_dispatcher(),
+                                             fidl::kIgnoreBindingClosure),
+    });
+    ASSERT_OK(ns->outgoing.AddService<fuchsia_hardware_power_sensor::Service>(std::move(handler)));
+    ASSERT_OK(ns->outgoing.Serve(std::move(server)));
+  });
+  fake_parent->AddFidlService(fuchsia_hardware_power_sensor::Service::Name,
+                              std::move(outgoing_endpoints->client), "power-sensor");
+
   fake_parent->AddProtocol(ZX_PROTOCOL_CODEC, codec->GetProto().ops, codec->GetProto().ctx,
                            "codec");
-  fake_parent->AddProtocol(ZX_PROTOCOL_POWER_SENSOR, power_sensor.GetProto()->ops,
-                           power_sensor.GetProto()->ctx, "power-sensor");
   fake_parent->AddProtocol(ZX_PROTOCOL_GPIO, alert_gpio.GetProto()->ops, alert_gpio.GetProto()->ctx,
                            "alert-gpio");
-
   ASSERT_OK(NelsonBrownoutProtection::Create(nullptr, fake_parent.get()));
   auto* child_dev2 = fake_parent->GetLatestChild();
   ASSERT_NOT_NULL(child_dev2);
   child_dev2->InitOp();
   EXPECT_FALSE(codec->agl_enabled());
 
-  power_sensor.set_voltage(10.0f);  // Must be less than 11.5 to stay in the brownout state.
+  incoming.SyncCall([](IncomingNamespace* ns) {
+    ns->power_sensor.set_voltage(10.0f);  // Must be less than 11.5 to stay in the brownout state.
+  });
 
   alert_gpio_interrupt.trigger(0, zx::clock::get_monotonic());
 
   while (!codec->agl_enabled()) {
   }
 
-  power_sensor.set_voltage(12.0f);  // End the brownout state and make sure AGL gets disabled.
+  incoming.SyncCall([](IncomingNamespace* ns) {
+    ns->power_sensor.set_voltage(12.0f);  // End the brownout state and make sure AGL gets disabled.
+  });
 
   while (codec->agl_enabled()) {
   }

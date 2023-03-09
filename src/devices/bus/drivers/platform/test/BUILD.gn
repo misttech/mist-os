@@ -44,7 +44,6 @@ fuchsia_driver("test-board-driver") {
     "test-composite-node-spec.cc",
     "test-gpio.cc",
     "test-i2c.cc",
-    "test-power-sensor.cc",
     "test-power.cc",
     "test-pwm.cc",
     "test-spi.cc",
@@ -365,7 +364,6 @@ fuchsia_driver("test-composite-driver") {
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.power:fuchsia.hardware.power_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.vreg:fuchsia.hardware.vreg_banjo_cpp",
@@ -457,7 +455,6 @@ fuchsia_unittest_package("platform-bus-test") {
     ":test-gpio",
     ":test-i2c",
     ":test-power",
-    ":test-power-sensor",
     ":test-pwm",
     ":test-spi",
     ":test-vreg",
@@ -562,38 +559,6 @@ test("platform-bus-bti") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-}
-
-driver_bind_rules("test-power-sensor-bind") {
-  rules = "test/test-power-sensor.bind"
-  header_output = "test-power-sensor-bind.h"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.test.platform",
-  ]
-}
-
-fuchsia_driver("test-power-sensor-driver") {
-  output_name = "test-power-sensor"
-  configs += [ "//build/config:all_source" ]
-  sources = [ "test/power-sensor.cc" ]
-  deps = [
-    ":test-power-sensor-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_banjo_cpp",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("test-power-sensor") {
-  component_name = "test-power-sensor"
-  deps = [ ":test-power-sensor-driver" ]
-  info = "test-driver-info.json"
-  manifest = "meta/test-power-sensor.cml"
 }
 
 fuchsia_unittest_package("platform-bus-bti-test") {
