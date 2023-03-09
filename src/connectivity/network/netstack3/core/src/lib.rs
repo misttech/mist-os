@@ -57,7 +57,7 @@ use net_types::{
 use packet::{Buf, BufferMut, EmptyBuf};
 
 use crate::{
-    context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
+    context::{CounterContext, EventContext, RngContext, TimerContext},
     device::DeviceId,
     device::{DeviceLayerState, DeviceLayerTimerId},
     ip::{
@@ -324,7 +324,7 @@ pub struct TimerId<C: NonSyncContext>(TimerIdInner<C>);
 )]
 enum TimerIdInner<C: NonSyncContext> {
     /// A timer event in the device layer.
-    DeviceLayer(DeviceLayerTimerId<C::Instant>),
+    DeviceLayer(DeviceLayerTimerId<C>),
     /// A timer event in the transport layer.
     TransportLayer(TransportLayerTimerId),
     /// A timer event in the IP layer.
@@ -338,8 +338,8 @@ enum TimerIdInner<C: NonSyncContext> {
     Nop(usize),
 }
 
-impl<C: NonSyncContext> From<DeviceLayerTimerId<C::Instant>> for TimerId<C> {
-    fn from(id: DeviceLayerTimerId<C::Instant>) -> TimerId<C> {
+impl<C: NonSyncContext> From<DeviceLayerTimerId<C>> for TimerId<C> {
+    fn from(id: DeviceLayerTimerId<C>) -> TimerId<C> {
         TimerId(TimerIdInner::DeviceLayer(id))
     }
 }
@@ -371,7 +371,7 @@ impl<C: NonSyncContext> From<TransportLayerTimerId> for TimerId<C> {
 impl_timer_context!(
     C: NonSyncContext,
     TimerId<C>,
-    DeviceLayerTimerId<<C as InstantContext>::Instant>,
+    DeviceLayerTimerId<C>,
     TimerId(TimerIdInner::DeviceLayer(id)),
     id
 );

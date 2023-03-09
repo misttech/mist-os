@@ -994,7 +994,7 @@ impl<I: Instant> Display for EthernetDeviceId<I> {
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub(crate) struct DeviceLayerTimerId<I: Instant>(DeviceLayerTimerIdInner<I>);
+pub(crate) struct DeviceLayerTimerId<C: DeviceLayerEventDispatcher>(DeviceLayerTimerIdInner<C>);
 
 #[derive(Derivative)]
 #[derivative(
@@ -1004,13 +1004,15 @@ pub(crate) struct DeviceLayerTimerId<I: Instant>(DeviceLayerTimerIdInner<I>);
     Hash(bound = ""),
     Debug(bound = "")
 )]
-enum DeviceLayerTimerIdInner<I: Instant> {
+enum DeviceLayerTimerIdInner<C: DeviceLayerEventDispatcher> {
     /// A timer event for an Ethernet device.
-    Ethernet(EthernetTimerId<EthernetDeviceId<I>>),
+    Ethernet(EthernetTimerId<EthernetDeviceId<C::Instant>>),
 }
 
-impl<I: Instant> From<EthernetTimerId<EthernetDeviceId<I>>> for DeviceLayerTimerId<I> {
-    fn from(id: EthernetTimerId<EthernetDeviceId<I>>) -> DeviceLayerTimerId<I> {
+impl<C: DeviceLayerEventDispatcher> From<EthernetTimerId<EthernetDeviceId<C::Instant>>>
+    for DeviceLayerTimerId<C>
+{
+    fn from(id: EthernetTimerId<EthernetDeviceId<C::Instant>>) -> DeviceLayerTimerId<C> {
         DeviceLayerTimerId(DeviceLayerTimerIdInner::Ethernet(id))
     }
 }
@@ -1027,7 +1029,8 @@ impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
 }
 
 impl_timer_context!(
-    DeviceLayerTimerId<<C as InstantContext>::Instant>,
+    C: DeviceLayerEventDispatcher,
+    DeviceLayerTimerId<C>,
     EthernetTimerId<EthernetDeviceId<<C as InstantContext>::Instant>>,
     DeviceLayerTimerId(DeviceLayerTimerIdInner::Ethernet(id)),
     id
@@ -1037,7 +1040,7 @@ impl_timer_context!(
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    id: DeviceLayerTimerId<NonSyncCtx::Instant>,
+    id: DeviceLayerTimerId<NonSyncCtx>,
 ) {
     match id.0 {
         DeviceLayerTimerIdInner::Ethernet(id) => ethernet::handle_timer(&mut sync_ctx, ctx, id),
