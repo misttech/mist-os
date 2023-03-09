@@ -502,7 +502,7 @@ impl FilesystemLauncher {
                 is_fatal: Some(false),
                 ..fidl_fuchsia_feedback::CrashReport::EMPTY
             };
-            if let Err(e) = proxy.file(report).await {
+            if let Err(e) = proxy.file_report(report).await {
                 tracing::error!(?e, "Failed to file crash report");
             }
         })

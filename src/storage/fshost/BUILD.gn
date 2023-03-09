@@ -74,6 +74,7 @@ source_set("fshost-registry") {
     "//zircon/system/ulib/zx",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp_natural_ostream",
     "//sdk/lib/fdio",
     "//src/lib/files",
     "//src/sys/lib/stdout-to-debuglog/cpp",
