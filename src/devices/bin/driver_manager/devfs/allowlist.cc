@@ -120,7 +120,6 @@ bool AllowMultiplexingController(std::string_view class_name) {
       "chromeos-acpi",
       "ctap",
       "aml-mailbox",
-      "aml-dsp",
       "adb",
   });
   return classes_that_include_controller.find(class_name) != classes_that_include_controller.end();
@@ -240,7 +239,6 @@ bool AllowMultiplexingNode(std::string_view class_name) {
       "chromeos-acpi",
       "ctap",
       "aml-mailbox",
-      "aml-dsp",
       "adb",
   });
   return classes_that_include_node.find(class_name) != classes_that_include_node.end();
