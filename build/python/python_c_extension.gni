@@ -1,0 +1,63 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_c_extension_shared_lib.gni")
+import("//build/python/python_library.gni")
+
+# Defines a python C extension library.
+#
+# This can be imported into a `.pyz` library, but the user must make sure the
+# .so that this is appending to the path is located in the output build directory,
+# as this will be appending to PYTHONPATH.
+
+template("python_c_extension") {
+  assert(is_host, "python C extensions can only be built on the host")
+
+  c_sources = invoker.sources
+  c_deps = invoker.deps
+  shlib_target_name = target_name + "_shlib"
+  main_target_name = target_name
+  python_c_extension_shared_lib(shlib_target_name) {
+    library_name = main_target_name
+    forward_variables_from(invoker, [ "testonly" ])
+    sources = c_sources
+    deps = c_deps
+  }
+
+  action(target_name + "_wrapper") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = [ ":" + shlib_target_name ]
+    script = "//build/python/create_c_extension_import_hook.py"
+    depfile = "${target_out_dir}/${target_name}.d"
+    _output = "${target_gen_dir}/${target_name}/__init__.py"
+    outputs = [ _output ]
+    args = [
+      "--target_name",
+      target_name,
+      "--shlib_source",
+      rebase_path(main_target_name, root_build_dir, root_out_dir),
+      "--gen_dir",
+      rebase_path(target_gen_dir, root_build_dir),
+      "--output",
+      rebase_path(_output, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+  }
+
+  python_library(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = [ ":" + target_name + "_wrapper" ]
+    source_root = "${target_gen_dir}/" + target_name + "_wrapper"
+    sources = [ "__init__.py" ]
+  }
+}

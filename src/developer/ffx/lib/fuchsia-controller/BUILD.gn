@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/python/python_c_extension_shared_lib.gni")
+import("//build/python/python_binary.gni")
+import("//build/python/python_c_extension.gni")
 import("//build/rust/rustc_cdylib.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 
@@ -46,7 +47,7 @@ rustc_cdylib("lib") {
   ]
 }
 
-python_c_extension_shared_lib("fuchsia_controller_py") {
+python_c_extension("fuchsia_controller_py") {
   sources = [
     "abi/fuchsia_controller.h",
     "abi/fuchsia_controller_py.cc",
@@ -58,8 +59,16 @@ python_c_extension_shared_lib("fuchsia_controller_py") {
   ]
 }
 
+python_binary("example") {
+  main_source = "python/example.py"
+  deps = [ ":fuchsia_controller_py" ]
+}
+
 group("fuchsia-controller") {
-  public_deps = [ ":fuchsia_controller_py" ]
+  public_deps = [
+    ":example",
+    ":fuchsia_controller_py",
+  ]
 }
 
 group("tests") {
