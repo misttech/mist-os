@@ -34,8 +34,8 @@ TEST(Unwinder, UnwindLocal) {
   auto frames = f3();
 
   for (auto& frame : frames) {
-    ASSERT_TRUE(frame.trust == Frame::Trust::kCFI);
     ASSERT_TRUE(frame.error.ok()) << frame.error.msg();
+    ASSERT_EQ(frame.trust, Frame::Trust::kCFI);
   }
 
   ASSERT_GT(frames.size(), 3UL);

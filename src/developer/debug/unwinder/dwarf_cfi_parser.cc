@@ -47,14 +47,16 @@ DwarfCfiParser::DwarfCfiParser(Registers::Arch arch, uint64_t code_alignment_fac
   // x18 (shadow call stack pointer) is considered preserved. SCS-enabled functions will have
   // DW_CFA_val_expression rules for x18, and SCS-disabled functions don't touch x18.
   //
-  // LR/SP are considered to be preserved, because a function has to ensure that when the function
-  // returns, the values in LR/SP are the same as when the function begins.
+  // LR is considered to be preserved, because a function has to ensure that when it returns, LR has
+  // the same value as when the function begins.
+  //
+  // SP is not considered to be preserved: its value will be recovered from CFA.
   static RegisterID kArm64Preserved[] = {
       RegisterID::kArm64_x18, RegisterID::kArm64_x19, RegisterID::kArm64_x20,
       RegisterID::kArm64_x21, RegisterID::kArm64_x22, RegisterID::kArm64_x23,
       RegisterID::kArm64_x24, RegisterID::kArm64_x25, RegisterID::kArm64_x26,
       RegisterID::kArm64_x27, RegisterID::kArm64_x28, RegisterID::kArm64_x29,
-      RegisterID::kArm64_x30, RegisterID::kArm64_x31,
+      RegisterID::kArm64_x30,
   };
 
   RegisterID* preserved;
@@ -307,7 +309,21 @@ Error DwarfCfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin
         instructions_begin += length;
         continue;
       }
-      // case 0x11:  // DW_CFA_offset_extended_sf  ULEB128 register  SLEB128 offset
+      case 0x11: {  // DW_CFA_offset_extended_sf  ULEB128 register  SLEB128 offset
+        RegisterID reg;
+        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+          return err;
+        }
+        int64_t offset;
+        if (auto err = elf->ReadSLEB128(instructions_begin, offset); err.has_err()) {
+          return err;
+        }
+        int64_t real_offset = offset * data_alignment_factor_;
+        LOG_DEBUG("DW_CFA_offset_extended_sf %hhu %" PRId64 "\n", reg, real_offset);
+        register_locations_[reg].type = RegisterLocation::Type::kOffset;
+        register_locations_[reg].offset = real_offset;
+        continue;
+      }
       // case 0x12:  // DW_CFA_def_cfa_sf          ULEB128 register  SLEB128 offset
       // case 0x13:  // DW_CFA_def_cfa_offset_sf   SLEB128 offset
       // case 0x14:  // DW_CFA_val_offset          ULEB128 register  ULEB128 offset
@@ -382,8 +398,11 @@ Error DwarfCfiParser::Step(Memory* stack, RegisterID return_address_register,
   }
 
   // By definition, the CFA is the stack pointer at the call site, so restoring SP means setting it
-  // to CFA.
-  next.SetSP(cfa);
+  // to CFA. However, if there's a rule that defines SP, we don't override that. This is used in
+  // the starnix runner to achieve "unwinding into restricted mode".
+  if (uint64_t sp; next.GetSP(sp).has_err()) {
+    next.SetSP(cfa);
+  }
 
   // Return address is the address after the call instruction, so setting IP to that simulates a
   // return. On x64, return_address_register is just RIP so it's a noop. On arm64,
