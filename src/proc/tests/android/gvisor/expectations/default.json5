@@ -764,12 +764,6 @@
                 // readv_test
                 "ReadvTestNoFixture.TruncatedAtMax",
 
-                // rename_test - https://fxbug.dev/79345
-                "RenameTest.FileNameTooLong",
-                "RenameTest.FailsWhenOldParentNotWritable",
-                "RenameTest.FailsWhenNewParentNotWritable",
-                "RenameTest.OverwriteFailsWhenNewParentNotWritable",
-
                 // rlimits_test
                 "RlimitTest.UnprivilegedSetRlimit",
                 "RlimitTest.SetSoftRlimitAboveHard",

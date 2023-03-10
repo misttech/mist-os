@@ -723,6 +723,10 @@ pub fn sys_renameat2(
     let (old_parent, old_basename) = lookup(old_dir_fd, old_user_path)?;
     let (new_parent, new_basename) = lookup(new_dir_fd, new_user_path)?;
 
+    if new_basename.len() > NAME_MAX as usize {
+        return error!(ENAMETOOLONG);
+    }
+
     if !NamespaceNode::mount_eq(&old_parent, &new_parent) {
         return error!(EXDEV);
     }

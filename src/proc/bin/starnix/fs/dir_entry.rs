@@ -441,6 +441,10 @@ impl DirEntry {
             return Ok(());
         }
 
+        // This task must have write access to the old and new parent nodes.
+        old_parent.node.check_access(current_task, Access::WRITE)?;
+        new_parent.node.check_access(current_task, Access::WRITE)?;
+
         // We need to hold these DirEntryHandles until after we drop all the
         // locks so that we do not deadlock when we drop them.
         let (_renamed, maybe_replaced) = {
