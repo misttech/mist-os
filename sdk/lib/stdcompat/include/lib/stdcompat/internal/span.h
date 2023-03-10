@@ -212,4 +212,20 @@ using byte_span_size =
 }  // namespace internal
 }  // namespace cpp20
 
+#ifdef _LIBCPP_STD_VER
+#if _LIBCPP_STD_VER <= 17
+
+// Indicate to libc++ that our `span_iterator` points to elements that are
+// contiguous in memory, which enables copy and move optimizations. In C++20,
+// this would be done in a standard way by implementing the
+// `std::contiguous_iterator_tag` concept. Since that's not present in C++17,
+// hook into the libc++ marker template type instead.
+
+namespace std {
+template <class It>
+struct __is_cpp17_contiguous_iterator<cpp20::internal::span_iterator<It>> : true_type {};
+}  // namespace std
+#endif
+#endif
+
 #endif  // SDK_LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
