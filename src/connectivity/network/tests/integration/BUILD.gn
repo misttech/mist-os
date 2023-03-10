@@ -210,14 +210,21 @@ resource("sampler-config") {
   outputs = [ "data/sampler-config/netstack.json" ]
 }
 
+# We keep tests that involve the virtualization stack (and especially guest
+# images) restricted to a separate builder.  See https://fxbug.dev/122994 for
+# more details.
+group("tests-involving-guests") {
+  testonly = true
+  deps = [ "guest:netstack-guest-integration-tests" ]
+}
+
 group("tests") {
   testonly = true
+
+  # See comment above about tests-involving-guests
+  assert_no_deps = [ "guest:*" ]
   deps = [
            ":netstack-integration-tests",
-
-           # TODO(https://fxbug.dev/122994): Temporarily disabled until
-           # virtualization tests can be made lighter-weight to infra.
-           # "guest:netstack-guest-integration-tests",
            "macros:netstack_testing_macros_test",
          ] + err_log_package_deps
 

@@ -132,14 +132,23 @@ static_library("f2fs") {
   }
 }
 
+# The compatibility tests are expensive to build/run because they pull in a
+# Linux guest image and use the hypervisor, so we keep them in a separate group
+# target pulled in by a virtualization-specific builder which we run less
+# frequently. See https://fxbug.dev/122994 for more background.
+group("tests-involving-guests") {
+  testonly = true
+  deps = [ "test/compatibility:tests" ]
+}
+
 group("tests") {
   testonly = true
+
+  # See comment above about tests-involving-guests
+  assert_no_deps = [ "test/compatibility:*" ]
+
   deps = [
     "test:f2fs-fs-tests",
     "test:f2fs-slow-fs-tests",
-
-    # TODO(https://fxbug.dev/122994): Temporarily disabled until virtualization
-    # tests can be made lighter-weight to infra.
-    # "test/compatibility:tests",
   ]
 }

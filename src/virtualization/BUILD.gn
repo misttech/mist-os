@@ -12,15 +12,30 @@ group("virtualization") {
   ]
 }
 
+# To avoid creating excessive load on infra, we split out tests that pull in
+# heavyweight guest packages (which are expensive to include in built images)
+# or tests that involve actually booting guest images.  See
+# https://fxbug.dev/122994 for more background.
+group("tests-involving-guests") {
+  testonly = true
+
+  deps = [
+    "lib:tests-involving-guests",
+    "tests",
+  ]
+}
+
 group("tests") {
   testonly = true
+
+  # Make sure we don't accidentally pull in tests that involve large guest images.
+  assert_no_deps = [
+    "tests",
+    "//src/virtualization/packages:*",
+  ]
 
   deps = [
     "bin:tests",
     "lib:tests",
-
-    # TODO(https://fxbug.dev/122994): Temporarily disabled until virtualization
-    # tests can be made lighter-weight to infra.
-    # "tests",
   ]
 }

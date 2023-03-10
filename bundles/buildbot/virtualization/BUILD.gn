@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# WARNING: Known to infrastructure
+#
+# This group contains tests that may pull in virtualized guest images, which we
+# want to keep out of our more commonly-used images as they are very heavy in
+# terms of image size and test runtime.  See https://fxbug.dev/122994 for more
+# background.
+group("virtualization") {
+  testonly = true
+  deps = [
+    # Connectivity's netemul framework supports a "guest" setup where one of
+    # the nodes in the network is a virtualized guest.
+    "//src/connectivity/network/testing/netemul:tests-involving-guests",
+
+    # The netemul framework is used to support some integration tests,
+    # including tests that verify that a Fuchsia DHCPv4 and DHCPv6 client can
+    # interoperate with a Linux DHCP server.
+    "//src/connectivity/network/tests/integration:tests-involving-guests",
+
+    # f2fs compatibility tests use a Linux guest to test that Fuchsia and Linux
+    # can successfully interoperate bidirectionally with f2fs disk images.
+    "//src/storage/f2fs:tests-involving-guests",
+
+    # The virtualization integration tests themselves involve guest images.
+    "//src/virtualization:tests-involving-guests",
+  ]
+}
