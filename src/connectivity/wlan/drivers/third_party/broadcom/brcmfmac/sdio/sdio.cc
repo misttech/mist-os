@@ -1879,10 +1879,6 @@ static zx_status_t brcmf_sdio_tx_frames(struct brcmf_sdio* bus,
   return err;
 }
 
-// TODO(fxbug.dev/42151): Remove once bug resolved
-static uint32_t brcmf_sdio_txq_full_errors = 0;
-static bool brcmf_sdio_txq_full_debug_log = false;
-
 static zx_status_t brcmf_sdio_send_tx_queue(struct brcmf_sdio* bus, uint32_t frame_count) {
   TRACE_DURATION("brcmfmac:isr", "send_tx_queue", "frame_count", frame_count);
 
@@ -2210,18 +2206,6 @@ static void brcmf_sdio_dpc(struct brcmf_sdio* bus) {
   /* Send queued frames (limit 1 if rx may still be pending) */
   if (bus->clkstate == CLK_AVAIL && !bus->fcstate.load() && txlimit > 0 && data_ok(bus)) {
     brcmf_sdio_send_tx_queue(bus, txlimit);
-  } else if (unlikely(brcmf_sdio_txq_full_debug_log)) {
-    // TODO(fxbug.dev/42151): Remove once bug resolved
-    int len = brcmu_pktq_mlen(&bus->txq, ~bus->flowcontrol);
-    if (len > 0) {
-      BRCMF_INFO(
-          "Not able to transmit queued frames right now, clkstate = %u, "
-          "fcstate = %d, queue len = %d, txlimit = %u, data_ok = %s",
-          bus->clkstate, bus->fcstate.load(), len, txlimit, data_ok(bus) ? "true" : "false");
-      if (!data_ok(bus)) {
-        BRCMF_INFO("The tx_window is not ready, tx_max: %d, tx_seq: %d", bus->tx_max, bus->tx_seq);
-      }
-    }
   }
 
   if ((bus->sdiodev->state != BRCMF_SDIOD_DATA) || (err != ZX_OK)) {
@@ -2478,24 +2462,11 @@ static zx_status_t brcmf_sdio_bus_txframes(brcmf_bus* bus_if,
         failed_frames->emplace_back(std::move(*dropped));
         failed_frames->back().ShrinkHead(bus->tx_hdrlen);
 
-        // TODO(fxbug.dev/42151): Remove once bug resolved
-        ++brcmf_sdio_txq_full_errors;
-        if (brcmf_sdio_txq_full_errors >= 30 && !brcmf_sdio_txq_full_debug_log) {
-          // We've seen a large number of these errors in a row, start providing
-          // more debug information.
-          BRCMF_WARN("Excessive out of bus->txq errors, enabling debug logging");
-          brcmf_sdio_txq_full_debug_log = true;
-        }
         sdiodev->drvr->device->GetInspect()->LogTxQueueFull();
         // Reset the pointer so that it's not used in the next loop iteration.
         dropped.reset();
         continue;
       }
-      // TODO(fxbug.dev/42151): Remove once bug resolved
-      // Reset the counter here in case there was just a spurious queue issue.
-      // Also stop the debug logging so we don't spam the logs unnecessarily.
-      brcmf_sdio_txq_full_errors = 0;
-      brcmf_sdio_txq_full_debug_log = false;
 
 #if !defined(NDEBUG)
       if (frame.Priority() < std::size(qcount) &&
