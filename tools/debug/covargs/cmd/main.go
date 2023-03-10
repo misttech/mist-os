@@ -492,17 +492,20 @@ func createLLVMCovResponseFile(tempDir string, modules *[]symbolize.FileCloser) 
 }
 
 // setDebuginfodEnv sets the environment variables for debuginfod.
-func setDebuginfodEnv(cmd *exec.Cmd) {
-	// When debuginfod server is provided, set the DEBUGINFOD_URLS environment variable that is a string of a space-separated URLs.
+func setDebuginfodEnv(cmd *exec.Cmd) error {
 	if len(debuginfodServers) > 0 {
+		if debuginfodCache == "" {
+			return fmt.Errorf("-debuginfod-cache must be set if debuginfod server is used")
+		}
+
 		debuginfodUrls := strings.Join(debuginfodServers, " ")
 		cmd.Env = os.Environ()
+		// Set DEBUGINFOD_URLS environment variable that is a string of a space-separated URLs.
 		cmd.Env = append(cmd.Env, "DEBUGINFOD_URLS="+debuginfodUrls)
-
-		if debuginfodCache != "" {
-			cmd.Env = append(cmd.Env, "DEBUGINFOD_CACHE_PATH="+debuginfodCache)
-		}
+		cmd.Env = append(cmd.Env, "DEBUGINFOD_CACHE_PATH="+debuginfodCache)
 	}
+
+	return nil
 }
 
 // showCoverageData shows coverage data by invoking llvm-cov show command.
@@ -530,7 +533,11 @@ func showCoverageData(ctx context.Context, mergedProfileFile string, covFile str
 	args = append(args, "@"+covFile)
 	showCmd := exec.Command(llvmCov, args...)
 	logger.Debugf(ctx, "%s\n", showCmd)
-	setDebuginfodEnv(showCmd)
+
+	if err := setDebuginfodEnv(showCmd); err != nil {
+		return fmt.Errorf("failed to set debuginfod environment: %w", err)
+	}
+
 	data, err := showCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v:\n%s", err, string(data))
@@ -574,7 +581,10 @@ func exportCoverageData(ctx context.Context, mergedProfileFile string, covFile s
 	logger.Debugf(ctx, "%s\n", exportCmd)
 	exportCmd.Stdout = &b
 	exportCmd.Stderr = stderrFile
-	setDebuginfodEnv(exportCmd)
+
+	if err := setDebuginfodEnv(exportCmd); err != nil {
+		return fmt.Errorf("failed to set debuginfod environment: %w", err)
+	}
 
 	if err := exportCmd.Run(); err != nil {
 		return fmt.Errorf("failed to export: %w", err)
@@ -692,6 +702,13 @@ func process(ctx context.Context) error {
 			return fmt.Errorf("failed to export coverage data: %w", err)
 		}
 		logger.Debugf(ctx, "time to export coverage: %.2f minutes\n", time.Since(start).Minutes())
+	}
+
+	// Delete debuginfod cache, which includes all the binary files that are fetched from debuginfod server.
+	if debuginfodCache != "" {
+		if err := os.RemoveAll(debuginfodCache); err != nil {
+			return fmt.Errorf("failed to remove debuginfod cache: %w", err)
+		}
 	}
 
 	return nil
