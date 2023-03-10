@@ -61,6 +61,8 @@ rustc_binary("bin") {
   sources = [
     "src/a2dp.rs",
     "src/audio.rs",
+    "src/audio/dai_audio_control.rs",
+    "src/audio/inband_audio_control.rs",
     "src/config.rs",
     "src/error.rs",
     "src/features.rs",

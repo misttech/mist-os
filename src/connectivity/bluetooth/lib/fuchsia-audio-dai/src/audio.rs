@@ -7,7 +7,7 @@ use fidl::prelude::*;
 use fidl_fuchsia_hardware_audio::*;
 use fidl_fuchsia_media as media;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx};
+use fuchsia_zircon as zx;
 use futures::{future::MaybeDone, StreamExt};
 use std::sync::Arc;
 use tracing::info;

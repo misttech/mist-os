@@ -13,7 +13,7 @@ use {
 };
 
 use crate::{
-    config::AudioGatewayFeatureSupport, fidl_service::run_services, hfp::Hfp,
+    audio::AudioControl, config::AudioGatewayFeatureSupport, fidl_service::run_services, hfp::Hfp,
     profile::register_audio_gateway,
 };
 
@@ -58,12 +58,22 @@ async fn main() -> Result<(), Error> {
     let (call_manager_sender, call_manager_receiver) = mpsc::channel(1);
     let (test_request_sender, test_request_receiver) = mpsc::channel(1);
 
-    let audio = match audio::DaiAudioControl::discover().await {
-        Err(e) => {
-            warn!("Couldn't setup DAI audio: {:?}", e);
-            return Err(format_err!("DAI failed"));
+    let audio: Box<dyn AudioControl> = if in_band_sco {
+        match audio::DaiAudioControl::discover().await {
+            Err(e) => {
+                error!(?e, "Couldn't setup DAI audio");
+                return Err(format_err!("DAI failed"));
+            }
+            Ok(audio) => Box::new(audio),
         }
-        Ok(audio) => audio,
+    } else {
+        match audio::InbandAudioControl::create() {
+            Err(e) => {
+                error!(?e, "Couldn't setup inband audio");
+                return Err(format_err!("Inband failed: {e:?}"));
+            }
+            Ok(audio) => Box::new(audio),
+        }
     };
 
     let mut hfp = Hfp::new(

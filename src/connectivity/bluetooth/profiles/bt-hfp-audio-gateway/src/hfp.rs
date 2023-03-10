@@ -84,7 +84,7 @@ impl Hfp {
         profile_client: ProfileClient,
         profile_svc: bredr::ProfileProxy,
         battery_client: Option<BatteryClient>,
-        audio: impl AudioControl + 'static,
+        audio: Box<dyn AudioControl>,
         call_manager_registration: Receiver<CallManagerProxy>,
         config: AudioGatewayFeatureSupport,
         in_band_sco: bool,
@@ -101,7 +101,7 @@ impl Hfp {
             config,
             test_requests,
             connection_behavior: ConnectionBehavior::default(),
-            audio: Arc::new(Mutex::new(Box::new(audio))),
+            audio: Arc::new(Mutex::new(audio)),
             battery_client: battery_client.into(),
             internal_events_rx,
             internal_events_tx,
@@ -329,7 +329,7 @@ mod tests {
     use async_test_helpers::run_while;
     use async_utils::PollExt;
     use bt_rfcomm::{profile::build_rfcomm_protocol, ServerChannel};
-    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle};
     use fidl_fuchsia_bluetooth as bt;
     use fidl_fuchsia_bluetooth_bredr as bredr;
     use fidl_fuchsia_bluetooth_hfp::{
@@ -360,7 +360,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             rx1,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -391,7 +391,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -434,7 +434,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -492,7 +492,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -516,52 +516,56 @@ mod tests {
     // TODO: This test can be enabled once the test synchronizes the call manager channels such that
     // the first call manager is seen as closed by both ends before the second call manager channel
     // is sent into the Hfp task.
-    // #[fuchsia::test]
-    // async fn manager_disconnect_and_new_connection_works() {
-    //     let (profile, profile_svc, server) = setup_profile_and_test_server();
-    //     let (battery_client, _test_battery_manager) = TestBatteryManager::make_battery_client_with_test_manager().await;
-    //     let (proxy, stream) =
-    //         create_proxy_and_stream::<CallManagerMarker>().unwrap();
+    #[fuchsia::test]
+    #[ignore]
+    async fn manager_disconnect_and_new_connection_works() {
+        let (profile, profile_svc, server) = setup_profile_and_test_server();
+        let (battery_client, _test_battery_manager) =
+            TestBatteryManager::make_battery_client_with_test_manager().await;
+        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
 
-    //     let (mut sender, receiver) = mpsc::channel(1);
-    //     sender.send(proxy).await.expect("Hfp to receive the proxy");
+        let (mut sender, receiver) = mpsc::channel(1);
+        sender.send(proxy).await.expect("Hfp to receive the proxy");
 
-    //     let (_, rx) = mpsc::channel(1);
+        let (_, rx) = mpsc::channel(1);
 
-    //     // Run hfp in a background task since we are testing that the profile server observes the
-    //     // expected behavior when interacting with hfp.
-    //     let hfp = Hfp::new(
-    //         profile,
-    //         profile_svc,
-    //         Some(battery_client),
-    //         TestAudioControl::default(),
-    //         receiver,
-    //         AudioGatewayFeatureSupport::default(),
-    //         false,
-    //         rx,
-    //     );
-    //     let _hfp_task = fasync::Task::local(hfp.run());
+        // Run hfp in a background task since we are testing that the profile server observes the
+        // expected behavior when interacting with hfp.
+        let hfp = Hfp::new(
+            profile,
+            profile_svc,
+            Some(battery_client),
+            Box::new(TestAudioControl::default()),
+            receiver,
+            AudioGatewayFeatureSupport::default(),
+            false,
+            rx,
+        );
+        let _hfp_task = fasync::Task::local(hfp.run());
 
-    //     // Setup profile, then connect RFCOMM channel.
-    //     let _server = profile_server_init_and_peer_handling(server, true).await.expect("peer setup to complete");
+        // Setup profile, then connect RFCOMM channel.
+        let _server = profile_server_init_and_peer_handling(server, true)
+            .await
+            .expect("peer setup to complete");
 
-    //     // Peer Connected notification occurs after channel is connected.
-    //     let mut stream = call_manager_init_and_peer_handling(stream).await.expect("call manager to be notified");
+        // Peer Connected notification occurs after channel is connected.
+        let mut stream =
+            call_manager_init_and_peer_handling(stream).await.expect("call manager to be notified");
 
-    //     // Close call manager stream end
-    //     use fidl::endpoints::RequestStream;
-    //     stream.control_handle().shutdown();
-    //     let _ = stream.next().await;
+        // Close call manager stream end
+        use fidl::endpoints::RequestStream;
+        stream.control_handle().shutdown();
+        let _ = stream.next().await;
 
-    //     // Setup a new call manager.
-    //     let (proxy, stream) =
-    //         create_proxy_and_stream::<CallManagerMarker>().unwrap();
-    //     sender.send(proxy).await.expect("Hfp to receive the proxy");
+        // Setup a new call manager.
+        let (proxy, stream) = create_proxy_and_stream::<CallManagerMarker>().unwrap();
+        sender.send(proxy).await.expect("Hfp to receive the proxy");
 
-    //     // The new call manager should receive a peer connected notification for the peer that is
-    //     // connected.
-    //     let _ = call_manager_init_and_peer_handling(stream).await.expect("call manager to be notified");
-    // }
+        // The new call manager should receive a peer connected notification for the peer that is
+        // connected.
+        let _ =
+            call_manager_init_and_peer_handling(stream).await.expect("call manager to be notified");
+    }
 
     /// Tests the HFP main run loop from a blackbox perspective by asserting on the FIDL messages
     /// sent and received by the services that Hfp interacts with: A bredr profile server and
@@ -586,7 +590,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -712,7 +716,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             call_mgr_rx,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -759,7 +763,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             receiver,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -805,7 +809,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             call_mgr_rx,
             AudioGatewayFeatureSupport::default(),
             false,
@@ -859,7 +863,7 @@ mod tests {
             profile,
             profile_svc,
             Some(battery_client),
-            TestAudioControl::default(),
+            Box::new(TestAudioControl::default()),
             rx1,
             AudioGatewayFeatureSupport::default(),
             false,

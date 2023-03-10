@@ -662,17 +662,17 @@ impl TryFrom<&ChannelParameters> for fidl_bredr::ChannelParameters {
 #[derive(Debug, Clone, ValidFidlTable, PartialEq)]
 #[fidl_table_src(fidl_bredr::ScoConnectionParameters)]
 pub struct ValidScoConnectionParameters {
-    parameter_set: fidl_bredr::HfpParameterSet,
-    air_coding_format: fidl_bredr::CodingFormat,
-    air_frame_size: u16,
-    io_bandwidth: u32,
-    io_coding_format: fidl_bredr::CodingFormat,
-    io_frame_size: u16,
+    pub parameter_set: fidl_bredr::HfpParameterSet,
+    pub air_coding_format: fidl_bredr::CodingFormat,
+    pub air_frame_size: u16,
+    pub io_bandwidth: u32,
+    pub io_coding_format: fidl_bredr::CodingFormat,
+    pub io_frame_size: u16,
     #[fidl_field_type(optional)]
-    io_pcm_data_format: Option<fidl_fuchsia_hardware_audio::SampleFormat>,
+    pub io_pcm_data_format: Option<fidl_fuchsia_hardware_audio::SampleFormat>,
     #[fidl_field_type(optional)]
-    io_pcm_sample_payload_msb_position: Option<u8>,
-    path: fidl_bredr::DataPath,
+    pub io_pcm_sample_payload_msb_position: Option<u8>,
+    pub path: fidl_bredr::DataPath,
 }
 
 impl Unit for ValidScoConnectionParameters {

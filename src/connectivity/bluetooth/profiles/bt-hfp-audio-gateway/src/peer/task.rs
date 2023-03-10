@@ -753,13 +753,15 @@ impl PeerTask {
             }
             Ok(token) => {
                 info!("Successfully paused audio for peer {:}.", peer_id);
-                Some(token)
+                token
             }
         };
+        let vigil = Vigil::new(ScoActive::new(&sco_connection, pause_token));
         {
             let mut audio = self.audio_control.lock();
             // Start the DAI with the given parameters
-            if let Err(e) = audio.start(self.id.clone(), sco_connection.params.clone().into()) {
+            let codec_id = self.codec_for_parameter_set(&sco_connection.params.parameter_set);
+            if let Err(e) = audio.start(self.id.clone(), sco_connection, codec_id) {
                 // Cancel the SCO connection, we can't send audio.
                 // TODO(fxbug.dev/79784): this probably means we should just cancel out of HFP and
                 // this peer's connection entirely.
@@ -772,8 +774,6 @@ impl PeerTask {
                 info!("Successfully started Audio DAI for peer {:}.", peer_id);
             }
         }
-
-        let vigil = Vigil::new(ScoActive { sco_connection, _pause_token: pause_token });
         Vigil::watch(&vigil, {
             let control = self.audio_control.clone();
             move |_| match control.lock().stop() {
@@ -787,9 +787,17 @@ impl PeerTask {
         Ok(())
     }
 
+    fn codec_for_parameter_set(&self, param_set: &bredr::HfpParameterSet) -> CodecId {
+        use bredr::HfpParameterSet::*;
+        match param_set {
+            MsbcT2 | MsbcT1 => CodecId::MSBC,
+            _ => CodecId::CVSD,
+        }
+    }
+
     fn on_active_sco_closed(&self) -> impl Future<Output = ()> + 'static {
         match &*self.sco_state {
-            ScoState::Active(connection) => connection.sco_connection.on_closed().left_future(),
+            ScoState::Active(connection) => connection.on_closed().left_future(),
             _ => future::pending().right_future(),
         }
     }
@@ -916,6 +924,7 @@ mod tests {
                 SlcState,
             },
         },
+        sco_connector::tests::connection_for_codec,
     };
 
     fn arb_signal() -> impl Strategy<Value = Option<SignalStrength>> {
@@ -1943,8 +1952,9 @@ mod tests {
         // should be an error.
         {
             let mut lock = audio_control.lock();
+            let (connection, _stream) = connection_for_codec(CodecId::CVSD, false);
             let _ = lock
-                .start(PeerId(0), bredr::ScoConnectionParameters::EMPTY)
+                .start(PeerId(0), connection, CodecId::CVSD)
                 .expect_err("shouldn't be able to start, already started");
         }
     }
@@ -1965,8 +1975,9 @@ mod tests {
         // Should have started up the test audio control.
         {
             let mut lock = audio_control.lock();
+            let (connection, _stream) = connection_for_codec(CodecId::CVSD, false);
             let _ = lock
-                .start(PeerId(0), bredr::ScoConnectionParameters::EMPTY)
+                .start(PeerId(0), connection, CodecId::CVSD)
                 .expect_err("shouldn't be able to start, already started");
         }
 

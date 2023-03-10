@@ -19,8 +19,8 @@ use crate::features::CodecId;
 pub struct ScoConnection {
     /// The parameters that this connection was set up with.
     pub params: ValidScoConnectionParameters,
-    /// Protocol which holds the connection open. Held so when this is dropped the connection closes.
-    proxy: bredr::ScoConnectionProxy,
+    /// Proxy for this connection.  Used to read/write to the connection.
+    pub proxy: bredr::ScoConnectionProxy,
 }
 
 impl Unit for ScoConnection {
@@ -211,10 +211,24 @@ impl ScoConnector {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
     use crate::profile::test_server::setup_profile_and_test_server;
+    use bredr::ScoConnectionMarker;
     use fidl_fuchsia_bluetooth_bredr::HfpParameterSet;
+
+    #[track_caller]
+    pub fn connection_for_codec(
+        codec_id: CodecId,
+        in_band: bool,
+    ) -> (ScoConnection, bredr::ScoConnectionRequestStream) {
+        let sco_params = parameter_sets_for_codec(codec_id, in_band).pop().unwrap();
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<ScoConnectionMarker>().unwrap();
+        let connection = ScoConnection::build(sco_params, proxy);
+        (connection, stream)
+    }
 
     #[fuchsia::test]
     fn codec_parameters() {

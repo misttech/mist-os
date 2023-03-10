@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_bluetooth::profile::ValidScoConnectionParameters;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{IValue, Unit};
-use futures::future::{BoxFuture, Fuse, FusedFuture, Future};
+use futures::future::{BoxFuture, Fuse, FusedFuture, Future, Shared};
 use futures::FutureExt;
 use std::fmt;
 use vigil::Vigil;
@@ -13,18 +14,30 @@ use crate::{a2dp, error::ScoConnectError, sco_connector::ScoConnection};
 
 #[derive(Debug)]
 pub struct ScoActive {
-    pub sco_connection: ScoConnection,
-    pub _pause_token: Option<a2dp::PauseToken>,
+    pub params: ValidScoConnectionParameters,
+    on_closed: Shared<BoxFuture<'static, ()>>,
+    pub pause_token: a2dp::PauseToken,
+}
+
+impl ScoActive {
+    pub fn new(connection: &ScoConnection, pause_token: a2dp::PauseToken) -> Self {
+        let on_closed = connection.on_closed().boxed().shared();
+        Self { params: connection.params.clone(), on_closed, pause_token }
+    }
+
+    pub fn on_closed(&self) -> impl Future<Output = ()> + 'static {
+        self.on_closed.clone()
+    }
 }
 
 impl Unit for ScoActive {
     type Data = <ScoConnection as Unit>::Data;
     fn inspect_create(&self, parent: &inspect::Node, name: impl AsRef<str>) -> Self::Data {
-        self.sco_connection.inspect_create(parent, name)
+        self.params.inspect_create(parent, name)
     }
 
     fn inspect_update(&self, data: &mut Self::Data) {
-        self.sco_connection.inspect_update(data)
+        self.params.inspect_update(data)
     }
 }
 
@@ -164,10 +177,8 @@ mod tests {
         let (sco_proxy, _sco_stream) =
             fidl::endpoints::create_proxy_and_stream::<bredr::ScoConnectionMarker>()
                 .expect("ScoConnection proxy and stream");
-        let vigil = Vigil::new(ScoActive {
-            sco_connection: ScoConnection::build(params, sco_proxy),
-            _pause_token: None,
-        });
+        let connection = ScoConnection::build(params, sco_proxy);
+        let vigil = Vigil::new(ScoActive::new(&connection, None));
         state.iset(ScoState::Active(vigil));
         assert_data_tree!(inspect, root: {
             sco_connection: {
