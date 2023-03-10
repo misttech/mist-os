@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/checkout.gni")
 import("//build/config/zircon/levels.gni")
 import("../libc.gni")
 
@@ -305,8 +306,14 @@ libc_test("gwp_asan-unittests") {
 
   # TODO(fxbug.dev/122829): Add tests/never_allocated.cpp to sources after gwp_asan
   # successfully rolls.
-  gwp_asan_git_revision =
-      read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
+  if (submodules) {
+    gwp_asan_git_revision =
+        read_file("//.git/modules/third_party%2fscudo%2fgwp_asan/HEAD",
+                  "list lines")
+  } else {
+    gwp_asan_git_revision =
+        read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
+  }
   if (gwp_asan_git_revision != [ "f36df953a3bab8b8e54e1ce7214cb710a5605a1a" ]) {
     sources += [ "tests/never_allocated.cpp" ]
   }
