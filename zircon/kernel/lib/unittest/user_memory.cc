@@ -11,7 +11,7 @@
 namespace testing {
 
 UserMemory::~UserMemory() {
-  zx_status_t status = mapping_->Unmap(mapping_->base(), mapping_->size());
+  zx_status_t status = mapping_->Destroy();
   DEBUG_ASSERT(status == ZX_OK);
 }
 
@@ -38,7 +38,7 @@ ktl::unique_ptr<UserMemory> UserMemory::CreateInAspace(fbl::RefPtr<VmObject> vmo
   }
   auto unmap = fit::defer([&]() {
     if (mapping) {
-      zx_status_t status = mapping->Unmap(mapping->base(), mapping->size());
+      zx_status_t status = mapping->Destroy();
       DEBUG_ASSERT(status == ZX_OK);
     }
   });
