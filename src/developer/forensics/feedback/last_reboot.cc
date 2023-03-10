@@ -10,8 +10,7 @@ LastReboot::LastReboot(async_dispatcher_t* dispatcher,
                        std::shared_ptr<sys::ServiceDirectory> services, cobalt::Logger* cobalt,
                        RedactorBase* redactor, fuchsia::feedback::CrashReporter* crash_reporter,
                        const Options options)
-    : dispatcher_(dispatcher),
-      reboot_watcher_(services, options.graceful_reboot_reason_write_path, cobalt),
+    : reboot_watcher_(services, options.graceful_reboot_reason_write_path, cobalt),
       reporter_(dispatcher, services, cobalt, redactor, crash_reporter),
       last_reboot_info_provider_(options.reboot_log) {
   reboot_watcher_.Connect();
@@ -23,11 +22,8 @@ LastReboot::LastReboot(async_dispatcher_t* dispatcher,
   }
 }
 
-void LastReboot::LastReboot::Handle(
-    ::fidl::InterfaceRequest<fuchsia::feedback::LastRebootInfoProvider> request,
-    ::fit::function<void(zx_status_t)> error_handler) {
-  last_reboot_info_provider_connections_.AddBinding(&last_reboot_info_provider_, std::move(request),
-                                                    dispatcher_, std::move(error_handler));
+fuchsia::feedback::LastRebootInfoProvider* LastReboot::LastRebootInfoProvider() {
+  return &last_reboot_info_provider_;
 }
 
 }  // namespace forensics::feedback

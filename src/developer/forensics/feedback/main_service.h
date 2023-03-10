@@ -1,7 +1,6 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 #ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_MAIN_SERVICE_H_
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_MAIN_SERVICE_H_
 
@@ -27,7 +26,7 @@
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/component/component.h"
 #include "src/developer/forensics/utils/inspect_node_manager.h"
-#include "src/developer/forensics/utils/inspect_protocol_stats.h"
+#include "src/developer/forensics/utils/instrumented_binding_set.h"
 #include "src/developer/forensics/utils/redact/redactor.h"
 #include "src/lib/timekeeper/clock.h"
 
@@ -68,12 +67,14 @@ class MainService {
   CrashReports crash_reports_;
   LastReboot last_reboot_;
 
-  InspectProtocolStats last_reboot_info_provider_stats_;
-  InspectProtocolStats crash_reporter_stats_;
-  InspectProtocolStats crash_reporting_product_register_stats_;
-  InspectProtocolStats component_data_register_stats_;
-  InspectProtocolStats data_provider_stats_;
-  InspectProtocolStats data_provider_controller_stats_;
+  InstrumentedBindingSet<fuchsia::feedback::ComponentDataRegister>
+      component_data_register_bindings_;
+  InstrumentedBindingSet<fuchsia::feedback::CrashReporter> crash_reporter_bindings_;
+  InstrumentedBindingSet<fuchsia::feedback::CrashReportingProductRegister> crash_register_bindings_;
+  InstrumentedBindingSet<fuchsia::feedback::DataProvider> data_provider_bindings_;
+  InstrumentedBindingSet<fuchsia::feedback::DataProviderController>
+      data_provider_controller_bindings_;
+  InstrumentedBindingSet<fuchsia::feedback::LastRebootInfoProvider> last_reboot_info_bindings_;
 };
 
 }  // namespace forensics::feedback

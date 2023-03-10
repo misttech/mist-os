@@ -37,8 +37,7 @@ class AnnotationProviders {
 
   AnnotationManager* GetAnnotationManager() { return &annotation_manager_; }
 
-  void Handle(::fidl::InterfaceRequest<fuchsia::feedback::ComponentDataRegister> request,
-              ::fit::function<void(zx_status_t)> error_handler);
+  fuchsia::feedback::ComponentDataRegister* ComponentDataRegister();
 
   static std::unique_ptr<backoff::Backoff> AnnotationProviderBackoff();
 
@@ -56,8 +55,6 @@ class AnnotationProviders {
   UIStateProvider ui_state_provider_;
 
   AnnotationManager annotation_manager_;
-
-  ::fidl::BindingSet<fuchsia::feedback::ComponentDataRegister> data_register_connections_;
 };
 
 }  // namespace forensics::feedback

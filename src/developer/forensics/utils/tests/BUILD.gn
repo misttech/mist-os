@@ -99,16 +99,17 @@ executable("inspect_node_manager_unittest_exe") {
   ]
 }
 
-executable("inspect_protocol_stats_unittest_exe") {
+executable("instrumented_binding_set_unittest_exe") {
   testonly = true
 
-  sources = [ "inspect_protocol_stats_unittest.cc" ]
+  sources = [ "instrumented_binding_set_unittest.cc" ]
 
   deps = [
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",
     "//src/developer/forensics/utils:inspect_node_manager",
-    "//src/developer/forensics/utils:inspect_protocol_stats",
+    "//src/developer/forensics/utils:instrumented_binding_set",
   ]
 }
 
@@ -226,8 +227,8 @@ fuchsia_unittest_component("inspect_node_manager_unittest") {
   ]
 }
 
-fuchsia_unittest_component("inspect_protocol_stats_unittest") {
-  deps = [ ":inspect_protocol_stats_unittest_exe" ]
+fuchsia_unittest_component("instrumented_binding_set_unittest") {
+  deps = [ ":instrumented_binding_set_unittest_exe" ]
 }
 
 fuchsia_unittest_component("log_format_unittest") {
@@ -271,7 +272,7 @@ fuchsia_test_package("feedback-utils-tests") {
     ":component_unittest",
     ":fidl_oneshot_unittest",
     ":inspect_node_manager_unittest",
-    ":inspect_protocol_stats_unittest",
+    ":instrumented_binding_set_unittest",
     ":log_format_unittest",
     ":previous_boot_file_unittest",
     ":time_unittest",

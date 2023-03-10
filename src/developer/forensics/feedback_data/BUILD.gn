@@ -101,7 +101,6 @@ source_set("inspect_budget") {
   deps = [
     ":constants",
     "//sdk/lib/syslog/cpp",
-    "//src/developer/forensics/utils:inspect_protocol_stats",
   ]
 }
 

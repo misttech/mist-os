@@ -7,7 +7,6 @@
 
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/binding_set.h>
 
 #include "src/developer/forensics/crash_reports/annotation_map.h"
 #include "src/developer/forensics/crash_reports/crash_register.h"
@@ -39,28 +38,18 @@ class CrashReports {
                feedback::AnnotationManager* annotation_manager,
                feedback_data::DataProviderInternal* data_provider, Options options);
 
-  void Handle(::fidl::InterfaceRequest<fuchsia::feedback::CrashReporter> request,
-              ::fit::function<void(zx_status_t)> error_handler);
-  void Handle(::fidl::InterfaceRequest<fuchsia::feedback::CrashReportingProductRegister> request,
-              ::fit::function<void(zx_status_t)> error_handler);
-
   fuchsia::feedback::CrashReporter* CrashReporter();
+  fuchsia::feedback::CrashReportingProductRegister* CrashRegister();
 
   void ShutdownImminent();
 
  private:
-  async_dispatcher_t* dispatcher_;
-
   std::shared_ptr<crash_reports::InfoContext> info_context_;
   crash_reports::LogTags tags_;
   crash_reports::CrashServer crash_server_;
   crash_reports::ReportStore report_store_;
   crash_reports::CrashRegister crash_register_;
   crash_reports::CrashReporter crash_reporter_;
-
-  ::fidl::BindingSet<fuchsia::feedback::CrashReporter> crash_reporter_connections_;
-  ::fidl::BindingSet<fuchsia::feedback::CrashReportingProductRegister>
-      crash_reporting_product_register_connections_;
 };
 
 }  // namespace forensics::feedback

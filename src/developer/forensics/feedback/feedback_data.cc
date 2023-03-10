@@ -15,6 +15,7 @@
 
 #include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/feedback_data/constants.h"
+#include "src/developer/forensics/feedback_data/data_provider_controller.h"
 #include "src/lib/files/path.h"
 
 namespace forensics::feedback {
@@ -42,19 +43,11 @@ FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
   }
 }
 
-void FeedbackData::Handle(::fidl::InterfaceRequest<fuchsia::feedback::DataProvider> request,
-                          ::fit::function<void(zx_status_t)> error_handler) {
-  data_provider_connections_.AddBinding(&data_provider_, std::move(request), dispatcher_,
-                                        std::move(error_handler));
-}
-void FeedbackData::Handle(
-    ::fidl::InterfaceRequest<fuchsia::feedback::DataProviderController> request,
-    ::fit::function<void(zx_status_t)> error_handler) {
-  data_provider_controller_connections_.AddBinding(&data_provider_controller_, std::move(request),
-                                                   dispatcher_, std::move(error_handler));
-}
-
 feedback_data::DataProvider* FeedbackData::DataProvider() { return &data_provider_; }
+
+feedback_data::DataProviderController* FeedbackData::DataProviderController() {
+  return &data_provider_controller_;
+}
 
 void FeedbackData::ShutdownImminent(::fit::deferred_callback stop_respond) {
   system_log_recorder_lifecycle_.set_error_handler(

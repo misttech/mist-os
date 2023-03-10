@@ -7,7 +7,6 @@
 
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/time.h>
@@ -37,17 +36,12 @@ class LastReboot {
              cobalt::Logger* cobalt, RedactorBase* redactor,
              fuchsia::feedback::CrashReporter* crash_reporter, Options options);
 
-  void Handle(::fidl::InterfaceRequest<fuchsia::feedback::LastRebootInfoProvider> request,
-              ::fit::function<void(zx_status_t)> error_handler);
+  fuchsia::feedback::LastRebootInfoProvider* LastRebootInfoProvider();
 
  private:
-  async_dispatcher_t* dispatcher_;
   last_reboot::ImminentGracefulRebootWatcher reboot_watcher_;
   last_reboot::Reporter reporter_;
   last_reboot::LastRebootInfoProvider last_reboot_info_provider_;
-
-  ::fidl::BindingSet<fuchsia::feedback::LastRebootInfoProvider>
-      last_reboot_info_provider_connections_;
 };
 
 }  // namespace forensics::feedback

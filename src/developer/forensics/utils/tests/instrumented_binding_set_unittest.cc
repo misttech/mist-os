@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/forensics/utils/inspect_protocol_stats.h"
+#include "src/developer/forensics/utils/instrumented_binding_set.h"
 
+#include <fuchsia/feedback/cpp/fidl.h>
+#include <fuchsia/feedback/cpp/fidl_test_base.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <string>
@@ -22,20 +24,29 @@ using inspect::testing::UintIs;
 using testing::AllOf;
 using testing::UnorderedElementsAreArray;
 
-class InspectProtocolStatsTest : public UnitTestFixture {
+class StubCrashReporter : public fuchsia::feedback::testing::CrashReporter_TestBase {
  public:
-  void SetUpProtocolStats(const std::string &path) {
-    inspect_node_manager_ = std::make_unique<InspectNodeManager>(&InspectRoot());
-    protocol_stats_ = std::make_unique<InspectProtocolStats>(inspect_node_manager_.get(), path);
-  }
-
- protected:
-  std::unique_ptr<InspectNodeManager> inspect_node_manager_;
-  std::unique_ptr<InspectProtocolStats> protocol_stats_;
+  void NotImplemented_(const std::string& name) override { FX_CHECK(false); }
 };
 
-TEST_F(InspectProtocolStatsTest, Check_MakingAndClosingConnections) {
-  SetUpProtocolStats("/fidl");
+class InstrumentedBindingSetTest : public UnitTestFixture {
+ public:
+  InstrumentedBindingSetTest()
+      : inspect_node_manager_(&InspectRoot()),
+        bindings_(dispatcher(), &crash_reporter_, &inspect_node_manager_, "/fidl") {}
+
+  InstrumentedBindingSet<fuchsia::feedback::CrashReporter>& Bindings() { return bindings_; }
+
+ protected:
+  InspectNodeManager inspect_node_manager_;
+  StubCrashReporter crash_reporter_;
+  InstrumentedBindingSet<fuchsia::feedback::CrashReporter> bindings_;
+};
+
+TEST_F(InstrumentedBindingSetTest, Check_MakingAndClosingConnections) {
+  fuchsia::feedback::CrashReporterPtr ptr1;
+  fuchsia::feedback::CrashReporterPtr ptr2;
+  fuchsia::feedback::CrashReporterPtr ptr3;
 
   EXPECT_THAT(InspectTree(), ChildrenMatch(ElementsAre(NodeMatches(AllOf(
                                  NameMatches("fidl"), PropertyList(UnorderedElementsAreArray({
@@ -43,8 +54,8 @@ TEST_F(InspectProtocolStatsTest, Check_MakingAndClosingConnections) {
                                                           UintIs("total_num_connections", 0u),
                                                       })))))));
   // 2 New connections: 2 created, 2 active
-  protocol_stats_->NewConnection();
-  protocol_stats_->NewConnection();
+  Bindings().AddBinding(ptr1.NewRequest(dispatcher()));
+  Bindings().AddBinding(ptr2.NewRequest(dispatcher()));
 
   EXPECT_THAT(InspectTree(), ChildrenMatch(ElementsAre(NodeMatches(AllOf(
                                  NameMatches("fidl"), PropertyList(UnorderedElementsAreArray({
@@ -53,7 +64,8 @@ TEST_F(InspectProtocolStatsTest, Check_MakingAndClosingConnections) {
                                                       })))))));
 
   // Close 1 connection: 2 created, 1 active
-  protocol_stats_->CloseConnection();
+  ptr1.Unbind();
+  RunLoopUntilIdle();
 
   EXPECT_THAT(InspectTree(), ChildrenMatch(ElementsAre(NodeMatches(AllOf(
                                  NameMatches("fidl"), PropertyList(UnorderedElementsAreArray({
@@ -62,7 +74,7 @@ TEST_F(InspectProtocolStatsTest, Check_MakingAndClosingConnections) {
                                                       })))))));
 
   // 1 New Connection: 3 created, 2 active
-  protocol_stats_->NewConnection();
+  Bindings().AddBinding(ptr3.NewRequest(dispatcher()));
 
   EXPECT_THAT(InspectTree(), ChildrenMatch(ElementsAre(NodeMatches(AllOf(
                                  NameMatches("fidl"), PropertyList(UnorderedElementsAreArray({
@@ -71,8 +83,9 @@ TEST_F(InspectProtocolStatsTest, Check_MakingAndClosingConnections) {
                                                       })))))));
 
   // Close 2 connections: 3 created, 0 active
-  protocol_stats_->CloseConnection();
-  protocol_stats_->CloseConnection();
+  ptr2.Unbind();
+  ptr3.Unbind();
+  RunLoopUntilIdle();
 
   EXPECT_THAT(InspectTree(), ChildrenMatch(ElementsAre(NodeMatches(AllOf(
                                  NameMatches("fidl"), PropertyList(UnorderedElementsAreArray({

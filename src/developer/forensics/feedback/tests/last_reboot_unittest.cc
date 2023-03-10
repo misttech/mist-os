@@ -118,38 +118,5 @@ TEST_F(LastRebootTest, IsNotFirstInstance) {
   EXPECT_THAT(ReceivedCobaltEvents(), IsEmpty());
 }
 
-TEST_F(LastRebootTest, ReportsOnReboot) {
-  const zx::duration oom_crash_reporting_delay = zx::sec(90);
-  const RebootLog reboot_log(RebootReason::kOOM, "reboot log", zx::sec(1), std::nullopt);
-
-  LastReboot last_reboot(dispatcher(), services(), Cobalt(), Redactor(), CrashReporter(),
-                         LastReboot::Options{
-                             .is_first_instance = false,
-                             .reboot_log = reboot_log,
-                             .graceful_reboot_reason_write_path = "n/a",
-                             .oom_crash_reporting_delay = oom_crash_reporting_delay,
-                         });
-
-  bool error_handler_called = false;
-  ::fidl::InterfaceRequestHandler<fuchsia::feedback::LastRebootInfoProvider> handler(
-      [&](::fidl::InterfaceRequest<fuchsia::feedback::LastRebootInfoProvider> request) {
-        last_reboot.Handle(std::move(request), [&](zx_status_t) { error_handler_called = true; });
-      });
-  AddHandler(std::move(handler));
-
-  fuchsia::feedback::LastRebootInfoProviderPtr last_reboot_info_ptr;
-  services()->Connect(last_reboot_info_ptr.NewRequest(dispatcher()));
-
-  bool called = false;
-  last_reboot_info_ptr->Get([&](::fuchsia::feedback::LastReboot) { called = true; });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(called);
-
-  last_reboot_info_ptr.Unbind();
-  RunLoopUntilIdle();
-  EXPECT_TRUE(error_handler_called);
-}
-
 }  // namespace
 }  // namespace forensics::feedback

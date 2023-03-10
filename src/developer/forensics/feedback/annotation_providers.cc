@@ -45,11 +45,8 @@ AnnotationProviders::AnnotationProviders(
   }
 }
 
-void AnnotationProviders::Handle(
-    ::fidl::InterfaceRequest<fuchsia::feedback::ComponentDataRegister> request,
-    ::fit::function<void(zx_status_t)> error_handler) {
-  data_register_connections_.AddBinding(&data_register_, std::move(request), dispatcher_,
-                                        std::move(error_handler));
+fuchsia::feedback::ComponentDataRegister* AnnotationProviders::ComponentDataRegister() {
+  return &data_register_;
 }
 
 std::unique_ptr<backoff::Backoff> AnnotationProviders::AnnotationProviderBackoff() {

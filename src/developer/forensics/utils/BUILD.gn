@@ -59,11 +59,8 @@ source_set("inspect_node_manager") {
   ]
 }
 
-source_set("inspect_protocol_stats") {
-  sources = [
-    "inspect_protocol_stats.cc",
-    "inspect_protocol_stats.h",
-  ]
+source_set("instrumented_binding_set") {
+  sources = [ "instrumented_binding_set.h" ]
 
   public_deps = [
     "//sdk/lib/sys/inspect/cpp",

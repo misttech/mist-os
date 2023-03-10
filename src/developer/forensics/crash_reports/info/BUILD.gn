@@ -26,7 +26,6 @@ source_set("info") {
     "//sdk/lib/sys/inspect/cpp",
     "//src/developer/forensics/crash_reports:product",
     "//src/developer/forensics/feedback:config",
-    "//src/developer/forensics/utils:inspect_protocol_stats",
     "//src/developer/forensics/utils:storage_size",
     "//src/developer/forensics/utils/cobalt",
     "//src/lib/timekeeper",
@@ -58,7 +57,6 @@ source_set("inspect_manager") {
   deps = [
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/crash_reports:constants",
-    "//src/developer/forensics/utils:inspect_protocol_stats",
     "//src/developer/forensics/utils:time",
     "//src/lib/files:files",
   ]
