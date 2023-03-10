@@ -1017,6 +1017,26 @@ class TestConnection {
     EXPECT_NE(0u, vendor_id);
   }
 
+  void GetVendorVersionImported() {
+    ASSERT_TRUE(device_);
+
+    // Ensure failure if result pointer not provided
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_VERSION, nullptr, nullptr));
+
+    uint64_t vendor_version = 0;
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_VERSION, nullptr, &vendor_version));
+    EXPECT_NE(0u, vendor_version);
+
+    magma_handle_t unused;
+    vendor_version = 0;
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_VERSION, &unused, &vendor_version));
+    EXPECT_FALSE(is_valid_handle(unused));
+    EXPECT_NE(0u, vendor_version);
+  }
+
   void QueryReturnsBufferImported(bool leaky = false, bool check_clock = false) {
     ASSERT_TRUE(device_);
     ASSERT_TRUE(connection_);
@@ -1293,6 +1313,11 @@ TEST_F(Magma, DeviceId) {
 TEST_F(Magma, VendorId) {
   TestConnection test;
   test.GetVendorIdImported();
+}
+
+TEST_F(Magma, VendorVersion) {
+  TestConnection test;
+  test.GetVendorVersionImported();
 }
 
 TEST_F(Magma, QueryReturnsBuffer) {

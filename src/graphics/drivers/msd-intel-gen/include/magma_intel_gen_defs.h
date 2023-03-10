@@ -8,6 +8,7 @@
 #include "magma/magma_common_defs.h"
 
 #define MAGMA_VENDOR_ID_INTEL 0x8086
+#define MAGMA_VENDOR_VERSION_INTEL 1
 
 enum MagmaIntelGenQuery {
   // Returns chip details (simple result)

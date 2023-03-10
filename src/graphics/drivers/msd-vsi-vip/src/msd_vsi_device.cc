@@ -480,7 +480,8 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
       // This should never be null as |WriteInterruptEvent| does not allow it.
       // Ignore it in case it's a spurious interrupt.
       if (!batch) {
-        MAGMA_LOG(ERROR,
+        MAGMA_LOG(
+            ERROR,
             "Ignoring interrupt, event %u did not have an associated mapped batch, allocated: %d "
             "submitted: %d",
             i, events_[i].allocated, events_[i].submitted);
@@ -499,7 +500,7 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
         rb_new_head = events_[i].ringbuffer_offset;
       }
       if (!CompleteInterruptEvent(i)) {
-        MAGMA_LOG(ERROR,"Failed to complete event %u", i);
+        MAGMA_LOG(ERROR, "Failed to complete event %u", i);
       }
     }
   }
@@ -1447,6 +1448,10 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
   switch (id) {
     case MAGMA_QUERY_VENDOR_ID:
       *result_out = MAGMA_VENDOR_ID_VSI;
+      break;
+
+    case MAGMA_QUERY_VENDOR_VERSION:
+      *result_out = MAGMA_VENDOR_VERSION_VSI;
       break;
 
     case MAGMA_QUERY_DEVICE_ID:

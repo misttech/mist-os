@@ -28,6 +28,10 @@ type QueryId = flexible enum : uint64 {
     /// Returns the hardware device ID (simple result)
     DEVICE_ID = 1;
 
+    /// Returns the version of the vendor interfaces supported by the system driver.
+    @available(added=12)
+    VENDOR_VERSION = 2;
+
     /// Returns true if MAGMA_QUERY_TOTAL_TIME is supported (simple result)
     IS_TOTAL_TIME_SUPPORTED = 3;
 

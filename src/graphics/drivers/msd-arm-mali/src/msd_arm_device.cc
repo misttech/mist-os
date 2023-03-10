@@ -1274,6 +1274,10 @@ magma_status_t MsdArmDevice::QueryInfo(uint64_t id, uint64_t* value_out) {
       *value_out = MAGMA_VENDOR_ID_MALI;
       return MAGMA_STATUS_OK;
 
+    case MAGMA_QUERY_VENDOR_VERSION:
+      *value_out = MAGMA_VENDOR_VERSION_ARM;
+      return MAGMA_STATUS_OK;
+
     case MAGMA_QUERY_DEVICE_ID:
       *value_out = gpu_features_.gpu_id.reg_value();
       return MAGMA_STATUS_OK;

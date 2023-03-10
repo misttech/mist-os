@@ -8,6 +8,7 @@
 #include "magma/magma_common_defs.h"
 
 #define MAGMA_VENDOR_ID_VSI 0x10001  // VK_VENDOR_ID_VIV
+#define MAGMA_VENDOR_VERSION_VSI 1
 
 enum MsdVsiVendorQuery {
   // Returns magma_vsi_vip_chip_identity (buffer result)

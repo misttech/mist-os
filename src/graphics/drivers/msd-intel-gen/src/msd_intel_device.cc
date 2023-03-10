@@ -1190,6 +1190,10 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
       *result_out = MsdIntelDevice::cast(device)->device_id();
       break;
 
+    case MAGMA_QUERY_VENDOR_VERSION:
+      *result_out = MAGMA_VENDOR_VERSION_INTEL;
+      break;
+
     case MAGMA_QUERY_IS_TOTAL_TIME_SUPPORTED:
       *result_out = 0;
       break;

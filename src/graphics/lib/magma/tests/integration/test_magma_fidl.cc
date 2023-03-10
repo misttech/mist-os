@@ -90,6 +90,14 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
     ASSERT_TRUE(device_.client_end());
 
     {
+      auto wire_result = device_->Query(fuchsia_gpu_magma::wire::QueryId::kVendorVersion);
+      ASSERT_TRUE(wire_result.ok());
+
+      ASSERT_TRUE(wire_result->value()->is_simple_result());
+      EXPECT_NE(0u, wire_result->value()->simple_result());
+    }
+
+    {
       auto wire_result = device_->Query(fuchsia_gpu_magma::wire::QueryId::kMaximumInflightParams);
       ASSERT_TRUE(wire_result.ok());
 

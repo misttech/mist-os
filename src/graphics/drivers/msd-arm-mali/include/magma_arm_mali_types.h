@@ -9,6 +9,8 @@
 
 #include "magma/magma_common_defs.h"
 
+#define MAGMA_VENDOR_VERSION_ARM 1
+
 // These flags can be specified to magma_map_buffer.
 enum MagmaArmMaliGpuMapFlags {
   // Accesses to this data should be GPU-L2 coherent.
