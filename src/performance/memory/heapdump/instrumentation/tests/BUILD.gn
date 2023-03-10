@@ -38,8 +38,8 @@ fuchsia_unittest_component("stats-test") {
   deps = [ ":stats" ]
 }
 
-fuchsia_test_package("tests") {
-  package_name = "heapdump-instrumentation-tests"
+fuchsia_test_package("cpp-tests") {
+  package_name = "heapdump-instrumentation-cpp-tests"
   test_components = [
     ":bind-test",
     ":stats-test",

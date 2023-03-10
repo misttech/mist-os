@@ -5,21 +5,24 @@
 use fuchsia_zircon::{self as zx, sys::zx_handle_t, AsHandleRef};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
-use std::ffi::c_void;
 
 mod allocations_table;
 mod profiler;
+
+// Do not include the hooks in the tests' executable, to avoid instrumenting the test framework.
+#[cfg(not(test))]
+mod hooks;
 
 use crate::profiler::{PerThreadData, Profiler};
 
 // WARNING! Do not change this to use once_cell: once_cell uses parking_lot, which may allocate in
 // the contended case.
 lazy_static! {
-    static ref PROFILER: Profiler = Default::default();
+    pub static ref PROFILER: Profiler = Default::default();
 }
 
 thread_local! {
-    static THREAD_DATA: RefCell<PerThreadData> = RefCell::new(Default::default());
+    pub static THREAD_DATA: RefCell<PerThreadData> = RefCell::new(Default::default());
 }
 
 #[derive(Clone, Copy, Default)]
@@ -34,22 +37,6 @@ pub struct heapdump_global_stats {
 pub struct heapdump_thread_local_stats {
     pub total_allocated_bytes: u64,
     pub total_deallocated_bytes: u64,
-}
-
-#[no_mangle]
-pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
-    THREAD_DATA.with(|thread_data| {
-        PROFILER.record_allocation(&mut thread_data.borrow_mut(), ptr as u64, size as u64)
-    });
-}
-
-#[no_mangle]
-pub extern "C" fn __scudo_deallocate_hook(ptr: *mut c_void) {
-    if ptr != std::ptr::null_mut() {
-        THREAD_DATA.with(|thread_data| {
-            PROFILER.forget_allocation(&mut thread_data.borrow_mut(), ptr as u64);
-        });
-    }
 }
 
 /// # Safety
