@@ -1,0 +1,25 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_mobly_test.gni")
+
+if (is_host) {
+  python_mobly_test("soft_reboot_test") {
+    main_source = "test_soft_reboot.py"
+
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+
+    params_source = "params.yaml"
+    local_config_source = "../../functional_tests/testbeds/One-FEmu.yaml"
+
+    # Used for infra Swarming bot allocation.
+    environments = [
+      {
+        dimensions = {
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}
