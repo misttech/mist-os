@@ -6,11 +6,6 @@ import("//build/components.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//tools/cmc/build/cmc.gni")
 
-declare_args() {
-  # If true, use the Rust version of fshost.
-  rust_fshost = true
-}
-
 # Generates an fshost cml file.
 #
 # Parameters
@@ -85,8 +80,6 @@ template("fshost_cml") {
 #   options - same as for `fshost_cml` above, see that template's documentation
 #             for details. The following options are also supported:
 #
-#     use_rust_port - if set, use the rust port of fshost instead of the cpp version.
-#
 #   component_name (optional; default: target_name)
 #     [string] The name to use for the fshost component (changes the name of the
 #     component manifest that's created).
@@ -137,25 +130,14 @@ template("fshost_component_and_config") {
   # The config
   generated_fshost_config(_config_target) {
     options = {
-      forward_variables_from(invoker.options,
-                             "*",
-                             [
-                               "bootfs_only",
-                               "use_rust_port",
-                             ])
+      forward_variables_from(invoker.options, "*", [ "bootfs_only" ])
     }
   }
 
   # The component
   fuchsia_component(_component_target) {
     forward_variables_from(invoker, [ "testonly" ])
-    forward_variables_from(invoker.options, [ "use_rust_port" ])
-    deps = []
-    if (defined(use_rust_port) && use_rust_port) {
-      deps += [ "//src/storage/fshost-rust" ]
-    } else {
-      deps += [ "//src/storage/fshost" ]
-    }
+    deps = [ "//src/storage/fshost-rust" ]
     cm_label = ":$_manifest_target"
   }
 
