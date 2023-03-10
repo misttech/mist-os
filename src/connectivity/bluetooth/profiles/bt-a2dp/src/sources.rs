@@ -6,7 +6,7 @@ use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, PcmFormat};
 use fuchsia_async as fasync;
-use fuchsia_audio_device_output::driver::SoftPcmOutput;
+use fuchsia_audio_device_output::driver::SoftPcm;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
 use fuchsia_inspect_derive::Inspect;
 use fuchsia_zircon::{self as zx, DurationNum};
@@ -87,9 +87,9 @@ impl AudioOutStream {
         peer_id: &PeerId,
         pcm_format: PcmFormat,
         external_delay: zx::Duration,
-    ) -> Result<fuchsia_audio_device_output::driver::AudioFrameStream, Error> {
+    ) -> Result<fuchsia_audio_device_output::AudioFrameStream, Error> {
         let id = peer_audio_stream_id(*peer_id, AUDIO_SOURCE_UUID);
-        let (client, frame_stream) = SoftPcmOutput::build(
+        let (client, frame_stream) = SoftPcm::create_output(
             &id,
             "Google",
             "Bluetooth A2DP",

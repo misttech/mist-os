@@ -33,6 +33,8 @@ rustc_library("fuchsia-audio-device-output") {
   ]
 
   sources = [
+    "src/audio_frame_sink.rs",
+    "src/audio_frame_stream.rs",
     "src/driver.rs",
     "src/frame_vmo.rs",
     "src/lib.rs",

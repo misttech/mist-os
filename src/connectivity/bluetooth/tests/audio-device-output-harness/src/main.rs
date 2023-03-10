@@ -5,7 +5,7 @@
 use {
     anyhow::Context,
     fidl_fuchsia_media::{AudioChannelId, AudioDeviceEnumeratorMarker, AudioPcmMode, PcmFormat},
-    fuchsia_audio_device_output::driver::SoftPcmOutput,
+    fuchsia_audio_device_output::driver::SoftPcm,
     fuchsia_zircon::DurationNum,
     futures::StreamExt,
     tracing::info,
@@ -22,7 +22,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     let id = [2; 16];
-    let (client, mut frame_stream) = SoftPcmOutput::build(
+    let (client, mut frame_stream) = SoftPcm::create_output(
         &id,
         "Fuchsia",
         "AudioOutHarness",
