@@ -6,7 +6,7 @@ use crate::env_context::EnvContext;
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use crate::waker::handle_notifier_waker;
-use fidl::AsHandleRef;
+use fidl::{AsHandleRef, HandleBased};
 use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
 use std::mem::ManuallyDrop;
@@ -62,6 +62,17 @@ pub(crate) enum LibraryCommand {
         channel: fidl::Channel,
         buf: ExtBuffer<u8>,
         handles: ExtBuffer<fidl::Handle>,
+        responder: Responder<zx_status::Status>,
+    },
+    SocketRead {
+        lib: Arc<LibContext>,
+        socket: fidl::Socket,
+        out_buf: ExtBuffer<u8>,
+        responder: Responder<ReadResponse>,
+    },
+    SocketWrite {
+        socket: fidl::Socket,
+        buf: ExtBuffer<u8>,
         responder: Responder<zx_status::Status>,
     },
 }
@@ -207,6 +218,64 @@ impl LibraryCommand {
             Self::ChannelWrite { channel, buf, mut handles, responder } => {
                 let channel = ManuallyDrop::new(channel);
                 let status = match channel.write(&buf, &mut handles) {
+                    Ok(_) => zx_status::Status::OK,
+                    Err(e) => e,
+                };
+                responder.send(status).unwrap();
+            }
+            Self::SocketRead { lib, socket, mut out_buf, responder } => {
+                let socket = match fidl::AsyncSocket::from_socket(socket) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        lib.write_err(e);
+                        responder
+                            .send(ReadResponse {
+                                actual_bytes_count: 0,
+                                actual_handles_count: 0,
+                                result: zx_status::Status::INTERNAL,
+                            })
+                            .unwrap();
+                        return;
+                    }
+                };
+                let waker =
+                    handle_notifier_waker(socket.raw_handle(), lib.notification_sender().await);
+                let task_ctx = &mut Context::from_waker(&waker);
+                let res = match socket.poll_read_ref(task_ctx, &mut out_buf) {
+                    Poll::Ready(res) => res,
+                    Poll::Pending => {
+                        let _ = socket.into_zx_socket().into_raw();
+                        responder
+                            .send(ReadResponse {
+                                actual_bytes_count: 0,
+                                actual_handles_count: 0,
+                                result: zx_status::Status::SHOULD_WAIT,
+                            })
+                            .unwrap();
+                        return;
+                    }
+                };
+                let _ = socket.into_zx_socket().into_raw();
+                match res {
+                    Err(e) => responder
+                        .send(ReadResponse {
+                            actual_bytes_count: 0,
+                            actual_handles_count: 0,
+                            result: e,
+                        })
+                        .unwrap(),
+                    Ok(size) => responder
+                        .send(ReadResponse {
+                            actual_handles_count: 0,
+                            actual_bytes_count: size,
+                            result: zx_status::Status::OK,
+                        })
+                        .unwrap(),
+                }
+            }
+            Self::SocketWrite { socket, buf, responder } => {
+                let socket = ManuallyDrop::new(socket);
+                let status = match socket.write(&buf) {
                     Ok(_) => zx_status::Status::OK,
                     Err(e) => e,
                 };

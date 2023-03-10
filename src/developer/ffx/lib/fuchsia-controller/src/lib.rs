@@ -228,6 +228,48 @@ pub unsafe extern "C" fn ffx_channel_read(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ffx_socket_write(
+    ctx: *const LibContext,
+    handle: zx_types::zx_handle_t,
+    buf: *mut u8,
+    buf_len: u64,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (responder, rx) = mpsc::sync_channel(1);
+    let handle = unsafe { fidl::Handle::from_raw(handle) };
+    let socket = fidl::Socket::from_handle(handle);
+    ctx.run(LibraryCommand::SocketWrite {
+        socket,
+        buf: ExtBuffer::new(buf, buf_len as usize),
+        responder,
+    });
+    rx.recv().unwrap()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffx_socket_read(
+    ctx: *const LibContext,
+    handle: zx_types::zx_handle_t,
+    out_buf: *mut u8,
+    out_len: u64,
+    bytes_read: *mut u64,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (responder, rx) = mpsc::sync_channel(1);
+    let handle = unsafe { fidl::Handle::from_raw(handle) };
+    let socket = fidl::Socket::from_handle(handle);
+    ctx.run(LibraryCommand::SocketRead {
+        lib: ctx.clone(),
+        socket,
+        out_buf: ExtBuffer::new(out_buf, out_len as usize),
+        responder,
+    });
+    let ReadResponse { actual_bytes_count: bytes_count_recv, result, .. } = rx.recv().unwrap();
+    safe_write(bytes_read, bytes_count_recv as u64);
+    result
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ffx_open_handle_notifier(ctx: *const LibContext) -> i32 {
     let ctx = unsafe { get_arc(ctx) };
     let (tx, rx) = mpsc::sync_channel(1);
@@ -284,6 +326,24 @@ mod test {
     }
 
     #[test]
+    fn socket_read_empty() {
+        let lib_ctx = testing_lib_context();
+        let (a, _b) = fidl::Socket::create_stream();
+        let mut buf = [0u8; 2];
+        let result = unsafe {
+            ffx_socket_read(
+                lib_ctx,
+                a.raw_handle(),
+                buf.as_mut_ptr(),
+                buf.len() as u64,
+                std::ptr::null_mut(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::SHOULD_WAIT);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
     fn channel_read_some_data_null_out_params() {
         let lib_ctx = testing_lib_context();
         let (a, b) = fidl::Channel::create();
@@ -332,6 +392,28 @@ mod test {
             )
         };
         assert_eq!(result, zx_status::Status::BUFFER_TOO_SMALL);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn socket_read_some_data_too_large_byte_buffer() {
+        let lib_ctx = testing_lib_context();
+        let (a, b) = fidl::Socket::create_stream();
+        let mut buf = [0u8; 3];
+        b.write(&[1, 2]).unwrap();
+        let mut bytes_len = 0u64;
+        let result = unsafe {
+            ffx_socket_read(
+                lib_ctx,
+                a.raw_handle(),
+                buf.as_mut_ptr(),
+                buf.len() as u64,
+                &mut bytes_len,
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(bytes_len, 2);
+        assert_eq!(&buf[0..2], &[1, 2]);
         unsafe { destroy_ffx_lib_context(lib_ctx) }
     }
 
@@ -436,6 +518,35 @@ mod test {
     }
 
     #[test]
+    fn socket_write_then_read_some_data() {
+        let lib_ctx = testing_lib_context();
+        let (a, b) = fidl::Socket::create_stream();
+        let mut write_buf = [1u8, 2u8];
+        let result = unsafe {
+            ffx_socket_write(
+                lib_ctx,
+                b.raw_handle(),
+                write_buf.as_mut_ptr(),
+                write_buf.len() as u64,
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let mut buf = [0u8; 2];
+        let result = unsafe {
+            ffx_socket_read(
+                lib_ctx,
+                a.raw_handle(),
+                buf.as_mut_ptr(),
+                buf.len() as u64,
+                std::ptr::null_mut(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(&buf, &[1, 2]);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
     fn channel_read_peer_closed() {
         let lib_ctx = testing_lib_context();
         let (a, b) = fidl::Channel::create();
@@ -474,6 +585,38 @@ mod test {
                 handles.as_mut_ptr(),
                 handles.len() as u64,
             )
+        };
+        assert_eq!(result, zx_status::Status::PEER_CLOSED);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn socket_read_peer_closed() {
+        let lib_ctx = testing_lib_context();
+        let (a, b) = fidl::Socket::create_datagram();
+        drop(b);
+        let mut buf = [0u8];
+        let result = unsafe {
+            ffx_socket_read(
+                lib_ctx,
+                a.raw_handle(),
+                buf.as_mut_ptr(),
+                buf.len() as u64,
+                std::ptr::null_mut(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::PEER_CLOSED);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn socket_write_peer_closed() {
+        let lib_ctx = testing_lib_context();
+        let (a, b) = fidl::Socket::create_stream();
+        drop(b);
+        let mut buf = [0u8];
+        let result = unsafe {
+            ffx_socket_write(lib_ctx, a.raw_handle(), buf.as_mut_ptr(), buf.len() as u64)
         };
         assert_eq!(result, zx_status::Status::PEER_CLOSED);
         unsafe { destroy_ffx_lib_context(lib_ctx) }

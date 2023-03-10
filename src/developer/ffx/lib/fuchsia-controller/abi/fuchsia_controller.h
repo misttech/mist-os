@@ -45,6 +45,10 @@ extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
 extern zx_status_t ffx_channel_read(ffx_lib_context_t* ctx, zx_handle_t handle, char* out_buf,
                                     uint64_t out_len, zx_handle_t* hdls, uint64_t hdls_len,
                                     uint64_t* actual_bytes_count, uint64_t* actual_handles_count);
+extern zx_status_t ffx_socket_read(ffx_lib_context_t* ctx, zx_handle_t handle, char* out_buf,
+                                   uint64_t out_len, uint64_t* bytes_read);
+extern zx_status_t ffx_socket_write(ffx_lib_context_t* ctx, zx_handle_t handle, const char* buf,
+                                    uint64_t buf_len);
 
 // This can only be called once per lifetime of the lib context.
 extern int32_t ffx_open_handle_notifier(ffx_lib_context_t* ctx);

@@ -72,6 +72,17 @@ impl Socket {
         }
     }
 
+    /// Attempt to read from the socket, registering for wakeup if the socket doesn’t have any
+    /// contents available. Used internally in the `AsyncRead` implementation, exposed for users who
+    /// know the concrete type they’re using and don’t want to pin the socket.
+    pub fn poll_read_ref(
+        &self,
+        cx: &mut Context<'_>,
+        out: &mut [u8],
+    ) -> Poll<Result<usize, zx_status::Status>> {
+        self.socket.poll_read(out, cx)
+    }
+
     /// Reads the next datagram that becomes available onto the end of |out|.  Note: Using this
     /// multiple times concurrently is an error and the first one will never complete.
     pub async fn read_datagram<'a>(
