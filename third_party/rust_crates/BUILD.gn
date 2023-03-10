@@ -515,7 +515,7 @@ group("p256") {
 }
 
 group("parking_lot") {
-  public_deps = [ ":parking_lot-v0_12_1" ]
+  public_deps = [ ":parking_lot-v0_9_0" ]
 }
 
 group("paste") {
@@ -5603,6 +5603,27 @@ rust_library("lipsum-v0_6_0") {
   visibility = [ ":*" ]
 }
 
+rust_library("lock_api-v0_3_4") {
+  crate_name = "lock_api"
+  crate_root = "//third_party/rust_crates/vendor/lock_api-0.3.4/src/lib.rs"
+  output_name = "lock_api-12f3d9bb96757377"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":scopeguard-v1_1_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=12f3d9bb96757377",
+    "-Cextra-filename=-12f3d9bb96757377",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("lock_api-v0_4_7") {
   crate_name = "lock_api"
   crate_root = "//third_party/rust_crates/vendor/lock_api-0.4.7/src/lib.rs"
@@ -6747,10 +6768,10 @@ rust_library("parking_lot-v0_11_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("parking_lot-v0_12_1") {
+rust_library("parking_lot-v0_12_0") {
   crate_name = "parking_lot"
-  crate_root = "//third_party/rust_crates/vendor/parking_lot-0.12.1/src/lib.rs"
-  output_name = "parking_lot-93d58527e852e8db"
+  crate_root = "//third_party/rust_crates/vendor/parking_lot-0.12.0/src/lib.rs"
+  output_name = "parking_lot-d9810ba0a454a15a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -6762,11 +6783,72 @@ rust_library("parking_lot-v0_12_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=93d58527e852e8db",
-    "-Cextra-filename=-93d58527e852e8db",
+    "-Cmetadata=d9810ba0a454a15a",
+    "-Cextra-filename=-d9810ba0a454a15a",
     "--cfg=feature=\"default\"",
   ]
 
+  visibility = [ ":*" ]
+}
+
+rust_library("parking_lot-v0_9_0") {
+  crate_name = "parking_lot"
+  crate_root = "//third_party/rust_crates/vendor/parking_lot-0.9.0/src/lib.rs"
+  output_name = "parking_lot-6721767503fecbee"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":lock_api-v0_3_4" ]
+  deps += [ ":parking_lot_core-v0_6_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=6721767503fecbee",
+    "-Cextra-filename=-6721767503fecbee",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("parking_lot_core-v0_6_2") {
+  crate_name = "parking_lot_core"
+  crate_root =
+      "//third_party/rust_crates/vendor/parking_lot_core-0.6.2/src/lib.rs"
+  output_name = "parking_lot_core-32ade8d5cf038200"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cfg-if-v0_1_10" ]
+  deps += [ ":smallvec-v0_6_13" ]
+  if (false) {
+    deps += [ ":cloudabi-v0_0_3" ]
+  }
+  if (false) {
+    deps += [ ":redox_syscall-v0_1_51" ]
+  }
+  if (true) {
+    deps += [ ":libc-v0_2_138" ]
+  }
+  if (false) {
+    deps += [ ":winapi-v0_3_9" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=32ade8d5cf038200",
+    "-Cextra-filename=-32ade8d5cf038200",
+  ]
+
+  aliased_deps = {
+    syscall = ":redox_syscall-v0_1_51"
+  }
   visibility = [ ":*" ]
 }
 
@@ -10021,6 +10103,29 @@ rust_library("slab-v0_4_7") {
   visibility = [ ":*" ]
 }
 
+rust_library("smallvec-v0_6_13") {
+  crate_name = "smallvec"
+  crate_root = "//third_party/rust_crates/vendor/smallvec-0.6.13/lib.rs"
+  output_name = "smallvec-15257cc85e7a16b9"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":maybe-uninit-v2_0_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=15257cc85e7a16b9",
+    "-Cextra-filename=-15257cc85e7a16b9",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("smallvec-v1_8_0") {
   crate_name = "smallvec"
   crate_root = "//third_party/rust_crates/vendor/smallvec-1.8.0/src/lib.rs"
@@ -11148,7 +11253,7 @@ rust_library("trust-dns-resolver-v0_22_0") {
   deps += [ ":futures-util-v0_3_19" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":lru-cache-v0_1_2" ]
-  deps += [ ":parking_lot-v0_12_1" ]
+  deps += [ ":parking_lot-v0_12_0" ]
   deps += [ ":smallvec-v1_8_0" ]
   deps += [ ":thiserror-v1_0_23" ]
   deps += [ ":tracing-v0_1_34" ]
