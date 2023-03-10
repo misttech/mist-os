@@ -227,6 +227,11 @@ impl NonSyncContext for FakeNonSyncCtx {
         let BufferSizes { send, receive } = buffer_sizes;
         (RingBuffer::new(receive), RingBuffer::new(send), ())
     }
+
+    fn default_buffer_sizes() -> BufferSizes {
+        // Use the test-only default impl.
+        BufferSizes::default()
+    }
 }
 
 impl FakeNonSyncCtx {

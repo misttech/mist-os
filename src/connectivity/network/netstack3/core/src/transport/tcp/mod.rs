@@ -24,7 +24,6 @@ use crate::{
     sync::Mutex,
     transport::tcp::{
         self,
-        seqnum::WindowSize,
         socket::{isn::IsnGenerator, Sockets},
     },
 };
@@ -119,12 +118,6 @@ pub struct BufferSizes {
     pub send: usize,
     /// The size of the receive buffer.
     pub receive: usize,
-}
-
-impl Default for BufferSizes {
-    fn default() -> Self {
-        Self { send: WindowSize::DEFAULT.into(), receive: WindowSize::DEFAULT.into() }
-    }
 }
 
 #[derive(Debug)]

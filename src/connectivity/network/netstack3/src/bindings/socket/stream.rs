@@ -55,6 +55,7 @@ use netstack3_core::{
     Ctx, SyncCtx,
 };
 use nonzero_ext::nonzero;
+use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::bindings::{
@@ -190,6 +191,17 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
         let (rbuf, sbuf) =
             LocalZirconSocketAndNotifier(Arc::clone(&socket), notifier).into_buffers(buffer_sizes);
         (rbuf, sbuf, PeerZirconSocketAndWatcher { peer, socket, watcher })
+    }
+
+    fn default_buffer_sizes() -> BufferSizes {
+        static ZIRCON_SOCKET_BUFFER_SIZE: Lazy<usize> = Lazy::new(|| {
+            let (local, _peer) = zx::Socket::create_stream();
+            local.info().unwrap().tx_buf_max
+        });
+        static RING_BUFFER_DEFAULT_SIZE: Lazy<usize> =
+            Lazy::new(|| RingBuffer::default().target_capacity());
+
+        BufferSizes { receive: *ZIRCON_SOCKET_BUFFER_SIZE, send: *RING_BUFFER_DEFAULT_SIZE }
     }
 }
 

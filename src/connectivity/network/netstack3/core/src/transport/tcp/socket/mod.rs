@@ -136,6 +136,9 @@ pub trait NonSyncContext: TimerContext<TimerId> {
     /// buffers when the connection becomes established.
     type ProvidedBuffers: Debug + Takeable + IntoBuffers<Self::ReceiveBuffer, Self::SendBuffer>;
 
+    /// The buffer sizes to use when creating new sockets.
+    fn default_buffer_sizes() -> BufferSizes;
+
     /// A new connection is ready to be accepted on the listener.
     fn on_new_connection<I: Ip>(&mut self, listener: ListenerId<I>);
     /// Creates new buffers and returns the object that Bindings need to
@@ -752,7 +755,6 @@ impl<I: Ip, D, LI, RI> Tagged<ConnAddr<I::Addr, D, LI, RI>> for ConnAddrState<I>
 }
 
 #[derive(Debug, Derivative, Clone)]
-#[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(PartialEq))]
 struct Unbound<D> {
     bound_device: Option<D>,
@@ -1119,7 +1121,12 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
 
 impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for SC {
     fn create_socket(&mut self, _ctx: &mut C) -> UnboundId<I> {
-        let unbound = Unbound::default();
+        let unbound = Unbound {
+            buffer_sizes: C::default_buffer_sizes(),
+            bound_device: Default::default(),
+            sharing: Default::default(),
+            socket_options: Default::default(),
+        };
         UnboundId(
             self.with_tcp_sockets_mut(move |sockets| sockets.inactive.push(unbound)),
             IpVersionMarker::default(),
@@ -3169,6 +3176,10 @@ mod tests {
                 TestSendBuffer::new(Rc::clone(&client.send), RingBuffer::default()),
                 client,
             )
+        }
+
+        fn default_buffer_sizes() -> BufferSizes {
+            BufferSizes::default()
         }
     }
 
