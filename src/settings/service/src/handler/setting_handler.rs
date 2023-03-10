@@ -89,6 +89,7 @@ pub enum Event {
     // handler have been changed.
     Changed(SettingInfo),
     Exited(ExitResult),
+    StateChanged(State),
 }
 
 pub(crate) trait StorageFactory: StorageFactoryTrait + Send + Sync {}
@@ -318,6 +319,12 @@ impl ClientImpl {
                 Audience::Messenger(self.notifier_signature),
             );
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn emit_state_event(&self, state: State) {
+        let event = Payload::Event(Event::StateChanged(state));
+        let _ = self.messenger.message(event.into(), Audience::EventSink);
     }
 }
 

@@ -307,6 +307,7 @@ impl SettingProxy {
                             trace!(id, "process exit");
                             self.process_exit(result);
                         }
+                        Event::StateChanged(_) => {}
                     }
                 }
                 _ => {

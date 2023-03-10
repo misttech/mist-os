@@ -137,7 +137,6 @@ mod tests {
     use crate::handler::setting_handler::{
         BoxedController, ClientImpl, ControllerError, ControllerStateResult, SettingHandlerResult,
     };
-    use crate::message::base::{Message, MessageType};
     use crate::service;
     use crate::service_context::ServiceContext;
     use fuchsia_async as fasync;
@@ -145,12 +144,14 @@ mod tests {
     use futures::select;
 
     /// Test controller used to test startup waiting behavior in SettingHandlerFactoryImpl.
-    struct TestController;
+    struct TestController {
+        client: Arc<ClientImpl>,
+    }
 
     #[async_trait]
     impl Create for TestController {
-        async fn create(_client: Arc<ClientImpl>) -> Result<Self, ControllerError> {
-            Ok(Self)
+        async fn create(client: Arc<ClientImpl>) -> Result<Self, ControllerError> {
+            Ok(Self { client })
         }
     }
 
@@ -163,6 +164,7 @@ mod tests {
 
         // When we see a startup message, send a signal to signify we're done.
         async fn change_state(&mut self, state: State) -> Option<ControllerStateResult> {
+            let _ = self.client.emit_state_event(state);
             match state {
                 State::Startup => Some(Ok(())),
                 _ => None,
@@ -194,14 +196,8 @@ mod tests {
         factory_impl.register(SettingType::Unknown, generate_handler);
 
         // Create a broker that only listens to replies.
-        let (_, broker_receptor) = delegate
-            .create(MessengerType::Broker(Arc::new(move |message: &Message| {
-                // Only filter for reply's that contain results.
-                matches!(message.get_type(), MessageType::Reply(_))
-                    && matches!(message.payload(), service::Payload::Controller(Payload::Result(_)))
-            })))
-            .await
-            .expect("could not create broker receptor");
+        let (_, broker_receptor) =
+            delegate.create_sink().await.expect("could not create event sink receptor");
 
         let (_, receptor) =
             delegate.create(MessengerType::Unbound).await.expect("messenger should be created");
@@ -221,16 +217,17 @@ mod tests {
         let mut idx: u8 = 0;
         while generate_done.is_none() || startup_done.is_none() {
             select! {
-                result = generate_future.select_next_some() => {
-                    let _ = result.expect("should have received a signature");
-                    generate_done = Some(idx);
-                    idx += 1;
-                }
                 maybe = broker_receptor.next() => {
                     let _ = maybe.expect("should have gotten a reply");
                     startup_done = Some(idx);
                     idx += 1;
                 }
+                result = generate_future.select_next_some() => {
+                    let _ = result.expect("should have received a signature");
+                    generate_done = Some(idx);
+                    idx += 1;
+                }
+
                 complete => break,
             }
         }
