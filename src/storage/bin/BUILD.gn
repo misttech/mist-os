@@ -14,7 +14,7 @@ group("tests") {
   ]
 }
 
-fuchsia_shell_package("fs_realm_tools") {
+fuchsia_package("fs_realm_tools") {
   deps = [
     "fsck",
     "mkfs",

@@ -253,6 +253,18 @@ assembly_input_bundle("core_realm_eng") {
 
     # The fs_realm component should be available in every engineering-mode product.
     "//src/storage/fs_realm",
+    "//src/storage/bin:fs_realm_tools",
+  ]
+  shell_commands = [
+    {
+      package = "fs_realm_tools"
+      components = [
+        "mkfs",
+        "fsck",
+        "mount",
+        "umount",
+      ]
+    },
   ]
   compiled_packages = [
     {
