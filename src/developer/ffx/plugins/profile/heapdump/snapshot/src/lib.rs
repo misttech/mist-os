@@ -9,6 +9,7 @@ use {
     ffx_heapdump_snapshot_args::SnapshotCommand,
     ffx_writer::Writer,
     fidl_fuchsia_memory_heapdump_client as fheapdump_client,
+    std::io::Write,
 };
 
 #[ffx_plugin(
@@ -18,12 +19,16 @@ use {
 pub async fn snapshot(
     collector: fheapdump_client::CollectorProxy,
     cmd: SnapshotCommand,
-    _writer: Writer,
+    mut writer: Writer,
 ) -> Result<()> {
     let mut process_selector = build_process_selector(cmd.by_name, cmd.by_koid)?;
 
     let result = collector.take_live_snapshot(&mut process_selector).await?;
-    let _receiver_stream = check_collector_error(result)?.into_stream()?;
+    let receiver_stream = check_collector_error(result)?.into_stream()?;
 
-    unimplemented!("Support for receiving snapshots has not been implemented yet");
+    // TODO(fxbug.dev/123442): Convert the received snapshot into a pprof file.
+    let snapshot = heapdump_snapshot::Snapshot::receive_from(receiver_stream).await?;
+    writeln!(writer, "{:#x?}", snapshot)?;
+
+    Ok(())
 }

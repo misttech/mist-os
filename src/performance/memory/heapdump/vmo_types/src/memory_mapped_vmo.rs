@@ -16,7 +16,6 @@ impl MemoryMappedVmo {
     /// Maps a VMO in read-only mode.
     ///
     /// Attempting to call methods on the returned object that return mutable references will panic.
-    #[cfg(test)] // TODO(fdurso): To be removed once features that call it are implemented.
     pub fn new_readonly(vmo: &zx::Vmo) -> Result<MemoryMappedVmo, zx::Status> {
         Self::new_impl(vmo, false)
     }
@@ -96,7 +95,6 @@ impl MemoryMappedVmo {
     /// Returns a reference to an element in the VMO.
     ///
     /// This method validates the alignment and the bounds against the VMO size.
-    #[cfg(test)] // TODO(fdurso): To be removed once features that call it are implemented.
     pub fn get_object<'a, T: MemoryMappable>(
         &'a self,
         byte_offset: usize,

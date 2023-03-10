@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use fuchsia_zircon::Koid;
 use std::fmt::Debug;
 
@@ -17,6 +18,9 @@ pub trait Process: Send + Sync {
 
     /// Serves requests from the process and returns when the process disconnects.
     async fn serve_until_exit(&self) -> Result<(), anyhow::Error>;
+
+    /// Takes a live snapshot.
+    fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error>;
 }
 
 impl Debug for dyn Process {
@@ -26,4 +30,14 @@ impl Debug for dyn Process {
             .field("koid", &self.get_koid())
             .finish()
     }
+}
+
+/// A snapshot of all the live allocations in a given process.
+#[async_trait]
+pub trait Snapshot: Send + Sync {
+    /// Writes this snapshot into a SnapshotReceiver channel.
+    async fn write_to(
+        &self,
+        dest: fheapdump_client::SnapshotReceiverProxy,
+    ) -> Result<(), anyhow::Error>;
 }

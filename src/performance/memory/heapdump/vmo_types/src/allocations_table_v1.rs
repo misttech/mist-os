@@ -204,10 +204,53 @@ impl AllocationsTableWriter {
     }
 }
 
+/// Mediates read access to a VMO written by AllocationsTableWriter.
+pub struct AllocationsTableReader {
+    storage: MemoryMappedVmo,
+    max_num_nodes: usize,
+}
+
+impl AllocationsTableReader {
+    pub fn new(vmo: &zx::Vmo) -> Result<AllocationsTableReader, crate::Error> {
+        let storage = MemoryMappedVmo::new_readonly(vmo)?;
+        let max_num_nodes = compute_nodes_count(storage.vmo_size())?;
+
+        Ok(AllocationsTableReader { storage, max_num_nodes })
+    }
+
+    /// Iterates all the allocated blocks that are present in the hash table.
+    pub fn iter(&self) -> impl Iterator<Item = Result<&Node, crate::Error>> {
+        // The bucket heads are stored at the beginning of the VMO.
+        let bucket_heads = self.storage.get_object::<BucketHeads>(0).unwrap();
+        bucket_heads.iter().map(|head| self.iterate_bucket(head.load(Relaxed))).flatten()
+    }
+
+    fn iterate_bucket(&self, head: NodeIndex) -> impl Iterator<Item = Result<&Node, crate::Error>> {
+        let mut curr_index = head;
+        std::iter::from_fn(move || {
+            if curr_index != NODE_INVALID {
+                let result = if (curr_index as usize) < self.max_num_nodes {
+                    // The nodes are stored consecutively immediately after the bucket heads.
+                    let byte_offset =
+                        size_of::<BucketHeads>() + curr_index as usize * size_of::<Node>();
+                    let curr_data = self.storage.get_object::<Node>(byte_offset).unwrap();
+                    curr_index = curr_data.next.load(Relaxed);
+                    Ok(curr_data)
+                } else {
+                    Err(crate::Error::InvalidInput)
+                };
+                Some(result)
+            } else {
+                None
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::alloc::Layout;
+    use std::{alloc::Layout, collections::HashMap};
 
     // Some tests below use this constant to ensure that each bucket is been used at least 10 times.
     const NUM_ITERATIONS: usize = NUM_BUCKETS * 10;
@@ -231,6 +274,10 @@ mod tests {
 
         fn create_writer(&self) -> AllocationsTableWriter {
             AllocationsTableWriter::new(&self.vmo).unwrap()
+        }
+
+        fn create_reader(&self) -> AllocationsTableReader {
+            AllocationsTableReader::new(&self.vmo).unwrap()
         }
     }
 
@@ -325,5 +372,78 @@ mod tests {
             let result = writer.erase_allocation(i as u64);
             assert_eq!(result, Some(1), "failed to erase 0x{:x}", i);
         }
+    }
+
+    #[test]
+    fn test_read_empty() {
+        let storage = TestStorage::new(NUM_NODES);
+
+        // Initialize the hash table.
+        storage.create_writer();
+
+        // Read it back and verify that it is empty.
+        let reader = storage.create_reader();
+        assert_eq!(reader.iter().count(), 0);
+    }
+
+    #[test]
+    fn test_read_populated() {
+        let storage = TestStorage::new(NUM_NODES);
+
+        // Fill the hash table.
+        let mut writer = storage.create_writer();
+        let mut expected_map = HashMap::new();
+        for i in 0..NUM_ITERATIONS as u64 {
+            let result = writer.insert_allocation(i, 1);
+            assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
+
+            expected_map.insert(i, 1);
+        }
+
+        // Read it back and verify.
+        let reader = storage.create_reader();
+        let mut actual_map = HashMap::new();
+        for node in reader.iter() {
+            let Node { address, size, .. } = node.unwrap();
+            assert!(
+                actual_map.insert(*address, *size).is_none(),
+                "address 0x{:x} was read more than once",
+                address
+            );
+        }
+
+        assert_eq!(actual_map, expected_map);
+    }
+
+    #[test]
+    fn test_read_bad_bucket_head() {
+        let storage = TestStorage::new(NUM_NODES);
+
+        // Initialize the hash table and corrupt one of the heads.
+        let mut writer = storage.create_writer();
+        writer.bucket_head_at(NUM_BUCKETS / 2).store(NODE_INVALID - 1, SeqCst);
+
+        // Try to read it back and verify that the iterator returns an error.
+        let reader = storage.create_reader();
+        let contains_error = reader.iter().any(|e| e.is_err());
+
+        assert!(contains_error);
+    }
+
+    #[test]
+    fn test_read_bad_node_next() {
+        let storage = TestStorage::new(NUM_NODES);
+
+        // Initialize the hash table and insert a node with a bad next pointer.
+        let mut writer = storage.create_writer();
+        writer.bucket_head_at(NUM_BUCKETS / 2).store(0, SeqCst);
+        *writer.node_at(0) =
+            Node { next: AtomicNodeIndex::new(NODE_INVALID - 1), address: 0x1234, size: 0x5678 };
+
+        // Try to read it back and verify that the iterator returns an error.
+        let reader = storage.create_reader();
+        let contains_error = reader.iter().any(|e| e.is_err());
+
+        assert!(contains_error);
     }
 }

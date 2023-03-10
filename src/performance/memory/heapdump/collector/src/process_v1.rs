@@ -4,11 +4,13 @@
 
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_zircon::{self as zx, AsHandleRef, Koid};
 use futures::{lock::Mutex, StreamExt};
+use vmo_types::allocations_table_v1::AllocationsTableReader;
 
-use crate::process::Process;
+use crate::process::{Process, Snapshot};
 
 fn get_process_name(process: &zx::Process) -> Result<String, anyhow::Error> {
     Ok(String::from_utf8_lossy(process.get_name()?.as_bytes()).to_string())
@@ -66,6 +68,49 @@ impl Process for ProcessV1 {
         }
 
         Ok(())
+    }
+
+    fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error> {
+        let size = self.allocations_vmo.get_size()?;
+        let snapshot = self.allocations_vmo.create_child(zx::VmoChildOptions::SNAPSHOT, 0, size)?;
+        Ok(Box::new(SnapshotV1::new(snapshot)))
+    }
+}
+
+/// A snapshot of a V1 process.
+pub struct SnapshotV1 {
+    allocations_vmo: zx::Vmo,
+}
+
+impl SnapshotV1 {
+    pub fn new(allocations_vmo: zx::Vmo) -> SnapshotV1 {
+        SnapshotV1 { allocations_vmo }
+    }
+}
+
+#[async_trait]
+impl Snapshot for SnapshotV1 {
+    async fn write_to(
+        &self,
+        dest: fheapdump_client::SnapshotReceiverProxy,
+    ) -> Result<(), anyhow::Error> {
+        let mut streamer = heapdump_snapshot::Streamer::new(dest);
+        let allocations_table = AllocationsTableReader::new(&self.allocations_vmo)?;
+
+        for block in allocations_table.iter() {
+            let block = block?;
+            streamer = streamer
+                .push_element(fheapdump_client::SnapshotElement::Allocation(
+                    fheapdump_client::Allocation {
+                        address: Some(block.address),
+                        size: Some(block.size),
+                        ..fheapdump_client::Allocation::EMPTY
+                    },
+                ))
+                .await?;
+        }
+
+        Ok(streamer.end_of_stream().await?)
     }
 }
 
@@ -130,5 +175,46 @@ mod tests {
 
         // Verify that the registry no longer contains the process.
         assert_eq!(ex.run_singlethreaded(registry.list_processes()), []);
+    }
+
+    #[test]
+    fn test_take_live_snapshot() {
+        let mut ex = fasync::TestExecutor::new();
+        let registry = std::rc::Rc::new(Registry::new());
+
+        // Setup fake process.
+        let (registry_stream, _snapshot_sink, koid, mut allocations_writer) =
+            setup_fake_process_from_self();
+
+        // Register it.
+        let serve_fut = registry.serve_process_stream(registry_stream);
+        pin_mut!(serve_fut);
+        assert!(ex.run_until_stalled(&mut serve_fut).is_pending());
+
+        // Record an allocation.
+        let foobar = Box::pin(b"foobar");
+        let foobar_address = foobar.as_ptr() as u64;
+        let foobar_size = foobar.len() as u64;
+        allocations_writer.insert_allocation(foobar_address, foobar_size).unwrap();
+
+        // Take a live snapshot.
+        let mut received_snapshot = ex.run_singlethreaded(async {
+            let (receiver_proxy, receiver_stream) =
+                create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+            let receive_worker =
+                fasync::Task::local(heapdump_snapshot::Snapshot::receive_from(receiver_stream));
+
+            let process = registry.get_process(&koid).await.unwrap();
+            let snapshot = process.take_live_snapshot().unwrap();
+            snapshot.write_to(receiver_proxy).await.expect("failed to write snapshot");
+
+            receive_worker.await.expect("failed to receive snapshot")
+        });
+
+        // Verify that it contains our test allocation.
+        let foobar_allocation = received_snapshot.allocations.remove(&foobar_address).unwrap();
+        assert_eq!(foobar_allocation.size, foobar_size);
+
+        assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
     }
 }

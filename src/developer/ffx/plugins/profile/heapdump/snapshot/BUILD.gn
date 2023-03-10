@@ -12,6 +12,7 @@ ffx_plugin("ffx_heapdump_snapshot") {
     "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.client_rust",
     "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/profile/heapdump/common:ffx_heapdump",
+    "//src/performance/memory/heapdump/lib/heapdump_snapshot",
     "//third_party/rust_crates:anyhow",
   ]
 

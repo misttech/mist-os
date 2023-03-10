@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_memory_heapdump_client::{self as fheapdump_client, CollectorError};
 use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_zircon::Koid;
@@ -64,10 +65,22 @@ impl Registry {
                     };
 
                     match process {
-                        Ok(_process) => {
-                            // Not implemented yet, pretend that an error happened.
-                            responder.send(&mut Err(CollectorError::LiveSnapshotFailed))?;
-                        }
+                        Ok(process) => match process.take_live_snapshot() {
+                            Ok(snapshot) => {
+                                let (proxy, stream) =
+                                    create_proxy::<fheapdump_client::SnapshotReceiverMarker>()
+                                        .expect("failed to create snapshot receiver channel");
+                                responder.send(&mut Ok(stream))?;
+
+                                if let Err(error) = snapshot.write_to(proxy).await {
+                                    warn!(?error, "Error while streaming snapshot");
+                                }
+                            }
+                            Err(error) => {
+                                warn!(?error, "Error while taking live snapshot");
+                                responder.send(&mut Err(CollectorError::LiveSnapshotFailed))?;
+                            }
+                        },
                         Err(e) => responder.send(&mut Err(e))?,
                     };
                 }
@@ -129,6 +142,11 @@ impl Registry {
             .map(|(koid, process)| (*koid, process.get_name().to_string()))
             .collect()
     }
+
+    #[cfg(test)]
+    pub async fn get_process(&self, koid: &Koid) -> Option<Arc<dyn Process>> {
+        self.processes.lock().await.get(koid).cloned()
+    }
 }
 
 #[cfg(test)]
@@ -139,6 +157,8 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::{channel::oneshot, pin_mut};
     use test_case::test_case;
+
+    use crate::process::Snapshot;
 
     fn create_registry_and_proxy(
         initial_processes: impl IntoIterator<Item = Arc<dyn Process>>,
@@ -173,6 +193,7 @@ mod tests {
         name: String,
         koid: Koid,
         exit_signal: Mutex<Option<oneshot::Receiver<Result<(), anyhow::Error>>>>,
+        live_snapshot_succeeds: bool,
     }
 
     impl FakeProcess {
@@ -180,12 +201,14 @@ mod tests {
         pub fn new(
             name: &str,
             koid: Koid,
+            live_snapshot_succeeds: bool,
         ) -> (Arc<dyn Process>, oneshot::Sender<anyhow::Result<()>>) {
             let (sender, receiver) = oneshot::channel();
             let fake_process = FakeProcess {
                 name: name.to_string(),
                 koid,
                 exit_signal: Mutex::new(Some(receiver)),
+                live_snapshot_succeeds,
             };
             (Arc::new(fake_process), sender)
         }
@@ -205,6 +228,61 @@ mod tests {
             let exit_signal = self.exit_signal.lock().await.take().unwrap();
             exit_signal.await?
         }
+
+        fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error> {
+            // Either pretend success or failure, depending on the `live_snapshot_succeeds` flag.
+            if self.live_snapshot_succeeds {
+                Ok(Box::new(FakeSnapshot {}))
+            } else {
+                Err(anyhow::anyhow!("Live snapshot failed"))
+            }
+        }
+    }
+
+    struct FakeSnapshot;
+
+    // A FakeSnapshot contains a single allocation with these values:
+    const FAKE_ALLOCATION_ADDRESS: u64 = 1234;
+    const FAKE_ALLOCATION_SIZE: u64 = 8;
+
+    #[async_trait]
+    impl Snapshot for FakeSnapshot {
+        async fn write_to(
+            &self,
+            dest: fheapdump_client::SnapshotReceiverProxy,
+        ) -> Result<(), anyhow::Error> {
+            let fut = dest.batch(
+                &mut [fheapdump_client::SnapshotElement::Allocation(
+                    fheapdump_client::Allocation {
+                        address: Some(FAKE_ALLOCATION_ADDRESS),
+                        size: Some(FAKE_ALLOCATION_SIZE),
+                        ..fheapdump_client::Allocation::EMPTY
+                    },
+                )]
+                .iter_mut(),
+            );
+            fut.await?;
+
+            let fut = dest.batch(&mut [].iter_mut());
+            fut.await?;
+
+            Ok(())
+        }
+    }
+
+    impl FakeSnapshot {
+        /// Receives a Snapshot from a SnapshotReceiver channel and asserts that it matches the
+        /// output of `write_to`.
+        async fn receive_and_assert_match(src: fheapdump_client::SnapshotReceiverRequestStream) {
+            let mut received_snapshot =
+                heapdump_snapshot::Snapshot::receive_from(src).await.unwrap();
+
+            let allocation =
+                received_snapshot.allocations.remove(&FAKE_ALLOCATION_ADDRESS).unwrap();
+            assert_eq!(allocation.size, FAKE_ALLOCATION_SIZE);
+
+            assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
+        }
     }
 
     #[test_case(Ok(()) ; "exit ok")]
@@ -216,7 +294,7 @@ mod tests {
         // Setup fake process and register it.
         let name = "fake";
         let koid = Koid::from_raw(1234);
-        let (process, signal) = FakeProcess::new(name, koid);
+        let (process, signal) = FakeProcess::new(name, koid, false);
         let serve_fut = registry.serve_process(process);
         pin_mut!(serve_fut);
         assert!(ex.run_until_stalled(&mut serve_fut).is_pending());
@@ -241,8 +319,8 @@ mod tests {
         let name1 = "fake-1";
         let name2 = "fake-2";
         let koid = Koid::from_raw(1234);
-        let (process1, _signal1) = FakeProcess::new(name1, koid);
-        let (process2, _signal2) = FakeProcess::new(name2, koid);
+        let (process1, _signal1) = FakeProcess::new(name1, koid, false);
+        let (process2, _signal2) = FakeProcess::new(name2, koid, false);
 
         // Register the first process.
         let serve1_fut = registry.serve_process(process1);
@@ -264,25 +342,29 @@ mod tests {
         assert!(ex.run_until_stalled(&mut serve1_fut).is_pending());
     }
 
+    #[test_case(fheapdump_client::ProcessSelector::ByKoid(3),
+        None ; "valid koid, snapshot succeeds")]
     #[test_case(fheapdump_client::ProcessSelector::ByName("foo".to_string()),
-        CollectorError::LiveSnapshotFailed ; "valid name, snapshot fails")]
+        Some(CollectorError::LiveSnapshotFailed) ; "valid name, snapshot fails")]
     #[test_case(fheapdump_client::ProcessSelector::ByName("bar".to_string()),
-        CollectorError::ProcessSelectorAmbiguous ; "ambiguous name")]
+        Some(CollectorError::ProcessSelectorAmbiguous) ; "ambiguous name")]
     #[test_case(fheapdump_client::ProcessSelector::ByName("baz".to_string()),
-        CollectorError::ProcessSelectorNoMatch ; "no matching name")]
+        Some(CollectorError::ProcessSelectorNoMatch) ; "no matching name")]
     #[test_case(fheapdump_client::ProcessSelector::ByKoid(2),
-        CollectorError::LiveSnapshotFailed ; "valid koid, snapshot fails")]
+        Some(CollectorError::LiveSnapshotFailed) ; "valid koid, snapshot fails")]
     #[test_case(fheapdump_client::ProcessSelector::ByKoid(99),
-        CollectorError::ProcessSelectorNoMatch ; "no matching koid")]
+        Some(CollectorError::ProcessSelectorNoMatch) ; "no matching koid")]
     #[fasync::run_singlethreaded(test)]
     async fn test_take_live_snapshot(
         mut process_selector: fheapdump_client::ProcessSelector,
-        expect_error: CollectorError,
+        expect_error: Option<CollectorError>,
     ) {
         // Create three FakeProcess instances, two of which with the same name.
-        let (process1, _signal1) = FakeProcess::new("foo", Koid::from_raw(1));
-        let (process2, _signal2) = FakeProcess::new("bar", Koid::from_raw(2));
-        let (process3, _signal3) = FakeProcess::new("bar", Koid::from_raw(3));
+        // The first two processes return a LiveSnapshotFailed error; the third one successfully
+        // returns a snapshot.
+        let (process1, _signal1) = FakeProcess::new("foo", Koid::from_raw(1), false);
+        let (process2, _signal2) = FakeProcess::new("bar", Koid::from_raw(2), false);
+        let (process3, _signal3) = FakeProcess::new("bar", Koid::from_raw(3), true);
 
         // Create a Registry and a client connected to it.
         let (_registry, proxy) = create_registry_and_proxy([process1, process2, process3]);
@@ -291,6 +373,12 @@ mod tests {
         let result =
             proxy.take_live_snapshot(&mut process_selector).await.expect("FIDL channel error");
 
-        assert_eq!(result.expect_err("request should fail"), expect_error);
+        // Verify that the result matches our expectation (either success or a specific error).
+        if let Some(expect_error) = expect_error {
+            assert_eq!(result.expect_err("request should fail"), expect_error);
+        } else {
+            let result = result.expect("request should succeed");
+            FakeSnapshot::receive_and_assert_match(result.into_stream().unwrap()).await;
+        }
     }
 }

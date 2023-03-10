@@ -16,6 +16,7 @@ group("tests") {
   testonly = true
   deps = [
     "collector:tests",
+    "lib/heapdump_snapshot:tests",
     "vmo_types:tests",
   ]
 
