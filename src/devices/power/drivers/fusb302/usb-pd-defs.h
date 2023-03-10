@@ -26,7 +26,7 @@ enum class PowerRole : int8_t {
 };
 
 // Descriptor for logging and debugging.
-const char* DebugStringFromPowerRole(PowerRole power_role);
+const char* PowerRoleToString(PowerRole power_role);
 
 // Specification Revision
 //
@@ -48,7 +48,7 @@ enum class DataRole : uint8_t {
 };
 
 // Descriptor for logging and debugging.
-const char* DebugStringFromDataRole(DataRole data_role);
+const char* DataRoleToString(DataRole data_role);
 
 // Type-safe selector for one of the two CC (Configuration Channel) pins.
 //
@@ -60,7 +60,7 @@ enum class ConfigChannelPinId : int8_t {
 };
 
 // Descriptor for logging and debugging.
-const char* DebugStringFromConfigChannelPinId(ConfigChannelPinId pin_id);
+const char* ConfigChannelPinIdToString(ConfigChannelPinId pin_id);
 
 // State of a switch that can either point to a CC pin or be open.
 //
@@ -73,7 +73,7 @@ enum class ConfigChannelPinSwitch : int8_t {
 };
 
 // Descriptor for logging and debugging.
-const char* DebugStringFromConfigChannelPinSwitch(ConfigChannelPinSwitch cc_switch);
+const char* ConfigChannelPinSwitchToString(ConfigChannelPinSwitch cc_switch);
 
 // Measured voltage of a CC pin.
 enum class ConfigChannelTermination : int8_t {
@@ -87,7 +87,7 @@ enum class ConfigChannelTermination : int8_t {
 };
 
 // Descriptor for logging and debugging.
-const char* DebugStringFromConfigChannelTermination(ConfigChannelTermination termination);
+const char* ConfigChannelTerminationToString(ConfigChannelTermination termination);
 
 // Inverts a ConfigChannelPinId.
 constexpr ConfigChannelPinId ConfigChannelPinIdFromInverse(ConfigChannelPinId id) {

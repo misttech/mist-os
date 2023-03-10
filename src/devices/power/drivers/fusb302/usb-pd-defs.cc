@@ -10,7 +10,7 @@
 
 namespace usb_pd {
 
-const char* DebugStringFromPowerRole(PowerRole power_role) {
+const char* PowerRoleToString(PowerRole power_role) {
   switch (power_role) {
     case PowerRole::kSink:
       return "Sink";
@@ -21,7 +21,7 @@ const char* DebugStringFromPowerRole(PowerRole power_role) {
   return nullptr;
 }
 
-const char* DebugStringFromDataRole(DataRole data_role) {
+const char* DataRoleToString(DataRole data_role) {
   switch (data_role) {
     case DataRole::kDownstreamFacingPort:
       return "DFP";
@@ -32,7 +32,7 @@ const char* DebugStringFromDataRole(DataRole data_role) {
   return nullptr;
 }
 
-const char* DebugStringFromConfigChannelPinId(ConfigChannelPinId pin_id) {
+const char* ConfigChannelPinIdToString(ConfigChannelPinId pin_id) {
   switch (pin_id) {
     case ConfigChannelPinId::kCc1:
       return "CC1";
@@ -43,7 +43,7 @@ const char* DebugStringFromConfigChannelPinId(ConfigChannelPinId pin_id) {
   return nullptr;
 }
 
-const char* DebugStringFromConfigChannelPinSwitch(ConfigChannelPinSwitch cc_switch) {
+const char* ConfigChannelPinSwitchToString(ConfigChannelPinSwitch cc_switch) {
   switch (cc_switch) {
     case ConfigChannelPinSwitch::kNone:
       return "(not connected)";
@@ -56,7 +56,7 @@ const char* DebugStringFromConfigChannelPinSwitch(ConfigChannelPinSwitch cc_swit
   return nullptr;
 }
 
-const char* DebugStringFromConfigChannelTermination(ConfigChannelTermination termination) {
+const char* ConfigChannelTerminationToString(ConfigChannelTermination termination) {
   switch (termination) {
     case ConfigChannelTermination::kUnknown:
       return "(unknown)";
