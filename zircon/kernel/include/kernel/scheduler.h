@@ -548,8 +548,22 @@ class Scheduler {
   // associated with: no other locks may be nested within a queue lock. A queue
   // lock may be acquired across CPUs, however, the no nesting rule still
   // applies.
-  mutable DECLARE_SPINLOCK_WITH_TYPE(Scheduler, MonitoredSpinLock,
-                                     lockdep::LockFlagsLeaf) queue_lock_;
+  //
+  // Note: while the queue_lock_ is the bottom-most lock in the system from the
+  // scheduler's perspective, it is not (formally) a leaf-lock right now.
+  // Currently, there is one place in the system (DumpThreadLocked) where the
+  // queue_lock_ needs to be held, while fprintf is called.
+  //
+  // This happens when the lockup-detector is unhappy, and asking the Scheduler
+  // to print information about its run queue state.  Most of the printf targets
+  // which could be passed to the scheduler also involve holding locks.  If the
+  // queue_lock_ is flagged as a leaf lock, and lockdep is enabled, and the
+  // lockup-detector attempt to report a hang, it will cause lock-dep to
+  // complain about obtaining a lock while holding a leaf-lock, which will cause
+  // more printing, which causes more complaints, etc...
+  //
+  // See fxb/119371 for more details.
+  mutable DECLARE_SPINLOCK_WITH_TYPE(Scheduler, MonitoredSpinLock) queue_lock_;
 
   // Alias of the queue lock wrapper type.
   using QueueLock = decltype(queue_lock_);
