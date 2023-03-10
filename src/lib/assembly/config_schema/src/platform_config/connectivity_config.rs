@@ -28,6 +28,7 @@ pub struct PlatformNetworkConfig {
 
 /// Which networking type to use (standard or basic).
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum NetworkingConfig {
     /// The standard network configuration
     #[default]
