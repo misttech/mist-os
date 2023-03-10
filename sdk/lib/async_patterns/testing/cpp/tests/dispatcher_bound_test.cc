@@ -102,6 +102,20 @@ TEST(TestDispatcherBound, AsyncCallWithReplyUsingFuture) {
   EXPECT_EQ("abcdef", fut.get());
 }
 
+TEST(TestDispatcherBound, AsyncCallOverloaded) {
+  async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
+  remote_loop.StartThread();
+
+  struct Object {
+    int Pass(int a) { return a; }
+    std::string Pass(std::string a) { return a; }
+  };
+  async_patterns::TestDispatcherBound<Object> obj{remote_loop.dispatcher(), std::in_place};
+
+  EXPECT_EQ(1, obj.SyncCall<int(int)>(&Object::Pass, 1));
+  EXPECT_EQ("a", obj.SyncCall<std::string(std::string)>(&Object::Pass, std::string{"a"}));
+}
+
 TEST(TestDispatcherBound, MakeTestDispatcherBound) {
   async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
   remote_loop.StartThread();

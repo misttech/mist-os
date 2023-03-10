@@ -62,6 +62,11 @@ class TestDispatcherBound final : public DispatcherBound<T> {
   //
   //     int result = object.SyncCall(&Object::Add, 1, 2);  // result == 3
   //
+  // If |Object::Add| is an overloaded member function, you may disambiguate it
+  // by spelling out its signature:
+  //
+  //     int result = object.SyncCall<int(int, int)>(&Object::Add, 1, 2);
+  //
   // General callables are also supported. The provided callable can safely
   // capture state without data races, because the current thread will be
   // suspended while the dispatcher thread is accessing the captures. However,
@@ -98,6 +103,10 @@ class TestDispatcherBound final : public DispatcherBound<T> {
                                                                std::forward<Args>(args)...));
       }
     }
+  }
+  template <typename Member, typename... Args>
+  auto SyncCall(Member T::*member, Args&&... args) {
+    return SyncCall(std::mem_fn(member), std::forward<Args>(args)...);
   }
 
  private:

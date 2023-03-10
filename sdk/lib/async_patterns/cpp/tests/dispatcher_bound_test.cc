@@ -346,6 +346,36 @@ TEST_F(DispatcherBound, AsyncCallWithReply) {
   EXPECT_TRUE(owner.got_result());
 }
 
+TEST_F(DispatcherBound, AsyncCallOverloaded) {
+  struct Object {
+    int Pass(int a) { return a; }
+    std::string Pass(std::string a) { return a; }
+  };
+
+  struct Owner {
+    explicit Owner(async_dispatcher_t* dispatcher)
+        : receiver{this, dispatcher}, obj{dispatcher, std::in_place} {
+      obj.AsyncCall<int(int)>(&Object::Pass, 1).Then(receiver.Once([](Owner* owner, int a) {
+        EXPECT_EQ(1, a);
+        owner->count++;
+      }));
+
+      obj.AsyncCall<std::string(std::string)>(&Object::Pass, std::string{"a"})
+          .Then(receiver.Once([](Owner* owner, const std::string& a) {
+            EXPECT_EQ("a", a);
+            owner->count++;
+          }));
+    }
+
+    async_patterns::Receiver<Owner> receiver;
+    async_patterns::DispatcherBound<Object> obj;
+    int count = 0;
+  } owner{loop().dispatcher()};
+
+  loop().RunUntilIdle();
+  EXPECT_EQ(2, owner.count);
+}
+
 TEST_F(DispatcherBound, SynchronouslyRunIfShutdown) {
   loop().Shutdown();
   auto object_count = make_arc_atomic();

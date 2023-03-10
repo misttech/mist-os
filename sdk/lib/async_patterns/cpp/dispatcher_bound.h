@@ -150,6 +150,11 @@ class DispatcherBound {
   //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
+  // If |Background::DoSomething| is an overloaded member function, you may
+  // disambiguate it by spelling out its signature:
+  //
+  //     background_.AsyncCall<void(Result)>(&Background::DoSomething);
+  //
   // The task will be synchronously called if the dispatcher is shutdown.
   template <typename Member, typename... Args>
   auto AsyncCall(Member T::*member, Args&&... args) {
