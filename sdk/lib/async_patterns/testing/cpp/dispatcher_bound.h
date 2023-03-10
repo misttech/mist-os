@@ -83,6 +83,7 @@ class TestDispatcherBound final : public DispatcherBound<T> {
   // fire-and-forget call, use |AsyncCall|.
   template <typename Callable, typename... Args>
   auto SyncCall(Callable&& callable, Args&&... args) {
+    ZX_ASSERT(DispatcherBound<T>::has_value());
     constexpr bool kIsInvocable = std::is_invocable_v<Callable, T*, Args...>;
     static_assert(kIsInvocable,
                   "|Callable| must be callable with |T*| and the provided |Args|. "
