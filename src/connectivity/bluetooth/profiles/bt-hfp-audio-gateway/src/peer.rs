@@ -107,6 +107,8 @@ pub struct PeerImpl {
     /// A handle to the audio control interface.
     audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
     hfp_sender: mpsc::Sender<hfp::Event>,
+    /// TODO(fxbug.dev/122263): consider configuring in-band SCO per codec type.
+    in_band_sco: bool,
     inspect_node: inspect::Node,
 }
 
@@ -118,6 +120,7 @@ impl PeerImpl {
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: mpsc::Sender<hfp::Event>,
+        in_band_sco: bool,
         inspect_node: inspect::Node,
     ) -> Result<Self, Error> {
         let (task, queue) = PeerTask::spawn(
@@ -127,6 +130,7 @@ impl PeerImpl {
             local_config,
             connection_behavior,
             hfp_sender.clone(),
+            in_band_sco,
             &inspect_node,
         )?;
         Ok(Self {
@@ -138,6 +142,7 @@ impl PeerImpl {
             queue,
             connection_behavior,
             hfp_sender,
+            in_band_sco,
             inspect_node,
         })
     }
@@ -151,6 +156,7 @@ impl PeerImpl {
             self.local_config,
             self.connection_behavior,
             self.hfp_sender.clone(),
+            self.in_band_sco,
             &self.inspect_node,
         )?;
 
@@ -307,12 +313,14 @@ pub(crate) mod fake {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, async_utils::PollExt,
-        fidl_fuchsia_bluetooth_bredr::ProfileMarker, fuchsia_async as fasync, futures::pin_mut,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use async_utils::PollExt;
+    use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
+    use fuchsia_async as fasync;
+    use futures::pin_mut;
 
-    use crate::audio::TestAudioControl;
+    use crate::{audio::TestAudioControl, AudioGatewayFeatureSupport};
 
     fn new_audio_control() -> Arc<Mutex<Box<dyn AudioControl>>> {
         Arc::new(Mutex::new(Box::new(TestAudioControl::default())))
@@ -327,6 +335,7 @@ mod tests {
             AudioGatewayFeatureSupport::default(),
             ConnectionBehavior::default(),
             mpsc::channel(1).0,
+            false,
             Default::default(),
         )
         .expect("valid peer")

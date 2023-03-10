@@ -64,6 +64,8 @@ pub struct Hfp {
     internal_events_rx: Receiver<Event>,
     internal_events_tx: Sender<Event>,
     inspect_node: HfpInspect,
+    /// TODO(fxbug.dev/122263): consider configuring in-band SCO per codec type.
+    in_band_sco: bool,
 }
 
 impl Inspect for &mut Hfp {
@@ -85,6 +87,7 @@ impl Hfp {
         audio: impl AudioControl + 'static,
         call_manager_registration: Receiver<CallManagerProxy>,
         config: AudioGatewayFeatureSupport,
+        in_band_sco: bool,
         test_requests: Receiver<hfp_test::HfpTestRequest>,
     ) -> Self {
         let (internal_events_tx, internal_events_rx) = mpsc::channel(1);
@@ -103,6 +106,7 @@ impl Hfp {
             internal_events_rx,
             internal_events_tx,
             inspect_node: Default::default(),
+            in_band_sco,
         }
     }
 
@@ -219,6 +223,7 @@ impl Hfp {
                     self.config,
                     self.connection_behavior,
                     self.internal_events_tx.clone(),
+                    self.in_band_sco,
                     self.inspect_node.peers.create_child(inspect::unique_name("peer_")),
                 )?);
                 if let Some(connection_id) = self.call_manager.connection_id() {
@@ -358,6 +363,7 @@ mod tests {
             TestAudioControl::default(),
             rx1,
             AudioGatewayFeatureSupport::default(),
+            false,
             rx2,
         );
         let result = hfp.run().await;
@@ -388,6 +394,7 @@ mod tests {
             TestAudioControl::default(),
             receiver,
             AudioGatewayFeatureSupport::default(),
+            false,
             rx,
         );
         let _hfp_task = fasync::Task::local(hfp.run());
@@ -430,6 +437,7 @@ mod tests {
             TestAudioControl::default(),
             receiver,
             AudioGatewayFeatureSupport::default(),
+            false,
             rx,
         );
         let _hfp_task = fasync::Task::local(hfp.run());
@@ -487,6 +495,7 @@ mod tests {
             TestAudioControl::default(),
             receiver,
             AudioGatewayFeatureSupport::default(),
+            false,
             rx,
         );
         let _hfp_task = fasync::Task::local(hfp.run());
@@ -528,6 +537,7 @@ mod tests {
     //         TestAudioControl::default(),
     //         receiver,
     //         AudioGatewayFeatureSupport::default(),
+    //         false,
     //         rx,
     //     );
     //     let _hfp_task = fasync::Task::local(hfp.run());
@@ -579,6 +589,7 @@ mod tests {
             TestAudioControl::default(),
             receiver,
             AudioGatewayFeatureSupport::default(),
+            false,
             rx,
         );
 
@@ -704,6 +715,7 @@ mod tests {
             TestAudioControl::default(),
             call_mgr_rx,
             AudioGatewayFeatureSupport::default(),
+            false,
             test_rx,
         );
 
@@ -750,6 +762,7 @@ mod tests {
             TestAudioControl::default(),
             receiver,
             AudioGatewayFeatureSupport::default(),
+            false,
             rx,
         );
 
@@ -795,6 +808,7 @@ mod tests {
             TestAudioControl::default(),
             call_mgr_rx,
             AudioGatewayFeatureSupport::default(),
+            false,
             test_rx,
         );
 
@@ -848,6 +862,7 @@ mod tests {
             TestAudioControl::default(),
             rx1,
             AudioGatewayFeatureSupport::default(),
+            false,
             rx2,
         );
 

@@ -102,5 +102,8 @@
         // See HFP Spec v1.8 Sec 4.26
         // TODO(fxbug.dev/66016): unimplemented, ignored for now
         enhanced_voice_recognition_with_text: { type: "bool" },
+
+        // Use in-band SCO connection instead of out-of-band SCO connection.
+        in_band_sco: { type: "bool" },
     },
 }

@@ -60,7 +60,7 @@ const DEFAULT_CODECS: &[CodecId] = &[CodecId::CVSD];
 
 pub(super) struct PeerTask {
     id: PeerId,
-    _local_config: AudioGatewayFeatureSupport,
+    local_config: AudioGatewayFeatureSupport,
     connection_behavior: ConnectionBehavior,
     profile_proxy: bredr::ProfileProxy,
     handler: Option<PeerHandlerProxy>,
@@ -99,15 +99,15 @@ impl PeerTask {
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: Sender<hfp::Event>,
+        sco_connector: ScoConnector,
     ) -> Result<Self, Error> {
         let connection = ServiceLevelConnection::with_init_timeout(fuchsia_async::Timer::new(
             CONNECTION_INIT_TIMEOUT,
         ));
-        let sco_connector = ScoConnector::build(profile_proxy.clone());
         let a2dp_control = a2dp::Control::connect();
         Ok(Self {
             id,
-            _local_config: local_config,
+            local_config,
             connection_behavior,
             profile_proxy,
             handler: None,
@@ -137,9 +137,11 @@ impl PeerTask {
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: Sender<hfp::Event>,
+        in_band_sco: bool,
         inspect: &inspect::Node,
     ) -> Result<(Task<()>, Sender<PeerRequest>), Error> {
         let (sender, receiver) = mpsc::channel(0);
+        let sco_connector = ScoConnector::build(profile_proxy.clone(), in_band_sco);
         let mut peer = Self::new(
             id,
             profile_proxy,
@@ -147,6 +149,7 @@ impl PeerTask {
             local_config,
             connection_behavior,
             hfp_sender,
+            sco_connector,
         )?;
         if let Err(e) = peer.iattach(inspect, "task") {
             warn!("Failed to attach PeerTaskInspect to provided inspect node: {}", e)
@@ -368,7 +371,7 @@ impl PeerTask {
         let marker = (&request).into();
         match request {
             SlcRequest::GetAgFeatures { response } => {
-                let features = (&self._local_config).into();
+                let features = (&self.local_config).into();
                 // Update the procedure with the retrieved AG update.
                 self.connection.receive_ag_request(marker, response(features)).await;
             }
@@ -948,6 +951,7 @@ mod tests {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
         let audio: Arc<Mutex<Box<dyn AudioControl>>> =
             Arc::new(Mutex::new(Box::new(TestAudioControl::default())));
+        let sco_connector = ScoConnector::build(proxy.clone(), false);
         let mut task = PeerTask::new(
             PeerId(1),
             proxy,
@@ -955,6 +959,7 @@ mod tests {
             AudioGatewayFeatureSupport::default(),
             ConnectionBehavior::default(),
             mpsc::channel(1).0,
+            sco_connector,
         )
         .expect("Could not create PeerTask");
         if let Some(conn) = connection {

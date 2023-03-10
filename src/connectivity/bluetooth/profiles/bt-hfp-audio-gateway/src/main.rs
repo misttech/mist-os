@@ -39,7 +39,9 @@ async fn main() -> Result<(), Error> {
         warn!("Couldn't serve inspect: {}", e);
     }
 
-    let feature_support = AudioGatewayFeatureSupport::load();
+    let config = hfp_profile_config::Config::take_from_startup_handle();
+    let in_band_sco = config.in_band_sco;
+    let feature_support = AudioGatewayFeatureSupport::load_from_config(config);
     debug!(?feature_support, "Starting HFP Audio Gateway");
     let (profile_client, profile_svc) = register_audio_gateway(feature_support)?;
 
@@ -71,6 +73,7 @@ async fn main() -> Result<(), Error> {
         audio,
         call_manager_receiver,
         feature_support,
+        in_band_sco,
         test_request_receiver,
     );
     if let Err(e) = hfp.iattach(&inspector.root(), "hfp") {

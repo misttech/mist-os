@@ -52,6 +52,7 @@ impl ScoConnection {
 #[derive(Clone)]
 pub struct ScoConnector {
     proxy: bredr::ProfileProxy,
+    in_band_sco: bool,
 }
 
 const COMMON_SCO_PARAMS: bredr::ScoConnectionParameters = bredr::ScoConnectionParameters {
@@ -60,7 +61,6 @@ const COMMON_SCO_PARAMS: bredr::ScoConnectionParameters = bredr::ScoConnectionPa
     io_coding_format: Some(bredr::CodingFormat::LinearPcm),
     io_frame_size: Some(16),
     io_pcm_data_format: Some(fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned),
-    path: Some(bredr::DataPath::Offload),
     ..bredr::ScoConnectionParameters::EMPTY
 };
 
@@ -74,8 +74,21 @@ const SCO_PARAMS_FALLBACK: bredr::ScoConnectionParameters = bredr::ScoConnection
     ..COMMON_SCO_PARAMS
 };
 
+fn params_with_data_path(
+    sco_params: bredr::ScoConnectionParameters,
+    in_band_sco: bool,
+) -> bredr::ScoConnectionParameters {
+    bredr::ScoConnectionParameters {
+        path: in_band_sco.then_some(bredr::DataPath::Host).or(Some(bredr::DataPath::Offload)),
+        ..sco_params
+    }
+}
+
 // pub in this crate for tests
-pub(crate) fn parameter_sets_for_codec(codec_id: CodecId) -> Vec<bredr::ScoConnectionParameters> {
+pub(crate) fn parameter_sets_for_codec(
+    codec_id: CodecId,
+    in_band_sco: bool,
+) -> Vec<bredr::ScoConnectionParameters> {
     use bredr::HfpParameterSet::*;
     match codec_id {
         CodecId::MSBC => {
@@ -84,7 +97,7 @@ pub(crate) fn parameter_sets_for_codec(codec_id: CodecId) -> Vec<bredr::ScoConne
                 air_coding_format: Some(bredr::CodingFormat::Msbc),
                 // IO bandwidth to match an 16khz audio rate. (x2 for input + output)
                 io_bandwidth: Some(32000),
-                ..COMMON_SCO_PARAMS
+                ..params_with_data_path(COMMON_SCO_PARAMS.clone(), in_band_sco)
             };
             // TODO(b/200305833): Disable MsbcT1 for now as it results in bad audio
             //vec![params_fn(MsbcT2), params_fn(MsbcT1)]
@@ -94,20 +107,11 @@ pub(crate) fn parameter_sets_for_codec(codec_id: CodecId) -> Vec<bredr::ScoConne
         _ => {
             let params_fn = |set| bredr::ScoConnectionParameters {
                 parameter_set: Some(set),
-                ..SCO_PARAMS_FALLBACK
+                ..params_with_data_path(SCO_PARAMS_FALLBACK.clone(), in_band_sco)
             };
             vec![params_fn(CvsdS4), params_fn(CvsdS1)]
         }
     }
-}
-
-fn parameters_for_codecs(codecs: Vec<CodecId>) -> Vec<bredr::ScoConnectionParameters> {
-    codecs
-        .into_iter()
-        .map(parameter_sets_for_codec)
-        .flatten()
-        .chain([SCO_PARAMS_FALLBACK.clone()])
-        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -117,8 +121,8 @@ enum ScoInitiatorRole {
 }
 
 impl ScoConnector {
-    pub fn build(proxy: bredr::ProfileProxy) -> Self {
-        Self { proxy }
+    pub fn build(proxy: bredr::ProfileProxy, in_band_sco: bool) -> Self {
+        Self { proxy, in_band_sco }
     }
 
     async fn setup_sco_connection(
@@ -154,12 +158,21 @@ impl ScoConnector {
         Ok(connection)
     }
 
+    fn parameters_for_codecs(&self, codecs: Vec<CodecId>) -> Vec<bredr::ScoConnectionParameters> {
+        codecs
+            .into_iter()
+            .map(|id| parameter_sets_for_codec(id, self.in_band_sco))
+            .flatten()
+            .chain([params_with_data_path(SCO_PARAMS_FALLBACK.clone(), self.in_band_sco)])
+            .collect()
+    }
+
     pub fn connect(
         &self,
         peer_id: PeerId,
         codecs: Vec<CodecId>,
     ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
-        let params = parameters_for_codecs(codecs);
+        let params = self.parameters_for_codecs(codecs);
         info!("Initiating SCO connection for {}: {:?}", peer_id, &params);
 
         let proxy = self.proxy.clone();
@@ -189,10 +202,85 @@ impl ScoConnector {
         peer_id: PeerId,
         codecs: Vec<CodecId>,
     ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
-        let params = parameters_for_codecs(codecs);
+        let params = self.parameters_for_codecs(codecs);
         info!("Accepting SCO connection for {}: {:?}.", peer_id, &params);
 
         let proxy = self.proxy.clone();
         Self::setup_sco_connection(proxy, peer_id, ScoInitiatorRole::Accept, params)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::profile::test_server::setup_profile_and_test_server;
+    use fidl_fuchsia_bluetooth_bredr::HfpParameterSet;
+
+    #[fuchsia::test]
+    fn codec_parameters() {
+        let _exec = fuchsia_async::TestExecutor::new();
+
+        // Out-of-band SCO.
+        let (_, profile_svc, _) = setup_profile_and_test_server();
+        let sco = ScoConnector::build(profile_svc.clone(), false);
+        let res = sco.parameters_for_codecs(vec![CodecId::MSBC, CodecId::CVSD]);
+        assert_eq!(res.len(), 4);
+        assert_eq!(
+            res,
+            vec![
+                bredr::ScoConnectionParameters {
+                    parameter_set: Some(HfpParameterSet::MsbcT2),
+                    air_coding_format: Some(bredr::CodingFormat::Msbc),
+                    io_bandwidth: Some(32000),
+                    path: Some(bredr::DataPath::Offload),
+                    ..COMMON_SCO_PARAMS
+                },
+                bredr::ScoConnectionParameters {
+                    parameter_set: Some(HfpParameterSet::CvsdS4),
+                    path: Some(bredr::DataPath::Offload),
+                    ..SCO_PARAMS_FALLBACK
+                },
+                bredr::ScoConnectionParameters {
+                    parameter_set: Some(HfpParameterSet::CvsdS1),
+                    path: Some(bredr::DataPath::Offload),
+                    ..SCO_PARAMS_FALLBACK
+                },
+                bredr::ScoConnectionParameters {
+                    path: Some(bredr::DataPath::Offload),
+                    ..SCO_PARAMS_FALLBACK
+                },
+            ]
+        );
+
+        // In-band SCO.
+        let sco = ScoConnector::build(profile_svc.clone(), true);
+        let res = sco.parameters_for_codecs(vec![CodecId::MSBC, CodecId::CVSD]);
+        assert_eq!(res.len(), 4);
+        assert_eq!(
+            res,
+            vec![
+                bredr::ScoConnectionParameters {
+                    parameter_set: Some(HfpParameterSet::MsbcT2),
+                    air_coding_format: Some(bredr::CodingFormat::Msbc),
+                    io_bandwidth: Some(32000),
+                    path: Some(bredr::DataPath::Host),
+                    ..COMMON_SCO_PARAMS
+                },
+                bredr::ScoConnectionParameters {
+                    parameter_set: Some(HfpParameterSet::CvsdS4),
+                    path: Some(bredr::DataPath::Host),
+                    ..SCO_PARAMS_FALLBACK
+                },
+                bredr::ScoConnectionParameters {
+                    parameter_set: Some(HfpParameterSet::CvsdS1),
+                    path: Some(bredr::DataPath::Host),
+                    ..SCO_PARAMS_FALLBACK
+                },
+                bredr::ScoConnectionParameters {
+                    path: Some(bredr::DataPath::Host),
+                    ..SCO_PARAMS_FALLBACK
+                },
+            ]
+        );
     }
 }

@@ -326,7 +326,8 @@ mod test {
         let (output, _output_handle) = dai::test::test_digital_audio_interface(false);
         let mut audio = DaiAudioControl::setup(vec![input, output], proxy.clone()).await.unwrap();
 
-        let sco_params = parameter_sets_for_codec(CodecId::CVSD).pop().unwrap();
+        let sco_params =
+            parameter_sets_for_codec(CodecId::CVSD, /* in_band_sco= */ false).pop().unwrap();
 
         let result = audio.start(PeerId(0), sco_params.clone());
         result.expect("audio should start okay");
@@ -355,7 +356,8 @@ mod test {
 
         let _ = audio.stop().expect_err("stopping without starting is an error");
 
-        let sco_params = parameter_sets_for_codec(CodecId::CVSD).pop().unwrap();
+        let sco_params =
+            parameter_sets_for_codec(CodecId::CVSD, /* in_band_sco= */ false).pop().unwrap();
         let result = audio.start(PeerId(0), sco_params);
         result.expect("audio should start okay");
 

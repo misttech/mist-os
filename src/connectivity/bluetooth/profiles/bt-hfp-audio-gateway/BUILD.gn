@@ -137,6 +137,7 @@ fuchsia_structured_config_values("default_config_values") {
     wide_band_speech = true
     enhanced_voice_recognition = false
     enhanced_voice_recognition_with_text = false
+    in_band_sco = false
   }
 }
 

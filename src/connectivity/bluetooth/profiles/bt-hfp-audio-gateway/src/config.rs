@@ -9,7 +9,7 @@ use {
 
 /// Configuration of optional feature support.
 /// This list of features is derived from the optional features in HFP v1.8, Table 3.1.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(test, derive(Default))]
 pub struct AudioGatewayFeatureSupport {
     pub reject_incoming_voice_call: bool,
@@ -83,8 +83,8 @@ impl From<hfp_profile_config::Config> for AudioGatewayFeatureSupport {
 
 impl AudioGatewayFeatureSupport {
     /// Load AudioGatewayFeatureSupport from package config data directory.
-    pub fn load() -> Self {
-        hfp_profile_config::Config::take_from_startup_handle().into()
+    pub fn load_from_config(config: hfp_profile_config::Config) -> Self {
+        config.into()
     }
 }
 
@@ -92,6 +92,40 @@ impl AudioGatewayFeatureSupport {
 mod tests {
     use super::*;
     use fuchsia_inspect::assert_data_tree;
+
+    #[fuchsia::test]
+    fn load_from_config() {
+        let config = AudioGatewayFeatureSupport::load_from_config(hfp_profile_config::Config {
+            reject_incoming_voice_call: false,
+            three_way_calling: false,
+            in_band_ringtone: false,
+            echo_canceling_and_noise_reduction: true,
+            voice_recognition: false,
+            attach_phone_number_to_voice_tag: false,
+            respond_and_hold: false,
+            enhanced_call_controls: false,
+            wide_band_speech: true,
+            enhanced_voice_recognition: false,
+            enhanced_voice_recognition_with_text: false,
+            in_band_sco: false,
+        });
+        assert_eq!(
+            config,
+            AudioGatewayFeatureSupport {
+                reject_incoming_voice_call: false,
+                three_way_calling: false,
+                in_band_ringtone: false,
+                echo_canceling_and_noise_reduction: true,
+                voice_recognition: false,
+                attach_phone_number_to_voice_tag: false,
+                respond_and_hold: false,
+                enhanced_call_controls: false,
+                wide_band_speech: true,
+                enhanced_voice_recognition: false,
+                enhanced_voice_recognition_with_text: false,
+            }
+        );
+    }
 
     #[fuchsia::test]
     fn expected_inspect_tree() {
