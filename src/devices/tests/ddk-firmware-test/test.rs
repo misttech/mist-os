@@ -259,19 +259,13 @@ async fn load_package_firmware_test() -> Result<(), Error> {
 
     // Check that we can load firmware out of /boot.
     driver_proxy.load_firmware("test-firmware").await?.unwrap();
-    driver_proxy.load_firmware_async("test-firmware").await?.unwrap();
 
     // Check that we can load firmware from our package.
     driver_proxy.load_firmware("package-firmware").await?.unwrap();
-    driver_proxy.load_firmware_async("package-firmware").await?.unwrap();
 
     // Check that loading unknown name fails.
     assert!(
         driver_proxy.load_firmware("test-bad").await? == Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND)
-    );
-    assert!(
-        driver_proxy.load_firmware_async("test-bad").await?
-            == Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND)
     );
     Ok(())
 }
@@ -300,15 +294,10 @@ async fn load_package_firmware_test_dfv2() -> Result<(), Error> {
 
     // Check that we can load firmware from our package.
     driver_proxy.load_firmware("test-firmware").await?.unwrap();
-    driver_proxy.load_firmware_async("test-firmware").await?.unwrap();
 
     // Check that loading unknown name fails.
     assert_eq!(
         driver_proxy.load_firmware("test-bad").await?,
-        Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND)
-    );
-    assert_eq!(
-        driver_proxy.load_firmware_async("test-bad").await?,
         Err(fuchsia_zircon::sys::ZX_ERR_NOT_FOUND)
     );
     Ok(())

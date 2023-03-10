@@ -637,44 +637,6 @@ TEST_F(DriverTest, Start_BindFailed) {
   EXPECT_TRUE(v1_test->did_release);
 }
 
-TEST_F(DriverTest, LoadFirwmareAsync) {
-  zx_protocol_device_t ops{};
-  auto driver = StartDriver("/pkg/driver/v1_test.so", &ops);
-
-  // Verify that v1_test.so has set a context.
-  while (!driver->Context()) {
-    fdf_testing_run_until_idle();
-  }
-  std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
-  ASSERT_NE(nullptr, v1_test.get());
-
-  // Verify that v1_test.so has not added a child device.
-  EXPECT_TRUE(node().children().empty());
-
-  bool was_called = false;
-
-  driver->LoadFirmwareAsync(
-      nullptr, "test",
-      [](void* ctx, zx_status_t status, zx_handle_t fw, size_t size) {
-        ASSERT_EQ(status, ZX_OK);
-        ASSERT_EQ(size, 16ul);
-        zx::vmo vmo(fw);
-        auto buf = std::vector<char>(size);
-        vmo.read(buf.data(), 0, size);
-        buf.push_back('\0');
-        ASSERT_STREQ(buf.data(), "Hello, firmware!");
-
-        *reinterpret_cast<bool*>(ctx) = true;
-      },
-      &was_called);
-  while (!was_called) {
-    fdf_testing_run_until_idle();
-  }
-  ASSERT_TRUE(was_called);
-
-  UnbindAndFreeDriver(std::move(driver));
-}
-
 TEST_F(DriverTest, GetVariable) {
   zx_protocol_device_t ops{
       .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },

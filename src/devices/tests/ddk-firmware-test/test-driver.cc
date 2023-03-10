@@ -44,8 +44,6 @@ class TestFirmwareDriver : public DeviceType {
   // Device message ops implementation.
   void LoadFirmware(LoadFirmwareRequestView request,
                     LoadFirmwareCompleter::Sync& completer) override;
-  void LoadFirmwareAsync(LoadFirmwareAsyncRequestView request,
-                         LoadFirmwareAsyncCompleter::Sync& completer) override;
 
  private:
   static zx_status_t CheckFirmware(zx_handle_t fw, size_t size);
@@ -68,37 +66,6 @@ void TestFirmwareDriver::LoadFirmware(LoadFirmwareRequestView request,
 
   TestFirmwareDriver::CheckFirmware(fw, size);
   completer.ReplySuccess();
-}
-
-void TestFirmwareDriver::LoadFirmwareAsync(LoadFirmwareAsyncRequestView request,
-                                           LoadFirmwareAsyncCompleter::Sync& completer) {
-  struct FwCtx {
-    LoadFirmwareAsyncCompleter::Async completer;
-  };
-
-  auto ctx = std::make_unique<FwCtx>(FwCtx{
-      .completer = completer.ToAsync(),
-  });
-  std::string str_path(request->path.begin(), request->path.size());
-
-  load_firmware_async(
-      zxdev(), str_path.c_str(),
-      [](void* ctx, zx_status_t result, zx_handle_t fw, size_t size) {
-        std::unique_ptr<FwCtx> context(reinterpret_cast<FwCtx*>(ctx));
-
-        if (result != ZX_OK) {
-          context->completer.ReplyError(result);
-          return;
-        }
-
-        result = TestFirmwareDriver::CheckFirmware(fw, size);
-        if (result != ZX_OK) {
-          context->completer.ReplyError(result);
-          return;
-        }
-        context->completer.ReplySuccess();
-      },
-      ctx.release());
 }
 
 zx_status_t TestFirmwareDriver::CheckFirmware(zx_handle_t fw, size_t size) {

@@ -599,22 +599,6 @@ zx::result<zx::vmo> Driver::LoadFirmware(Device* device, const char* filename, s
   return zx::ok(std::move(vmo));
 }
 
-void Driver::LoadFirmwareAsync(Device* device, const char* filename,
-                               load_firmware_callback_t callback, void* ctx) {
-  std::string firmware_path = "/pkg/lib/firmware/";
-  firmware_path.append(filename);
-  executor_.schedule_task(
-      fdf::Open(*context().incoming(), dispatcher(), firmware_path.c_str(), kOpenFlags)
-          .and_then(fit::bind_member<&Driver::GetBuffer>(this))
-          .and_then([callback, ctx](FileVmo& result) {
-            callback(ctx, ZX_OK, result.vmo.release(), result.size);
-          })
-          .or_else([callback, ctx](zx_status_t& status) {
-            callback(ctx, ZX_ERR_NOT_FOUND, ZX_HANDLE_INVALID, 0);
-          })
-          .wrap_with(scope_));
-}
-
 zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device_t** out) {
   return RunOnDispatcher([&] {
     zx_device_t* child;

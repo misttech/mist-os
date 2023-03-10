@@ -371,14 +371,6 @@ __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* de
   return internal::ContextForApi()->LoadFirmware(drv, dev_ref, path, fw, size);
 }
 
-__EXPORT void load_firmware_async_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,
-                                              load_firmware_callback_t callback, void* ctx) {
-  DEBUG_ASSERT_VALID_DEVICE(dev);
-  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-  fbl::RefPtr<zx_device_t> dev_ref(dev);
-  internal::ContextForApi()->LoadFirmwareAsync(drv, dev_ref, path, callback, ctx);
-}
-
 // Interface Used by DevHost RPC Layer
 
 zx_status_t device_bind(const fbl::RefPtr<zx_device_t>& dev, const char* drv_libname) {

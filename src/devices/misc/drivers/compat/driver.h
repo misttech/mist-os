@@ -40,8 +40,6 @@ class Driver : public fdf::DriverBase {
            const char* msg, va_list args);
 
   zx::result<zx::vmo> LoadFirmware(Device* device, const char* filename, size_t* size);
-  void LoadFirmwareAsync(Device* device, const char* filename, load_firmware_callback_t callback,
-                         void* ctx);
 
   // # Threading notes
   //

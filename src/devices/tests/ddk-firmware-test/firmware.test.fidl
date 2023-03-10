@@ -10,8 +10,4 @@ closed protocol TestDevice {
     strict LoadFirmware(struct {
         path string;
     }) -> () error zx.status;
-    /// Call load_firmware_async and make sure it worked.
-    strict LoadFirmwareAsync(struct {
-        path string;
-    }) -> () error zx.status;
 };

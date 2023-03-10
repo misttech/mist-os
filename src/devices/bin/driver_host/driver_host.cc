@@ -1037,48 +1037,6 @@ zx_status_t DriverHostContext::LoadFirmware(const zx_driver_t* drv,
   return call_status;
 }
 
-void DriverHostContext::LoadFirmwareAsync(const zx_driver_t* drv,
-                                          const fbl::RefPtr<zx_device_t>& dev, const char* path,
-                                          load_firmware_callback_t callback, void* context) {
-  ZX_DEBUG_ASSERT(callback);
-
-  const auto& client = dev->coordinator_client;
-  if (!client) {
-    callback(context, ZX_ERR_IO_REFUSED, ZX_HANDLE_INVALID, 0);
-    return;
-  }
-  VLOGD(1, *dev, "load-firmware-async");
-  auto drv_libname = ::fidl::StringView::FromExternal(drv->libname());
-  auto str_path = ::fidl::StringView::FromExternal(path);
-  client->LoadFirmware(drv_libname, str_path)
-      .ThenExactlyOnce(
-          [callback, context, dev = dev](
-              fidl::WireUnownedResult<fuchsia_device_manager::Coordinator::LoadFirmware>& result) {
-            if (!result.ok()) {
-              log_rpc_result(dev, "load-firmware-async", result.status(), ZX_OK);
-              callback(context, result.status(), ZX_HANDLE_INVALID, 0);
-              return;
-            }
-            zx_status_t call_status = ZX_OK;
-            size_t size = 0;
-            zx::vmo vmo;
-
-            if (result->is_error()) {
-              call_status = result->error_value();
-            } else {
-              auto& resp = *result->value();
-              size = resp.size;
-              vmo = std::move(resp.vmo);
-            }
-            log_rpc_result(dev, "load-firmware-async", ZX_OK, call_status);
-            if (call_status == ZX_OK && !vmo.is_valid()) {
-              call_status = ZX_ERR_INTERNAL;
-            }
-
-            callback(context, call_status, vmo.release(), size);
-          });
-}
-
 zx_status_t DriverHostContext::GetMetadata(const fbl::RefPtr<zx_device_t>& dev, uint32_t type,
                                            void* buf, size_t buflen, size_t* actual) {
   if (!buf) {

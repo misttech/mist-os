@@ -72,11 +72,6 @@ __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* de
   return ZX_OK;
 }
 
-__EXPORT void load_firmware_async_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,
-                                              load_firmware_callback_t callback, void* ctx) {
-  dev->driver()->LoadFirmwareAsync(dev, path, callback, ctx);
-}
-
 __EXPORT zx_status_t device_get_metadata(zx_device_t* dev, uint32_t type, void* buf, size_t buflen,
                                          size_t* actual) {
   return dev->GetMetadata(type, buf, buflen, actual);
