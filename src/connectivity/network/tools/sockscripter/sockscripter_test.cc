@@ -9,6 +9,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#if PACKET_SOCKETS
+#include <netpacket/packet.h>
+#endif
+
 TEST(SendBufferGenTest, LoadHexBuffer) {
   SendBufferGenerator gen;
   EXPECT_TRUE(gen.SetSendBufHex("61 62 63 64"));
@@ -73,6 +77,8 @@ class TestApi : ApiAbstraction {
   MOCK_METHOD(int, getsockname, (int fd, struct sockaddr* addr, socklen_t* len), (override));
 
   MOCK_METHOD(int, getpeername, (int fd, struct sockaddr* addr, socklen_t* len), (override));
+
+  MOCK_METHOD(unsigned int, if_nametoindex, (const char* ifname), (override));
 
   int RunCommandLine(const std::string& line) {
     SockScripter scripter(this);
@@ -150,6 +156,13 @@ TEST(CommandLine, SocketBuild) {
   EXPECT_CALL(test, socket(AF_INET6, SOCK_RAW, 2));
   EXPECT_EQ(test.RunCommandLine("raw6 2"), 0);
   EXPECT_NE(test.RunCommandLine("raw bind"), 0);
+
+#if PACKET_SOCKETS
+  EXPECT_CALL(test, socket(AF_PACKET, SOCK_DGRAM, 0));
+  EXPECT_EQ(test.RunCommandLine("packet"), 0);
+  EXPECT_CALL(test, socket(AF_PACKET, SOCK_RAW, 0));
+  EXPECT_EQ(test.RunCommandLine("packet-raw"), 0);
+#endif
 }
 
 constexpr int kSockFd = 15;
@@ -446,6 +459,37 @@ TEST(CommandLine, JoinDropMcast6) {
   o << "udp join6 " << multiaddr << '-' << interface << " drop6 " << multiaddr << '-' << interface;
   EXPECT_EQ(test.RunCommandLine(o.str()), 0) << o.str();
 }
+
+#if PACKET_SOCKETS
+TEST(CommandLine, PacketBind) {
+  constexpr unsigned int kIfIndex = 5;
+  constexpr uint16_t kEthProtocol = 2048;
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  EXPECT_CALL(test, socket(AF_PACKET, SOCK_DGRAM, 0)).WillOnce(testing::Return(kSockFd));
+  EXPECT_CALL(test, if_nametoindex(testing::_)).WillOnce([](const char* ifname) {
+    EXPECT_EQ(std::string(ifname), "myinterfacename");
+    return kIfIndex;
+  });
+  EXPECT_CALL(test, bind(kSockFd, testing::_, testing::_))
+      .WillOnce([](testing::Unused, const struct sockaddr* addr, socklen_t addrlen) {
+        const struct sockaddr_ll expected_addr = {
+            .sll_family = AF_PACKET,
+            .sll_protocol = htons(kEthProtocol),
+            .sll_ifindex = kIfIndex,
+        };
+        EXPECT_GE(addrlen, sizeof(expected_addr));
+        const auto& addr_ll = *reinterpret_cast<const struct sockaddr_ll*>(addr);
+        EXPECT_EQ(addr_ll.sll_family, expected_addr.sll_family);
+        EXPECT_EQ(addr_ll.sll_protocol, expected_addr.sll_protocol);
+        EXPECT_EQ(addr_ll.sll_ifindex, expected_addr.sll_ifindex);
+        return 0;
+      });
+  EXPECT_CALL(test, recvfrom(kSockFd, testing::_, testing::_, testing::_, testing::_, testing::_))
+      .WillOnce(testing::Return(0));
+  EXPECT_EQ(test.RunCommandLine("packet packet-bind 2048:myinterfacename recvfrom"), 0);
+}
+#endif
 
 struct SockOptParam {
   SockOptParam(std::string name, std::string arg, int level, int optname,

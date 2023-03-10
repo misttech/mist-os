@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <net/if.h>
 #include <unistd.h>
 
 #include "sockscripter.h"
@@ -84,6 +85,8 @@ class PosixCalls : public ApiAbstraction {
   int getpeername(int fd, struct sockaddr* addr, socklen_t* len) override {
     return ::getpeername(fd, addr, len);
   }
+
+  unsigned int if_nametoindex(const char* ifname) override { return ::if_nametoindex(ifname); }
 };
 
 int main(int argc, char* const argv[]) {

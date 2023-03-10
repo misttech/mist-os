@@ -8,6 +8,13 @@
 #include <string>
 
 #include "api_abstraction.h"
+#include "src/lib/fxl/build_config.h"
+
+#if OS_LINUX
+#define PACKET_SOCKETS 1
+#elif OS_FUCHSIA
+#define PACKET_SOCKETS 1
+#endif
 
 // {sendto}N=3T=2 1.2.3.4:3445
 // "{<cmd>}[N=<n>][T=<t>]"
@@ -96,6 +103,10 @@ class SockScripter {
   bool SetSendBufHex(char* arg);
   bool SetSendBufText(char* arg);
   bool Sleep(char* arg);
+
+#if PACKET_SOCKETS
+  bool PacketBind(char* arg);
+#endif
 
  private:
   bool JoinOrDrop4(const char* func, char* arg, int optname, const char* optname_str);

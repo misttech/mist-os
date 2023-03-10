@@ -5,6 +5,7 @@
 #include "util.h"
 
 #include <net/if.h>
+#include <sys/socket.h>
 
 #include <climits>
 
@@ -54,6 +55,10 @@ const char* GetDomainName(int domain) {
       return "IPv4";
     case AF_INET6:
       return "IPv6";
+#if PACKET_SOCKETS
+    case AF_PACKET:
+      return "PACKET";
+#endif
     default:
       return "UNKNOWN";
   }

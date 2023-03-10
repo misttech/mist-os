@@ -26,6 +26,7 @@ class ApiAbstraction {
                            socklen_t* addrlen) = 0;
   virtual int getsockname(int fd, struct sockaddr* addr, socklen_t* len) = 0;
   virtual int getpeername(int fd, struct sockaddr* addr, socklen_t* len) = 0;
+  virtual unsigned int if_nametoindex(const char* ifname) = 0;
 };
 
 #endif  // SRC_CONNECTIVITY_NETWORK_TOOLS_SOCKSCRIPTER_API_ABSTRACTION_H_

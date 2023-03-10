@@ -7,11 +7,16 @@
 #include <arpa/inet.h>
 #include <getopt.h>
 #include <net/if.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #include <cstring>
 #include <iomanip>
 #include <optional>
+
+#if PACKET_SOCKETS
+#include <netpacket/packet.h>
+#endif
 
 #include "addr.h"
 #include "log.h"
@@ -87,11 +92,18 @@ struct SocketType {
   int domain;
   int type;
   std::optional<int> proto;
-} socket_types[] = {
-    {"udp", AF_INET, SOCK_DGRAM, IPPROTO_UDP},   {"udp6", AF_INET6, SOCK_DGRAM, IPPROTO_UDP},
-    {"icmp", AF_INET, SOCK_DGRAM, IPPROTO_ICMP}, {"icmp6", AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6},
-    {"tcp", AF_INET, SOCK_STREAM, IPPROTO_TCP},  {"tcp6", AF_INET6, SOCK_STREAM, IPPROTO_TCP},
-    {"raw", AF_INET, SOCK_RAW, std::nullopt},    {"raw6", AF_INET6, SOCK_RAW, std::nullopt},
+} socket_types[] = {{"udp", AF_INET, SOCK_DGRAM, IPPROTO_UDP},
+                    {"udp6", AF_INET6, SOCK_DGRAM, IPPROTO_UDP},
+                    {"icmp", AF_INET, SOCK_DGRAM, IPPROTO_ICMP},
+                    {"icmp6", AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6},
+                    {"tcp", AF_INET, SOCK_STREAM, IPPROTO_TCP},
+                    {"tcp6", AF_INET6, SOCK_STREAM, IPPROTO_TCP},
+                    {"raw", AF_INET, SOCK_RAW, std::nullopt},
+                    {"raw6", AF_INET6, SOCK_RAW, std::nullopt},
+#if PACKET_SOCKETS
+                    {"packet", AF_PACKET, SOCK_DGRAM, 0},
+                    {"packet-raw", AF_PACKET, SOCK_RAW, 0}
+#endif
 };
 
 using SockScripterHandler = bool (SockScripter::*)(char*);
@@ -183,6 +195,10 @@ const struct Command {
     {"set-send-buf-text", "\"<string>\" ", "set send-buffer with text chars",
      &SockScripter::SetSendBufText},
     {"sleep", "<sleep-secs>", "sleeps", &SockScripter::Sleep},
+#if PACKET_SOCKETS
+    {"packet-bind", "<protocol>:<if-name-string>",
+     "bind a packet socket to the given protocol and interface", &SockScripter::PacketBind},
+#endif
 };
 
 void print_socket_types() {
@@ -719,6 +735,50 @@ bool SockScripter::Bind(char* arg) {
   }
   return LogBoundToAddress(nullptr);
 }
+
+#if PACKET_SOCKETS
+bool SockScripter::PacketBind(char* arg) {
+  std::string argstr = arg;
+  size_t col_pos = argstr.find_first_of(':');
+  if (col_pos == std::string::npos) {
+    LOG(ERROR) << "Error-Cannot parse packet-bind arg='" << argstr
+               << "' for <protocol>:<ifname> - missing separating colon ':'!";
+    return false;
+  }
+
+  std::string protocol_str = argstr.substr(0, col_pos);
+  std::string ifname_str = argstr.substr(col_pos + 1);
+
+  int protocol;
+  if (!str2int(protocol_str, &protocol)) {
+    LOG(ERROR) << "Error-Cannot parse protocol number='" << protocol_str << "'!";
+    return false;
+  }
+
+  unsigned int if_index = api_->if_nametoindex(ifname_str.c_str());
+  if (!if_index) {
+    LOG(ERROR) << "Error-if_nametoindex(" << ifname_str << ") failed -"
+               << "[" << errno << "]" << strerror(errno);
+    return false;
+  }
+
+  const struct sockaddr_ll sll = {
+      .sll_family = AF_PACKET,
+      .sll_protocol = htons(static_cast<uint16_t>(protocol)),
+      .sll_ifindex = static_cast<int>(if_index),
+  };
+
+  LOG(INFO) << "PacketBind(fd:" << sockfd_ << ", protocol:" << protocol << ", if_index:" << if_index
+            << ")";
+  if (api_->bind(sockfd_, reinterpret_cast<const struct sockaddr*>(&sll), sizeof(sll)) < 0) {
+    LOG(ERROR) << "Error-PacketBind(fd:" << sockfd_ << ") failed-"
+               << "[" << errno << "]" << strerror(errno);
+    return false;
+  }
+
+  return true;
+}
+#endif
 
 bool SockScripter::Shutdown(char* arg) {
   std::string howStr(arg);
