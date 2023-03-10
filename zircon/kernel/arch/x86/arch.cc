@@ -160,14 +160,14 @@ int GetContext(int argc, const cmd_args* argv, uint32_t flags) {
     return 1;
   }
 
-  const zx_duration_t timeout = ZX_MSEC(argv[2].u);
+  const uint64_t timeout_ms = argv[3].u;
+  printf("requesting context of CPU-%u with timeout %lums\n", target, timeout_ms);
 
-  printf("requesting context of CPU-%u\n", target);
   CpuContext context;
   zx_status_t status;
   {
     InterruptDisableGuard irqd;
-    status = g_cpu_context_exchange.RequestContext(target, timeout, context);
+    status = g_cpu_context_exchange.RequestContext(target, ZX_MSEC(timeout_ms), context);
   }
   if (status != ZX_OK) {
     printf("error: %d\n", status);
