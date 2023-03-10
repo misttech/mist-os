@@ -33,8 +33,6 @@
 
 namespace forensics::feedback {
 
-// Handles queueing connections to Feedback protocols while data migration is occurring and
-// dispatching those requests once migration is complete.
 class MainService {
  public:
   struct Options {
@@ -53,10 +51,6 @@ class MainService {
   ::fidl::InterfaceRequestHandler<Protocol> GetHandler();
 
   void ShutdownImminent(::fit::deferred_callback stop_respond);
-
-  // Files a crash report indicating the Feedback migration experienced an error with the specified
-  // annotations.
-  void ReportMigrationError(const std::map<std::string, std::string>& annotations);
 
  private:
   async_dispatcher_t* dispatcher_;

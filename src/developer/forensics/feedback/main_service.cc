@@ -69,24 +69,6 @@ MainService::MainService(async_dispatcher_t* dispatcher,
       data_provider_controller_stats_(&inspect_node_manager_,
                                       "/fidl/fuchsia.feedback.DataProviderController") {}
 
-void MainService::ReportMigrationError(const std::map<std::string, std::string>& annotations) {
-  fuchsia::feedback::CrashReport crash_report;
-  crash_report.set_program_name("feedback")
-      .set_crash_signature("fuchsia-feedback-component-merge-failure");
-
-  std::vector<fuchsia::feedback::Annotation> report_annotations;
-  for (const auto& [k, v] : annotations) {
-    report_annotations.push_back(fuchsia::feedback::Annotation{
-        .key = k,
-        .value = v,
-    });
-  }
-  crash_report.set_annotations(std::move(report_annotations));
-
-  crash_reports_.CrashReporter()->File(std::move(crash_report),
-                                       [](fuchsia::feedback::CrashReporter_File_Result) {});
-}
-
 void MainService::ShutdownImminent(::fit::deferred_callback stop_respond) {
   crash_reports_.ShutdownImminent();
   feedback_data_.ShutdownImminent(std::move(stop_respond));
