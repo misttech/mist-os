@@ -373,6 +373,7 @@ mod tests {
         file.write_all(bytes).unwrap();
     }
 
+    #[track_caller]
     fn check_event_paths(event: &BatchEvent, expected_paths: impl IntoIterator<Item = PathBuf>) {
         assert_eq!(event.paths, expected_paths.into_iter().collect::<HashSet<_>>());
     }
@@ -392,7 +393,7 @@ mod tests {
         // Some notify backends can observe file system events that occurred before the watcher
         // is set up (for example, with FSEvents and OSX). To avoid this from confusing the
         // tests, ignore if any files are observed.
-        match event_rx.recv_timeout(BATCH_DURATION * 2) {
+        match event_rx.recv_timeout(BATCH_DURATION * 10) {
             Ok(Ok(event)) => {
                 check_event_paths(&event, [dir.into()]);
             }
@@ -420,7 +421,7 @@ mod tests {
         update_file(&file_path, b"there1");
         std::fs::remove_file(&file_path).unwrap();
 
-        std::thread::sleep(BATCH_DURATION * 2);
+        std::thread::sleep(BATCH_DURATION * 10);
         let event1 = event_rx.recv().unwrap().unwrap();
         check_event_paths(&event1, [file_path]);
 
@@ -432,7 +433,7 @@ mod tests {
         update_file(&file_path, b"there2");
         std::fs::remove_file(&file_path).unwrap();
 
-        std::thread::sleep(BATCH_DURATION * 2);
+        std::thread::sleep(BATCH_DURATION * 10);
         let event2 = event_rx.recv().unwrap().unwrap();
         check_event_paths(&event2, [file_path]);
 
