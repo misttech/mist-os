@@ -3722,7 +3722,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3913,13 +3913,9 @@ their own `__hwasan_default_options` C function.  Instead, they can use a
 sanitizer_extra_options() target in their `deps` and then any options
 injected that way can override that option's setting in this list.
 
-TODO(fxbug.dev/120208): At the moment, lsan is not enabled by default with
-hwasan, so we'll need to explicitly enable leak checking for now. Once it's
-enabled by default, we can come back and remove this.
+**Current value (from the default):** `[]`
 
-**Current value (from the default):** `["detect_leaks=1"]`
-
-From //build/config/sanitizers/sanitizer_default_options.gni:98
+From //build/config/sanitizers/sanitizer_default_options.gni:94
 
 ### i_can_haz_atlas_camera
 
@@ -7974,7 +7970,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
