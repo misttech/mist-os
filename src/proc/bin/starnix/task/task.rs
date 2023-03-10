@@ -22,6 +22,15 @@ use crate::syscalls::SyscallResult;
 use crate::task::*;
 use crate::types::*;
 
+// In user space, priority (niceness) is an integer from -20..19 (inclusive)
+// with the default being 0.
+//
+// In the kernel it is represented as a range from 1..40 (inclusive).
+// The conversion is done by the formula: user_nice = 20 - kernel_nice.
+//
+// See https://man7.org/linux/man-pages/man2/setpriority.2.html#NOTES
+const DEFAULT_TASK_PRIORITY: u8 = 20;
+
 pub struct CurrentTask {
     pub task: Arc<Task>,
 
@@ -190,6 +199,13 @@ pub struct TaskMutableState {
     /// implement ExitStatus::CoreDump.
     pub dump_on_exit: bool,
 
+    /// The priority of the current task, a value between 1 and 40 (inclusive). Higher value means
+    /// higher priority. Defaults to 20.
+    ///
+    /// In POSIX, priority is a per-process setting, but in Linux it is per-thread.
+    /// See https://man7.org/linux/man-pages/man2/setpriority.2.html#BUGS
+    pub priority: u8,
+
     /// Desired scheduler policy for the task.
     pub scheduler_policy: SchedulerPolicy,
 }
@@ -285,6 +301,7 @@ impl Task {
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
         exit_signal: Option<Signal>,
         vfork_event: Option<zx::Event>,
+        priority: u8,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -311,6 +328,7 @@ impl Task {
                 signals: Default::default(),
                 exit_status: None,
                 dump_on_exit: false,
+                priority,
                 scheduler_policy: Default::default(),
             }),
         };
@@ -409,6 +427,7 @@ impl Task {
             Arc::clone(&kernel.default_abstract_vsock_namespace),
             None,
             None,
+            DEFAULT_TASK_PRIORITY,
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -495,6 +514,8 @@ impl Task {
         let pid;
         let command;
         let creds;
+        let priority;
+
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
             let thread_group_state = self.thread_group.write();
@@ -503,6 +524,8 @@ impl Task {
             pid = pids.allocate_pid();
             command = self.command();
             creds = self.creds();
+            priority = state.priority;
+
             if clone_thread {
                 create_zircon_thread(self)?
             } else {
@@ -544,6 +567,7 @@ impl Task {
             self.abstract_vsock_namespace.clone(),
             child_exit_signal,
             vfork_event,
+            priority,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child

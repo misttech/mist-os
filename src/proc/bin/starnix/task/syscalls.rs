@@ -1026,7 +1026,7 @@ pub fn sys_getpriority(current_task: &CurrentTask, which: u32, who: i32) -> Resu
     }
     // TODO(tbodt): check permissions
     let task = get_task_or_current(current_task, who)?;
-    let state = task.thread_group.read();
+    let state = task.read();
     Ok(state.priority)
 }
 
@@ -1046,7 +1046,7 @@ pub fn sys_setpriority(
     // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
     // be lying anymore by the time you read this.)
     let priority = 20 - priority;
-    task.thread_group.write().priority = priority.clamp(1, 40) as u8;
+    task.write().priority = priority.clamp(1, 40) as u8;
     Ok(())
 }
 

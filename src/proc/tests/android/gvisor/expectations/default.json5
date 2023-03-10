@@ -108,7 +108,6 @@
                 "ExecveatTest.InterpreterScriptWithCloexecFD",
                 "ExecveatTest.InterpreterScriptWithCloexecDirFD",
                 "ExecveatTest.InvalidFlags",
-                "GetpriorityTest.ExecveMaintainsPriority",
 
                 // exec_binary_test
                 "InterpreterScriptTest.UncleanPath",
@@ -577,7 +576,6 @@
                 "PrctlTest.RootDumpability",
 
                 // priority_test
-                "GetpriorityTest.CloneMaintainsPriority",
                 "SetpriorityTest.NicenessExposedViaProcfs",
 
                 // processes_test

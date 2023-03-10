@@ -84,10 +84,6 @@ pub struct ThreadGroupMutableState {
 
     pub terminating: bool,
 
-    /// The priority of the process, a value between 1 and 40 (inclusive). Higher value means
-    /// higher priority. Defaults to 20.
-    pub priority: u8,
-
     pub selinux: SeLinuxThreadGroupState,
 }
 
@@ -210,7 +206,6 @@ impl ThreadGroup {
                 waitable: None,
                 zombie_leader: None,
                 terminating: false,
-                priority: 20,
                 selinux: Default::default(),
             }),
         });
