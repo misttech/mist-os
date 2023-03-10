@@ -46,8 +46,8 @@ const char* DeviceStatusToString(network::internal::DeviceStatus status) {
 namespace network {
 
 zx::result<std::unique_ptr<NetworkDeviceInterface>> NetworkDeviceInterface::Create(
-    async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent) {
-  return internal::DeviceInterface::Create(dispatcher, parent);
+    async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent, Sys* sys) {
+  return internal::DeviceInterface::Create(dispatcher, parent, sys);
 }
 
 namespace internal {
@@ -65,7 +65,7 @@ uint16_t TransformFifoDepth(uint16_t device_depth) {
 }
 
 zx::result<std::unique_ptr<DeviceInterface>> DeviceInterface::Create(
-    async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent) {
+    async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent, Sys* sys) {
   fbl::AllocChecker ac;
   std::unique_ptr<DeviceInterface> device(new (&ac) DeviceInterface(dispatcher, parent));
   if (!ac.check()) {
@@ -75,6 +75,12 @@ zx::result<std::unique_ptr<DeviceInterface>> DeviceInterface::Create(
   if (status != ZX_OK) {
     return zx::error(status);
   }
+
+  if (sys != nullptr) {
+    sys->NotifyThread(device->tx_queue_->thread_handle(), Sys::ThreadType::Tx);
+    sys->NotifyThread(device->rx_queue_->thread_handle(), Sys::ThreadType::Rx);
+  }
+
   return zx::ok(std::move(device));
 }
 

@@ -3288,6 +3288,18 @@ int brcmf_sdio_oob_irqhandler(void* cookie) {
   zx_status_t status;
   uint32_t intstatus;
 
+  BRCMF_INFO("OOB IRQ thread starting");
+
+  constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.sdio.oob-interrupt";
+  zx_device_t* zx_device = sdiodev->drvr->device->zxdev();
+  status = device_set_profile_by_role(zx_device, thrd_get_zx_handle(thrd_current()), kRoleName,
+                                      strlen(kRoleName));
+  if (status != ZX_OK) {
+    BRCMF_WARN("Failed to apply role '%s' to OOB IRQ thread: %s", kRoleName,
+               zx_status_get_string(status));
+    // Keep going, this shouldn't stop the entire driver from working.
+  }
+
   while ((status = zx_interrupt_wait(sdiodev->irq_handle, NULL)) == ZX_OK) {
     bus->sdcnt.intrcount++;
     // Sleep the interrupt handling when reloading the firmware to reduce the chaos in driver caused
@@ -3991,6 +4003,29 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev) {
     BRCMF_ERR("insufficient memory to create txworkqueue");
     goto fail;
   }
+
+  // Apply a scheduler role to the work queue threads.
+  {
+    constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.workqueue.runner";
+    zx_device_t* zx_device = sdiodev->drvr->device->zxdev();
+    zx_status_t status = device_set_profile_by_role(zx_device, thrd_get_zx_handle(wq->thread()),
+                                                    kRoleName, strlen(kRoleName));
+    if (status != ZX_OK) {
+      BRCMF_WARN("Failed to apply role '%s' to wq thread: %s", kRoleName,
+                 zx_status_get_string(status));
+      // Keep going, this shouldn't stop the entire driver from working.
+    }
+
+    status = device_set_profile_by_role(zx_device,
+                                        thrd_get_zx_handle(WorkQueue::DefaultInstance().thread()),
+                                        kRoleName, strlen(kRoleName));
+    if (status != ZX_OK) {
+      BRCMF_WARN("Failed to apply role '%s' to default wq thread: %s", kRoleName,
+                 zx_status_get_string(status));
+      // Keep going, this shouldn't stop the entire driver from working.
+    }
+  }
+
   bus->datawork = WorkItem(brcmf_sdio_dataworker);
   bus->brcmf_wq = wq;
 

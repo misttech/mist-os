@@ -31,7 +31,8 @@ zx_status_t NetworkDevice::Create(void* ctx, zx_device_t* parent, async_dispatch
     return ZX_ERR_NOT_FOUND;
   }
 
-  zx::result device = NetworkDeviceInterface::Create(netdev->dispatcher_, netdevice_impl);
+  zx::result device =
+      NetworkDeviceInterface::Create(netdev->dispatcher_, netdevice_impl, netdev.get());
   if (device.is_error()) {
     zxlogf(ERROR, "failed to create inner device %s", device.status_string());
     return device.status_value();
@@ -68,6 +69,30 @@ void NetworkDevice::DdkRelease() {
 void NetworkDevice::GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) {
   ZX_ASSERT_MSG(device_, "can't serve device if not bound to parent implementation");
   device_->Bind(std::move(request->device));
+}
+
+void NetworkDevice::NotifyThread(zx::unowned_thread thread, ThreadType type) {
+  const std::string_view role = [type]() {
+    switch (type) {
+      case ThreadType::Tx:
+        return "fuchsia.devices.network.core.tx";
+      case ThreadType::Rx:
+        return "fuchsia.devices.network.core.rx";
+    }
+  }();
+
+  if (!thread->is_valid()) {
+    zxlogf(INFO, "thread not present, scheduler role '%.*s' will not be applied",
+           static_cast<int>(role.size()), role.data());
+    return;
+  }
+
+  if (zx_status_t status =
+          device_set_profile_by_role(zxdev(), thread->get(), role.data(), role.size());
+      status != ZX_OK) {
+    zxlogf(WARNING, "failed to set scheduler role '%.*s': %s", static_cast<int>(role.size()),
+           role.data(), zx_status_get_string(status));
+  }
 }
 
 static constexpr zx_driver_ops_t network_driver_ops = {

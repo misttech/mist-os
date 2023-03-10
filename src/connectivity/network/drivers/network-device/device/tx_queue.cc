@@ -7,6 +7,7 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include "device_interface.h"
@@ -372,6 +373,13 @@ TxQueue::SessionKey TxQueue::AddSession(Session* session) {
 void TxQueue::RemoveSession(SessionKey key) {
   std::optional s = sessions_.Erase(key);
   ZX_ASSERT_MSG(s.has_value(), "attempted to remove unknown session %ld", key);
+}
+
+zx::unowned_thread TxQueue::thread_handle() {
+  if (thread_.has_value()) {
+    return zx::unowned_thread(thrd_get_zx_handle(thread_.value()));
+  }
+  return zx::unowned_thread();
 }
 
 }  // namespace network::internal

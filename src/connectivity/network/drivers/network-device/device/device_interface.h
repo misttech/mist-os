@@ -66,7 +66,8 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
                         public ::network::NetworkDeviceInterface {
  public:
   static zx::result<std::unique_ptr<DeviceInterface>> Create(
-      async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent);
+      async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent,
+      Sys* sys = nullptr);
   ~DeviceInterface() override;
 
   // Public NetworkDevice API.

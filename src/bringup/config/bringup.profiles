@@ -14,6 +14,8 @@
     "fuchsia.devices.i2c.drivers.i2c.bus": { "capacity": "150us", "deadline": "1ms", "period": "1ms" },
     "fuchsia.devices.i2c.drivers.aml-i2c.interrupt": { "capacity": "20us", "deadline": "100us", "period": "100us" },
     "fuchsia.devices.nand.drivers.nand.device": { "capacity": "300us", "deadline": "2ms", "period": "2ms" },
+    "fuchsia.devices.network.core.tx": { "capacity": "400us", "deadline": "1ms", "period": "1ms" },
+    "fuchsia.devices.network.core.rx": { "capacity": "400us", "deadline": "1ms", "period": "1ms" },
     "fuchsia.devices.power.drivers.fusb302.interrupt": { "capacity": "3ms", "deadline": "4ms", "period": "4ms" },
     "fuchsia.devices.power.drivers.nelson-brownout-protection": { "capacity": "3ms", "deadline": "4ms", "period": "4ms" },
     "fuchsia.devices.spi.drivers.aml-spi.transaction": { "priority": 16 },

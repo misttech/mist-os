@@ -5,6 +5,7 @@
 #include "rx_queue.h"
 
 #include <zircon/assert.h>
+#include <zircon/threads.h>
 
 #include "log.h"
 #include "session.h"
@@ -403,6 +404,13 @@ void RxQueue::SessionTransaction::Push(Session* session, uint16_t descriptor)
   // `SessionTransaction`'s constructor and destructor.
   uint32_t idx = queue_->in_flight_->Push(InFlightBuffer(session, descriptor));
   queue_->available_queue_->Push(idx);
+}
+
+zx::unowned_thread RxQueue::thread_handle() {
+  if (rx_watch_thread_.has_value()) {
+    return zx::unowned_thread(thrd_get_zx_handle(rx_watch_thread_.value()));
+  }
+  return zx::unowned_thread();
 }
 
 }  // namespace network::internal

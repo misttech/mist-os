@@ -23,13 +23,17 @@ using DeviceType =
     ddk::Device<NetworkDevice, ddk::Messageable<fuchsia_hardware_network::DeviceInstance>::Mixin,
                 ddk::Unbindable>;
 
-class NetworkDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_NETWORK_DEVICE> {
+class NetworkDevice : public DeviceType,
+                      public ddk::EmptyProtocol<ZX_PROTOCOL_NETWORK_DEVICE>,
+                      NetworkDeviceInterface::Sys {
  public:
   explicit NetworkDevice(zx_device_t* parent, async_dispatcher_t* dispatcher)
       : DeviceType(parent), dispatcher_(dispatcher) {}
   ~NetworkDevice() override;
 
   static zx_status_t Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher);
+
+  void NotifyThread(zx::unowned_thread thread, ThreadType type) override;
 
   void DdkUnbind(ddk::UnbindTxn unbindTxn);
 

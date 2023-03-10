@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/zx/port.h>
+#include <lib/zx/thread.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -70,6 +71,8 @@ class RxQueue {
     RxQueue* const queue_;
     DISALLOW_COPY_ASSIGN_AND_MOVE(SessionTransaction);
   };
+
+  zx::unowned_thread thread_handle();
 
  private:
   explicit RxQueue(DeviceInterface* parent) : parent_(parent) {}

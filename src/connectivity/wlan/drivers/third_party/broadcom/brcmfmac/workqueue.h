@@ -77,6 +77,8 @@ class WorkQueue {
   list_node_t list_;
   WorkItem* current_;
 
+  thrd_t thread() const { return thread_; }
+
  private:
   sync_completion_t work_ready_;
   char name_[kWorkqueueNameMaxlen];

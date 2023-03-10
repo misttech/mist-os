@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/zx/port.h>
+#include <lib/zx/thread.h>
 #include <threads.h>
 #include <zircon/types.h>
 
@@ -81,6 +82,8 @@ class TxQueue {
 
   // Marks all buffers in tx as complete, returning them to their respective sessions.
   void CompleteTxList(const tx_result_t* tx, size_t count) __TA_EXCLUDES(parent_->tx_lock());
+
+  zx::unowned_thread thread_handle();
 
  private:
   explicit TxQueue(DeviceInterface* parent) : parent_(parent) {}
