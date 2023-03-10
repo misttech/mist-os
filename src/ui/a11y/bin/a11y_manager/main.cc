@@ -62,7 +62,8 @@ int run_a11y_manager(int argc, const char** argv) {
       };
       auto flatland_a11y_view = std::make_shared<a11y::FlatlandAccessibilityView>(
           make_flatland(), make_flatland(),
-          context->svc()->Connect<fuchsia::ui::observation::scope::Registry>());
+          context->svc()->Connect<fuchsia::ui::observation::scope::Registry>(),
+          context->svc()->Connect<fuchsia::ui::pointer::augment::LocalHit>());
       context->outgoing()->AddPublicService(flatland_a11y_view->GetHandler());
       a11y_view = std::move(flatland_a11y_view);
     } else {

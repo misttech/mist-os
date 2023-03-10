@@ -269,6 +269,12 @@ void MockScenic::CreateSessionT(fuchsia::ui::scenic::SessionEndpoints endpoints,
                                 CreateSessionTCallback callback) {
   mock_session_->Bind(std::move(*endpoints.mutable_session()),
                       endpoints.mutable_session_listener()->Bind());
+
+  // This binding is necessary because a11y code will use the client-side of the channel to call
+  // Upgrade in the protocol fuchsia::ui::pointer::augment::LocalHit. If the channel is not bound to
+  // a server end, fidl reports an error when you try to pass a channel that was not bound over a
+  // message.
+  touch_source_binding_.Bind(std::move(*endpoints.mutable_touch_source()));
   create_session_called_ = true;
 }
 
@@ -278,5 +284,7 @@ fidl::InterfaceRequestHandler<fuchsia::ui::scenic::Scenic> MockScenic::GetHandle
     bindings_.AddBinding(this, std::move(request), dispatcher);
   };
 }
+
+MockLocalHit::MockLocalHit() : touch_source_binding_(this) {}
 
 }  // namespace accessibility_test

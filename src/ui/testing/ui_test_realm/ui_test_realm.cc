@@ -21,6 +21,7 @@
 #include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/ui/observation/scope/cpp/fidl.h>
 #include <fuchsia/ui/observation/test/cpp/fidl.h>
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/configuration/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
 #include <fuchsia/ui/policy/cpp/fidl.h>
@@ -167,6 +168,7 @@ std::vector<std::string> ScenicServices(const UITestRealm::Config& config) {
     // the client subrealm.
     return {fuchsia::ui::observation::test::Registry::Name_,
             fuchsia::ui::observation::scope::Registry::Name_,
+            fuchsia::ui::pointer::augment::LocalHit::Name_,
             fuchsia::ui::composition::Allocator::Name_,
             fuchsia::ui::composition::Flatland::Name_,
             fuchsia::ui::composition::FlatlandDisplay::Name_,
@@ -174,8 +176,10 @@ std::vector<std::string> ScenicServices(const UITestRealm::Config& config) {
   } else {
     return {fuchsia::ui::observation::test::Registry::Name_,
             fuchsia::ui::observation::scope::Registry::Name_,
+            fuchsia::ui::pointer::augment::LocalHit::Name_,
             fuchsia::ui::focus::FocusChainListenerRegistry::Name_,
-            fuchsia::ui::scenic::Scenic::Name_, fuchsia::ui::views::ViewRefInstalled::Name_};
+            fuchsia::ui::scenic::Scenic::Name_,
+            fuchsia::ui::views::ViewRefInstalled::Name_};
   }
 }
 
@@ -370,7 +374,8 @@ void UITestRealm::ConfigureAccessibility() {
                 /* source = */ ParentRef(),
                 /* targets = */ {ChildRef{kA11yManagerName}});
   RouteServices({fuchsia::ui::composition::Flatland::Name_, fuchsia::ui::scenic::Scenic::Name_,
-                 fuchsia::ui::observation::scope::Registry::Name_},
+                 fuchsia::ui::observation::scope::Registry::Name_,
+                 fuchsia::ui::pointer::augment::LocalHit::Name_},
                 /* source = */ ChildRef{kScenicName},
                 /* targets = */ {ChildRef{kA11yManagerName}});
   RouteServices({fuchsia::accessibility::semantics::SemanticsManager::Name_,
