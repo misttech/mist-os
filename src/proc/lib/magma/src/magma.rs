@@ -215,16 +215,6 @@ pub struct virtmagma_ioctl_args_magma_command {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtmagma_command_buffer {
-    pub command_buffer_size: __u64,
-    pub command_buffer: __u64,
-    pub resource_size: __u64,
-    pub resources: __u64,
-    pub semaphore_size: __u64,
-    pub semaphores: __u64,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtmagma_command_descriptor {
     pub descriptor_size: __u64,
     pub descriptor: __u64,
