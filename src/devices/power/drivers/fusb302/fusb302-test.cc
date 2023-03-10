@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/mock-i2c/mock-i2c.h>
+#include <lib/zx/result.h>
 
 #include <zxtest/zxtest.h>
 
@@ -26,9 +27,9 @@ class Fusb302Test : public Fusb302 {
 
   zx_status_t Init() {
     // Test version of Init doesn't start IrqThread
-    auto status = InitInspect();
-    if (status != ZX_OK) {
-      return status;
+    zx::result<> result = identity_.ReadIdentity();
+    if (result.is_error()) {
+      return result.error_value();
     }
     return InitHw();
   }
@@ -52,7 +53,7 @@ class Fusb302TestFixture : public InspectTestHelper, public zxtest::Test {
     fidl::BindServer<fuchsia_hardware_i2c::Device>(loop_.dispatcher(), std::move(endpoints->server),
                                                    &mock_i2c_);
 
-    // InitInspect
+    // Fusb302Identity::ReadIdentity()
     mock_i2c_.ExpectWrite({0x01}).ExpectReadStop({0x91});  // Device ID
 
     // InitHw
@@ -108,17 +109,6 @@ class Fusb302TestFixture : public InspectTestHelper, public zxtest::Test {
 
 TEST_F(Fusb302TestFixture, InspectTest) {
   ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_->inspect_vmo()));
-  auto* inspect_device_id = hierarchy().GetByPath({"DeviceId"});
-  ASSERT_TRUE(inspect_device_id);
-  // VersionId: 9
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(inspect_device_id->node(), "VersionId", inspect::UintPropertyValue(9)));
-  // ProductId: 0
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(inspect_device_id->node(), "ProductId", inspect::UintPropertyValue(0)));
-  // RevisionId: 1
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(inspect_device_id->node(), "RevisionId", inspect::UintPropertyValue(1)));
 
   auto* inspect_sink_policy_engine = hierarchy().GetByPath({"SinkPolicyEngine"});
   ASSERT_TRUE(inspect_sink_policy_engine);

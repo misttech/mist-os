@@ -14,6 +14,7 @@
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 
+#include "src/devices/power/drivers/fusb302/fusb302-identity.h"
 #include "src/devices/power/drivers/fusb302/inspectable-types.h"
 #include "src/devices/power/drivers/fusb302/registers.h"
 #include "src/devices/power/drivers/fusb302/state-machine-base.h"
@@ -119,7 +120,10 @@ class StateMachine : public StateMachineBase<HwDrpStates, Fusb302> {
 class Fusb302 : public DeviceType {
  public:
   Fusb302(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c, zx::interrupt irq)
-      : DeviceType(parent), i2c_(std::move(i2c)), irq_(std::move(irq)) {}
+      : DeviceType(parent),
+        i2c_(std::move(i2c)),
+        irq_(std::move(irq)),
+        identity_(i2c_, inspect_.GetRoot().CreateChild("Identity")) {}
   ~Fusb302() override {
     irq_.destroy();
     if (is_thread_running_) {
@@ -150,7 +154,6 @@ class Fusb302 : public DeviceType {
 
   // Initialization Functions and Variables
   zx_status_t Init();
-  zx_status_t InitInspect();
   zx_status_t InitHw();
   zx_status_t IrqThread();
   zx::result<Event> GetInterrupt();
@@ -163,8 +166,9 @@ class Fusb302 : public DeviceType {
 
   // Inspect Variables
   inspect::Inspector inspect_;
-  inspect::Node inspect_device_id_ = inspect_.GetRoot().CreateChild("DeviceId");
   inspect::Node inspect_hw_drp_ = inspect_.GetRoot().CreateChild("HardwareDRP");
+
+  Fusb302Identity identity_;
 
   // state_machine_: HW DRP (Dual Role Port) state machine which will run the policy engine state
   // machines when in the correct attached states.

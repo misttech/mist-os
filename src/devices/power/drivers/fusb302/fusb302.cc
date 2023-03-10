@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/zx/profile.h>
+#include <lib/zx/result.h>
 #include <zircon/threads.h>
 
 #include <fbl/alloc_checker.h>
@@ -552,14 +553,13 @@ zx_status_t Fusb302::InitHw() {
 }
 
 zx_status_t Fusb302::Init() {
-  // InitInspect also initializes variables for state machine and DRP
-  auto status = InitInspect();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize inspect. %d", status);
-    return status;
+  zx::result<> result = identity_.ReadIdentity();
+  if (result.is_error()) {
+    return result.error_value();
   }
 
-  status = InitHw();
+  // InitHw also initializes variables for state machine and DRP
+  auto status = InitHw();
   if (status != ZX_OK) {
     zxlogf(ERROR, "InitHw failed. %d", status);
     return status;
@@ -580,15 +580,6 @@ zx_status_t Fusb302::Init() {
   }
   is_thread_running_ = true;
 
-  return ZX_OK;
-}
-
-zx_status_t Fusb302::InitInspect() {
-  // Device ID
-  auto device_id = DeviceIdReg::ReadFrom(i2c_);
-  inspect_device_id_.CreateUint("VersionId", device_id.version_id(), &inspect_);
-  inspect_device_id_.CreateUint("ProductId", device_id.product_id(), &inspect_);
-  inspect_device_id_.CreateUint("RevisionId", device_id.revision_id(), &inspect_);
   return ZX_OK;
 }
 

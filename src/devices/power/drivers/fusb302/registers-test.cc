@@ -18,6 +18,45 @@ namespace fusb302 {
 
 namespace {
 
+TEST(DeviceIdRegTest, VersionCharacter) {
+  // Test cases from page 19 in the data sheet.
+
+  auto f302a_device_id = DeviceIdReg::Get().FromValue(0b1000'00'00);
+  EXPECT_EQ('A', f302a_device_id.VersionCharacter());
+
+  auto f302b_device_id = DeviceIdReg::Get().FromValue(0b1001'00'00);
+  EXPECT_EQ('B', f302b_device_id.VersionCharacter());
+
+  auto f302c_device_id = DeviceIdReg::Get().FromValue(0b1010'00'00);
+  EXPECT_EQ('C', f302c_device_id.VersionCharacter());
+}
+
+TEST(DeviceIdRegTest, RevisionCharacter) {
+  // Test cases from page 19 in the data sheet.
+
+  auto f302b_reva_device_id = DeviceIdReg::Get().FromValue(0b1001'00'00);
+  EXPECT_EQ('A', f302b_reva_device_id.RevisionCharacter());
+
+  auto f302b_revb_device_id = DeviceIdReg::Get().FromValue(0b1001'00'01);
+  EXPECT_EQ('B', f302b_revb_device_id.RevisionCharacter());
+
+  auto f302b_revc_device_id = DeviceIdReg::Get().FromValue(0b1001'00'10);
+  EXPECT_EQ('C', f302b_revc_device_id.RevisionCharacter());
+
+  auto f302b_revd_device_id = DeviceIdReg::Get().FromValue(0b1001'00'11);
+  EXPECT_EQ('D', f302b_revd_device_id.RevisionCharacter());
+}
+
+TEST(DeviceIdRegTest, ProductString) {
+  // Test cases from page 19 in the data sheet.
+
+  auto f302bmpx_device_id = DeviceIdReg::Get().FromValue(0b1001'00'00);
+  EXPECT_STREQ("FUSB302BMPX", f302bmpx_device_id.ProductString());
+
+  auto f302b01mpx_device_id = DeviceIdReg::Get().FromValue(0b1001'01'00);
+  EXPECT_STREQ("FUSB302B01MPX", f302b01mpx_device_id.ProductString());
+}
+
 class Fusb302RegisterTest : public zxtest::Test {
  public:
   void SetUp() override {

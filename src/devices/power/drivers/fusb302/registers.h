@@ -150,13 +150,27 @@ class Fusb302Register : public hwreg::I2cRegisterBase<RegType, uint8_t, 1> {
   }
 };
 
+// DEVICE ID - Identifies the chip.
+//
+// Rev 5 datasheet: Table 17 on page 19
 class DeviceIdReg : public Fusb302Register<DeviceIdReg> {
  public:
   DEF_FIELD(7, 4, version_id);
   DEF_FIELD(3, 2, product_id);
   DEF_FIELD(1, 0, revision_id);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<DeviceIdReg>(DEVICE_ID_ADDR); }
+  // The product name is "F302", suffixed by the return value character.
+  //
+  // Returns "?" if the version ID is invalid.
+  char VersionCharacter() const;
+
+  // The revision is the returned character.
+  char RevisionCharacter() const;
+
+  // Returns a C-style string that contains the expanded product ID.
+  const char* ProductString() const;
+
+  static auto Get() { return hwreg::I2cRegisterAddr<DeviceIdReg>(0x01); }
 };
 
 class Switches0Reg : public Fusb302Register<Switches0Reg> {
@@ -425,6 +439,36 @@ class FifosReg : public Fusb302Register<FifosReg> {
 
   static auto Get() { return hwreg::I2cRegisterAddr<FifosReg>(FIFOS_ADDR); }
 };
+
+inline char DeviceIdReg::VersionCharacter() const {
+  if (version_id() < 0b1000) {
+    return '?';  // Invalid version.
+  }
+  // `version_id()` is a 4-bit field, so the cast result will be between 'A' and
+  // 'P'. No overflow / UB will occur.
+  return static_cast<char>('A' + (version_id() - 8));
+}
+
+inline char DeviceIdReg::RevisionCharacter() const {
+  // `revision_id()` is a 4-bit field, so the cast result will be between 'A' and
+  // 'D'. No overflow / UB will occur.
+  return static_cast<char>('A' + revision_id());
+}
+
+inline const char* DeviceIdReg::ProductString() const {
+  if (version_id() != 0b1001) {
+    static constexpr char kUnknownProduct[] = "Unknown product";
+    return kUnknownProduct;
+  }
+
+  static constexpr const char* kVersionBProductIds[] = {
+      "FUSB302BMPX",
+      "FUSB302B01MPX",
+      "FUSB302B10MPX",
+      "FUSB302B11MPX",
+  };
+  return kVersionBProductIds[product_id()];
+}
 
 }  // namespace fusb302
 

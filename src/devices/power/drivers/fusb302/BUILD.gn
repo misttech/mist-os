@@ -38,6 +38,7 @@ group("common") {
 fuchsia_driver("fusb302-driver") {
   output_name = "fusb302"
   sources = [
+    "fusb302-identity.cc",
     "fusb302.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
@@ -64,6 +65,8 @@ fuchsia_driver_component("fusb302") {
 
 test("fusb302-test-bin") {
   sources = [
+    "fusb302-identity-test.cc",
+    "fusb302-identity.cc",
     "fusb302-test.cc",
     "fusb302.cc",
     "registers-test.cc",
