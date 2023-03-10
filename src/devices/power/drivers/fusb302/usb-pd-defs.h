@@ -8,8 +8,7 @@
 // The comments in this file reference the USB Power Delivery Specification,
 // downloadable at https://usb.org/document-library/usb-power-delivery
 //
-// The section and page numbers reference Revision 3.1, Version 1.7, published
-// January 2023.
+// usbpd3.1 is Revision 3.1, Version 1.7, published January 2023.
 
 #include <zircon/assert.h>
 
@@ -19,8 +18,8 @@ namespace usb_pd {
 
 // Type-safe selector for a USB power role.
 //
-// The values match Section 6.2.1.1.4 "Port Power Role" in the USB PD spec. So,
-// instances can be bit-copied into PD message headers.
+// The values match usbpd3.1 6.2.1.1.4 "Port Power Role". So, instances can be
+// bit-copied into PD message headers.
 enum class PowerRole : int8_t {
   kSink = 0,
   kSource = 1,
@@ -31,8 +30,8 @@ const char* DebugStringFromPowerRole(PowerRole power_role);
 
 // Specification Revision
 //
-// The values match Section 6.2.1.1.5 "Specification Revision" in the USB PD
-// spec. So, instances can be bit-copied into PD message headers.
+// The values match usbpd3.1 6.2.1.1.5 "Specification Revision". So, instances
+// can be bit-copied into PD message headers.
 enum class SpecRevision : uint8_t {
   kRev1 = 0b00,
   kRev2 = 0b01,
@@ -41,8 +40,8 @@ enum class SpecRevision : uint8_t {
 
 // Type-safe selector for a USB data role.
 //
-// The values match Section 6.2.1.1.6 "Port Data Role" in the USB PD spec. So,
-// instances can be bit-copied into PD message headers.
+// The values match usbpd3.1 6.2.1.1.6 "Port Data Role". So, instances can be
+// bit-copied into PD message headers.
 enum class DataRole : uint8_t {
   kUpstreamFacingPort = 0,    // UFP
   kDownstreamFacingPort = 1,  // DFP
@@ -53,9 +52,8 @@ const char* DebugStringFromDataRole(DataRole data_role);
 
 // Type-safe selector for one of the two CC (Configuration Channel) pins.
 //
-// The Configuration Channel is described by the USB PD spec. It is introduced
-// in Section 2.1 "Introduction", and its role is summarized in in Section 2.3
-// "Configuration Process".
+// The Configuration Channel is introduced in usbpd3.1 2.1 "Introduction", and
+// its role is summarized in usbpd3.1 2.3 "Configuration Process".
 enum class ConfigChannelPinId : int8_t {
   kCc1 = 1,
   kCc2 = 2,
