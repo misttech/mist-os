@@ -316,4 +316,9 @@ variant("hwasan") {
 }
 
 sanitizer_default_options("hwasan_default_options") {
+  # The hwasan runtime includes the ubsan runtime, which parses its
+  # own options.
+  # TODO(fxbug.dev/120208): Also add lsan_default_options here once we
+  # roll a clang revision that supports hwasan+lsan.
+  deps = [ ":ubsan_default_options" ]
 }
