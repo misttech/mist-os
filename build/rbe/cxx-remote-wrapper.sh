@@ -132,6 +132,9 @@ profile_list=
 comma_remote_inputs=
 comma_remote_outputs=
 
+# relative to current working dir
+extra_output_dirs=()
+
 uses_macos_sdk=0
 
 # Some compiles will need C-preprocessing to be done locally.
@@ -260,6 +263,8 @@ EOF
     # TODO(b/220028444): integrate handling of this flag into reclient
     -fprofile-list=*) profile_list="$optarg" ;;
     -fprofile-list) prev_opt=profile_list ;;
+
+    -fcrash-diagnostics-dir=* ) extra_output_dirs+=( "$optarg" ) ;;
 
     --sysroot=/Library/Developer/* ) uses_macos_sdk=1 ;;
 
@@ -517,6 +522,16 @@ test "${#extra_outputs[@]}" = 0 || {
   remote_outputs_joined="${_remote_outputs_comma%,}"  # get rid of last trailing comma
 }
 
+# Output directories also need to be normalized relative to exec_root,
+# so prepend $build_subdir to each element.
+rewrapper_output_dirs_flag=()
+test "${#extra_output_dirs[@]}" = 0 || {
+  remote_output_dirs_joined=
+  _remote_output_dirs_comma="$(printf "${build_subdir}/%s," "${extra_output_dirs[@]}")"
+  remote_output_dirs_joined="${_remote_output_dirs_comma%,}"  # get rid of last trailing comma
+  rewrapper_output_dirs_flag+=( "--output_directories=$remote_output_dirs_joined" )
+}
+
 exec_root_flag=()
 [[ "$project_root" == "$default_project_root" ]] || \
   exec_root_flag=( "--exec_root=$project_root" )
@@ -532,7 +547,8 @@ dump_vars() {
   debug_var "depfile" "$depfile"
   debug_var "C-preprocess strategy" "$cpreprocess_strategy"
   debug_var "remote inputs" "${remote_inputs[@]}"
-  debug_var "extra outputs" "${extra_outputs[@]}"
+  debug_var "extra output files" "${extra_outputs[@]}"
+  debug_var "extra output dirs" "${extra_output_dirs[@]}"
 }
 
 dump_vars
@@ -550,6 +566,7 @@ remote_cc_command=(
 #  "${remote_trace_flags[@]}"
   --input_list_paths="$inputs_file_list"
   --output_files="$remote_outputs_joined"
+  "${rewrapper_output_dirs_flag[@]}"
   "${rewrapper_compiler_swapper_prefix[@]}"
   "${rewrapper_options[@]}"
   --
