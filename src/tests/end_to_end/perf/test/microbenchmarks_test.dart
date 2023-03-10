@@ -42,8 +42,7 @@ void main() {
       "'(^Tracing/)|(^Syscall/Null\$)|(^Syscall/ManyArgs\$)|(^Channel/WriteRead/1024bytes/1handles\$)'";
 
   test('fuchsia_microbenchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'fuchsia_microbenchmarks',
         componentName: 'fuchsia_microbenchmarks.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}'

@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('fuchsia.kernel.boot', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'kernel-boot-benchmarks',
         componentName: 'kernel-boot-benchmarks.cm',
         commandArgs: PerfTestHelper.componentOutputPath,

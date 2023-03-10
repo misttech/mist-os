@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('socket_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'socket-benchmarks-tests',
         componentName: 'socket-benchmarks.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
@@ -22,8 +21,7 @@ void main() {
   }, timeout: Timeout.none);
 
   test('socket_benchmarks_with_fast_udp', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'socket-benchmarks-tests',
         componentName: 'socket-benchmarks-with-fast-udp.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
@@ -31,8 +29,7 @@ void main() {
   }, timeout: Timeout.none);
 
   test('socket_benchmarks_with_netstack3', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'socket-benchmarks-tests',
         componentName: 'socket-benchmarks-with-netstack3.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
@@ -41,8 +38,7 @@ void main() {
   }, timeout: Timeout.none);
 
   test('socket_benchmarks_with_fake_netstack', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'socket-benchmarks-tests',
         componentName: 'socket-benchmarks-with-fake-netstack.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',
@@ -51,8 +47,7 @@ void main() {
   }, timeout: Timeout.none);
 
   test('udp_serde_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'udp-serde-benchmarks',
         componentName: 'udp-serde-benchmarks.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',

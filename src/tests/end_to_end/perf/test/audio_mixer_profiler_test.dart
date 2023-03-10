@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('fuchsia.audio.mixer', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'audio_mixer_profiler',
         componentName: 'audio_mixer_profiler.cm',
         commandArgs: '--perftest-json=${PerfTestHelper.componentOutputPath}',

@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('network_device_microbenchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'network-device-microbenchmarks',
         componentName: 'network-device-microbenchmarks.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}',

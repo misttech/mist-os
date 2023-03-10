@@ -30,8 +30,7 @@ void main() {
   const filterRegex = "'^(Channel/WriteRead|Stream|Syscall|Vmar)/.*'";
 
   test('direct_mode_microbenchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'direct_mode_microbenchmarks',
         componentName: 'direct_mode_microbenchmarks.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}'

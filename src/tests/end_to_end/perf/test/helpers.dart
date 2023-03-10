@@ -60,13 +60,22 @@ class PerfTestHelper {
   sl4f.Storage storage;
   sl4f.Component component;
 
-  Future<void> setUp() async {
+  // The simpler test cases depend on only on SSH and not on the SL4F
+  // server.  These can be run without starting the SL4F server.  That
+  // allows these tests to be run from a products/*.gni config that
+  // doesn't include the SL4F server.  It also allows these tests to
+  // be run locally on QEMU without doing the extra networking setup
+  // that is required for making TCP connections from the host to the
+  // SL4F server.
+  Future<void> setUp({bool requiresSl4fServer = true}) async {
     sl4fDriver = sl4f.Sl4f.fromEnvironment();
-    await sl4fDriver.startServer();
-    addTearDown(() async {
-      await sl4fDriver.stopServer();
-      sl4fDriver.close();
-    });
+    if (requiresSl4fServer) {
+      await sl4fDriver.startServer();
+      addTearDown(() async {
+        await sl4fDriver.stopServer();
+        sl4fDriver.close();
+      });
+    }
     performance = sl4f.Performance(sl4fDriver);
     dump = sl4f.Dump();
     storage = sl4f.Storage(sl4fDriver);
@@ -195,27 +204,6 @@ class PerfTestHelper {
     }
   }
 
-  // Runs a component and publishes the performance test results that
-  // it produces, which the component should write to the file
-  // componentOutputPath.
-  Future<void> runTestComponent(
-      {@required String packageName,
-      @required String componentName,
-      @required String commandArgs,
-      @required String expectedMetricNamesFile,
-      int processRuns = 1}) async {
-    final List<File> localResultsFiles = [];
-    for (var process = 0; process < processRuns; ++process) {
-      localResultsFiles.add(await runTestComponentReturningResultsFile(
-          packageName: packageName,
-          componentName: componentName,
-          commandArgs: commandArgs,
-          resultsFileSuffix: '_process$process'));
-    }
-    await processResultsSummarized(localResultsFiles,
-        expectedMetricNamesFile: expectedMetricNamesFile);
-  }
-
   // Runs a component without processing any results.  This is useful when
   // the caller retrieves performance results via tracing.
   Future<void> runTestComponentWithNoResults(
@@ -228,4 +216,28 @@ class PerfTestHelper {
     final result = await sl4fDriver.ssh.run(command);
     expect(result.exitCode, equals(0));
   }
+}
+
+// Runs a component and publishes the performance test results that it
+// produces, which the component should write to the file
+// PerfTestHelper.componentOutputPath.
+Future<void> runTestComponent(
+    {@required String packageName,
+    @required String componentName,
+    @required String commandArgs,
+    @required String expectedMetricNamesFile,
+    int processRuns = 1}) async {
+  final helper = PerfTestHelper();
+  await helper.setUp(requiresSl4fServer: false);
+
+  final List<File> localResultsFiles = [];
+  for (var process = 0; process < processRuns; ++process) {
+    localResultsFiles.add(await helper.runTestComponentReturningResultsFile(
+        packageName: packageName,
+        componentName: componentName,
+        commandArgs: commandArgs,
+        resultsFileSuffix: '_process$process'));
+  }
+  await helper.processResultsSummarized(localResultsFiles,
+      expectedMetricNamesFile: expectedMetricNamesFile);
 }

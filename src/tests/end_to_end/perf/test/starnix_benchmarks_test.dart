@@ -27,8 +27,7 @@ void main() {
   const int iterationsPerTestPerProcess = 120;
 
   test('starnix_microbenchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'starnix_microbenchmarks_perftestmode',
         componentName: 'starnix_microbenchmarks.cm',
         commandArgs: '-p --quiet --out ${PerfTestHelper.componentOutputPath}'

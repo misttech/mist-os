@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('netstack3_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'netstack3_benchmarks',
         componentName: 'netstack3_benchmarks.cm',
         commandArgs: PerfTestHelper.componentOutputPath,

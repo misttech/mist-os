@@ -47,8 +47,7 @@ void main() {
 
   benchmarks.forEach((String componentName, String expectedMetricNamesFile) {
     test('starnix_gvisor_benchmarks', () async {
-      final helper = await PerfTestHelper.make();
-      await helper.runTestComponent(
+      await runTestComponent(
           packageName: 'starnix_gvisor_benchmarks',
           componentName: componentName,
           commandArgs: '',

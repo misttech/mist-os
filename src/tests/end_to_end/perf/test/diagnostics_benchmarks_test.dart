@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('selectors_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'selectors-benchmarks',
         componentName: 'selectors-benchmarks.cm',
         commandArgs: PerfTestHelper.componentOutputPath,

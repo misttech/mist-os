@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('rust_inspect_reader_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'rust-inspect-benchmarks',
         componentName: 'reader.cm',
         commandArgs: PerfTestHelper.componentOutputPath,
@@ -22,8 +21,7 @@ void main() {
   }, timeout: Timeout.none);
 
   test('rust_inspect_writer_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'rust-inspect-benchmarks',
         componentName: 'writer.cm',
         commandArgs: PerfTestHelper.componentOutputPath,
@@ -31,8 +29,7 @@ void main() {
   }, timeout: Timeout.none);
 
   test('rust_inspect_snapshot_filter_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'rust-inspect-benchmarks',
         componentName: 'snapshot_filter.cm',
         commandArgs: PerfTestHelper.componentOutputPath,

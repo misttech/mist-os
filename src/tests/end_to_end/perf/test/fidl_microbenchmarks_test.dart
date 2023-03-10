@@ -86,8 +86,7 @@ void main(List<String> args) {
     })
     ..add(() {
       test('dart_fidl_microbenchmarks', () async {
-        final helper = await PerfTestHelper.make();
-        await helper.runTestComponent(
+        await runTestComponent(
             packageName: 'dart-fidl-benchmarks',
             componentName: 'dart-fidl-benchmarks.cm',
             commandArgs: '',

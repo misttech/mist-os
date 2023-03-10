@@ -13,8 +13,7 @@ void main() {
   enableLoggingOutput();
 
   test('archivist_logging_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'archivist-benchmarks',
         componentName: 'logging.cm',
         commandArgs: PerfTestHelper.componentOutputPath,
@@ -22,8 +21,7 @@ void main() {
   }, timeout: Timeout.none);
 
   test('archivist_formatter_benchmarks', () async {
-    final helper = await PerfTestHelper.make();
-    await helper.runTestComponent(
+    await runTestComponent(
         packageName: 'archivist-benchmarks',
         componentName: 'formatter.cm',
         commandArgs: PerfTestHelper.componentOutputPath,
