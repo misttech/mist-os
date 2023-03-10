@@ -2573,28 +2573,6 @@ void brcmf_cfg80211_handle_eapol_frame(struct brcmf_if* ifp, const void* data, s
 }
 
 #define EAPOL_ETHERNET_TYPE_UINT16 0x8e88
-void brcmf_cfg80211_rx(struct brcmf_if* ifp, const void* data, size_t size) {
-  struct net_device* ndev = ifp->ndev;
-
-  std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
-  if (ndev->if_proto.ops == nullptr) {
-    BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping data recv");
-    return;
-  }
-  BRCMF_THROTTLE_IF(5, BRCMF_IS_ON(BYTES) && BRCMF_IS_ON(DATA),
-                    BRCMF_DBG_HEX_DUMP(true, data, std::min<size_t>(size, 64u),
-                                       "Data received (%zu bytes, max 64 shown):", size));
-  // IEEE Std. 802.3-2015, 3.1.1
-  const uint16_t eth_type = ((uint16_t*)(data))[6];
-  if (eth_type == EAPOL_ETHERNET_TYPE_UINT16) {
-    // queue up the eapol frame along with events to ensure processing order
-    brcmf_fweh_queue_eapol_frame(ifp, data, size);
-  } else {
-    wlan_fullmac_impl_ifc_data_recv(&ndev->if_proto, reinterpret_cast<const uint8_t*>(data), size,
-                                    0);
-  }
-}
-
 static bool brcmf_is_eapol_frame(const wlan::drivers::components::Frame& frame) {
   if (frame.Size() >= sizeof(ethhdr)) {
     const uint16_t eth_type = reinterpret_cast<const uint16_t*>(frame.Data())[6];

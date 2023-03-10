@@ -357,41 +357,6 @@ void brcmf_txflowblock_if(struct brcmf_if* ifp, enum brcmf_netif_stop_reason rea
   ifp->drvr->irq_callback_lock.unlock();
 }
 
-void brcmf_netif_rx(struct brcmf_if* ifp, const void* data, size_t size) {
-  const ethhdr* const eh = reinterpret_cast<const ethhdr*>(data);
-  if (address_is_multicast(eh->h_dest) && !address_is_broadcast(eh->h_dest)) {
-    ifp->ndev->stats.multicast++;
-  }
-
-  if (!(ifp->ndev->is_up)) {
-    return;
-  }
-
-  ifp->ndev->stats.rx_bytes += size;
-  ifp->ndev->stats.rx_packets++;
-
-  BRCMF_DBG(DATA, "rx proto=0x%X len %zu", be16toh(eh->h_proto), size);
-  brcmf_cfg80211_rx(ifp, data, size);
-}
-
-static zx_status_t brcmf_rx_hdrpull(struct brcmf_pub* drvr, struct brcmf_netbuf* netbuf,
-                                    struct brcmf_if** ifp) {
-  zx_status_t ret;
-
-  /* process and remove protocol-specific header */
-  ret = brcmf_proto_hdrpull(drvr, netbuf, ifp);
-
-  if (ret != ZX_OK || !(*ifp) || !(*ifp)->ndev) {
-    if (ret != ZX_ERR_BUFFER_TOO_SMALL && *ifp) {
-      (*ifp)->ndev->stats.rx_errors++;
-    }
-    brcmu_pkt_buf_free_netbuf(netbuf);
-    return ZX_ERR_IO;
-  }
-
-  return ZX_OK;
-}
-
 static zx_status_t brcmf_rx_hdrpull(struct brcmf_pub* drvr, wlan::drivers::components::Frame& frame,
                                     struct brcmf_if** ifp) {
   zx_status_t ret = brcmf_proto_hdrpull_frame(drvr, frame, ifp);
@@ -403,25 +368,6 @@ static zx_status_t brcmf_rx_hdrpull(struct brcmf_pub* drvr, wlan::drivers::compo
   }
   frame.SetPortId((*ifp)->ifidx);
   return ZX_OK;
-}
-
-void brcmf_rx_frame(brcmf_pub* drvr, brcmf_netbuf* netbuf, bool handle_event) {
-  struct brcmf_if* ifp;
-
-  BRCMF_DBG(DATA, "Enter: rxp=%p", netbuf);
-
-  if (brcmf_rx_hdrpull(drvr, netbuf, &ifp)) {
-    BRCMF_DBG(TEMP, "hdrpull returned nonzero");
-    return;
-  }
-
-  /* Process special event packets */
-  if (handle_event) {
-    brcmf_fweh_process_event(ifp->drvr, reinterpret_cast<brcmf_event*>(netbuf->data), netbuf->len);
-  }
-
-  brcmf_netif_rx(ifp, netbuf->data, netbuf->len);
-  brcmu_pkt_buf_free_netbuf(netbuf);
 }
 
 void brcmf_rx_frame(brcmf_pub* drvr, wlan::drivers::components::Frame&& frame, bool handle_event) {
@@ -482,19 +428,6 @@ void brcmf_rx_frames(brcmf_pub* drvr, wlan::drivers::components::FrameContainer&
   }
 
   brcmf_cfg80211_rx(drvr, std::move(frames));
-}
-
-void brcmf_rx_event(brcmf_pub* drvr, brcmf_netbuf* netbuf) {
-  struct brcmf_if* ifp;
-
-  BRCMF_DBG(EVENT, "Enter: rxp=%p", netbuf);
-
-  if (brcmf_rx_hdrpull(drvr, netbuf, &ifp)) {
-    return;
-  }
-
-  brcmf_fweh_process_event(ifp->drvr, reinterpret_cast<brcmf_event*>(netbuf->data), netbuf->len);
-  brcmu_pkt_buf_free_netbuf(netbuf);
 }
 
 void brcmf_rx_event(brcmf_pub* drvr, wlan::drivers::components::Frame&& frame) {

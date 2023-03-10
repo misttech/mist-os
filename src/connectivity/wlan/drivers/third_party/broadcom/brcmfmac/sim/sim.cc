@@ -162,32 +162,22 @@ zx_status_t brcmf_sim_register(brcmf_pub* drvr) {
   return status;
 }
 
-// Allocate a netbuf, copy the data, and pass it to the driver, which takes ownership of the memory.
-// Copying the data isn't ideal, but performance isn't an issue in the simulator and it's cleaner to
-// draw a line between memory owned by the simulator and memory owned by the driver, with this file
-// being the only thing that straddles that boundary.
-zx_status_t brcmf_sim_create_netbuf(brcmf_simdev* simdev,
-                                    std::shared_ptr<std::vector<uint8_t>> buffer,
-                                    brcmf_netbuf** netbuf_out) {
-  uint32_t packet_len = buffer->size();
-  if (packet_len < ETH_HLEN) {
-    BRCMF_ERR("Malformed packet\n");
-    return ZX_ERR_INVALID_ARGS;
-  }
-  brcmf_netbuf* netbuf = brcmf_netbuf_allocate(packet_len);
-  memcpy(netbuf->data, buffer->data(), packet_len);
-  brcmf_netbuf_set_length_to(netbuf, packet_len);
-  *netbuf_out = netbuf;
-  return ZX_OK;
-}
-
 // Handle a simulator event
 void brcmf_sim_rx_event(brcmf_simdev* simdev, std::shared_ptr<std::vector<uint8_t>> buffer) {
-  brcmf_netbuf* netbuf = nullptr;
-  zx_status_t status = brcmf_sim_create_netbuf(simdev, std::move(buffer), &netbuf);
-  if (status == ZX_OK) {
-    brcmf_rx_event(simdev->drvr, netbuf);
-  }
+  // We use the passed in buffer as the backing storage for the event frame.
+  //
+  // The call to brcmf_rx_event() is all synchronous in sim (see fweh.cc), so we don't have to worry
+  // about the lifetime of the storage -- the driver won't be accessing it asynchronously outside of
+  // this function call.
+  //
+  // And unlike the data path in brcmf_sim_rx_frame(), the driver accesses the data directly. It
+  // does not use region descriptors in shared memory to communicate, so there isn't really a reason
+  // to use shared memory here.
+  //
+  // If we choose to make sim test events async in the future, we'll need to change this to either
+  // copy or keep a shared_ptr pointer pointing to the buffer.
+  wlan::drivers::components::Frame frame(nullptr, 0, 0, 0, buffer->data(), buffer->size(), 0);
+  brcmf_rx_event(simdev->drvr, std::move(frame));
 }
 
 // Handle a simulator frame

@@ -218,14 +218,6 @@ class SimFirmware {
     uint64_t switch_timer_id;
   };
 
-  struct PacketBuf {
-    std::unique_ptr<uint8_t[]> data;
-    uint32_t len;
-    // this is just to remember the coming netbuf's allocated_size, this, if the usage of
-    // brcmf_netbuf is removed, this can be removed as well.
-    uint32_t allocated_size_of_buf_in;
-  };
-
   SimFirmware() = delete;
   explicit SimFirmware(brcmf_simdev* simdev);
   ~SimFirmware();

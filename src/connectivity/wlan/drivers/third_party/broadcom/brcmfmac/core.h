@@ -283,7 +283,6 @@ zx_status_t brcmf_add_if(struct brcmf_pub* drvr, int32_t bsscfgidx, int32_t ifid
 void brcmf_remove_interface(struct brcmf_if* ifp, bool rtnl_locked);
 void brcmf_txflowblock_if(struct brcmf_if* ifp, enum brcmf_netif_stop_reason reason, bool state);
 void brcmf_txfinalize(struct brcmf_if* ifp, const struct ethhdr* eh, bool success);
-void brcmf_netif_rx(struct brcmf_if* ifp, const void* data, size_t size);
 void brcmf_net_setcarrier(struct brcmf_if* ifp, bool on);
 
 void brcmf_tx_complete(struct brcmf_pub* drvr, cpp20::span<wlan::drivers::components::Frame> frames,
@@ -368,12 +367,10 @@ struct net_device {
  */
 
 /* Receive frame for delivery to OS.  Callee disposes of rxp. */
-void brcmf_rx_frame(brcmf_pub* drvr, brcmf_netbuf* rxp, bool handle_event);
 void brcmf_rx_frame(brcmf_pub* drvr, wlan::drivers::components::Frame&& frame, bool handle_event);
 void brcmf_rx_frames(brcmf_pub* drvr, wlan::drivers::components::FrameContainer&& frames);
 
 /* Receive async event packet from firmware. Callee disposes of rxp. */
-void brcmf_rx_event(brcmf_pub* drvr, brcmf_netbuf* rxp);
 void brcmf_rx_event(brcmf_pub* drvr, wlan::drivers::components::Frame&& frame);
 
 /* Indication from bus module regarding presence/insertion of dongle. */

@@ -15,17 +15,6 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 
-source_set("stub_netbuf") {
-  testonly = true
-  sources = [ "stub_netbuf.cc" ]
-  public = [ "stub_netbuf.h" ]
-  public_deps = [
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:linuxisms",
-    "//zircon/system/public",
-  ]
-  deps = [ "//zircon/system/ulib/zxtest" ]
-}
-
 source_set("stub_device") {
   testonly = true
   sources = [ "stub_device.cc" ]
