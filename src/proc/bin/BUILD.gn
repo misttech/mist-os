@@ -5,8 +5,8 @@
 group("bin") {
   deps = [
     "containers",
+    "manager",
     "starnix",
-    "starnix_manager",
   ]
 }
 

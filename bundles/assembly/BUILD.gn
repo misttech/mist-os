@@ -482,7 +482,7 @@ assembly_input_bundle("common_minimal_userdebug") {
 # valid build-types: all
 #
 assembly_input_bundle("starnix_support") {
-  base_packages = [ "//src/proc/bin/starnix_manager:starnix_package" ]
+  base_packages = [ "//src/proc/bin/manager:starnix_package" ]
   if (target_cpu == "x64") {
     base_packages += [ "//src/proc/bin/starnix:starnix_kernel_package" ]
   }
@@ -491,7 +491,7 @@ assembly_input_bundle("starnix_support") {
       name = "core"
       component_shards = {
         core = [ rebase_path(
-                "//src/proc/bin/starnix_manager/meta/starnix_manager.core_shard.cml",
+                "//src/proc/bin/manager/meta/starnix_manager.core_shard.cml",
                 root_build_dir) ]
       }
     },

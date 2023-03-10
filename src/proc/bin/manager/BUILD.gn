@@ -7,7 +7,7 @@ import("//build/rust/rustc_binary.gni")
 import("//src/proc/bin/starnix/starnix.gni")
 import("//src/sys/core/build/core_shard.gni")
 
-group("starnix_manager") {
+group("manager") {
   deps = [ ":starnix_package" ]
   if (target_cpu == "x64") {
     deps += [ "//src/proc/bin/starnix:starnix_kernel_package" ]
