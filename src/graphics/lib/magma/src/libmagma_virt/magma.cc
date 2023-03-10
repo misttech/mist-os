@@ -143,8 +143,7 @@ magma_status_t magma_connection_execute_command(magma_connection_t connection, u
   return static_cast<magma_status_t>(response.result_return);
 }
 
-magma_status_t magma_buffer_get_info(magma_connection_t connection, magma_buffer_t buffer,
-                                     magma_buffer_info_t* info_out) {
+magma_status_t magma_buffer_get_info(magma_buffer_t buffer, magma_buffer_info_t* info_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 

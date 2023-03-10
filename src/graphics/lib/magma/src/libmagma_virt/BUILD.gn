@@ -34,6 +34,9 @@ static_library("libmagma_virt") {
     "magma.cc",
   ]
 
+  # All functions should be declared in magma.h, so warn about unnecessary functions.
+  cflags = [ "-Wmissing-prototypes" ]
+
   if (virtmagma_debug) {
     defines = [ "VIRTMAGMA_DEBUG=1" ]
   }
