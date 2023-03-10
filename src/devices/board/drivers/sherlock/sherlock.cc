@@ -5,9 +5,9 @@
 #include "src/devices/board/drivers/sherlock/sherlock.h"
 
 #include <assert.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fuchsia/hardware/gpio/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -26,6 +26,7 @@
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
+namespace fhgpio = fuchsia_hardware_gpio;
 
 zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
   iommu_protocol_t iommu;
@@ -75,9 +76,9 @@ uint8_t Sherlock::GetBoardRev() {
   if (!board_rev_) {
     uint8_t id0, id1, id2;
 
-    gpio_impl_.ConfigIn(GPIO_HW_ID0, GPIO_NO_PULL);
-    gpio_impl_.ConfigIn(GPIO_HW_ID1, GPIO_NO_PULL);
-    gpio_impl_.ConfigIn(GPIO_HW_ID2, GPIO_NO_PULL);
+    gpio_impl_.ConfigIn(GPIO_HW_ID0, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
+    gpio_impl_.ConfigIn(GPIO_HW_ID1, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
+    gpio_impl_.ConfigIn(GPIO_HW_ID2, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
     gpio_impl_.Read(GPIO_HW_ID0, &id0);
     gpio_impl_.Read(GPIO_HW_ID1, &id1);
     gpio_impl_.Read(GPIO_HW_ID2, &id2);

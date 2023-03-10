@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fuchsia/hardware/gpio/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -18,13 +18,16 @@
 
 namespace av400 {
 namespace fpbus = fuchsia_hardware_platform_bus;
+namespace fhgpio = fuchsia_hardware_gpio;
 
 static constexpr buttons_button_config_t av400_buttons[] = {
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_MIC_MUTE, 0, 0, 0},
 };
 
 static constexpr buttons_gpio_config_t av400_gpios[] = {
-    {BUTTONS_GPIO_TYPE_POLL, 0, {.poll = {GPIO_NO_PULL, zx::msec(20).get()}}},
+    {BUTTONS_GPIO_TYPE_POLL,
+     0,
+     {.poll = {static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull), zx::msec(20).get()}}},
 };
 
 static constexpr zx_device_prop_t props[] = {

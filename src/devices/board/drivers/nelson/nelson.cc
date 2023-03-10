@@ -5,9 +5,9 @@
 #include "src/devices/board/drivers/nelson/nelson.h"
 
 #include <assert.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fuchsia/hardware/gpio/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -27,15 +27,16 @@
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
+namespace fhgpio = fuchsia_hardware_gpio;
 
 uint32_t Nelson::GetBoardRev() {
   if (!board_rev_) {
     uint32_t board_rev;
     uint8_t id0, id1, id2;
 
-    gpio_impl_.ConfigIn(GPIO_HW_ID0, GPIO_NO_PULL);
-    gpio_impl_.ConfigIn(GPIO_HW_ID1, GPIO_NO_PULL);
-    gpio_impl_.ConfigIn(GPIO_HW_ID2, GPIO_NO_PULL);
+    gpio_impl_.ConfigIn(GPIO_HW_ID0, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
+    gpio_impl_.ConfigIn(GPIO_HW_ID1, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
+    gpio_impl_.ConfigIn(GPIO_HW_ID2, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
     gpio_impl_.Read(GPIO_HW_ID0, &id0);
     gpio_impl_.Read(GPIO_HW_ID1, &id1);
     gpio_impl_.Read(GPIO_HW_ID2, &id2);
@@ -57,8 +58,8 @@ uint32_t Nelson::GetBoardOption() {
   if (!board_option_) {
     uint8_t id3, id4;
 
-    gpio_impl_.ConfigIn(GPIO_HW_ID3, GPIO_NO_PULL);
-    gpio_impl_.ConfigIn(GPIO_HW_ID4, GPIO_NO_PULL);
+    gpio_impl_.ConfigIn(GPIO_HW_ID3, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
+    gpio_impl_.ConfigIn(GPIO_HW_ID4, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
     gpio_impl_.Read(GPIO_HW_ID3, &id3);
     gpio_impl_.Read(GPIO_HW_ID4, &id4);
 
@@ -71,8 +72,8 @@ uint32_t Nelson::GetBoardOption() {
 uint32_t Nelson::GetDisplayId() {
   if (!display_id_) {
     uint8_t id0, id1;
-    gpio_impl_.ConfigIn(GPIO_DISP_SOC_ID0, GPIO_NO_PULL);
-    gpio_impl_.ConfigIn(GPIO_DISP_SOC_ID1, GPIO_NO_PULL);
+    gpio_impl_.ConfigIn(GPIO_DISP_SOC_ID0, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
+    gpio_impl_.ConfigIn(GPIO_DISP_SOC_ID1, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
     gpio_impl_.Read(GPIO_DISP_SOC_ID0, &id0);
     gpio_impl_.Read(GPIO_DISP_SOC_ID1, &id1);
     display_id_.emplace((id1 << 1) | id0);
