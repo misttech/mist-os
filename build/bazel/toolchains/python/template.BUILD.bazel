@@ -13,11 +13,7 @@ _python3_interpreter_path = "external/{repository_dir}/{python_launcher}"
 
 filegroup(
     name = "runtime_files",
-    srcs = [
-        "{python_launcher}",
-        "{python_real}",
-        "{lib_python_zip}",
-    ],
+    srcs = {python_runtime_files},
 )
 
 py_runtime(
