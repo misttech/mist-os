@@ -175,6 +175,12 @@ impl PartialEq for ExecutionScope {
 
 impl Eq for ExecutionScope {}
 
+impl std::fmt::Debug for ExecutionScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(stringify!(ExecutionScope)).finish()
+    }
+}
+
 pub struct ExecutionScopeParams {
     entry_constructor: Option<Arc<dyn EntryConstructor + Send + Sync>>,
 }
