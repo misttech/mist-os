@@ -17,6 +17,7 @@
 #include <cstring>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <ddk/usb-peripheral-config.h>
 #include <ddktl/device.h>
 #include <soc/aml-common/aml-registers.h>
@@ -27,7 +28,6 @@
 #include <usb/peripheral.h>
 #include <usb/usb.h>
 
-#include "bind/fuchsia/registers/cpp/bind.h"
 #include "src/devices/board/drivers/vim3/vim3-gpios.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
@@ -99,11 +99,13 @@ static const fpbus::Node usb_phy_dev = []() {
 }();
 
 const std::vector<fuchsia_driver_framework::BindRule> kResetRegisterRules = {
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                            bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::NodeProperty> kResetRegisterProperties = {
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                      bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
     fdf::MakeProperty(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::ParentSpec> kUsbPhyDevParents = {

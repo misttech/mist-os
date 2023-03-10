@@ -80,6 +80,31 @@ void Register<T>::RegistersConnect(zx::channel channel) {
   }
 }
 
+template <typename T>
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Register<T>::CreateAndServeOutgoingDirectory() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+
+  fuchsia_hardware_registers::Service::InstanceHandler handler({
+      .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_.AddService<fuchsia_hardware_registers::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.take_error();
+  }
+
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.take_error();
+  }
+
+  return zx::ok(std::move(endpoints->client));
+}
+
 // Returns: true if mask requested is covered by allowed mask.
 //          false if mask requested is not covered by allowed mask or mask is not found.
 template <typename T>
@@ -216,8 +241,22 @@ zx_status_t RegistersDevice<T>::Init(zx_device_t* parent, Metadata metadata) {
     };
     char name[20];
     snprintf(name, sizeof(name), "register-%u", reg.bind_id());
+
+    zx::result outgoing_directory_result = tmp_register->CreateAndServeOutgoingDirectory();
+    if (outgoing_directory_result.is_error()) {
+      return outgoing_directory_result.error_value();
+    }
+
+    std::array offers = {
+        fuchsia_hardware_registers::Service::Name,
+    };
+
     auto status = tmp_register->DdkAdd(
-        ddk::DeviceAddArgs(name).set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE).set_props(props));
+        ddk::DeviceAddArgs(name)
+            .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+            .set_props(props)
+            .set_fidl_service_offers(offers)
+            .set_outgoing_dir(outgoing_directory_result.value().TakeChannel()));
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: DdkAdd for %s failed %d", __func__, name, status);
       return status;

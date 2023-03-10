@@ -12,7 +12,7 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/registers/cpp/bind.h>
+#include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <soc/aml-a5/a5-hw.h>
 
 #include "av400.h"
@@ -102,7 +102,7 @@ zx_status_t Av400::NnaInit() {
       .bind_rules =
           {
               fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+                                      bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(
                   bind_fuchsia::REGISTER_ID,
                   bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
@@ -110,7 +110,7 @@ zx_status_t Av400::NnaInit() {
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                bind_fuchsia_registers::BIND_PROTOCOL_DEVICE),
+                                bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
               fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
                                 bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
           },

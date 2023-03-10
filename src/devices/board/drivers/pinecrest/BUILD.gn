@@ -46,8 +46,8 @@ driver_bind_rules("pinecrest-emmc-bind") {
   bind_output = "pinecrest-emmc-bind.bc"
   tests = "bind-tests/pinecrest-emmc-bind-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
     "//src/devices/bind/fuchsia.synaptics.platform",
   ]
 }
@@ -140,8 +140,8 @@ driver_bind_rules("pinecrest-nna-bind") {
   bind_output = "pinecrest_nna_bind.bc"
   tests = "bind-tests/pinecrest-nna-bind-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
     "//src/devices/bind/fuchsia.synaptics.platform",
   ]
 }

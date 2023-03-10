@@ -4,6 +4,6 @@
 
 import("//build/bind/bind.gni")
 
-bind_library("fuchsia.registers") {
-  source = "fuchsia.registers.bind"
+bind_library("fuchsia.hardware.registers") {
+  source = "fuchsia.hardware.registers.bind"
 }

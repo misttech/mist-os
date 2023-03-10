@@ -6,7 +6,7 @@ composite pinecrest_nna;
 
 using fuchsia.platform;
 using fuchsia.synaptics.platform;
-using fuchsia.registers;
+using fuchsia.hardware.registers;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -17,6 +17,6 @@ primary node "pdev" {
 }
 
 node "register-reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.registers.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PROTOCOL == fuchsia.hardware.registers.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_REGISTER_ID == fuchsia.synaptics.platform.BIND_REGISTER_ID.AS370_TOP_STICKY_RESETN;
 }

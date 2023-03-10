@@ -4,6 +4,8 @@
 
 #include "registers.h"
 
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
@@ -96,6 +98,7 @@ class RegistersDeviceTest : public zxtest::Test {
   }
 
  protected:
+  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
   // Mmio Regs and Regions
   std::vector<fbl::Array<ddk_mock::MockMmioReg>> regs_;
   std::vector<std::unique_ptr<ddk_mock::MockMmioRegRegion>> mock_mmio_;

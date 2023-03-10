@@ -73,8 +73,8 @@ driver_bind_rules("astro-mali-bind") {
   tests = "bind-tests/astro-mali-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
   ]
 }
 
@@ -158,8 +158,8 @@ driver_bind_rules("astro-aml-usb-phy-v2-bind") {
   tests = "bind-tests/astro-aml-usb-phy-v2-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
   ]
 }
 

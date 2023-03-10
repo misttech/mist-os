@@ -89,8 +89,8 @@ driver_bind_rules("usb-phy-bind") {
   bind_output = "usb-phy-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
   ]
 }
 
@@ -356,7 +356,7 @@ fuchsia_driver("av400-driver") {
     "//sdk/lib/driver/component/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
-    "//src/devices/bind/fuchsia.registers:fuchsia.registers_cpp",
+    "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",

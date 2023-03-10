@@ -103,8 +103,8 @@ driver_bind_rules("as370-nna-bind") {
   bind_output = "as370_nna_bind.bc"
   tests = "bind-tests/as370-nna-bind-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.hardware.registers",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.registers",
     "//src/devices/bind/fuchsia.synaptics.platform",
   ]
 }

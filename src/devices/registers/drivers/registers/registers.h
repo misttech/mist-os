@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/types.h>
@@ -56,7 +57,9 @@ class Register : public RegisterType<T>,
   explicit Register(zx_device_t* device, std::shared_ptr<MmioInfo> mmio)
       : RegisterType<T>(device),
         mmio_(std::move(mmio)),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+        outgoing_(dispatcher_) {}
 
   zx_status_t Init(const RegistersMetadataEntry& config);
 
@@ -67,6 +70,8 @@ class Register : public RegisterType<T>,
   void DdkRelease() { delete this; }
 
   void RegistersConnect(zx::channel channel);
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CreateAndServeOutgoingDirectory();
 
   void ReadRegister8(Device::ReadRegister8RequestView request,
                      Device::ReadRegister8Completer::Sync& completer) override {
@@ -145,6 +150,10 @@ class Register : public RegisterType<T>,
 
   async::Loop loop_;
   bool loop_started_ = false;
+
+  async_dispatcher_t* dispatcher_;
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_registers::Device> bindings_;
 };
 
 template <typename T>

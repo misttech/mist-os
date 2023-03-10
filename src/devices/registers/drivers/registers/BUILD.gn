@@ -45,6 +45,7 @@ test("registers-test") {
   deps = [
     ":common",
     ":registers_bind",
+    "//sdk/lib/driver/runtime/testing/runtime",
     "//src/devices/testing/mock-mmio-reg",
     "//src/devices/testing/no_ddk",
     "//zircon/system/ulib/zx",
@@ -60,6 +61,8 @@ group("common") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.registers:fuchsia.hardware.registers_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/metadata:llcpp",

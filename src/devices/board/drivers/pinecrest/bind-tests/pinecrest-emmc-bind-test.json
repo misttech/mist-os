@@ -22,7 +22,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.registers.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.registers.BIND_PROTOCOL.DEVICE",
                     "fuchsia.BIND_REGISTER_ID": "fuchsia.synaptics.platform.BIND_REGISTER_ID.EMMC_RESET"
                 }
             }

@@ -23,7 +23,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_REGISTER_ID": "fuchsia.synaptics.platform.BIND_REGISTER_ID.AS370_TOP_STICKY_RESETN",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.registers.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.hardware.registers.BIND_PROTOCOL.DEVICE"
                 }
             }
         ]
