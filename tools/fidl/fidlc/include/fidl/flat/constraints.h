@@ -28,6 +28,7 @@ enum class ConstraintKind {
   kSize,
   kNullability,
   kProtocol,
+  kUtf8,
 };
 
 // Forward declarations.
@@ -176,6 +177,22 @@ struct ConstraintStorage<ConstraintKind::kProtocol> : public ConstraintStorageBa
   static const Constant* LayoutInvocation::*kLayoutInvocationRaw;
 
   bool ResolveConstraint(TypeResolver* resolver, Constant* param, Resource* resource) override;
+};
+
+template <>
+struct ConstraintStorage<ConstraintKind::kUtf8> : public ConstraintStorageBase {
+  using ValueType = bool;
+  static constexpr ValueType kDefault = false;
+
+  ValueType utf8 = kDefault;
+  static constexpr ValueType ConstraintStorage::*kValuePtr = &ConstraintStorage::utf8;
+  static ValueType LayoutInvocation::*kLayoutInvocationValue;
+  static const Constant* LayoutInvocation::*kLayoutInvocationRaw;
+
+  bool ResolveConstraint(TypeResolver* resolver, Constant* param, Resource* resource) override;
+
+  bool ReportMergeFailure(Reporter* reporter, const Name& layout_name,
+                          const Constant* param) const override;
 };
 
 // Merge two |Constraint| objects of the same |ConstraintKind|.
@@ -385,7 +402,9 @@ struct Constraints<> : ConstraintsBase {
 
   bool ResolveAndMergeConstraints(TypeResolver* resolver, std::optional<SourceSpan> params_span,
                                   const Name& layout_name, Resource* resource,
-                                  const std::vector<std::unique_ptr<Constant>>& params) const {
+                                  const std::vector<std::unique_ptr<Constant>>& params,
+                                  nullptr_t out_merged,
+                                  LayoutInvocation* layout_invocation = nullptr) const {
     if (!params.empty()) {
       return OnUnexpectedConstraint(resolver, params_span, layout_name, resource, 0, params, 0);
     }

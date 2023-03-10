@@ -539,6 +539,7 @@ test("fidlc-test") {
     "source_signature_tests.cc",
     "span_tests.cc",
     "strictness_tests.cc",
+    "string_array_tests.cc",
     "structs_tests.cc",
     "table_tests.cc",
     "test_library.cc",

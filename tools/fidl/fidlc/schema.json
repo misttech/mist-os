@@ -42,6 +42,41 @@
             ],
             "type": "object"
         },
+        "string-array-type": {
+            "additionalProperties": false,
+            "description": "Definition of string_array type",
+            "patternProperties": {
+                "^experimental_": {}
+            },
+            "properties": {
+                "element_count": {
+                    "$ref": "#/definitions/count",
+                    "description": "Number of UTF8 octets in string_array type"
+                },
+                "kind": {
+                    "description": "Selection of base type as string_array type",
+                    "enum": [
+                        "string_array"
+                    ],
+                    "type": "string"
+                },
+                "type_shape_v1": {
+                    "$ref": "#/definitions/typeshape",
+                    "description": "Type shape of this declaration"
+                },
+                "type_shape_v2": {
+                    "$ref": "#/definitions/typeshape",
+                    "description": "Type shape of this declaration"
+                }
+            },
+            "required": [
+                "kind",
+                "element_count",
+                "type_shape_v1",
+                "type_shape_v2"
+            ],
+            "type": "object"
+        },
         "attribute": {
             "additionalProperties": false,
             "description": "Definition of an attribute list element",
@@ -1643,6 +1678,10 @@
             "oneOf": [
                 {
                     "$ref": "#/definitions/array-type",
+                    "description": "Selection of array type"
+                },
+                {
+                    "$ref": "#/definitions/string-array-type",
                     "description": "Selection of array type"
                 },
                 {

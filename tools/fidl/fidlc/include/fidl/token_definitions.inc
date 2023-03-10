@@ -55,6 +55,7 @@ TOKEN_SUBKIND(Using, "using")
 TOKEN_SUBKIND(Array, "array")
 TOKEN_SUBKIND(Request, "request")
 TOKEN_SUBKIND(String, "string")
+TOKEN_SUBKIND(StringArray, "string_array")
 TOKEN_SUBKIND(Vector, "vector")
 
 // TOKEN_SUBKIND(Max, "MAX")

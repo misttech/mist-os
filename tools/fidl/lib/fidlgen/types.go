@@ -539,6 +539,7 @@ const (
 	IdentifierType            TypeKind = "identifier"
 	InternalType              TypeKind = "internal"
 	ZxExperimentalPointerType TypeKind = "experimental_pointer"
+	StringArray               TypeKind = "string_array"
 )
 
 type Boundedness string
@@ -596,6 +597,13 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return err
 		}
+		err = json.Unmarshal(*obj["element_count"], &t.ElementCount)
+		if err != nil {
+			return err
+		}
+	case StringArray:
+		// Treat string_array as just an array of uint8
+		t.ElementType = &Type{Kind: PrimitiveType, PrimitiveSubtype: Uint8}
 		err = json.Unmarshal(*obj["element_count"], &t.ElementCount)
 		if err != nil {
 			return err
@@ -709,6 +717,8 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 	switch t.Kind {
 	case ArrayType:
 		obj["element_type"] = t.ElementType
+		obj["element_count"] = t.ElementCount
+	case StringArray:
 		obj["element_count"] = t.ElementCount
 	case VectorType:
 		obj["element_type"] = t.ElementType

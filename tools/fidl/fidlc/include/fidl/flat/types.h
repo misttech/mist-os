@@ -112,11 +112,25 @@ struct RejectOptionalConstraints : public Constraints<> {
                               size_t param_index) const override;
 };
 
-struct ArrayType final : public Type, public RejectOptionalConstraints {
-  using Constraints = RejectOptionalConstraints;
+struct ArrayConstraints : public Constraints<ConstraintKind::kUtf8> {
+  using Constraints::Constraints;
+  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
+                              const Name& layout_name, Resource* resource, size_t num_constraints,
+                              const std::vector<std::unique_ptr<Constant>>& params,
+                              size_t param_index) const override;
+};
+
+struct ArrayType final : public Type, public ArrayConstraints {
+  using Constraints = ArrayConstraints;
 
   ArrayType(const Name& name, const Type* element_type, const Size* element_count)
       : Type(name, Kind::kArray), element_type(element_type), element_count(element_count) {}
+  ArrayType(const Name& name, const Type* element_type, const Size* element_count,
+            Constraints constraints)
+      : Type(name, Kind::kArray),
+        Constraints(std::move(constraints)),
+        element_type(element_type),
+        element_count(element_count) {}
 
   const Type* element_type;
   const Size* element_count;
@@ -133,6 +147,8 @@ struct ArrayType final : public Type, public RejectOptionalConstraints {
   bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                         const Reference& layout, std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
+
+  bool IsStringArray() const { return utf8; }
 };
 
 struct VectorConstraints : public Constraints<ConstraintKind::kSize, ConstraintKind::kNullability> {

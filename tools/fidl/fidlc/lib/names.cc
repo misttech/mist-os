@@ -126,6 +126,9 @@ std::string NameFlatName(const flat::Name& name) { return FormatName(name, ".", 
 std::string NameFlatTypeKind(const flat::Type* type) {
   switch (type->kind) {
     case flat::Type::Kind::kArray:
+      if (static_cast<const flat::ArrayType*>(type)->IsStringArray()) {
+        return "string_array";
+      }
       return "array";
     case flat::Type::Kind::kVector:
       return "vector";

@@ -125,6 +125,7 @@ class Typespace::Creator : private ReporterMixin {
   const Type* CreateInternalType(types::InternalSubtype subtype);
   const Type* CreateStringType();
   const Type* CreateArrayType();
+  const Type* CreateStringArrayType();
   const Type* CreateVectorType();
   const Type* CreateBytesType();
   const Type* CreateTransportErrType();
@@ -198,6 +199,8 @@ const Type* Typespace::Creator::Create() {
       return CreateBoxType();
     case Builtin::Identity::kArray:
       return CreateArrayType();
+    case Builtin::Identity::kStringArray:
+      return CreateStringArrayType();
     case Builtin::Identity::kVector:
       return CreateVectorType();
     case Builtin::Identity::kZxExperimentalPointer:
@@ -265,6 +268,26 @@ const Type* Typespace::Creator::CreateArrayType() {
   out_params_->size_raw = parameters_.items[1]->AsConstant();
 
   ArrayType type(layout_.resolved().name(), element_type, size);
+  std::unique_ptr<Type> constrained_type;
+  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  return typespace_->Intern(std::move(constrained_type));
+}
+
+const Type* Typespace::Creator::CreateStringArrayType() {
+  if (!EnsureNumberOfLayoutParams(1)) {
+    return nullptr;
+  }
+
+  const Type* uint8_type = typespace_->GetPrimitiveType(types::PrimitiveSubtype::kUint8);
+
+  const Size* size = nullptr;
+  if (!resolver_->ResolveParamAsSize(layout_, parameters_.items[0], &size))
+    return nullptr;
+  out_params_->size_resolved = size;
+  out_params_->size_raw = parameters_.items[0]->AsConstant();
+
+  ArrayType type(layout_.resolved().name(), uint8_type, size);
+  type.utf8 = true;
   std::unique_ptr<Type> constrained_type;
   type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
   return typespace_->Intern(std::move(constrained_type));

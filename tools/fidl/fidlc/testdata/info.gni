@@ -499,6 +499,21 @@ fidl_testdata_info = [
       "fidlgen_syzkaller",
     ]
   },
+  {
+    name = "string_arrays"
+    target = "//tools/fidl/fidlc/testdata:test.stringarrays"
+    denylist = [
+      "fidldoc",
+      "fidlgen_banjo",
+      "fidlgen_dart",
+      "fidlgen_go",
+      "fidlgen_hlcpp",
+      "fidlgen_libfuzzer",
+      "fidlgen_cpp",
+      "fidlgen_rust",
+      "fidlgen_syzkaller",
+    ]
+  },
 ]
 
 # Add computed properties.

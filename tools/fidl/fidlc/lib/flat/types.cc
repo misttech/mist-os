@@ -27,15 +27,34 @@ bool RejectOptionalConstraints::OnUnexpectedConstraint(
                                                  num_constraints, params, param_index);
 }
 
+bool ArrayConstraints::OnUnexpectedConstraint(TypeResolver* resolver,
+                                              std::optional<SourceSpan> params_span,
+                                              const Name& layout_name, Resource* resource,
+                                              size_t num_constraints,
+                                              const std::vector<std::unique_ptr<Constant>>& params,
+                                              size_t param_index) const {
+  if (params.size() == 1 && resolver->ResolveAsOptional(params[0].get())) {
+    return resolver->Fail(ErrCannotBeOptional, params[0]->span, layout_name);
+  }
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
+                                                 num_constraints, params, param_index);
+}
+
 bool ArrayType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
                                  const Reference& layout, std::unique_ptr<Type>* out_type,
                                  LayoutInvocation* out_params) const {
+  Constraints c;
   if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items)) {
+                                  constraints.items, &c, out_params)) {
     return false;
   }
 
-  *out_type = std::make_unique<ArrayType>(name, element_type, element_count);
+  if (c.utf8 && !resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
+    return resolver->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
+                          layout.resolved().name());
+  }
+
+  *out_type = std::make_unique<ArrayType>(name, element_type, element_count, std::move(c));
   return true;
 }
 
@@ -224,7 +243,7 @@ bool BoxType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& co
                                const Reference& layout, std::unique_ptr<Type>* out_type,
                                LayoutInvocation* out_params) const {
   if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items)) {
+                                  constraints.items, nullptr)) {
     return false;
   }
 
@@ -269,7 +288,7 @@ bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, const TypeConstrain
                                      const Reference& layout, std::unique_ptr<Type>* out_type,
                                      LayoutInvocation* out_params) const {
   if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items)) {
+                                  constraints.items, nullptr)) {
     return false;
   }
 
@@ -288,7 +307,7 @@ bool InternalType::ApplyConstraints(TypeResolver* resolver, const TypeConstraint
                                     const Reference& layout, std::unique_ptr<Type>* out_type,
                                     LayoutInvocation* out_params) const {
   if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items)) {
+                                  constraints.items, nullptr)) {
     return false;
   }
   *out_type = std::make_unique<InternalType>(name, subtype);
@@ -301,7 +320,7 @@ bool ZxExperimentalPointerType::ApplyConstraints(TypeResolver* resolver,
                                                  std::unique_ptr<Type>* out_type,
                                                  LayoutInvocation* out_params) const {
   if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items)) {
+                                  constraints.items, nullptr)) {
     return false;
   }
   if (!resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {

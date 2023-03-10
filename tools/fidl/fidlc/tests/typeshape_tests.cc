@@ -1674,6 +1674,29 @@ type TableWithUnboundedString = table {
                                     }));
 }
 
+TEST(TypeshapeTests, GoodStringArrays) {
+  TestLibrary test_library(R"FIDL(library example;
+
+type StringArray = struct {
+    s string_array<5>;
+};
+
+)FIDL");
+  test_library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+
+  ASSERT_COMPILED(test_library);
+
+  auto string_array = test_library.LookupStruct("StringArray");
+  ASSERT_NOT_NULL(string_array);
+  ASSERT_NO_FAILURES(CheckTypeShape(string_array, Expected{
+                                                      .inline_size = 5,
+                                                      .alignment = 1,
+                                                      .max_out_of_line = 0,
+                                                      .depth = 0,
+                                                      .has_padding = false,
+                                                  }));
+}
+
 TEST(TypeshapeTests, GoodArrays) {
   TestLibrary test_library(R"FIDL(library example;
 

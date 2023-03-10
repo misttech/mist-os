@@ -36,6 +36,7 @@ standalone_libraries = [
   "protocols.test.fidl",
   "request_flexible_envelope.test.fidl",
   "service.test.fidl",
+  "string_arrays.test.fidl",
   "struct.test.fidl",
   "table.test.fidl",
   "union.test.fidl",
@@ -74,6 +75,10 @@ foreach(filename, standalone_libraries) {
     }
 
     if (filename == "experimental_zx_c_types.test.fidl") {
+      experimental_flags += [ "zx_c_types" ]
+    }
+
+    if (filename == "string_arrays.test.fidl") {
       experimental_flags += [ "zx_c_types" ]
     }
 

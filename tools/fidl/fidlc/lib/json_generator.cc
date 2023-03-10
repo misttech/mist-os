@@ -513,7 +513,9 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const f
     switch (type->kind) {
       case flat::Type::Kind::kArray: {
         const auto* array_type = static_cast<const flat::ArrayType*>(type);
-        GenerateTypeAndFromAlias(TypeKind::kParameterized, invocation.element_type_raw);
+        if (!array_type->IsStringArray()) {
+          GenerateTypeAndFromAlias(TypeKind::kParameterized, invocation.element_type_raw);
+        }
         GenerateObjectMember("element_count", array_type->element_count->value);
         break;
       }

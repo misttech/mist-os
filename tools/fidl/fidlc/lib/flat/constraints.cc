@@ -120,6 +120,26 @@ bool ConstraintStorage<ConstraintKind::kProtocol>::ResolveConstraint(TypeResolve
   return resolver->ResolveAsProtocol(param, &protocol_decl);
 }
 
+////////// UTF8
+template class Constraint<ConstraintKind::kUtf8>;
+ConstraintStorage<ConstraintKind::kUtf8>::ValueType LayoutInvocation::*
+    ConstraintStorage<ConstraintKind::kUtf8>::kLayoutInvocationValue = &LayoutInvocation::utf8;
+const Constant* LayoutInvocation::*ConstraintStorage<ConstraintKind::kUtf8>::kLayoutInvocationRaw =
+    nullptr;
+
+bool ConstraintStorage<ConstraintKind::kUtf8>::ResolveConstraint(TypeResolver* resolver,
+                                                                 Constant* param,
+                                                                 Resource* resource) {
+  // Never actually resolve it from the layout.
+  return false;
+}
+
+bool ConstraintStorage<ConstraintKind::kUtf8>::ReportMergeFailure(Reporter* reporter,
+                                                                  const Name& layout_name,
+                                                                  const Constant* param) const {
+  return reporter->Fail(ErrCannotBoundTwice, param->span, layout_name);
+}
+
 ////////// ConstraintsBase
 bool ConstraintsBase::OnUnexpectedConstraint(TypeResolver* resolver,
                                              std::optional<SourceSpan> params_span,
