@@ -39,6 +39,12 @@ pub fn node_to_device_property(
         // The duplicate key needs to be fixed since this is incorrect and is working by luck.
         if key != BIND_PROTOCOL_KEY {
             if device_properties.contains_key(&key) && device_properties.get(&key) != Some(&value) {
+                log::error!(
+                    "Node property key {:?} contains multiple values: {:?} and {:?}",
+                    key,
+                    device_properties.get(&key),
+                    value
+                );
                 return Err(Status::INVALID_ARGS.into_raw());
             }
         }

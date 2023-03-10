@@ -235,7 +235,7 @@ zx_status_t BindDriverManager::MatchAndBindCompositeNodeSpec(const fbl::RefPtr<D
 zx::result<MatchedDriverInfo> BindDriverManager::MatchCompositeDevice(
     CompositeDevice& composite, const DriverLoader::MatchDeviceConfig& config) {
   auto matched_drivers = coordinator_->driver_loader().MatchDeviceDriverIndex(
-      composite.properties(), composite.str_properties(), 0, config);
+      composite.name().data(), composite.properties(), composite.str_properties(), 0, config);
   for (auto driver : matched_drivers) {
     if (auto info = std::get_if<MatchedDriverInfo>(&driver); info) {
       return zx::ok(*info);

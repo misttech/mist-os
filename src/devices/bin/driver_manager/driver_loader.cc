@@ -166,12 +166,14 @@ void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::Composit
 
 const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
     const fbl::RefPtr<Device>& dev, const MatchDeviceConfig& config) {
-  return MatchDeviceDriverIndex(dev->props(), dev->str_props(), dev->protocol_id(), config);
+  return MatchDeviceDriverIndex(dev->name().data(), dev->props(), dev->str_props(),
+                                dev->protocol_id(), config);
 }
 
 const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
-    const fbl::Array<const zx_device_prop_t>& props, const fbl::Array<const StrProperty>& str_props,
-    uint32_t protocol_id, const MatchDeviceConfig& config) {
+    std::string_view name, const fbl::Array<const zx_device_prop_t>& props,
+    const fbl::Array<const StrProperty>& str_props, uint32_t protocol_id,
+    const MatchDeviceConfig& config) {
   if (!driver_index_.is_valid()) {
     return std::vector<MatchedDriver>();
   }
@@ -223,11 +225,12 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
     }
   }
 
-  return MatchPropertiesDriverIndex(fidl_props, config);
+  return MatchPropertiesDriverIndex(name, fidl_props, config);
 }
 
 const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
-    fidl::VectorView<fdf::wire::NodeProperty> props, const MatchDeviceConfig& config) {
+    std::string_view name, fidl::VectorView<fdf::wire::NodeProperty> props,
+    const MatchDeviceConfig& config) {
   std::vector<MatchedDriver> matched_drivers;
   std::vector<MatchedDriver> matched_fallback_drivers;
   if (!driver_index_.is_valid()) {
@@ -241,14 +244,16 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
   auto result = driver_index_.sync()->MatchDriversV1(args.Build());
   if (!result.ok()) {
     if (result.status() != ZX_OK) {
-      LOGF(ERROR, "DriverIndex::MatchDriversV1 failed: %d", result.status());
+      LOGF(ERROR, "DriverIndex::MatchDriversV1 for '%s' failed: %s", std::string(name).c_str(),
+           result.status_string());
       return matched_drivers;
     }
   }
   // If there's no driver to match then DriverIndex will return ZX_ERR_NOT_FOUND.
   if (result->is_error()) {
     if (result->error_value() != ZX_ERR_NOT_FOUND) {
-      LOGF(ERROR, "DriverIndex: MatchDriversV1 returned error: %d", result->error_value());
+      LOGF(ERROR, "DriverIndex: MatchDriversV1 for '%s' returned error: %d",
+           std::string(name).c_str(), result->error_value());
     }
     return matched_drivers;
   }

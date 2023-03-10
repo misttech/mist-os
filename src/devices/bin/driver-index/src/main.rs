@@ -167,6 +167,7 @@ impl Indexer {
 
     fn match_driver(&self, args: fdi::MatchDriverArgs) -> fdi::DriverIndexMatchDriverResult {
         if args.properties.is_none() {
+            log::error!("Failed to match driver: empty properties");
             return Err(Status::INVALID_ARGS.into_raw());
         }
         let properties = args.properties.unwrap();

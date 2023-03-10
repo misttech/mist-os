@@ -142,7 +142,7 @@ TEST_F(DriverLoaderTest, TestFallbackGetsRemoved) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
   ASSERT_EQ(drivers.size(), 1);
   ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->libname, not_fallback_libname);
 }
@@ -176,7 +176,7 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedAfterBaseLoaded) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 2);
   // The non-fallback should always be first.
@@ -208,7 +208,7 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedWhenSystemNotRequired) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 2);
   // The non-fallback should always be first.
@@ -238,7 +238,7 @@ TEST_F(DriverLoaderTest, TestLibname) {
   DriverLoader::MatchDeviceConfig config;
   config.libname = name2;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
   ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->libname, name2);
@@ -267,7 +267,7 @@ TEST_F(DriverLoaderTest, TestRelativeLibname) {
     DriverLoader::MatchDeviceConfig config;
     config.libname = "driver1.cm";
     fidl::VectorView<fdf::wire::NodeProperty> props{};
-    auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+    auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
     ASSERT_EQ(1, drivers.size());
     ASSERT_EQ(name1, std::get<MatchedDriverInfo>(drivers[0]).v1()->libname);
@@ -277,7 +277,7 @@ TEST_F(DriverLoaderTest, TestRelativeLibname) {
     DriverLoader::MatchDeviceConfig config;
     config.libname = "driver2.cm";
     fidl::VectorView<fdf::wire::NodeProperty> props{};
-    auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+    auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
     ASSERT_EQ(1, drivers.size());
     ASSERT_EQ(name2, std::get<MatchedDriverInfo>(drivers[0]).v1()->libname);
@@ -303,7 +303,7 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeLibname) {
   DriverLoader::MatchDeviceConfig config;
   config.libname = long_name;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 0);
 }
@@ -331,7 +331,7 @@ TEST_F(DriverLoaderTest, TestLibnameConvertToPath) {
   DriverLoader::MatchDeviceConfig config;
   config.libname = "/boot/meta/driver2.cm";
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
   ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->libname, name2);
@@ -367,7 +367,7 @@ TEST_F(DriverLoaderTest, TestOnlyReturnBaseAndFallback) {
   DriverLoader::MatchDeviceConfig config;
   config.only_return_base_and_fallback_drivers = true;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 2);
   ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->libname, name1);
@@ -408,7 +408,7 @@ TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 2);
 
@@ -450,7 +450,7 @@ TEST_F(DriverLoaderTest, TestReturnDriversAndNodeGroups) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 2);
 
@@ -483,7 +483,7 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoTopologicalPath) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
   ASSERT_EQ(drivers.size(), 0);
 }
 
@@ -502,7 +502,7 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoNodes) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
   ASSERT_EQ(drivers.size(), 0);
 }
 
@@ -531,7 +531,7 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
 
   DriverLoader::MatchDeviceConfig config;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
 
@@ -568,7 +568,7 @@ TEST_F(DriverLoaderTest, TestEphemeralDriver) {
   DriverLoader::MatchDeviceConfig config;
   config.libname = name1;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
   ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->libname, name1);
@@ -587,7 +587,7 @@ TEST_F(DriverLoaderTest, TestV2Driver) {
   DriverLoader::MatchDeviceConfig config;
   config.libname = name;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex(props, config);
+  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
   ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).is_v1(), false);

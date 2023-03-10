@@ -58,12 +58,13 @@ class DriverLoader {
   const std::vector<MatchedDriver> MatchDeviceDriverIndex(const fbl::RefPtr<Device>& dev,
                                                           const MatchDeviceConfig& config);
   const std::vector<MatchedDriver> MatchDeviceDriverIndex(
-      const fbl::Array<const zx_device_prop_t>& props,
+      std::string_view name, const fbl::Array<const zx_device_prop_t>& props,
       const fbl::Array<const StrProperty>& str_props, uint32_t protocol_id,
       const MatchDeviceConfig& config);
 
   const std::vector<MatchedDriver> MatchPropertiesDriverIndex(
-      fidl::VectorView<fdf::wire::NodeProperty> props, const MatchDeviceConfig& config);
+      std::string_view name, fidl::VectorView<fdf::wire::NodeProperty> props,
+      const MatchDeviceConfig& config);
 
   const Driver* LibnameToDriver(std::string_view libname) const;
 
