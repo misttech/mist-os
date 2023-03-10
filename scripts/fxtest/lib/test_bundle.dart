@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fxtest/fxtest.dart';
@@ -86,20 +87,16 @@ class TestBundle {
 
   /// Calculate the minimal set of build targets based on tests in [testBundles]
   /// Returns null for a full build.
-  static Set<String> calculateMinimalBuildTargets(
-      TestsConfig testsConfig, List<TestBundle> testBundles) {
+  static Future<Set<String>> calculateMinimalBuildTargets(
+      TestsConfig testsConfig, List<TestBundle> testBundles) async {
     Set<String> targets = {};
 
     // The incremental publisher uses `all_package_manifests.list` to know which
     // packages to publish, we'll need to build the `updates` package if it
     // doesn't exist. This will allow `fx test` to work with incremental and a
     // clean build directory.
-    bool packageListExists = false;
-    if (testsConfig.fxEnv.outputDir != null) {
-      String packageList =
-          testsConfig.fxEnv.outputDir! + "/all_package_manifests.list";
-      packageListExists = File(packageList).existsSync();
-    }
+    Set<String>? allPackageManifests =
+        await readPackageManifestsList(testsConfig);
 
     final bool incrementalEnabled =
         (testsConfig.fxEnv.isFeatureEnabled('fxtest_auto_publishes_packages') ||
@@ -111,14 +108,34 @@ class TestBundle {
       switch (e.testDefinition.testType) {
         case TestType.suite:
           String? target = 'updates';
-          if (packageListExists && incrementalEnabled) {
-            if (e.testDefinition.packageLabel?.isNotEmpty ?? false) {
-              target = fxutils.getBuildTarget(e.testDefinition.packageLabel);
-            } else if (e.testDefinition.label?.isNotEmpty ?? false) {
-              target = fxutils.getBuildTarget(e.testDefinition.label);
+
+          // Incremental publishing depends on the `all_package_manifests.list`,
+          // which is produced by `updates`. So we'll need to build it if the
+          // file doesn't exist.
+          if (incrementalEnabled && allPackageManifests != null) {
+            // Even though we have an `all_package_manifests.list`, it's
+            // possible it is out of date. Check if the tests we want to build
+            // are in the list. If not, try to build `updates` to see if it will
+            // create our test package manifests.
+            bool foundOutdatedManifest = false;
+            for (var path in e.testDefinition.packageManifests ?? []) {
+              if (!allPackageManifests.contains(path)) {
+                foundOutdatedManifest = true;
+                break;
+              }
+            }
+
+            if (!foundOutdatedManifest) {
+              if (e.testDefinition.packageLabel?.isNotEmpty ?? false) {
+                target = fxutils.getBuildTarget(e.testDefinition.packageLabel);
+              } else if (e.testDefinition.label?.isNotEmpty ?? false) {
+                target = fxutils.getBuildTarget(e.testDefinition.label);
+              }
             }
           }
+
           if (target != null) targets.add(target);
+
           break;
         case TestType.command:
         case TestType.host:
@@ -134,6 +151,30 @@ class TestBundle {
       }
     }
     return targets;
+  }
+
+  static Future<Set<String>?> readPackageManifestsList(
+      TestsConfig testsConfig) async {
+    if (testsConfig.fxEnv.outputDir == null) {
+      return null;
+    }
+
+    String path = testsConfig.fxEnv.outputDir! + "/all_package_manifests.list";
+
+    if (!await File(path).exists()) {
+      return null;
+    }
+
+    // Read all the manifests.
+    Set<String> manifests = {};
+
+    await File(path)
+        .openRead()
+        .transform(utf8.decoder)
+        .transform(LineSplitter())
+        .forEach((line) => manifests.add(line.trim()));
+
+    return manifests;
   }
 
   static bool hasDevicePackages(List<TestBundle> testBundles) {

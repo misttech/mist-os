@@ -435,7 +435,7 @@ void main() {
 
     test('host tests only build the tests path', () async {
       expect(
-          TestBundle.calculateMinimalBuildTargets(
+          await TestBundle.calculateMinimalBuildTargets(
               testsConfig,
               createBundlesFromJson([
                 {
@@ -458,7 +458,7 @@ void main() {
 
     test('component tests only build the component', () async {
       expect(
-          TestBundle.calculateMinimalBuildTargets(
+          await TestBundle.calculateMinimalBuildTargets(
               testsConfig,
               createBundlesFromJson([
                 {
@@ -481,7 +481,7 @@ void main() {
 
     test('component tests only build the package', () async {
       expect(
-          TestBundle.calculateMinimalBuildTargets(
+          await TestBundle.calculateMinimalBuildTargets(
               testsConfig,
               createBundlesFromJson([
                 {
@@ -508,7 +508,7 @@ void main() {
         'mixed host and component tests build both the component and the host test path',
         () async {
       expect(
-          TestBundle.calculateMinimalBuildTargets(
+          await TestBundle.calculateMinimalBuildTargets(
               testsConfig,
               createBundlesFromJson([
                 {
@@ -545,7 +545,7 @@ void main() {
 
     test('an e2e test forces a full rebuild (default target)', () async {
       expect(
-          TestBundle.calculateMinimalBuildTargets(
+          await TestBundle.calculateMinimalBuildTargets(
               testsConfig,
               createBundlesFromJson([
                 // e2e test

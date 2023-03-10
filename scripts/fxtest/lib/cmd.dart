@@ -182,7 +182,7 @@ class FuchsiaTestCommand {
     }
 
     if (testsConfig.flags.shouldRebuild) {
-      Set<String> buildArgs = TestBundle.calculateMinimalBuildTargets(
+      Set<String> buildArgs = await TestBundle.calculateMinimalBuildTargets(
           testsConfig, parsedManifest.testBundles);
       emitEvent(TestInfo(testsConfig
           .wrapWith('> fx build ${buildArgs.join(' ')}', [green, styleBold])));
