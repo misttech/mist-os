@@ -22,6 +22,7 @@
 
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <fbl/intrusive_double_list.h>
 
@@ -77,9 +78,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   // Only exposed for testing.
   CompositeNodeSpecManager& composite_node_spec_manager() { return composite_node_spec_manager_; }
 
+  // NodeManager
   // Create a driver component with `url` against a given `node`.
   zx::result<> StartDriver(Node& node, std::string_view url,
-                           fuchsia_driver_index::DriverPackageType package_type);
+                           fuchsia_driver_index::DriverPackageType package_type) override;
 
   // Shutdown hooks called by the shutdown manager
   void ShutdownAllDrivers(fit::callback<void()> callback) override {
@@ -92,6 +94,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
     root_node_->Remove(RemovalSet::kPackage, &removal_tracker_);
     removal_tracker_.FinishEnumeration();
   }
+
+  zx::result<uint32_t> RestartNodesColocatedWithDriverUrl(std::string_view url);
+
+  std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 
  private:
   // fidl::WireServer<fuchsia_component_runner::ComponentRunner>

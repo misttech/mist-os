@@ -23,7 +23,6 @@
 #include <queue>
 #include <random>
 #include <stack>
-#include <unordered_set>
 
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -147,6 +146,34 @@ fidl::StringView CollectionName(Collection collection) {
       return "pkg-drivers";
     case Collection::kUniversePackage:
       return "universe-pkg-drivers";
+  }
+}
+
+// Perfrom a Breadth-First-Search (BFS) over the node topology, applying the visitor function on
+// the node being visited.
+// The return value of the visitor function is a boolean for whether the children of the node
+// should be visited. If it returns false, the children will be skipped.
+void PerformBFS(const std::shared_ptr<Node>& starting_node,
+                fit::function<bool(const std::shared_ptr<dfv2::Node>&)> visitor) {
+  std::unordered_set<std::shared_ptr<const Node>> visited;
+  std::queue<std::shared_ptr<Node>> node_queue;
+  visited.insert(starting_node);
+  node_queue.push(starting_node);
+
+  while (!node_queue.empty()) {
+    auto current = node_queue.front();
+    node_queue.pop();
+
+    bool visit_children = visitor(current);
+    if (!visit_children) {
+      continue;
+    }
+
+    for (const auto& child : current->children()) {
+      if (auto [_, inserted] = visited.insert(child); inserted) {
+        node_queue.push(child);
+      }
+    }
   }
 }
 
@@ -627,6 +654,45 @@ zx::result<> DriverRunner::CreateComponent(std::string name, Collection collecti
                     child_decl_builder.Build(), child_args_builder.Build())
       .Then(std::move(create_callback));
   return zx::ok();
+}
+
+zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(std::string_view url) {
+  auto driver_hosts = DriverHostsWithDriverUrl(url);
+
+  // Perform a BFS over the node topology, if the current node's host is one of the driver_hosts
+  // we collected, then restart that node and skip its children since they will go away
+  // as part of it's restart.
+  //
+  // The BFS ensures that we always find the topmost node of a driver host.
+  // This node will by definition have colocated set to false, so when we call StartDriver
+  // on this node we will always create a new driver host. The old driver host will go away
+  // on its own asynchronously since it is drained from all of its drivers.
+  PerformBFS(root_node_, [&driver_hosts](const std::shared_ptr<dfv2::Node>& current) {
+    if (driver_hosts.find(current->driver_host()) != driver_hosts.end()) {
+      current->RestartNode();
+      // Don't visit children of this node since we restarted it.
+      return false;
+    }
+
+    return true;
+  });
+
+  return zx::ok(static_cast<uint32_t>(driver_hosts.size()));
+}
+
+std::unordered_set<const DriverHost*> DriverRunner::DriverHostsWithDriverUrl(std::string_view url) {
+  std::unordered_set<const DriverHost*> result_hosts;
+
+  // Perform a BFS over the node topology, if the current node's driver url is the url we are
+  // interested in, add the driver host it is in to the result set.
+  PerformBFS(root_node_, [&result_hosts, url](const std::shared_ptr<dfv2::Node>& current) {
+    if (current->driver_url() == url) {
+      result_hosts.insert(current->driver_host());
+    }
+    return true;
+  });
+
+  return result_hosts;
 }
 
 }  // namespace dfv2

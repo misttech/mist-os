@@ -233,8 +233,12 @@ void DriverDevelopmentService::GetCompositeNodeSpecs(
 
 void DriverDevelopmentService::RestartDriverHosts(RestartDriverHostsRequestView request,
                                                   RestartDriverHostsCompleter::Sync& completer) {
-  // TODO(fxbug.dev/90735): Implement RestartDriverHost
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  auto result = driver_runner_.RestartNodesColocatedWithDriverUrl(request->driver_path.get());
+  if (result.is_ok()) {
+    completer.ReplySuccess(result.value());
+  } else {
+    completer.ReplyError(result.error_value());
+  }
 }
 
 void DriverDevelopmentService::BindAllUnboundNodes(BindAllUnboundNodesCompleter::Sync& completer) {

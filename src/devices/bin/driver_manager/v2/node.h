@@ -65,6 +65,11 @@ class NodeManager {
   // track the results.
   virtual void Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) = 0;
 
+  virtual zx::result<> StartDriver(Node& node, std::string_view url,
+                                   fuchsia_driver_index::DriverPackageType package_type) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
   virtual zx::result<DriverHost*> CreateDriverHost() = 0;
 
   // Destroys the dynamic child component that runs the driver associated with
@@ -140,6 +145,13 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                 fidl::ServerEnd<fuchsia_driver_framework::Node> node,
                 AddNodeResultCallback callback);
 
+  // Begins the process of restarting the node. Restarting a node includes stopping and removing
+  // all children nodes, stopping the driver that is bound to the node, and asking the NodeManager
+  // to bind the node again. The restart operation is very similar to the Remove operation, the
+  // difference being once the children are removed, and the driver stopped, we don't remove the
+  // node from the topology but instead bind the node again.
+  void RestartNode();
+
   zx::result<> StartDriver(
       fuchsia_component_runner::wire::ComponentStartInfo start_info,
       fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller);
@@ -214,8 +226,11 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // stopped and ensure the component is destroyed.
   void ScheduleStopComponent();
   // Cleanup and remove node. Called by `ScheduleStopComponent` once the
-  // associated component has been removed.
+  // associated component has been removed. If |node_restarting_|, it will start the driver
+  // of the node again instead of removing it from the node topology.
   void FinishRemoval();
+  // Start the node's driver back up.
+  void FinishRestart();
   // Call `callback` once child node with the name `name` has been removed.
   // Returns an error if a child node with the name `name` exists and is not in
   // the process of being removed.
@@ -249,6 +264,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   NodeState node_state_ = NodeState::kRunning;
   std::optional<NodeId> removal_id_;
   NodeRemovalTracker* removal_tracker_ = nullptr;
+  bool node_restarting_ = false;
 
   // Invoked when the node has been fully removed.
   fit::callback<void()> remove_complete_callback_;

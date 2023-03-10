@@ -509,10 +509,15 @@ void Node::CheckForRemoval() {
 
 void Node::FinishRemoval() {
   LOGF(DEBUG, "Node: %s Finishing removal", name().c_str());
-  // Get an extra shared_ptr to ourselves so we are not freed halfway through this function.
-  auto this_node = shared_from_this();
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
                 "FinishRemoval called in invalid node state: %s", State2String(node_state_));
+  if (node_restarting_) {
+    FinishRestart();
+    return;
+  }
+
+  // Get an extra shared_ptr to ourselves so we are not freed halfway through this function.
+  auto this_node = shared_from_this();
   node_state_ = NodeState::kStopping;
   driver_component_.reset();
   for (auto& parent : parents()) {
@@ -530,6 +535,34 @@ void Node::FinishRemoval() {
     remove_complete_callback_();
   }
 }
+
+void Node::FinishRestart() {
+  node_restarting_ = false;
+  node_state_ = NodeState::kRunning;
+
+  fuchsia_driver_index::DriverPackageType pkg_type;
+  switch (collection_) {
+    case Collection::kNone:
+    case Collection::kHost:
+      pkg_type = fuchsia_driver_index::DriverPackageType::Unknown();
+      break;
+    case Collection::kBoot:
+      pkg_type = fuchsia_driver_index::DriverPackageType::kBoot;
+      break;
+    case Collection::kPackage:
+      pkg_type = fuchsia_driver_index::DriverPackageType::kBase;
+      break;
+    case Collection::kUniversePackage:
+      pkg_type = fuchsia_driver_index::DriverPackageType::kUniverse;
+      break;
+  }
+  std::string url = driver_url();
+  zx::result start_result = node_manager_.value()->StartDriver(*this, url, pkg_type);
+  if (start_result.is_error()) {
+    LOGF(ERROR, "Failed to start driver '%s': %s", name().c_str(), start_result.status_string());
+  }
+}
+
 // State table for package driver:
 //                                   Initial States
 //                 Running | Prestop|  WoC   | WoDriver | Stopping
@@ -610,6 +643,11 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
 
   // In case we had no children, or they removed themselves synchronously:
   CheckForRemoval();
+}
+
+void Node::RestartNode() {
+  node_restarting_ = true;
+  Remove(RemovalSet::kAll, nullptr);
 }
 
 fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> Node::AddChildHelper(
