@@ -73,6 +73,7 @@ test("fusb302-test-bin") {
     "registers-test.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
+    "usb-pd-message-test.cc",
     "usb-pd-message-type-test.cc",
     "usb-pd-message-type.cc",
   ]
