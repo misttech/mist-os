@@ -42,6 +42,7 @@ fuchsia_driver("fusb302-driver") {
     "fusb302.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
+    "usb-pd-message-type.cc",
   ]
   configs += [ "//build/config:all_source" ]
   deps = [
@@ -72,6 +73,8 @@ test("fusb302-test-bin") {
     "registers-test.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
+    "usb-pd-message-type-test.cc",
+    "usb-pd-message-type.cc",
   ]
   output_name = "fusb302-test"
   configs += [ "//build/config:all_source" ]
