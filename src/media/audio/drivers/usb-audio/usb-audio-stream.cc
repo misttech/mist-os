@@ -789,13 +789,9 @@ void UsbAudioStream::GetVmo(GetVmoRequestView request, GetVmoCompleter::Sync& co
   });
 
   // Compute the ring buffer size.  It needs to be at least as big
-  // as the virtual fifo depth.
+  // as min_frames + the virtual fifo depth.
   ZX_DEBUG_ASSERT(frame_size_ && ((fifo_bytes_ % frame_size_) == 0));
-  ZX_DEBUG_ASSERT(fifo_bytes_ && ((fifo_bytes_ % fifo_bytes_) == 0));
-  ring_buffer_size_ = request->min_frames;
-  ring_buffer_size_ *= frame_size_;
-  if (ring_buffer_size_ < fifo_bytes_)
-    ring_buffer_size_ = fbl::round_up(fifo_bytes_, frame_size_);
+  ring_buffer_size_ = request->min_frames * frame_size_ + fifo_bytes_;
 
   // Set up our state for generating notifications.
   if (request->clock_recovery_notifications_per_ring) {

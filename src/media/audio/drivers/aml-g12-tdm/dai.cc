@@ -149,8 +149,9 @@ void AmlG12TdmDai::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notificat
     return;
   }
   frame_size_ = metadata_.ring_buffer.number_of_channels * metadata_.ring_buffer.bytes_per_sample;
-  size_t ring_buffer_size = fbl::round_up<size_t, size_t>(
-      min_frames * frame_size_, std::lcm(frame_size_, aml_audio_->GetBufferAlignment()));
+  size_t ring_buffer_size =
+      fbl::round_up<size_t, size_t>(min_frames * frame_size_ + aml_audio_->fifo_depth(),
+                                    std::lcm(frame_size_, aml_audio_->GetBufferAlignment()));
   size_t out_frames = ring_buffer_size / frame_size_;
   if (out_frames > std::numeric_limits<uint32_t>::max()) {
     zxlogf(ERROR, "out frames too big %zu", out_frames);

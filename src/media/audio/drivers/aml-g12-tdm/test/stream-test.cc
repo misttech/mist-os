@@ -1903,14 +1903,28 @@ struct AmlG12TdmTest : public inspect::InspectTestHelper, public zxtest::Test {
                                                                    std::in_place};
 };
 
-// With 16 bits samples, frame size is 2 x number of channels bytes.
-// Frames returned are rounded to HW buffer alignment (8 bytes) and frame size.
-TEST_F(AmlG12TdmTest, RingBufferSize1) { TestRingBufferSize(2, 1, 2); }  // Rounded to HW buffer.
-TEST_F(AmlG12TdmTest, RingBufferSize2) { TestRingBufferSize(2, 3, 4); }  // Rounded to HW buffer.
-TEST_F(AmlG12TdmTest, RingBufferSize3) { TestRingBufferSize(3, 1, 4); }  // Rounded to both.
-TEST_F(AmlG12TdmTest, RingBufferSize4) { TestRingBufferSize(3, 3, 4); }  // Rounded to both.
-TEST_F(AmlG12TdmTest, RingBufferSize5) { TestRingBufferSize(8, 1, 1); }  // Rounded to frame size.
-TEST_F(AmlG12TdmTest, RingBufferSize6) { TestRingBufferSize(8, 3, 3); }  // Rounded to frame size.
+// With 16 bits samples, frame size is 2 x number of channels bytes. FIFO is 1024 bytes.
+// Frames returned depend on client requested min_frames, HW buffer alignment (8 bytes)
+// and FIFO size.
+
+// min_frames + FIFO size. With number of channels = 2 (frame size = 4):
+// num_frames = min_frames + (FIFO / frame_size) = 2 + (1024 / 4) = 258.
+TEST_F(AmlG12TdmTest, RingBufferSize1) { TestRingBufferSize(2, 2, 258); }
+
+// Rounded to HW buffer alignment (8). With number of channels = 2 (frame size = 4),
+// num_frames = min_frames + (FIFO / frame_size) = 257 + (1024 / 4) = 513, but then
+// it is rounded to 2 frames alignmend (8 bytes) to 514.
+TEST_F(AmlG12TdmTest, RingBufferSize2) { TestRingBufferSize(2, 257, 514); }
+
+// Rounded to HW buffer alignment (8). With number of channels = 3 (frame size = 6),
+// num_frames = min_frames + (FIFO / frame_size) = 1 + (1024 / 6) = 171, but then
+// it is rounded to 2 frames alignmend (8 bytes) to 172.
+TEST_F(AmlG12TdmTest, RingBufferSize3) { TestRingBufferSize(3, 1, 172); }
+
+// Rounded to HW buffer alignment (8). With number of channels = 3 (frame size = 6),
+// num_frames = min_frames + (FIFO / frame_size) = 341 + (1024 / 6) = 511, but then
+// it is rounded to 2 frames alignmend (8 bytes) to 512.
+TEST_F(AmlG12TdmTest, RingBufferSize4) { TestRingBufferSize(3, 341, 512); }
 
 TEST_F(AmlG12TdmTest, Attributes) { TestAttributes(); }
 

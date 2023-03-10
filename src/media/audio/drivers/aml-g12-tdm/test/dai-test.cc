@@ -552,8 +552,8 @@ TEST_F(AmlG12TdmDaiTest, RingBufferOperations) {
 
     ::fuchsia::hardware::audio::RingBuffer_SyncProxy ring_buffer(std::move(local));
     ::fuchsia::hardware::audio::RingBuffer_GetVmo_Result out_result = {};
-    ASSERT_OK(ring_buffer.GetVmo(8192, 0, &out_result));
-    ZX_ASSERT(out_result.response().num_frames == 8192);
+    constexpr uint32_t kMinFrames = 8192;
+    ASSERT_OK(ring_buffer.GetVmo(kMinFrames, 0, &out_result));
     ZX_ASSERT(out_result.response().ring_buffer.is_valid());
 
     int64_t out_start_time = 0;
@@ -577,17 +577,18 @@ TEST_F(AmlG12TdmDaiTest, RingBufferOperations) {
                                   std::move(ring_buffer_intf));
     ::fuchsia::hardware::audio::RingBuffer_SyncProxy ring_buffer(std::move(local));
     ::fuchsia::hardware::audio::RingBuffer_GetVmo_Result out_result = {};
-    ASSERT_OK(ring_buffer.GetVmo(1, 0, &out_result));
-    // 2 x 16 bits samples = 4 bytes frames, and must align to HW buffer (64 bits), so we need 2.
-    ZX_ASSERT(out_result.response().num_frames == 2);
+    constexpr uint32_t kMinFrames = 1;
+    ASSERT_OK(ring_buffer.GetVmo(kMinFrames, 0, &out_result));
+    // 2 x 16 bits samples = 4 bytes frames, and must align to HW buffer (64 bits).
+    // num_frames = (kMinFrames + kFifoSize (in frames)) rounded to 8 bytes;
+    // num_frames = (1 + 256) rounded to 8 bytes (2 frames) = 258;
+    ZX_ASSERT(out_result.response().num_frames == 258);
     ZX_ASSERT(out_result.response().ring_buffer.is_valid());
 
     int64_t out_start_time = 0;
     ring_buffer.Start(&out_start_time);
     ring_buffer.Stop();
     ASSERT_OK(ring_buffer.GetVmo(1, 0, &out_result));
-    // 2 x 16 bits samples = 4 bytes frames, and must align to HW buffer (64 bits), so we need 2.
-    ZX_ASSERT(out_result.response().num_frames == 2);
     ZX_ASSERT(out_result.response().ring_buffer.is_valid());
   }
 }

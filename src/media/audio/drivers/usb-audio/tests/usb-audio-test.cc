@@ -960,4 +960,43 @@ TEST_F(UsbAudioTest, GetDriverTransferBytes) {
   ASSERT_EQ(result.value().properties.driver_transfer_bytes(), 1'152);
 }
 
+TEST_F(UsbAudioTest, VmoSize) {
+  ASSERT_OK(UsbAudioDevice::DriverBind(fake_dev_->zxdev()));
+  ASSERT_EQ(root_->GetLatestChild()->child_count(), 1);
+
+  ASSERT_EQ(root_->GetLatestChild()->GetLatestChild()->child_count(), 2);
+  auto itr = root_->GetLatestChild()->GetLatestChild()->children().begin();
+  std::advance(itr, 0);
+  UsbAudioStream* dut = (*itr)->GetDeviceContext<UsbAudioStream>();
+
+  auto endpoints = fidl::CreateEndpoints<audio_fidl::StreamConfigConnector>();
+  ASSERT_OK(endpoints.status_value());
+  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut);
+  auto stream_client = GetStreamClient(std::move(endpoints->client));
+  ASSERT_TRUE(stream_client.is_valid());
+
+  auto endpoints2 = fidl::CreateEndpoints<audio_fidl::RingBuffer>();
+  ASSERT_OK(endpoints2.status_value());
+  auto [local, remote] = std::move(endpoints2.value());
+
+  fidl::Arena allocator;
+  audio_fidl::wire::Format format(allocator);
+  auto default_format = GetDefaultPcmFormat();
+  format.set_pcm_format(allocator, default_format);
+  uint32_t frame_size = default_format.number_of_channels * default_format.bytes_per_sample;
+  auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
+  ASSERT_OK(rb.status());
+
+  constexpr uint32_t kNumberOfPositionNotifications = 5;
+  constexpr uint32_t kMinFrames = 10;
+  auto vmo = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetVmo(kMinFrames,
+                                                                   kNumberOfPositionNotifications);
+  ASSERT_OK(vmo.status());
+  // transfer bytes is 6 ms x frame rate x frame size.
+  static_assert(kTestFrameRate % 1'000 == 0);
+  uint32_t transfer_bytes = 6 * kTestFrameRate * frame_size / 1'000;
+  uint32_t frames_expected = kMinFrames + (transfer_bytes + frame_size - 1) / frame_size;
+  ASSERT_EQ(vmo->value()->num_frames, frames_expected);
+}
+
 }  // namespace audio::usb

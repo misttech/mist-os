@@ -743,7 +743,9 @@ void SimpleAudioStream::GetVmo(GetVmoRequestView request, GetVmoCompleter::Sync&
 
   uint32_t num_ring_buffer_frames = 0;
   audio_proto::RingBufGetBufferReq req = {};
-  req.min_ring_buffer_frames = request->min_frames;
+  // The ring buffer must be at least min_frames + fifo_frames.
+  req.min_ring_buffer_frames =
+      request->min_frames + (driver_transfer_bytes_ + frame_size_ - 1) / frame_size_;
   req.notifications_per_ring = request->clock_recovery_notifications_per_ring;
   zx::vmo buffer;
   auto status = GetBuffer(req, &num_ring_buffer_frames, &buffer);

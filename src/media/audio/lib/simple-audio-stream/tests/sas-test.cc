@@ -940,7 +940,9 @@ TEST_F(SimpleAudioTest, RingBufferTests) {
 
   fidl::Arena allocator;
   audio_fidl::wire::Format format(allocator);
-  format.set_pcm_format(allocator, GetDefaultPcmFormat());
+  auto default_format = GetDefaultPcmFormat();
+  format.set_pcm_format(allocator, default_format);
+  uint32_t frame_size = default_format.number_of_channels * default_format.bytes_per_sample;
 
   auto rb = stream_client->CreateRingBuffer(std::move(format), std::move(remote));
   ASSERT_OK(rb.status());
@@ -948,10 +950,12 @@ TEST_F(SimpleAudioTest, RingBufferTests) {
   constexpr uint32_t kNumberOfPositionNotifications = 5;
   // Buffer is set to hold at least 1 second, with kNumberOfPositionNotifications notifications
   // per ring buffer (i.e. per second) we set the time waiting for the watch below to 200ms+.
-
-  auto vmo = fidl::WireCall(local)->GetVmo(MockSimpleAudio::kTestFrameRate,
-                                           kNumberOfPositionNotifications);
+  constexpr uint32_t kMinFrames = MockSimpleAudio::kTestFrameRate;
+  auto vmo = fidl::WireCall(local)->GetVmo(kMinFrames, kNumberOfPositionNotifications);
   ASSERT_OK(vmo.status());
+  uint32_t frames_expected =
+      kMinFrames + (MockSimpleAudio::kTestDriverTransferBytes + frame_size - 1) / frame_size;
+  ASSERT_EQ(vmo->value()->num_frames, frames_expected);
 
   constexpr uint64_t kSomeActiveChannelsMask = 0xc3;
   auto active_channels = fidl::WireCall(local)->SetActiveChannels(kSomeActiveChannelsMask);

@@ -329,14 +329,21 @@ protocol RingBuffer {
         position_info RingBufferPositionInfo;
     });
 
-    /// Requests a shared buffer to be used for moving bulk audio data. Requests the buffer size to
-    /// fit at least `min_frames`, and returns the actual `num_frames` allocated in
-    /// `ring_buffer`.
+    /// Requests a shared buffer to be used for moving bulk audio data between client and driver.
+    /// The client requests `min_frames` as the size for part of the ring buffer it needs.
+    /// The driver returns the actual size of allocated ring buffer space in `num_frames`.
     ///
-    /// Drivers must incorporate any internal requirements when reporting the ring buffer size
-    /// in the actual `num_frames` allocated. For instance the driver, not the client, must take
-    /// into account any ring buffer data copy semantics like minimum hardware or virtual FIFO copy
-    /// size as required by the driver.
+    /// `num_frames` must be at least `min_frames` plus `driver_transfer_bytes` (in frames) such
+    /// that ring buffer contents can be transfered in and out, or else the call must be failed
+    /// with GetVmoError.INVALID_ARGS.
+    ///
+    /// The driver may increase the ring buffer size beyond `min_frames` plus
+    /// `driver_transfer_bytes` (in frames) due to any internal requirements, for instance
+    /// alignment.
+    ///
+    /// Clients can treat the entire returned ring buffer as safe to access, except for the
+    /// `driver_transfer_bytes` immediately adjacent to the current position, see the
+    /// `driver_transfer_bytes` parameter specification in `RingBufferProperties` for more details.
     ///
     /// If `clock_recovery_notifications_per_ring` is non-zero, the driver will send replies to
     /// `WatchClockRecoveryPositionInfo` client requests at most at

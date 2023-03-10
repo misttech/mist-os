@@ -325,7 +325,8 @@ void IntelHDAStream::GetVmo(GetVmoRequestView request, GetVmoCompleter::Sync& co
   // 1) The user's minimum ring buffer size in frames 0.
   // 2) The user's minimum ring buffer size in bytes is too large to hold in a 32 bit integer.
   // 3) The user wants more notifications per ring than we have BDL entries.
-  tmp = static_cast<uint64_t>(request->min_frames) * bytes_per_frame_;
+  tmp = static_cast<uint64_t>(request->min_frames) * bytes_per_frame_ +
+        static_cast<uint64_t>(driver_transfer_bytes_);
   if ((request->min_frames == 0) || (tmp > std::numeric_limits<uint32_t>::max()) ||
       (request->clock_recovery_notifications_per_ring > MAX_BDL_LENGTH)) {
     LOG(DEBUG,
