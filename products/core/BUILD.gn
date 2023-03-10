@@ -37,7 +37,7 @@ product_assembly_configuration("core") {
 
     # TODO(https://fxbug.dev/121811): Remove this as soon as the existing
     # Netstack3 CI builders have been transitioned to use the
-    # core-with-netstack3 target below.
+    # core_with_netstack3 target below.
     connectivity = {
       network = {
         force_netstack3 = use_netstack3
@@ -50,7 +50,7 @@ product_assembly_configuration("core") {
   base_driver_packages = _base_driver_packages
 }
 
-product_assembly_configuration("core-with-netstack3") {
+product_assembly_configuration("core_with_netstack3") {
   testonly = true
   platform = {
     build_type = "eng"
