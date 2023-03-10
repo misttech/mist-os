@@ -31,7 +31,7 @@ use utf8_path::path_relative_from;
 /// println!("{:?}", serde_json::to_value(manifest).unwrap());
 /// ```
 ///
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct AssemblyManifest {
     /// List of images in the manifest.
     pub images: Vec<Image>,
@@ -47,7 +47,7 @@ struct SerializationHelper {
 }
 
 /// An item in the AssemblyManifest.
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Image {
     /// Base Package.
     BasePackage(Utf8PathBuf),
@@ -324,7 +324,7 @@ impl Serialize for Image {
 }
 
 /// Detailed metadata on the contents of a particular image output.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct BlobfsContents {
     /// Information about packages included in the image.
     pub packages: PackagesMetadata,
@@ -425,7 +425,7 @@ impl BlobfsContents {
 }
 
 /// Metadata on packages included in a given image.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct PackagesMetadata {
     /// Paths to package manifests for the base package set.
     pub base: PackageSetMetadata,
@@ -434,12 +434,12 @@ pub struct PackagesMetadata {
 }
 
 /// Metadata for a certain package set (e.g. base or cache).
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct PackageSetMetadata(pub Vec<PackageMetadata>);
 
 /// Metadata on a single package included in a given image.
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct PackageMetadata {
     /// The package's name.
     pub name: String,
@@ -449,7 +449,7 @@ pub struct PackageMetadata {
     pub blobs: Vec<PackageBlob>,
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct PackageBlob {
     // Merkle hash of this blob
     pub merkle: String,

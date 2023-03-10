@@ -63,8 +63,6 @@ template("scrutiny_x_smoke_test") {
       rebase_path(_stamp_file, root_build_dir),
       "--product-bundle",
       rebase_path(_pb_dir, root_build_dir),
-      "--repository-name",
-      "fuchsia.com",
 
       # Uncomment line below to get verbose output from smoke test build step.
       # "--debug",

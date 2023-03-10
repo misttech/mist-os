@@ -5,12 +5,14 @@
 use crate::api;
 use crate::blob::Blob;
 use crate::blob::BlobDirectoryBlobSetBuilderError;
+use crate::blob::BlobDirectoryError;
 use crate::blob::BlobSet;
+use crate::blob::CompositeBlobSet;
 use crate::data_source::DataSource;
 use crate::package::ScrutinyPackage;
 use crate::product_bundle::DataSource as ProductBundleSource;
 use crate::product_bundle::ProductBundle;
-use crate::product_bundle::ProductBundleRepositoryBlobSet;
+use crate::product_bundle::ProductBundleRepositoryBlob;
 use std::fmt;
 use thiserror::Error;
 
@@ -38,14 +40,14 @@ impl ScrutinyBuilder {
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn build(self) -> Result<Scrutiny, ScrutinyBuilderError> {
         let product_bundle = self.product_bundle.clone();
-        let product_bundle_blobs_set = product_bundle.repository().blobs().blob_set()?;
+        let product_bundle_blobs_set = product_bundle.blob_set()?;
         Ok(Scrutiny { product_bundle_blobs_set, product_bundle })
     }
 }
 
 /// Production implementation of the [`crate::api::Scrutiny`] API.
 pub struct Scrutiny {
-    product_bundle_blobs_set: ProductBundleRepositoryBlobSet,
+    product_bundle_blobs_set: CompositeBlobSet<ProductBundleRepositoryBlob, BlobDirectoryError>,
     product_bundle: ProductBundle,
 }
 
@@ -65,7 +67,7 @@ impl fmt::Debug for Scrutiny {
 }
 
 impl api::Scrutiny for Scrutiny {
-    type Blob = Blob;
+    type Blob = Blob<ProductBundleRepositoryBlob>;
     type Package = ScrutinyPackage;
     type DataSource = DataSource;
 
@@ -216,20 +218,35 @@ mod tests {
     use super::ScrutinyBuilderError;
     use crate::api::Blob as _;
     use crate::api::Scrutiny as _;
+    use crate::blob;
+    use crate::data_source::BlobSource;
     use crate::hash::Hash;
-    use crate::product_bundle::test::utf8_path;
-    use crate::product_bundle::test::v2_sdk_a_product_bundle;
-    use crate::product_bundle::test::v2_sdk_abr_product_bundle;
-    use crate::product_bundle::test::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH;
-    use crate::product_bundle::test::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME;
-    use crate::product_bundle::test::V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH;
-    use crate::product_bundle::test::V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_NAME;
-    use crate::product_bundle::test::V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH;
-    use crate::product_bundle::test::V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_NAME;
+    use crate::product_bundle::test as pbt;
     use crate::product_bundle::ProductBundle;
+    use crate::product_bundle::ProductBundleRepositoryBlob;
+    use crate::product_bundle::ProductBundleRepositoryBlobs;
     use crate::product_bundle::SystemSlot;
+    use maplit::hashmap;
+    use maplit::hashset;
+    use sdk_metadata::Repository;
+    use std::borrow::Borrow;
+    use std::collections::HashMap;
+    use std::collections::HashSet;
     use std::fs;
+    use std::io::Read as _;
+    use std::path::Path;
     use tempfile::TempDir;
+
+    fn write_blob<Directory: AsRef<Path>, Contents: Borrow<str>>(
+        directory: Directory,
+        contents: Contents,
+    ) -> Hash {
+        let hash = Hash::from_contents(contents.borrow().as_bytes());
+        let filename = format!("{}", hash);
+        fs::write(directory.as_ref().join(filename), contents.borrow().as_bytes())
+            .expect("write blob");
+        hash
+    }
 
     #[fuchsia::test]
     fn test_blob_directory_blob_set_builder_error() {
@@ -238,20 +255,20 @@ mod tests {
         // Note: Do not create blobs directory, which will trigger expected error.
 
         // Write product bundle manifest.
-        v2_sdk_a_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
+        pbt::v2_sdk_a_product_bundle(temp_dir.path())
+            .write(pbt::utf8_path(temp_dir.path()))
+            .unwrap();
 
         // Construct product bundle.
-        let product_bundle = ProductBundle::builder(
-            temp_dir.path(),
-            SystemSlot::A,
-            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
-        )
-        .build()
-        .expect("product bundle from well-formed manifest");
+        let product_bundle = ProductBundle::builder(temp_dir.path(), SystemSlot::A)
+            .build()
+            .expect("product bundle from well-formed manifest");
 
         // Ensure blobs directory is missing.
-        fs::remove_dir_all(&temp_dir.path().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH))
-            .expect("remove blobs directory");
+        fs::remove_dir_all(
+            &temp_dir.path().join(pbt::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH),
+        )
+        .expect("remove blobs directory");
 
         // Expect error creating blob set.
         match Scrutiny::builder(product_bundle)
@@ -266,115 +283,143 @@ mod tests {
     fn test_ok() {
         // Create directory for product bundle, complete with repository blob directory.
         let temp_dir = TempDir::new().unwrap();
-        let blobs_path_buf = temp_dir.path().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH);
-        fs::create_dir_all(&blobs_path_buf).unwrap();
 
         // Write product bundle manifest.
-        v2_sdk_abr_product_bundle(temp_dir.path()).write(utf8_path(temp_dir.path())).unwrap();
+        pbt::v2_sdk_abr_product_bundle(temp_dir.path())
+            .write(pbt::utf8_path(temp_dir.path()))
+            .unwrap();
 
+        let a_blobs_directory =
+            temp_dir.path().join(pbt::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH);
+        let a_metadata_directory =
+            temp_dir.path().join(pbt::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_METADATA_PATH);
+        fs::create_dir_all(&a_blobs_directory).expect("create a blobs directory");
         let a_blob_contents = "a";
-        let a_blob_hash = Hash::from_contents(a_blob_contents.as_bytes());
-        let a_blob_hash_string = format!("{}", a_blob_hash);
-        fs::create_dir_all(temp_dir.path().join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH))
-            .expect("create a blob directory");
-        fs::write(
-            temp_dir
-                .path()
-                .join(V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH)
-                .join(&a_blob_hash_string),
-            a_blob_contents.as_bytes(),
-        )
-        .expect("write a blob");
+        let a_blob_hash = write_blob(&a_blobs_directory, a_blob_contents);
+        let ab_blob_contents = "ab";
+        let ab_blob_hash = write_blob(&a_blobs_directory, ab_blob_contents);
+        let ar_blob_contents = "ar";
+        let ar_blob_hash = write_blob(&a_blobs_directory, ar_blob_contents);
 
+        let b_blobs_directory =
+            temp_dir.path().join(pbt::V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH);
+        let b_metadata_directory =
+            temp_dir.path().join(pbt::V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_METADATA_PATH);
+        fs::create_dir_all(&b_blobs_directory).expect("create b blobs directory");
         let b_blob_contents = "b";
-        let b_blob_hash = Hash::from_contents(b_blob_contents.as_bytes());
-        let b_blob_hash_string = format!("{}", b_blob_hash);
-        fs::create_dir_all(temp_dir.path().join(V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH))
-            .expect("create b blob directory");
-        fs::write(
-            temp_dir
-                .path()
-                .join(V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH)
-                .join(&b_blob_hash_string),
-            b_blob_contents.as_bytes(),
-        )
-        .expect("write b blob");
+        let b_blob_hash = write_blob(&b_blobs_directory, b_blob_contents);
+        write_blob(&b_blobs_directory, ab_blob_contents);
+        let br_blob_contents = "br";
+        let br_blob_hash = write_blob(&b_blobs_directory, br_blob_contents);
 
+        let r_blobs_directory =
+            temp_dir.path().join(pbt::V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH);
+        let r_metadata_directory =
+            temp_dir.path().join(pbt::V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_METADATA_PATH);
+        fs::create_dir_all(&r_blobs_directory).expect("create r blobs directory");
         let r_blob_contents = "r";
-        let r_blob_hash = Hash::from_contents(r_blob_contents.as_bytes());
-        let r_blob_hash_string = format!("{}", r_blob_hash);
-        fs::create_dir_all(temp_dir.path().join(V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH))
-            .expect("create r blob directory");
-        fs::write(
-            temp_dir
-                .path()
-                .join(V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_BLOBS_PATH)
-                .join(&r_blob_hash_string),
-            r_blob_contents.as_bytes(),
-        )
-        .expect("write r blob");
+        let r_blob_hash = write_blob(&r_blobs_directory, r_blob_contents);
+        write_blob(&r_blobs_directory, ar_blob_contents);
+        write_blob(&r_blobs_directory, br_blob_contents);
+
+        let blobs_map = hashmap! {
+            a_blob_hash.clone() => a_blob_contents.as_bytes().to_vec(),
+            ab_blob_hash.clone() => ab_blob_contents.as_bytes().to_vec(),
+            ar_blob_hash.clone() => ar_blob_contents.as_bytes().to_vec(),
+            b_blob_hash.clone() => b_blob_contents.as_bytes().to_vec(),
+            br_blob_hash.clone() => br_blob_contents.as_bytes().to_vec(),
+            r_blob_hash.clone() => r_blob_contents.as_bytes().to_vec(),
+        };
+
+        let a_repository = Repository {
+            name: pbt::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
+            metadata_path: a_metadata_directory.try_into().unwrap(),
+            blobs_path: a_blobs_directory.try_into().unwrap(),
+        };
+        let b_repository = Repository {
+            name: pbt::V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
+            metadata_path: b_metadata_directory.try_into().unwrap(),
+            blobs_path: b_blobs_directory.try_into().unwrap(),
+        };
+        let r_repository = Repository {
+            name: pbt::V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
+            metadata_path: r_metadata_directory.try_into().unwrap(),
+            blobs_path: r_blobs_directory.try_into().unwrap(),
+        };
+
+        let data_source = |product_bundle: &ProductBundle,
+                           repository: &Repository|
+         -> ProductBundleRepositoryBlobs {
+            ProductBundleRepositoryBlobs::new_for_test(product_bundle.clone(), repository.clone())
+        };
+
+        let blob_sources = |product_bundle: &ProductBundle| -> HashMap<Hash, HashSet<ProductBundleRepositoryBlobs>> {
+            hashmap! {
+                a_blob_hash.clone() => hashset!{data_source(product_bundle, &a_repository)},
+                ab_blob_hash.clone() => hashset!{data_source(product_bundle, &a_repository), data_source(product_bundle, &b_repository)},
+                ar_blob_hash.clone() => hashset!{data_source(product_bundle, &a_repository), data_source(product_bundle, &r_repository)},
+                b_blob_hash.clone() => hashset!{data_source(product_bundle, &b_repository)},
+                br_blob_hash.clone() => hashset!{data_source(product_bundle, &b_repository), data_source(product_bundle, &r_repository)},
+                r_blob_hash.clone() => hashset!{data_source(product_bundle, &r_repository)},
+            }
+        };
+
+        let verify_blobs =
+            |product_bundle: &ProductBundle,
+             blobs: Vec<blob::Blob<ProductBundleRepositoryBlob>>| {
+                assert_eq!(blobs_map.len(), blobs.len());
+
+                let blob_sources_map = blob_sources(product_bundle);
+
+                for actual_blob in blobs.into_iter() {
+                    let actual_hash = actual_blob.hash();
+                    let mut actual_contents = vec![];
+                    actual_blob
+                        .reader_seeker()
+                        .expect("blob reader")
+                        .read_to_end(&mut actual_contents)
+                        .expect("blob read");
+                    let expected_blob_contents =
+                        blobs_map.get(&actual_hash).expect("expected blob for actual blob");
+                    assert_eq!(expected_blob_contents, &actual_contents);
+                    let expected_blob_sources = blob_sources_map
+                        .get(&actual_hash)
+                        .expect("expected blob sources for actual blob")
+                        .clone()
+                        .into_iter()
+                        .map(BlobSource::from)
+                        .collect::<HashSet<BlobSource>>();
+                    let actual_blob_sources: HashSet<BlobSource> =
+                        actual_blob.data_sources().collect();
+                    assert_eq!(expected_blob_sources, actual_blob_sources);
+                }
+            };
 
         // Test against a slot.
-        let a_product_bundle = ProductBundle::builder(
-            temp_dir.path(),
-            SystemSlot::A,
-            V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME,
-        )
-        .build()
-        .expect("product bundle from well-formed manifest and directories");
-        let a_scrutiny = Scrutiny::builder(a_product_bundle)
+        let a_product_bundle = ProductBundle::builder(temp_dir.path(), SystemSlot::A)
+            .build()
+            .expect("product bundle from well-formed manifest and directories");
+        let a_scrutiny = Scrutiny::builder(a_product_bundle.clone())
             .build()
             .expect("scrutiny from well-formed product bundle");
-        let a_blobs: Vec<_> = a_scrutiny.blobs().collect();
-        assert_eq!(1, a_blobs.len());
-        let mut a_blob_read_contents = vec![];
-        a_blobs[0]
-            .reader_seeker()
-            .expect("a blob reader")
-            .read_to_end(&mut a_blob_read_contents)
-            .expect("a blob read");
-        assert_eq!(a_blob_contents.as_bytes(), a_blob_read_contents.as_slice());
+        verify_blobs(&a_product_bundle, a_scrutiny.blobs().collect());
 
         // Test against b slot.
-        let b_product_bundle = ProductBundle::builder(
-            temp_dir.path(),
-            SystemSlot::B,
-            V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_NAME,
-        )
-        .build()
-        .expect("product bundle from well-formed manifest and directories");
-        let b_scrutiny = Scrutiny::builder(b_product_bundle)
+        let b_product_bundle = ProductBundle::builder(temp_dir.path(), SystemSlot::B)
+            .build()
+            .expect("product bundle from well-formed manifest and directories");
+        let b_scrutiny = Scrutiny::builder(b_product_bundle.clone())
             .build()
             .expect("scrutiny from well-formed product bundle");
-        let b_blobs: Vec<_> = b_scrutiny.blobs().collect();
-        assert_eq!(1, b_blobs.len());
-        let mut b_blob_read_contents = vec![];
-        b_blobs[0]
-            .reader_seeker()
-            .expect("b blob reader")
-            .read_to_end(&mut b_blob_read_contents)
-            .expect("b blob read");
-        assert_eq!(b_blob_contents.as_bytes(), b_blob_read_contents.as_slice());
+        verify_blobs(&b_product_bundle, b_scrutiny.blobs().collect());
 
         // Test against r slot.
-        let r_product_bundle = ProductBundle::builder(
-            temp_dir.path(),
-            SystemSlot::R,
-            V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_NAME,
-        )
-        .build()
-        .expect("product bundle from well-formed manifest and directories");
-        let r_scrutiny = Scrutiny::builder(r_product_bundle)
+        let r_product_bundle = ProductBundle::builder(temp_dir.path(), SystemSlot::R)
+            .build()
+            .expect("product bundle from well-formed manifest and directories");
+        let r_scrutiny = Scrutiny::builder(r_product_bundle.clone())
             .build()
             .expect("scrutiny from well-formed product bundle");
-        let r_blobs: Vec<_> = r_scrutiny.blobs().collect();
-        assert_eq!(1, r_blobs.len());
-        let mut r_blob_read_contents = vec![];
-        r_blobs[0]
-            .reader_seeker()
-            .expect("r blob reader")
-            .read_to_end(&mut r_blob_read_contents)
-            .expect("r blob read");
-        assert_eq!(r_blob_contents.as_bytes(), r_blob_read_contents.as_slice());
+        verify_blobs(&r_product_bundle, r_scrutiny.blobs().collect());
     }
 }

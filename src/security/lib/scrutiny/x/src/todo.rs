@@ -16,6 +16,7 @@ use crate::package::ScrutinyPackage;
 
 // APIs to be stubbed.
 use crate::api;
+use crate::product_bundle::ProductBundleRepositoryBlob;
 
 // External dependencies.
 use std::path::PathBuf;
@@ -135,7 +136,7 @@ pub struct System;
 impl api::System for System {
     type DataSourcePath = PathBuf;
     type Zbi = Zbi;
-    type Blob = Blob;
+    type Blob = Blob<ProductBundleRepositoryBlob>;
     type Package = ScrutinyPackage;
     type KernelFlags = KernelFlags;
     type VbMeta = VbMeta;
@@ -175,7 +176,7 @@ pub struct Zbi;
 
 impl api::Zbi for Zbi {
     type BootfsPath = PathBuf;
-    type Blob = Blob;
+    type Blob = Blob<ProductBundleRepositoryBlob>;
 
     fn bootfs(&self) -> Box<dyn Iterator<Item = (Self::BootfsPath, Self::Blob)>> {
         todo!("TODO(fxbug.dev/111251): Integrate with production system API");

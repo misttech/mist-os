@@ -12,13 +12,17 @@ use fuchsia_merkle::Hash as FuchsiaMerkleHash;
 use fuchsia_merkle::MerkleTree;
 use rayon::prelude::*;
 use scrutiny_utils::io::ReadSeek;
+use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fs;
 use std::io;
+use std::iter;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::vec;
 use thiserror::Error;
 
 pub trait BlobSet {
@@ -42,6 +46,195 @@ pub trait BlobSet {
 
     /// Iterate over this blob set's data sources.
     fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>>;
+}
+
+pub struct CompositeBlobSet<B: api::Blob + 'static, E: api::Error> {
+    delegates:
+        Vec<Rc<dyn BlobSet<Hash = B::Hash, Blob = B, DataSource = B::DataSource, Error = E>>>,
+}
+
+impl<B: api::Blob + 'static, E: api::Error> CompositeBlobSet<B, E> {
+    pub fn new<
+        I: Into<Rc<dyn BlobSet<Hash = B::Hash, Blob = B, DataSource = B::DataSource, Error = E>>>,
+    >(
+        delegates: impl Iterator<Item = I>,
+    ) -> Self {
+        Self { delegates: delegates.map(|delegate| delegate.into()).collect() }
+    }
+}
+
+impl<B: api::Blob + 'static, E: api::Error> BlobSet for CompositeBlobSet<B, E> {
+    type Hash = B::Hash;
+    type Blob = CompositeBlob<B>;
+    type DataSource = B::DataSource;
+    type Error = anyhow::Error;
+
+    fn iter(&self) -> Box<dyn Iterator<Item = Self::Blob>> {
+        Box::new(CompositeBlobSetIterator::new(self.delegates.clone().into_iter()))
+    }
+
+    fn blob(&self, hash: Self::Hash) -> Result<Self::Blob, Self::Error> {
+        let mut errors = vec![];
+        let mut delegates_iter = self.delegates.clone().into_iter();
+        while let Some(delegate) = delegates_iter.next() {
+            match delegate.blob(hash.clone()) {
+                Ok(blob) => {
+                    return Ok(CompositeBlob::new_with_blob_sets(blob, delegates_iter.clone()))
+                }
+                Err(error) => {
+                    errors.push(error);
+                }
+            }
+        }
+
+        Err(errors.into_iter().fold(
+            anyhow::anyhow!("blob with id {} not found in multiple data sources", hash),
+            |anyhow_error, error| anyhow_error.context(format!("{:?}", error)),
+        ))
+    }
+
+    fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>> {
+        let mut data_sources = vec![];
+
+        for delegate in self.delegates.iter() {
+            data_sources.extend(delegate.data_sources())
+        }
+
+        Box::new(data_sources.into_iter())
+    }
+}
+
+pub struct CompositeBlobSetIterator<
+    B: api::Blob + 'static,
+    E: api::Error,
+    I: Iterator<
+            Item = Rc<dyn BlobSet<Hash = B::Hash, Blob = B, DataSource = B::DataSource, Error = E>>,
+        > + Clone,
+> {
+    blob_iterator: Box<dyn Iterator<Item = B>>,
+    blob_set_iterator: I,
+    visited: HashSet<B::Hash>,
+}
+
+impl<
+        B: api::Blob + 'static,
+        E: api::Error,
+        I: Iterator<
+                Item = Rc<
+                    dyn BlobSet<Hash = B::Hash, Blob = B, DataSource = B::DataSource, Error = E>,
+                >,
+            > + Clone,
+    > CompositeBlobSetIterator<B, E, I>
+{
+    pub fn new(blob_set_iterator: I) -> Self {
+        Self { blob_iterator: Box::new(iter::empty()), blob_set_iterator, visited: HashSet::new() }
+    }
+
+    /// Returns the next blob in `self.blob_iterator`, or else the first blob in
+    /// `self.blob_set_iterator.next()`.
+    ///
+    /// This is the next blob for consideration of `self` as an iterator, but performs no
+    /// deduplication.
+    fn next_blob(&mut self) -> Option<B> {
+        // Check in-flight blob iterator.
+        if let result @ Some(_) = self.blob_iterator.next() {
+            return result;
+        }
+
+        // Keep checking unconsumed blob sets for a blob.
+        while let Some(blob_set) = self.blob_set_iterator.next() {
+            self.blob_iterator = blob_set.iter();
+            if let result @ Some(_) = self.blob_iterator.next() {
+                return result;
+            }
+        }
+
+        return None;
+    }
+}
+
+impl<
+        B: api::Blob + 'static,
+        E: api::Error,
+        I: Iterator<
+                Item = Rc<
+                    dyn BlobSet<Hash = B::Hash, Blob = B, DataSource = B::DataSource, Error = E>,
+                >,
+            > + Clone,
+    > Iterator for CompositeBlobSetIterator<B, E, I>
+{
+    type Item = CompositeBlob<B>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut first_blob: Option<B> = None;
+        while let Some(blob) = self.next_blob() {
+            if self.visited.insert(blob.hash()) {
+                first_blob = Some(blob);
+                break;
+            }
+        }
+
+        match first_blob {
+            // When a blob is found for the first time, locate it in all subsequent blob sets while
+            // constructing its `CompositeBlob`.
+            Some(first_blob) => {
+                Some(CompositeBlob::new_with_blob_sets(first_blob, self.blob_set_iterator.clone()))
+            }
+            None => None,
+        }
+    }
+}
+
+/// A `api::Blob` implementation that is backed by multiple data sources for the same blob. All
+/// operations delegate to the first blob in the underlying composite, except for `data_sources`,
+/// which concatenates the series of sources returned by each underlying `api::Blob` implementation.
+///
+/// This type is used, for example, when the system is aware of multiple repositories that may serve
+/// some of the same blobs.
+pub struct CompositeBlob<B: api::Blob + 'static> {
+    blobs: Vec<B>,
+}
+
+impl<B: api::Blob + 'static> CompositeBlob<B> {
+    /// Constructs a new [`CompositeBlob`] that refers to `first_blob`, and instances of the same
+    /// blob (by `hash()`) that are found in `other_blob_sets`.
+    pub fn new_with_blob_sets<
+        E: api::Error,
+        BS: Borrow<dyn BlobSet<Hash = B::Hash, Blob = B, DataSource = B::DataSource, Error = E>>,
+        I: Iterator<Item = BS>,
+    >(
+        first_blob: B,
+        other_blob_sets: I,
+    ) -> Self {
+        let hash = first_blob.hash();
+        let blobs = iter::once(first_blob)
+            .chain(other_blob_sets.filter_map(|set| set.borrow().blob(hash.clone()).ok()))
+            .collect();
+        Self { blobs }
+    }
+}
+
+impl<B: api::Blob + 'static> api::Blob for CompositeBlob<B> {
+    type Hash = B::Hash;
+    type ReaderSeeker = B::ReaderSeeker;
+    type DataSource = B::DataSource;
+    type Error = B::Error;
+
+    fn hash(&self) -> Self::Hash {
+        self.blobs[0].hash()
+    }
+
+    fn reader_seeker(&self) -> Result<Self::ReaderSeeker, Self::Error> {
+        self.blobs[0].reader_seeker()
+    }
+
+    fn data_sources(&self) -> Box<dyn Iterator<Item = Self::DataSource>> {
+        let mut data_sources = vec![];
+        for blob in self.blobs.iter() {
+            data_sources.extend(blob.data_sources())
+        }
+        Box::new(data_sources.into_iter())
+    }
 }
 
 #[derive(Debug, Error)]
@@ -432,37 +625,75 @@ pub enum BlobError {
 
     #[error("{0}")]
     BlobDirectoryError(#[from] BlobDirectoryError),
+
+    #[error("{0:?}")]
+    CompositeBlobError(#[from] anyhow::Error),
 }
 
 /// Unified `crate::api::Blob` implementation for production blob types.
-pub enum Blob {
+pub enum Blob<CB: api::Blob<Hash = Hash, ReaderSeeker = Box<dyn ReadSeek>> + 'static>
+where
+    CB::Error: Into<BlobError>,
+    CB::DataSource: Into<BlobSource>,
+{
     #[cfg(test)]
     BlobFsBlob(blobfs::BlobFsBlob),
 
     FileBlob(FileBlob),
     ProductBundleRepositoryBlob(ProductBundleRepositoryBlob),
+    CompositeBlob(CompositeBlob<CB>),
 }
 
 #[cfg(test)]
-impl From<blobfs::BlobFsBlob> for Blob {
+impl<CB: api::Blob<Hash = Hash, ReaderSeeker = Box<dyn ReadSeek>> + 'static>
+    From<blobfs::BlobFsBlob> for Blob<CB>
+where
+    CB::Error: Into<BlobError>,
+    CB::DataSource: Into<BlobSource>,
+{
     fn from(blob_fs_blob: blobfs::BlobFsBlob) -> Self {
         Self::BlobFsBlob(blob_fs_blob)
     }
 }
 
-impl From<FileBlob> for Blob {
+impl<CB: api::Blob<Hash = Hash, ReaderSeeker = Box<dyn ReadSeek>> + 'static> From<FileBlob>
+    for Blob<CB>
+where
+    CB::Error: Into<BlobError>,
+    CB::DataSource: Into<BlobSource>,
+{
     fn from(file_blob: FileBlob) -> Self {
         Self::FileBlob(file_blob)
     }
 }
 
-impl From<ProductBundleRepositoryBlob> for Blob {
+impl<CB: api::Blob<Hash = Hash, ReaderSeeker = Box<dyn ReadSeek>> + 'static>
+    From<ProductBundleRepositoryBlob> for Blob<CB>
+where
+    CB::Error: Into<BlobError>,
+    CB::DataSource: Into<BlobSource>,
+{
     fn from(product_bundle_repository_blob: ProductBundleRepositoryBlob) -> Self {
         Self::ProductBundleRepositoryBlob(product_bundle_repository_blob)
     }
 }
 
-impl api::Blob for Blob {
+impl<CB: api::Blob<Hash = Hash, ReaderSeeker = Box<dyn ReadSeek>> + 'static> From<CompositeBlob<CB>>
+    for Blob<CB>
+where
+    CB::Error: Into<BlobError>,
+    CB::DataSource: Into<BlobSource>,
+{
+    fn from(composite_blob: CompositeBlob<CB>) -> Self {
+        Self::CompositeBlob(composite_blob)
+    }
+}
+
+impl<CB: api::Blob<Hash = Hash, ReaderSeeker = Box<dyn ReadSeek>> + 'static> api::Blob for Blob<CB>
+where
+    CB::Error: Into<BlobError>,
+    CB::DataSource: Into<BlobSource>,
+{
     type Hash = Hash;
     type ReaderSeeker = Box<dyn ReadSeek>;
     type DataSource = BlobSource;
@@ -477,6 +708,7 @@ impl api::Blob for Blob {
             Self::ProductBundleRepositoryBlob(product_bundle_repository_blob) => {
                 product_bundle_repository_blob.hash()
             }
+            Self::CompositeBlob(composite_blob) => composite_blob.hash(),
         }
     }
 
@@ -484,10 +716,12 @@ impl api::Blob for Blob {
         match self {
             #[cfg(test)]
             Self::BlobFsBlob(blob_fs_blob) => blob_fs_blob.reader_seeker().map_err(BlobError::from),
-
             Self::FileBlob(file_blob) => file_blob.reader_seeker().map_err(BlobError::from),
             Self::ProductBundleRepositoryBlob(product_bundle_repository_blob) => {
                 product_bundle_repository_blob.reader_seeker().map_err(BlobError::from)
+            }
+            Self::CompositeBlob(composite_blob) => {
+                composite_blob.reader_seeker().map_err(|cb_error| cb_error.into())
             }
         }
     }
@@ -505,6 +739,9 @@ impl api::Blob for Blob {
             Self::ProductBundleRepositoryBlob(product_bundle_repository_blob) => Box::new(
                 product_bundle_repository_blob.data_sources().map(|data_source| data_source.into()),
             ),
+            Self::CompositeBlob(composite_blob) => {
+                Box::new(composite_blob.data_sources().map(|data_source| data_source.into()))
+            }
         }
     }
 }

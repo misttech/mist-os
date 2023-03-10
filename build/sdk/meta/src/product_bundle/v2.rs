@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// Description of the data needed to set up (flash) a device.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProductBundleV2 {
     /// The <product>.<board> for the product bundle.
@@ -73,7 +73,7 @@ pub struct ProductBundleV2 {
 }
 
 /// A repository that holds all the packages, blobs, and keys.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Repository {
     /// The unique name of the repository, such as "fuchsia.com".

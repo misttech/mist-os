@@ -70,7 +70,7 @@ impl api::DataSource for DataSource {
 }
 
 /// Unified `crate::api::DataSource` implementation over production blob types.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub enum BlobSource {
     #[cfg(test)]
     BlobFsArchive(blobfs::BlobFsArchive),
@@ -170,7 +170,7 @@ pub mod blobfs {
     use std::iter;
     use std::path::PathBuf;
 
-    #[derive(Debug, Eq, PartialEq)]
+    #[derive(Debug, Eq, Hash, PartialEq)]
     pub struct BlobFsArchive {
         path: PathBuf,
     }
@@ -211,7 +211,7 @@ pub mod blobfs {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct BlobDirectory {
     directory: PathBuf,
 }

@@ -39,10 +39,6 @@ struct Args {
     #[argh(option)]
     pub product_bundle: PathBuf,
 
-    /// name of the repository in the product bundle to analyze.
-    #[argh(option)]
-    pub repository_name: String,
-
     /// output debug logging.
     #[argh(switch)]
     pub debug: bool,
@@ -67,9 +63,9 @@ fn main() -> Result<()> {
 
 #[tracing::instrument(level = "trace")]
 fn run_smoke_test(args: Args) -> Result<()> {
-    let Args { depfile, stamp, product_bundle, repository_name, .. } = args;
+    let Args { depfile, stamp, product_bundle, .. } = args;
 
-    let scrutiny = build_scrutiny_instance(product_bundle.clone(), repository_name, SystemSlot::A)?;
+    let scrutiny = build_scrutiny_instance(product_bundle.clone(), SystemSlot::A)?;
 
     output_data_sources(&scrutiny);
     output_blobs(&scrutiny);
@@ -87,13 +83,10 @@ fn run_smoke_test(args: Args) -> Result<()> {
 #[tracing::instrument(level = "trace")]
 fn build_scrutiny_instance(
     product_bundle: PathBuf,
-    repository_name: String,
     system_slot: SystemSlot,
 ) -> Result<impl Scrutiny> {
     ScrutinyBuilder::new(
-        ProductBundleBuilder::new(product_bundle, SystemSlot::A, repository_name)
-            .build()
-            .expect("product bundle"),
+        ProductBundleBuilder::new(product_bundle, SystemSlot::A).build().expect("product bundle"),
     )
     .build()
     .context("building scrutiny instance")
