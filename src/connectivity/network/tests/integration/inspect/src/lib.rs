@@ -7,7 +7,7 @@
 use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU16};
 
 use fuchsia_async as fasync;
-use fuchsia_inspect::testing::TreeAssertion;
+use fuchsia_inspect::testing::{tree_assertion, AnyProperty, NonZeroUintProperty, TreeAssertion};
 use fuchsia_zircon as zx;
 
 use diagnostics_hierarchy::Property;
@@ -16,7 +16,7 @@ use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
 use netstack_testing_common::{
     constants, get_inspect_data,
-    realms::{KnownServiceProvider, Netstack, Netstack2, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Netstack, Netstack2, NetstackVersion, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -191,7 +191,6 @@ async fn inspect_nic<N: Netstack>(name: &str) {
         .expect("get_inspect_data failed");
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
-    use fuchsia_inspect::testing::{AnyProperty, NonZeroUintProperty};
     fuchsia_inspect::assert_data_tree!(data, NICs: {
         loopback_props.id.to_string() => {
             Name: loopback_props.name,
@@ -338,13 +337,12 @@ async fn inspect_routing_table<N: Netstack>(name: &str) {
     assert!(!routing_table.is_empty());
     println!("Got routing table: {:#?}", routing_table);
 
-    use fuchsia_inspect::testing::{AnyProperty, TreeAssertion};
     let mut routing_table_assertion = TreeAssertion::new("Routes", true);
     for (i, route) in routing_table.into_iter().enumerate() {
         let index = &i.to_string();
         let fidl_fuchsia_net_stack_ext::ForwardingEntry { subnet, device_id, next_hop, metric } =
             route.into();
-        let route_assertion = fuchsia_inspect::tree_assertion!(var index: {
+        let route_assertion = tree_assertion!(var index: {
             "Destination": format!(
                 "{}",
                 subnet,
@@ -617,7 +615,6 @@ async fn inspect_stat_counters<N: Netstack>(name: &str) {
         .await
         .expect("get_inspect_data failed");
     // TODO(https://fxbug.dev/62447): change AnyProperty to AnyUintProperty when available.
-    use fuchsia_inspect::testing::AnyProperty;
     fuchsia_inspect::assert_data_tree!(data, "Networking Stat Counters": {
         DroppedPackets: AnyProperty,
         SocketCount: AnyProperty,
@@ -949,9 +946,22 @@ async fn inspect_for_sampler<N: Netstack>(name: &str) {
     }
 }
 
+const CONFIG_DATA_SPECIFIED_PROCS: &str = "/pkg/netstack/specified_procs.json";
+const CONFIG_DATA_NONEXISTENT: &str = "/pkg/netstack/idontexist.json";
+
 #[netstack_test]
-#[test_case(true, "DEBUG", "1m0s", false, false; "default debug config")]
-#[test_case(false, "INFO", "2m0s", true, true; "non-default config")]
+#[test_case(
+    true, "DEBUG", "1m0s", false, false, NetstackVersion::Netstack2.get_config_data(), None;
+    "default debug config"
+)]
+#[test_case(
+    false, "INFO", "2m0s", true, true, CONFIG_DATA_SPECIFIED_PROCS, Some(2);
+    "non-default config"
+)]
+#[test_case(
+    false, "INFO", "2m0s", true, true, CONFIG_DATA_NONEXISTENT, None;
+    "config-data file is nonexistent"
+)]
 async fn inspect_config(
     name: &str,
     log_packets: bool,
@@ -959,6 +969,8 @@ async fn inspect_config(
     socket_stats_sampling_interval: &str,
     no_opaque_iids: bool,
     fast_udp: bool,
+    config_data: &str,
+    expect_max_procs_set: Option<usize>,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = {
@@ -966,19 +978,14 @@ async fn inspect_config(
             Netstack2::VERSION,
         ));
         let fidl_fuchsia_netemul::ChildDef { program_args, .. } = &mut netstack;
-        assert_eq!(
-            std::mem::replace(
-                program_args,
-                Some(vec![
-                    format!("--log-packets={log_packets}"),
-                    format!("--verbosity={verbosity}"),
-                    format!("--socket-stats-sampling-interval={socket_stats_sampling_interval}"),
-                    format!("--no-opaque-iids={no_opaque_iids}"),
-                    format!("--fast-udp={fast_udp}"),
-                ])
-            ),
-            None,
-        );
+        *program_args = Some(vec![
+            format!("--log-packets={log_packets}"),
+            format!("--verbosity={verbosity}"),
+            format!("--socket-stats-sampling-interval={socket_stats_sampling_interval}"),
+            format!("--no-opaque-iids={no_opaque_iids}"),
+            format!("--fast-udp={fast_udp}"),
+            format!("--config-data={config_data}"),
+        ]);
         sandbox.create_realm(name, [netstack]).expect("create realm")
     };
 
@@ -987,15 +994,28 @@ async fn inspect_config(
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("connect to protocol");
 
-    let data =
-        get_inspect_data(&realm, "netstack", r#"Runtime\ Configuration\ Flags"#, "configuration")
-            .await
-            .expect("get inspect data");
-    fuchsia_inspect::assert_data_tree!(data, "Runtime Configuration Flags": {
+    let mut inspect_assertion = tree_assertion!("Runtime Configuration Flags": {
         "log-packets": format!("{log_packets}"),
         "verbosity": verbosity.to_string(),
         "socket-stats-sampling-interval": socket_stats_sampling_interval.to_string(),
         "no-opaque-iids": format!("{no_opaque_iids}"),
         "fast-udp": format!("{fast_udp}"),
     });
+    let mut config_data_assertion = tree_assertion!("config-data": {
+        file: config_data.to_string(),
+        "num-cpu": AnyProperty,
+    });
+    if let Some(max_procs) = expect_max_procs_set {
+        config_data_assertion
+            .add_property_assertion("max-procs", Box::new(format!("{}", max_procs)));
+    }
+    inspect_assertion.add_child_assertion(config_data_assertion);
+
+    let data =
+        get_inspect_data(&realm, "netstack", r#"Runtime\ Configuration\ Flags"#, "configuration")
+            .await
+            .expect("get inspect data");
+    inspect_assertion
+        .run(&data)
+        .unwrap_or_else(|e| panic!("unexpected inspect data: {:?}; got {:#?}", e, data));
 }

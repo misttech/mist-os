@@ -57,6 +57,24 @@ impl NetstackVersion {
         }
     }
 
+    /// Gets the path to the config-data file that Netstack should use.
+    pub fn get_config_data(&self) -> &'static str {
+        "/pkg/netstack/default.json"
+    }
+
+    /// Default arguments that should be passed to the component when run in a
+    /// test realm.
+    pub fn get_program_args(&self) -> &[&'static str] {
+        match self {
+            NetstackVersion::Netstack2 => &["--log-packets", "--verbosity=debug"],
+            NetstackVersion::Netstack2WithFastUdp => {
+                &["--log-packets", "--verbosity=debug", "--fast-udp"]
+            }
+            NetstackVersion::Netstack3 => &[],
+            NetstackVersion::ProdNetstack2 => &[],
+        }
+    }
+
     /// Gets the services exposed by this Netstack component.
     pub fn get_services(&self) -> &[&'static str] {
         macro_rules! common_services_and {
@@ -253,6 +271,16 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
             KnownServiceProvider::Netstack(version) => fnetemul::ChildDef {
                 name: Some(constants::netstack::COMPONENT_NAME.to_string()),
                 source: Some(fnetemul::ChildSource::Component(version.get_url().to_string())),
+                program_args: Some(
+                    version
+                        .get_program_args()
+                        .iter()
+                        .cloned()
+                        .chain(std::iter::once("--config-data"))
+                        .chain(std::iter::once(version.get_config_data()))
+                        .map(Into::into)
+                        .collect(),
+                ),
                 exposes: Some(
                     version.get_services().iter().map(|service| service.to_string()).collect(),
                 ),

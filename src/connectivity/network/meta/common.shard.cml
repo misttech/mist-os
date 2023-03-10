@@ -24,6 +24,7 @@
         },
         {
             name: "netstack",
+
             // Pull the netstack from an external package. This allows its
             // contents to be determined at product assembly time, which makes
             // it easy to swap out the netstack. We can't use subpackages for
@@ -173,8 +174,14 @@
         {
             directory: "config-data",
             from: "parent",
-            to: [ "#netcfg" ],
+            to: "#netcfg",
             subdir: "netcfg",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#netstack",
+            subdir: "netstack",
         },
         {
             directory: "root-ssl-certificates",

@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -272,6 +273,10 @@ func InstallThreadProfiles(ctx context.Context, componentCtx *component.Context)
 	}()
 }
 
+type config struct {
+	GOMAXPROCS *int
+}
+
 func Main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -293,8 +298,31 @@ func Main() {
 	fastUDP := true
 	flags.BoolVar(&fastUDP, "fast-udp", true, "enable Fast UDP")
 
+	configFile := flags.String("config-data", "/config/data/default.json", "config file to use")
+
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		panic(err)
+	}
+
+	var config *config
+	setMaxProcs := func() bool {
+		b, err := os.ReadFile(*configFile)
+		if err != nil {
+			_ = syslog.Warnf("failed to read config data at %s, continuing with defaults", *configFile)
+			return false
+		}
+		if err := json.Unmarshal(b, &config); err != nil {
+			panic(fmt.Sprintf("failed to unmarshal JSON from config file: %s", err))
+		}
+		if config.GOMAXPROCS != nil {
+			prev := runtime.GOMAXPROCS(*config.GOMAXPROCS)
+			_ = syslog.Infof("set GOMAXPROCS to %d, was %d (NumCPU = %d)", *config.GOMAXPROCS, prev, runtime.NumCPU())
+			return true
+		}
+		return false
+	}()
+	if !setMaxProcs {
+		_ = syslog.Infof("override for GOMAXPROCS not provided, leaving as default (NumCPU = %d)", runtime.NumCPU())
 	}
 
 	componentCtx := component.NewContextFromStartupInfo()
@@ -507,6 +535,12 @@ func Main() {
 					socketStatsTimerPeriod: socketStatsTimerPeriod,
 					noOpaqueIID:            noOpaqueIID,
 					fastUDP:                fastUDP,
+					config: configDataInspectImpl{
+						name:   "config-data",
+						file:   *configFile,
+						data:   config,
+						numCPU: runtime.NumCPU(),
+					},
 				},
 			}).asService,
 		},

@@ -66,6 +66,7 @@ config_data_for_pkg_allowlist = [
   "memory_monitor",
   "metrics-logger",
   "netcfg",
+  "netstack",
   "night_mode_integration_test_pkg",
   "omaha-client",
   "omaha-client-service-bin-tests",

@@ -128,6 +128,7 @@ type configInspectImpl struct {
 	socketStatsTimerPeriod time.Duration
 	noOpaqueIID            bool
 	fastUDP                bool
+	config                 configDataInspectImpl
 }
 
 func (impl *configInspectImpl) ReadData() inspect.Object {
@@ -143,11 +144,48 @@ func (impl *configInspectImpl) ReadData() inspect.Object {
 	}
 }
 
-func (_ *configInspectImpl) ListChildren() []string {
+func (impl *configInspectImpl) ListChildren() []string {
+	return []string{impl.config.name}
+}
+
+func (impl *configInspectImpl) GetChild(childName string) inspectInner {
+	if childName != impl.config.name {
+		return nil
+	}
+	return &impl.config
+}
+
+var _ inspectInner = (*configDataInspectImpl)(nil)
+
+type configDataInspectImpl struct {
+	name   string
+	file   string
+	data   *config
+	numCPU int
+}
+
+func (impl *configDataInspectImpl) ReadData() inspect.Object {
+	properties := []inspect.Property{
+		{Key: "file", Value: inspect.PropertyValueWithStr(impl.file)},
+		{Key: "num-cpu", Value: inspect.PropertyValueWithStr(strconv.FormatInt(int64(impl.numCPU), 10))},
+	}
+	if impl.data != nil && impl.data.GOMAXPROCS != nil {
+		properties = append(properties, inspect.Property{
+			Key:   "max-procs",
+			Value: inspect.PropertyValueWithStr(strconv.FormatInt(int64(*impl.data.GOMAXPROCS), 10)),
+		})
+	}
+	return inspect.Object{
+		Name:       impl.name,
+		Properties: properties,
+	}
+}
+
+func (_ *configDataInspectImpl) ListChildren() []string {
 	return nil
 }
 
-func (_ *configInspectImpl) GetChild(_ string) inspectInner {
+func (_ *configDataInspectImpl) GetChild(_ string) inspectInner {
 	return nil
 }
 
