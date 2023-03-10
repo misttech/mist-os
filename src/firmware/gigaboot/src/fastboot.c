@@ -807,14 +807,24 @@ void fb_reboot(char *cmd) {
   // Throw away the reboot command.
   strtok(cmd, "-");
 
+  efi_status result = EFI_INVALID_PARAMETER;
   char *partition = strtok(NULL, "-");
   if (!partition) {
-    set_bootbyte(gSys->RuntimeServices, EFI_BOOT_NORMAL);
+    result = set_bootbyte(gSys->RuntimeServices, EFI_BOOT_NORMAL);
   } else if (!strncmp(partition, "bootloader", 10)) {
-    set_bootbyte(gSys->RuntimeServices, EFI_BOOT_BOOTLOADER);
+    result = set_bootbyte(gSys->RuntimeServices, EFI_BOOT_BOOTLOADER);
   } else if (!strncmp(partition, "recovery", 8)) {
-    set_bootbyte(gSys->RuntimeServices, EFI_BOOT_RECOVERY);
+    result = set_bootbyte(gSys->RuntimeServices, EFI_BOOT_RECOVERY);
   }
+
+  if (result != EFI_SUCCESS) {
+    char err_msg[FB_CMD_MAX_LEN];
+    snprintf(err_msg, FB_CMD_MAX_LEN, "failed to set bootbyte (%s); efi_status: %016" PRIx64,
+             partition ? partition : "default", result);
+    fb_send_fail(err_msg);
+    return;
+  }
+
   fb_send_okay("");
 
   // Set the reboot flag but don't do it right away so that we can complete
@@ -1097,7 +1107,14 @@ void fb_staged_bootloader_file(char *cmd) {
     return;
   }
 
-  zircon_stage_zbi_file(name, curr_img.data, curr_img.size);
+  int result = zircon_stage_zbi_file(name, curr_img.data, curr_img.size);
+  if (result != 0) {
+    char err_msg[FB_CMD_MAX_LEN];
+    snprintf(err_msg, FB_CMD_MAX_LEN, "failed to stage zbi file %s; code: %i", name, result);
+    fb_send_fail(err_msg);
+    return;
+  }
+
   fb_send_okay("");
 }
 
