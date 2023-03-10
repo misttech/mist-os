@@ -49,6 +49,9 @@ if (!is_host) {
 
       # For `fx bindc`.
       "//tools/bindc:host",
+
+      # For `fx update-rustc-third-party`.
+      "//tools/cargo-gnaw:install-cargo-gnaw",
     ]
   }
 }
