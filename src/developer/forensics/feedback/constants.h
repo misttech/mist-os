@@ -22,6 +22,8 @@ const char kOverrideBuildTypeConfigPath[] = "/config/data/build_type/override_co
 const char kDefaultProductConfigPath[] = "/pkg/data/product/default_config.json";
 const char kOverrideProductConfigPath[] = "/config/data/product/override_config.json";
 
+const char kDefaultSnapshotConfigPath[] = "/pkg/data/snapshot/default_config.json";
+
 constexpr char kInspectConfigKey[] = "config";
 
 constexpr char kPersistedLogsNumFilesKey[] = "persisted_logs_num_files";
@@ -84,8 +86,6 @@ constexpr zx::duration kSnapshotSharedRequestWindow = zx::sec(5);
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Feedback data
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-constexpr char kFeedbackDataConfigPath[] = "/pkg/data/feedback_data/config.json";
-
 constexpr char kBuildSnapshotPath[] = "/config/build-info/snapshot";
 constexpr char kDeviceIdPath[] = "/data/device_id.txt";
 constexpr char kCurrentLogsDir[] = "/cache/current_system_logs";

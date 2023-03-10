@@ -10,24 +10,6 @@ visibility = [ ":*" ]
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("config_unittest_exe") {
-  testonly = true
-
-  # "config_unittest" is rather generic for the default_output_dir that is set
-  # to root_out_dir so instead we write the binary to target_out_dir.
-  output_dir = target_out_dir
-
-  sources = [ "config_unittest.cc" ]
-
-  deps = [
-    "//src/developer/forensics/feedback_data:config",
-    "//src/developer/forensics/testing:gtest_with_syslog_main",
-    "//third_party/googletest:gmock",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 executable("data_provider_unittest_exe") {
   testonly = true
 
@@ -166,18 +148,6 @@ executable("screenshot_unittest_exe") {
 ###############################################################################
 # RESOURCES
 ###############################################################################
-resource("test_configs") {
-  sources = [
-    "configs/bad_schema_duplicated_attachment_key.json",
-    "configs/bad_schema_missing_required_field.json",
-    "configs/bad_schema_spurious_field.json",
-    "configs/valid.json",
-    "configs/valid_empty_list.json",
-  ]
-
-  outputs = [ "data/configs/{{source_file_part}}" ]
-}
-
 resource("test_image") {
   sources =
       [ "//src/developer/forensics/testing/resources/checkerboard_100.png" ]
@@ -188,13 +158,6 @@ resource("test_image") {
 ###############################################################################
 # COMPONENTS
 ###############################################################################
-fuchsia_unittest_component("config_unittest") {
-  deps = [
-    ":config_unittest_exe",
-    ":test_configs",
-  ]
-}
-
 fuchsia_component("data_provider_unittest") {
   testonly = true
 
@@ -244,7 +207,6 @@ fuchsia_unittest_component("screenshot_unittest") {
 ###############################################################################
 fuchsia_test_package("feedback-data-tests") {
   test_components = [
-    ":config_unittest",
     ":data_provider_unittest",
     ":data_provider_controller_unittest",
     ":inspect_data_budget_unittest",

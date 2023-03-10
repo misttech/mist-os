@@ -8,10 +8,10 @@
 #include <lib/inspect/cpp/vmo/types.h>
 
 #include <optional>
+#include <set>
 #include <string>
 
 #include "src/developer/forensics/feedback/constants.h"
-#include "src/developer/forensics/feedback_data/config.h"
 #include "src/developer/forensics/utils/storage_size.h"
 
 namespace forensics::feedback {
@@ -45,6 +45,11 @@ struct BuildTypeConfig {
   bool enable_limit_inspect_data;
 };
 
+struct SnapshotConfig {
+  std::set<std::string> annotation_allowlist;
+  std::set<std::string> attachment_allowlist;
+};
+
 std::optional<ProductConfig> GetProductConfig(
     const std::string& default_path = kDefaultProductConfigPath,
     const std::string& override_path = kOverrideProductConfigPath);
@@ -53,8 +58,8 @@ std::optional<BuildTypeConfig> GetBuildTypeConfig(
     const std::string& default_path = kDefaultBuildTypeConfigPath,
     const std::string& override_path = kOverrideBuildTypeConfigPath);
 
-std::optional<feedback_data::Config> GetFeedbackDataConfig(
-    const std::string& path = kFeedbackDataConfigPath);
+std::optional<SnapshotConfig> GetSnapshotConfig(
+    const std::string& path = kDefaultSnapshotConfigPath);
 
 // Exposes the static configuration based on build type and product.
 void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type_config,

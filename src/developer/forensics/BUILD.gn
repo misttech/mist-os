@@ -80,9 +80,9 @@ fuchsia_component("feedback") {
   manifest = "feedback/meta/feedback.cml"
 
   deps = [
-    ":feedback_data_config",
     ":feedback_default_build_type_config",
     ":feedback_default_product_config",
+    ":feedback_default_snapshot_config",
     ":feedback_exe",
     ":system_log_recorder_exe",
   ]
@@ -148,12 +148,6 @@ config_data("feedback_large_disk_product_config") {
   outputs = [ "product/override_config.json" ]
 }
 
-resource("feedback_data_config") {
-  sources = [ "feedback_data/configs/default.json" ]
-
-  outputs = [ "data/feedback_data/config.json" ]
-}
-
 resource("feedback_default_build_type_config") {
   sources = [ "feedback/configs/build_type/default.json" ]
 
@@ -174,6 +168,12 @@ config_data("feedback_userdebug_config") {
   sources = [ "feedback/configs/build_type/userdebug.json" ]
 
   outputs = [ "build_type/override_config.json" ]
+}
+
+resource("feedback_default_snapshot_config") {
+  sources = [ "feedback/configs/snapshot/default.json" ]
+
+  outputs = [ "data/snapshot/default_config.json" ]
 }
 
 config_data("feedback_remote_device_id_provider") {

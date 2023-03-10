@@ -15,6 +15,7 @@
 
 #include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
+#include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"
 
 namespace forensics::feedback {
@@ -27,6 +28,8 @@ using inspect::testing::NodeMatches;
 using inspect::testing::PropertyList;
 using inspect::testing::StringIs;
 using inspect::testing::UintIs;
+using testing::ElementsAreArray;
+using testing::IsEmpty;
 using testing::IsSupersetOf;
 
 constexpr auto kConfigDisabled = CrashReportUploadPolicy::kDisabled;
@@ -63,6 +66,13 @@ class BuildTypeConfigTest : public ConfigTest {
  protected:
   std::optional<BuildTypeConfig> ParseConfig(const std::string& config) {
     return GetBuildTypeConfig(WriteConfig(config));
+  }
+};
+
+class SnapshotConfigTest : public ConfigTest {
+ protected:
+  std::optional<SnapshotConfig> ParseConfig(const std::string& config) {
+    return GetSnapshotConfig(WriteConfig(config));
   }
 };
 
@@ -113,7 +123,7 @@ TEST_F(ProductConfigTest, SpuriousField) {
   "persisted_logs_num_files": 1,
   "persisted_logs_total_size_kib": 1,
   "snapshot_persistence_max_tmp_size_mib": 1,
-  "snapshot_persistence_max_cache_size_mib": 1
+  "snapshot_persistence_max_cache_size_mib": 1,
   "spurious": ""
 })");
 
@@ -680,28 +690,130 @@ TEST_F(BuildTypeConfigTest, MissingOverrideAndDefaultBuildTypeConfigs) {
   EXPECT_FALSE(config.has_value());
 }
 
-TEST_F(ConfigTest, GetFeedbackDataConfig) {
-  const std::string config_path = WriteConfig(R"({
-    "annotation_allowlist": [
-      "annotation_one",
-      "annotation_two"
-    ],
-    "attachment_allowlist": [
-      "attachment_one"
-    ]
+TEST_F(SnapshotConfigTest, MissingAnnotationAllowlist) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "attachment_allowlist": []
 })");
 
-  EXPECT_FALSE(GetFeedbackDataConfig("/bad/path"));
+  EXPECT_FALSE(config.has_value());
+}
 
-  const auto config = GetFeedbackDataConfig(config_path);
-  ASSERT_TRUE(config);
-  EXPECT_EQ(config->annotation_allowlist, std::set<std::string>({
-                                              "annotation_one",
-                                              "annotation_two",
-                                          }));
-  EXPECT_EQ(config->attachment_allowlist, std::set<std::string>({
-                                              "attachment_one",
-                                          }));
+TEST_F(SnapshotConfigTest, MissingAttachmentAllowlist) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": []
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, SpuriousField) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": [],
+  "attachment_allowlist": [],
+  "spurious": ""
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, AnnotationAllowlistNotArray) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": "",
+  "attachment_allowlist": []
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, AttachmentAllowlistNotArray) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": [],
+  "attachment_allowlist": ""
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, AnnotationAllowlistNotArrayOfStrings) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": [1],
+  "attachment_allowlist": []
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, AttachmentAllowlistNotArrayOfStrings) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": [],
+  "attachment_allowlist": [1]
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, AnnotationAllowlistDuplicateItems) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": ["a", "a"],
+  "attachment_allowlist": []
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, AttachmentAllowlistDuplicateItems) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": [],
+  "attachment_allowlist": ["a", "a"]
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotConfigTest, AnnotationAllowlistEmpty) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": [],
+  "attachment_allowlist": ["a"]
+})");
+
+  ASSERT_TRUE(config.has_value());
+  EXPECT_THAT(config->annotation_allowlist, IsEmpty());
+}
+
+TEST_F(SnapshotConfigTest, AttachmentAllowlistEmpty) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": ["a"],
+  "attachment_allowlist": []
+})");
+
+  ASSERT_TRUE(config.has_value());
+  EXPECT_THAT(config->attachment_allowlist, IsEmpty());
+}
+
+TEST_F(SnapshotConfigTest, AnnotationAllowlistNonEmpty) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": ["a", "b"],
+  "attachment_allowlist": []
+})");
+
+  ASSERT_TRUE(config.has_value());
+  EXPECT_THAT(config->annotation_allowlist, ElementsAreArray({"a", "b"}));
+}
+
+TEST_F(SnapshotConfigTest, AttachmentAllowlistNonEmpty) {
+  const std::optional<SnapshotConfig> config = ParseConfig(R"({
+  "annotation_allowlist": [],
+  "attachment_allowlist": ["a", "b"]
+})");
+
+  ASSERT_TRUE(config.has_value());
+  EXPECT_THAT(config->attachment_allowlist, ElementsAreArray({"a", "b"}));
+}
+
+TEST_F(ProductConfigTest, MissingConfigs) {
+  const std::optional<SnapshotConfig> config = GetSnapshotConfig("/bad/path");
+
+  EXPECT_FALSE(config.has_value());
 }
 
 TEST_F(InspectConfigTest, ExposeConfig_UploadDisabled) {

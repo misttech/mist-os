@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/feedback/config.h"
@@ -14,6 +15,8 @@
 namespace forensics::feedback {
 namespace {
 
+using testing::UnorderedElementsAreArray;
+
 class ProdConfigTest : public testing::Test {
  public:
   static std::optional<ProductConfig> ReadProductConfig(const std::string& config_filename) {
@@ -22,6 +25,10 @@ class ProdConfigTest : public testing::Test {
 
   static std::optional<BuildTypeConfig> ReadBuildTypeConfig(const std::string& config_filename) {
     return GetBuildTypeConfig(files::JoinPath("/pkg/data/build_type/configs", config_filename));
+  }
+
+  static std::optional<SnapshotConfig> ReadSnapshotConfig(const std::string& config_filename) {
+    return GetSnapshotConfig(files::JoinPath("/pkg/data/snapshot/configs", config_filename));
   }
 };
 
@@ -45,7 +52,7 @@ TEST_F(ProdConfigTest, LargeDiskProduct) {
   EXPECT_EQ(config->snapshot_persistence_max_cache_size, StorageSize::Megabytes(10));
 }
 
-TEST_F(ProdConfigTest, Default) {
+TEST_F(ProdConfigTest, DefaultBuildType) {
   const std::optional<BuildTypeConfig> config = ReadBuildTypeConfig("default.json");
   ASSERT_TRUE(config.has_value());
 
@@ -76,6 +83,52 @@ TEST_F(ProdConfigTest, Userdebug) {
   EXPECT_FALSE(config->enable_data_redaction);
   EXPECT_TRUE(config->enable_hourly_snapshots);
   EXPECT_FALSE(config->enable_limit_inspect_data);
+}
+
+TEST_F(ProdConfigTest, DefaultSnapshot) {
+  const std::optional<SnapshotConfig> config = ReadSnapshotConfig("default.json");
+  ASSERT_TRUE(config.has_value());
+
+  EXPECT_THAT(config->annotation_allowlist, UnorderedElementsAreArray({
+                                                "build.board",
+                                                "build.is_debug",
+                                                "build.latest-commit-date",
+                                                "build.product",
+                                                "build.version",
+                                                "build.version.previous-boot",
+                                                "device.board-name",
+                                                "device.feedback-id",
+                                                "device.num-cpus",
+                                                "device.uptime",
+                                                "device.utc-time",
+                                                "hardware.board.name",
+                                                "hardware.board.revision",
+                                                "hardware.product.language",
+                                                "hardware.product.locale-list",
+                                                "hardware.product.manufacturer",
+                                                "hardware.product.model",
+                                                "hardware.product.name",
+                                                "hardware.product.regulatory-domain",
+                                                "hardware.product.sku",
+                                                "system.boot-id.current",
+                                                "system.boot-id.previous",
+                                                "system.last-reboot.reason",
+                                                "system.last-reboot.uptime",
+                                                "system.locale.primary",
+                                                "system.timezone.primary",
+                                                "system.update-channel.current",
+                                                "system.update-channel.target",
+                                                "system.user-activity.current.state",
+                                                "system.user-activity.current.duration",
+                                            }));
+
+  EXPECT_THAT(config->attachment_allowlist, UnorderedElementsAreArray({
+                                                "build.snapshot.xml",
+                                                "inspect.json",
+                                                "log.kernel.txt",
+                                                "log.system.previous_boot.txt",
+                                                "log.system.txt",
+                                            }));
 }
 
 }  // namespace

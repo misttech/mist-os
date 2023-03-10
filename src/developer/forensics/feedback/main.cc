@@ -33,13 +33,13 @@ namespace forensics::feedback {
 int main() {
   syslog::SetTags({"forensics", "feedback"});
 
-  auto feedback_data_config = GetFeedbackDataConfig();
-  if (!feedback_data_config) {
-    FX_LOGS(FATAL) << "Failed to get config for feedback data";
+  const std::optional<SnapshotConfig> snapshot_config = GetSnapshotConfig();
+  if (!snapshot_config) {
+    FX_LOGS(FATAL) << "Failed to get config for snapshot";
     return EXIT_FAILURE;
   }
 
-  std::optional<BuildTypeConfig> build_type_config = GetBuildTypeConfig();
+  const std::optional<BuildTypeConfig> build_type_config = GetBuildTypeConfig();
   if (!build_type_config) {
     FX_LOGS(FATAL) << "Failed to get config for build type";
     return EXIT_FAILURE;
@@ -104,7 +104,7 @@ int main() {
               .snapshot_collector_window_duration = kSnapshotSharedRequestWindow,
           },
           FeedbackData::Options{
-              .config = *feedback_data_config,
+              .config = *snapshot_config,
               .is_first_instance = component.IsFirstInstance(),
               .limit_inspect_data = build_type_config->enable_limit_inspect_data,
               .spawn_system_log_recorder = spawn_system_log_recorder,

@@ -25,7 +25,6 @@ source_set("config") {
   public_deps = [
     ":constants",
     "//sdk/lib/sys/inspect/cpp",
-    "//src/developer/forensics/feedback_data:config",
   ]
 
   deps = [

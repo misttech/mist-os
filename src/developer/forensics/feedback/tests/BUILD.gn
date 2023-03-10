@@ -392,6 +392,7 @@ executable("prod_configs_unittest_exe") {
     "//src/developer/forensics/feedback:config",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/lib/files",
+    "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
 }
@@ -535,6 +536,13 @@ resource("prod_product_configs") {
   outputs = [ "data/product/configs/{{source_file_part}}" ]
 }
 
+resource("prod_snapshot_configs") {
+  sources =
+      [ "//src/developer/forensics/feedback/configs/snapshot/default.json" ]
+
+  outputs = [ "data/snapshot/configs/{{source_file_part}}" ]
+}
+
 ###############################################################################
 # COMPONENTS
 ###############################################################################
@@ -660,6 +668,7 @@ fuchsia_unittest_component("prod_configs_unittest") {
     ":prod_build_type_configs",
     ":prod_configs_unittest_exe",
     ":prod_product_configs",
+    ":prod_snapshot_configs",
   ]
 }
 

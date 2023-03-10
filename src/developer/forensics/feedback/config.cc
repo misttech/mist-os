@@ -60,12 +60,12 @@ template <typename T>
 std::optional<T> GetConfig(const std::string& schema_str,
                            std::function<std::optional<T>(const rapidjson::Document&)> convert_fn,
                            const std::string& config_type, const std::string& default_path,
-                           const std::string& override_path) {
+                           const std::optional<std::string>& override_path) {
   std::optional<T> config;
-  if (files::IsFile(override_path)) {
-    if (config = ReadConfig<T>(schema_str, convert_fn, override_path); !config.has_value()) {
+  if (override_path.has_value() && files::IsFile(*override_path)) {
+    if (config = ReadConfig<T>(schema_str, convert_fn, *override_path); !config.has_value()) {
       FX_LOGS(ERROR) << "Failed to read override " << config_type << " config file at "
-                     << override_path;
+                     << *override_path;
     }
   }
 
@@ -200,6 +200,44 @@ std::optional<BuildTypeConfig> ParseBuildTypeConfig(const rapidjson::Document& j
   return config;
 }
 
+constexpr char kSnapshotConfigSchema[] = R"({
+  "type": "object",
+  "properties": {
+    "annotation_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "attachment_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "annotation_allowlist",
+    "attachment_allowlist"
+  ],
+  "additionalProperties": false
+})";
+
+std::optional<SnapshotConfig> ParseSnapshotConfig(const rapidjson::Document& json) {
+  SnapshotConfig config;
+  for (const auto& k : json["annotation_allowlist"].GetArray()) {
+    config.annotation_allowlist.insert(k.GetString());
+  }
+
+  for (const auto& k : json["attachment_allowlist"].GetArray()) {
+    config.attachment_allowlist.insert(k.GetString());
+  }
+
+  return config;
+}
+
 }  // namespace
 
 std::optional<ProductConfig> GetProductConfig(const std::string& default_path,
@@ -214,14 +252,9 @@ std::optional<BuildTypeConfig> GetBuildTypeConfig(const std::string& default_pat
                                     default_path, override_path);
 }
 
-std::optional<feedback_data::Config> GetFeedbackDataConfig(const std::string& path) {
-  feedback_data::Config config;
-  if (const zx_status_t status = feedback_data::ParseConfig(path, &config); status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to read config file at " << path;
-    return std::nullopt;
-  }
-
-  return config;
+std::optional<SnapshotConfig> GetSnapshotConfig(const std::string& default_path) {
+  return GetConfig<SnapshotConfig>(kSnapshotConfigSchema, ParseSnapshotConfig, "snapshot",
+                                   default_path, std::nullopt);
 }
 
 void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type_config,
