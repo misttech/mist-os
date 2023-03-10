@@ -160,19 +160,6 @@ driver_bind_rules("sherlock-hevc-enc-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-cpu-bind") {
-  rules = "bind/sherlock-cpu.bind"
-  header_output = "sherlock-cpu-bind.h"
-  bind_output = "sherlock-cpu-bind.bc"
-  tests = "bind-tests/sherlock-cpu-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.thermal",
-  ]
-}
-
 driver_bind_rules("sherlock-emmc-bind") {
   rules = "bind/sherlock-emmc.bind"
   header_output = "sherlock-emmc-bind.h"
@@ -383,7 +370,6 @@ template("sherlock_driver") {
       ":sherlock-aml-usb-phy-v2-bind_header",
       ":sherlock-bluetooth-bind_header",
       ":sherlock-buttons-bind_header",
-      ":sherlock-cpu-bind_header",
       ":sherlock-dai-test-in-bind_header",
       ":sherlock-dai-test-out-bind_header",
       ":sherlock-dwc2-phy-bind_header",
@@ -430,6 +416,7 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
       "//src/devices/bind/fuchsia.gdc:fuchsia.gdc_cpp",
       "//src/devices/bind/fuchsia.ge2d:fuchsia.ge2d_cpp",
+      "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
       "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
       "//src/devices/bind/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
       "//src/devices/bind/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
@@ -440,6 +427,7 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
       "//src/devices/bind/fuchsia.sony.platform:fuchsia.sony.platform_cpp",
       "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
+      "//src/devices/bind/fuchsia.thermal:fuchsia.thermal_cpp",
       "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
       "//src/devices/bus/lib/platform-bus-composites",
       "//src/devices/lib/amlogic",

@@ -5,18 +5,17 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
-#include <lib/ddk/binding.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/thermal/cpp/bind.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-cpu-bind.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -50,9 +49,9 @@ const std::vector<fpbus::Metadata> cpu_metadata{
 const fpbus::Node cpu_dev = []() {
   fpbus::Node result = {};
   result.name() = "aml-cpu";
-  result.vid() = PDEV_VID_GOOGLE;
-  result.pid() = PDEV_PID_SHERLOCK;
-  result.did() = PDEV_DID_GOOGLE_AMLOGIC_CPU;
+  result.vid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE;
+  result.pid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_SHERLOCK;
+  result.did() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_DID_GOOGLE_AMLOGIC_CPU;
   result.metadata() = cpu_metadata;
   result.mmio() = cpu_mmios;
   return result;
@@ -65,18 +64,38 @@ namespace sherlock {
 zx_status_t Sherlock::CpuInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SHER');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, cpu_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_cpu_fragments,
-                                               std::size(aml_cpu_fragments)),
-      "thermal");
+
+  auto aml_cpu_legacy_thermal_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_thermal::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia::PLATFORM_DEV_DID,
+                  bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_thermal::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                                bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL),
+          },
+  }};
+
+  auto composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
+      .name = "aml_cpu_legacy_spec",
+      .parents = {{aml_cpu_legacy_thermal_node}},
+  }};
+
+  fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, cpu_dev), fidl::ToWire(fidl_arena, composite_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite SherlockCpu(cpu_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec SherlockCpu(cpu_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite SherlockCpu(cpu_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec SherlockCpu(cpu_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

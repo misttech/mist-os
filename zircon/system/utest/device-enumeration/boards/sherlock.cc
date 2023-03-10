@@ -74,8 +74,8 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/03:05:6",
       "class/cpu-ctrl/000",
       "class/cpu-ctrl/001",
-      "sys/platform/05:04:a/aml-thermal-pll/thermal/aml-cpu/big-cluster",
-      "sys/platform/05:04:a/aml-thermal-pll/thermal/aml-cpu/little-cluster",
+      "sys/platform/05:04:a/aml-thermal-pll/thermal/aml_cpu_legacy/big-cluster",
+      "sys/platform/05:04:a/aml-thermal-pll/thermal/aml_cpu_legacy/little-cluster",
 
       // Thermal devices.
       "sys/platform/05:04:a",

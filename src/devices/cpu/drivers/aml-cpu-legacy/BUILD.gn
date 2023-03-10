@@ -12,7 +12,12 @@ driver_bind_rules("aml-cpu-legacy-bind") {
   header_output = "aml-cpu-legacy-bind.h"
   bind_output = "aml-cpu-legacy.bindbc"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.google.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.google.platform",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.thermal",
+  ]
 }
 
 fuchsia_driver("aml-cpu-legacy-driver") {

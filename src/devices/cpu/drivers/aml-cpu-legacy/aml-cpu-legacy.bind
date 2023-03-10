@@ -1,17 +1,25 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite aml_cpu_legacy;
+
+using fuchsia.amlogic.platform;
 using fuchsia.google.platform;
+using fuchsia.platform;
+using fuchsia.thermal;
 
-// The device must be a composite protocol device.
-fuchsia.BIND_COMPOSITE == 1;
+// The CPU device must bind to a legacy thermal driver to which DVFS commands are forwarded.
+// We need to specify the PLL sensor to ensure the correct bind, as there is a non-legacy thermal
+// device controlling the DDR sensor.
+primary node "thermal" {
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL;
+  fuchsia.BIND_PROTOCOL == fuchsia.thermal.BIND_PROTOCOL.DEVICE;
+}
 
-// Vendor must be Google.
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
-
-// Device ID Must be Google Amlogic CPU.
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOOGLE_AMLOGIC_CPU;
-
-// Only bind on Sherlock
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.SHERLOCK;
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.SHERLOCK;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.GOOGLE_AMLOGIC_CPU;
+}
