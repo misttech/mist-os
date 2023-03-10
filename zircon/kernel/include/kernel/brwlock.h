@@ -48,9 +48,12 @@ struct BrwLockState;
 
 template <>
 struct alignas(16) BrwLockState<BrwLockEnablePi::Yes> {
-  BrwLockState(uint64_t state) : state_(state), writer_(nullptr) {}
-  ktl::atomic<uint64_t> state_;
-  ktl::atomic<Thread*> writer_;
+  constexpr BrwLockState(uint64_t state, Thread* writer) : state_(state), writer_(writer) {}
+
+  explicit constexpr BrwLockState(uint64_t state) : BrwLockState(state, nullptr) {}
+
+  uint64_t state_;
+  Thread* writer_;
 };
 
 static_assert(sizeof(BrwLockState<BrwLockEnablePi::Yes>) == 16,
@@ -59,8 +62,11 @@ static_assert(BYTE_ORDER == LITTLE_ENDIAN, "PI BrwLockState assumptions little e
 
 template <>
 struct BrwLockState<BrwLockEnablePi::No> {
-  BrwLockState(uint64_t state) : state_(state) {}
-  ktl::atomic<uint64_t> state_;
+  explicit constexpr BrwLockState(uint64_t state) : state_(state) {}
+
+  constexpr BrwLockState(uint64_t state, Thread* writer) : BrwLockState(state) {}
+
+  uint64_t state_;
 };
 
 static_assert(sizeof(BrwLockState<BrwLockEnablePi::No>) == 8,
@@ -77,7 +83,7 @@ static_assert(sizeof(BrwLockState<BrwLockEnablePi::No>) == 8,
 template <BrwLockEnablePi PI>
 class TA_CAP("mutex") BrwLock {
  public:
-  BrwLock() {}
+  BrwLock() = default;
   ~BrwLock();
 
   void ReadAcquire() TA_ACQ_SHARED(this) TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -90,7 +96,8 @@ class TA_CAP("mutex") BrwLock {
       Thread::Current::preemption_state().PreemptDisable();
     }
     // Attempt the optimistic grab
-    uint64_t prev = state_.state_.fetch_add(kBrwLockReader, ktl::memory_order_acquire);
+    uint64_t prev =
+        ktl::atomic_ref(state_.state_).fetch_add(kBrwLockReader, ktl::memory_order_acquire);
     // See if there are only readers
     if (unlikely((prev & kBrwLockReaderMask) != prev)) {
       ContendedReadAcquire();
@@ -109,7 +116,8 @@ class TA_CAP("mutex") BrwLock {
 
   void ReadRelease() TA_REL_SHARED(this) TA_NO_THREAD_SAFETY_ANALYSIS {
     canary_.Assert();
-    uint64_t prev = state_.state_.fetch_sub(kBrwLockReader, ktl::memory_order_release);
+    uint64_t prev =
+        ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockReader, ktl::memory_order_release);
     if (unlikely((prev & kBrwLockReaderMask) == 1 && (prev & kBrwLockWaiterMask) != 0)) {
       LOCK_TRACE_DURATION("ContendedReadRelease");
       // there are no readers but still some waiters, becomes our job to wake them up
@@ -204,41 +212,39 @@ class TA_CAP("mutex") BrwLock {
   };
 
   AcquireResult AtomicWriteAcquire(uint64_t expected_state_bits, Thread* current_thread) {
-    if constexpr (PI == BrwLockEnablePi::Yes) {
-      // To prevent a race between setting the kBrwLocKWriter bit and the writer_ we
-      // perform a 16byte compare and swap of both values. This ensures that Block
-      // can never fail to see a writer_. Other possibilities are
-      //   * Disable interrupts: This would be correct, but disabling interrupts
-      //     is more expensive than a 16byte CAS
-      //   * thread_preempt_disable: Cheaper than disabling interrupts but is
-      //     *INCORRECT* as when preemption happens we must take the thread_lock to
-      //     proceed, but Block must hold the thread lock until it observes that
-      //     writer_ has been set, thus resulting in deadlock.
-      static_assert(alignof(BrwLockState<PI>) >= sizeof(unsigned __int128));
-      static_assert(sizeof(state_) == sizeof(unsigned __int128));
-      static_assert(offsetof(BrwLockState<PI>, state_) == 0);
-      static_assert(offsetof(BrwLockState<PI>, writer_) == 8);
-      unsigned __int128* raw_state = reinterpret_cast<unsigned __int128*>(&state_);
+    // Clang considers a type "always lock-free" when compare_exchange
+    // operations work on that type.  GCC also requires that it believe that
+    // atomic load operations are also actually atomic, which isn't the case of
+    // 16-byte quantities on machines with 8-byte words.  But we only care that
+    // compare_exchange be atomic, not that 16-byte atomic loads be available.
+#ifdef __clang__
+    constexpr bool kLockFree = decltype(ktl::atomic_ref(state_))::is_always_lock_free;
+#elif defined(__aarch64__) || defined(__x86_64__)
+    constexpr bool kLockFree = true;
+#else
+    constexpr bool kLockFree = false;
+#endif
 
-      unsigned __int128 expected = static_cast<unsigned __int128>(expected_state_bits);
-      unsigned __int128 desired =
-          static_cast<unsigned __int128>(kBrwLockWriter) |
-          static_cast<unsigned __int128>(reinterpret_cast<uintptr_t>(current_thread)) << 64;
-
-      // TODO(maniscalco): Ideally, we'd use a ktl::atomic/std::atomic here, but that's not easy to
-      // do. Once we have std::atomic_ref, raw_state can become a struct and we can stop using the
-      // compiler builtin without triggering UB.
-      const bool success =
-          __atomic_compare_exchange_n(raw_state, &expected, desired, /*weak=*/false,
-                                      /*success_memmodel=*/__ATOMIC_ACQUIRE,
-                                      /*failure_memmodel=*/__ATOMIC_RELAXED);
-      return {success, static_cast<uint64_t>(expected)};
-
+    // To prevent a race between setting the kBrwLocKWriter bit and the writer_
+    // we perform a 16-byte compare and swap of both values. This ensures that
+    // Block can never fail to see a writer_. Other possibilities are:
+    //
+    //   * Disable interrupts: This would be correct, but disabling interrupts
+    //     is more expensive than a 16-byte CAS.
+    //
+    //   * thread_preempt_disable: Cheaper than disabling interrupts but is
+    //     **INCORRECT** as when preemption happens we must take the
+    //     thread_lock to proceed, but Block must hold the thread lock until it
+    //     observes that writer_ has been set, thus resulting in deadlock.
+    if constexpr (kLockFree) {
+      BrwLockState<PI> current_state(expected_state_bits, nullptr);
+      const BrwLockState<PI> new_state(kBrwLockWriter, current_thread);
+      ktl::atomic_ref state(state_);
+      const bool success = state.compare_exchange_strong(
+          current_state, new_state, ktl::memory_order_acquire, ktl::memory_order_relaxed);
+      return {success, current_state.state_};
     } else {
-      const bool success = state_.state_.compare_exchange_strong(
-          expected_state_bits, kBrwLockWriter, ktl::memory_order_acquire,
-          ktl::memory_order_relaxed);
-      return {success, expected_state_bits};
+      PANIC_UNIMPLEMENTED;
     }
   }
 
@@ -249,13 +255,14 @@ class TA_CAP("mutex") BrwLock {
     if (unlikely(!AtomicWriteAcquire(expected_state_bits, current_thread))) {
       contended();
       if constexpr (PI == BrwLockEnablePi::Yes) {
-        DEBUG_ASSERT(state_.writer_.load(ktl::memory_order_relaxed) == current_thread);
+        DEBUG_ASSERT(ktl::atomic_ref(state_.writer_).load(ktl::memory_order_relaxed) ==
+                     current_thread);
       }
     }
   }
 
   fbl::Canary<fbl::magic("RWLK")> canary_;
-  BrwLockState<PI> state_ = kBrwLockUnlocked;
+  BrwLockState<PI> state_{kBrwLockUnlocked};
   typename BrwLockWaitQueueType<PI>::Type wait_;
 };
 

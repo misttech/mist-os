@@ -36,7 +36,7 @@ class atomic_ref : public atomic_internal::atomic_ops<atomic_ref<T>, T>,
   using value_type = T;
   using difference_type = atomic_internal::difference_t<T>;
 
-  static constexpr bool is_always_lockfree =
+  static constexpr bool is_always_lock_free =
       __atomic_always_lock_free(sizeof(T), static_cast<T*>(nullptr));
 
   static constexpr std::size_t required_alignment =

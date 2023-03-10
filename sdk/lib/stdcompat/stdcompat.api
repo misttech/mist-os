@@ -1,7 +1,7 @@
 {
   "pkg/stdcompat/include/lib/stdcompat/algorithm.h": "522ee20ca1977cc383a4ac7257951be3",
   "pkg/stdcompat/include/lib/stdcompat/array.h": "3e8d4766e4b0bb1a244ee8ec29a11833",
-  "pkg/stdcompat/include/lib/stdcompat/atomic.h": "866d6fc9f0f34c93645e3ea99d91d82b",
+  "pkg/stdcompat/include/lib/stdcompat/atomic.h": "509a41279e7a30ed8ec9fad2c1e19d5b",
   "pkg/stdcompat/include/lib/stdcompat/bit.h": "ee7a86eaabc73bb955e7c64400361b6d",
   "pkg/stdcompat/include/lib/stdcompat/cstddef.h": "360180219d58b7c9dbfc8da81b85407b",
   "pkg/stdcompat/include/lib/stdcompat/functional.h": "bd9288ba7319ca0a6305c36515c5ddb8",

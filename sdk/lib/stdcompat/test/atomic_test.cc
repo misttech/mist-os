@@ -422,7 +422,7 @@ TEST(AtomicRefTest, IntegerSpecialization) {
   CheckIntegerSpecialization<bool>();
 
   // 16 bytes -- if supported, to silence oversized atomic operations.
-  if (!cpp20::atomic_ref<int128_t>::is_always_lockfree) {
+  if (!cpp20::atomic_ref<int128_t>::is_always_lock_free) {
     return;
   }
   CheckAtomicOperations<int128_t*>();

@@ -23,7 +23,7 @@ namespace internal {
 
 template <BrwLockEnablePi PI>
 BrwLock<PI>::~BrwLock() {
-  DEBUG_ASSERT(state_.state_.load(ktl::memory_order_relaxed) == 0);
+  DEBUG_ASSERT(ktl::atomic_ref(state_.state_).load(ktl::memory_order_relaxed) == 0);
 }
 
 template <BrwLockEnablePi PI>
@@ -63,8 +63,8 @@ void BrwLock<PI>::Block(bool write) {
     // and unwinds).
     AutoEagerReschedDisabler eager_resched_disabler;
     ret = wait_.BlockAndAssignOwner(Deadline::infinite(),
-                                    state_.writer_.load(ktl::memory_order_relaxed), reason,
-                                    Interruptible::No);
+                                    ktl::atomic_ref(state_.writer_).load(ktl::memory_order_relaxed),
+                                    reason, Interruptible::No);
   } else {
     ret = wait_.BlockEtc(Deadline::infinite(), 0, reason, Interruptible::No);
   }
@@ -96,9 +96,9 @@ ResourceOwnership BrwLock<PI>::Wake() {
       if (context->ownership == ResourceOwnership::Normal) {
         // Check if target is blocked for writing and not reading
         if (woken->state() == THREAD_BLOCKED) {
-          context->state.writer_.store(woken, ktl::memory_order_relaxed);
-          context->state.state_.fetch_add(-kBrwLockWaiter + kBrwLockWriter,
-                                          ktl::memory_order_acq_rel);
+          ktl::atomic_ref(context->state.writer_).store(woken, ktl::memory_order_relaxed);
+          ktl::atomic_ref(context->state.state_)
+              .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acq_rel);
           return Action::SelectAndAssignOwner;
         }
         // If not writing then we must be blocked for reading
@@ -111,8 +111,8 @@ ResourceOwnership BrwLock<PI>::Wake() {
       if (woken->state() == THREAD_BLOCKED_READ_LOCK) {
         // We are waking readers and we found a reader, so we can wake them up and
         // search for me.
-        context->state.state_.fetch_add(-kBrwLockWaiter + kBrwLockReader,
-                                        ktl::memory_order_acq_rel);
+        ktl::atomic_ref(context->state.state_)
+            .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acq_rel);
         return Action::SelectAndKeepGoing;
       } else {
         // We are waking readers but we have found a writer. To preserve fairness we
@@ -133,12 +133,14 @@ ResourceOwnership BrwLock<PI>::Wake() {
         if (next->state() != THREAD_BLOCKED_READ_LOCK) {
           break;
         }
-        state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acq_rel);
+        ktl::atomic_ref(state_.state_)
+            .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acq_rel);
         wait_.UnblockThread(next, ZX_OK);
       }
       return ResourceOwnership::Reader;
     } else {
-      state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acq_rel);
+      ktl::atomic_ref(state_.state_)
+          .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acq_rel);
       wait_.UnblockThread(next, ZX_OK);
       return ResourceOwnership::Normal;
     }
@@ -160,7 +162,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
       affine::utils::ClampAdd(now_ticks, time_to_ticks.Scale(spin_max_duration));
 
   do {
-    const uint64_t state = state_.state_.load(ktl::memory_order_acquire);
+    const uint64_t state = ktl::atomic_ref(state_.state_).load(ktl::memory_order_acquire);
 
     // If there are any waiters, implying another thread exhausted its spin phase on the same lock,
     // break out of the spin phase early.
@@ -185,8 +187,8 @@ void BrwLock<PI>::ContendedReadAcquire() {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
   // Remove our optimistic reader from the count, and put a waiter on there instead.
-  uint64_t prev =
-      state_.state_.fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
+  uint64_t prev = ktl::atomic_ref(state_.state_)
+                      .fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
   // If there is a writer then we just block, they will wake us up
   if (StateHasWriter(prev)) {
     Block(false);
@@ -195,7 +197,8 @@ void BrwLock<PI>::ContendedReadAcquire() {
   // If we raced and there is in fact no one waiting then we can switch to
   // having the lock
   if (!StateHasWaiters(prev)) {
-    state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
+    ktl::atomic_ref(state_.state_)
+        .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
     return;
   }
   // If there are no current readers then we need to wake somebody up
@@ -205,7 +208,8 @@ void BrwLock<PI>::ContendedReadAcquire() {
     AutoEagerReschedDisabler eager_resched_disabler;
     if (Wake() == ResourceOwnership::Reader) {
       // Join the reader pool.
-      state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
+      ktl::atomic_ref(state_.state_)
+          .fetch_add(-kBrwLockWaiter + kBrwLockReader, ktl::memory_order_acquire);
       return;
     }
   }
@@ -252,7 +256,8 @@ void BrwLock<PI>::ContendedWriteAcquire() {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
   // Mark ourselves as waiting
-  uint64_t prev = state_.state_.fetch_add(kBrwLockWaiter, ktl::memory_order_relaxed);
+  uint64_t prev =
+      ktl::atomic_ref(state_.state_).fetch_add(kBrwLockWaiter, ktl::memory_order_relaxed);
   // If there is a writer then we just block, they will wake us up
   if (StateHasWriter(prev)) {
     Block(true);
@@ -261,11 +266,12 @@ void BrwLock<PI>::ContendedWriteAcquire() {
   if (!StateHasReaders(prev)) {
     if (!StateHasWaiters(prev)) {
       if constexpr (PI == BrwLockEnablePi::Yes) {
-        state_.writer_.store(Thread::Current::Get(), ktl::memory_order_relaxed);
+        ktl::atomic_ref(state_.writer_).store(Thread::Current::Get(), ktl::memory_order_relaxed);
       }
       // Must have raced previously as turns out there's no readers or
       // waiters, so we can convert to having the lock
-      state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
+      ktl::atomic_ref(state_.state_)
+          .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
       return;
     } else {
       // There's no readers, but someone already waiting, wake up someone
@@ -286,7 +292,7 @@ void BrwLock<PI>::WriteRelease() {
 
 #if LK_DEBUGLEVEL > 0
   if constexpr (PI == BrwLockEnablePi::Yes) {
-    Thread* holder = state_.writer_.load(ktl::memory_order_relaxed);
+    Thread* holder = ktl::atomic_ref(state_.writer_).load(ktl::memory_order_relaxed);
     Thread* ct = Thread::Current::Get();
     if (unlikely(ct != holder)) {
       panic(
@@ -315,9 +321,10 @@ void BrwLock<PI>::WriteRelease() {
   if constexpr (PI == BrwLockEnablePi::Yes) {
     Thread::Current::preemption_state().PreemptDisable();
 
-    state_.writer_.store(nullptr, ktl::memory_order_relaxed);
+    ktl::atomic_ref(state_.writer_).store(nullptr, ktl::memory_order_relaxed);
   }
-  uint64_t prev = state_.state_.fetch_sub(kBrwLockWriter, ktl::memory_order_release);
+  uint64_t prev =
+      ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockWriter, ktl::memory_order_release);
 
   if (unlikely(StateHasWaiters(prev))) {
     LOCK_TRACE_DURATION("ContendedWriteRelease");
@@ -341,7 +348,7 @@ void BrwLock<PI>::ReleaseWakeup() {
   AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
-  uint64_t count = state_.state_.load(ktl::memory_order_relaxed);
+  uint64_t count = ktl::atomic_ref(state_.state_).load(ktl::memory_order_relaxed);
   if (StateHasWaiters(count) && !StateHasWriter(count) && !StateHasReaders(count)) {
     Wake();
   }
@@ -356,16 +363,17 @@ void BrwLock<PI>::ContendedReadUpgrade() {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
   // Convert our reading into waiting
-  uint64_t prev =
-      state_.state_.fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
+  uint64_t prev = ktl::atomic_ref(state_.state_)
+                      .fetch_add(-kBrwLockReader + kBrwLockWaiter, ktl::memory_order_relaxed);
   if (StateHasExclusiveReader(prev)) {
     if constexpr (PI == BrwLockEnablePi::Yes) {
-      state_.writer_.store(Thread::Current::Get(), ktl::memory_order_relaxed);
+      ktl::atomic_ref(state_.writer_).store(Thread::Current::Get(), ktl::memory_order_relaxed);
     }
     // There are no writers or readers. There might be waiters, but as we
     // already have some form of lock we still have fairness even if we
     // bypass the queue, so we convert our waiting into writing
-    state_.state_.fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
+    ktl::atomic_ref(state_.state_)
+        .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
   } else {
     Block(true);
   }
