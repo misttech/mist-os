@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use fuchsia_zircon::Koid;
+use std::fmt::Debug;
 
 /// An instrumented process.
 #[async_trait]
@@ -16,4 +17,13 @@ pub trait Process: Send + Sync {
 
     /// Serves requests from the process and returns when the process disconnects.
     async fn serve_until_exit(&self) -> Result<(), anyhow::Error>;
+}
+
+impl Debug for dyn Process {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt.debug_struct("Process")
+            .field("name", &self.get_name())
+            .field("koid", &self.get_koid())
+            .finish()
+    }
 }

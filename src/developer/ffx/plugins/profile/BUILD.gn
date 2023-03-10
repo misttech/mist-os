@@ -11,6 +11,7 @@ ffx_plugin("ffx_profile") {
   plugin_deps = [
     "cpu:ffx_profile_cpu",
     "gpu:ffx_profile_gpu",
+    "heapdump:ffx_profile_heapdump",
     "memory:ffx_profile_memory",
     "network:ffx_profile_network",
     "power:ffx_profile_power",

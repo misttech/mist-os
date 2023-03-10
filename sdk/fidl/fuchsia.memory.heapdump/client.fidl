@@ -1,0 +1,67 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.memory.heapdump.client;
+
+using zx;
+
+/// The reason why a method failed.
+type CollectorError = flexible enum {
+    /// The given ProcessSelector value is not supported.
+    PROCESS_SELECTOR_UNSUPPORTED = 1;
+
+    /// The given ProcessSelector value does not match any process.
+    PROCESS_SELECTOR_NO_MATCH = 2;
+
+    /// The given ProcessSelector value matches more than one process but the requested operation
+    /// needs a unique match.
+    PROCESS_SELECTOR_AMBIGUOUS = 3;
+
+    /// Failed to take a live snapshot.
+    LIVE_SNAPSHOT_FAILED = 4;
+};
+
+/// Filter to restrict an operation to a subset of the available processes.
+type ProcessSelector = flexible union {
+    /// Matches any process with the given ZX_PROP_NAME.
+    1: by_name string:zx.MAX_NAME_LEN;
+
+    /// Matches the process with the given koid.
+    2: by_koid zx.koid;
+};
+
+/// An allocated memory block.
+type Allocation = table {
+    /// The address of the memory block.
+    1: address uint64;
+
+    /// Block size, in bytes.
+    2: size uint64;
+};
+
+/// An element that is part of a snapshot.
+type SnapshotElement = flexible union {
+    1: allocation Allocation;
+};
+
+/// Protocol to transmit a snapshot as a stream of elements.
+protocol SnapshotReceiver {
+    /// Delivers a batch of snapshot elements.
+    ///
+    /// It will be called repeatedly until no elements are left, and then one final time with an
+    /// empty vector to signal the end of the stream.
+    Batch(struct {
+        batch vector<SnapshotElement>:MAX;
+    }) -> ();
+};
+
+/// Protocol to request and retrieve memory profiles.
+@discoverable
+protocol Collector {
+    /// Obtains a snapshot of the current live allocations in an instrumented process.
+    TakeLiveSnapshot(struct {
+        process_selector ProcessSelector;
+    }) -> (resource struct {
+        receiver server_end:SnapshotReceiver;
+    }) error CollectorError;
+};
