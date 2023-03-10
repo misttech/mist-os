@@ -16,7 +16,7 @@ use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
 use netstack_testing_common::{
     constants, get_inspect_data,
-    realms::{KnownServiceProvider, Netstack, Netstack2, NetstackVersion, TestSandboxExt as _},
+    realms::{KnownServiceProvider, Netstack, Netstack2, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
@@ -946,12 +946,13 @@ async fn inspect_for_sampler<N: Netstack>(name: &str) {
     }
 }
 
+const CONFIG_DATA_EMPTY: &str = "/pkg/netstack/empty.json";
 const CONFIG_DATA_SPECIFIED_PROCS: &str = "/pkg/netstack/specified_procs.json";
 const CONFIG_DATA_NONEXISTENT: &str = "/pkg/netstack/idontexist.json";
 
 #[netstack_test]
 #[test_case(
-    true, "DEBUG", "1m0s", false, false, NetstackVersion::Netstack2.get_config_data(), None;
+    true, "DEBUG", "1m0s", false, false, CONFIG_DATA_EMPTY, None;
     "default debug config"
 )]
 #[test_case(

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
@@ -85,12 +84,6 @@ fuchsia_component("component-with-tracing") {
   component_name = "netstack"
   manifest = "meta/netstack_with_tracing.cml"
   deps = [ ":bin_with_tracing" ]
-}
-
-config_data("config-default") {
-  for_pkg = "netstack"
-  sources = [ "config/empty.json" ]
-  outputs = [ "default.json" ]
 }
 
 go_library("pprof") {

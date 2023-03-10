@@ -132,7 +132,6 @@ assembly_input_groups("network") {
     "//src/connectivity/network/mdns/bundles:config",
     "//src/connectivity/network/mdns/bundles:services",
     "//src/connectivity/network/netcfg:config-default",
-    "//src/connectivity/network/netstack:config-default",
     "//src/connectivity/network",
     "//src/sys/stash:pkg",
   ]
