@@ -61,7 +61,10 @@ python_c_extension("fuchsia_controller_py") {
 
 python_binary("example") {
   main_source = "python/example.py"
-  deps = [ ":fuchsia_controller_py" ]
+  deps = [
+    ":fuchsia_controller_py",
+    "//src/developer/ffx:ffx_tool",
+  ]
 }
 
 group("fuchsia-controller") {
