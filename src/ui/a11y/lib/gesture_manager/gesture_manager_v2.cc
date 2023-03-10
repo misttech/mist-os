@@ -121,7 +121,8 @@ GestureManagerV2::GestureManagerV2(TouchSourceWithLocalHitPtr touch_source)
 
 GestureManagerV2::GestureManagerV2(TouchSourceWithLocalHitPtr touch_source,
                                    ArenaFactory arena_factory)
-    : touch_source_(std::move(touch_source)) {
+    : touch_source_(std::move(touch_source)),
+      gesture_handler_([this](GestureRecognizerV2* recognizer) { AddRecognizer(recognizer); }) {
   // Park a callback that will notify the TouchSource (via UpdateResponse) when
   // a held interaction becomes decided.
   auto callback = [this](fuchsia::ui::pointer::TouchInteractionId interaction,
@@ -200,5 +201,7 @@ void GestureManagerV2::ConvertToNdc(fuchsia::ui::pointer::augment::TouchEventWit
   auto point = event.touch_event.mutable_pointer_sample()->mutable_position_in_viewport();
   *point = *normalizeToNdc(*point, *viewport_bounds_);
 }
+
+void GestureManagerV2::AddRecognizer(GestureRecognizerV2* recognizer) { arena_->Add(recognizer); }
 
 }  // namespace a11y

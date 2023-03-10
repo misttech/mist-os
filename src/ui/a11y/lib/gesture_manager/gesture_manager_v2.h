@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "src/ui/a11y/lib/gesture_manager/arena_v2/gesture_arena_v2.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_handler_v2.h"
 
 namespace a11y {
 
@@ -35,6 +36,13 @@ class GestureManagerV2 {
   explicit GestureManagerV2(fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source,
                             ArenaFactory arena_factory);
 
+  // Returns a pointer to the gesture handler, which can be used to bind actions to gestures.
+  GestureHandlerV2* gesture_handler() { return &gesture_handler_; }
+
+  GestureArenaV2* arena() { return arena_.get(); }
+
+  void AddRecognizer(GestureRecognizerV2* recognizer);
+
  private:
   // Call `TouchSourceWithLocalHit.Watch` repeatedly, responding to touch events.
   void WatchForTouchEvents(std::vector<fuchsia::ui::pointer::TouchResponse> responses);
@@ -54,6 +62,9 @@ class GestureManagerV2 {
 
   // API to get touch events, and participate in system-level gesture disambiguation.
   fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source_;
+
+  // Manages bound actions and gestures.
+  GestureHandlerV2 gesture_handler_;
 
   // Gesture arena, to perform a11y-specific gesture disambiguation.
   //
