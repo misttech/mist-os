@@ -52,8 +52,9 @@ use devices::{BindingId, CommonInfo, DeviceSpecificInfo, Devices, LoopbackInfo, 
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
 
+use net_declare::net_subnet_v4;
 use net_types::{
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6, Mtu},
+    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Mtu, Subnet},
     SpecifiedAddr,
 };
 use netstack3_core::{
@@ -87,6 +88,9 @@ const LOOPBACK_NAME: &'static str = "lo";
 ///     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 /// ```
 const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(65536);
+
+/// Subnet for the IPv4 Limited Broadcast Address.
+const IPV4_LIMITED_BROADCAST_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("255.255.255.255/32");
 
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
@@ -630,7 +634,8 @@ fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
     Ok(())
 }
 
-/// Adds the IPv4 and IPv6 Loopback and multicast subnet routes.
+/// Adds the IPv4 and IPv6 Loopback and multicast subnet routes, and the IPv4
+/// limited broadcast subnet route.
 ///
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
@@ -656,6 +661,10 @@ fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv6::MULTICAST_SUBNET,
+            loopback.clone(),
+        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            IPV4_LIMITED_BROADCAST_SUBNET,
             loopback.clone(),
         )),
     ] {

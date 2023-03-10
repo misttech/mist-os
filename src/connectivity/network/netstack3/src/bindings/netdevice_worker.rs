@@ -325,18 +325,18 @@ impl DeviceHandler {
             .add_device(core_id.clone(), make_info)
             .expect("duplicate core id in set");
 
-        add_default_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
+        add_initial_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
 
         Ok((binding_id, status_stream))
     }
 }
 
-/// Adds the IPv4 and IPv6 multicast subnet routes and the IPv6 link-local subnet
-/// route.
+/// Adds the IPv4 and IPv6 multicast subnet routes, the IPv6 link-local subnet
+/// route, and the IPv4 limited broadcast subnet route.
 ///
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
-fn add_default_routes<NonSyncCtx: NonSyncContext>(
+fn add_initial_routes<NonSyncCtx: NonSyncContext>(
     sync_ctx: &mut SyncCtx<NonSyncCtx>,
     non_sync_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
@@ -352,6 +352,10 @@ fn add_default_routes<NonSyncCtx: NonSyncContext>(
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv6::MULTICAST_SUBNET,
+            device.clone(),
+        )),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET,
             device.clone(),
         )),
     ] {

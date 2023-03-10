@@ -675,9 +675,18 @@ async fn test_list_del_routes() {
         // Multicast routes are added automatically after the device is
         // installed.
         AddableEntry::without_gateway(Ipv4::MULTICAST_SUBNET, loopback.clone()).into(),
-        AddableEntry::without_gateway(Ipv6::MULTICAST_SUBNET, loopback).into(),
+        AddableEntry::without_gateway(Ipv6::MULTICAST_SUBNET, loopback.clone()).into(),
         AddableEntry::without_gateway(Ipv4::MULTICAST_SUBNET, device.clone()).into(),
         AddableEntry::without_gateway(Ipv6::MULTICAST_SUBNET, device.clone()).into(),
+        // The Limited Broadcast subnet route is added automatically after the
+        // device is installed.
+        AddableEntry::without_gateway(crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET, loopback)
+            .into(),
+        AddableEntry::without_gateway(
+            crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET,
+            device.clone(),
+        )
+        .into(),
     ];
     let got = test_stack
         .with_ctx(|ctx| {
