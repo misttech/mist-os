@@ -965,11 +965,12 @@ impl CurrentTask {
                     return error!(EISDIR);
                 }
                 Ok((
-                    parent.create_node(
+                    parent.open_create_node(
                         self,
                         basename,
                         mode.with_type(FileMode::IFREG),
                         DeviceType::NONE,
+                        flags,
                     )?,
                     true,
                 ))

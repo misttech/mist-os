@@ -784,6 +784,26 @@ impl NamespaceNode {
         ))
     }
 
+    pub fn open_create_node(
+        &self,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        mode: FileMode,
+        dev: DeviceType,
+        flags: OpenFlags,
+    ) -> Result<NamespaceNode, Errno> {
+        let owner = current_task.as_fscred();
+        let mode = current_task.fs().apply_umask(mode);
+        Ok(self.with_new_entry(self.entry.open_create_node(
+            current_task,
+            name,
+            mode,
+            dev,
+            owner,
+            flags,
+        )?))
+    }
+
     pub fn create_node(
         &self,
         current_task: &CurrentTask,

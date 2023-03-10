@@ -76,6 +76,11 @@ type DirEntryChildren = BTreeMap<FsString, Weak<DirEntry>>;
 
 pub type DirEntryHandle = Arc<DirEntry>;
 
+enum ExistsOption {
+    ReturnExisting,
+    DoNotReturnExisting,
+}
+
 impl DirEntry {
     #[allow(clippy::let_and_return)]
     pub fn new(
@@ -187,10 +192,11 @@ impl DirEntry {
     ///
     /// If the entry already exists, create_node_fn is not called, and EEXIST is
     /// returned.
-    pub fn create_entry<F>(
+    fn create_entry<F>(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
         name: &FsStr,
+        exists_option: ExistsOption,
         create_node_fn: F,
     ) -> Result<DirEntryHandle, Errno>
     where
@@ -205,10 +211,12 @@ impl DirEntry {
         }
         let (entry, exists) = self.get_or_create_child(current_task, name, create_node_fn)?;
         if exists {
-            return error!(EEXIST);
+            match exists_option {
+                ExistsOption::ReturnExisting => return Ok(entry),
+                ExistsOption::DoNotReturnExisting => return error!(EEXIST),
+            }
         }
         self.node.touch();
-        entry.node.fs().did_create_dir_entry(&entry);
         Ok(entry)
     }
 
@@ -232,7 +240,7 @@ impl DirEntry {
         dev: DeviceType,
         ops: impl FsNodeOps,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, || {
+        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
             let node = self.node.fs().create_node(ops, mode, FsCred::root());
             {
                 let mut info = node.info_write();
@@ -251,7 +259,7 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         // TODO: apply_umask
-        self.create_entry(current_task, name, || {
+        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
             self.node.mkdir(current_task, name, mode!(IFDIR, 0o777), FsCred::root())
         })
     }
@@ -266,22 +274,52 @@ impl DirEntry {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, || {
-            if mode.is_dir() {
-                self.node.mkdir(current_task, name, mode, owner)
-            } else {
-                let node = self.node.mknod(current_task, name, mode, dev, owner)?;
-                if mode.is_sock() {
-                    node.set_socket(Socket::new(
-                        current_task.kernel(),
-                        SocketDomain::Unix,
-                        SocketType::Stream,
-                        SocketProtocol::default(),
-                    )?);
-                }
-                Ok(node)
-            }
+        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
+            self.create_node_fn(current_task, name, mode, dev, owner)
         })
+    }
+
+    pub fn open_create_node(
+        self: &DirEntryHandle,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        mode: FileMode,
+        dev: DeviceType,
+        owner: FsCred,
+        flags: OpenFlags,
+    ) -> Result<DirEntryHandle, Errno> {
+        let exists_option = if flags.contains(OpenFlags::EXCL) {
+            ExistsOption::DoNotReturnExisting
+        } else {
+            ExistsOption::ReturnExisting
+        };
+        self.create_entry(current_task, name, exists_option, || {
+            self.create_node_fn(current_task, name, mode, dev, owner)
+        })
+    }
+
+    fn create_node_fn(
+        self: &DirEntryHandle,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        mode: FileMode,
+        dev: DeviceType,
+        owner: FsCred,
+    ) -> Result<FsNodeHandle, Errno> {
+        if mode.is_dir() {
+            self.node.mkdir(current_task, name, mode, owner)
+        } else {
+            let node = self.node.mknod(current_task, name, mode, dev, owner)?;
+            if mode.is_sock() {
+                node.set_socket(Socket::new(
+                    current_task.kernel(),
+                    SocketDomain::Unix,
+                    SocketType::Stream,
+                    SocketProtocol::default(),
+                )?);
+            }
+            Ok(node)
+        }
     }
 
     pub fn bind_socket(
@@ -293,7 +331,7 @@ impl DirEntry {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, || {
+        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
             let node = self.node.mknod(current_task, name, mode, DeviceType::NONE, owner)?;
             if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
                 unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
@@ -311,7 +349,7 @@ impl DirEntry {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<DirEntryHandle, Errno> {
-        self.create_entry(current_task, name, || {
+        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
             self.node.create_symlink(current_task, name, target, owner)
         })
     }
@@ -322,18 +360,10 @@ impl DirEntry {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        if DirEntry::is_reserved_name(name) {
-            return error!(EEXIST);
-        }
-        let (entry, exists) = self.get_or_create_child(current_task, name, || {
+        self.create_entry(current_task, name, ExistsOption::DoNotReturnExisting, || {
             self.node.link(current_task, name, child)?;
             Ok(child.clone())
         })?;
-        if exists {
-            return error!(EEXIST);
-        }
-        self.node.touch();
-        entry.node.fs().did_create_dir_entry(&entry);
         Ok(())
     }
 
@@ -700,6 +730,7 @@ impl<'a> DirEntryLockedChildren<'a> {
             Entry::Vacant(entry) => {
                 let child = create_child()?;
                 entry.insert(Arc::downgrade(&child));
+                child.node.fs().did_create_dir_entry(&child);
                 Ok((child, false))
             }
             Entry::Occupied(mut entry) => {
