@@ -406,6 +406,8 @@ mod tests {
                 build_manifest_path.as_str(),
                 "-o",
                 pkg_dir.as_str(),
+                "--abi-revision",
+                "0x406C7CA7EF077DB4",
                 "archive",
                 "--output",
                 archive_path.as_str(),
