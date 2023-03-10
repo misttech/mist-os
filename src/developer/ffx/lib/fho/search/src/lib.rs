@@ -6,8 +6,9 @@ use ffx_command::{
     FfxCommandLine, FfxContext, FfxToolInfo, FfxToolSource, MetricsSession, Result, ToolRunner,
     ToolSuite,
 };
-use ffx_config::{EnvironmentContext, Sdk};
+use ffx_config::{EnvironmentContext, Sdk, SelectMode};
 use fho_metadata::FhoToolMetadata;
+use serde_json::Value;
 
 use std::{
     collections::HashMap,
@@ -15,6 +16,9 @@ use std::{
     path::{Path, PathBuf},
     process::ExitStatus,
 };
+
+/// The config key for holding subtool search paths.
+pub const FFX_SUBTOOL_PATHS_CONFIG: &str = "ffx.subtool-search-paths";
 
 /// Path information about a subtool
 #[derive(Clone, Debug)]
@@ -103,8 +107,14 @@ impl ExternalSubToolSuite {
 
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for ExternalSubToolSuite {
-    fn from_env(env: &EnvironmentContext) -> Result<Self> {
-        Self::with_tools_from(env.clone(), &env.subtool_paths())
+    async fn from_env(env: &EnvironmentContext) -> Result<Self> {
+        let subtool_config: Vec<Value> = env
+            .query(FFX_SUBTOOL_PATHS_CONFIG)
+            .select(SelectMode::All)
+            .get_file()
+            .await
+            .unwrap_or_else(|_| vec![]);
+        Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config))
     }
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
@@ -142,6 +152,20 @@ impl ToolSuite for ExternalSubToolSuite {
         // and we're done
         Ok(None)
     }
+}
+
+/// Loads a list of subtool paths from an array of values, flattening them into
+/// a list of [`PathBuf`]s.
+fn get_subtool_paths(subtools: Vec<Value>) -> Vec<PathBuf> {
+    use Value::*;
+    subtools
+        .into_iter()
+        .flat_map(|val| match val {
+            Array(arr) => arr.into_iter(),
+            other => vec![other].into_iter(),
+        })
+        .filter_map(|val| val.as_str().map(PathBuf::from))
+        .collect()
 }
 
 /// Searches a set of directories for tools matching the path `ffx-<name>`
@@ -216,6 +240,7 @@ mod tests {
     use super::*;
     use ffx_command::Ffx;
     use fho_metadata::{FhoDetails, Only};
+    use serde_json::json;
     use std::{collections::HashSet, io::Write};
 
     enum MockMetadata<'a> {
@@ -416,5 +441,56 @@ mod tests {
             })
             .await
             .expect("should be able to find mock subtool in suite");
+    }
+
+    #[test]
+    fn subtool_config_none() {
+        assert!(get_subtool_paths(vec![]).is_empty());
+    }
+
+    #[test]
+    fn subtool_config_one() {
+        assert_eq!(get_subtool_paths(vec![json!("boom")]), vec![PathBuf::from("boom")]);
+    }
+
+    #[test]
+    fn subtool_config_multiple() {
+        assert_eq!(
+            get_subtool_paths(vec![json!("boom"), json!("zoom")]),
+            vec![PathBuf::from("boom"), PathBuf::from("zoom")]
+        );
+    }
+
+    #[test]
+    fn subtool_config_listlist() {
+        assert_eq!(
+            get_subtool_paths(vec![json!(["boom", "zoom"])]),
+            vec![PathBuf::from("boom"), PathBuf::from("zoom")]
+        );
+    }
+
+    #[test]
+    fn subtool_config_multiple_listlist() {
+        assert_eq!(
+            get_subtool_paths(vec![json!(["boom", "zoom"]), json!(["doom", "loom"])]),
+            vec![
+                PathBuf::from("boom"),
+                PathBuf::from("zoom"),
+                PathBuf::from("doom"),
+                PathBuf::from("loom")
+            ]
+        );
+    }
+
+    #[test]
+    fn subtool_config_multiple_different() {
+        assert_eq!(
+            get_subtool_paths(vec![json!("boom"), json!(["doom", "loom"])]),
+            vec![PathBuf::from("boom"), PathBuf::from("doom"), PathBuf::from("loom")]
+        );
+        assert_eq!(
+            get_subtool_paths(vec![json!(["boom", "zoom"]), json!("loom")]),
+            vec![PathBuf::from("boom"), PathBuf::from("zoom"), PathBuf::from("loom")]
+        );
     }
 }

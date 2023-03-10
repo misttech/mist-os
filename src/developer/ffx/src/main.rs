@@ -31,10 +31,10 @@ const CIRCUIT_REFRESH_RATE: std::time::Duration = std::time::Duration::from_mill
 
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for FfxSuite {
-    fn from_env(env: &EnvironmentContext) -> Result<Self> {
+    async fn from_env(env: &EnvironmentContext) -> Result<Self> {
         let context = env.clone();
 
-        let external_commands = ExternalSubToolSuite::from_env(env)?;
+        let external_commands = ExternalSubToolSuite::from_env(env).await?;
 
         Ok(Self { context, external_commands })
     }

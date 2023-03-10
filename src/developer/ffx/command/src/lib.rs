@@ -63,7 +63,7 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
         Error::Help { command: cmd.command.clone(), output, code }
     })?;
 
-    let tools = T::from_env(&context)?;
+    let tools = T::from_env(&context).await?;
 
     let tool = tools.try_from_args(&cmd).await?;
 

@@ -118,3 +118,6 @@ When updating, please add the value in alphabetical order.
 :                                         : is unspecified                     :
 | `targets.manual`                        | Contains the list of manual        |
 :                                         : targets                            :
+| `ffx.subtool-search-paths`              | A list of paths to search for non- |
+|                                         | SDK subtool binaries.              |
+:                                         :                                    :

@@ -193,17 +193,6 @@ impl EnvironmentContext {
         }
     }
 
-    /// Returns paths to locations to search for external subtools other than
-    /// the active sdk.
-    pub fn subtool_paths(&self) -> Vec<PathBuf> {
-        match &self.kind {
-            EnvironmentKind::InTree { build_dir: Some(build_dir), .. } => {
-                vec![build_dir.join("host-tools")]
-            }
-            _ => vec![],
-        }
-    }
-
     /// Returns version info about the running ffx binary
     pub fn build_info(&self) -> ffx_build_version::VersionInfo {
         ffx_build_version::build_info()
@@ -572,6 +561,7 @@ impl Environment {
     pub fn build_dir(&self) -> Option<&Path> {
         self.context.build_dir()
     }
+
     /// returns either the directory indicated by the override or the one configured in this
     /// environment.
     pub fn override_build_dir<'a>(
