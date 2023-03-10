@@ -679,6 +679,13 @@
             to: [ "#system-tests" ],
         },
 
+        // System tests can capture a trace.
+        {
+            protocol: [ "fuchsia.tracing.controller.Controller" ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+
         // CPU Profiling tests require access to ktrace data to parse results
         {
             protocol: [
