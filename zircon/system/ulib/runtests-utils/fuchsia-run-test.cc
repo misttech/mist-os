@@ -9,10 +9,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/debugdata/datasink.h>
 #include <lib/debugdata/debugdata.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
-#include <lib/fdio/namespace.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
@@ -235,25 +232,25 @@ std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, cons
 
     vfs.emplace(loop.dispatcher());
 
-    std::tuple<const char*, int> map[] = {
-        {"/boot", O_RDONLY},
-        {"/svc", O_RDONLY},
-        {"/tmp", O_RDWR},
+    std::tuple<const char*, fuchsia_io::OpenFlags> map[] = {
+        {"/boot", fuchsia_io::OpenFlags::kRightReadable},
+        {"/svc", {}},
+        {"/tmp", fuchsia_io::OpenFlags::kRightReadable | fuchsia_io::OpenFlags::kRightWritable},
     };
     for (auto [path, flags] : map) {
-      fbl::unique_fd fd{open(path, flags | O_DIRECTORY)};
-      if (!fd) {
-        fprintf(stderr, "FAILURE: Could not open directory %s: %s\n", path, strerror(errno));
+      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+      if (endpoints.is_error()) {
+        fprintf(stderr, "FAILURE: Could not create endpoints: %s\n", endpoints.status_string());
         return std::make_unique<Result>(path, FAILED_UNKNOWN, 0, 0);
       }
-      fdio_cpp::FdioCaller caller(std::move(fd));
-      zx::result result = caller.take_directory();
-      if (result.is_error()) {
-        fprintf(stderr, "FAILURE: Could not take directory %s channel: %s\n", path,
-                result.status_string());
+      auto& [client_end, server_end] = endpoints.value();
+      if (zx_status_t status =
+              fdio_open(path, static_cast<uint32_t>(flags), server_end.TakeChannel().release());
+          status != ZX_OK) {
+        fprintf(stderr, "FAILURE: Could not open directory %s: %s\n", path,
+                zx_status_get_string(status));
         return std::make_unique<Result>(path, FAILED_UNKNOWN, 0, 0);
       }
-      fidl::ClientEnd client_end = std::move(result).value();
 
       if (strcmp(path, "/svc") == 0) {
         zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
