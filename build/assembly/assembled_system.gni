@@ -540,6 +540,9 @@ template("assembled_system") {
         if (embed_fvm_in_zbi) {
           fvm_ramdisk = true
         }
+
+        # Use the rust implementation of fshost based on the global GN arg.
+        use_rust_port = rust_fshost
       }
     }
   }

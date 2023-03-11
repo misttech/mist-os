@@ -61,14 +61,14 @@ rustc_library("fshost_test_fixture") {
 # Generates an fshost integration test component. Includes the fshost component on which the test
 # is exectuted.
 #
+#   use_rust_port (required)
+#     [bool] Whether or not to use the rust port of fshost.
+#
 #   data_filesystem_format (required)
 #     [string] The format of the data partition fshost exports. One of "fxfs", "minfs", or "f2fs".
 #
-#   data_filesystem_variant (optional)
-#     [string] A variant string passed to the integration test harness. Defaults to the
-#              data_filesystem_format.
-#
 template("fshost_integration_test") {
+  assert(defined(invoker.use_rust_port), "use rust port not specified")
   assert(defined(invoker.data_filesystem_format),
          "data filesystem format not specified")
   if (!defined(invoker.data_filesystem_variant)) {
@@ -79,6 +79,7 @@ template("fshost_integration_test") {
   fshost_component_and_config(_fshost_target) {
     testonly = true
     options = invoker.options
+    options.use_rust_port = invoker.use_rust_port
   }
 
   _fshost_component_name = get_label_info(_fshost_target, "name")
@@ -99,6 +100,9 @@ template("fshost_integration_test") {
       "DATA_FILESYSTEM_VARIANT=${invoker.data_filesystem_variant}",
     ]
     features = [ invoker.data_filesystem_format ]
+    if (invoker.use_rust_port) {
+      features += [ "fshost_rust" ]
+    }
     deps = [
       ":fshost_test_fixture",
       "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
@@ -158,69 +162,92 @@ template("fshost_integration_test") {
   }
 }
 
-fshost_integration_test("fshost_integration_tests_fxfs") {
-  data_filesystem_format = "fxfs"
-  options = default_integration_test_options
-  options.data_filesystem_format = "fxfs"
-}
+# Generates a test package for fshost with a set of integration tests for each filesystem type, for
+# a given fshost language choice.
+#
+#   use_rust_port (required)
+#     [bool] Whether or not to use the rust port of fshost.
+#
+template("fshost_integration_test_suite") {
+  assert(defined(invoker.use_rust_port), "use rust port not specified")
 
-fshost_integration_test("fshost_integration_tests_f2fs") {
-  data_filesystem_format = "f2fs"
-  options = default_integration_test_options
-  options.data_filesystem_format = "f2fs"
-}
-
-fshost_integration_test("fshost_integration_tests_minfs") {
-  data_filesystem_format = "minfs"
-  options = default_integration_test_options
-  options.data_filesystem_format = "minfs"
-}
-
-# In addition to the basic filesystem formats, there are some modifying options we want to test.
-fshost_integration_test("fshost_integration_tests_fxfs_legacy_crypto") {
-  data_filesystem_format = "fxfs"
-  data_filesystem_variant = "fxfs-legacy-crypto"
-  options = default_integration_test_options
-  options.use_native_fxfs_crypto = false
-  options.data_filesystem_format = "fxfs"
-}
-
-fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {
-  data_filesystem_format = "f2fs"
-  data_filesystem_variant = "f2fs-no-zxcrypt"
-  options = default_integration_test_options
-  options.no_zxcrypt = true
-  options.data_filesystem_format = "f2fs"
-}
-
-fshost_integration_test("fshost_integration_tests_minfs_no_zxcrypt") {
-  data_filesystem_format = "minfs"
-  data_filesystem_variant = "minfs-no-zxcrypt"
-  options = default_integration_test_options
-  options.no_zxcrypt = true
-  options.data_filesystem_format = "minfs"
-}
-
-fuchsia_test_package("fshost_integration_tests") {
-  # Currently required because the data_formatted test causes Fxfs to log:
-  #   ERROR: ... handle_start failed error=Journal replay failed
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_components = [
-    ":fshost_integration_tests_fxfs",
-    ":fshost_integration_tests_f2fs",
-    ":fshost_integration_tests_minfs",
-    ":fshost_integration_tests_fxfs_legacy_crypto",
-    ":fshost_integration_tests_f2fs_no_zxcrypt",
-    ":fshost_integration_tests_minfs_no_zxcrypt",
+  filesystem_formats = [
+    "fxfs",
+    "f2fs",
+    "minfs",
   ]
-  deps = [ "//src/storage/testing:storage_driver_test_realm" ]
+  fshost_integration_tests = []
+
+  foreach(filesystem_format, filesystem_formats) {
+    fshost_integration_test_label = "${target_name}_${filesystem_format}"
+    fshost_integration_test(fshost_integration_test_label) {
+      data_filesystem_format = filesystem_format
+      use_rust_port = invoker.use_rust_port
+      options = default_integration_test_options
+      options.data_filesystem_format = filesystem_format
+    }
+    fshost_integration_tests += [ ":${fshost_integration_test_label}" ]
+  }
+
+  # In addition to the basic filesystem formats, there are some modifying options we want to test.
+  fshost_integration_fxfs_legacy_label = "${target_name}_fxfs_legacy_crypto"
+  fshost_integration_test(fshost_integration_fxfs_legacy_label) {
+    data_filesystem_format = "fxfs"
+    data_filesystem_variant = "fxfs-legacy-crypto"
+    use_rust_port = invoker.use_rust_port
+    options = default_integration_test_options
+    options.use_native_fxfs_crypto = false
+    options.data_filesystem_format = "fxfs"
+  }
+  fshost_integration_tests += [ ":$fshost_integration_fxfs_legacy_label" ]
+
+  fshost_integration_minfs_no_zxcrypt_label = "${target_name}_minfs_no_zxcrypt"
+  fshost_integration_test(fshost_integration_minfs_no_zxcrypt_label) {
+    data_filesystem_format = "minfs"
+    data_filesystem_variant = "minfs-no-zxcrypt"
+    use_rust_port = invoker.use_rust_port
+    options = default_integration_test_options
+    options.no_zxcrypt = true
+    options.data_filesystem_format = "minfs"
+  }
+  fshost_integration_tests += [ ":$fshost_integration_minfs_no_zxcrypt_label" ]
+
+  fshost_integration_f2fs_no_zxcrypt_label = "${target_name}_f2fs_no_zxcrypt"
+  fshost_integration_test(fshost_integration_f2fs_no_zxcrypt_label) {
+    data_filesystem_format = "f2fs"
+    data_filesystem_variant = "f2fs-no-zxcrypt"
+    use_rust_port = invoker.use_rust_port
+    options = default_integration_test_options
+    options.no_zxcrypt = true
+    options.data_filesystem_format = "f2fs"
+  }
+  fshost_integration_tests += [ ":$fshost_integration_f2fs_no_zxcrypt_label" ]
+
+  fuchsia_test_package(target_name) {
+    # Currently required because the data_formatted test causes Fxfs to log:
+    #   ERROR: ... handle_start failed error=Journal replay failed
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+    }
+    test_components = fshost_integration_tests
+    deps = [ "//src/storage/testing:storage_driver_test_realm" ]
+  }
+}
+
+fshost_integration_test_suite("fshost_integration_tests_cpp") {
+  use_rust_port = false
+}
+
+fshost_integration_test_suite("fshost_integration_tests_rust") {
+  use_rust_port = true
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":fshost_integration_tests" ]
+  deps = [
+    ":fshost_integration_tests_cpp",
+    ":fshost_integration_tests_rust",
+  ]
 }
