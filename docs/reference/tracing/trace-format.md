@@ -243,7 +243,7 @@ followed by a bullet-point description of its contents.
 * [Blob record (record type = 5)](#blob-record)
 * [Userspace object record (record type = 6)](#userspace-object-record)
 * [Kernel object record (record type = 7)](#kernel-object-record)
-* [Context switch record (record type = 8)](#context-switch-record)
+* [Scheduling record (record type = 8)](#scheduling-record)
 * [Log record (record type = 9)](#log-record)
 * [Large BLOB record (record type = 15, large type = 0)](#large-blob-record)
 
@@ -844,20 +844,143 @@ Note: This information may not always be available.
 - `"process"`: for `ZX_OBJ_TYPE_THREAD` objects, specifies the koid of the
   process that contains the thread
 
-### Context switch record (record type = 8) {#context-switch-record}
+### Scheduling Record (record type = 8) {#scheduling-record}
 
-Describes a context switch during which a CPU handed off control from an
-outgoing thread to an incoming thread that resumes execution.
+Describes a scheduling event such as when a thread was woken up, or a context
+switch from one thread to another.
+
+##### Format
+
+```
++---------(4)--------------+--------(48)--------+--(8)--+-(4)-+
+| scheduling record type   |  <type specific>   | size  |  8  |
++--------------------------+--------------------+-------+-----+
+```
+
+_header word_
+
+- `[0 .. 3]`: record type (8)
+- `[4 .. 15]`: record size (inclusive of this word) as a multiple of 8 bytes
+- `[16 .. 59]`: sceduling record type specific data
+- `[60 .. 63]`: scheduling record type
+
+#### Context Switch Record (scheduling event record type = 1)
+
+##### Format
+
+```
++-(4)-+----(20)---+--------(4)-------+----(16)---+-------(4)-------+----(8)--+-(4)-+
+|  1  | reserved  | out thread state |    cpu    | argument count  |   size  |  8  |
++-----+-----------+------------------+-----------+-----------------+---------+-----+
++---------------------------(64)------------------------------+
+|                        timestamp                            |
++-------------------------------------------------------------+
++---------------------------(64)------------------------------+
+|                   outgoing thread id                        |
++-------------------------------------------------------------+
++---------------------------(64)------------------------------+
+|                   incoming thread id                        |
++-------------------------------------------------------------+
++--------------------------(...)------------------------------+
+|                       argument data                         |
++-------------------------------------------------------------+
+```
+
+_header word_
+
+- `[0 .. 3]`: record type (8)
+- `[4 .. 15]`: record size (inclusive of this word) as a multiple of 8 bytes
+- `[16 .. 19]`: argument count
+- `[20 .. 35]`: cpu number
+- `[36 .. 39]`: outgoing thread state
+- `[40 .. 59]`: reserved
+- `[60 .. 63]`: scheduling record type (1)
+
+_timestamp word_
+
+- `[0 .. 63]`: number of ticks
+
+_outoing thread id_
+
+- `[0 .. 63]`: thread koid (kernel object id)
+
+_incoming thread id_
+
+- `[0 .. 63]`: thread koid (kernel object id)
+
+_argument data_ (repeats of each argument)
+
+- (see [Arguments](#arguments) for argument format)
+
+##### Argument Conventions
+
+By convention, the trace writer may also optionally include the following named
+arguments when writing this record to provide additional information to trace
+consumers.
+
+- `"incoming_weight"`: `Int32` describing the relative [weight](/docs/concepts/kernel/fair_scheduler.md) of the incoming
+  thread
+- `"outgoing_weight"`: `Int32` describing the relative weight of the outgoing
+  thread
+
+#### Thread Wakeup Record (scheduling event record type = 2)
+
+##### Format
+
+```
++-(4)-+----(24)---+----(16)---+-------(4)-------+----(8)--+-(4)-+
+|  2  | reserved  |    cpu    | argument count  |   size  |  8  |
++-----+-----------+-----------+-----------------+---------+-----+
++---------------------------(64)------------------------------+
+|                        timestamp                            |
++-------------------------------------------------------------+
++---------------------------(64)------------------------------+
+|                     waking thread id                        |
++-------------------------------------------------------------+
++--------------------------(...)------------------------------+
+|                       argument data                         |
++-------------------------------------------------------------+
+```
+
+_header word_
+
+- `[0 .. 3]`: record type (8)
+- `[4 .. 15]`: record size (inclusive of this word) as a multiple of 8 bytes
+- `[16 .. 19]`: argument count.
+- `[20 .. 35]`: cpu number.
+- `[60 .. 63]`: scheduling record type (2)
+
+_timestamp word_
+
+- `[0 .. 63]`: number of ticks
+
+_waking thread id_
+
+- `[0 .. 63]`: thread koid (kernel object id)
+
+_argument data_ (repeats of each argument)
+
+- (see [Arguments](#arguments) for argument format)
+
+##### Argument Conventions
+
+By convention, the trace writer may also optionally include the following named
+argument when writing this record to provide additional information to trace
+consumers.
+
+- `"weight"`: `Int32` describing the relative [weight](/docs/concepts/kernel/fair_scheduler.md) of the waking thread
+
+#### Legacy Context Switch Record (context switch record type = 0)
+
+As Fuchsia's scheduling has evolved, this record is no longer an effective
+context switch model. It remains for backwards compatibility.
 
 The record specifies the new state of the outgoing thread following the
 context switch. By definition, the new state of the incoming thread is
 "running" since it was just resumed.
 
 ##### Format
-
 ![drawing](images/trace-format/context.png)
-
-_header word_
 
 - `[0 .. 3]`: record type (8)
 - `[4 .. 15]`: record size (inclusive of this word) as a multiple of 8 bytes
@@ -867,7 +990,7 @@ _header word_
 - `[36 .. 43]`: incoming thread (thread ref)
 - `[44 .. 51]`: outgoing thread priority
 - `[52 .. 59]`: incoming thread priority
-- `[60 .. 63]`: reserved
+- `[60 .. 63]`: scheduling record type (0)
 
 _timestamp word_
 
