@@ -315,7 +315,7 @@ void FakeAudioDriver::GetProperties(
     props.set_external_delay(external_delay_->to_nsecs());
   }
   if (fifo_depth_.has_value()) {
-    props.set_fifo_depth(*fifo_depth_);
+    props.set_driver_transfer_bytes(*fifo_depth_);
   }
   if (turn_on_delay_.has_value()) {
     props.set_turn_on_delay(turn_on_delay_->to_nsecs());

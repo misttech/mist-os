@@ -537,23 +537,6 @@ zx_status_t ValidateDelayInfo(
                        << " ns)";
       return ZX_ERR_INVALID_ARGS;
     }
-
-    // Check that internal_delay matches the equivalent fifo_depth (if present).
-    if (rb_props->fifo_depth()) {
-      // nsec = bytes * sample/byte * frame/sample * sec/frame * nsec/sec.
-      auto fifo_depth_duration_ns = *rb_props->fifo_depth() * ZX_SEC(1) /
-                                    format.bytes_per_sample() / format.number_of_channels() /
-                                    format.frame_rate();
-      if (fifo_depth_duration_ns + 1 < int_delay || fifo_depth_duration_ns - 1 > int_delay) {
-        FX_LOGS(WARNING) << "RingBufferProperties reported 'fifo_depth' ("
-                         << *rb_props->fifo_depth() << " bytes) or " << fifo_depth_duration_ns
-                         << " ns (" << format.bytes_per_sample() << " bytes/sample, "
-                         << format.number_of_channels() << "-channel, " << format.frame_rate()
-                         << " fps) must match WatchDelayInfo 'internal_delay' (" << int_delay
-                         << " ns)";
-        return ZX_ERR_INVALID_ARGS;
-      }
-    }
   }
 
   return ZX_OK;

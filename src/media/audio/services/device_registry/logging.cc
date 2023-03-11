@@ -368,15 +368,15 @@ void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties&
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/RingBufferProperties:";
   if (props.external_delay()) {
-    FX_LOGS(INFO) << "    external_delay       " << *props.external_delay() << " ns";
+    FX_LOGS(INFO) << "    external_delay        " << *props.external_delay() << " ns";
   } else {
-    FX_LOGS(INFO) << "    external_delay       NONE (0 ns)";
+    FX_LOGS(INFO) << "    external_delay        NONE (0 ns)";
   }
 
-  if (props.fifo_depth()) {
-    FX_LOGS(INFO) << "    fifo_depth           " << *props.fifo_depth() << " bytes";
+  if (props.driver_transfer_bytes()) {
+    FX_LOGS(INFO) << "    driver_transfer_bytes " << *props.driver_transfer_bytes() << " bytes";
   } else {
-    FX_LOGS(INFO) << "    fifo_depth           NONE (0 bytes)";
+    FX_LOGS(INFO) << "    driver_transfer_bytes NONE (non-compliant)";
   }
 
   FX_LOGS(INFO) << "    needs_cache_flush    "
@@ -385,9 +385,9 @@ void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties&
                         : "NONE (non-compliant)");
 
   if (props.turn_on_delay()) {
-    FX_LOGS(INFO) << "    turn_on_delay        " << *props.turn_on_delay() << " ns";
+    FX_LOGS(INFO) << "    turn_on_delay         " << *props.turn_on_delay() << " ns";
   } else {
-    FX_LOGS(INFO) << "    turn_on_delay        NONE (0 ns)";
+    FX_LOGS(INFO) << "    turn_on_delay         NONE (0 ns)";
   }
 }
 
