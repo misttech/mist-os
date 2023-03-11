@@ -21,14 +21,20 @@ Add the following to your Fuchsia set configuration to include the profile compo
 
 Component startup differs based on the component framework version.
 
-#### Component Framework v2
+#### Component Framework
 
-Currently, the only way to start the v2 component is via protocol discovery. Include the appropriate
+Currently, the only way to start the component is via protocol discovery. Include the appropriate
 `core_shard` in your product config target. For configurations in which HFP AG support is desired,
-include the `bt-hfp-audio-gateway-core-shard`. For testonly configurations, include the
-`bt-hfp-audio-gateway-for-testing-core-shard`.
+include the `bt-hfp-audio-gateway-core-shard`. For testonly configurations, include both the
+`bt-hfp-audio-gateway-core-shard` and `testonly-core-shard`.
 
-When the `fuchsia.bluetooth.hfp.Hfp` FIDL capability is requested, the CFv2 HFP AG component will be
+For example, if using `fx set`:
+
+```
+--args='core_realm_shards += [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:bt-hfp-audio-gateway-core-shard", "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:testonly-core-shard" ]'
+```
+
+When the `fuchsia.bluetooth.hfp.Hfp` FIDL capability is requested, the HFP AG component will be
 started.
 
 ## Running tests

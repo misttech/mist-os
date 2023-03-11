@@ -139,3 +139,14 @@ start the component, then connect from a phone or computer.
 Troubleshooting:
   * Volume low? Try turning up the volume on your source, using `vol` to turn up the volume on
     the Fuchsia device, or turning up the volume at the speaker.
+
+## Manual Testing
+
+The A2DP component exposes the testonly `fuchsia.bluetooth.avdtp.testonly.PeerManager` capability
+which can be used to manipulate the streaming state. Include the [A2DP core shard](//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-eager.core_shard.cml)
+and [testonly A2DP core shard](//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-testonly.core_shard.cml)
+in the build. For example, if using `fx set`:
+
+```
+--args='core_realm_shards += [ "//src/connectivity/bluetooth/profiles/bt-a2dp:eager-core-shard", "//src/connectivity/bluetooth/profiles/bt-a2dp:testonly-core-shard" ]'
+```
