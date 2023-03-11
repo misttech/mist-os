@@ -164,6 +164,42 @@ To run a component on a specific package, use both `-p <PACKAGE_NAME>` and `-c
 fx test -p my_example_test_pkg -c my_example_test
 ```
 
+## Set the minimum log severity
+
+`fx test` (and the underlying `ffx test`) accept a flag ``--min-severity-logs` which allows you to
+set the minimum severity of the logs that are emitted by the test and components under the test.
+
+If the test or components under it are using logging libraries which support setting dynamic
+log severity (Fuchsia Rust and C++ log libraries support this). For test components that don't
+support this, [`test_manager`][test-manager] manually filters their logs if the tests emit logs of
+a severity that is lower than the minimum you set.
+
+This flag accepts two ways of defining the minimum severity:
+
+- `<severity>`: one of `FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. This applies to logs
+  emitted by the test itself and all components under the test.
+
+- `<component selector>#<severity>` in which [`<component selector>`](#component-selectors)
+  specifies a set of components under the test (for example `foo/bar`) and severity is one of the
+  accepted severities mentioned earlier.
+
+A few examples:
+
+- `--min-severity-logs DEBUG`: the test and all components under the test are instructed to emit
+  logs of severity `DEBUG` or higher. This is equivalent to using a component selector:
+  `--min-severity-logs **#DEBUG`
+
+- `--min-severity-logs a#DEBUG --min-severity-logs b/c#ERROR`: the component under the test `a`
+  emits logs of severity `DEBUG` or higher and the component under the test `b/c` emits logs of
+  severity ERROR or higher. Logs emitted by the test itself uses their default minimum severity.
+
+- `--min-severity-logs '<root>#DEBUG'`: the test is instructed to emit logs of severity `DEBUG`
+  or higher, but components under it emits logs using their default minimum severity.
+
+- `--min-severity-logs foo/*/bar#ERROR`: all components named `bar` under a child of `foo` with any
+  name emits logs of severity `ERROR` or higher. For example, `foo/a/bar` and `foo/baz/bar`
+  are affected, but the test component, `foo/bar` and `a/b` aren't.
+
 ## Convert from run-host-tests {#convert-from-run-host-tests}
 
 The `fx run-host-tests` and `fx run-e2e-tests` commands are being
@@ -218,8 +254,8 @@ the build system as affected by changes in your checkout. Try the following:
 fx -i smoke-test --verbose
 ```
 
-In the command above, `--verbose` will also print which tests `fx smoke-test`
-thinks are affected by your change. `-i` will automatically repeat this command
+In the command above, `--verbose` also prints which tests `fx smoke-test`
+thinks are affected by your change. `-i` automatically repeats this command
 every time you save your changes. For test-driven development, try launching
 this command in a separate shell and watching your code rebuild and retest as
 you're working on it.
@@ -233,18 +269,20 @@ require rebuilding that test's package as well.
 
 Component tests may produce additional artifacts that cannot be displayed to
 stdout, such as [custom artifacts][custom-artifacts] and coverage profile. By
-default, `fx test` will silently discard these artifacts. To see these
+default, `fx test` silently discards these artifacts. To see these
 artifacts, specify an output directory to `fx test` using
-`--ffx-output-directory`. The artifacts will be pulled out of the test and
+`--ffx-output-directory`. The artifacts are pulled out of the test and
 saved to the specified directory.
 
 <!-- Reference links -->
 
+[compoennt-selectors]: /docs/reference/diagnostics/selectors.md#component-selector
 [custom-artifacts]: /docs/development/testing/components/test_runner_framework.md#custom-artifacts
 [tests-as-components]: /docs/development/testing/components/README.md
 [scripting-layer-for-fuchsia]: /docs/development/drivers/concepts/driver_development/sl4f.md
 [component-uri]: /docs/reference/components/url.md
 [fuchsia-package-name]: /docs/concepts/packages/package_url.md#package-name
 [resource-path]: /docs/concepts/packages/package_url.md#resource-paths
+[test-manager]: /docs/get-started/learn/components/component-tests.md
 [fx-test-flags]: https://fuchsia.dev/reference/tools/fx/cmd/test
 [ffx-test]: /docs/development/sdk/ffx/run-device-tests.md
