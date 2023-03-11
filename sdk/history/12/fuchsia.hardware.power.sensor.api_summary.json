@@ -1,0 +1,76 @@
+[
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.power.sensor/Device.GetPowerWatts",
+        "ordinal": "6137197282480723323",
+        "type": "() -> (fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result result)"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.hardware.power.sensor/Device.GetVoltageVolts",
+        "ordinal": "5407987806620638263",
+        "type": "() -> (fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result result)"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.hardware.power.sensor/Device"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Response.power",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result.err",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.power.sensor/Device_GetPowerWatts_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Response.voltage",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Response"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result.err",
+        "ordinal": "2",
+        "type": "int32"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result.response",
+        "ordinal": "1",
+        "type": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Response"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.hardware.power.sensor/Device_GetVoltageVolts_Result",
+        "strictness": "strict"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.hardware.power.sensor"
+    }
+]

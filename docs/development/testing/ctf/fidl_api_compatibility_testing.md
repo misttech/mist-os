@@ -75,7 +75,7 @@ target this API level.
 Usually compatibility issues can be fixed by adding `@available` annotations on FIDL
 declarations.
 
-{% set in_development_api_level = 11 %}
+{% set in_development_api_level = 12 %}
 Below are some good guidelines to follow when changing FIDL APIs.
 
 1. Annotate new, unstable APIs with `@available(added=HEAD)`.
