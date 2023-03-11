@@ -31,10 +31,13 @@ ControllerImpl::ControllerImpl(async_dispatcher_t* dispatcher,
 
 void ControllerImpl::Connect(fidl::InterfaceRequest<fuchsia::camera2::hal::Controller> request) {
   if (binding_.is_bound()) {
+    FX_LOGS(WARNING) << "ControllerImpl::Connect(): Camera controller is already bound";
     request.Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
-  binding_.Bind(std::move(request), dispatcher_);
+
+  zx_status_t status = binding_.Bind(std::move(request), dispatcher_);
+  FX_LOGS(INFO) << "ControllerImpl::Connect(): Bind() -> " << status;
 }
 
 void ControllerImpl::GetNextConfig(GetNextConfigCallback callback) {

@@ -21,6 +21,9 @@
 // This node handles the communication with the clients.
 namespace camera {
 
+constexpr uint32_t kBindingWarningsInitial = 5;
+constexpr uint32_t kBindingWarningsInterval = 100;
+
 class OutputNode : public ProcessNode, public fuchsia::camera2::Stream {
  public:
   OutputNode(async_dispatcher_t* dispatcher, BufferAttachments attachments);
@@ -80,6 +83,7 @@ class OutputNode : public ProcessNode, public fuchsia::camera2::Stream {
   fidl::Binding<fuchsia::camera2::Stream> binding_;
   std::map<uint32_t, FrameToken> client_tokens_;
   fuchsia::sysmem::BufferCollectionPtr observer_collection_;
+  uint32_t binding_warnings_ = 0;
 };
 
 }  // namespace camera

@@ -39,10 +39,24 @@ void OutputNode::ProcessFrame(FrameToken token, frame_metadata_t metadata) {
   if (!started_) {
     return;  // ~token
   }
+
+  // Throttle the rate of binding warning messages.
+  // Once a connection is unbound, every frame from the camera can produce multiple
+  // of these warnings - one per stream.
   if (!binding_.is_bound()) {
-    FX_LOGS(WARNING) << this << ": client disconnected? returning frame...";
+    binding_warnings_++;
+    if (binding_warnings_ <= kBindingWarningsInitial || kBindingWarningsInterval % 100 == 0) {
+      FX_LOGS(WARNING) << this << ": client disconnected? returning frame... (seen "
+                       << binding_warnings_ << " times)";
+    }
     return;  // ~token
   }
+
+  if (binding_warnings_ > 0) {
+    FX_LOGS(WARNING) << this << ": client reconnected? delivering frame...";
+    binding_warnings_ = 0;
+  }
+
   TRACE_FLOW_BEGIN("camera", "camera_stream_on_frame_available", metadata.timestamp);
   client_tokens_.emplace(*token, token);
   fuchsia::camera2::FrameAvailableInfo frame_info{};
