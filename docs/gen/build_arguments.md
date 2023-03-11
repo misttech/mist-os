@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"socket"`
+**Current value (from the default):** `"libcurl"`
 
-From //third_party/crashpad/src/util/net/tls.gni:19
+From //third_party/crashpad/src/util/net/tls.gni:21
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2393,7 +2393,7 @@ From //.gn:83
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/third_party/emboss/emboss.gni:18
+From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
@@ -2401,7 +2401,7 @@ From //.gn:83
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/third_party/emboss/emboss.gni:18
+From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 ### dir_pw_third_party_googletest
 
@@ -2744,7 +2744,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2779,7 +2779,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -6595,6 +6595,12 @@ From //.gn:80
 
 From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
+### pw_third_party_emboss_CONFIG
+
+**Current value (from the default):** `"//third_party/pigweed/src/third_party/emboss:default_config"`
+
+From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
+
 ### pw_third_party_nanopb_CONFIG
 
 The build target that overrides the default configuration options for this
@@ -7377,7 +7383,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"DFD7rVAGmgIiTbkH0CmhQoUtcmLt39NP2mMlPflo9RgC"`
+**Current value (from the default):** `"3LWhdfNUtA1UczJE7Q-UfQYSYAX-_HZQdH1RXwbEAS0C"`
 
 From //build/rust/config.gni:32
 
@@ -8315,7 +8321,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/lib/vulkan/build/config.gni:40
 
