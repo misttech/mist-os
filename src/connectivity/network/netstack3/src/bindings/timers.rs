@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 use async_utils::futures::{FutureExt as _, ReplaceValue};
+use derivative::Derivative;
 use fuchsia_async as fasync;
 use futures::{
     channel::mpsc,
@@ -18,17 +19,19 @@ use log::{trace, warn};
 
 use super::StackTime;
 
-/// A possible timer event that may be fulfilled by calling
-/// [`TimerDispatcher::commit_timer`].
-#[derive(Debug)]
-struct TimerEvent<T> {
-    inner: T,
-    id: u64,
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct InternalId(u64);
+
+impl InternalId {
+    fn increment(&self) -> Self {
+        let Self(id) = self;
+        Self(id.wrapping_add(1))
+    }
 }
 
 /// Internal information to keep tabs on timers.
 struct TimerInfo {
-    id: u64,
+    id: InternalId,
     instant: StackTime,
     abort_handle: AbortHandle,
 }
@@ -61,12 +64,14 @@ pub(crate) trait TimerHandler<T: Hash + Eq>: Sized + 'static {
     fn get_timer_dispatcher(&mut self) -> &mut TimerDispatcher<T>;
 }
 
-type TimerFut<T> = ReplaceValue<fasync::Timer, T>;
+type TimerFut = ReplaceValue<fasync::Timer, InternalId>;
 
 /// Shorthand for the type of futures used by [`TimerDispatcher`] internally.
-type InternalFut<T> = Abortable<TimerFut<TimerEvent<T>>>;
+type InternalFut = Abortable<TimerFut>;
 
 /// Helper struct to keep track of timers for the event loop.
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
 pub(crate) struct TimerDispatcher<T: Hash + Eq> {
     // Invariant: TimerDispatcher uses a HashMap keyed on an external identifier
     // T and assigns an internal "versioning" ID every time a timer is
@@ -75,22 +80,19 @@ pub(crate) struct TimerDispatcher<T: Hash + Eq> {
     // TimerInfo in the HashMap will always hold the latest allocated
     // "versioning" identifier, meaning that:
     //  - When a timer is rescheduled, we update TimerInfo::id to a new value
-    //  - To "commit" a timer firing (through commit_timer), the TimerEvent
+    //  - To "commit" a timer firing (through commit_timer), the timer ID
     //    given must carry the same "versioning" identifier as the one currently
     //    held by the HashMap in TimerInfo::id.
+    //  - timer_ids will always/only hold the timer IDs that are still scheduled
+    //    keyed by their most recent "versioning" ID.
     // The committing mechanism is invisible to external users, which just
     // receive the expired timers through TimerHandler::handle_expired_timer.
     // See TimerDispatcher::spawn for the critical section that makes versioning
     // required.
+    timer_ids: HashMap<InternalId, T>,
     timers: HashMap<T, TimerInfo>,
-    next_id: u64,
-    futures_sender: Option<mpsc::UnboundedSender<InternalFut<T>>>,
-}
-
-impl<T: Hash + Eq> Default for TimerDispatcher<T> {
-    fn default() -> TimerDispatcher<T> {
-        TimerDispatcher { timers: Default::default(), next_id: 0, futures_sender: None }
-    }
+    next_id: InternalId,
+    futures_sender: Option<mpsc::UnboundedSender<InternalFut>>,
 }
 
 impl<T> TimerDispatcher<T>
@@ -108,12 +110,12 @@ where
         let (sender, mut recv) = mpsc::unbounded();
         self.futures_sender = Some(sender);
         fasync::Task::spawn(async move {
-            let mut futures = FuturesUnordered::<InternalFut<T>>::new();
+            let mut futures = FuturesUnordered::<InternalFut>::new();
 
             #[derive(Debug)]
-            enum PollResult<T> {
-                InstallFuture(InternalFut<T>),
-                TimerFired(TimerEvent<T>),
+            enum PollResult {
+                InstallFuture(InternalFut),
+                TimerFired(InternalId),
                 Aborted,
                 ReceiverClosed,
                 FuturesClosed,
@@ -148,7 +150,7 @@ where
                 // The race comes from the fact that we don't currently have a
                 // lock on the context, we're going to acquire the lock in case
                 // the `r` is `TimerFired` below. As we await on the lock, the
-                // TimerEvent we're currently holding may have be invalidated by
+                // timer ID we're currently holding may have be invalidated by
                 // another Task, so it must NOT be given to to the handler.
 
                 trace!("TimerDispatcher work: {:?}", r);
@@ -190,14 +192,12 @@ where
         // a timer scheduled from long ago and be unlucky enough that ordering
         // ends up giving it the same ID. That seems unlikely, so we just wrap
         // around and overflow next_id.
-        self.next_id = self.next_id.overflowing_add(1).0;
-
-        let event = TimerEvent { inner: timer_id.clone(), id: next_id };
+        self.next_id = next_id.increment();
 
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let timeout = {
             let StackTime(time) = time;
-            Abortable::new(fasync::Timer::new(time).replace_value(event), abort_registration)
+            Abortable::new(fasync::Timer::new(time).replace_value(next_id), abort_registration)
         };
 
         if let Some(sender) = self.futures_sender.as_mut() {
@@ -206,6 +206,8 @@ where
             // Timers are always stopped in tests.
             warn!("TimerDispatcher not spawned, timer {:?} will not fire", timer_id);
         }
+
+        assert_eq!(self.timer_ids.insert(next_id, timer_id.clone()), None);
 
         match self.timers.entry(timer_id) {
             Entry::Vacant(e) => {
@@ -228,12 +230,16 @@ where
                 // ...store the new "versioning" timer_id next_id, effectively
                 // marking this newest version as the only valid one, in case
                 // the old timer had already fired as is currently waiting to be
-                // commited.
+                // committed.
+                let prev_id = info.id;
                 info.id = next_id;
                 // ...finally, we get the old instant information to be returned
                 // and update the TimerInfo entry with the new time value:
                 let old = Some(info.instant);
                 info.instant = time;
+
+                assert_eq!(self.timer_ids.remove(&prev_id).as_ref(), Some(e.key()));
+
                 old
             }
         }
@@ -247,6 +253,7 @@ where
         if let Some(t) = self.timers.remove(timer_id) {
             // call the abort handle, in case the future hasn't fired yet:
             t.abort_handle.abort();
+            assert_eq!(self.timer_ids.remove(&t.id).as_ref(), Some(timer_id));
             Some(t.instant)
         } else {
             None
@@ -275,30 +282,21 @@ where
         self.timers.get(timer_id).map(|t| t.instant)
     }
 
-    /// Retrieves the internal timer value of a [`TimerEvent`].
+    /// Retrieves the internal timer value of a timer ID.
     ///
-    /// `commit_timer` will "commit" `event` for consumption, if `event` is
+    /// `commit_timer` will "commit" `id` for consumption, if `id` is
     /// still valid to be triggered. If `commit_timer` returns `Ok`, then
-    /// `TimerDispatcher` will "forget" about the timer identifier contained in
-    /// `event`, meaning subsequent calls to [`cancel_timer`] or
-    /// [`schedule_timer`] will return `None`.
+    /// `TimerDispatcher` will "forget" about the timer identifier referenced
+    /// by `id`, meaning subsequent calls to [`cancel_timer`] or
+    /// [`schedule_timer`] will return `Err`.
     ///
     /// [`cancel_timer`]: TimerDispatcher::cancel_timer
     /// [`schedule_timer`]: TimerDispatcher::schedule_timer
-    fn commit_timer(&mut self, event: TimerEvent<T>) -> Result<T, TimerEvent<T>> {
-        match self.timers.entry(event.inner.clone()) {
-            Entry::Occupied(e) => {
-                // The event is only valid if its id matches the one in the
-                // HashMap:
-                if e.get().id == event.id {
-                    let _: TimerInfo = e.remove();
-                    Ok(event.inner)
-                } else {
-                    Err(event)
-                }
-            }
-            Entry::Vacant(_) => Err(event),
-        }
+    fn commit_timer(&mut self, id: InternalId) -> Result<T, InternalId> {
+        let external_id = self.timer_ids.remove(&id).ok_or(id)?;
+        let info = self.timers.remove(&external_id).ok_or(id)?;
+        assert_eq!(info.id, id);
+        Ok(external_id)
     }
 }
 
