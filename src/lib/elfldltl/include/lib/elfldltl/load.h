@@ -190,8 +190,8 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file,
 // of PT_LOAD segments.
 //
 // The RelroBounds function returns the normalized [start, end) of RELRO so
-// mprotect can be applied there.  The returned LoadInfo::Region object
-// also has size() and empty() for convenience.
+// protection can be applied there.  The returned LoadInfo::Region object also
+// has size() and empty() for convenience.
 //
 // The ApplyRelro method uses this to adjust the segments for uses where
 // relocation precedes loading, after all segments have been added.
@@ -278,7 +278,10 @@ class LoadInfo {
   }
 
   // When loading before relocation, the RelroBounds() region can just be made
-  // read-only in memory after relocation.
+  // read-only in memory after relocation. Partial pages in the RELRO region are
+  // excluded from RelroBounds, as protections can only be applied per-page.
+  // TODO(fxbug.dev/123468): Address the discrepancy between our round-up behavior and glibc's
+  // round-down behavior for RELRO start.
   static constexpr Region RelroBounds(const std::optional<Phdr>& relro, size_type page_size) {
     Region region;
     if (relro) {

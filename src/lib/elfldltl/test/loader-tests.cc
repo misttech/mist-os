@@ -30,6 +30,8 @@ namespace {
 
 #ifdef __Fuchsia__
 struct LocalVmarLoaderTraits {
+  using Loader = elfldltl::LocalVmarLoader;
+
   static auto MakeLoader() { return elfldltl::LocalVmarLoader{}; }
 
   static inline auto TestLibProvider = GetTestLibVmo;
@@ -45,6 +47,8 @@ struct LocalVmarLoaderTraits {
 };
 
 struct RemoteVmarLoaderTraits : public LocalVmarLoaderTraits {
+  using Loader = elfldltl::RemoteVmarLoader;
+
   static auto MakeLoader() { return elfldltl::RemoteVmarLoader{*zx::vmar::root_self()}; }
 
   static constexpr bool kHasMemory = false;
@@ -52,6 +56,8 @@ struct RemoteVmarLoaderTraits : public LocalVmarLoaderTraits {
 #endif
 
 struct MmapLoaderTraits {
+  using Loader = elfldltl::MmapLoader;
+
   static auto MakeLoader() { return elfldltl::MmapLoader{}; }
 
   static inline auto TestLibProvider = GetTestLib;
@@ -74,6 +80,7 @@ using LoaderTypes = ::testing::Types<
 
 struct LoadOptions {
   bool commit = true;
+  bool persist_state = false;
   bool reloc = true;
 };
 
@@ -107,8 +114,9 @@ class ElfldltlLoaderTests : public testing::Test {
     ASSERT_TRUE(phdrs_result);
     cpp20::span<const Phdr> phdrs = phdrs_result.get();
 
-    auto loader = Traits::MakeLoader();
-    elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
+    typename Traits::Loader loader = Traits::MakeLoader();
+
+    ElfLoadInfo load_info;
     ASSERT_TRUE(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())));
 
     ASSERT_TRUE(loader.Load(diag, load_info, Traits::LoadFileArgument(lib_file)));
@@ -129,7 +137,9 @@ class ElfldltlLoaderTests : public testing::Test {
               load_info.vaddr_start() + loader.load_bias());
 
     std::optional<Phdr> ph;
-    elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph));
+    std::optional<Phdr> relro_phdr;
+    elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph),
+                          elfldltl::PhdrRelroObserver<Elf>(relro_phdr));
     ASSERT_TRUE(ph);
 
     auto dyn = mem.ReadArray<Dyn>(ph->vaddr(), ph->filesz() / sizeof(Dyn));
@@ -164,6 +174,11 @@ class ElfldltlLoaderTests : public testing::Test {
       std::move(loader).Commit();
     }
 
+    if (options.persist_state) {
+      loader_opt_ = std::move(loader);
+      relro_phdr_ = std::move(relro_phdr);
+    }
+
     EXPECT_EQ(mem_.image().empty(), !options.commit);
   }
 
@@ -174,6 +189,15 @@ class ElfldltlLoaderTests : public testing::Test {
     return mem_.GetPointer<T>(sym->value);
   }
 
+  void protect_relro() {
+    ASSERT_TRUE(loader_opt_);
+    ASSERT_TRUE(relro_phdr_);
+    auto diag = ExpectOkDiagnostics();
+
+    ASSERT_TRUE(loader_opt_->ProtectRelro(
+        diag, ElfLoadInfo::RelroBounds(*relro_phdr_, loader_opt_->page_size())));
+  }
+
   template <typename T>
   T* entry() const {
     return reinterpret_cast<T*>(entry_);
@@ -181,6 +205,7 @@ class ElfldltlLoaderTests : public testing::Test {
 
  private:
   using Elf = elfldltl::Elf<>;
+  using ElfLoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container>;
   using Phdr = Elf::Phdr;
   using Dyn = Elf::Dyn;
   using Sym = Elf::Sym;
@@ -206,6 +231,9 @@ class ElfldltlLoaderTests : public testing::Test {
   void (*entry_)() = nullptr;
   elfldltl::DirectMemory mem_;
   elfldltl::SymbolInfo<Elf> sym_info_;
+
+  std::optional<typename Traits::Loader> loader_opt_;
+  std::optional<Phdr> relro_phdr_;
 };
 
 TYPED_TEST_SUITE(ElfldltlLoaderTests, LoaderTypes);
@@ -220,6 +248,12 @@ TYPED_TEST(ElfldltlLoaderTests, UnmapCorrectly) {
   this->Load(kRet24, {.commit = false, .reloc = false});
 
   EXPECT_DEATH(this->template entry<decltype(Return24)>()(), "");
+}
+
+TYPED_TEST(ElfldltlLoaderTests, PersistCorrectly) {
+  this->Load(kRet24, {.commit = false, .persist_state = true, .reloc = false});
+
+  EXPECT_EQ(this->template entry<decltype(Return24)>()(), 24);
 }
 
 TYPED_TEST(ElfldltlLoaderTests, DataSegments) {
@@ -267,6 +301,22 @@ TYPED_TEST(ElfldltlLoaderTests, LargeBssSegment) {
   *data->bss = 2;
   int* rodata = const_cast<int*>(data->rodata);
   EXPECT_DEATH(*rodata = 3, "");
+}
+
+TYPED_TEST(ElfldltlLoaderTests, ProtectRelroTest) {
+  this->Load(kRelro, {.commit = false, .persist_state = true});
+
+  RelroData* data = this->template entry<RelroData>();
+  ASSERT_NE(data, nullptr);
+
+  int* volatile relrodata = const_cast<int*>(data->relocated);
+  ASSERT_NE(relrodata, nullptr);
+
+  data->relocated = nullptr;
+  this->protect_relro();
+
+  ASSERT_EQ(data->relocated, nullptr);
+  EXPECT_DEATH(data->relocated = relrodata, "");
 }
 
 TYPED_TEST(ElfldltlLoaderTests, BasicSymbol) {

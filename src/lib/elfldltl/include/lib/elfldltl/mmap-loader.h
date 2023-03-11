@@ -22,10 +22,23 @@ namespace elfldltl {
 
 class MmapLoader {
  public:
+  MmapLoader() = default;
+
   ~MmapLoader() {
     if (!image().empty()) {
       munmap(image().data(), image().size());
     }
+  }
+
+  MmapLoader(MmapLoader&& other) noexcept : memory_(other.memory_.image(), other.memory_.base()) {
+    other.memory().set_image({});
+  }
+
+  MmapLoader& operator=(MmapLoader&& other) noexcept {
+    memory_.set_image(other.memory_.image());
+    memory_.set_base(other.memory_.base());
+    other.memory_.set_image({});
+    return *this;
   }
 
   [[gnu::const]] static size_t page_size() { return sysconf(_SC_PAGESIZE); }
@@ -48,9 +61,8 @@ class MmapLoader {
     // touched.
     void* map = mmap(nullptr, load_info.vaddr_size(), PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (map == MAP_FAILED) [[unlikely]] {
-      diag.SystemError("couldn't mmap address range of size ", load_info.vaddr_size(), ": ",
-                       PosixError{errno});
-      return false;
+      return diag.SystemError("couldn't mmap address range of size ", load_info.vaddr_size(), ": ",
+                              PosixError{errno});
     }
     memory_.set_image({static_cast<std::byte*>(map), load_info.vaddr_size()});
     memory_.set_base(load_info.vaddr_start());
@@ -123,6 +135,19 @@ class MmapLoader {
     return load_info.VisitSegments(mapper);
   }
 
+  /// Given a region returned by LoadInfo::RelroBounds, make that region read-only.
+  template <class Diagnostics, class Region>
+  [[nodiscard]] bool ProtectRelro(Diagnostics& diag, Region region) {
+    if (!region.empty()) {
+      auto ptr = reinterpret_cast<void*>(region.start + load_bias());
+      if (mprotect(ptr, region.size(), PROT_READ) != 0) [[unlikely]] {
+        diag.SystemError("cannot protect PT_GNU_RELRO region: ", PosixError{errno});
+        return false;
+      }
+    }
+    return true;
+  }
+
   // After Load(), this is the bias added to the given LoadInfo::vaddr_start()
   // to find the runtime load address.
   uintptr_t load_bias() const {
@@ -142,6 +167,7 @@ class MmapLoader {
 
  private:
   cpp20::span<std::byte> image() const { return memory_.image(); }
+  uintptr_t base() const { return memory_.base(); }
 
   DirectMemory memory_;
 };

@@ -246,6 +246,11 @@ loader_test_lib("elfldltl-test-ret24") {
   ldflags = [ "-Wl,-e,Return24" ]
 }
 
+loader_test_lib("elfldltl-test-relro") {
+  sources = [ "relro.cc" ]
+  ldflags = [ "-Wl,-e,relro_data" ]
+}
+
 loader_test_sizes = [
   {
     data = 0
@@ -283,6 +288,7 @@ loader_test_lib("elfldltl-test-symbolic") {
 }
 
 loader_test_data_deps = [
+  "elfldltl-test-relro",
   "elfldltl-test-ret24",
   "elfldltl-test-symbolic",
 ]

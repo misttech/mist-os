@@ -36,6 +36,9 @@ class VmarLoader {
     }
   }
 
+  VmarLoader(VmarLoader&& other) = default;
+  VmarLoader& operator=(VmarLoader&& other) = default;
+
   [[gnu::const]] static size_t page_size() { return zx_system_get_page_size(); }
 
   /// After Load(), this is the bias added to the given LoadInfo::vaddr_start()
@@ -51,6 +54,19 @@ class VmarLoader {
   /// handle can usually be discarded, but saving makes it possible to modify
   /// page protections after loading.
   zx::vmar Commit() && { return std::exchange(load_image_vmar_, {}); }
+
+  /// Given a region returned by LoadInfo::RelroBounds, make that region read-only.
+  template <class Diagnostics, class Region>
+  [[nodiscard]] bool ProtectRelro(Diagnostics& diag, Region region) {
+    if (!region.empty()) {
+      zx_status_t status =
+          load_image_vmar_.protect(ZX_VM_PERM_READ, region.start + load_bias_, region.size());
+      if (status != ZX_OK) {
+        return diag.SystemError("cannot protect PT_GNU_RELRO region: ", ZirconError{status});
+      }
+    }
+    return true;
+  }
 
  protected:
   // This encapsulates the main differences between the Load methods of the
@@ -301,6 +317,20 @@ class VmarLoader {
 class LocalVmarLoader : public VmarLoader {
  public:
   explicit LocalVmarLoader(const zx::vmar& vmar = *zx::vmar::root_self()) : VmarLoader(vmar) {}
+
+  LocalVmarLoader(LocalVmarLoader&& other) noexcept
+      : VmarLoader(static_cast<VmarLoader&&>(other)),
+        memory_(other.memory_.image(), other.memory_.base()) {
+    other.memory().set_image({});
+  }
+
+  LocalVmarLoader& operator=(LocalVmarLoader&& other) noexcept {
+    memory_.set_image(other.memory_.image());
+    memory_.set_base(other.memory_.base());
+    VmarLoader::operator=(static_cast<VmarLoader&&>(other));
+    other.memory_.set_image({});
+    return *this;
+  }
 
   template <class Diagnostics, class LoadInfo>
   [[nodiscard]] bool Load(Diagnostics& diag, const LoadInfo& load_info, zx::unowned_vmo vmo) {
