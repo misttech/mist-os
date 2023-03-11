@@ -127,7 +127,6 @@ sysroot_uninstrumented_libc_entries = [
         "assert.h",
         "bits/aarch64/endian.h",
         "bits/aarch64/fenv.h",
-        "bits/aarch64/io.h",
         "bits/aarch64/ioctl.h",
         "bits/aarch64/ipc.h",
         "bits/aarch64/reg.h",
