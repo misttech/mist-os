@@ -174,6 +174,9 @@ class GestureArenaV2 {
   // contest.
   void Add(GestureRecognizerV2* recognizer);
 
+  // Clears all recognizers from the arena.
+  void ClearRecognizers();
+
   // Dispatches a new pointer event to this arena. This event gets sent to all participating
   // recognizers.
   //

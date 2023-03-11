@@ -610,5 +610,16 @@ TEST(GestureArenaTest, DiscardStaleEventsTwoInteractions) {
   }
 }
 
+TEST(GestureArenaTest, ClearsRecognizers) {
+  a11y::GestureArenaV2 arena;
+  MockGestureRecognizer recognizer;
+  arena.Add(&recognizer);
+
+  arena.ClearRecognizers();
+
+  auto status = SendPointerEvent(&arena, {1, Phase::ADD, {}}, 0);
+  EXPECT_EQ(status, a11y::InteractionTracker::ConsumptionStatus::kReject);
+}
+
 }  // namespace
 }  // namespace accessibility_test

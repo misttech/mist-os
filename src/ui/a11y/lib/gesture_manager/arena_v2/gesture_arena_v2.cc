@@ -32,7 +32,6 @@ InteractionTracker::InteractionTracker(HeldInteractionCallback callback)
 }
 
 void InteractionTracker::Reset() {
-  FX_DCHECK(open_interactions_.empty());
   FX_DCHECK(held_interactions_.empty());
 
   status_ = ConsumptionStatus::kUndecided;
@@ -187,14 +186,27 @@ void GestureArenaV2::Add(GestureRecognizerV2* recognizer) {
   recognizers_.push_back({.recognizer = recognizer, .status = RecognizerStatus::kRejected});
 }
 
-// Possible |Remove| implementation:
-// fxr/c/fuchsia/+/341227/11/src/ui/a11y/lib/gesture_manager/arena/gesture_arena.cc#151
+void GestureArenaV2::ClearRecognizers() {
+  for (auto& handle : recognizers_) {
+    if (handle.status != RecognizerStatus ::kRejected) {
+      handle.recognizer->OnDefeat();
+    }
+  }
+
+  recognizers_.clear();
+
+  // clear streams if active.
+  if (interactions_.Status() != InteractionTracker::ConsumptionStatus::kReject) {
+    interactions_.RejectInteractions();
+  }
+}
 
 InteractionTracker::ConsumptionStatus GestureArenaV2::OnEvent(
     const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
   FX_CHECK(event.touch_event.has_pointer_sample());
-  FX_CHECK(!recognizers_.empty()) << "The a11y Gesture arena is listening for pointer events "
-                                     "but has no added gesture recognizer.";
+  if (recognizers_.empty()) {
+    return InteractionTracker::ConsumptionStatus::kReject;
+  }
 
   if (IsIdle()) {
     StartNewContest();
