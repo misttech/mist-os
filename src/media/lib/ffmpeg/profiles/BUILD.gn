@@ -63,7 +63,6 @@ group("common_args") {
     "//src/media/lib/ffmpeg/features:enable_decoder_theora",
     "//src/media/lib/ffmpeg/features:enable_decoder_vorbis",
     "//src/media/lib/ffmpeg/features:enable_decoder_vp8",
-    "//src/media/lib/ffmpeg/features:enable_decoder_vp9",
     "//src/media/lib/ffmpeg/features:enable_demuxer_aac",
     "//src/media/lib/ffmpeg/features:enable_demuxer_amr",
     "//src/media/lib/ffmpeg/features:enable_demuxer_avi",
@@ -74,7 +73,6 @@ group("common_args") {
     "//src/media/lib/ffmpeg/features:enable_demuxer_mp3",
     "//src/media/lib/ffmpeg/features:enable_demuxer_ogg",
     "//src/media/lib/ffmpeg/features:enable_demuxer_wav",
-    "//src/media/lib/ffmpeg/features:enable_encoder_sbc",
     "//src/media/lib/ffmpeg/features:enable_parser_aac",
     "//src/media/lib/ffmpeg/features:enable_parser_aac_latm",
     "//src/media/lib/ffmpeg/features:enable_parser_flac",
@@ -87,6 +85,5 @@ group("common_args") {
     "//src/media/lib/ffmpeg/features:enable_parser_vorbis",
     "//src/media/lib/ffmpeg/features:enable_parser_vp3",
     "//src/media/lib/ffmpeg/features:enable_parser_vp8",
-    "//src/media/lib/ffmpeg/features:enable_parser_vp9",
   ]
 }
