@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <endian.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
 #include <lib/zx/channel.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,9 +16,6 @@
 
 #include <cstdint>
 #include <string_view>
-
-#include <fbl/string_buffer.h>
-#include <fbl/unique_fd.h>
 
 namespace sysinfo = fuchsia_sysinfo;
 namespace gpio = fuchsia_hardware_gpio;
@@ -36,34 +29,25 @@ enum Boards {
 
 Boards board = UNKNOWN_BOARD;
 
-fbl::StringBuffer<sysinfo::wire::kBoardNameLen> board_name;
-
 Boards GetBoard() {
-  zx::channel sysinfo_server_channel, sysinfo_client_channel;
-  auto status = zx::channel::create(0, &sysinfo_server_channel, &sysinfo_client_channel);
-  if (status != ZX_OK) {
+  zx::result channel = component::Connect<sysinfo::SysInfo>();
+  if (channel.is_error()) {
     return UNKNOWN_BOARD;
   }
 
-  const char* sysinfo_path = "svc/fuchsia.sysinfo.SysInfo";
-  fbl::unique_fd sysinfo_fd(open(sysinfo_path, O_RDWR));
-  if (!sysinfo_fd) {
+  const fidl::WireResult result = fidl::WireCall(channel.value())->GetBoardName();
+  if (!result.ok()) {
     return UNKNOWN_BOARD;
   }
-  fdio_cpp::FdioCaller caller_sysinfo(std::move(sysinfo_fd));
-  auto result = fidl::WireCall(caller_sysinfo.borrow_as<sysinfo::SysInfo>())->GetBoardName();
-  if (!result.ok() || result.value().status != ZX_OK) {
+  const fidl::WireResponse response = result.value();
+  if (response.status != ZX_OK) {
     return UNKNOWN_BOARD;
-  }
+  };
 
-  board_name.Clear();
-  board_name.Append(result.value().name.data(), result.value().name.size());
-
-  auto board_name_cmp = std::string_view(board_name.data(), board_name.size());
-  if (board_name_cmp.find("sherlock") != std::string_view::npos) {
+  if (response.name.get().find("sherlock") != std::string_view::npos) {
     return SHERLOCK;
   }
-  if (board_name_cmp.find("luis") != std::string_view::npos) {
+  if (response.name.get().find("luis") != std::string_view::npos) {
     return LUIS;
   }
   return UNKNOWN_BOARD;

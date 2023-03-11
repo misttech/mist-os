@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <errno.h>
+#include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/zircon-internal/align.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,17 +27,9 @@
 #include <memory>
 #include <string_view>
 
-#include <fbl/algorithm.h>
-#include <fbl/string.h>
 #include <fbl/string_buffer.h>
-#include <fbl/unique_fd.h>
 #include <fbl/vector.h>
 
-#include "fidl/fuchsia.hardware.display/cpp/wire.h"
-#include "fidl/fuchsia.hardware.display/cpp/wire_types.h"
-#include "lib/ddk/driver.h"
-#include "lib/fdio/directory.h"
-#include "lib/fzl/vmo-mapper.h"
 #include "src/graphics/display/testing/display.h"
 #include "src/graphics/display/testing/utils.h"
 #include "src/graphics/display/testing/virtual-layer.h"
@@ -628,22 +620,26 @@ void usage(void) {
 }
 
 Platforms GetPlatform() {
-  zx::result sysinfo = component::Connect<sysinfo::SysInfo>();
-  if (sysinfo.is_error()) {
+  zx::result channel = component::Connect<sysinfo::SysInfo>();
+  if (channel.is_error()) {
     return UNKNOWN_PLATFORM;
   }
 
-  auto result = fidl::WireCall(sysinfo.value())->GetBoardName();
-  if (!result.ok() || result.value().status != ZX_OK) {
+  const fidl::WireResult result = fidl::WireCall(channel.value())->GetBoardName();
+  if (!result.ok()) {
     return UNKNOWN_PLATFORM;
   }
+  const fidl::WireResponse response = result.value();
+  if (response.status != ZX_OK) {
+    return UNKNOWN_PLATFORM;
+  };
 
   board_name.Clear();
-  board_name.Append(result.value().name.data(), result.value().name.size());
+  board_name.Append(response.name.get());
 
-  printf("Found board %.*s\n", static_cast<int>(board_name.size()), result.value().name.data());
+  printf("Found board %s\n", board_name.c_str());
 
-  auto board_name_cmp = std::string_view(board_name.data(), board_name.size());
+  std::string_view board_name_cmp(board_name);
   if (board_name_cmp == "x64" || board_name_cmp == "chromebook-x64" || board_name_cmp == "Eve" ||
       board_name_cmp.find("Nocturne") != std::string_view::npos ||
       board_name_cmp.find("NUC") != std::string_view::npos) {
