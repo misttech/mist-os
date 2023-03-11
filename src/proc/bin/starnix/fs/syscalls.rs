@@ -601,6 +601,15 @@ pub fn sys_mkdirat(
     Ok(())
 }
 
+pub fn sys_mknod(
+    current_task: &CurrentTask,
+    user_path: UserCString,
+    mode: FileMode,
+    dev: DeviceType,
+) -> Result<(), Errno> {
+    sys_mknodat(current_task, FdNumber::AT_FDCWD, user_path, mode, dev)
+}
+
 pub fn sys_mknodat(
     current_task: &CurrentTask,
     dir_fd: FdNumber,

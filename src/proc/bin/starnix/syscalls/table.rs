@@ -155,6 +155,7 @@ pub fn dispatch_syscall(
         memfd_create[2],
         #[cfg(target_arch = "x86_64")] mkdir[2],
         mkdirat[3],
+        #[cfg(target_arch = "x86_64")] mknod[3],
         mknodat[4],
         mmap[6],
         mount[5],
