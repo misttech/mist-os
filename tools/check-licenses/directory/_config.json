@@ -171,6 +171,14 @@
                 "notes": [
                     "Auto-generated golden files for build system tests."
                 ]
+            },
+            {
+                "paths": [
+                    "local"
+                ],
+                "notes": [
+                    "Skip developer-local files.  These are not part of fuchsia.git."
+                ]
             }
         ]
     }
