@@ -24,6 +24,7 @@ group("headers") {
       # Since these headers are meant to be used by assembly code, they should
       # not be needed by any host-compatible code.
       ":gen-arm64-sysreg-asm",
+      ":gen-riscv64-system-asm",
       ":gen-x86-msr-asm",
     ]
   }
@@ -73,5 +74,13 @@ hwreg_asm_header("gen-arm64-sysreg-asm") {
   output_name = "lib/arch/arm64/sysreg-asm.h"
   defines = [ "LIB_ARCH_PRINTERS" ]
   sources = [ "gen-arm64-sysreg-asm.cc" ]
+  deps = [ ":arch" ]
+}
+
+hwreg_asm_header("gen-riscv64-system-asm") {
+  visibility = [ ":*" ]
+  output_name = "lib/arch/riscv64/system-asm.h"
+  defines = [ "LIB_ARCH_PRINTERS" ]
+  sources = [ "gen-riscv64-system-asm.cc" ]
   deps = [ ":arch" ]
 }
