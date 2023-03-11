@@ -122,6 +122,12 @@ type DeviceSelector = table {
     2: id fuchsia.io.Path;
 };
 
+/// Cancels an AudioDaemonRecordRequest if no duration was specified.
+protocol AudioDaemonCanceler {
+    /// Finish sending audio data back to the client.
+    Cancel() -> () error zx.status;
+};
+
 /// The main entry point for ffx audio.
 @discoverable
 protocol AudioDaemon {
@@ -160,7 +166,12 @@ protocol AudioDaemon {
         2: stream_type fuchsia.media.AudioStreamType;
 
         /// Duration in nanoseconds to record audio data.
+        /// Optional.
         3: duration zx.duration;
+
+        /// Handle to specify when to stop.
+        /// Can be set only if the `duration` is not specified.
+        4: canceler server_end:AudioDaemonCanceler;
     }) -> (resource table {
         /// Contains audio data in the form of a complete WAV file.
         /// Required.
@@ -170,7 +181,6 @@ protocol AudioDaemon {
         /// Required.
         2: stderr zx.handle:SOCKET;
     }) error zx.status;
-
 
     /// Lists all available audio devices on target.
     ListDevices() -> (resource table {

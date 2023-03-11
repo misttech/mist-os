@@ -14,10 +14,10 @@ use {
     async_lock as _,
     fidl::HandleBased,
     fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonDeviceInfoResponse, AudioDaemonListDevicesResponse, AudioDaemonPlayRequest,
-        AudioDaemonPlayResponder, AudioDaemonPlayResponse, AudioDaemonRecordRequest,
-        AudioDaemonRecordResponder, AudioDaemonRecordResponse, AudioDaemonRequest,
-        AudioDaemonRequestStream, PlayLocation, RecordLocation,
+        AudioDaemonCancelerMarker, AudioDaemonDeviceInfoResponse, AudioDaemonListDevicesResponse,
+        AudioDaemonPlayRequest, AudioDaemonPlayResponder, AudioDaemonPlayResponse,
+        AudioDaemonRecordRequest, AudioDaemonRecordResponder, AudioDaemonRecordResponse,
+        AudioDaemonRequest, AudioDaemonRequestStream, PlayLocation, RecordLocation,
     },
     fidl_fuchsia_media::AudioRendererProxy,
     fidl_fuchsia_media_audio, fuchsia as _, fuchsia_async as fasync,
@@ -46,7 +46,7 @@ impl AudioDaemon {
         responder: AudioDaemonRecordResponder,
     ) -> Result<(), anyhow::Error> {
         let (stdout_remote, stdout_local) = zx::Socket::create_stream();
-        let (stderr_remote, _stderr_local) = zx::Socket::create_stream();
+        let (stderr_remote, stderr_local) = zx::Socket::create_stream();
 
         let response = AudioDaemonRecordResponse {
             stdout: Some(stdout_remote),
@@ -69,11 +69,14 @@ impl AudioDaemon {
             _ => panic!("Expected Capturer RecordLocation"),
         };
 
+        let stop_signal = std::sync::atomic::AtomicBool::new(false);
+        let cancel_server = request.canceler;
         let mut stream_type = request.stream_type.ok_or(anyhow::anyhow!("Stream type missing"))?;
         let format = format_utils::Format::from(&stream_type);
-        let duration_nanos =
-            request.duration.ok_or(anyhow::anyhow!("Duration argument missing."))? as u64;
-        let duration = std::time::Duration::from_nanos(duration_nanos);
+
+        let duration = request
+            .duration
+            .map(|duration_nanos| std::time::Duration::from_nanos(duration_nanos as u64));
 
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
@@ -108,8 +111,12 @@ impl AudioDaemon {
         let bytes_per_packet = buffer_size_bytes / num_packets;
 
         let frames_per_packet = bytes_per_packet / bytes_per_frame;
-        let bytes_to_capture = format.frames_in_duration(duration) * bytes_per_frame;
-        let packets_to_capture = (bytes_to_capture as f64 / bytes_per_packet as f64).ceil() as u64;
+
+        let packets_to_capture = duration.map(|duration| {
+            (format.frames_in_duration(duration) as f64 * bytes_per_frame as f64
+                / bytes_per_packet as f64)
+                .ceil() as u64
+        });
         let vmo = zx::Vmo::create(buffer_size_bytes)?;
 
         capturer_proxy.add_payload_buffer(0, vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
@@ -117,30 +124,57 @@ impl AudioDaemon {
 
         let mut stream = capturer_proxy.take_event_stream();
         let mut packets_so_far = 0;
+        let mut async_stderr_writer = fidl::AsyncSocket::from_socket(stderr_local)?;
 
-        while let Some(event) = stream.try_next().await? {
-            match event {
-                fidl_fuchsia_media::AudioCapturerEvent::OnPacketProduced { mut packet } => {
-                    packets_so_far += 1;
-
-                    let mut data = vec![0u8; packet.payload_size as usize];
-                    let _audio_data = vmo.read(&mut data[..], packet.payload_offset)?;
-
-                    let mut bytes_written_from_packet = 0usize;
-                    while bytes_written_from_packet < packet.payload_size as usize {
-                        bytes_written_from_packet +=
-                            stdout_local.write(&data[bytes_written_from_packet..])?;
-                    }
-                    capturer_proxy.release_packet(&mut packet)?;
-                    if packets_so_far == packets_to_capture {
-                        break;
-                    }
+        let packet_fut = async {
+            while let Some(event) = stream.try_next().await? {
+                if stop_signal.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
                 }
-                fidl_fuchsia_media::AudioCapturerEvent::OnEndOfStream {} => break,
-            }
-        }
+                match event {
+                    fidl_fuchsia_media::AudioCapturerEvent::OnPacketProduced { mut packet } => {
+                        packets_so_far += 1;
 
-        Ok(())
+                        let mut data = vec![0u8; packet.payload_size as usize];
+                        let _audio_data = vmo.read(&mut data[..], packet.payload_offset)?;
+
+                        let mut bytes_written_from_packet = 0usize;
+                        while bytes_written_from_packet < packet.payload_size as usize {
+                            bytes_written_from_packet +=
+                                stdout_local.write(&data[bytes_written_from_packet..])?;
+                        }
+                        capturer_proxy
+                            .release_packet(&mut packet)
+                            .map_err(|e| anyhow::anyhow!("Release packet error: {}", e))?;
+
+                        if let Some(packets_to_capture) = packets_to_capture {
+                            if packets_so_far == packets_to_capture {
+                                break;
+                            }
+                        }
+                    }
+                    fidl_fuchsia_media::AudioCapturerEvent::OnEndOfStream {} => break,
+                }
+            }
+
+            let output_message = format!(
+                "Read {} packets from AudioCapturer, totaling {} bytes. \n",
+                packets_so_far,
+                packets_so_far * bytes_per_packet
+            );
+            async_stderr_writer
+                .write_all(output_message.as_bytes())
+                .await
+                .map_err(|e| anyhow::anyhow!("Error writing to stderr: {}", e))
+        };
+
+        if let Some(cancel_server) = cancel_server {
+            futures::future::try_join(stop_listener(cancel_server, &stop_signal), packet_fut)
+                .await
+                .map(|((), ())| ())
+        } else {
+            packet_fut.await.map_err(|e| anyhow::anyhow!("Error receiving packets: {}", e))
+        }
     }
 
     fn setup_reference_clock(
@@ -236,11 +270,10 @@ impl AudioDaemon {
                     bytes_per_packet,
                     iteration + 1,
                 )
-                .await?;
+                .await
             } else {
-                return Ok(());
+                Ok(())
             }
-            Ok(())
         }
         .boxed()
     }
@@ -349,8 +382,7 @@ impl AudioDaemon {
                 bytes_per_packet,
                 1,
             )
-            .await?;
-            Ok::<(), Error>(())
+            .await
         });
 
         futures::future::try_join_all(futs).await?;
@@ -412,6 +444,7 @@ impl AudioDaemon {
             stderr: Some(stderr_remote),
             ..AudioDaemonRecordResponse::EMPTY
         };
+
         responder.send(&mut Ok(response)).expect("Failed to send response.");
 
         let stream_type = request.stream_type.ok_or(anyhow::anyhow!("Stream type missing"))?;
@@ -423,9 +456,9 @@ impl AudioDaemon {
                 _ => Err(anyhow::anyhow!("Expected Ring Buffer location")),
             })?;
 
-        let duration_nanos =
-            request.duration.ok_or(anyhow::anyhow!("Duration argument missing."))? as u64;
-        let duration = std::time::Duration::from_nanos(duration_nanos);
+        let cancel_server = request.canceler;
+        let duration =
+            request.duration.map(|duration| std::time::Duration::from_nanos(duration as u64));
 
         let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id));
         let output_message = device
@@ -433,13 +466,16 @@ impl AudioDaemon {
                 format_utils::Format::from(&stream_type),
                 fasync::Socket::from_socket(stdout_local)?,
                 duration,
+                cancel_server,
             )
             .await?;
 
         let mut stderr = fasync::Socket::from_socket(stderr_local)?;
 
-        stderr.write_all(output_message.as_bytes()).await?;
-        Ok(())
+        stderr
+            .write_all(output_message.as_bytes())
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to write to stderr: {}", e))
     }
 
     async fn serve(&mut self, mut stream: AudioDaemonRequestStream) -> Result<(), Error> {
@@ -447,40 +483,33 @@ impl AudioDaemon {
             match request {
                 AudioDaemonRequest::Play { payload, responder } => match payload.location {
                     Some(PlayLocation::Renderer(..)) => {
-                        self.play_renderer(payload, responder).await?;
-                        Ok(())
+                        self.play_renderer(payload, responder).await
                     }
                     Some(PlayLocation::RingBuffer(..)) => {
-                        self.play_device(payload, responder).await?;
-                        Ok(())
+                        self.play_device(payload, responder).await
                     }
                     Some(..) => Err(anyhow::anyhow!("No PlayLocation variant specified.")),
                     None => Err(anyhow::anyhow!("PlayLocation argument missing. ")),
                 }?,
 
-                AudioDaemonRequest::Record { payload, responder } => {
-                    match payload.location {
-                        Some(RecordLocation::Capturer(..)) => {
-                            self.record_capturer(payload, responder).await?;
-                            Ok(())
-                        }
-                        Some(RecordLocation::RingBuffer(..)) => {
-                            self.record_device(payload, responder).await?;
-                            Ok(())
-                        }
-                        Some(RecordLocation::Loopback(..)) => {
-                            self.record_capturer(payload, responder).await?;
-                            Ok(())
-                        }
-                        Some(..) => Err(anyhow::anyhow!("No RecordLocation variant specified.")),
-                        None => Err(anyhow::anyhow!("RecordLocation argument missing. ")),
-                    }?;
-                }
+                AudioDaemonRequest::Record { payload, responder } => match payload.location {
+                    Some(RecordLocation::Capturer(..)) => {
+                        self.record_capturer(payload, responder).await
+                    }
+                    Some(RecordLocation::RingBuffer(..)) => {
+                        self.record_device(payload, responder).await
+                    }
+                    Some(RecordLocation::Loopback(..)) => {
+                        self.record_capturer(payload, responder).await
+                    }
+                    Some(..) => Err(anyhow::anyhow!("No RecordLocation variant specified.")),
+                    None => Err(anyhow::anyhow!("RecordLocation argument missing. ")),
+                }?,
+
                 AudioDaemonRequest::ListDevices { responder } => {
                     let mut input_entries = device::get_entries("/dev/class/audio-input/").await?;
                     let mut output_entries =
                         device::get_entries("/dev/class/audio-output/").await?;
-
                     input_entries.append(&mut output_entries);
 
                     let response = AudioDaemonListDevicesResponse {
@@ -508,11 +537,33 @@ impl AudioDaemon {
                         ..AudioDaemonDeviceInfoResponse::EMPTY
                     };
 
-                    responder.send(&mut Ok(response))?
+                    responder.send(&mut Ok(response))?;
                 }
             }
         }
         Ok(())
+    }
+}
+
+pub async fn stop_listener(
+    canceler: fidl::endpoints::ServerEnd<AudioDaemonCancelerMarker>,
+    stop_signal: &std::sync::atomic::AtomicBool,
+) -> Result<(), anyhow::Error> {
+    let mut stream = canceler
+        .into_stream()
+        .map_err(|e| anyhow::anyhow!("Error turning canceler server into stream {}", e))?;
+
+    match stream.try_next().await {
+        Ok(Some(request)) => match request {
+            fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerRequest::Cancel { responder } => {
+                stop_signal.store(true, std::sync::atomic::Ordering::SeqCst);
+                responder.send(&mut Ok(())).context("FIDL error with stop request")
+            }
+        },
+        Ok(None) | Err(_) => {
+            stop_signal.store(true, std::sync::atomic::Ordering::SeqCst);
+            Err(anyhow::anyhow!("FIDL error with stop request"))
+        }
     }
 }
 

@@ -18,10 +18,11 @@ use {
 pub struct RecordCommand {
     #[argh(
         option,
-        description = "duration of output signal. Examples: 5ms or 3s.",
+        description = "duration of output signal. Examples: 5ms or 3s. If not specified,\
+        press ENTER to stop recording.",
         from_str_fn(parse_duration)
     )]
-    pub duration: Duration,
+    pub duration: Option<Duration>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
     pub format: Format,

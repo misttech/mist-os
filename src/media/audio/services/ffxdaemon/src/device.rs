@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::{socket, RingBuffer, SECONDS_PER_NANOSECOND},
+    crate::{socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
     anyhow::{self, Context, Error},
     fdio,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_audio_ffxdaemon::DeviceInfo,
+    fidl_fuchsia_audio_ffxdaemon::{AudioDaemonCancelerMarker, DeviceInfo},
     fidl_fuchsia_hardware_audio::StreamConfigProxy,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx},
@@ -223,7 +223,8 @@ impl Device {
         self,
         format: format_utils::Format,
         mut data_socket: fasync::Socket,
-        duration: std::time::Duration,
+        duration: Option<std::time::Duration>,
+        cancel_server: Option<fidl::endpoints::ServerEnd<AudioDaemonCancelerMarker>>,
     ) -> Result<String, Error> {
         let mut socket = socket::Socket { socket: &mut data_socket };
         socket.write_wav_header(duration, &format).await?;
@@ -279,75 +280,94 @@ impl Device {
 
         let mut timer = fuchsia_async::Interval::new(wakeup_interval);
         let mut buf = vec![format.silence_value(); bytes_per_wakeup_interval as usize];
+        let stop_signal = std::sync::atomic::AtomicBool::new(false);
 
-        loop {
-            timer.next().await;
+        let packet_fut = async {
+            loop {
+                timer.next().await;
 
-            // Check that we woke up on time. Approximate ring buffer pointer position based on
-            // the current time and the expected rate of how fast it moves.
-            // Ring buffer pointer should be ahead of last byte read.
-            let now = zx::Time::get_monotonic();
+                if stop_signal.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
+                // Check that we woke up on time. Approximate ring buffer pointer position based on
+                // the current time and the expected rate of how fast it moves.
+                // Ring buffer pointer should be ahead of last byte read.
+                let now = zx::Time::get_monotonic();
 
-            let elapsed_since_last_wakeup = now - last_wakeup;
-            let elapsed_since_start = now - t_zero;
+                let elapsed_since_last_wakeup = now - last_wakeup;
+                let elapsed_since_start = now - t_zero;
 
-            let elapsed_frames_since_start =
-                (frames_per_nanosecond * elapsed_since_start.into_nanos() as f64).floor() as u64;
+                let elapsed_frames_since_start = (frames_per_nanosecond
+                    * elapsed_since_start.into_nanos() as f64)
+                    .floor() as u64;
 
-            let expected_frames_since_last_wakeup =
-                (wakeup_interval.into_nanos() as f64 * frames_per_nanosecond).floor() as u64;
+                let expected_frames_since_last_wakeup =
+                    (wakeup_interval.into_nanos() as f64 * frames_per_nanosecond).floor() as u64;
 
-            let available_frames_to_read = elapsed_frames_since_start - last_frame_read;
-            let bytes_to_read = available_frames_to_read * format.bytes_per_frame() as u64;
-            if buf.len() < bytes_to_read as usize {
-                buf.resize(bytes_to_read as usize, 0);
+                let available_frames_to_read = elapsed_frames_since_start - last_frame_read;
+                let bytes_to_read = available_frames_to_read * format.bytes_per_frame() as u64;
+                if buf.len() < bytes_to_read as usize {
+                    buf.resize(bytes_to_read as usize, 0);
+                }
+
+                // Check for late wakeup to know whether we have missed reading some audio signal.
+                // In a given wakeup period, the "unsafe bytes" we avoid reading from
+                // are the range of bytes that the driver will write to during that period,
+                // since we'd be reading stale data.
+                // There are (producer_bytes + bytes_per_wakeup_interval) unsafe bytes since reads
+                // can take up to one period in the worst case. The remaining bytes in the ring buffer
+                // are safe to read from since the data will be up to date.
+                // If the difference in elapsed frames and what we expect to write is
+                // greater than the range of safe bytes, we've woken up too late and
+                // we will miss some of the audio signal.
+
+                let distance_bytes = (available_frames_to_read - expected_frames_since_last_wakeup)
+                    * format.bytes_per_frame() as u64;
+
+                let unsafe_bytes = producer_bytes + bytes_per_wakeup_interval;
+
+                let bytes_missed = if distance_bytes > bytes_in_rb - unsafe_bytes {
+                    println!(
+                        "Woke up {} ns late",
+                        elapsed_since_last_wakeup.into_nanos() - wakeup_interval.into_nanos()
+                    );
+                    late_wakeups += 1;
+                    (distance_bytes + unsafe_bytes - bytes_in_rb) as usize
+                } else {
+                    0usize
+                };
+
+                buf[..bytes_missed].fill(format.silence_value());
+                let _ = ring_buffer_wrapper
+                    .read_from_frame(last_frame_read, &mut buf[bytes_missed..])?;
+
+                last_frame_read += available_frames_to_read;
+
+                let write_full_buffer = duration.is_none()
+                    || (format.frames_in_duration(duration.unwrap_or_default()) - last_frame_read
+                        > available_frames_to_read);
+
+                if write_full_buffer {
+                    data_socket.write_all(&buf).await?;
+                    last_wakeup = now;
+                } else {
+                    let bytes_to_write = (format.frames_in_duration(duration.unwrap_or_default())
+                        - last_frame_read) as usize
+                        * format.bytes_per_frame() as usize;
+                    data_socket.write_all(&buf[..bytes_to_write]).await?;
+                    break;
+                }
             }
+            Ok(())
+        };
 
-            // Check for late wakeup to know whether we have missed reading some audio signal.
-            // In a given wakeup period, the "unsafe bytes" we avoid reading from
-            // are the range of bytes that the driver will write to during that period,
-            // since we'd be reading stale data.
-            // There are (producer_bytes + bytes_per_wakeup_interval) unsafe bytes since reads
-            // can take up to one period in the worst case. The remaining bytes in the ring buffer
-            // are safe to read from since the data will be up to date.
-            // If the difference in elapsed frames and what we expect to write is
-            // greater than the range of safe bytes, we've woken up too late and
-            // we will miss some of the audio signal.
-
-            let distance_bytes = (available_frames_to_read - expected_frames_since_last_wakeup)
-                * format.bytes_per_frame() as u64;
-
-            let unsafe_bytes = producer_bytes + bytes_per_wakeup_interval;
-
-            let bytes_missed = if distance_bytes > bytes_in_rb - unsafe_bytes {
-                println!(
-                    "Woke up {} ns late",
-                    elapsed_since_last_wakeup.into_nanos() - wakeup_interval.into_nanos()
-                );
-                late_wakeups += 1;
-                (distance_bytes + unsafe_bytes - bytes_in_rb) as usize
-            } else {
-                0usize
-            };
-
-            buf[..bytes_missed].fill(format.silence_value());
-            let _ =
-                ring_buffer_wrapper.read_from_frame(last_frame_read, &mut buf[bytes_missed..])?;
-
-            last_frame_read += available_frames_to_read;
-
-            if format.frames_in_duration(duration) - last_frame_read > available_frames_to_read {
-                data_socket.write_all(&buf).await?;
-
-                last_wakeup = now;
-            } else {
-                let bytes_to_write = (format.frames_in_duration(duration) - last_frame_read)
-                    as usize
-                    * format.bytes_per_frame() as usize;
-                data_socket.write_all(&buf[..bytes_to_write]).await?;
-                break;
-            }
+        if let Some(cancel_server) = cancel_server {
+            futures::future::try_join(stop_listener(cancel_server, &stop_signal), packet_fut)
+                .await?;
+        } else {
+            packet_fut.await?;
         }
+
         let output_message = format!(
             "Succesfully processed all audio data. \n Woke up late {} times.\n ",
             late_wakeups

@@ -7,6 +7,7 @@ use {
     errors::ffx_bail,
     fidl::Socket,
     fidl_fuchsia_audio_ffxdaemon::{AudioDaemonPlayRequest, AudioDaemonProxy},
+    std::io::BufRead,
 };
 
 pub async fn play(
@@ -48,4 +49,24 @@ pub async fn play(
     futs.await?;
 
     Ok(())
+}
+
+pub async fn wait_for_keypress(
+    canceler: fidl::endpoints::ClientEnd<fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker>,
+) -> Result<(), std::io::Error> {
+    blocking::unblock(move || {
+        let mut line = String::new();
+        let stdin = std::io::stdin();
+        let mut locked = stdin.lock();
+        let _ = locked.read_line(&mut line);
+    })
+    .await;
+    let proxy =
+        canceler.into_proxy().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    proxy
+        .cancel()
+        .await
+        .unwrap()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))
 }

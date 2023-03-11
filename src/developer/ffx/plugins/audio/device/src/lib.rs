@@ -387,6 +387,15 @@ pub async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) ->
         _ => ffx_bail!("Unreachable"),
     };
 
+    let (cancel_client, cancel_server) = if record_command.duration.is_some() {
+        let (c, s) = fidl::endpoints::create_endpoints::<
+            fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker,
+        >();
+        (Some(c), Some(s))
+    } else {
+        (None, None)
+    };
+
     let request = AudioDaemonRecordRequest {
         location: Some(RecordLocation::RingBuffer(fidl_fuchsia_audio_ffxdaemon::DeviceSelector {
             is_input: Some(true),
@@ -395,7 +404,8 @@ pub async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) ->
         })),
 
         stream_type: Some(AudioStreamType::from(&record_command.format)),
-        duration: Some(record_command.duration.as_nanos() as i64),
+        duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
+        canceler: cancel_server,
         ..AudioDaemonRecordRequest::EMPTY
     };
 
@@ -410,12 +420,18 @@ pub async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) ->
     let mut stdout = Unblock::new(std::io::stdout());
     let mut stderr = Unblock::new(std::io::stderr());
 
-    futures::future::try_join(
+    let canceler_future = match cancel_client {
+        Some(canceler) => {
+            futures::future::Either::Left(ffx_audio_common::wait_for_keypress(canceler))
+        }
+        None => futures::future::Either::Right(async { Ok(()) }),
+    };
+    futures::future::try_join3(
         futures::io::copy(fidl::AsyncSocket::from_socket(stdout_sock)?, &mut stdout),
         futures::io::copy(fidl::AsyncSocket::from_socket(stderr_sock)?, &mut stderr),
+        canceler_future,
     )
     .await
-    .map_err(|e| anyhow::anyhow!("Error copying data from socket. {}", e))?;
-
-    Ok(())
+    .map(|_| ())
+    .map_err(|e| anyhow::anyhow!("Error copying data from socket. {}", e))
 }

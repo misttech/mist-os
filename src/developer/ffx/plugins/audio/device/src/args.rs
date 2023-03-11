@@ -66,10 +66,11 @@ pub enum InfoOutputFormat {
 pub struct DeviceRecordCommand {
     #[argh(
         option,
-        description = "duration of output signal. Examples: 5ms or 3s.",
+        description = "duration of output signal. Examples: 5ms or 3s. If not specified,\
+        press ENTER to stop recording.",
         from_str_fn(parse_duration)
     )]
-    pub duration: std::time::Duration,
+    pub duration: Option<std::time::Duration>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
     pub format: Format,
