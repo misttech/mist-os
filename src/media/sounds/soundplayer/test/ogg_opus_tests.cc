@@ -25,8 +25,11 @@ class TestDiscardableSound : public DiscardableSound {
   }
 };
 
-static constexpr uint64_t kGoldenHashArm64 = 3820812293088111280u;
-static constexpr uint64_t kGoldenHashX64 = 15504583706996406662u;
+constexpr uint64_t kGoldenHashArm64 = 3820812293088111280u;
+constexpr uint64_t kGoldenHashX64 = 15504583706996406662u;
+constexpr size_t kVmoNameBufSize = 32;
+const char kExpectedVmoName[] = "soundplayer decoded sound";
+static_assert(kVmoNameBufSize > sizeof(kExpectedVmoName));
 
 // Demuxes and decodes a test opus file.
 TEST(OggOpusTests, DemuxDecodeTestFile) {
@@ -61,6 +64,11 @@ TEST(OggOpusTests, DemuxDecodeTestFile) {
     // the test.
     EXPECT_EQ(kGoldenHashArm64, hash);
   }
+
+  // Expect that the VMO is named.
+  char name[kVmoNameBufSize];
+  EXPECT_EQ(ZX_OK, vmo.get_property(ZX_PROP_NAME, name, sizeof(name)));
+  EXPECT_EQ(0, strcmp(kExpectedVmoName, name));
 
   sound.Unlock();
 }

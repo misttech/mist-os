@@ -7,7 +7,8 @@
 namespace soundplayer {
 namespace {
 
-static constexpr uint64_t kNanosPerSecond = 1000000000;
+constexpr uint64_t kNanosPerSecond = 1000000000;
+const char kVmoName[] = "soundplayer decoded sound";
 
 bool operator==(const fuchsia::media::AudioStreamType& lhs,
                 const fuchsia::media::AudioStreamType& rhs) {
@@ -119,6 +120,11 @@ zx_status_t DiscardableSound::SetSize(size_t size_arg) {
   if (status != ZX_OK) {
     FX_PLOGS(WARNING, status) << "Failed to create vmo";
     return status;
+  }
+
+  status = vmo().set_property(ZX_PROP_NAME, kVmoName, strlen(kVmoName));
+  if (status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "Failed to set vmo name";
   }
 
   uint64_t vmo_size;
