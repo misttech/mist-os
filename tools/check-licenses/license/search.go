@@ -23,7 +23,15 @@ type SearchResult struct {
 // f (file) is assumed to be a single or multi license file, where all content
 // in the file is license information.
 func Search(projectRoot string, f *file.File) ([]*SearchResult, error) {
-	return search(projectRoot, f, AllPatterns)
+	searchResults, err := search(projectRoot, f, AllPatterns)
+	if err != nil {
+		return searchResults, err
+	}
+
+	for _, sr := range searchResults {
+		AllLicenseFileSearchResults = append(AllLicenseFileSearchResults, sr)
+	}
+	return searchResults, err
 }
 
 // SearchHeaders searches the beginning portion of the given file for

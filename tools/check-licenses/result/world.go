@@ -26,12 +26,13 @@ type world struct {
 	DedupedLicenseData [][]*file.FileData
 
 	// license
-	AllPatterns          []*license.Pattern
-	AllCopyrightPatterns []*license.Pattern
-	AllSearchResults     []*license.SearchResult
-	AllowlistPatternMap  map[string][]string
-	Unrecognized         *license.Pattern
-	Empty                *license.Pattern
+	AllPatterns                 []*license.Pattern
+	AllCopyrightPatterns        []*license.Pattern
+	AllSearchResults            []*license.SearchResult
+	AllLicenseFileSearchResults []*license.SearchResult
+	AllowlistPatternMap         map[string][]string
+	Unrecognized                *license.Pattern
+	Empty                       *license.Pattern
 }
 
 func getWorldStruct() *world {
@@ -46,11 +47,12 @@ func getWorldStruct() *world {
 		FilteredProjects:   project.FilteredProjects,
 		DedupedLicenseData: project.DedupedLicenseData,
 
-		AllPatterns:          license.AllPatterns,
-		AllCopyrightPatterns: license.AllCopyrightPatterns,
-		AllSearchResults:     license.AllSearchResults,
-		AllowlistPatternMap:  license.AllowlistPatternMap,
-		Unrecognized:         license.Unrecognized,
-		Empty:                license.Empty,
+		AllPatterns:                 license.AllPatterns,
+		AllCopyrightPatterns:        license.AllCopyrightPatterns,
+		AllSearchResults:            license.AllSearchResults,
+		AllLicenseFileSearchResults: license.AllLicenseFileSearchResults,
+		AllowlistPatternMap:         license.AllowlistPatternMap,
+		Unrecognized:                license.Unrecognized,
+		Empty:                       license.Empty,
 	}
 }

@@ -31,11 +31,11 @@ func AnalyzeLicenses() error {
 			if results, err := license.Search(p.Root, l); err != nil {
 				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmePath, err)
 			} else {
-				p.SearchResults = append(p.SearchResults, results...)
+				p.LicenseFileSearchResults = append(p.LicenseFileSearchResults, results...)
 				for _, r := range results {
 					key := string(r.LicenseData.Data)
-					if _, ok := p.SearchResultsDeduped[key]; !ok {
-						p.SearchResultsDeduped[key] = r
+					if _, ok := p.LicenseFileSearchResultsDeduped[key]; !ok {
+						p.LicenseFileSearchResultsDeduped[key] = r
 					}
 				}
 			}
@@ -52,7 +52,7 @@ func AnalyzeLicenses() error {
 			if results, err := license.SearchHeaders(p.Root, f); err != nil {
 				return fmt.Errorf("Issue analyzing Project defined in [%v]: %v\n", p.ReadmePath, err)
 			} else {
-				p.SearchResults = append(p.SearchResults, results...)
+				p.RegularFileSearchResults = append(p.RegularFileSearchResults, results...)
 			}
 		}
 	}

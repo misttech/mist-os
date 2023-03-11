@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	AllPatterns          []*Pattern
-	AllCopyrightPatterns []*Pattern
-	AllSearchResults     []*SearchResult
-	AllowlistPatternMap  map[string][]string
+	AllPatterns                 []*Pattern
+	AllCopyrightPatterns        []*Pattern
+	AllSearchResults            []*SearchResult
+	AllLicenseFileSearchResults []*SearchResult
+	AllowlistPatternMap         map[string][]string
 
 	Unrecognized *Pattern
 	Empty        *Pattern
@@ -28,6 +29,7 @@ func init() {
 	AllPatterns = make([]*Pattern, 0)
 	AllCopyrightPatterns = make([]*Pattern, 0)
 	AllSearchResults = make([]*SearchResult, 0)
+	AllLicenseFileSearchResults = make([]*SearchResult, 0)
 	AllowlistPatternMap = make(map[string][]string, 0)
 }
 

@@ -63,14 +63,14 @@ func NewSpecialProject(projectRootPath string) (*Project, error) {
 	}
 
 	p := &Project{
-		Name:                 projectName,
-		Root:                 projectRootPath,
-		LicenseFileType:      file.SingleLicense,
-		RegularFileType:      file.Any,
-		ShouldBeDisplayed:    true,
-		SourceCodeIncluded:   false,
-		Children:             make(map[string]*Project, 0),
-		SearchResultsDeduped: make(map[string]*license.SearchResult, 0),
+		Name:                            projectName,
+		Root:                            projectRootPath,
+		LicenseFileType:                 file.SingleLicense,
+		RegularFileType:                 file.Any,
+		ShouldBeDisplayed:               true,
+		SourceCodeIncluded:              false,
+		Children:                        make(map[string]*Project, 0),
+		LicenseFileSearchResultsDeduped: make(map[string]*license.SearchResult, 0),
 	}
 
 	switch {
