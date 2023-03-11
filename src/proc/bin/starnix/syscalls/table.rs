@@ -236,6 +236,7 @@ pub fn dispatch_syscall(
         splice[6],
         #[cfg(target_arch = "x86_64")] stat[2],
         statfs[2],
+        statx[5],
         #[cfg(target_arch = "x86_64")] symlink[2],
         symlinkat[3],
         tgkill[3],

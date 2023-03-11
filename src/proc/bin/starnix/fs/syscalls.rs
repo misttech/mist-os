@@ -523,6 +523,39 @@ pub fn sys_newfstatat(
     Ok(())
 }
 
+pub fn sys_statx(
+    current_task: &CurrentTask,
+    dir_fd: FdNumber,
+    user_path: UserCString,
+    flags: u32,
+    mask: u32,
+    statxbuf: UserRef<statx>,
+) -> Result<(), Errno> {
+    let implemented_flags = AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH | AT_STATX_SYNC_AS_STAT;
+    let unimplemented_flags =
+        AT_NO_AUTOMOUNT | AT_STATX_SYNC_TYPE | AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC;
+    let all_flags = implemented_flags | unimplemented_flags;
+    if flags & !all_flags != 0 {
+        return error!(EINVAL);
+    }
+    if flags & (AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC)
+        == (AT_STATX_FORCE_SYNC | AT_STATX_DONT_SYNC)
+    {
+        return error!(EINVAL);
+    }
+    if flags & unimplemented_flags != 0 {
+        // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
+        not_implemented!(current_task, "statx: flags 0x{:x}", flags);
+        return error!(ENOSYS);
+    }
+
+    let flags = LookupFlags::from_bits(flags, all_flags)?;
+    let name = lookup_at(current_task, dir_fd, user_path, flags)?;
+    let result = name.entry.node.statx(mask)?;
+    current_task.mm.write_object(statxbuf, &result)?;
+    Ok(())
+}
+
 pub fn sys_readlinkat(
     current_task: &CurrentTask,
     dir_fd: FdNumber,

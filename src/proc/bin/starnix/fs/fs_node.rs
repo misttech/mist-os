@@ -852,6 +852,62 @@ impl FsNode {
         })
     }
 
+    fn statx_timestamp_from_time(time: zx::Time) -> statx_timestamp {
+        let nanos = time.into_nanos();
+        statx_timestamp {
+            tv_sec: nanos / NANOS_PER_SECOND,
+            tv_nsec: (nanos % NANOS_PER_SECOND) as u32,
+            ..Default::default()
+        }
+    }
+
+    pub fn statx(&self, mask: u32) -> Result<statx, Errno> {
+        // Ignore mask for now and fill in all of the fields.
+        let info = self.ops().update_info(self)?;
+        if mask & STATX__RESERVED == STATX__RESERVED {
+            return error!(EINVAL);
+        }
+
+        // The blksize cast is necessary depending on the architecture.
+        #[allow(clippy::unnecessary_cast)]
+        let blocks = info.storage_size as i64 / info.blksize as i64;
+
+        Ok(statx {
+            stx_mask: STATX_NLINK
+                | STATX_UID
+                | STATX_GID
+                | STATX_ATIME
+                | STATX_MTIME
+                | STATX_CTIME
+                | STATX_INO
+                | STATX_SIZE
+                | STATX_BLOCKS
+                | STATX_BASIC_STATS,
+            stx_blksize: info.blksize as u32,
+            stx_attributes: 0, // TODO
+            stx_nlink: info.link_count as u32,
+            stx_uid: info.uid,
+            stx_gid: info.gid,
+            stx_mode: info.mode.bits() as u16,
+            stx_ino: self.inode_num,
+            stx_size: info.size as u64,
+            stx_blocks: blocks as u64,
+            stx_attributes_mask: 0, // TODO
+
+            stx_ctime: Self::statx_timestamp_from_time(info.time_create),
+            stx_mtime: Self::statx_timestamp_from_time(info.time_modify),
+            stx_atime: Self::statx_timestamp_from_time(info.time_access),
+
+            stx_rdev_major: info.rdev.major(),
+            stx_rdev_minor: info.rdev.minor(),
+
+            stx_dev_major: self.fs().dev_id.major(),
+            stx_dev_minor: self.fs().dev_id.minor(),
+            stx_mnt_id: 0, // TODO
+            ..Default::default()
+        })
+    }
+
     /// Check that `current_task` can access the extended attributed `name`. Will return the result
     /// of `error` in case the attributed is trusted and the task has not the CAP_SYS_ADMIN
     /// capability.

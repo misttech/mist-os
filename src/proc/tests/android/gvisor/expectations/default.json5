@@ -1000,16 +1000,6 @@
                 "TeeTest.TwoPipesPartialWrite",
                 "SpliceTest.WriteOverflow",
 
-                // stat_test
-                "StatTest.StatxAbsPath",
-                "StatTest.StatxRelPathDirFD",
-                "StatTest.StatxRelPathCwd",
-                "StatTest.StatxEmptyPath",
-                "StatTest.StatxDoesNotRejectExtraneousMaskBits",
-                "StatTest.StatxRejectsReservedMaskBit",
-                "StatTest.StatxSymlink",
-                "StatTest.StatxInvalidFlags",
-
                 // statfs_test
                 "FstatfsTest.BlocksFree",
 
