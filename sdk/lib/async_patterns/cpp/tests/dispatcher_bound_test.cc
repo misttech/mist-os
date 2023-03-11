@@ -376,6 +376,35 @@ TEST_F(DispatcherBound, AsyncCallOverloaded) {
   EXPECT_EQ(2, owner.count);
 }
 
+TEST_F(DispatcherBound, PassDispatcherInConstructor) {
+  std::shared_ptr shared_dispatcher_slot = std::make_shared<async_dispatcher_t*>(nullptr);
+  struct Object {
+    Object(async_dispatcher_t* dispatcher, std::shared_ptr<async_dispatcher_t*> out_dispatcher) {
+      *out_dispatcher = dispatcher;
+    }
+  };
+  async_patterns::DispatcherBound<Object> obj{
+      loop().dispatcher(), std::in_place, async_patterns::PassDispatcher, shared_dispatcher_slot};
+  EXPECT_EQ(nullptr, *shared_dispatcher_slot);
+  loop().RunUntilIdle();
+  EXPECT_EQ(loop().dispatcher(), *shared_dispatcher_slot);
+}
+
+TEST_F(DispatcherBound, PassDispatcherInAsyncCall) {
+  std::shared_ptr shared_dispatcher_slot = std::make_shared<async_dispatcher_t*>(nullptr);
+  struct Object {
+    void Method(async_dispatcher_t* dispatcher,
+                std::shared_ptr<async_dispatcher_t*> out_dispatcher) {
+      *out_dispatcher = dispatcher;
+    }
+  };
+  async_patterns::DispatcherBound<Object> obj{loop().dispatcher(), std::in_place};
+  obj.AsyncCall(&Object::Method, async_patterns::PassDispatcher, shared_dispatcher_slot);
+  EXPECT_EQ(nullptr, *shared_dispatcher_slot);
+  loop().RunUntilIdle();
+  EXPECT_EQ(loop().dispatcher(), *shared_dispatcher_slot);
+}
+
 TEST_F(DispatcherBound, SynchronouslyRunIfShutdown) {
   loop().Shutdown();
   auto object_count = make_arc_atomic();

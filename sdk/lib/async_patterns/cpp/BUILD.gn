@@ -16,6 +16,7 @@ sdk_source_set("cpp") {
     "internal/dispatcher_bound_storage.h",
     "internal/receiver_base.cc",
     "internal/receiver_base.h",
+    "internal/sendable.h",
     "internal/task_queue.cc",
     "internal/task_queue.h",
     "receiver.h",

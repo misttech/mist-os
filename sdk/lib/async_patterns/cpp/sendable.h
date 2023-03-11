@@ -5,6 +5,7 @@
 #ifndef LIB_ASYNC_PATTERNS_CPP_SENDABLE_H_
 #define LIB_ASYNC_PATTERNS_CPP_SENDABLE_H_
 
+#include <lib/async_patterns/cpp/internal/sendable.h>
 #include <lib/stdcompat/type_traits.h>
 
 #include <tuple>
@@ -102,7 +103,7 @@ auto BindForSending(Callable callable, Args&&... args) {
           };
           (void)(check_arg(args) && ...);
 
-          return callable(std::move(args)...);
+          return callable(internal::UnSmuggle(std::move(args))...);
         },
         args);
   };

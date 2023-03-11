@@ -17,6 +17,16 @@
 
 namespace async_patterns {
 
+// |DispatcherBound<T>| does not allow sending raw pointers to the wrapped
+// object. However, it is common for an async object to obtain its associated
+// |async_dispatcher_t*|. Often that can be accomplished with
+// |async_get_default_dispatcher|, but in case where that's not feasible, one
+// may specify the |async_patterns::PassDispatcher| constant in place of an
+// |async_dispatcher_t*|, at the argument location where the wrapped async
+// object desires a dispatcher, and |DispatcherBound| will automatically supply
+// the correct dispatcher that the async object is associated with.
+constexpr auto PassDispatcher = internal::PassDispatcherT{};
+
 // |DispatcherBound<T>| enables an owner object living on some arbitrary thread,
 // to construct, call methods on, and destroy an object of type |T| that must be
 // used from a particular [synchronized async dispatcher][synchronized-dispatcher].

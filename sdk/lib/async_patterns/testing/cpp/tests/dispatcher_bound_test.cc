@@ -102,7 +102,7 @@ TEST(TestDispatcherBound, AsyncCallWithReplyUsingFuture) {
   EXPECT_EQ("abcdef", fut.get());
 }
 
-TEST(TestDispatcherBound, AsyncCallOverloaded) {
+TEST(TestDispatcherBound, SyncCallOverloaded) {
   async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
   remote_loop.StartThread();
 
@@ -114,6 +114,22 @@ TEST(TestDispatcherBound, AsyncCallOverloaded) {
 
   EXPECT_EQ(1, obj.SyncCall<int(int)>(&Object::Pass, 1));
   EXPECT_EQ("a", obj.SyncCall<std::string(std::string)>(&Object::Pass, std::string{"a"}));
+}
+
+TEST(TestDispatcherBound, PassDispatcherInSyncCall) {
+  async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
+  remote_loop.StartThread();
+
+  std::shared_ptr shared_dispatcher_slot = std::make_shared<async_dispatcher_t*>(nullptr);
+  struct Object {
+    void Method(async_dispatcher_t* dispatcher,
+                std::shared_ptr<async_dispatcher_t*> out_dispatcher) {
+      *out_dispatcher = dispatcher;
+    }
+  };
+  async_patterns::TestDispatcherBound<Object> obj{remote_loop.dispatcher(), std::in_place};
+  obj.SyncCall(&Object::Method, async_patterns::PassDispatcher, shared_dispatcher_slot);
+  EXPECT_EQ(remote_loop.dispatcher(), *shared_dispatcher_slot);
 }
 
 TEST(TestDispatcherBound, MakeTestDispatcherBound) {

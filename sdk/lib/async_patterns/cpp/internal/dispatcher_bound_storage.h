@@ -18,6 +18,16 @@
 
 namespace async_patterns::internal {
 
+struct PassDispatcherT {
+  // Pretend this is a dispatcher pointer to support |std::is_invocable| tests.
+  // It is never called in practice.
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  operator async_dispatcher_t*() const {
+    __builtin_abort();
+    return nullptr;
+  }
+};
+
 // |DispatcherBoundStorage| encapsulates the subtle work of managing memory
 // across concurrency domains so |DispatcherBound| could be a minimal wrapper.
 class DispatcherBoundStorage final {
@@ -57,9 +67,10 @@ class DispatcherBoundStorage final {
       }
     };
 
-    ConstructInternal(dispatcher,
-                      BindForSending([ptr](auto&&... args) { new (ptr) T(std::move(args)...); },
-                                     std::forward<Args>(args)...));
+    ConstructInternal(
+        dispatcher,
+        BindForSending([ptr](auto&&... args) { new (ptr) T(std::move(args)...); },
+                       ForwardOrPassDispatcher(dispatcher, std::forward<Args>(args))...));
   }
 
   template <typename T, typename Callable, typename... Args>
@@ -68,7 +79,7 @@ class DispatcherBoundStorage final {
     T* ptr = static_cast<T*>(raw_ptr);
     CallInternal(dispatcher,
                  BindForSending(cpp20::bind_front(std::forward<Callable>(callable), ptr),
-                                std::forward<Args>(args)...));
+                                ForwardOrPassDispatcher(dispatcher, std::forward<Args>(args))...));
   }
 
   template <template <typename> typename Builder, typename T, typename Callable, typename... Args>
@@ -77,9 +88,18 @@ class DispatcherBoundStorage final {
     T* ptr = static_cast<T*>(raw_ptr);
     auto make_task = [&] {
       return BindForSending(cpp20::bind_front(std::forward<Callable>(callable), ptr),
-                            std::forward<Args>(args)...);
+                            ForwardOrPassDispatcher(dispatcher, std::forward<Args>(args))...);
     };
     return Builder<decltype(make_task())>(this, dispatcher, make_task());
+  }
+
+  template <typename Arg>
+  auto ForwardOrPassDispatcher(async_dispatcher_t* dispatcher, Arg&& arg) {
+    if constexpr (std::is_same_v<cpp20::remove_cvref_t<Arg>, PassDispatcherT>) {
+      return Smuggle(dispatcher);
+    } else {
+      return std::forward<Arg>(arg);
+    }
   }
 
   // Asynchronously destructs the object that was constructed earlier in
