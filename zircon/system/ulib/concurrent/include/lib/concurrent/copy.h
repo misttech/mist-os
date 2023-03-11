@@ -9,6 +9,8 @@
 #include <lib/stdcompat/bit.h>
 #include <stdint.h>
 
+#include <atomic>
+
 namespace concurrent {
 namespace internal {
 

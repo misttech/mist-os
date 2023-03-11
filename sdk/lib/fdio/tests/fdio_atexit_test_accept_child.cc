@@ -12,6 +12,7 @@
 #include <zircon/processargs.h>
 #include <zircon/status.h>
 
+#include <atomic>
 #include <memory>
 #include <thread>
 

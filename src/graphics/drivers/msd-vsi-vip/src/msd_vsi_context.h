@@ -5,6 +5,7 @@
 #ifndef MSD_VSI_CONTEXT_H
 #define MSD_VSI_CONTEXT_H
 
+#include <atomic>
 #include <memory>
 
 #include "address_space.h"

@@ -19,6 +19,7 @@
 
 #include <stddef.h>
 
+#include <atomic>
 #include <deque>
 #include <memory>
 #include <optional>

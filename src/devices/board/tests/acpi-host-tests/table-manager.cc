@@ -5,6 +5,7 @@
 #include "src/devices/board/tests/acpi-host-tests/table-manager.h"
 
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <lib/fit/defer.h>
 #include <stddef.h>

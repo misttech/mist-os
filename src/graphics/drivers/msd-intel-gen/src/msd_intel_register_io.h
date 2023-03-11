@@ -5,6 +5,7 @@
 #ifndef MSD_INTEL_REGISTER_IO_H
 #define MSD_INTEL_REGISTER_IO_H
 
+#include <chrono>
 #include <map>
 
 #include "device_id.h"
