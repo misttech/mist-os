@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/ui/lib/escher/impl/model_pipeline_spec.h"
+#include "src/ui/lib/escher/shape/mesh_spec.h"
 #include "src/ui/lib/escher/util/hash_map.h"
 #include "src/ui/lib/escher/vk/image.h"
 
@@ -51,15 +51,11 @@ void TestHashForValue(const Hashee& hashee) {
 
 // This test should be updated to include all hashed types used by Escher.
 TEST(Hash, AllHashedTypes) {
-  // MeshSpec and ModelPipelineSpec.
+  // MeshSpec
   {
     MeshSpec mesh_spec{{MeshAttribute::kPosition2D, MeshAttribute::kUV}};
 
-    impl::ModelPipelineSpec model_pipeline_spec;
-    model_pipeline_spec.mesh_spec = mesh_spec;
-
     TestHashForValue(mesh_spec);
-    TestHashForValue(model_pipeline_spec);
   }
 
   // ImageInfo.

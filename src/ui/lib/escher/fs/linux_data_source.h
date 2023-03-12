@@ -9,7 +9,7 @@
 
 namespace escher {
 
-// The data source from Linux filesystem.
+// Implementation of HackFilesystem which reads its data from the Linux filesystem.
 class LinuxDataSource : public HackFilesystem {
  public:
   // |HackFilesystem|

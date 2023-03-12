@@ -17,6 +17,8 @@ namespace escher {
 class Material;
 using MaterialPtr = fxl::RefPtr<Material>;
 
+// Simple textured material.  If no texture is set, then the material is a solid color.  If a
+// texture is set, then it will be multiplied by the material's color.
 class Material : public fxl::RefCountedThreadSafe<Material> {
  public:
   enum class Type { kOpaque, kTranslucent, kWireframe };

@@ -153,8 +153,6 @@ template("escher_library") {
     ]
 
     sources = [
-      "acceleration/uniform_grid.cc",
-      "acceleration/uniform_grid.h",
       "debug/debug_font.cc",
       "debug/debug_font.h",
       "debug/debug_rects.cc",
@@ -195,9 +193,6 @@ template("escher_library") {
       "impl/mesh_manager.h",
       "impl/mesh_shader_binding.cc",
       "impl/mesh_shader_binding.h",
-      "impl/model_data.cc",
-      "impl/model_data.h",
-      "impl/model_pipeline_spec.h",
       "impl/naive_buffer.cc",
       "impl/naive_buffer.h",
       "impl/naive_image.cc",

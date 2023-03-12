@@ -13,7 +13,7 @@
 
 namespace escher {
 
-// The data source from Fuchsia filesystem.
+// Implementation of HackFilesystem which reads data from the Fuchsia component's local filesystem.
 class FuchsiaDataSource : public HackFilesystem {
  public:
   FuchsiaDataSource(const std::shared_ptr<vfs::PseudoDir>& root_dir);

@@ -4,13 +4,10 @@
 
 #include "src/ui/lib/escher/paper/paper_renderer.h"
 
-#include <glm/gtc/matrix_access.hpp>
-#include <vulkan/vulkan.hpp>
-
-// TODO(fxbug.dev/7244): possibly delete.  See comment below about NUM_CLIP_PLANES.
 #include "src/ui/lib/escher/debug/debug_font.h"
 #include "src/ui/lib/escher/debug/debug_rects.h"
 #include "src/ui/lib/escher/escher.h"
+// TODO(fxbug.dev/44894): try to avoid including an "impl" file.
 #include "src/ui/lib/escher/impl/vulkan_utils.h"
 #include "src/ui/lib/escher/mesh/tessellation.h"
 #include "src/ui/lib/escher/paper/paper_render_queue_context.h"
@@ -20,7 +17,6 @@
 #include "src/ui/lib/escher/renderer/batch_gpu_uploader.h"
 #include "src/ui/lib/escher/renderer/render_funcs.h"
 #include "src/ui/lib/escher/scene/object.h"
-// TODO(fxbug.dev/44894): try to avoid including an "impl" file.
 #include "src/ui/lib/escher/third_party/granite/vk/command_buffer_pipeline_state.h"
 #include "src/ui/lib/escher/third_party/granite/vk/render_pass.h"
 #include "src/ui/lib/escher/util/string_utils.h"
@@ -32,6 +28,9 @@
 #include "src/ui/lib/escher/vk/render_pass_info.h"
 #include "src/ui/lib/escher/vk/shader_program.h"
 #include "src/ui/lib/escher/vk/texture.h"
+
+#include <glm/gtc/matrix_access.hpp>
+#include <vulkan/vulkan.hpp>
 
 // In full 3d use-cases, we may not want to display backfacing triangles.  For now,
 // we disable backface culling everywhere so that we can flip rendered content.

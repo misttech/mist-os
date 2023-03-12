@@ -9,7 +9,7 @@
 
 namespace escher {
 
-// The data source from macOS filesystem.
+// Implementation of HackFilesystem which reads its data from the macOS filesystem.
 class MacOSDataSource : public HackFilesystem {
  public:
   // |HackFilesystem|

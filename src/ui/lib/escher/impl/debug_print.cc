@@ -8,10 +8,10 @@
 
 #include "src/ui/lib/escher/geometry/bounding_box.h"
 #include "src/ui/lib/escher/geometry/transform.h"
-#include "src/ui/lib/escher/impl/model_pipeline_spec.h"
 #include "src/ui/lib/escher/paper/paper_renderer_config.h"
 #include "src/ui/lib/escher/scene/camera.h"
 #include "src/ui/lib/escher/scene/viewing_volume.h"
+#include "src/ui/lib/escher/shape/mesh_spec.h"
 #include "src/ui/lib/escher/third_party/granite/vk/command_buffer_pipeline_state.h"
 #include "src/ui/lib/escher/third_party/granite/vk/descriptor_set_layout.h"
 #include "src/ui/lib/escher/third_party/granite/vk/pipeline_layout.h"
@@ -145,30 +145,6 @@ std::ostream& operator<<(std::ostream& str, const MeshSpec& spec) {
     }
   }
   str << "]";
-  return str;
-}
-
-std::ostream& operator<<(std::ostream& str,
-                         const impl::ModelPipelineSpec::ClipperState& clipper_state) {
-  using ClipperState = impl::ModelPipelineSpec::ClipperState;
-  switch (clipper_state) {
-    case ClipperState::kBeginClipChildren:
-      str << "ClipperState::kBeginClipChildren";
-      break;
-    case ClipperState::kEndClipChildren:
-      str << "ClipperState::kEndClipChildren";
-      break;
-    case ClipperState::kNoClipChildren:
-      str << "ClipperState::kNoClipChildren";
-      break;
-  }
-  return str;
-}
-
-std::ostream& operator<<(std::ostream& str, const impl::ModelPipelineSpec& spec) {
-  str << "ModelPipelineSpec[" << spec.mesh_spec << ", clipper_state: " << spec.clipper_state
-      << ", is_clippee: " << spec.is_clippee << ", has_material: " << spec.has_material
-      << ", is_opaque: " << spec.is_opaque << "]";
   return str;
 }
 

@@ -14,6 +14,7 @@
 
 namespace escher {
 
+// Uses Vulkan timestamps to profile the execution of commands on the GPU.
 class TimestampProfiler : public fxl::RefCountedThreadSafe<TimestampProfiler> {
  public:
   TimestampProfiler(vk::Device device, float timestamp_period);
