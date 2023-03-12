@@ -17,7 +17,7 @@ pub use enumerations::{
 
 pub use instances::{
     clean_up_instance_dir, get_all_instances, get_instance_dir, read_from_disk,
-    read_from_disk_untyped, write_to_disk, EMU_INSTANCE_ROOT_DIR,
+    read_from_disk_untyped, write_to_disk,
 };
 
 /// Holds a single mapping from a host port to the guest.
@@ -43,8 +43,6 @@ pub trait EmulatorInstanceInfo {
     fn get_emulator_configuration(&self) -> &EmulatorConfiguration;
     fn get_emulator_configuration_mut(&mut self) -> &mut EmulatorConfiguration;
     fn get_emulator_binary(&self) -> &PathBuf;
-    fn get_networking_mode(&self) -> &NetworkingMode;
-    fn get_ssh_port(&self) -> Option<u16>;
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -289,15 +287,6 @@ impl EmulatorInstanceInfo for EmulatorInstanceData {
     }
     fn get_emulator_binary(&self) -> &PathBuf {
         &self.emulator_binary
-    }
-    fn get_networking_mode(&self) -> &NetworkingMode {
-        &self.emulator_configuration.host.networking
-    }
-    fn get_ssh_port(&self) -> Option<u16> {
-        if let Some(ssh) = self.emulator_configuration.host.port_map.get("ssh") {
-            return ssh.host;
-        }
-        None
     }
 }
 
