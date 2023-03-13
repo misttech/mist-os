@@ -84,6 +84,8 @@ type AudioCompressedFormat = flexible union {
     2: sbc AudioCompressedFormatSbc;
     @available(added=HEAD)
     3: cvsd AudioCompressedFormatCvsd;
+    @available(added=HEAD)
+    4: lc3 AudioCompressedFormatLc3;
 };
 
 type AudioBitrateMode = strict enum {
@@ -105,6 +107,12 @@ type AudioCompressedFormatSbc = struct {};
 /// section 9.2.
 @available(added=HEAD)
 type AudioCompressedFormatCvsd = table {};
+
+/// AudioCompressedFormatLc3 contains no fields. The required parameters
+/// for setting up the decoder would be embedded as Codec_Specific_Configuration
+/// (Assigned Numbers section 6.12.5) in `FormatDetails.oob_bytes`.
+@available(added=HEAD)
+type AudioCompressedFormatLc3 = table {};
 
 /// AudioPcmMode
 ///
@@ -639,6 +647,30 @@ type HevcEncoderSettings = table {
 @available(added=HEAD)
 type CvsdEncoderSettings = table {};
 
+@available(added=HEAD)
+type Lc3FrameDuration = flexible enum {
+    // 10ms duration.
+    D10_MS = 1;
+    // 7.5ms duration.
+    D7P5_MS = 2;
+};
+
+
+/// Settings for LC3 Encoders. Contains parameters stated in LC3 Specification v1.0.
+/// Contains fields that are not represented by PcmFormat.
+@available(added=HEAD)
+type Lc3EncoderSettings = table {
+    /// External byte count values to be used for the frame encoding of audio.
+    /// According to the LC3 Specification v1.0, each audio channel could have different
+    /// output byte size value, but for Fuchsia use case, we use the same `nbytes` value
+    /// for all channels.
+    1: nbytes uint16;
+    /// Frame duration is used together with sampling frequency to determine the
+    /// frame size.
+    2: frame_duration Lc3FrameDuration;
+};
+
+
 /// Settings for encoders that tell them how to encode raw
 /// formats.
 type EncoderSettings = flexible union {
@@ -648,6 +680,8 @@ type EncoderSettings = flexible union {
     4: hevc HevcEncoderSettings;
     @available(added=HEAD)
     5: cvsd CvsdEncoderSettings;
+    @available(added=HEAD)
+    6: lc3 Lc3EncoderSettings;
 };
 
 /// A list of permitted codec profiles. This list should be flexible since codecs can and will be added
