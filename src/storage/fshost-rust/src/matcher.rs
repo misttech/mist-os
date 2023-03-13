@@ -4,11 +4,13 @@
 
 use {
     crate::{
+        crypt::zxcrypt::UnsealOutcome,
         device::{
             constants::{
                 BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
                 DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
                 LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
+                ZXCRYPT_DRIVER_PATH,
             },
             Device,
         },
@@ -414,7 +416,15 @@ impl Matcher for ZxcryptMatcher {
         device: &mut dyn Device,
         env: &mut dyn Environment,
     ) -> Result<(), Error> {
-        env.bind_zxcrypt(device).await
+        env.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
+        let _zxcrypt_device = match env.unseal_zxcrypt(device).await? {
+            UnsealOutcome::Unsealed(_) => {}
+            UnsealOutcome::FormatRequired => {
+                tracing::warn!("failed to unseal zxcrypt, reformatting");
+                env.format_zxcrypt(device).await?;
+            }
+        };
+        Ok(())
     }
 }
 
@@ -424,10 +434,11 @@ mod tests {
         super::{Device, DiskFormat, Environment, Matchers},
         crate::{
             config::default_config,
+            crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice},
             device::constants::{
                 BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
                 DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
-                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
+                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH, ZXCRYPT_DRIVER_PATH,
             },
         },
         anyhow::{anyhow, Error},
@@ -530,7 +541,8 @@ mod tests {
 
     struct MockEnv {
         expected_driver_path: Mutex<Option<String>>,
-        expect_bind_zxcrypt: Mutex<bool>,
+        expect_unseal_zxcrypt: Mutex<bool>,
+        expect_format_zxcrypt: Mutex<bool>,
         expect_mount_blobfs: Mutex<bool>,
         expect_mount_data: Mutex<bool>,
     }
@@ -539,7 +551,8 @@ mod tests {
         fn new() -> Self {
             MockEnv {
                 expected_driver_path: Mutex::new(None),
-                expect_bind_zxcrypt: Mutex::new(false),
+                expect_unseal_zxcrypt: Mutex::new(false),
+                expect_format_zxcrypt: Mutex::new(false),
                 expect_mount_blobfs: Mutex::new(false),
                 expect_mount_data: Mutex::new(false),
             }
@@ -548,8 +561,12 @@ mod tests {
             *self.expected_driver_path.get_mut().unwrap() = Some(path.to_string());
             self
         }
-        fn expect_bind_zxcrypt(mut self) -> Self {
-            *self.expect_bind_zxcrypt.get_mut().unwrap() = true;
+        fn expect_unseal_zxcrypt(mut self) -> Self {
+            *self.expect_unseal_zxcrypt.get_mut().unwrap() = true;
+            self
+        }
+        fn expect_format_zxcrypt(mut self) -> Self {
+            *self.expect_format_zxcrypt.get_mut().unwrap() = true;
             self
         }
         fn expect_mount_blobfs(mut self) -> Self {
@@ -580,13 +597,27 @@ mod tests {
             Ok(())
         }
 
-        async fn bind_zxcrypt(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
+        async fn unseal_zxcrypt(
+            &mut self,
+            _device: &mut dyn Device,
+        ) -> Result<UnsealOutcome, Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_bind_zxcrypt.lock().unwrap()),
+                std::mem::take(&mut *self.expect_unseal_zxcrypt.lock().unwrap()),
                 true,
-                "Unexpected call to bind_zxcrypt"
+                "Unexpected call to unseal_zxcrypt"
             );
-            Ok(())
+            Ok(UnsealOutcome::Unsealed(ZxcryptDevice::new_mock(Box::new(MockDevice::new()))))
+        }
+        async fn format_zxcrypt(
+            &mut self,
+            _device: &mut dyn Device,
+        ) -> Result<ZxcryptDevice, Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_format_zxcrypt.lock().unwrap()),
+                true,
+                "Unexpected call to format_zxcrypt"
+            );
+            Ok(ZxcryptDevice::new_mock(Box::new(MockDevice::new())))
         }
 
         async fn mount_blobfs(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
@@ -611,7 +642,6 @@ mod tests {
     impl Drop for MockEnv {
         fn drop(&mut self) {
             assert!(self.expected_driver_path.get_mut().unwrap().is_none());
-            assert!(!*self.expect_bind_zxcrypt.lock().unwrap());
             assert!(!*self.expect_mount_blobfs.lock().unwrap());
             assert!(!*self.expect_mount_data.lock().unwrap());
         }
@@ -742,7 +772,8 @@ mod tests {
             .set_topological_path("first_prefix/fvm/data-p-2/block")
             .set_partition_label(DATA_PARTITION_LABEL)
             .set_partition_type(&DATA_TYPE_GUID);
-        let mut env = MockEnv::new().expect_bind_zxcrypt();
+        let mut env =
+            MockEnv::new().expect_attach_driver(ZXCRYPT_DRIVER_PATH).expect_unseal_zxcrypt();
         assert!(matchers
             .match_device(&mut data_device, &mut env)
             .await
@@ -820,7 +851,7 @@ mod tests {
             .set_partition_label(DATA_PARTITION_LABEL)
             .set_partition_type(&DATA_TYPE_GUID);
         assert!(!matchers
-            .match_device(&mut data_device, &mut MockEnv::new())
+            .match_device(&mut data_device, &mut MockEnv::new().expect_unseal_zxcrypt())
             .await
             .expect("match_device failed"));
     }
@@ -980,7 +1011,10 @@ mod tests {
                     .set_topological_path("mock_device/fvm/data-p-2/block")
                     .set_partition_label(DATA_PARTITION_LABEL)
                     .set_partition_type(&DATA_TYPE_GUID),
-                &mut MockEnv::new().expect_bind_zxcrypt()
+                &mut MockEnv::new()
+                    .expect_attach_driver(ZXCRYPT_DRIVER_PATH)
+                    .expect_format_zxcrypt()
+                    .expect_unseal_zxcrypt()
             )
             .await
             .expect("match_device failed"));

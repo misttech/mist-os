@@ -45,6 +45,12 @@ pub trait Device: Send + Sync {
     /// Otherwise, an error is returned.
     async fn partition_instance(&mut self) -> Result<&[u8; 16], Error>;
 
+    /// If this device is a volume, this allows resizing the device.
+    /// Returns actual byte size assuming success, or error.
+    async fn resize(&mut self, _target_size_bytes: u64) -> Result<u64, Error> {
+        Err(anyhow!("Unimplemented"))
+    }
+
     /// Returns a channel connected to the device.
     fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error>;
 
@@ -116,6 +122,10 @@ impl Device for NandDevice {
 
     async fn partition_instance(&mut self) -> Result<&[u8; 16], Error> {
         self.block_device.partition_instance().await
+    }
+
+    async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
+        self.block_device.resize(target_size_bytes).await
     }
 
     fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
@@ -231,6 +241,15 @@ impl Device for BlockDevice {
                 Some(instance_guid.ok_or(anyhow!("Expected instance guid"))?.value);
         }
         Ok(self.partition_instance.as_ref().unwrap())
+    }
+
+    async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
+        let volume_proxy = {
+            let volume: ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker> =
+                self.client_end()?.into_channel().into();
+            volume.into_proxy()?
+        };
+        crate::volume::resize_volume(&volume_proxy, target_size_bytes, false).await
     }
 
     fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {

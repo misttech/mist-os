@@ -52,6 +52,7 @@ pub async fn resize_volume(
 
     // Count the first slice (which is already allocated to the volume) as available.
     let slices_available = 1 + manager.slice_count - manager.assigned_slice_count;
+    // TODO(fxbug.dev/123427): Shouldn't this round up?
     let mut slice_count = target_bytes / slice_size;
     if slice_count == 0 {
         // If a size is not specified, limit the size of the data partition so as not to use up all

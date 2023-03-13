@@ -7,10 +7,12 @@ use {
         boot_args::BootArgs,
         crypt::{
             fxfs::{self, CryptService, UnlockResult},
-            zxcrypt,
+            zxcrypt::{UnsealOutcome, ZxcryptDevice},
         },
-        device::{constants::DEFAULT_F2FS_MIN_BYTES, Device},
-        volume::resize_volume,
+        device::{
+            constants::{DEFAULT_F2FS_MIN_BYTES, ZXCRYPT_DRIVER_PATH},
+            Device,
+        },
     },
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
@@ -32,6 +34,7 @@ use {
 };
 
 /// Environment is a trait that performs actions when a device is matched.
+/// Nb: matcher.rs depend on this interface being used in order to mock tests.
 #[async_trait]
 pub trait Environment: Send + Sync {
     /// Attaches the specified driver to the device.
@@ -41,8 +44,11 @@ pub trait Environment: Send + Sync {
         driver_path: &str,
     ) -> Result<(), Error>;
 
-    /// Bind zxcrypt to this device, unsealing it and formatting it if necessary.
-    async fn bind_zxcrypt(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+    /// Calls ZxCryptDevice::unseal, but allows for mocking.
+    async fn unseal_zxcrypt(&mut self, device: &mut dyn Device) -> Result<UnsealOutcome, Error>;
+
+    /// Calls ZxcryptDevice::format(), but allows for mocking.
+    async fn format_zxcrypt(&mut self, device: &mut dyn Device) -> Result<ZxcryptDevice, Error>;
 
     /// Mounts Blobfs on the given device.
     async fn mount_blobfs(&mut self, device: &mut dyn Device) -> Result<(), Error>;
@@ -151,8 +157,12 @@ impl Environment for FshostEnvironment {
         self.launcher.attach_driver(device, driver_path).await
     }
 
-    async fn bind_zxcrypt(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        self.launcher.bind_zxcrypt(device).await
+    async fn unseal_zxcrypt(&mut self, device: &mut dyn Device) -> Result<UnsealOutcome, Error> {
+        ZxcryptDevice::unseal(device).await
+    }
+
+    async fn format_zxcrypt(&mut self, device: &mut dyn Device) -> Result<ZxcryptDevice, Error> {
+        ZxcryptDevice::format(device).await
     }
 
     async fn mount_blobfs(&mut self, device: &mut dyn Device) -> Result<(), Error> {
@@ -190,8 +200,7 @@ impl Environment for FshostEnvironment {
         }
 
         // Potentially bind zxcrypt before serving data.
-        let mut new_dev;
-        let mut inside_zxcrypt = false;
+        let mut zxcrypt_device;
         let device = match format {
             // Fxfs never has zxcrypt underneath
             DiskFormat::Fxfs => device,
@@ -200,16 +209,15 @@ impl Environment for FshostEnvironment {
             _ if self.config.fvm_ramdisk => device,
             // Otherwise, we need to bind a zxcrypt device first.
             _ => {
-                inside_zxcrypt = true;
-                self.bind_zxcrypt(device).await?;
-
-                // Instead of waiting for the zxcrypt device to go through the watcher and then
-                // matching it again, just wait for it to appear and immediately use it. The
-                // block watcher will find the zxcrypt device later and pass it through the
-                // matchers, but it won't match anything since the fvm matcher only matches
-                // immediate children.
-                new_dev = device.get_child("/zxcrypt/unsealed/block").await?;
-                new_dev.as_mut()
+                self.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
+                zxcrypt_device = Box::new(match self.unseal_zxcrypt(device).await? {
+                    UnsealOutcome::Unsealed(device) => device,
+                    UnsealOutcome::FormatRequired => {
+                        tracing::warn!("failed to unseal zxcrypt, reformatting");
+                        self.format_zxcrypt(device).await?
+                    }
+                });
+                zxcrypt_device.as_mut()
             }
         };
 
@@ -217,17 +225,17 @@ impl Environment for FshostEnvironment {
             DiskFormat::Fxfs => {
                 let config =
                     Fxfs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.serve_data(device, config, inside_zxcrypt).await?
+                self.launcher.serve_data(device, config).await?
             }
             DiskFormat::F2fs => {
                 let config =
                     F2fs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.serve_data(device, config, inside_zxcrypt).await?
+                self.launcher.serve_data(device, config).await?
             }
             DiskFormat::Minfs => {
                 let config =
                     Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
-                self.launcher.serve_data(device, config, inside_zxcrypt).await?
+                self.launcher.serve_data(device, config).await?
             }
             _ => unreachable!(),
         };
@@ -262,18 +270,17 @@ pub struct FilesystemLauncher {
 }
 
 impl FilesystemLauncher {
-    async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error> {
+    pub async fn attach_driver(
+        &self,
+        device: &mut dyn Device,
+        driver_path: &str,
+    ) -> Result<(), Error> {
         tracing::info!(path = %device.path(), %driver_path, "Binding driver to device");
         // TODO(https://fxbug.dev/112484): this relies on multiplexing.
         let controller: ClientEnd<ControllerMarker> = device.client_end()?.into_channel().into();
         let controller = controller.into_proxy()?;
         controller.bind(driver_path).await?.map_err(zx::Status::from_raw)?;
         Ok(())
-    }
-
-    pub async fn bind_zxcrypt(&self, device: &mut dyn Device) -> Result<(), Error> {
-        self.attach_driver(device, "zxcrypt.cm").await?;
-        zxcrypt::unseal_or_format(device).await
     }
 
     pub fn get_blobfs_config(&self) -> Blobfs {
@@ -317,11 +324,10 @@ impl FilesystemLauncher {
         &self,
         device: &mut dyn Device,
         config: FSC,
-        inside_zxcrypt: bool,
     ) -> Result<Filesystem, Error> {
         let block = device.client_end()?;
         let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)?;
-        self.serve_data_from(device, fs, inside_zxcrypt).await
+        self.serve_data_from(device, fs).await
     }
 
     // NB: keep these larger functions monomorphized, otherwise they cause significant code size
@@ -330,7 +336,6 @@ impl FilesystemLauncher {
         &self,
         device: &mut dyn Device,
         mut fs: fs_management::filesystem::Filesystem,
-        inside_zxcrypt: bool,
     ) -> Result<Filesystem, Error> {
         let format = fs.config().disk_format();
         tracing::info!(
@@ -340,11 +345,6 @@ impl FilesystemLauncher {
         );
 
         let detected_format = device.content_format().await?;
-        let volume_proxy = {
-            let volume: ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker> =
-                device.client_end()?.into_channel().into();
-            volume.into_proxy()?
-        };
 
         if detected_format != format {
             tracing::info!(
@@ -352,7 +352,7 @@ impl FilesystemLauncher {
                 expected_format = ?format,
                 "Expected format not detected. Reformatting.",
             );
-            return self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await;
+            return self.format_data(device, &mut fs).await;
         }
 
         if self.config.check_filesystems {
@@ -361,7 +361,7 @@ impl FilesystemLauncher {
                 self.report_corruption(format, &error);
                 if self.config.format_data_on_corruption {
                     tracing::info!("Reformatting filesystem, expect data loss...");
-                    return self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await;
+                    return self.format_data(device, &mut fs).await;
                 } else {
                     tracing::error!(?format, "format on corruption is disabled, not continuing");
                     return Err(error);
@@ -390,13 +390,13 @@ impl FilesystemLauncher {
             Ok(Either::Left(fs)) => Ok(fs),
             Ok(Either::Right(())) => {
                 tracing::info!("Detected marker file, shredding volume. Expect data loss...");
-                self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await
+                self.format_data(device, &mut fs).await
             }
             Err(error) => {
                 self.report_corruption(format, &error);
                 if self.config.format_data_on_corruption {
                     tracing::info!("Reformatting filesystem, expect data loss...");
-                    self.format_data(&mut fs, volume_proxy, inside_zxcrypt).await
+                    self.format_data(device, &mut fs).await
                 } else {
                     tracing::error!(?format, "format on corruption is disabled, not continuing");
                     Err(error)
@@ -407,9 +407,8 @@ impl FilesystemLauncher {
 
     async fn format_data(
         &self,
+        device: &mut dyn Device,
         fs: &mut fs_management::filesystem::Filesystem,
-        volume_proxy: fidl_fuchsia_hardware_block_volume::VolumeProxy,
-        inside_zxcrypt: bool,
     ) -> Result<Filesystem, Error> {
         let format = fs.config().disk_format();
         tracing::info!(?format, "Formatting");
@@ -417,9 +416,8 @@ impl FilesystemLauncher {
             DiskFormat::Fxfs => {
                 let target_bytes = self.config.data_max_bytes;
                 tracing::info!(target_bytes, "Resizing data volume");
-                let allocated_bytes = resize_volume(&volume_proxy, target_bytes, inside_zxcrypt)
-                    .await
-                    .context("format volume resize")?;
+                let allocated_bytes =
+                    device.resize(target_bytes).await.context("format volume resize")?;
                 if allocated_bytes < target_bytes {
                     tracing::warn!(
                         target_bytes,
@@ -429,23 +427,11 @@ impl FilesystemLauncher {
                 }
             }
             DiskFormat::F2fs => {
-                let target_bytes = self.config.data_max_bytes;
-                let (status, info, _) =
-                    volume_proxy.get_volume_info().await.context("volume get_info call failed")?;
-                zx::Status::ok(status).context("volume get_info returned an error")?;
-                let info = info.ok_or_else(|| anyhow!("volume get_info returned no info"))?;
-                let slice_size = info.slice_size;
-                let round_up = |val: u64, divisor: u64| ((val + (divisor - 1)) / divisor) * divisor;
-                let mut required_size = round_up(DEFAULT_F2FS_MIN_BYTES, slice_size);
-                if inside_zxcrypt {
-                    required_size += slice_size;
-                }
-
-                let target_bytes = std::cmp::max(target_bytes, required_size);
+                let target_bytes =
+                    std::cmp::max(self.config.data_max_bytes, DEFAULT_F2FS_MIN_BYTES);
                 tracing::info!(target_bytes, "Resizing data volume");
-                let allocated_bytes = resize_volume(&volume_proxy, target_bytes, inside_zxcrypt)
-                    .await
-                    .context("format volume resize")?;
+                let allocated_bytes =
+                    device.resize(target_bytes).await.context("format volume resize")?;
                 if allocated_bytes < DEFAULT_F2FS_MIN_BYTES {
                     tracing::error!(
                         minimum_bytes = DEFAULT_F2FS_MIN_BYTES,
