@@ -191,6 +191,7 @@ std::string_view MaybeMapPartitionName(const EfiGptBlockDevice& device,
       {GUID_ZIRCON_A_NAME, GPT_ZIRCON_A_NAME},
       {GUID_ZIRCON_B_NAME, GPT_ZIRCON_B_NAME},
       {GUID_ZIRCON_R_NAME, GPT_ZIRCON_R_NAME},
+      {GUID_FVM_NAME, GPT_FVM_NAME},
   };
 
   auto name_entry =

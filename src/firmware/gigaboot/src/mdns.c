@@ -279,9 +279,10 @@ bool mdns_write_fastboot_packet(bool finished, bool tcp, struct mdns_buf* packet
 }
 
 /*** fastboot mdns broadcasts ***/
-bool mdns_broadcast_fastboot(bool finished) {
+
+bool mdns_broadcast_fastboot(bool finished, bool fastboot_tcp) {
   static struct mdns_buf pkt;
-  if (!mdns_write_fastboot_packet(finished, fb_tcp_is_available(), &pkt)) {
+  if (!mdns_write_fastboot_packet(finished, fastboot_tcp, &pkt)) {
     ELOG("Failed to create fastboot mDNS packet");
     return false;
   }
@@ -290,27 +291,27 @@ bool mdns_broadcast_fastboot(bool finished) {
 }
 
 static int mdns_active = 0;
-void mdns_start(uint32_t namegen) {
+void mdns_start(uint32_t namegen, bool fastboot_tcp) {
   device_id(ll_mac_addr, device_nodename, namegen);
   printf("mdns: starting broadcast\n");
   netifc_set_timer(MDNS_BROADCAST_FREQ_MS);
-  mdns_broadcast_fastboot(false);
+  mdns_broadcast_fastboot(false, fastboot_tcp);
   mdns_active = 1;
 }
 
-void mdns_poll(void) {
+void mdns_poll(bool fastboot_tcp) {
   if (!mdns_active)
     return;
   if (netifc_timer_expired()) {
-    mdns_broadcast_fastboot(false);
+    mdns_broadcast_fastboot(false, fastboot_tcp);
     netifc_set_timer(MDNS_BROADCAST_FREQ_MS);
   }
 }
 
-void mdns_stop(void) {
+void mdns_stop(bool fastboot_tcp) {
   if (!mdns_active)
     return;
 
   mdns_active = 0;
-  mdns_broadcast_fastboot(true);
+  mdns_broadcast_fastboot(true, fastboot_tcp);
 }

@@ -125,10 +125,12 @@ INSTANTIATE_TEST_SUITE_P(
         {GPT_ZIRCON_B_NAME, GPT_ZIRCON_B_NAME},
         {GPT_ZIRCON_R_NAME, GPT_ZIRCON_R_NAME},
         {GPT_DURABLE_BOOT_NAME, GPT_DURABLE_BOOT_NAME},
+        {GPT_FVM_NAME, GPT_FVM_NAME},
         {GUID_ZIRCON_A_NAME, GPT_ZIRCON_A_NAME},
         {GUID_ZIRCON_B_NAME, GPT_ZIRCON_B_NAME},
         {GUID_ZIRCON_R_NAME, GPT_ZIRCON_R_NAME},
         {GUID_ABR_META_NAME, GPT_DURABLE_BOOT_NAME},
+        {GUID_FVM_NAME, GPT_FVM_NAME},
     }),
     [](testing::TestParamInfo<DynamicPartitionNameTest::ParamType> const& info) {
       // Only alphanumeric chars and _ are allowed in gtest names.

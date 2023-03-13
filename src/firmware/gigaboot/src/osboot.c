@@ -362,15 +362,15 @@ void do_select_fb(void) {
 void do_fastboot(efi_handle img, efi_system_table* sys, uint32_t namegen) {
   LOG("entering fastboot mode");
   fb_bootimg_t bootimg;
-  mdns_start(namegen);
+  mdns_start(namegen, fb_tcp_is_available());
   fb_poll_next_action action = POLL;
   while (action == POLL) {
-    mdns_poll();
+    mdns_poll(fb_tcp_is_available());
     action = fb_poll(&bootimg);
   }
   switch (action) {
     case BOOT_FROM_RAM:
-      mdns_stop();
+      mdns_stop(fb_tcp_is_available());
       zbi_boot(img, sys, bootimg.kernel_start, bootimg.kernel_size);
       break;
     case CONTINUE_BOOT:
@@ -383,7 +383,7 @@ void do_fastboot(efi_handle img, efi_system_table* sys, uint32_t namegen) {
       }
     }
   }
-  mdns_stop();
+  mdns_stop(fb_tcp_is_available());
 }
 
 void do_bootmenu(bool have_fb) {

@@ -70,6 +70,7 @@ cpp20::span<Fastboot::VariableEntry> Fastboot::GetVariableTable() {
       // Constant based variables
       {"slot-count", {"2"}},
       {"slot-suffixes", {"a,b"}},
+      {"hw-revision", {BOARD_NAME}},
   };
 
   return var_entries;

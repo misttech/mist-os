@@ -37,10 +37,6 @@ zx::result<> TcpInitialize(tcp6_socket &fb_tcp_socket) {
   }
 }
 
-// Statically allocate the download buffer
-constexpr size_t kDownloadBufferSize = 512 * 1024 * 1024;
-uint8_t download_buffer[kDownloadBufferSize];
-
 }  // namespace
 
 class TcpTransport : public TcpTransportInterface {
@@ -80,13 +76,17 @@ zx::result<> FastbootTcpMain() {
 
   TcpTransport transport(fb_tcp_socket);
   ZirconBootOps zb_ops = gigaboot::GetZirconBootOps();
+  fbl::Vector<uint8_t> download_buffer;
+  // TODO(b/268532862): This needs to be large enough to hold the entire FVM image until we
+  // implement sparse flashing support.
+  download_buffer.resize(2ULL * 1024 * 1024 * 1024);  // 2GB
   Fastboot fastboot(download_buffer, zb_ops);
 
   constexpr uint32_t namegen = 1;
-  mdns_start(namegen);
+  mdns_start(namegen, /* fastboot_tcp = */ true);
 
   while (true) {
-    mdns_poll();
+    mdns_poll(/* fastboot_tcp = */ true);
     tcp6_result result = tcp6_accept(&fb_tcp_socket);
 
     if (result == TCP6_RESULT_SUCCESS) {
@@ -94,7 +94,7 @@ zx::result<> FastbootTcpMain() {
       FastbootTcpSession(transport, fastboot);
       if (fastboot.IsContinue()) {
         // Close is best effort since we're about to hand control over to the kernel.
-        mdns_stop();
+        mdns_stop(/* fastboot_tcp = */ true);
         tcp6_close(&fb_tcp_socket);
         return zx::ok();
       }
@@ -106,7 +106,7 @@ zx::result<> FastbootTcpMain() {
       }
 
       if (disconnect_res != TCP6_RESULT_SUCCESS) {
-        mdns_stop();
+        mdns_stop(/* fastboot_tcp = */ true);
         printf("Failed to disconnect socket, %d\n", disconnect_res);
         return zx::error(ZX_ERR_INTERNAL);
       }

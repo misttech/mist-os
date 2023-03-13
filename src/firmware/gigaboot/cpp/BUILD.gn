@@ -2,9 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/board.gni")
 import("//build/images/vboot/vboot.gni")
 import("//src/firmware/gigaboot/cpp/backends.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
+
+config("board_name") {
+  cflags = [ "-DBOARD_NAME=\"${board_name}\"" ]
+}
 
 source_set("lib") {
   sources = [
@@ -54,6 +59,8 @@ source_set("lib") {
 
     include_dirs = [ "//" ]  # utf_conversion isn't a proper library.
   }
+
+  public_configs = [ ":board_name" ]
 }
 
 # Some dependency does not exist in non efi toolchain, which will cause gn

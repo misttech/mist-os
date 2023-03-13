@@ -167,6 +167,7 @@ INSTANTIATE_TEST_SUITE_P(FastbootGetVarsTests, BasicVarTest,
                              {"slot_count", "slot-count", "2"},
                              {"slot_suffixes", "slot-suffixes", "a,b"},
                              {"max_download_size", "max-download-size", "0x00002000"},
+                             {"hw_revision", "hw-revision", BOARD_NAME},
                          }),
                          [](testing::TestParamInfo<BasicVarTest::ParamType> const& info) {
                            return info.param.name;

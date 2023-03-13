@@ -19,10 +19,10 @@ __BEGIN_CDECLS
 // nodename is an old-style step-atom-yard-juicy name or a new-style fuchsia-5254-0063-5e7a name.
 //
 // This expects sole access to the netifc timer.
-void mdns_start(uint32_t namegen);
-void mdns_poll(void);
+void mdns_start(uint32_t namegen, bool fastboot_tcp);
+void mdns_poll(bool fastboot_tcp);
 // Stop broadcasting mDNS information.
-void mdns_stop(void);
+void mdns_stop(bool fastboot_tcp);
 
 // Everything below this point is only available
 // outside of mdns.c for testing purposes.
