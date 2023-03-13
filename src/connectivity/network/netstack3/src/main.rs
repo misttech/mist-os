@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 //! A networking stack.
-#![deny(missing_docs)]
-#![deny(unreachable_patterns)]
+#![deny(missing_docs, unreachable_patterns, unused)]
 #![recursion_limit = "256"]
 
 #[cfg(feature = "instrumented")]

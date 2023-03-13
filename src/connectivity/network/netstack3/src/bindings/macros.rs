@@ -14,13 +14,4 @@ macro_rules! responder_send {
             )
         })
     };
-    ($responder:expr, $arg1:expr, $arg2:expr) => {
-        $responder.send($arg1, $arg2).unwrap_or_else(|e| {
-            log::log!(
-                crate::bindings::util::fidl_err_log_level(&e),
-                "Responder send error: {:?}",
-                e
-            )
-        })
-    };
 }
