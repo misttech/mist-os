@@ -19,23 +19,27 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn connect(path: String) -> Self {
+    pub fn connect(path: String) -> Result<Self, Error> {
         // Connect to a StreamConfig channel.
         let (connector_client, connector_server) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_hardware_audio::StreamConfigConnectorMarker,
         >()
-        .expect("failed to create streamconfig");
+        .map_err(|e| anyhow::anyhow!("Failed to create StreamConfigConnector: {}", e))?;
 
         let (stream_config_client, stream_config_connector) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::StreamConfigMarker>()
-                .expect("failed to create streamconfig ");
+                .map_err(|e| anyhow::anyhow!("Failed to create StreamConfig: {}", e))?;
 
-        fdio::service_connect(&path, connector_server.into_channel()).unwrap();
+        fdio::service_connect(&path, connector_server.into_channel()).map_err(|e| {
+            anyhow::anyhow!("Failed to connect to service at path {}: {}", &path, e)
+        })?;
         // Using StreamConfigConnector client, pass the server end of StreamConfig
         // channel to the device so that device can respond to StreamConfig requests.
-        connector_client.connect(stream_config_connector).unwrap();
+        connector_client
+            .connect(stream_config_connector)
+            .map_err(|e| anyhow::anyhow!("Failed to connect to StreamConfig: {}", e))?;
 
-        Self { stream_config_client }
+        Ok(Self { stream_config_client })
     }
 
     pub async fn get_info(&self) -> Result<DeviceInfo, Error> {
@@ -60,13 +64,13 @@ impl Device {
 
         let supported_formats = self.stream_config_client.get_supported_formats().await?;
         if !format.is_supported_by(&supported_formats) {
-            panic!("Requested format not supported");
+            return Err(anyhow::anyhow!("Requested format not supported"));
         }
 
         // Create ring buffer channel.
         let (ring_buffer_client, ring_buffer_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>()
-                .expect("failed to create ring buffer channel");
+                .map_err(|e| anyhow::anyhow!("Failed to create ring buffer channel: {}", e))?;
 
         self.stream_config_client.create_ring_buffer(
             fidl_fuchsia_hardware_audio::Format::from(&format),
@@ -90,12 +94,12 @@ impl Device {
                 .floor() as u64;
 
         if consumer_bytes + bytes_per_wakeup_interval > bytes_in_rb {
-            panic!(
+            return Err(anyhow::anyhow!(
                 "Ring buffer not large enough for internal delay. Ring buffer bytes: {}, 
             consumer + producer bytes: {}",
                 bytes_in_rb,
                 consumer_bytes + bytes_per_wakeup_interval
-            )
+            ));
         }
 
         let t_zero = zx::Time::from_nanos(ring_buffer_wrapper.start().await?);
@@ -231,13 +235,13 @@ impl Device {
 
         let supported_formats = self.stream_config_client.get_supported_formats().await?;
         if !format.is_supported_by(&supported_formats) {
-            panic!("Requested format not supported");
+            return Err(anyhow::anyhow!("Requested format not supported"));
         }
 
         // Create ring buffer channel.
         let (ring_buffer_client, ring_buffer_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>()
-                .expect("failed to create ring buffer channel");
+                .map_err(|e| anyhow::anyhow!("Failed to create ring buffer channel: {}", e))?;
 
         self.stream_config_client.create_ring_buffer(
             fidl_fuchsia_hardware_audio::Format::from(&format),
@@ -258,12 +262,12 @@ impl Device {
             .floor() as u64;
 
         if producer_bytes + bytes_per_wakeup_interval > bytes_in_rb {
-            panic!(
+            return Err(anyhow::anyhow!(
                 "Ring buffer not large enough for driver internal delay and plugin wakeup interval.
                  Ring buffer bytes: {}, bytes_per_wakeup_interval + producer bytes: {}",
                 bytes_in_rb,
                 bytes_per_wakeup_interval + producer_bytes
-            )
+            ));
         }
 
         let mut late_wakeups = 0;
@@ -384,11 +388,15 @@ pub async fn get_entries(path: &str) -> Result<Vec<String>, Error> {
     fdio::service_connect(path, control_server)
         .context(format!("failed to connect to {:?}", path))?;
 
-    let directory_proxy =
-        fio::DirectoryProxy::from_channel(fasync::Channel::from_channel(control_client).unwrap());
+    let directory_proxy = fio::DirectoryProxy::from_channel(
+        fasync::Channel::from_channel(control_client)
+            .map_err(|e| anyhow::anyhow!("Could not create fasync channel: {}", e))?,
+    );
 
-    let (status, mut buf) =
-        directory_proxy.read_dirents(fio::MAX_BUF).await.expect("Failure calling read dirents");
+    let (status, mut buf) = directory_proxy
+        .read_dirents(fio::MAX_BUF)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failure calling read dirents: {}", e))?;
 
     if status != 0 {
         return Err(anyhow::anyhow!("Unable to call read dirents, status returned: {}", status));
@@ -397,7 +405,7 @@ pub async fn get_entries(path: &str) -> Result<Vec<String>, Error> {
     let entry_names = fuchsia_fs::directory::parse_dir_entries(&mut buf);
     let full_paths: Vec<String> = entry_names
         .into_iter()
-        .filter_map(|s| Some(path.to_owned() + &s.ok().unwrap().name))
+        .filter_map(|s| (s.and_then(|entry| Ok(path.to_owned() + entry.name.as_str())).ok()))
         .collect();
 
     Ok(full_paths)

@@ -15,9 +15,9 @@ use {
     fidl::HandleBased,
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonCancelerMarker, AudioDaemonDeviceInfoResponse, AudioDaemonListDevicesResponse,
-        AudioDaemonPlayRequest, AudioDaemonPlayResponder, AudioDaemonPlayResponse,
-        AudioDaemonRecordRequest, AudioDaemonRecordResponder, AudioDaemonRecordResponse,
-        AudioDaemonRequest, AudioDaemonRequestStream, PlayLocation, RecordLocation,
+        AudioDaemonPlayRequest, AudioDaemonPlayResponse, AudioDaemonRecordRequest,
+        AudioDaemonRecordResponse, AudioDaemonRequest, AudioDaemonRequestStream, PlayLocation,
+        RecordLocation,
     },
     fidl_fuchsia_media::AudioRendererProxy,
     fidl_fuchsia_media_audio, fuchsia as _, fuchsia_async as fasync,
@@ -43,18 +43,9 @@ impl AudioDaemon {
     async fn record_capturer(
         &self,
         request: AudioDaemonRecordRequest,
-        responder: AudioDaemonRecordResponder,
+        stdout_local: zx::Socket,
+        stderr_local: zx::Socket,
     ) -> Result<(), anyhow::Error> {
-        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
-        let (stderr_remote, stderr_local) = zx::Socket::create_stream();
-
-        let response = AudioDaemonRecordResponse {
-            stdout: Some(stdout_remote),
-            stderr: Some(stderr_remote),
-            ..AudioDaemonRecordResponse::EMPTY
-        };
-        responder.send(&mut Ok(response)).expect("Failed to send play response.");
-
         let audio_component =
             fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
                 .context("Failed to connect to fuchsia.media.Audio")?;
@@ -66,7 +57,7 @@ impl AudioDaemon {
                 (capturer_info.usage, false, capturer_info.clock)
             }
             RecordLocation::Loopback(..) => (None, true, None),
-            _ => panic!("Expected Capturer RecordLocation"),
+            _ => return Err(anyhow::anyhow!("Expected Capturer RecordLocation.")),
         };
 
         let stop_signal = std::sync::atomic::AtomicBool::new(false);
@@ -111,7 +102,9 @@ impl AudioDaemon {
         if !(loopback) {
             match capturer_usage {
                 Some(capturer_usage) => capturer_proxy.set_usage(capturer_usage)?,
-                None => panic!("No usage specified how to capture audio."),
+                None => {
+                    return Err(anyhow::anyhow!("No default usage specified how to capture audio."))
+                }
             }
         }
 
@@ -135,7 +128,11 @@ impl AudioDaemon {
         let vmo = zx::Vmo::create(buffer_size_bytes)?;
 
         capturer_proxy.add_payload_buffer(0, vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
-        capturer_proxy.start_async_capture(frames_per_packet.try_into().unwrap())?;
+        capturer_proxy.start_async_capture(
+            frames_per_packet
+                .try_into()
+                .map_err(|e| anyhow::anyhow!("Frames per packet argument is too large: {}", e))?,
+        )?;
 
         let mut stream = capturer_proxy.take_event_stream();
         let mut packets_so_far = 0;
@@ -200,10 +197,12 @@ impl AudioDaemon {
             fidl_fuchsia_audio_ffxdaemon::ClockType::Monotonic(_) => {
                 let clock =
                     zx::Clock::create(zx::ClockOpts::CONTINUOUS | zx::ClockOpts::AUTO_START, None)
-                        .expect("Creating reference clock failed");
+                        .map_err(|e| anyhow::anyhow!("Creating reference clock failed: {}", e))?;
                 let rights_clock = clock
                     .replace_handle(zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER)
-                    .expect("Replace handle for reference clock failed");
+                    .map_err(|e| {
+                        anyhow::anyhow!("Replace handle for reference clock failed: {}", e)
+                    })?;
                 Ok(Some(rights_clock))
             }
             fidl_fuchsia_audio_ffxdaemon::ClockType::Custom(info) => {
@@ -223,16 +222,20 @@ impl AudioDaemon {
                 };
 
                 let clock = zx::Clock::create(zx::ClockOpts::CONTINUOUS | auto_start, None)
-                    .expect("Creating reference clock failed");
+                    .map_err(|e| anyhow::anyhow!("Creating reference clock failed: {}", e))?;
 
-                clock.update(update_builder.build()).expect("Updating reference clock failed");
+                clock
+                    .update(update_builder.build())
+                    .map_err(|e| anyhow::anyhow!("Updating reference clock failed: {}", e))?;
 
                 Ok(Some(
                     clock
                         .replace_handle(
                             zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER,
                         )
-                        .expect("Replace handle for reference clock failed"),
+                        .map_err(|e| {
+                            anyhow::anyhow!("Replace handle for reference clock failed: {}", e)
+                        })?,
                 ))
             }
             fidl_fuchsia_audio_ffxdaemon::ClockTypeUnknown!() => Ok(None),
@@ -296,14 +299,12 @@ impl AudioDaemon {
     async fn play_renderer(
         &self,
         request: AudioDaemonPlayRequest,
-        responder: AudioDaemonPlayResponder,
+        stdout_local: zx::Socket,
     ) -> Result<(), anyhow::Error> {
         let audio_component =
             fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_media::AudioMarker>()
                 .context("Failed to connect to fuchsia.media.Audio")?;
         let num_packets = 4;
-        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
-        let (stderr_remote, _stderr_local) = zx::Socket::create_stream();
 
         let (client_end, server_end) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>();
@@ -314,12 +315,6 @@ impl AudioDaemon {
         let data_socket = request.socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
         audio_component.create_audio_renderer(server_end)?;
         let audio_renderer_proxy = Rc::new(client_end.into_proxy()?);
-
-        let response = AudioDaemonPlayResponse {
-            stdout: Some(stdout_remote),
-            stderr: Some(stderr_remote),
-            ..AudioDaemonPlayResponse::EMPTY
-        };
 
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
@@ -340,7 +335,7 @@ impl AudioDaemon {
                 renderer_info.usage.ok_or(anyhow::anyhow!("No usage provided."))?,
                 renderer_info.clock,
             ),
-            _ => panic!("Expected Renderer PlayLocation"),
+            _ => return Err(anyhow::anyhow!("Expected Renderer PlayLocation")),
         };
 
         if let Some(clock_type) = clock {
@@ -382,8 +377,6 @@ impl AudioDaemon {
             }
         }
 
-        responder.send(&mut Ok(response)).expect("Failed to send play response.");
-
         let offsets: Vec<usize> = (0..num_packets).map(|x| x * bytes_per_packet).collect();
 
         let futs = offsets.iter().map(|offset| async {
@@ -402,72 +395,57 @@ impl AudioDaemon {
 
         futures::future::try_join_all(futs).await?;
 
-        let mut async_stdout =
-            fasync::Socket::from_socket(stdout_local).expect("Async socket create failed.");
+        let mut async_stdout = fasync::Socket::from_socket(stdout_local)
+            .map_err(|e| anyhow::anyhow!("Async socket create failed: {}", e))?;
         async_stdout
             .write_all("Succesfully processed all audio data. \n".as_bytes())
             .await
-            .expect("Write to socket failed.");
-        Ok(())
+            .map_err(|e| anyhow::anyhow!("Write to socket failed: {}", e))
     }
 
     async fn play_device(
         &self,
         request: AudioDaemonPlayRequest,
-        responder: AudioDaemonPlayResponder,
+        stdout_local: zx::Socket,
     ) -> Result<(), anyhow::Error> {
-        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
-        let (stderr_remote, _stderr_local) = zx::Socket::create_stream();
-
-        let response = AudioDaemonPlayResponse {
-            stdout: Some(stdout_remote),
-            stderr: Some(stderr_remote),
-            ..AudioDaemonPlayResponse::EMPTY
-        };
-        responder.send(&mut Ok(response)).expect("Failed to send play response.");
-
         let device_id = request
             .location
             .ok_or(anyhow::anyhow!("Device id argument missing."))
             .and_then(|play_location| match play_location {
-                PlayLocation::RingBuffer(device_selector) => Ok(device_selector.id.unwrap()),
+                PlayLocation::RingBuffer(device_selector) => {
+                    device_selector.id.ok_or(anyhow::anyhow!("Device ID not specified."))
+                }
                 _ => Err(anyhow::anyhow!("Expected Ring Buffer play location")),
             })?;
 
         let data_socket = request.socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
 
-        let device = device::Device::connect(format!("/dev/class/audio-output/{}", device_id));
+        let device = device::Device::connect(format!("/dev/class/audio-output/{}", device_id))?;
 
         let output_message = device.play(fasync::Socket::from_socket(data_socket)?).await?;
-        let mut async_stdout =
-            fasync::Socket::from_socket(stdout_local).expect("Async socket create failed.");
+        let mut async_stdout = fasync::Socket::from_socket(stdout_local)
+            .map_err(|e| anyhow::anyhow!("Async socket create failed: {}", e))?;
 
-        async_stdout.write_all(output_message.as_bytes()).await.expect("Write to socket failed.");
-        Ok(())
+        async_stdout
+            .write_all(output_message.as_bytes())
+            .await
+            .map_err(|e| anyhow::anyhow!("Write to socket failed: {}", e))
     }
 
     async fn record_device(
         &self,
         request: AudioDaemonRecordRequest,
-        responder: AudioDaemonRecordResponder,
+        stdout_local: zx::Socket,
+        stderr_local: zx::Socket,
     ) -> Result<(), anyhow::Error> {
-        let (stdout_remote, stdout_local) = zx::Socket::create_stream();
-        let (stderr_remote, stderr_local) = zx::Socket::create_stream();
-
-        let response = AudioDaemonRecordResponse {
-            stdout: Some(stdout_remote),
-            stderr: Some(stderr_remote),
-            ..AudioDaemonRecordResponse::EMPTY
-        };
-
-        responder.send(&mut Ok(response)).expect("Failed to send response.");
-
         let stream_type = request.stream_type.ok_or(anyhow::anyhow!("Stream type missing"))?;
         let device_id = request
             .location
             .ok_or(anyhow::anyhow!("Device id argument missing."))
             .and_then(|location| match location {
-                RecordLocation::RingBuffer(device_selector) => Ok(device_selector.id.unwrap()),
+                RecordLocation::RingBuffer(device_selector) => {
+                    device_selector.id.ok_or(anyhow::anyhow!("Device ID not specified."))
+                }
                 _ => Err(anyhow::anyhow!("Expected Ring Buffer location")),
             })?;
 
@@ -475,7 +453,7 @@ impl AudioDaemon {
         let duration =
             request.duration.map(|duration| std::time::Duration::from_nanos(duration as u64));
 
-        let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id));
+        let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id))?;
         let output_message = device
             .record(
                 format_utils::Format::from(&stream_type),
@@ -495,31 +473,62 @@ impl AudioDaemon {
 
     async fn serve(&mut self, mut stream: AudioDaemonRequestStream) -> Result<(), Error> {
         while let Ok(Some(request)) = stream.try_next().await {
-            match request {
-                AudioDaemonRequest::Play { payload, responder } => match payload.location {
-                    Some(PlayLocation::Renderer(..)) => {
-                        self.play_renderer(payload, responder).await
-                    }
-                    Some(PlayLocation::RingBuffer(..)) => {
-                        self.play_device(payload, responder).await
-                    }
-                    Some(..) => Err(anyhow::anyhow!("No PlayLocation variant specified.")),
-                    None => Err(anyhow::anyhow!("PlayLocation argument missing. ")),
-                }?,
+            let (stdout_remote, stdout_local) = zx::Socket::create_stream();
+            let (stderr_remote, stderr_local) = zx::Socket::create_stream();
 
-                AudioDaemonRequest::Record { payload, responder } => match payload.location {
-                    Some(RecordLocation::Capturer(..)) => {
-                        self.record_capturer(payload, responder).await
+            let request_result = match request {
+                AudioDaemonRequest::Play { payload, responder } => {
+                    let response = AudioDaemonPlayResponse {
+                        stdout: Some(stdout_remote),
+                        stderr: Some(stderr_remote),
+                        ..AudioDaemonPlayResponse::EMPTY
+                    };
+
+                    responder
+                        .send(&mut Ok(response))
+                        .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))?;
+
+                    match payload.location {
+                        Some(PlayLocation::Renderer(..)) => {
+                            self.play_renderer(payload, stdout_local).await
+                        }
+                        Some(PlayLocation::RingBuffer(..)) => {
+                            self.play_device(payload, stdout_local).await
+                        }
+                        Some(..) => Err(anyhow::anyhow!("No PlayLocation variant specified.")),
+                        None => Err(anyhow::anyhow!("PlayLocation argument missing. ")),
                     }
-                    Some(RecordLocation::RingBuffer(..)) => {
-                        self.record_device(payload, responder).await
+                }
+
+                AudioDaemonRequest::Record { payload, responder } => {
+                    let response = AudioDaemonRecordResponse {
+                        stdout: Some(stdout_remote),
+                        stderr: Some(stderr_remote),
+                        ..AudioDaemonRecordResponse::EMPTY
+                    };
+                    responder
+                        .send(&mut Ok(response))
+                        .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))?;
+
+                    let stderr_copy =
+                        stderr_local.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|e| {
+                            anyhow::anyhow!("Could not duplicate stderr socket handle {}", e)
+                        })?;
+
+                    match payload.location {
+                        Some(RecordLocation::Capturer(..)) => {
+                            self.record_capturer(payload, stdout_local, stderr_copy).await
+                        }
+                        Some(RecordLocation::RingBuffer(..)) => {
+                            self.record_device(payload, stdout_local, stderr_copy).await
+                        }
+                        Some(RecordLocation::Loopback(..)) => {
+                            self.record_capturer(payload, stdout_local, stderr_copy).await
+                        }
+                        Some(..) => Err(anyhow::anyhow!("No RecordLocation variant specified.")),
+                        None => Err(anyhow::anyhow!("RecordLocation argument missing. ")),
                     }
-                    Some(RecordLocation::Loopback(..)) => {
-                        self.record_capturer(payload, responder).await
-                    }
-                    Some(..) => Err(anyhow::anyhow!("No RecordLocation variant specified.")),
-                    None => Err(anyhow::anyhow!("RecordLocation argument missing. ")),
-                }?,
+                }
 
                 AudioDaemonRequest::ListDevices { responder } => {
                     let mut input_entries = device::get_entries("/dev/class/audio-input/").await?;
@@ -531,7 +540,9 @@ impl AudioDaemon {
                         devices: Some(input_entries),
                         ..AudioDaemonListDevicesResponse::EMPTY
                     };
-                    responder.send(&mut Ok(response))?;
+                    responder
+                        .send(&mut Ok(response))
+                        .map_err(|e| anyhow::anyhow!("Failed to send device list response: {}", e))
                 }
 
                 AudioDaemonRequest::DeviceInfo { payload, responder } => {
@@ -540,11 +551,18 @@ impl AudioDaemon {
 
                     let path = format!(
                         "/dev/class/audio-{}/{}",
-                        if device_selector.is_input.unwrap() { "input" } else { "output" },
-                        device_selector.id.unwrap()
+                        if device_selector
+                            .is_input
+                            .ok_or(anyhow::anyhow!("Input/output not specified"))?
+                        {
+                            "input"
+                        } else {
+                            "output"
+                        },
+                        device_selector.id.ok_or(anyhow::anyhow!("No device ID specified"))?
                     );
-                    println!("path for device info {}", path);
-                    let device = device::Device::connect(path);
+
+                    let device = device::Device::connect(path)?;
 
                     let info = device.get_info().await?;
                     let response = AudioDaemonDeviceInfoResponse {
@@ -552,9 +570,20 @@ impl AudioDaemon {
                         ..AudioDaemonDeviceInfoResponse::EMPTY
                     };
 
-                    responder.send(&mut Ok(response))?;
+                    responder
+                        .send(&mut Ok(response))
+                        .map_err(|e| anyhow::anyhow!("Failed to send device info response: {}", e))
                 }
-            }
+            };
+
+            match request_result {
+                Ok(_) => request_result,
+                Err(e) => {
+                    let mut async_stderr_socket = fasync::Socket::from_socket(stderr_local)?;
+                    async_stderr_socket.write_all(e.to_string().as_bytes()).await?;
+                    Err(e)
+                }
+            }?
         }
         Ok(())
     }

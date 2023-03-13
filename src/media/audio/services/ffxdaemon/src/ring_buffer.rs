@@ -34,7 +34,9 @@ impl RingBuffer {
 
         let (num_frames_in_rb, vmo) = match res {
             Ok((num_frames, vmo)) => (num_frames as u64, vmo),
-            Err(_) => panic!("couldn't receive vmo "),
+            Err(e) => {
+                return Err(anyhow::anyhow!("Couldn't receive vmo from ring buffer: {:?}", e))
+            }
         };
 
         // Hardware might not use all bytes in vmo. Only want to use to frames hardware will read/write from.
@@ -43,7 +45,7 @@ impl RingBuffer {
 
         if bytes_in_rb > bytes_in_vmo {
             println!("Bad ring buffer size returned by audio driver! \n (kernel size = {} bytes, driver size = {} bytes. ", bytes_in_vmo, bytes_in_rb);
-            panic!();
+            return Err(anyhow::anyhow!("Bad ring buffer size returned by audio driver! \n (kernel size = {} bytes, driver size = {} bytes. ", bytes_in_vmo, bytes_in_rb));
         }
 
         let driver_bytes = ring_buffer_client
@@ -58,10 +60,11 @@ impl RingBuffer {
                 0,
                 &vmo,
                 0,
-                vmo.get_size().unwrap() as usize,
+                vmo.get_size().map_err(|e| anyhow::anyhow!("Failed to get vmo size: {}", e))?
+                    as usize,
                 zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
             )
-            .unwrap();
+            .map_err(|e| anyhow::anyhow!("Failed to mmap vmo: {}", e))?;
         Ok(Self {
             vmo,
             base_address,
@@ -84,7 +87,7 @@ impl RingBuffer {
 
     pub fn write_to_frame(&self, frame: u64, buf: &mut Vec<u8>) -> Result<(), Error> {
         if buf.len() % self.format.bytes_per_frame() as usize != 0 {
-            panic!("Must pass buffer with complete frames.")
+            return Err(anyhow::anyhow!("Must pass buffer with complete frames."));
         }
         let frame_offset = frame % self.num_frames;
         let byte_offset = frame_offset * self.format.bytes_per_frame() as u64;
@@ -156,7 +159,7 @@ impl RingBuffer {
     }
     pub fn read_from_frame(&self, frame: u64, buf: &mut [u8]) -> Result<(), Error> {
         if buf.len() % self.format.bytes_per_frame() as usize != 0 {
-            panic!("Must pass buffer with complete frames.")
+            return Err(anyhow::anyhow!("Must pass buffer with complete frames."));
         }
         let frame_offset = frame % self.num_frames;
         let byte_offset = frame_offset * self.format.bytes_per_frame() as u64;

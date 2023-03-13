@@ -58,12 +58,14 @@ impl Format {
         // We need all values corresponding to wav header fields set on the cursor_writer
         // before writing to stdout.
         let mut cursor_writer = Cursor::new(Vec::<u8>::new());
+
         {
             // Creation of WavWriter writes the Wav File Header to cursor_writer.
             // This written header has the file size field and data chunk size field both set
             // to 0, since the number of samples (and resulting file and chunk sizes) are
             // unknown to the WavWriter at this point.
-            let _writer = hound::WavWriter::new(&mut cursor_writer, self.into()).unwrap();
+            let _writer = hound::WavWriter::new(&mut cursor_writer, self.into())
+                .map_err(|e| anyhow::anyhow!("Failed to create WavWriter from spec: {}", e))?;
         }
 
         // The file and chunk size fields are set to 0 as placeholder values by the
@@ -288,11 +290,11 @@ impl From<CommandSampleType> for fidl_fuchsia_media::AudioSampleFormat {
 
 /// Parses a Duration from string.
 pub fn parse_duration(value: &str) -> Result<Duration, String> {
-    let re = Regex::new(DURATION_REGEX).unwrap();
+    let re = Regex::new(DURATION_REGEX).map_err(|e| format!("Could not create regex: {}", e))?;
     let captures = re
         .captures(&value)
         .ok_or(format!("Durations must be specified in the form {}.", DURATION_REGEX))?;
-    let number: u64 = captures[1].parse().unwrap();
+    let number: u64 = captures[1].parse().map_err(|e| format!("Could not parse number: {}", e))?;
     let unit = &captures[2];
 
     match unit {
