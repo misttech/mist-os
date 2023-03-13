@@ -53,21 +53,11 @@ class GfxAccessibilityView : public AccessibilityViewInterface {
   // |AccessibilityViewInterface|
   void RequestFocus(fuchsia::ui::views::ViewRef view_ref, RequestFocusCallback callback) override;
 
-  // |AccessibilityViewInterface|
-  fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr TakeTouchSource() override;
-
-  // |AccessibilityViewInterface|
-  void SetTouchSource(
-      fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) override;
-
  private:
   void OnScenicEvent(std::vector<fuchsia::ui::scenic::Event> events);
 
   // Component context, used to connect to scenic services.
   sys::ComponentContext* context_;
-
-  // Used to connect to the touch source registry to upgrade a touch source.
-  fuchsia::ui::pointer::augment::LocalHitPtr local_hit_;
 
   // Interface between the accessibility view and the scenic service
   // that inserts it into the scene graph.
@@ -78,9 +68,6 @@ class GfxAccessibilityView : public AccessibilityViewInterface {
 
   // Scenic focuser used to request focus chain updates in the a11y view's subtree.
   fuchsia::ui::views::FocuserPtr focuser_;
-
-  // TouchSource used to listen for pointer events.
-  std::optional<fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr> touch_source_;
 
   // Resources below must be declared after scenic session, because they
   // must be destroyed before the session is destroyed.

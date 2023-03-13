@@ -5,7 +5,6 @@
 #ifndef SRC_UI_A11Y_LIB_VIEW_ACCESSIBILITY_VIEW_H_
 #define SRC_UI_A11Y_LIB_VIEW_ACCESSIBILITY_VIEW_H_
 
-#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/ui/scenic/cpp/commands.h>
 #include <lib/ui/scenic/cpp/resources.h>
@@ -45,14 +44,6 @@ class AccessibilityViewInterface {
   // Attempts to transfer focus to the view corresponding to |view_ref|.
   virtual void RequestFocus(fuchsia::ui::views::ViewRef view_ref,
                             RequestFocusCallback callback) = 0;
-
-  // Takes ownership of the TouchSource owned by this accessibility view, used to listen for pointer
-  // events.
-  virtual fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr TakeTouchSource() = 0;
-
-  // Sets a new TouchSource to this accessibility view.
-  virtual void SetTouchSource(
-      fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) = 0;
 };
 
 }  // namespace a11y

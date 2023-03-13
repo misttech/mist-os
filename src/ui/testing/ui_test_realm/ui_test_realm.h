@@ -33,7 +33,7 @@ constexpr auto kHighResolutionDevicePixelRatio = 2.f;
 //       to the UITestRealm constructor. This portion of the realm is
 //       (mostly) specified statically in //src/ui/testing/ui_test_manager/meta.
 //   (2) The client subrealm. This subrealm is a RealmBuilder Realm, owned and
-//       configured by the client, containing any additional test-specific
+//       configured by the client, containing any additional test-sepcific
 //       components.
 //
 // The component topology of the test is:

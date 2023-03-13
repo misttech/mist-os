@@ -4,7 +4,6 @@
 
 #include "src/ui/a11y/lib/view/gfx_accessibility_view.h"
 
-#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/commands.h>
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
@@ -54,8 +53,6 @@ void InvokeSceneReadyCallbacks(std::vector<GfxAccessibilityView::SceneReadyCallb
 
 GfxAccessibilityView::GfxAccessibilityView(sys::ComponentContext* context) : context_(context) {
   FX_DCHECK(context_);
-  local_hit_ = context_->svc()->Connect<fuchsia::ui::pointer::augment::LocalHit>();
-
   Initialize();
 }
 
@@ -85,8 +82,6 @@ void GfxAccessibilityView::Initialize() {
   fuchsia::ui::scenic::SessionPtr session;
   endpoints.set_session(session.NewRequest());
   endpoints.set_view_focuser(focuser_.NewRequest());
-  fuchsia::ui::pointer::TouchSourcePtr touch_source;
-  endpoints.set_touch_source(touch_source.NewRequest());
   fidl::InterfaceHandle<fuchsia::ui::scenic::SessionListener> session_listener;
 
   // Wrap session for convenience and create valid session listener.
@@ -137,14 +132,12 @@ void GfxAccessibilityView::Initialize() {
   session_->Present(
       /* presentation_time = */ 0,
       /* presentation_callback = */ [this, a11y_view_ref_copy = std::move(a11y_view_ref_copy),
-                                     a11y_view_holder_token = std::move(a11y_view_holder_token),
-                                     touch_source = std::move(touch_source)](
+                                     a11y_view_holder_token = std::move(a11y_view_holder_token)](
                                         fuchsia::images::PresentationInfo info) mutable {
         // Insert a11y view into root presenter.
         accessibility_view_registry_->CreateAccessibilityViewHolder(
             std::move(a11y_view_ref_copy), std::move(a11y_view_holder_token),
-            [this, touch_source = std::move(touch_source)](
-                fuchsia::ui::views::ViewHolderToken proxy_view_holder_token) mutable {
+            [this](fuchsia::ui::views::ViewHolderToken proxy_view_holder_token) {
               // Create the proxy view holder and attach it to the scene.
               proxy_view_holder_.emplace(session_.get(), std::move(proxy_view_holder_token),
                                          "Proxy View Holder");
@@ -162,27 +155,12 @@ void GfxAccessibilityView::Initialize() {
               // Apply changes.
               session_->Present(
                   /* presentation_time = */ 0,
-                  /* presentation_callback = */ [this, touch_source = std::move(touch_source)](
-                                                    fuchsia::images::PresentationInfo
-                                                        info) mutable {
+                  /* presentation_callback = */ [this](fuchsia::images::PresentationInfo info) {
                     const bool old = is_initialized();
                     proxy_view_holder_attached_ = true;
                     if (a11y_view_properties_) {
                       proxy_view_holder_properties_set_ = true;
                     }
-                    // Upgrade Touchsource to its augmented form. This needs to be done when we are
-                    // sure the a11y view is in the scene and its regular Touch Source is
-                    // initialized.
-                    local_hit_->Upgrade(
-                        std::move(touch_source),
-                        [this](fidl::InterfaceHandle<
-                                   fuchsia::ui::pointer::augment::TouchSourceWithLocalHit>
-                                   augmented,
-                               std::unique_ptr<fuchsia::ui::pointer::augment::ErrorForLocalHit>
-                                   error) {
-                          FX_DCHECK(error == nullptr);
-                          touch_source_ = augmented.Bind();
-                        });
 
                     if (is_initialized() && !old) {
                       // The scene just became ready.
@@ -296,16 +274,6 @@ void GfxAccessibilityView::RequestFocus(fuchsia::ui::views::ViewRef view_ref,
                                         RequestFocusCallback callback) {
   FX_DCHECK(focuser_);
   focuser_->RequestFocus(std::move(view_ref), std::move(callback));
-}
-
-fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr GfxAccessibilityView::TakeTouchSource() {
-  FX_CHECK(touch_source_) << "Tried to obtain a touch source that was not initialized.";
-  return std::move(touch_source_.value());
-}
-
-void GfxAccessibilityView::SetTouchSource(
-    fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) {
-  touch_source_ = std::move(touch_source);
 }
 
 }  // namespace a11y

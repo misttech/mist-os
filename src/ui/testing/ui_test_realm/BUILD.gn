@@ -33,7 +33,6 @@ source_set("ui_test_realm") {
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.scope:fuchsia.ui.observation.scope_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.test:fuchsia.ui.observation.test_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointerinjector.configuration:fuchsia.ui.pointerinjector.configuration_hlcpp",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",

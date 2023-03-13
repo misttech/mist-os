@@ -19,7 +19,6 @@
 #include "fuchsia/ui/composition/cpp/fidl.h"
 #include "fuchsia/ui/views/cpp/fidl.h"
 #include "lib/fidl/cpp/clone.h"
-#include "lib/fidl/cpp/interface_request.h"
 #include "src/ui/a11y/lib/util/util.h"
 #include "src/ui/a11y/lib/view/view_coordinate_converter.h"
 
@@ -86,7 +85,6 @@ fuchsia::math::RectF SizeUToRectFAtOrigin(fuchsia::math::SizeU size) {
 fuchsia::ui::views::ViewRef InitialA11yViewSetup(
     fuchsia::ui::composition::Flatland* flatland_a11y,
     fuchsia::ui::views::ViewCreationToken a11y_view_token, fuchsia::ui::views::FocuserPtr& focuser,
-    fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource> touch_source_server_end,
     fuchsia::ui::composition::ParentViewportWatcherPtr& parent_watcher) {
   FX_DCHECK(flatland_a11y);
 
@@ -97,7 +95,6 @@ fuchsia::ui::views::ViewRef InitialA11yViewSetup(
   // Set up view-bound protocols for flatland instance.
   fuchsia::ui::composition::ViewBoundProtocols view_bound_protocols;
   view_bound_protocols.set_view_focuser(focuser.NewRequest());
-  view_bound_protocols.set_touch_source(std::move(touch_source_server_end));
 
   // Create a11y view, and set it as the content for the root transform.
   flatland_a11y->CreateView2(std::move(a11y_view_token), std::move(view_identity),
@@ -244,12 +241,10 @@ void InvokeSceneReadyCallbacks(
 FlatlandAccessibilityView::FlatlandAccessibilityView(
     fuchsia::ui::composition::FlatlandPtr flatland1,
     fuchsia::ui::composition::FlatlandPtr flatland2,
-    fuchsia::ui::observation::scope::RegistryPtr registry,
-    fuchsia::ui::pointer::augment::LocalHitPtr local_hit)
+    fuchsia::ui::observation::scope::RegistryPtr registry)
     : flatland_a11y_(std::move(flatland1), /* debug name = */ "a11y_view"),
       flatland_highlight_(std::move(flatland2), /* debug name = */ "highlight_view"),
-      registry_(std::move(registry)),
-      local_hit_(std::move(local_hit)) {}
+      registry_(std::move(registry)) {}
 
 void FlatlandAccessibilityView::CreateView(
     fuchsia::ui::views::ViewCreationToken a11y_view_token,
@@ -266,18 +261,14 @@ void FlatlandAccessibilityView::CreateView(
   // scenic, so we'll store the proxy viewport creation token to use later.
   proxy_viewport_token_ = std::move(proxy_viewport_token);
 
-  // Creates a touch source to be initialized. When the a11y view becomes ready, it will be upgraded
-  // to its augmented form.
-  fuchsia::ui::pointer::TouchSourcePtr touch_source;
   a11y_view_ref_ = InitialA11yViewSetup(flatland_a11y_.flatland(), std::move(a11y_view_token),
-                                        focuser_, touch_source.NewRequest(), parent_watcher_);
+                                        focuser_, parent_watcher_);
 
   // Present changes.
   flatland_a11y_.Present();
 
   // Watch for next layout info change.
-  parent_watcher_->GetLayout([this, touch_source =
-                                        std::move(touch_source)](LayoutInfo layout_info) mutable {
+  parent_watcher_->GetLayout([this](LayoutInfo layout_info) {
     FX_DCHECK(proxy_viewport_token_.has_value());
 
     layout_info_ = std::move(layout_info);
@@ -303,28 +294,12 @@ void FlatlandAccessibilityView::CreateView(
 
     // Make sure the highlight view is ready before presenting the a11y view.
     // Probably not necessary, but it might help avoid a flicker at startup.
-    flatland_highlight_.Present(
-        PresentArgs{}, [this, touch_source = std::move(touch_source)](auto) mutable {
-          flatland_a11y_.Present(PresentArgs{}, [this, touch_source =
-                                                           std::move(touch_source)](auto) mutable {
-            // Upgrade Touchsource to its augmented form. This needs to be done when we are sure the
-            // a11y view is in the scene and its regular Touch Source is initialized.
-            FX_LOGS(INFO) << "upgrading accessibility touch source.";
-            local_hit_->Upgrade(
-                std::move(touch_source),
-                [this](fidl::InterfaceHandle<fuchsia::ui::pointer::augment::TouchSourceWithLocalHit>
-                           augmented,
-                       std::unique_ptr<fuchsia::ui::pointer::augment::ErrorForLocalHit> error) {
-                  FX_DCHECK(error == nullptr);
-                  touch_source_ = augmented.Bind();
-
-                  // The a11y view can be considered initialized from now on, because it has the
-                  // Touch Source it needs.
-                  is_initialized_ = true;
-                  InvokeSceneReadyCallbacks(&scene_ready_callbacks_);
-                });
-          });
-        });
+    flatland_highlight_.Present(PresentArgs{}, [this](auto) {
+      flatland_a11y_.Present(PresentArgs{}, [this](auto) {
+        is_initialized_ = true;
+        InvokeSceneReadyCallbacks(&scene_ready_callbacks_);
+      });
+    });
 
     // Report changes in view properties to observers.
     InvokeViewPropertiesChangedCallbacks(*layout_info_, &view_properties_changed_callbacks_);
@@ -561,17 +536,6 @@ void FlatlandAccessibilityView::SetMagnificationTransform(
 
   flatland_a11y_.Present(fuchsia::ui::composition::PresentArgs{},
                          [callback = std::move(callback)](auto) { callback(); });
-}
-
-fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr
-FlatlandAccessibilityView::TakeTouchSource() {
-  FX_CHECK(touch_source_) << "Tried to obtain a touch source that was not initialized.";
-  return std::move(touch_source_.value());
-}
-
-void FlatlandAccessibilityView::SetTouchSource(
-    fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) {
-  touch_source_ = std::move(touch_source);
 }
 
 }  // namespace a11y
