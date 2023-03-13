@@ -5,14 +5,14 @@
 
 __LOCAL extern const struct FidlCodedTable test_doccomments_TableTable;
 __LOCAL extern const struct FidlCodedStruct test_doccomments_StructTable;
-__LOCAL extern const struct FidlCodedXUnion test_doccomments_StrictUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_doccomments_StrictUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_doccomments_StrictUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_doccomments_StrictUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedEnum test_doccomments_MyStrictEnumTable;
 __LOCAL extern const struct FidlCodedBits test_doccomments_MyStrictBitsTable;
 __LOCAL extern const struct FidlCodedEnum test_doccomments_MyFlexibleEnumTable;
 __LOCAL extern const struct FidlCodedBits test_doccomments_MyFlexibleBitsTable;
-__LOCAL extern const struct FidlCodedXUnion test_doccomments_FlexibleUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_doccomments_FlexibleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_doccomments_FlexibleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_doccomments_FlexibleUnionNullableRefTable;
 
 
 
@@ -23,14 +23,14 @@ const struct FidlCodedTable test_doccomments_TableTable = {.tag=kFidlTypeTable, 
 
 const struct FidlCodedStruct test_doccomments_StructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.doccomments/Struct"};
 
-static const struct FidlXUnionField Fields28test_doccomments_StrictUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+static const struct FidlUnionField Fields28test_doccomments_StrictUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_doccomments_StrictUnionTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields28test_doccomments_StrictUnion, .nullable=kFidlNullability_Nonnullable, .name="test.doccomments/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields39test_doccomments_StrictUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_doccomments_StrictUnionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields28test_doccomments_StrictUnion, .nullable=kFidlNullability_Nonnullable, .name="test.doccomments/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields39test_doccomments_StrictUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_doccomments_StrictUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields39test_doccomments_StrictUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.doccomments/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_doccomments_StrictUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields39test_doccomments_StrictUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.doccomments/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static bool EnumValidatorFor_test_doccomments_MyStrictEnum(uint64_t v) {
   switch (v) {
     case 1ul:
@@ -49,11 +49,11 @@ const struct FidlCodedEnum test_doccomments_MyFlexibleEnumTable = {.tag=kFidlTyp
 
 const struct FidlCodedBits test_doccomments_MyFlexibleBitsTable = {.tag=kFidlTypeBits, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Flexible, .mask=3ul, .name="test.doccomments/MyFlexibleBits"};
 
-static const struct FidlXUnionField Fields30test_doccomments_FlexibleUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+static const struct FidlUnionField Fields30test_doccomments_FlexibleUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_doccomments_FlexibleUnionTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields30test_doccomments_FlexibleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.doccomments/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields41test_doccomments_FlexibleUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_doccomments_FlexibleUnionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields30test_doccomments_FlexibleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.doccomments/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields41test_doccomments_FlexibleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_doccomments_FlexibleUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields41test_doccomments_FlexibleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.doccomments/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_doccomments_FlexibleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields41test_doccomments_FlexibleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.doccomments/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};

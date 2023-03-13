@@ -108,7 +108,7 @@ TEST(MyXUnion, CodingTableWhenNullable) {
 
   const fidl_type& my_xunion_type = *my_xunion_field.field_type;
   ASSERT_EQ(kFidlTypeXUnion, my_xunion_type.type_tag());
-  const FidlCodedXUnion& my_xunion_table = my_xunion_type.coded_xunion();
+  const FidlCodedXUnion& my_xunion_table = my_xunion_type.coded_union();
 
   // Please keep these assertions in the same order as FidlCodedXUnion's member variables.
 
@@ -121,8 +121,8 @@ TEST(MyXUnion, CodingTableWhenNullable) {
 
   ASSERT_STREQ("fidl.test.example.codingtables/MyXUnion", my_xunion_table.name);
 
-  ASSERT_EQ(kFidlStrictness_Flexible, my_xunion_type.coded_xunion().strictness);
-  ASSERT_EQ(kFidlIsResource_NotResource, my_xunion_type.coded_xunion().is_resource);
+  ASSERT_EQ(kFidlStrictness_Flexible, my_xunion_type.coded_union().strictness);
+  ASSERT_EQ(kFidlIsResource_NotResource, my_xunion_type.coded_union().is_resource);
 }
 
 TEST(MyStrictXUnion, CodingTableWhenNullable) {
@@ -140,7 +140,7 @@ TEST(MyStrictXUnion, CodingTableWhenNullable) {
 
   const fidl_type& my_strict_xunion_type = *my_strict_xunion_field.field_type;
   ASSERT_EQ(kFidlTypeXUnion, my_strict_xunion_type.type_tag());
-  const FidlCodedXUnion& my_strict_xunion_table = my_strict_xunion_type.coded_xunion();
+  const FidlCodedXUnion& my_strict_xunion_table = my_strict_xunion_type.coded_union();
 
   // Please keep these assertions in the same order as FidlCodedXUnion's member variables.
 
@@ -153,8 +153,8 @@ TEST(MyStrictXUnion, CodingTableWhenNullable) {
 
   ASSERT_STREQ("fidl.test.example.codingtables/MyStrictXUnion", my_strict_xunion_table.name);
 
-  ASSERT_EQ(kFidlStrictness_Strict, my_strict_xunion_type.coded_xunion().strictness);
-  ASSERT_EQ(kFidlIsResource_NotResource, my_strict_xunion_type.coded_xunion().is_resource);
+  ASSERT_EQ(kFidlStrictness_Strict, my_strict_xunion_type.coded_union().strictness);
+  ASSERT_EQ(kFidlIsResource_NotResource, my_strict_xunion_type.coded_union().is_resource);
 }
 
 TEST(MyTable, CodingTable) {
@@ -213,7 +213,7 @@ TEST(MyXUnion, CodingTableWhenNonnullable) {
 
   const fidl_type& xunion_type = *xunion_vector.element;
   ASSERT_EQ(kFidlTypeXUnion, xunion_type.type_tag());
-  const FidlCodedXUnion& coded_xunion = xunion_type.coded_xunion();
+  const FidlCodedXUnion& coded_xunion = xunion_type.coded_union();
 
   ASSERT_EQ(kFidlNullability_Nonnullable, coded_xunion.nullable);
 
@@ -239,7 +239,7 @@ TEST(MyStrictXUnion, CodingTableWhenNonnullable) {
 
   const fidl_type& xunion_type = *xunion_vector.element;
   ASSERT_EQ(kFidlTypeXUnion, xunion_type.type_tag());
-  const FidlCodedXUnion& coded_xunion = xunion_type.coded_xunion();
+  const FidlCodedXUnion& coded_xunion = xunion_type.coded_union();
 
   ASSERT_EQ(kFidlNullability_Nonnullable, coded_xunion.nullable);
 
@@ -308,7 +308,7 @@ TEST(ForeignXUnions, CodingTable) {
   const FidlStructField& tx_field = request_struct.elements[0].field;
   const fidl_type& tx_type = *tx_field.field_type;
   ASSERT_EQ(kFidlTypeXUnion, tx_type.type_tag());
-  const FidlCodedXUnion& tx_table = tx_type.coded_xunion();
+  const FidlCodedXUnion& tx_table = tx_type.coded_union();
   ASSERT_STREQ("fidl.test.example.codingtablesdeps/MyXUnionA", tx_table.name);
   ASSERT_EQ(kFidlNullability_Nonnullable, tx_table.nullable);
   ASSERT_EQ(kFidlIsResource_NotResource, tx_table.is_resource);
@@ -325,7 +325,7 @@ TEST(ForeignXUnions, CodingTable) {
   const FidlStructField& rx_field = response_struct.elements[0].field;
   const fidl_type& rx_type = *rx_field.field_type;
   ASSERT_EQ(kFidlTypeXUnion, rx_type.type_tag());
-  const FidlCodedXUnion& rx_table = rx_type.coded_xunion();
+  const FidlCodedXUnion& rx_table = rx_type.coded_union();
   ASSERT_STREQ("fidl.test.example.codingtablesdeps/MyXUnionA", rx_table.name);
   ASSERT_EQ(kFidlNullability_Nullable, rx_table.nullable);
   ASSERT_EQ(kFidlIsResource_NotResource, rx_table.is_resource);

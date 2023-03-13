@@ -68,17 +68,6 @@ std::ostream& fidl::ostream::Formatter<::test_placementofattributes::ExampleUnio
   }
   return os;
 }
-std::ostream& fidl::ostream::Formatter<::test_placementofattributes::ExampleXUnion>::Format(std::ostream& os, const ::test_placementofattributes::ExampleXUnion& value) {
-  os << "test_placementofattributes::ExampleXUnion::";
-  switch (value.Which()) {
-    case ::test_placementofattributes::ExampleXUnion::Tag::kVariant:
-      os << "variant(" << fidl::ostream::Formatted<uint32_t>(value.variant().value()) << ")";
-      break;
-    default:
-      os << "Unknown";
-  }
-  return os;
-}
 
 namespace test_placementofattributes {
 
@@ -104,10 +93,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::E
 
 std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::ExampleUnion& value) {
   return fidl::ostream::Formatter<::test_placementofattributes::ExampleUnion>::Format(os, value);
-}
-
-std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::ExampleXUnion& value) {
-  return fidl::ostream::Formatter<::test_placementofattributes::ExampleXUnion>::Format(os, value);
 }
 
 }  // namespace test_placementofattributes

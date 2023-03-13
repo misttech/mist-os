@@ -3,10 +3,10 @@
   "pkg/fidl_base/include/lib/fidl/cpp/transaction_header.h": "9ba7b6c916c912651fa582ed1cac4f79",
   "pkg/fidl_base/include/lib/fidl/cpp/transport_err.h": "1c7c7d49ede5997deceebc374e8c7229",
   "pkg/fidl_base/include/lib/fidl/cpp/wire_format_metadata.h": "8d6d755815958de4157af8d8bb5bef5c",
-  "pkg/fidl_base/include/lib/fidl/internal.h": "ca4fc421afb3b575de88e756984d133f",
+  "pkg/fidl_base/include/lib/fidl/internal.h": "0c3d402f13fa9bc6d19d07282bf204e8",
   "pkg/fidl_base/include/lib/fidl/internal_callable_traits.h": "dd7e77037e675ecf93a32491d50a1dcd",
   "pkg/fidl_base/include/lib/fidl/trace.h": "ddc7cd528d49a8ce501bf10e9a6dccaf",
   "pkg/fidl_base/include/lib/fidl/txn_header.h": "4114932cd3ad48b239635f182ed15594",
   "pkg/fidl_base/include/lib/fidl/visitor.h": "b8517a6a56e738ba1c30852b7ab493de",
-  "pkg/fidl_base/include/lib/fidl/walker.h": "90f88dee9f311a21e586dd2a964ec5e5"
+  "pkg/fidl_base/include/lib/fidl/walker.h": "9e20e960560a9e61b7ccd191c8f47477"
 }

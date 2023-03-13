@@ -10,21 +10,21 @@
 
 namespace test_union {
 
-[[maybe_unused]] constexpr inline uint64_t kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal = 582913180652179677lu;
+[[maybe_unused]] constexpr inline uint64_t kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal = 6628358876445129155lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal = 7698084639218919941lu;
+[[maybe_unused]] constexpr inline uint64_t kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal = 7588545459451501794lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_union
 
-::fidl::internal::NaturalThenable<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>
-fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::StrictXUnionHenceResponseMayBeStackAllocated() const {
-  return ::fidl::internal::NaturalThenable<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>(
-      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_DynamicFlags,
+::fidl::internal::NaturalThenable<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>
+fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::StrictUnionHenceResponseMayBeStackAllocated() const {
+  return ::fidl::internal::NaturalThenable<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags,
       [](NaturalMessageEncoder& encoder) mutable {
         return ZX_OK;
       },
@@ -37,10 +37,10 @@ fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::StrictXUnionHence
       });
 }
 
-::fidl::internal::NaturalThenable<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>
-fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::FlexibleXUnionHenceResponseMustBeHeapAllocated() const {
-  return ::fidl::internal::NaturalThenable<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>(
-      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal, ::test_union::kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_DynamicFlags,
+::fidl::internal::NaturalThenable<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>
+fidl::internal::NaturalClientImpl<::test_union::TestProtocol>::FlexibleUnionHenceResponseMustBeHeapAllocated() const {
+  return ::fidl::internal::NaturalThenable<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal, ::test_union::kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags,
       [](NaturalMessageEncoder& encoder) mutable {
         return ZX_OK;
       },
@@ -61,23 +61,23 @@ namespace test_union {
 
 #ifdef __Fuchsia__
 
-::fidl::Result<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>
-fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::StrictXUnionHenceResponseMayBeStackAllocated() {
+::fidl::Result<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>
+fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::StrictUnionHenceResponseMayBeStackAllocated() {
   ::fidl::internal::NaturalMessageEncoder encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_DynamicFlags};
+      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags};
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
-  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>> response_storage;
-  return ::fidl::internal::DecodeResponseAndFoldError<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>(
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
-::fidl::Result<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>
-fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::FlexibleXUnionHenceResponseMustBeHeapAllocated() {
+::fidl::Result<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>
+fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::FlexibleUnionHenceResponseMustBeHeapAllocated() {
   ::fidl::internal::NaturalMessageEncoder encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal, ::test_union::kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_DynamicFlags};
+      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal, ::test_union::kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags};
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
-  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>> response_storage;
-  return ::fidl::internal::DecodeResponseAndFoldError<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>(
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
@@ -98,20 +98,20 @@ fidl::internal::NaturalSyncClientImpl<::test_union::TestProtocol>::FlexibleXUnio
 
 #endif  // __Fuchsia__
 
-void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>::Reply(const ::fidl::Response<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>& response) {
+void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::Reply(const ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_DynamicFlags};
+      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal, ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags};
   _encoder.EncodeBody(
-      ::fidl::internal::ResponseMessageConverter<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>::IntoDomainObject(response));
+      ::fidl::internal::ResponseMessageConverter<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
-void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>::Reply(const ::fidl::Response<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>& response) {
+void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::Reply(const ::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
-      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal, ::test_union::kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_DynamicFlags};
+      &::fidl::internal::ChannelTransport::VTable, ::test_union::kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal, ::test_union::kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags};
   _encoder.EncodeBody(
-      ::fidl::internal::ResponseMessageConverter<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>::IntoDomainObject(response));
+      ::fidl::internal::ResponseMessageConverter<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::IntoDomainObject(response));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
@@ -120,7 +120,7 @@ void fidl::internal::NaturalCompleterBase<::test_union::TestProtocol::FlexibleXU
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_union::TestProtocol>::entries_[] = {
     {
-        ::test_union::kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal,
+        ::test_union::kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
           ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
@@ -128,15 +128,15 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           if (decoded.is_error()) {
             return decoded.error_value();
           }
-          ::fidl::internal::NaturalCompleter<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>::Sync completer(txn);
-          static_cast<::fidl::Server<::test_union::TestProtocol>*>(interface)->StrictXUnionHenceResponseMayBeStackAllocated(
+          ::fidl::internal::NaturalCompleter<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_union::TestProtocol>*>(interface)->StrictUnionHenceResponseMayBeStackAllocated(
 
               completer);
           return ::fidl::Status::Ok();
         },
     },
     {
-        ::test_union::kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal,
+        ::test_union::kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal,
         [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
            internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
           ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessageWithoutBody(
@@ -144,8 +144,8 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           if (decoded.is_error()) {
             return decoded.error_value();
           }
-          ::fidl::internal::NaturalCompleter<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>::Sync completer(txn);
-          static_cast<::fidl::Server<::test_union::TestProtocol>*>(interface)->FlexibleXUnionHenceResponseMustBeHeapAllocated(
+          ::fidl::internal::NaturalCompleter<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_union::TestProtocol>*>(interface)->FlexibleUnionHenceResponseMustBeHeapAllocated(
 
               completer);
           return ::fidl::Status::Ok();

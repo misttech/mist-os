@@ -12,8 +12,8 @@ __LOCAL extern const struct FidlCodedStruct test_nullable_StructWithNullableStri
 __LOCAL extern const struct FidlCodedStruct test_nullable_StructWithNullableRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_StructWithNullableProtocolTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_StructWithNullableHandleTable;
-__LOCAL extern const struct FidlCodedXUnion test_nullable_SimpleUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_nullable_SimpleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_nullable_SimpleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_nullable_SimpleUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestMessageTable;
@@ -68,16 +68,16 @@ static const struct FidlStructElement Fields38test_nullable_StructWithNullableHa
 };
 const struct FidlCodedStruct test_nullable_StructWithNullableHandleTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableHandle, .element_count=1u, .size_v2=4u, .name="test.nullable/StructWithNullableHandle"};
 
-static const struct FidlXUnionField Fields25test_nullable_SimpleUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+static const struct FidlUnionField Fields25test_nullable_SimpleUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
 };
-const struct FidlCodedXUnion test_nullable_SimpleUnionTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields25test_nullable_SimpleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.nullable/SimpleUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields36test_nullable_SimpleUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+const struct FidlCodedUnion test_nullable_SimpleUnionTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields25test_nullable_SimpleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.nullable/SimpleUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields36test_nullable_SimpleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
 };
-const struct FidlCodedXUnion test_nullable_SimpleUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields36test_nullable_SimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.nullable/SimpleUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_nullable_SimpleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields36test_nullable_SimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.nullable/SimpleUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/SimpleProtocolAddResponse"};
 
 const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.nullable/SimpleProtocolAddRequest"};

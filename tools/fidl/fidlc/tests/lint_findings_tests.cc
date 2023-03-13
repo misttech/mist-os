@@ -1450,7 +1450,6 @@ using zx as ${TEST};
       "with",
       "xor",
       "xor_eq",
-      "xunion",
       "yield",
   };
 

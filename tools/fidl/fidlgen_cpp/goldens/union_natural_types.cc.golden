@@ -27,17 +27,17 @@
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
 
-::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::Storage_ test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::CloneStorage_() const {
+::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::Storage_ test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.xu)};
 }
 
-::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::Storage_ test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::CloneStorage_() const {
+::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::Storage_ test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.xu)};
 }
 
-::test_union::StructWithNullableXUnion::Storage_ test_union::StructWithNullableXUnion::CloneStorage_() const {
+::test_union::StructWithNullableUnion::Storage_ test_union::StructWithNullableUnion::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.x1)};
 }
@@ -317,7 +317,7 @@ std::shared_ptr<::test_union::NewerSimpleUnion::Storage_> test_union::NewerSimpl
   }
 }
 
-std::shared_ptr<::test_union::StrictSimpleXUnion::Storage_> test_union::StrictSimpleXUnion::CloneStorage_() const {
+std::shared_ptr<::test_union::StrictSimpleUnion::Storage_> test_union::StrictSimpleUnion::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
     case 1:
@@ -337,7 +337,7 @@ std::shared_ptr<::test_union::StrictSimpleXUnion::Storage_> test_union::StrictSi
   }
 }
 
-std::shared_ptr<::test_union::XUnionContainingEmptyStruct::Storage_> test_union::XUnionContainingEmptyStruct::CloneStorage_() const {
+std::shared_ptr<::test_union::UnionContainingEmptyStruct::Storage_> test_union::UnionContainingEmptyStruct::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
     case 1:
@@ -349,7 +349,7 @@ std::shared_ptr<::test_union::XUnionContainingEmptyStruct::Storage_> test_union:
   }
 }
 
-std::shared_ptr<::test_union::StrictBoundedXUnion::Storage_> test_union::StrictBoundedXUnion::CloneStorage_() const {
+std::shared_ptr<::test_union::StrictBoundedUnion::Storage_> test_union::StrictBoundedUnion::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
     case 1:
@@ -361,7 +361,7 @@ std::shared_ptr<::test_union::StrictBoundedXUnion::Storage_> test_union::StrictB
   }
 }
 
-std::shared_ptr<::test_union::ExplicitXUnion::Storage_> test_union::ExplicitXUnion::CloneStorage_() const {
+std::shared_ptr<::test_union::ExplicitFlexibleUnion::Storage_> test_union::ExplicitFlexibleUnion::CloneStorage_() const {
   const Storage_& storage = *storage_;
   switch (storage_->index()) {
     case 1:

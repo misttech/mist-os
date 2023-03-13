@@ -46,29 +46,29 @@ namespace internal {
   };
 }
 
-::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::ToNatural(::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse src) {
-  return ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(WireNaturalConversionTraits<::test_union::wire::StrictBoundedXUnion, ::test_union::StrictBoundedXUnion>::ToNatural(std::move(src.xu)));
+::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::ToNatural(::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse src) {
+  return ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(WireNaturalConversionTraits<::test_union::wire::StrictBoundedUnion, ::test_union::StrictBoundedUnion>::ToNatural(std::move(src.xu)));
 }
-::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::ToWire(fidl::AnyArena& arena, ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse src) {
-  return ::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse{
-      .xu = WireNaturalConversionTraits<::test_union::wire::StrictBoundedXUnion, ::test_union::StrictBoundedXUnion>::ToWire(arena, std::move(src.xu())),
+::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::ToWire(fidl::AnyArena& arena, ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse src) {
+  return ::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse{
+      .xu = WireNaturalConversionTraits<::test_union::wire::StrictBoundedUnion, ::test_union::StrictBoundedUnion>::ToWire(arena, std::move(src.xu())),
   };
 }
 
-::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::ToNatural(::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse src) {
-  return ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(WireNaturalConversionTraits<::test_union::wire::OlderSimpleUnion, ::test_union::OlderSimpleUnion>::ToNatural(std::move(src.xu)));
+::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::ToNatural(::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse src) {
+  return ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(WireNaturalConversionTraits<::test_union::wire::OlderSimpleUnion, ::test_union::OlderSimpleUnion>::ToNatural(std::move(src.xu)));
 }
-::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::ToWire(fidl::AnyArena& arena, ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse src) {
-  return ::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse{
+::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::ToWire(fidl::AnyArena& arena, ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse src) {
+  return ::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse{
       .xu = WireNaturalConversionTraits<::test_union::wire::OlderSimpleUnion, ::test_union::OlderSimpleUnion>::ToWire(arena, std::move(src.xu())),
   };
 }
 
-::test_union::StructWithNullableXUnion WireNaturalConversionTraits<::test_union::wire::StructWithNullableXUnion, ::test_union::StructWithNullableXUnion>::ToNatural(::test_union::wire::StructWithNullableXUnion src) {
-  return ::test_union::StructWithNullableXUnion(WireNaturalConversionTraits<::fidl::WireOptional<::test_union::wire::OlderSimpleUnion>, ::fidl::Box<::test_union::OlderSimpleUnion>>::ToNatural(std::move(src.x1)));
+::test_union::StructWithNullableUnion WireNaturalConversionTraits<::test_union::wire::StructWithNullableUnion, ::test_union::StructWithNullableUnion>::ToNatural(::test_union::wire::StructWithNullableUnion src) {
+  return ::test_union::StructWithNullableUnion(WireNaturalConversionTraits<::fidl::WireOptional<::test_union::wire::OlderSimpleUnion>, ::fidl::Box<::test_union::OlderSimpleUnion>>::ToNatural(std::move(src.x1)));
 }
-::test_union::wire::StructWithNullableXUnion WireNaturalConversionTraits<::test_union::wire::StructWithNullableXUnion, ::test_union::StructWithNullableXUnion>::ToWire(fidl::AnyArena& arena, ::test_union::StructWithNullableXUnion src) {
-  return ::test_union::wire::StructWithNullableXUnion{
+::test_union::wire::StructWithNullableUnion WireNaturalConversionTraits<::test_union::wire::StructWithNullableUnion, ::test_union::StructWithNullableUnion>::ToWire(fidl::AnyArena& arena, ::test_union::StructWithNullableUnion src) {
+  return ::test_union::wire::StructWithNullableUnion{
       .x1 = WireNaturalConversionTraits<::fidl::WireOptional<::test_union::wire::OlderSimpleUnion>, ::fidl::Box<::test_union::OlderSimpleUnion>>::ToWire(arena, std::move(src.x1())),
   };
 }
@@ -76,14 +76,14 @@ namespace internal {
 ::test_union::UnionSandwich WireNaturalConversionTraits<::test_union::wire::UnionSandwich, ::test_union::UnionSandwich>::ToNatural(::test_union::wire::UnionSandwich src) {
   return ::test_union::UnionSandwich{{
       .a = WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.a)),
-      .u = WireNaturalConversionTraits<::test_union::wire::ExplicitXUnion, ::test_union::ExplicitXUnion>::ToNatural(std::move(src.u)),
+      .u = WireNaturalConversionTraits<::test_union::wire::ExplicitFlexibleUnion, ::test_union::ExplicitFlexibleUnion>::ToNatural(std::move(src.u)),
       .b = WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.b)),
   }};
 }
 ::test_union::wire::UnionSandwich WireNaturalConversionTraits<::test_union::wire::UnionSandwich, ::test_union::UnionSandwich>::ToWire(fidl::AnyArena& arena, ::test_union::UnionSandwich src) {
   return ::test_union::wire::UnionSandwich{
       .a = WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.a())),
-      .u = WireNaturalConversionTraits<::test_union::wire::ExplicitXUnion, ::test_union::ExplicitXUnion>::ToWire(arena, std::move(src.u())),
+      .u = WireNaturalConversionTraits<::test_union::wire::ExplicitFlexibleUnion, ::test_union::ExplicitFlexibleUnion>::ToWire(arena, std::move(src.u())),
       .b = WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.b())),
   };
 }
@@ -486,93 +486,93 @@ namespace internal {
   }
 }
 
-::test_union::StrictSimpleXUnion WireNaturalConversionTraits<::test_union::wire::StrictSimpleXUnion, ::test_union::StrictSimpleXUnion>::ToNatural(::test_union::wire::StrictSimpleXUnion src) {
+::test_union::StrictSimpleUnion WireNaturalConversionTraits<::test_union::wire::StrictSimpleUnion, ::test_union::StrictSimpleUnion>::ToNatural(::test_union::wire::StrictSimpleUnion src) {
   switch (src.Which()) {
-    case ::test_union::wire::StrictSimpleXUnion::Tag::kI:
-      return ::test_union::StrictSimpleXUnion::WithI(
+    case ::test_union::wire::StrictSimpleUnion::Tag::kI:
+      return ::test_union::StrictSimpleUnion::WithI(
           WireNaturalConversionTraits<int32_t, int32_t>::ToNatural(std::move(src.i())));
-    case ::test_union::wire::StrictSimpleXUnion::Tag::kF:
-      return ::test_union::StrictSimpleXUnion::WithF(
+    case ::test_union::wire::StrictSimpleUnion::Tag::kF:
+      return ::test_union::StrictSimpleUnion::WithF(
           WireNaturalConversionTraits<float, float>::ToNatural(std::move(src.f())));
-    case ::test_union::wire::StrictSimpleXUnion::Tag::kS:
-      return ::test_union::StrictSimpleXUnion::WithS(
+    case ::test_union::wire::StrictSimpleUnion::Tag::kS:
+      return ::test_union::StrictSimpleUnion::WithS(
           WireNaturalConversionTraits<::fidl::StringView, ::std::string>::ToNatural(std::move(src.s())));
     default:
       ZX_PANIC("unknown union tag in strict union");
   }
 }
-::test_union::wire::StrictSimpleXUnion WireNaturalConversionTraits<::test_union::wire::StrictSimpleXUnion, ::test_union::StrictSimpleXUnion>::ToWire(fidl::AnyArena& arena, ::test_union::StrictSimpleXUnion src) {
+::test_union::wire::StrictSimpleUnion WireNaturalConversionTraits<::test_union::wire::StrictSimpleUnion, ::test_union::StrictSimpleUnion>::ToWire(fidl::AnyArena& arena, ::test_union::StrictSimpleUnion src) {
   switch (src.Which()) {
-    case ::test_union::StrictSimpleXUnion::Tag::kI:
-      return ::test_union::wire::StrictSimpleXUnion::WithI(
+    case ::test_union::StrictSimpleUnion::Tag::kI:
+      return ::test_union::wire::StrictSimpleUnion::WithI(
           WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.i().value())));
-    case ::test_union::StrictSimpleXUnion::Tag::kF:
-      return ::test_union::wire::StrictSimpleXUnion::WithF(
+    case ::test_union::StrictSimpleUnion::Tag::kF:
+      return ::test_union::wire::StrictSimpleUnion::WithF(
           WireNaturalConversionTraits<float, float>::ToWire(arena, std::move(src.f().value())));
-    case ::test_union::StrictSimpleXUnion::Tag::kS:
-      return ::test_union::wire::StrictSimpleXUnion::WithS(arena,
-                                                           WireNaturalConversionTraits<::fidl::StringView, ::std::string>::ToWire(arena, std::move(src.s().value())));
+    case ::test_union::StrictSimpleUnion::Tag::kS:
+      return ::test_union::wire::StrictSimpleUnion::WithS(arena,
+                                                          WireNaturalConversionTraits<::fidl::StringView, ::std::string>::ToWire(arena, std::move(src.s().value())));
   }
 }
 
-::test_union::XUnionContainingEmptyStruct WireNaturalConversionTraits<::test_union::wire::XUnionContainingEmptyStruct, ::test_union::XUnionContainingEmptyStruct>::ToNatural(::test_union::wire::XUnionContainingEmptyStruct src) {
+::test_union::UnionContainingEmptyStruct WireNaturalConversionTraits<::test_union::wire::UnionContainingEmptyStruct, ::test_union::UnionContainingEmptyStruct>::ToNatural(::test_union::wire::UnionContainingEmptyStruct src) {
   switch (src.Which()) {
-    case ::test_union::wire::XUnionContainingEmptyStruct::Tag::kEmpty:
-      return ::test_union::XUnionContainingEmptyStruct::WithEmpty(
+    case ::test_union::wire::UnionContainingEmptyStruct::Tag::kEmpty:
+      return ::test_union::UnionContainingEmptyStruct::WithEmpty(
           WireNaturalConversionTraits<::test_union::wire::Empty, ::test_union::Empty>::ToNatural(std::move(src.empty())));
     default:
-      return ::test_union::XUnionContainingEmptyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
+      return ::test_union::UnionContainingEmptyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
   }
 }
-::test_union::wire::XUnionContainingEmptyStruct WireNaturalConversionTraits<::test_union::wire::XUnionContainingEmptyStruct, ::test_union::XUnionContainingEmptyStruct>::ToWire(fidl::AnyArena& arena, ::test_union::XUnionContainingEmptyStruct src) {
+::test_union::wire::UnionContainingEmptyStruct WireNaturalConversionTraits<::test_union::wire::UnionContainingEmptyStruct, ::test_union::UnionContainingEmptyStruct>::ToWire(fidl::AnyArena& arena, ::test_union::UnionContainingEmptyStruct src) {
   switch (src.Which()) {
-    case ::test_union::XUnionContainingEmptyStruct::Tag::kEmpty:
-      return ::test_union::wire::XUnionContainingEmptyStruct::WithEmpty(
+    case ::test_union::UnionContainingEmptyStruct::Tag::kEmpty:
+      return ::test_union::wire::UnionContainingEmptyStruct::WithEmpty(
           WireNaturalConversionTraits<::test_union::wire::Empty, ::test_union::Empty>::ToWire(arena, std::move(src.empty().value())));
     default:
-      return ::test_union::wire::XUnionContainingEmptyStruct();
+      return ::test_union::wire::UnionContainingEmptyStruct();
   }
 }
 
-::test_union::StrictBoundedXUnion WireNaturalConversionTraits<::test_union::wire::StrictBoundedXUnion, ::test_union::StrictBoundedXUnion>::ToNatural(::test_union::wire::StrictBoundedXUnion src) {
+::test_union::StrictBoundedUnion WireNaturalConversionTraits<::test_union::wire::StrictBoundedUnion, ::test_union::StrictBoundedUnion>::ToNatural(::test_union::wire::StrictBoundedUnion src) {
   switch (src.Which()) {
-    case ::test_union::wire::StrictBoundedXUnion::Tag::kV:
-      return ::test_union::StrictBoundedXUnion::WithV(
+    case ::test_union::wire::StrictBoundedUnion::Tag::kV:
+      return ::test_union::StrictBoundedUnion::WithV(
           WireNaturalConversionTraits<::fidl::VectorView<uint8_t>, ::std::vector<uint8_t>>::ToNatural(std::move(src.v())));
     default:
       ZX_PANIC("unknown union tag in strict union");
   }
 }
-::test_union::wire::StrictBoundedXUnion WireNaturalConversionTraits<::test_union::wire::StrictBoundedXUnion, ::test_union::StrictBoundedXUnion>::ToWire(fidl::AnyArena& arena, ::test_union::StrictBoundedXUnion src) {
+::test_union::wire::StrictBoundedUnion WireNaturalConversionTraits<::test_union::wire::StrictBoundedUnion, ::test_union::StrictBoundedUnion>::ToWire(fidl::AnyArena& arena, ::test_union::StrictBoundedUnion src) {
   switch (src.Which()) {
-    case ::test_union::StrictBoundedXUnion::Tag::kV:
-      return ::test_union::wire::StrictBoundedXUnion::WithV(arena,
-                                                            WireNaturalConversionTraits<::fidl::VectorView<uint8_t>, ::std::vector<uint8_t>>::ToWire(arena, std::move(src.v().value())));
+    case ::test_union::StrictBoundedUnion::Tag::kV:
+      return ::test_union::wire::StrictBoundedUnion::WithV(arena,
+                                                           WireNaturalConversionTraits<::fidl::VectorView<uint8_t>, ::std::vector<uint8_t>>::ToWire(arena, std::move(src.v().value())));
   }
 }
 
-::test_union::ExplicitXUnion WireNaturalConversionTraits<::test_union::wire::ExplicitXUnion, ::test_union::ExplicitXUnion>::ToNatural(::test_union::wire::ExplicitXUnion src) {
+::test_union::ExplicitFlexibleUnion WireNaturalConversionTraits<::test_union::wire::ExplicitFlexibleUnion, ::test_union::ExplicitFlexibleUnion>::ToNatural(::test_union::wire::ExplicitFlexibleUnion src) {
   switch (src.Which()) {
-    case ::test_union::wire::ExplicitXUnion::Tag::kI:
-      return ::test_union::ExplicitXUnion::WithI(
+    case ::test_union::wire::ExplicitFlexibleUnion::Tag::kI:
+      return ::test_union::ExplicitFlexibleUnion::WithI(
           WireNaturalConversionTraits<int64_t, int64_t>::ToNatural(std::move(src.i())));
-    case ::test_union::wire::ExplicitXUnion::Tag::kF:
-      return ::test_union::ExplicitXUnion::WithF(
+    case ::test_union::wire::ExplicitFlexibleUnion::Tag::kF:
+      return ::test_union::ExplicitFlexibleUnion::WithF(
           WireNaturalConversionTraits<float, float>::ToNatural(std::move(src.f())));
     default:
-      return ::test_union::ExplicitXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
+      return ::test_union::ExplicitFlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
   }
 }
-::test_union::wire::ExplicitXUnion WireNaturalConversionTraits<::test_union::wire::ExplicitXUnion, ::test_union::ExplicitXUnion>::ToWire(fidl::AnyArena& arena, ::test_union::ExplicitXUnion src) {
+::test_union::wire::ExplicitFlexibleUnion WireNaturalConversionTraits<::test_union::wire::ExplicitFlexibleUnion, ::test_union::ExplicitFlexibleUnion>::ToWire(fidl::AnyArena& arena, ::test_union::ExplicitFlexibleUnion src) {
   switch (src.Which()) {
-    case ::test_union::ExplicitXUnion::Tag::kI:
-      return ::test_union::wire::ExplicitXUnion::WithI(arena,
-                                                       WireNaturalConversionTraits<int64_t, int64_t>::ToWire(arena, std::move(src.i().value())));
-    case ::test_union::ExplicitXUnion::Tag::kF:
-      return ::test_union::wire::ExplicitXUnion::WithF(
+    case ::test_union::ExplicitFlexibleUnion::Tag::kI:
+      return ::test_union::wire::ExplicitFlexibleUnion::WithI(arena,
+                                                              WireNaturalConversionTraits<int64_t, int64_t>::ToWire(arena, std::move(src.i().value())));
+    case ::test_union::ExplicitFlexibleUnion::Tag::kF:
+      return ::test_union::wire::ExplicitFlexibleUnion::WithF(
           WireNaturalConversionTraits<float, float>::ToWire(arena, std::move(src.f().value())));
     default:
-      return ::test_union::wire::ExplicitXUnion();
+      return ::test_union::wire::ExplicitFlexibleUnion();
   }
 }
 
@@ -623,22 +623,22 @@ namespace internal {
 
 #ifdef __Fuchsia__
 
-::fidl::Response<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>, ::fidl::Response<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>>::ToNatural(::fidl::WireResponse<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated> src) {
-  return ::fidl::Response<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>(
-      WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::ToNatural(std::move(src)));
+::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>::ToNatural(::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> src) {
+  return ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(
+      WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::ToNatural(std::move(src)));
 }
-::fidl::WireResponse<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>, ::fidl::Response<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated> src) {
-  return ::fidl::WireResponse<::test_union::TestProtocol::StrictXUnionHenceResponseMayBeStackAllocated>(
-      WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::ToWire(arena, std::move(src)));
+::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> src) {
+  return ::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>(
+      WireNaturalConversionTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::ToWire(arena, std::move(src)));
 }
 
-::fidl::Response<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>, ::fidl::Response<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>>::ToNatural(::fidl::WireResponse<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated> src) {
-  return ::fidl::Response<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>(
-      WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::ToNatural(std::move(src)));
+::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, ::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>>::ToNatural(::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> src) {
+  return ::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(
+      WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::ToNatural(std::move(src)));
 }
-::fidl::WireResponse<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>, ::fidl::Response<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated> src) {
-  return ::fidl::WireResponse<::test_union::TestProtocol::FlexibleXUnionHenceResponseMustBeHeapAllocated>(
-      WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::ToWire(arena, std::move(src)));
+::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> WireNaturalConversionTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, ::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>>::ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> src) {
+  return ::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>(
+      WireNaturalConversionTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::ToWire(arena, std::move(src)));
 }
 
 #endif  // __Fuchsia__

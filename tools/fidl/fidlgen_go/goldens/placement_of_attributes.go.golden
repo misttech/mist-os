@@ -171,64 +171,6 @@ func ExampleUnionWithVariant(variant uint32) ExampleUnion {
 	return _u
 }
 
-type I_exampleXUnionTag uint64
-
-const (
-	ExampleXUnion_unknownData = 0 // 0x00000000
-	ExampleXUnionVariant      = 1 // 0x00000001
-)
-
-type ExampleXUnion struct {
-	I_exampleXUnionTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData      interface{}
-	Variant            uint32 `fidl_ordinal:"1"`
-}
-
-var _mExampleXUnion = _bindings.CreateLazyMarshaler(ExampleXUnion{})
-
-func (msg *ExampleXUnion) Marshaler() _bindings.Marshaler {
-	return _mExampleXUnion
-}
-
-func (_m *ExampleXUnion) reset() {
-	switch _m.I_exampleXUnionTag {
-	case 1:
-		var _zeroed uint32
-		_m.Variant = _zeroed
-	default:
-		var _zeroed interface{}
-		_m.I_unknownData = _zeroed
-	}
-}
-
-func (_m *ExampleXUnion) Which() I_exampleXUnionTag {
-	switch _m.I_exampleXUnionTag {
-	case 1:
-		return ExampleXUnionVariant
-	default:
-		return ExampleXUnion_unknownData
-	}
-}
-
-func (_m *ExampleXUnion) Ordinal() uint64 {
-	return uint64(_m.I_exampleXUnionTag)
-}
-
-func (_m *ExampleXUnion) SetVariant(variant uint32) {
-	_m.reset()
-	_m.I_exampleXUnionTag = ExampleXUnionVariant
-	_m.Variant = variant
-}
-
-func ExampleXUnionWithVariant(variant uint32) ExampleXUnion {
-	var _u ExampleXUnion
-	_u.SetVariant(variant)
-	return _u
-}
-func (_m *ExampleXUnion) GetUnknownData() _bindings.UnknownData {
-	return _m.I_unknownData.(_bindings.UnknownData)
-}
-
 type ExampleTable struct {
 	_             struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
 	I_unknownData interface{}

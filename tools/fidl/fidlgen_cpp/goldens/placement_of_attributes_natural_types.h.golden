@@ -32,8 +32,6 @@ class ExampleTable;
 
 class ExampleUnion;
 
-class ExampleXUnion;
-
 constexpr uint32_t kExampleConst = 0u;
 
 extern "C" const fidl_type_t test_placementofattributes_ExampleProtocolMethodRequestTable;
@@ -299,106 +297,6 @@ class ExampleUnion {
   }
 };
 
-extern "C" const fidl_type_t test_placementofattributes_ExampleXUnionTable;
-
-class ExampleXUnion {
- private:
-  using Storage_ =
-      std::variant<
-          std::monostate, uint32_t>;
-
- public:
-  // TODO: share union tag types between wire & natural.
-  enum class Tag : fidl_xunion_tag_t {
-    kVariant = 1,  // 0x1
-    _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
-  };
-
-  ExampleXUnion(ExampleXUnion&& other) noexcept
-      : ExampleXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  ExampleXUnion& operator=(ExampleXUnion&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
-  ExampleXUnion(const ExampleXUnion& other) noexcept : ExampleXUnion(other.CloneStorage_()) {}
-  ExampleXUnion& operator=(const ExampleXUnion& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
-
-  bool operator==(const ExampleXUnion& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const ExampleXUnion& other) const noexcept {
-    return *storage_ != *other.storage_;
-  }
-  constexpr bool IsUnknown() const {
-    return Which() == ::test_placementofattributes::ExampleXUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
-  }
-
-  constexpr ::test_placementofattributes::ExampleXUnion::Tag Which() const {
-    return ExampleXUnion::IndexToTag(storage_->index()).value();
-  }
-  static ExampleXUnion WithVariant(uint32_t val) {
-    return ExampleXUnion(std::make_shared<Storage_>(
-        std::in_place_index_t<1>{},
-        std::move(val)));
-  }
-
-  const ::fidl::internal::UnionMemberView<1, Storage_> variant() const {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  ::fidl::internal::UnionMemberView<1, Storage_> variant() {
-    return ::fidl::internal::UnionMemberView<1, Storage_>(storage_);
-  }
-
-  // Sets the union to hold the variant member.
-  //
-
-  ExampleXUnion& variant(uint32_t value) {
-    storage_->emplace<1>(std::move(value));
-    return *this;
-  }
-
-  ExampleXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
-
- private:
-  std::shared_ptr<Storage_> storage_;
-  std::shared_ptr<Storage_> CloneStorage_() const;
-  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_placementofattributes::ExampleXUnion>;
-  static constexpr auto kMembers = std::make_tuple(
-      ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
-
-  explicit ExampleXUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
-
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_placementofattributes::ExampleXUnion::Tag tag) {
-    switch (tag) {
-      case ::test_placementofattributes::ExampleXUnion::Tag::kVariant:
-        return 1;
-      default: {
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<::test_placementofattributes::ExampleXUnion::Tag> IndexToTag(size_t index) {
-    switch (index) {
-      case 1:
-        return ::test_placementofattributes::ExampleXUnion::Tag::kVariant;
-      default:
-        return ::test_placementofattributes::ExampleXUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
-    }
-  }
-};
-
 inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(::test_exampleusing::Empty arg) noexcept
     : storage_({.arg = std::move(arg)}) {}
@@ -535,28 +433,6 @@ struct IsUnion<::test_placementofattributes::ExampleUnion> : public std::true_ty
 template <>
 struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_placementofattributes::ExampleUnion> {};
-
-extern "C" const fidl_type_t test_placementofattributes_ExampleXUnionTable;
-
-template <>
-struct IsFidlType<::test_placementofattributes::ExampleXUnion> : public std::true_type {};
-
-template <>
-struct TypeTraits<::test_placementofattributes::ExampleXUnion> {
-  static constexpr uint32_t kMaxNumHandles = 0;
-  static constexpr uint32_t kMaxDepth = 1;
-  static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
-  static constexpr bool kHasPointer = true;
-};
-
-template <>
-struct IsUnion<::test_placementofattributes::ExampleXUnion> : public std::true_type {};
-
-template <>
-struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleXUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalUnionCodingTraits<::test_placementofattributes::ExampleXUnion> {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleBits, ::fidl::internal::NaturalCodingConstraintEmpty> {

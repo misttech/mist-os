@@ -11,17 +11,17 @@
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=124)*
 
 
-### FlexibleXUnionHenceResponseMustBeHeapAllocated {#TestProtocol.FlexibleXUnionHenceResponseMustBeHeapAllocated}
+### FlexibleUnionHenceResponseMustBeHeapAllocated {#TestProtocol.FlexibleUnionHenceResponseMustBeHeapAllocated}
 
 
 
 
-#### Request {#TestProtocol.FlexibleXUnionHenceResponseMustBeHeapAllocated_Request}
+#### Request {#TestProtocol.FlexibleUnionHenceResponseMustBeHeapAllocated_Request}
 
 &lt;EMPTY&gt;
 
 
-#### Response {#TestProtocol.FlexibleXUnionHenceResponseMustBeHeapAllocated_Response}
+#### Response {#TestProtocol.FlexibleUnionHenceResponseMustBeHeapAllocated_Response}
 
 <table>
     <tr><th>Name</th><th>Type</th></tr>
@@ -33,24 +33,24 @@
         </tr>
 </table>
 
-### StrictXUnionHenceResponseMayBeStackAllocated {#TestProtocol.StrictXUnionHenceResponseMayBeStackAllocated}
+### StrictUnionHenceResponseMayBeStackAllocated {#TestProtocol.StrictUnionHenceResponseMayBeStackAllocated}
 
 
 
 
-#### Request {#TestProtocol.StrictXUnionHenceResponseMayBeStackAllocated_Request}
+#### Request {#TestProtocol.StrictUnionHenceResponseMayBeStackAllocated_Request}
 
 &lt;EMPTY&gt;
 
 
-#### Response {#TestProtocol.StrictXUnionHenceResponseMayBeStackAllocated_Response}
+#### Response {#TestProtocol.StrictUnionHenceResponseMayBeStackAllocated_Response}
 
 <table>
     <tr><th>Name</th><th>Type</th></tr>
         <tr>
             <td><code>xu</code></td>
             <td>
-                <code><a class='link' href='#StrictBoundedXUnion'>StrictBoundedXUnion</a></code>
+                <code><a class='link' href='#StrictBoundedUnion'>StrictBoundedUnion</a></code>
             </td>
         </tr>
 </table>
@@ -108,12 +108,12 @@
         </tr>
 </table>
 
-### StructWithNullableXUnion  {#StructWithNullableXUnion data-text="StructWithNullableXUnion"}
+### StructWithNullableUnion  {#StructWithNullableUnion data-text="StructWithNullableUnion"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=133)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
-        <tr id="StructWithNullableXUnion.x1">
+        <tr id="StructWithNullableUnion.x1">
             <td><code>x1</code></td>
             <td>
                 <code><a class='link' href='#OlderSimpleUnion'>OlderSimpleUnion</a>?</code>
@@ -139,7 +139,7 @@
         <tr id="UnionSandwich.u">
             <td><code>u</code></td>
             <td>
-                <code><a class='link' href='#ExplicitXUnion'>ExplicitXUnion</a></code>
+                <code><a class='link' href='#ExplicitFlexibleUnion'>ExplicitFlexibleUnion</a></code>
             </td>
             <td></td>
             <td>No default</td>
@@ -161,6 +161,44 @@
 
 ### EmptyFlexibleUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#EmptyFlexibleUnion data-text="EmptyFlexibleUnion"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=158)*
+
+### ExplicitFlexibleUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ExplicitFlexibleUnion data-text="ExplicitFlexibleUnion"}
+*Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=137)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="ExplicitFlexibleUnion.i">
+<td><h3 id="ExplicitFlexibleUnion.i" class="add-link hide-from-toc">1</h3></td>
+            <td><code>i</code></td>
+            <td>
+                <code>int64</code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="ExplicitFlexibleUnion.">
+<td><h3 id="ExplicitFlexibleUnion." class="add-link hide-from-toc">2</h3></td>
+            <td><code></code></td>
+            <td>
+                <code></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="ExplicitFlexibleUnion.">
+<td><h3 id="ExplicitFlexibleUnion." class="add-link hide-from-toc">3</h3></td>
+            <td><code></code></td>
+            <td>
+                <code></code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="ExplicitFlexibleUnion.f">
+<td><h3 id="ExplicitFlexibleUnion.f" class="add-link hide-from-toc">4</h3></td>
+            <td><code>f</code></td>
+            <td>
+                <code>float32</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
 
 ### ExplicitFoo [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ExplicitFoo data-text="ExplicitFoo"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=80)*
@@ -285,44 +323,6 @@
             <td><code>StringNeedsConstructor</code></td>
             <td>
                 <code>string</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### ExplicitXUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ExplicitXUnion data-text="ExplicitXUnion"}
-*Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=137)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="ExplicitXUnion.i">
-<td><h3 id="ExplicitXUnion.i" class="add-link hide-from-toc">1</h3></td>
-            <td><code>i</code></td>
-            <td>
-                <code>int64</code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ExplicitXUnion.">
-<td><h3 id="ExplicitXUnion." class="add-link hide-from-toc">2</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ExplicitXUnion.">
-<td><h3 id="ExplicitXUnion." class="add-link hide-from-toc">3</h3></td>
-            <td><code></code></td>
-            <td>
-                <code></code>
-            </td>
-            <td></td>
-        </tr>
-        <tr id="ExplicitXUnion.f">
-<td><h3 id="ExplicitXUnion.f" class="add-link hide-from-toc">4</h3></td>
-            <td><code>f</code></td>
-            <td>
-                <code>float32</code>
             </td>
             <td></td>
         </tr>
@@ -526,12 +526,12 @@
         </tr>
 </table>
 
-### StrictBoundedXUnion [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#StrictBoundedXUnion data-text="StrictBoundedXUnion"}
+### StrictBoundedUnion [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#StrictBoundedUnion data-text="StrictBoundedUnion"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=120)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="StrictBoundedXUnion.v">
-<td><h3 id="StrictBoundedXUnion.v" class="add-link hide-from-toc">1</h3></td>
+        <tr id="StrictBoundedUnion.v">
+<td><h3 id="StrictBoundedUnion.v" class="add-link hide-from-toc">1</h3></td>
             <td><code>v</code></td>
             <td>
                 <code>vector&lt;uint8&gt;[10]</code>
@@ -584,28 +584,28 @@
         </tr>
 </table>
 
-### StrictSimpleXUnion [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#StrictSimpleXUnion data-text="StrictSimpleXUnion"}
+### StrictSimpleUnion [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#StrictSimpleUnion data-text="StrictSimpleUnion"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=107)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="StrictSimpleXUnion.i">
-<td><h3 id="StrictSimpleXUnion.i" class="add-link hide-from-toc">1</h3></td>
+        <tr id="StrictSimpleUnion.i">
+<td><h3 id="StrictSimpleUnion.i" class="add-link hide-from-toc">1</h3></td>
             <td><code>i</code></td>
             <td>
                 <code>int32</code>
             </td>
             <td></td>
         </tr>
-        <tr id="StrictSimpleXUnion.f">
-<td><h3 id="StrictSimpleXUnion.f" class="add-link hide-from-toc">2</h3></td>
+        <tr id="StrictSimpleUnion.f">
+<td><h3 id="StrictSimpleUnion.f" class="add-link hide-from-toc">2</h3></td>
             <td><code>f</code></td>
             <td>
                 <code>float32</code>
             </td>
             <td></td>
         </tr>
-        <tr id="StrictSimpleXUnion.s">
-<td><h3 id="StrictSimpleXUnion.s" class="add-link hide-from-toc">3</h3></td>
+        <tr id="StrictSimpleUnion.s">
+<td><h3 id="StrictSimpleUnion.s" class="add-link hide-from-toc">3</h3></td>
             <td><code>s</code></td>
             <td>
                 <code>string</code>
@@ -674,6 +674,20 @@
         </tr>
 </table>
 
+### UnionContainingEmptyStruct [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnionContainingEmptyStruct data-text="UnionContainingEmptyStruct"}
+*Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=115)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="UnionContainingEmptyStruct.empty">
+<td><h3 id="UnionContainingEmptyStruct.empty" class="add-link hide-from-toc">1</h3></td>
+            <td><code>empty</code></td>
+            <td>
+                <code><a class='link' href='#Empty'>Empty</a></code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
 ### UnionWithAttributes [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#UnionWithAttributes data-text="UnionWithAttributes"}
 *Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=151)*
 <table>
@@ -691,20 +705,6 @@
             <td><code></code></td>
             <td>
                 <code></code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
-### XUnionContainingEmptyStruct [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#XUnionContainingEmptyStruct data-text="XUnionContainingEmptyStruct"}
-*Defined in [test.union/union.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/union.test.fidl;l=115)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="XUnionContainingEmptyStruct.empty">
-<td><h3 id="XUnionContainingEmptyStruct.empty" class="add-link hide-from-toc">1</h3></td>
-            <td><code>empty</code></td>
-            <td>
-                <code><a class='link' href='#Empty'>Empty</a></code>
             </td>
             <td></td>
         </tr>

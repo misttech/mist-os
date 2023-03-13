@@ -29,15 +29,6 @@ test_placementofattributes_ExampleUnionOutOfLine [
 test_placementofattributes_ExampleUnionHandles [
     void void
 ][varlen]
-test_placementofattributes_ExampleXUnionInLine [
-    variant fidl_union_member[1, int32]
-]
-test_placementofattributes_ExampleXUnionOutOfLine [
-    void void
-][varlen]
-test_placementofattributes_ExampleXUnionHandles [
-    void void
-][varlen]
 
 
 test_placementofattributes_ExampleProtocolMethodRequest {

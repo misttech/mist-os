@@ -4,10 +4,10 @@
 
 #include "lib/fidl/cpp/internal/unknown_interactions_table.h"
 
-static const struct FidlXUnionField kUnknownMethodResponseFields[] = {
+static const FidlXUnionField kUnknownMethodResponseFields[] = {
     {.type = NULL}, {.type = NULL}, {.type = (fidl_type_t*)(&fidl_internal_kTransportErrTable)}};
 
-const struct FidlCodedXUnion kFidlInternalUnknownMethodResponseTable = {
+const FidlCodedXUnion kFidlInternalUnknownMethodResponseTable = {
     .tag = kFidlTypeXUnion,
     .nullable = kFidlNullability_Nonnullable,
     .strictness = kFidlStrictness_Strict,

@@ -102,9 +102,9 @@ type NewerSimpleUnion = flexible union {
     3: v vector<string>; // added
 };
 
-// 1. This xunion is currently unused by code, and for tracking changes in the goldens only.
-// 2. There's no FlexibleSimpleXUnion, since that's covered by OlderSimpleUnion above.
-type StrictSimpleXUnion = strict union {
+// 1. This union is currently unused by code, and for tracking changes in the goldens only.
+// 2. There's no FlexibleSimpleUnion, since that's covered by OlderSimpleUnion above.
+type StrictSimpleUnion = strict union {
     1: i int32;
     2: f float32;
     3: s string;
@@ -112,29 +112,29 @@ type StrictSimpleXUnion = strict union {
 
 type Empty = struct {};
 
-type XUnionContainingEmptyStruct = flexible union {
+type UnionContainingEmptyStruct = flexible union {
     // This is a test to prevent regressions for fxbug.dev/8084.
     1: empty Empty;
 };
 
-type StrictBoundedXUnion = strict union {
+type StrictBoundedUnion = strict union {
     1: v vector<uint8>:10;
 };
 
 closed protocol TestProtocol {
-    strict StrictXUnionHenceResponseMayBeStackAllocated() -> (struct {
-        xu StrictBoundedXUnion;
+    strict StrictUnionHenceResponseMayBeStackAllocated() -> (struct {
+        xu StrictBoundedUnion;
     });
-    strict FlexibleXUnionHenceResponseMustBeHeapAllocated() -> (struct {
+    strict FlexibleUnionHenceResponseMustBeHeapAllocated() -> (struct {
         xu OlderSimpleUnion;
     });
 };
 
-type StructWithNullableXUnion = struct {
+type StructWithNullableUnion = struct {
     x1 OlderSimpleUnion:optional;
 };
 
-type ExplicitXUnion = flexible union {
+type ExplicitFlexibleUnion = flexible union {
     3: reserved;
     2: reserved;
     1: i int64;
@@ -143,7 +143,7 @@ type ExplicitXUnion = flexible union {
 
 type UnionSandwich = struct {
     a uint32;
-    u ExplicitXUnion;
+    u ExplicitFlexibleUnion;
     b uint32;
 };
 

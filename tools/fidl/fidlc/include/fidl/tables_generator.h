@@ -52,7 +52,7 @@ class TablesGenerator {
   void Generate(const coded::BitsType& bits_type);
   void Generate(const coded::StructType& struct_type);
   void Generate(const coded::TableType& table_type);
-  void Generate(const coded::XUnionType& xunion_type);
+  void Generate(const coded::UnionType& union_type);
   void Generate(const coded::StructPointerType& pointer);
   void Generate(const coded::HandleType& handle_type);
   void Generate(const coded::ProtocolHandleType& protocol_type);
@@ -71,19 +71,19 @@ class TablesGenerator {
   void Generate(const coded::StructPadding& padding);
   void Generate(const coded::StructElement& element);
   void Generate(const coded::TableField& field);
-  void Generate(const coded::XUnionField& field);
+  void Generate(const coded::UnionField& field);
 
   void GenerateForward(const coded::EnumType& enum_type);
   void GenerateForward(const coded::BitsType& bits_type);
   void GenerateForward(const coded::StructType& struct_type);
   void GenerateForward(const coded::TableType& table_type);
-  void GenerateForward(const coded::XUnionType& xunion_type);
+  void GenerateForward(const coded::UnionType& union_type);
 
   void GenerateTypedef(const coded::EnumType& enum_type);
   void GenerateTypedef(const coded::BitsType& bits_type);
   void GenerateTypedef(const coded::StructType& struct_type);
   void GenerateTypedef(const coded::TableType& table_type);
-  void GenerateTypedef(const coded::XUnionType& xunion_type);
+  void GenerateTypedef(const coded::UnionType& union_type);
 
   void Produce(CodedTypesGenerator* coded_types_generator);
 

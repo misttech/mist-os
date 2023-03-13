@@ -1886,20 +1886,20 @@ type TableWithNullableHandleArray = resource table {
                                     }));
 }
 
-// TODO(fxbug.dev/118282): write an "xunions_with_handles" test case.
+// TODO(fxbug.dev/118282): write a "unions_with_handles" test case.
 
 TEST(TypeshapeTests, GoodFlexibleUnions) {
   TestLibrary test_library(R"FIDL(library example;
 
-type XUnionWithOneBool = flexible union {
+type UnionWithOneBool = flexible union {
     1: b bool;
 };
 
-type StructWithOptionalXUnionWithOneBool = struct {
-    opt_xunion_with_bool XUnionWithOneBool:optional;
+type StructWithOptionalUnionWithOneBool = struct {
+    opt_union_with_bool UnionWithOneBool:optional;
 };
 
-type XUnionWithBoundedOutOfLineObject = flexible union {
+type UnionWithBoundedOutOfLineObject = flexible union {
     // smaller than |v| below, so will not be selected for max-out-of-line
     // calculation.
     1: b bool;
@@ -1917,11 +1917,11 @@ type XUnionWithBoundedOutOfLineObject = flexible union {
     2: v vector<vector<int32>:5>:6;
 };
 
-type XUnionWithUnboundedOutOfLineObject = flexible union {
+type UnionWithUnboundedOutOfLineObject = flexible union {
     1: s string;
 };
 
-type XUnionWithoutPayloadPadding = flexible union {
+type UnionWithoutPayloadPadding = flexible union {
     1: a array<uint64, 7>;
 };
 
@@ -1932,7 +1932,7 @@ type PaddingCheck = flexible union {
 )FIDL");
   ASSERT_COMPILED(test_library);
 
-  auto one_bool = test_library.LookupUnion("XUnionWithOneBool");
+  auto one_bool = test_library.LookupUnion("UnionWithOneBool");
   ASSERT_NOT_NULL(one_bool);
   ASSERT_NO_FAILURES(CheckTypeShape(one_bool,
                                     Expected{
@@ -1958,7 +1958,7 @@ type PaddingCheck = flexible union {
   ASSERT_NO_FAILURES(CheckFieldShape(*one_bool->members[0].maybe_used, ExpectedField{.padding = 7},
                                      ExpectedField{.padding = 7}));
 
-  auto opt_one_bool = test_library.LookupStruct("StructWithOptionalXUnionWithOneBool");
+  auto opt_one_bool = test_library.LookupStruct("StructWithOptionalUnionWithOneBool");
   ASSERT_NOT_NULL(opt_one_bool);
   ASSERT_NO_FAILURES(CheckTypeShape(opt_one_bool,
                                     Expected{
@@ -1980,7 +1980,7 @@ type PaddingCheck = flexible union {
                                         .has_flexible_envelope = true,
                                     }));
 
-  auto xu = test_library.LookupUnion("XUnionWithBoundedOutOfLineObject");
+  auto xu = test_library.LookupUnion("UnionWithBoundedOutOfLineObject");
   ASSERT_NOT_NULL(xu);
   ASSERT_NO_FAILURES(CheckTypeShape(xu,
                                     Expected{
@@ -2002,7 +2002,7 @@ type PaddingCheck = flexible union {
                                         .has_flexible_envelope = true,
                                     }));
 
-  auto unbounded = test_library.LookupUnion("XUnionWithUnboundedOutOfLineObject");
+  auto unbounded = test_library.LookupUnion("UnionWithUnboundedOutOfLineObject");
   ASSERT_NOT_NULL(unbounded);
   ASSERT_NO_FAILURES(CheckTypeShape(unbounded,
                                     Expected{
@@ -2024,7 +2024,7 @@ type PaddingCheck = flexible union {
                                         .has_flexible_envelope = true,
                                     }));
 
-  auto xu_no_payload_padding = test_library.LookupUnion("XUnionWithoutPayloadPadding");
+  auto xu_no_payload_padding = test_library.LookupUnion("UnionWithoutPayloadPadding");
   ASSERT_NOT_NULL(xu_no_payload_padding);
   ASSERT_NO_FAILURES(
       CheckTypeShape(xu_no_payload_padding,
@@ -2033,7 +2033,7 @@ type PaddingCheck = flexible union {
                          .alignment = 8,
                          .max_out_of_line = 56,
                          .depth = 1,
-                         // xunion always have padding, because its ordinal is 32 bits.
+                         // union always have padding, because its ordinal is 32 bits.
                          // TODO(fxbug.dev/7970): increase the ordinal size to 64 bits, such that
                          // there is no padding.
                          .has_padding = true,
@@ -2045,7 +2045,7 @@ type PaddingCheck = flexible union {
                          .alignment = 8,
                          .max_out_of_line = 56,
                          .depth = 1,
-                         // xunion always have padding, because its ordinal is 32 bits.
+                         // union always have padding, because its ordinal is 32 bits.
                          // TODO(fxbug.dev/7970): increase the ordinal size to 64 bits, such that
                          // there is no padding.
                          .has_padding = true,
@@ -2085,41 +2085,41 @@ type PaddingCheck = flexible union {
 TEST(TypeshapeTests, GoodEnvelopeStrictness) {
   TestLibrary test_library(R"FIDL(library example;
 
-type StrictLeafXUnion = strict union {
+type StrictLeafUnion = strict union {
     1: a int64;
 };
 
-type FlexibleLeafXUnion = flexible union {
+type FlexibleLeafUnion = flexible union {
     1: a int64;
 };
 
-type FlexibleXUnionOfStrictXUnion = flexible union {
-    1: xu StrictLeafXUnion;
+type FlexibleUnionOfStrictUnion = flexible union {
+    1: xu StrictLeafUnion;
 };
 
-type FlexibleXUnionOfFlexibleXUnion = flexible union {
-    1: xu FlexibleLeafXUnion;
+type FlexibleUnionOfFlexibleUnion = flexible union {
+    1: xu FlexibleLeafUnion;
 };
 
-type StrictXUnionOfStrictXUnion = strict union {
-    1: xu StrictLeafXUnion;
+type StrictUnionOfStrictUnion = strict union {
+    1: xu StrictLeafUnion;
 };
 
-type StrictXUnionOfFlexibleXUnion = strict union {
-    1: xu FlexibleLeafXUnion;
+type StrictUnionOfFlexibleUnion = strict union {
+    1: xu FlexibleLeafUnion;
 };
 
 type FlexibleLeafTable = table {};
 
-type StrictXUnionOfFlexibleTable = strict union {
+type StrictUnionOfFlexibleTable = strict union {
     1: ft FlexibleLeafTable;
 };
 )FIDL");
   ASSERT_COMPILED(test_library);
 
-  auto strict_xunion = test_library.LookupUnion("StrictLeafXUnion");
-  ASSERT_NOT_NULL(strict_xunion);
-  ASSERT_NO_FAILURES(CheckTypeShape(strict_xunion,
+  auto strict_union = test_library.LookupUnion("StrictLeafUnion");
+  ASSERT_NOT_NULL(strict_union);
+  ASSERT_NO_FAILURES(CheckTypeShape(strict_union,
                                     Expected{
                                         .inline_size = 24,
                                         .alignment = 8,
@@ -2137,9 +2137,9 @@ type StrictXUnionOfFlexibleTable = strict union {
                                         .has_envelope = true,
                                     }));
 
-  auto flexible_xunion = test_library.LookupUnion("FlexibleLeafXUnion");
-  ASSERT_NOT_NULL(flexible_xunion);
-  ASSERT_NO_FAILURES(CheckTypeShape(flexible_xunion,
+  auto flexible_union = test_library.LookupUnion("FlexibleLeafUnion");
+  ASSERT_NOT_NULL(flexible_union);
+  ASSERT_NO_FAILURES(CheckTypeShape(flexible_union,
                                     Expected{
                                         .inline_size = 24,
                                         .alignment = 8,
@@ -2159,7 +2159,7 @@ type StrictXUnionOfFlexibleTable = strict union {
                                         .has_flexible_envelope = true,
                                     }));
 
-  auto flexible_of_strict = test_library.LookupUnion("FlexibleXUnionOfStrictXUnion");
+  auto flexible_of_strict = test_library.LookupUnion("FlexibleUnionOfStrictUnion");
   ASSERT_NOT_NULL(flexible_of_strict);
   ASSERT_NO_FAILURES(CheckTypeShape(flexible_of_strict,
                                     Expected{
@@ -2181,7 +2181,7 @@ type StrictXUnionOfFlexibleTable = strict union {
                                         .has_flexible_envelope = true,
                                     }));
 
-  auto flexible_of_flexible = test_library.LookupUnion("FlexibleXUnionOfFlexibleXUnion");
+  auto flexible_of_flexible = test_library.LookupUnion("FlexibleUnionOfFlexibleUnion");
   ASSERT_NOT_NULL(flexible_of_flexible);
   ASSERT_NO_FAILURES(CheckTypeShape(flexible_of_flexible,
                                     Expected{
@@ -2203,7 +2203,7 @@ type StrictXUnionOfFlexibleTable = strict union {
                                         .has_flexible_envelope = true,
                                     }));
 
-  auto strict_of_strict = test_library.LookupUnion("StrictXUnionOfStrictXUnion");
+  auto strict_of_strict = test_library.LookupUnion("StrictUnionOfStrictUnion");
   ASSERT_NOT_NULL(strict_of_strict);
   ASSERT_NO_FAILURES(CheckTypeShape(strict_of_strict,
                                     Expected{
@@ -2223,7 +2223,7 @@ type StrictXUnionOfFlexibleTable = strict union {
                                         .has_envelope = true,
                                     }));
 
-  auto strict_of_flexible = test_library.LookupUnion("StrictXUnionOfFlexibleXUnion");
+  auto strict_of_flexible = test_library.LookupUnion("StrictUnionOfFlexibleUnion");
   ASSERT_NOT_NULL(strict_of_flexible);
   ASSERT_NO_FAILURES(CheckTypeShape(strict_of_flexible,
                                     Expected{
@@ -2257,9 +2257,9 @@ type StrictXUnionOfFlexibleTable = strict union {
                                                         .has_flexible_envelope = true,
                                                     }));
 
-  auto strict_xunion_of_flexible_table = test_library.LookupUnion("StrictXUnionOfFlexibleTable");
-  ASSERT_NOT_NULL(strict_xunion_of_flexible_table);
-  ASSERT_NO_FAILURES(CheckTypeShape(strict_xunion_of_flexible_table,
+  auto strict_union_of_flexible_table = test_library.LookupUnion("StrictUnionOfFlexibleTable");
+  ASSERT_NOT_NULL(strict_union_of_flexible_table);
+  ASSERT_NO_FAILURES(CheckTypeShape(strict_union_of_flexible_table,
                                     Expected{
                                         .inline_size = 24,
                                         .alignment = 8,

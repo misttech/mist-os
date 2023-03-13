@@ -22,10 +22,57 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "data": "EmptyFlexibleUnion",
-        "start_offset": 3041,
-        "end_offset": 3059
+        "start_offset": 3046,
+        "end_offset": 3064
       },
       "members": []
+    },
+    {
+      "is_anonymous": false,
+      "identifier": "test.union/ExplicitFlexibleUnion",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+        "data": "ExplicitFlexibleUnion",
+        "start_offset": 2733,
+        "end_offset": 2754
+      },
+      "members": [
+        {
+          "is_reserved": false,
+          "name": "i",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+            "data": "i",
+            "start_offset": 2815,
+            "end_offset": 2816
+          },
+          "type": {
+            "kind": "primitive"
+          }
+        },
+        {
+          "is_reserved": true
+        },
+        {
+          "is_reserved": true
+        },
+        {
+          "is_reserved": false,
+          "name": "f",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+            "data": "f",
+            "start_offset": 2831,
+            "end_offset": 2832
+          },
+          "type": {
+            "kind": "primitive"
+          }
+        }
+      ]
     },
     {
       "is_anonymous": false,
@@ -220,53 +267,6 @@
           },
           "type": {
             "kind": "string"
-          }
-        }
-      ]
-    },
-    {
-      "is_anonymous": false,
-      "identifier": "test.union/ExplicitXUnion",
-      "location": {
-        "is_virtual": false,
-        "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "data": "ExplicitXUnion",
-        "start_offset": 2742,
-        "end_offset": 2756
-      },
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "i",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-            "data": "i",
-            "start_offset": 2817,
-            "end_offset": 2818
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        },
-        {
-          "is_reserved": true
-        },
-        {
-          "is_reserved": true
-        },
-        {
-          "is_reserved": false,
-          "name": "f",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-            "data": "f",
-            "start_offset": 2833,
-            "end_offset": 2834
-          },
-          "type": {
-            "kind": "primitive"
           }
         }
       ]
@@ -556,8 +556,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "data": "OnlyReservedFlexibleUnion",
-        "start_offset": 3087,
-        "end_offset": 3112
+        "start_offset": 3092,
+        "end_offset": 3117
       },
       "members": [
         {
@@ -667,13 +667,13 @@
     },
     {
       "is_anonymous": false,
-      "identifier": "test.union/StrictBoundedXUnion",
+      "identifier": "test.union/StrictBoundedUnion",
       "location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "data": "StrictBoundedXUnion",
-        "start_offset": 2334,
-        "end_offset": 2353
+        "data": "StrictBoundedUnion",
+        "start_offset": 2330,
+        "end_offset": 2348
       },
       "members": [
         {
@@ -683,8 +683,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "v",
-            "start_offset": 2378,
-            "end_offset": 2379
+            "start_offset": 2373,
+            "end_offset": 2374
           },
           "type": {
             "kind": "vector"
@@ -794,13 +794,13 @@
     },
     {
       "is_anonymous": false,
-      "identifier": "test.union/StrictSimpleXUnion",
+      "identifier": "test.union/StrictSimpleUnion",
       "location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "data": "StrictSimpleXUnion",
-        "start_offset": 2072,
-        "end_offset": 2090
+        "data": "StrictSimpleUnion",
+        "start_offset": 2070,
+        "end_offset": 2087
       },
       "members": [
         {
@@ -810,8 +810,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "i",
-            "start_offset": 2115,
-            "end_offset": 2116
+            "start_offset": 2112,
+            "end_offset": 2113
           },
           "type": {
             "kind": "primitive"
@@ -824,8 +824,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "f",
-            "start_offset": 2131,
-            "end_offset": 2132
+            "start_offset": 2128,
+            "end_offset": 2129
           },
           "type": {
             "kind": "primitive"
@@ -838,8 +838,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "s",
-            "start_offset": 2149,
-            "end_offset": 2150
+            "start_offset": 2146,
+            "end_offset": 2147
           },
           "type": {
             "kind": "string"
@@ -959,43 +959,13 @@
     },
     {
       "is_anonymous": false,
-      "identifier": "test.union/UnionWithAttributes",
+      "identifier": "test.union/UnionContainingEmptyStruct",
       "location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "data": "UnionWithAttributes",
-        "start_offset": 2942,
-        "end_offset": 2961
-      },
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "x",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-            "data": "x",
-            "start_offset": 2997,
-            "end_offset": 2998
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        },
-        {
-          "is_reserved": true
-        }
-      ]
-    },
-    {
-      "is_anonymous": false,
-      "identifier": "test.union/XUnionContainingEmptyStruct",
-      "location": {
-        "is_virtual": false,
-        "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "data": "XUnionContainingEmptyStruct",
-        "start_offset": 2193,
-        "end_offset": 2220
+        "data": "UnionContainingEmptyStruct",
+        "start_offset": 2190,
+        "end_offset": 2216
       },
       "members": [
         {
@@ -1005,8 +975,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "empty",
-            "start_offset": 2312,
-            "end_offset": 2317
+            "start_offset": 2308,
+            "end_offset": 2313
           },
           "type": {
             "kind": "identifier",
@@ -1016,10 +986,40 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
               "data": "Empty",
-              "start_offset": 2318,
-              "end_offset": 2323
+              "start_offset": 2314,
+              "end_offset": 2319
             }
           }
+        }
+      ]
+    },
+    {
+      "is_anonymous": false,
+      "identifier": "test.union/UnionWithAttributes",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+        "data": "UnionWithAttributes",
+        "start_offset": 2947,
+        "end_offset": 2966
+      },
+      "members": [
+        {
+          "is_reserved": false,
+          "name": "x",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
+            "data": "x",
+            "start_offset": 3002,
+            "end_offset": 3003
+          },
+          "type": {
+            "kind": "primitive"
+          }
+        },
+        {
+          "is_reserved": true
         }
       ]
     }
@@ -1033,8 +1033,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "data": "Empty",
-        "start_offset": 2168,
-        "end_offset": 2173
+        "start_offset": 2165,
+        "end_offset": 2170
       },
       "members": []
     },
@@ -1127,13 +1127,13 @@
     },
     {
       "is_anonymous": false,
-      "identifier": "test.union/StructWithNullableXUnion",
+      "identifier": "test.union/StructWithNullableUnion",
       "location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-        "data": "StructWithNullableXUnion",
-        "start_offset": 2663,
-        "end_offset": 2687
+        "data": "StructWithNullableUnion",
+        "start_offset": 2655,
+        "end_offset": 2678
       },
       "members": [
         {
@@ -1142,8 +1142,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "x1",
-            "start_offset": 2703,
-            "end_offset": 2705
+            "start_offset": 2694,
+            "end_offset": 2696
           },
           "type": {
             "kind": "identifier",
@@ -1153,8 +1153,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
               "data": "OlderSimpleUnion",
-              "start_offset": 2706,
-              "end_offset": 2722
+              "start_offset": 2697,
+              "end_offset": 2713
             }
           }
         }
@@ -1162,7 +1162,7 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.union/TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse",
+      "identifier": "test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse",
       "members": [
         {
           "name": "xu",
@@ -1170,8 +1170,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "xu",
-            "start_offset": 2625,
-            "end_offset": 2627
+            "start_offset": 2617,
+            "end_offset": 2619
           },
           "type": {
             "kind": "identifier",
@@ -1181,8 +1181,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
               "data": "OlderSimpleUnion",
-              "start_offset": 2628,
-              "end_offset": 2644
+              "start_offset": 2620,
+              "end_offset": 2636
             }
           }
         }
@@ -1190,7 +1190,7 @@
     },
     {
       "is_anonymous": true,
-      "identifier": "test.union/TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse",
+      "identifier": "test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse",
       "members": [
         {
           "name": "xu",
@@ -1198,19 +1198,19 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "xu",
-            "start_offset": 2512,
-            "end_offset": 2514
+            "start_offset": 2506,
+            "end_offset": 2508
           },
           "type": {
             "kind": "identifier",
             "is_anonymous": false,
-            "type_identifier": "test.union/StrictBoundedXUnion",
+            "type_identifier": "test.union/StrictBoundedUnion",
             "type_referenced_at": {
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-              "data": "StrictBoundedXUnion",
-              "start_offset": 2515,
-              "end_offset": 2534
+              "data": "StrictBoundedUnion",
+              "start_offset": 2509,
+              "end_offset": 2527
             }
           }
         }
@@ -1223,8 +1223,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "data": "UnionSandwich",
-        "start_offset": 2853,
-        "end_offset": 2866
+        "start_offset": 2851,
+        "end_offset": 2864
       },
       "members": [
         {
@@ -1233,8 +1233,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "a",
-            "start_offset": 2882,
-            "end_offset": 2883
+            "start_offset": 2880,
+            "end_offset": 2881
           },
           "type": {
             "kind": "primitive"
@@ -1246,19 +1246,19 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "u",
-            "start_offset": 2896,
-            "end_offset": 2897
+            "start_offset": 2894,
+            "end_offset": 2895
           },
           "type": {
             "kind": "identifier",
             "is_anonymous": false,
-            "type_identifier": "test.union/ExplicitXUnion",
+            "type_identifier": "test.union/ExplicitFlexibleUnion",
             "type_referenced_at": {
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-              "data": "ExplicitXUnion",
-              "start_offset": 2898,
-              "end_offset": 2912
+              "data": "ExplicitFlexibleUnion",
+              "start_offset": 2896,
+              "end_offset": 2917
             }
           }
         },
@@ -1268,8 +1268,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
             "data": "b",
-            "start_offset": 2918,
-            "end_offset": 2919
+            "start_offset": 2923,
+            "end_offset": 2924
           },
           "type": {
             "kind": "primitive"
@@ -1285,18 +1285,18 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
         "data": "TestProtocol",
-        "start_offset": 2418,
-        "end_offset": 2430
+        "start_offset": 2413,
+        "end_offset": 2425
       },
       "methods": [
         {
-          "identifier": "StrictXUnionHenceResponseMayBeStackAllocated",
+          "identifier": "StrictUnionHenceResponseMayBeStackAllocated",
           "location": {
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-            "data": "StrictXUnionHenceResponseMayBeStackAllocated",
-            "start_offset": 2444,
-            "end_offset": 2488
+            "data": "StrictUnionHenceResponseMayBeStackAllocated",
+            "start_offset": 2439,
+            "end_offset": 2482
           },
           "response_type": {
             "kind": "identifier",
@@ -1304,13 +1304,13 @@
           }
         },
         {
-          "identifier": "FlexibleXUnionHenceResponseMustBeHeapAllocated",
+          "identifier": "FlexibleUnionHenceResponseMustBeHeapAllocated",
           "location": {
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/union.test.fidl",
-            "data": "FlexibleXUnionHenceResponseMustBeHeapAllocated",
-            "start_offset": 2555,
-            "end_offset": 2601
+            "data": "FlexibleUnionHenceResponseMustBeHeapAllocated",
+            "start_offset": 2548,
+            "end_offset": 2593
           },
           "response_type": {
             "kind": "identifier",

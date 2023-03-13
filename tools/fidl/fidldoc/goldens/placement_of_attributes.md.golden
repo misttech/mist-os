@@ -101,20 +101,6 @@ Type: <code>uint32</code>
         </tr>
 </table>
 
-### ExampleXUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#ExampleXUnion data-text="ExampleXUnion"}
-*Defined in [test.placementofattributes/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl;l=51)*
-<table>
-    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
-        <tr id="ExampleXUnion.variant">
-<td><h3 id="ExampleXUnion.variant" class="add-link hide-from-toc">1</h3></td>
-            <td><code>variant</code></td>
-            <td>
-                <code>uint32</code>
-            </td>
-            <td></td>
-        </tr>
-</table>
-
 
 ## **BITS**
 

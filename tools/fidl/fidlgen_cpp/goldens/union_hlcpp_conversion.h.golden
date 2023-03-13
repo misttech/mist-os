@@ -108,34 +108,34 @@ struct HLCPPToNaturalTraits<::test::union_::Empty> {
   static inline ::test_union::Empty Convert(::test::union_::Empty&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
-  using HLCPPType = ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse;
-  static inline ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse Convert(::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&&);
+struct NaturalToHLCPPTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
+  using HLCPPType = ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
+  static inline ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse Convert(::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse&&);
 };
 template <>
-struct HLCPPToNaturalTraits<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
-  using NaturalType = ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse;
-  static inline ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse Convert(::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&&);
+struct HLCPPToNaturalTraits<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
+  using NaturalType = ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
+  static inline ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse Convert(::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
-  using HLCPPType = ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse;
-  static inline ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse Convert(::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&&);
+struct NaturalToHLCPPTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
+  using HLCPPType = ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
+  static inline ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse Convert(::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse&&);
 };
 template <>
-struct HLCPPToNaturalTraits<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
-  using NaturalType = ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse;
-  static inline ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse Convert(::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&&);
+struct HLCPPToNaturalTraits<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
+  using NaturalType = ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
+  static inline ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse Convert(::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_union::StructWithNullableXUnion> {
-  using HLCPPType = ::test::union_::StructWithNullableXUnion;
-  static inline ::test::union_::StructWithNullableXUnion Convert(::test_union::StructWithNullableXUnion&&);
+struct NaturalToHLCPPTraits<::test_union::StructWithNullableUnion> {
+  using HLCPPType = ::test::union_::StructWithNullableUnion;
+  static inline ::test::union_::StructWithNullableUnion Convert(::test_union::StructWithNullableUnion&&);
 };
 template <>
-struct HLCPPToNaturalTraits<::test::union_::StructWithNullableXUnion> {
-  using NaturalType = ::test_union::StructWithNullableXUnion;
-  static inline ::test_union::StructWithNullableXUnion Convert(::test::union_::StructWithNullableXUnion&&);
+struct HLCPPToNaturalTraits<::test::union_::StructWithNullableUnion> {
+  using NaturalType = ::test_union::StructWithNullableUnion;
+  static inline ::test_union::StructWithNullableUnion Convert(::test::union_::StructWithNullableUnion&&);
 };
 template <>
 struct NaturalToHLCPPTraits<::test_union::UnionSandwich> {
@@ -308,44 +308,44 @@ struct HLCPPToNaturalTraits<::test::union_::NewerSimpleUnion> {
   static inline ::test_union::NewerSimpleUnion Convert(::test::union_::NewerSimpleUnion&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_union::StrictSimpleXUnion> {
-  using HLCPPType = ::test::union_::StrictSimpleXUnion;
-  static inline ::test::union_::StrictSimpleXUnion Convert(::test_union::StrictSimpleXUnion&&);
+struct NaturalToHLCPPTraits<::test_union::StrictSimpleUnion> {
+  using HLCPPType = ::test::union_::StrictSimpleUnion;
+  static inline ::test::union_::StrictSimpleUnion Convert(::test_union::StrictSimpleUnion&&);
 };
 template <>
-struct HLCPPToNaturalTraits<::test::union_::StrictSimpleXUnion> {
-  using NaturalType = ::test_union::StrictSimpleXUnion;
-  static inline ::test_union::StrictSimpleXUnion Convert(::test::union_::StrictSimpleXUnion&&);
+struct HLCPPToNaturalTraits<::test::union_::StrictSimpleUnion> {
+  using NaturalType = ::test_union::StrictSimpleUnion;
+  static inline ::test_union::StrictSimpleUnion Convert(::test::union_::StrictSimpleUnion&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_union::XUnionContainingEmptyStruct> {
-  using HLCPPType = ::test::union_::XUnionContainingEmptyStruct;
-  static inline ::test::union_::XUnionContainingEmptyStruct Convert(::test_union::XUnionContainingEmptyStruct&&);
+struct NaturalToHLCPPTraits<::test_union::UnionContainingEmptyStruct> {
+  using HLCPPType = ::test::union_::UnionContainingEmptyStruct;
+  static inline ::test::union_::UnionContainingEmptyStruct Convert(::test_union::UnionContainingEmptyStruct&&);
 };
 template <>
-struct HLCPPToNaturalTraits<::test::union_::XUnionContainingEmptyStruct> {
-  using NaturalType = ::test_union::XUnionContainingEmptyStruct;
-  static inline ::test_union::XUnionContainingEmptyStruct Convert(::test::union_::XUnionContainingEmptyStruct&&);
+struct HLCPPToNaturalTraits<::test::union_::UnionContainingEmptyStruct> {
+  using NaturalType = ::test_union::UnionContainingEmptyStruct;
+  static inline ::test_union::UnionContainingEmptyStruct Convert(::test::union_::UnionContainingEmptyStruct&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_union::StrictBoundedXUnion> {
-  using HLCPPType = ::test::union_::StrictBoundedXUnion;
-  static inline ::test::union_::StrictBoundedXUnion Convert(::test_union::StrictBoundedXUnion&&);
+struct NaturalToHLCPPTraits<::test_union::StrictBoundedUnion> {
+  using HLCPPType = ::test::union_::StrictBoundedUnion;
+  static inline ::test::union_::StrictBoundedUnion Convert(::test_union::StrictBoundedUnion&&);
 };
 template <>
-struct HLCPPToNaturalTraits<::test::union_::StrictBoundedXUnion> {
-  using NaturalType = ::test_union::StrictBoundedXUnion;
-  static inline ::test_union::StrictBoundedXUnion Convert(::test::union_::StrictBoundedXUnion&&);
+struct HLCPPToNaturalTraits<::test::union_::StrictBoundedUnion> {
+  using NaturalType = ::test_union::StrictBoundedUnion;
+  static inline ::test_union::StrictBoundedUnion Convert(::test::union_::StrictBoundedUnion&&);
 };
 template <>
-struct NaturalToHLCPPTraits<::test_union::ExplicitXUnion> {
-  using HLCPPType = ::test::union_::ExplicitXUnion;
-  static inline ::test::union_::ExplicitXUnion Convert(::test_union::ExplicitXUnion&&);
+struct NaturalToHLCPPTraits<::test_union::ExplicitFlexibleUnion> {
+  using HLCPPType = ::test::union_::ExplicitFlexibleUnion;
+  static inline ::test::union_::ExplicitFlexibleUnion Convert(::test_union::ExplicitFlexibleUnion&&);
 };
 template <>
-struct HLCPPToNaturalTraits<::test::union_::ExplicitXUnion> {
-  using NaturalType = ::test_union::ExplicitXUnion;
-  static inline ::test_union::ExplicitXUnion Convert(::test::union_::ExplicitXUnion&&);
+struct HLCPPToNaturalTraits<::test::union_::ExplicitFlexibleUnion> {
+  using NaturalType = ::test_union::ExplicitFlexibleUnion;
+  static inline ::test_union::ExplicitFlexibleUnion Convert(::test::union_::ExplicitFlexibleUnion&&);
 };
 template <>
 struct NaturalToHLCPPTraits<::test_union::UnionWithAttributes> {
@@ -422,36 +422,36 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
       .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
   }};
 }
-::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse NaturalToHLCPPTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::Convert(::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&& value) {
-  ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse hlcpp;
+::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse NaturalToHLCPPTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::Convert(::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse&& value) {
+  ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse hlcpp;
   hlcpp.xu = ::fidl::NaturalToHLCPP(std::move(value.xu()));
   return hlcpp;
 }
 
-::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse HLCPPToNaturalTraits<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::Convert(::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&& value) {
-  return ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse{{
+::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse HLCPPToNaturalTraits<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::Convert(::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse&& value) {
+  return ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse{{
       .xu = ::fidl::HLCPPToNatural(std::move(value.xu)),
   }};
 }
-::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse NaturalToHLCPPTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::Convert(::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&& value) {
-  ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse hlcpp;
+::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse NaturalToHLCPPTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::Convert(::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse&& value) {
+  ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse hlcpp;
   hlcpp.xu = ::fidl::NaturalToHLCPP(std::move(value.xu()));
   return hlcpp;
 }
 
-::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse HLCPPToNaturalTraits<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::Convert(::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&& value) {
-  return ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse{{
+::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse HLCPPToNaturalTraits<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::Convert(::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse&& value) {
+  return ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse{{
       .xu = ::fidl::HLCPPToNatural(std::move(value.xu)),
   }};
 }
-::test::union_::StructWithNullableXUnion NaturalToHLCPPTraits<::test_union::StructWithNullableXUnion>::Convert(::test_union::StructWithNullableXUnion&& value) {
-  ::test::union_::StructWithNullableXUnion hlcpp;
+::test::union_::StructWithNullableUnion NaturalToHLCPPTraits<::test_union::StructWithNullableUnion>::Convert(::test_union::StructWithNullableUnion&& value) {
+  ::test::union_::StructWithNullableUnion hlcpp;
   hlcpp.x1 = ::fidl::NaturalToHLCPP(std::move(value.x1()));
   return hlcpp;
 }
 
-::test_union::StructWithNullableXUnion HLCPPToNaturalTraits<::test::union_::StructWithNullableXUnion>::Convert(::test::union_::StructWithNullableXUnion&& value) {
-  return ::test_union::StructWithNullableXUnion{{
+::test_union::StructWithNullableUnion HLCPPToNaturalTraits<::test::union_::StructWithNullableUnion>::Convert(::test::union_::StructWithNullableUnion&& value) {
+  return ::test_union::StructWithNullableUnion{{
       .x1 = ::fidl::HLCPPToNatural(std::move(value.x1)),
   }};
 }
@@ -937,16 +937,16 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
       return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
   }
 }
-::test::union_::StrictSimpleXUnion NaturalToHLCPPTraits<::test_union::StrictSimpleXUnion>::Convert(::test_union::StrictSimpleXUnion&& value) {
-  ::test::union_::StrictSimpleXUnion hlcpp;
+::test::union_::StrictSimpleUnion NaturalToHLCPPTraits<::test_union::StrictSimpleUnion>::Convert(::test_union::StrictSimpleUnion&& value) {
+  ::test::union_::StrictSimpleUnion hlcpp;
   switch (value.Which()) {
-    case ::test_union::StrictSimpleXUnion::Tag::kI:
+    case ::test_union::StrictSimpleUnion::Tag::kI:
       hlcpp.set_i(::fidl::NaturalToHLCPP(std::move(value.i().value())));
       break;
-    case ::test_union::StrictSimpleXUnion::Tag::kF:
+    case ::test_union::StrictSimpleUnion::Tag::kF:
       hlcpp.set_f(::fidl::NaturalToHLCPP(std::move(value.f().value())));
       break;
-    case ::test_union::StrictSimpleXUnion::Tag::kS:
+    case ::test_union::StrictSimpleUnion::Tag::kS:
       hlcpp.set_s(::fidl::NaturalToHLCPP(std::move(value.s().value())));
       break;
     default:
@@ -955,26 +955,26 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
   return hlcpp;
 }
 
-::test_union::StrictSimpleXUnion HLCPPToNaturalTraits<::test::union_::StrictSimpleXUnion>::Convert(::test::union_::StrictSimpleXUnion&& value) {
-  using _NaturalUnion = ::test_union::StrictSimpleXUnion;
+::test_union::StrictSimpleUnion HLCPPToNaturalTraits<::test::union_::StrictSimpleUnion>::Convert(::test::union_::StrictSimpleUnion&& value) {
+  using _NaturalUnion = ::test_union::StrictSimpleUnion;
   switch (value.Which()) {
-    case ::test::union_::StrictSimpleXUnion::Tag::kI:
+    case ::test::union_::StrictSimpleUnion::Tag::kI:
       return _NaturalUnion::WithI(
           ::fidl::HLCPPToNatural(std::move(value.i())));
-    case ::test::union_::StrictSimpleXUnion::Tag::kF:
+    case ::test::union_::StrictSimpleUnion::Tag::kF:
       return _NaturalUnion::WithF(
           ::fidl::HLCPPToNatural(std::move(value.f())));
-    case ::test::union_::StrictSimpleXUnion::Tag::kS:
+    case ::test::union_::StrictSimpleUnion::Tag::kS:
       return _NaturalUnion::WithS(
           ::fidl::HLCPPToNatural(std::move(value.s())));
     default:
-      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::union_::StrictSimpleXUnion");
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::union_::StrictSimpleUnion");
   }
 }
-::test::union_::XUnionContainingEmptyStruct NaturalToHLCPPTraits<::test_union::XUnionContainingEmptyStruct>::Convert(::test_union::XUnionContainingEmptyStruct&& value) {
-  ::test::union_::XUnionContainingEmptyStruct hlcpp;
+::test::union_::UnionContainingEmptyStruct NaturalToHLCPPTraits<::test_union::UnionContainingEmptyStruct>::Convert(::test_union::UnionContainingEmptyStruct&& value) {
+  ::test::union_::UnionContainingEmptyStruct hlcpp;
   switch (value.Which()) {
-    case ::test_union::XUnionContainingEmptyStruct::Tag::kEmpty:
+    case ::test_union::UnionContainingEmptyStruct::Tag::kEmpty:
       hlcpp.set_empty(::fidl::NaturalToHLCPP(std::move(value.empty().value())));
       break;
     default:
@@ -983,20 +983,20 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
   return hlcpp;
 }
 
-::test_union::XUnionContainingEmptyStruct HLCPPToNaturalTraits<::test::union_::XUnionContainingEmptyStruct>::Convert(::test::union_::XUnionContainingEmptyStruct&& value) {
-  using _NaturalUnion = ::test_union::XUnionContainingEmptyStruct;
+::test_union::UnionContainingEmptyStruct HLCPPToNaturalTraits<::test::union_::UnionContainingEmptyStruct>::Convert(::test::union_::UnionContainingEmptyStruct&& value) {
+  using _NaturalUnion = ::test_union::UnionContainingEmptyStruct;
   switch (value.Which()) {
-    case ::test::union_::XUnionContainingEmptyStruct::Tag::kEmpty:
+    case ::test::union_::UnionContainingEmptyStruct::Tag::kEmpty:
       return _NaturalUnion::WithEmpty(
           ::fidl::HLCPPToNatural(std::move(value.empty())));
     default:
       return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
   }
 }
-::test::union_::StrictBoundedXUnion NaturalToHLCPPTraits<::test_union::StrictBoundedXUnion>::Convert(::test_union::StrictBoundedXUnion&& value) {
-  ::test::union_::StrictBoundedXUnion hlcpp;
+::test::union_::StrictBoundedUnion NaturalToHLCPPTraits<::test_union::StrictBoundedUnion>::Convert(::test_union::StrictBoundedUnion&& value) {
+  ::test::union_::StrictBoundedUnion hlcpp;
   switch (value.Which()) {
-    case ::test_union::StrictBoundedXUnion::Tag::kV:
+    case ::test_union::StrictBoundedUnion::Tag::kV:
       hlcpp.set_v(::fidl::NaturalToHLCPP(std::move(value.v().value())));
       break;
     default:
@@ -1005,23 +1005,23 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
   return hlcpp;
 }
 
-::test_union::StrictBoundedXUnion HLCPPToNaturalTraits<::test::union_::StrictBoundedXUnion>::Convert(::test::union_::StrictBoundedXUnion&& value) {
-  using _NaturalUnion = ::test_union::StrictBoundedXUnion;
+::test_union::StrictBoundedUnion HLCPPToNaturalTraits<::test::union_::StrictBoundedUnion>::Convert(::test::union_::StrictBoundedUnion&& value) {
+  using _NaturalUnion = ::test_union::StrictBoundedUnion;
   switch (value.Which()) {
-    case ::test::union_::StrictBoundedXUnion::Tag::kV:
+    case ::test::union_::StrictBoundedUnion::Tag::kV:
       return _NaturalUnion::WithV(
           ::fidl::HLCPPToNatural(std::move(value.v())));
     default:
-      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::union_::StrictBoundedXUnion");
+      ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::union_::StrictBoundedUnion");
   }
 }
-::test::union_::ExplicitXUnion NaturalToHLCPPTraits<::test_union::ExplicitXUnion>::Convert(::test_union::ExplicitXUnion&& value) {
-  ::test::union_::ExplicitXUnion hlcpp;
+::test::union_::ExplicitFlexibleUnion NaturalToHLCPPTraits<::test_union::ExplicitFlexibleUnion>::Convert(::test_union::ExplicitFlexibleUnion&& value) {
+  ::test::union_::ExplicitFlexibleUnion hlcpp;
   switch (value.Which()) {
-    case ::test_union::ExplicitXUnion::Tag::kI:
+    case ::test_union::ExplicitFlexibleUnion::Tag::kI:
       hlcpp.set_i(::fidl::NaturalToHLCPP(std::move(value.i().value())));
       break;
-    case ::test_union::ExplicitXUnion::Tag::kF:
+    case ::test_union::ExplicitFlexibleUnion::Tag::kF:
       hlcpp.set_f(::fidl::NaturalToHLCPP(std::move(value.f().value())));
       break;
     default:
@@ -1030,13 +1030,13 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
   return hlcpp;
 }
 
-::test_union::ExplicitXUnion HLCPPToNaturalTraits<::test::union_::ExplicitXUnion>::Convert(::test::union_::ExplicitXUnion&& value) {
-  using _NaturalUnion = ::test_union::ExplicitXUnion;
+::test_union::ExplicitFlexibleUnion HLCPPToNaturalTraits<::test::union_::ExplicitFlexibleUnion>::Convert(::test::union_::ExplicitFlexibleUnion&& value) {
+  using _NaturalUnion = ::test_union::ExplicitFlexibleUnion;
   switch (value.Which()) {
-    case ::test::union_::ExplicitXUnion::Tag::kI:
+    case ::test::union_::ExplicitFlexibleUnion::Tag::kI:
       return _NaturalUnion::WithI(
           ::fidl::HLCPPToNatural(std::move(value.i())));
-    case ::test::union_::ExplicitXUnion::Tag::kF:
+    case ::test::union_::ExplicitFlexibleUnion::Tag::kF:
       return _NaturalUnion::WithF(
           ::fidl::HLCPPToNatural(std::move(value.f())));
     default:

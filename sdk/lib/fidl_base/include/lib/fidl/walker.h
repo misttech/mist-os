@@ -219,7 +219,7 @@ Result Walker<VisitorImpl, WireFormatVersion>::WalkInternal(
     case kFidlTypeTable:
       return WalkTable(&type->coded_table(), position, depth);
     case kFidlTypeXUnion:
-      return WalkXUnion(&type->coded_xunion(), position, depth);
+      return WalkXUnion(&type->coded_union(), position, depth);
     case kFidlTypeArray:
       return WalkArray(&type->coded_array(), position, depth);
     case kFidlTypeString:

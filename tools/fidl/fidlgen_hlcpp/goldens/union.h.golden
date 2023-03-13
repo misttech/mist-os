@@ -75,22 +75,22 @@ class OlderSimpleUnion;
 class NewerSimpleUnion;
 
 
-class StrictSimpleXUnion;
+class StrictSimpleUnion;
 
 
 class Empty;
 
 
-class XUnionContainingEmptyStruct;
+class UnionContainingEmptyStruct;
 
 
-class StrictBoundedXUnion;
+class StrictBoundedUnion;
 
 
-class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse;
+class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
 
 
-class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse;
+class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
 
 
 #ifdef __Fuchsia__
@@ -102,10 +102,10 @@ using TestProtocolHandle = ::fidl::InterfaceHandle<TestProtocol>;
 
 
 
-class StructWithNullableXUnion;
+class StructWithNullableUnion;
 
 
-class ExplicitXUnion;
+class ExplicitFlexibleUnion;
 
 
 class UnionSandwich;
@@ -1808,20 +1808,20 @@ using NewerSimpleUnionPtr = ::std::unique_ptr<NewerSimpleUnion>;
 
 
 
-class StrictSimpleXUnion final {
+class StrictSimpleUnion final {
  public:
   static const fidl_type_t* FidlType;
 
-  StrictSimpleXUnion();
-  ~StrictSimpleXUnion();
+  StrictSimpleUnion();
+  ~StrictSimpleUnion();
 
-  StrictSimpleXUnion(StrictSimpleXUnion&&);
-  StrictSimpleXUnion& operator=(StrictSimpleXUnion&&);
+  StrictSimpleUnion(StrictSimpleUnion&&);
+  StrictSimpleUnion& operator=(StrictSimpleUnion&&);
 
   
-  static StrictSimpleXUnion WithI(int32_t&&);
-  static StrictSimpleXUnion WithF(float&&);
-  static StrictSimpleXUnion WithS(::std::string&&);
+  static StrictSimpleUnion WithI(int32_t&&);
+  static StrictSimpleUnion WithF(float&&);
+  static StrictSimpleUnion WithS(::std::string&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
   
@@ -1831,21 +1831,21 @@ class StrictSimpleXUnion final {
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  static inline ::std::unique_ptr<StrictSimpleXUnion> New() { return ::std::make_unique<StrictSimpleXUnion>(); }
+  static inline ::std::unique_ptr<StrictSimpleUnion> New() { return ::std::make_unique<StrictSimpleUnion>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, StrictSimpleXUnion* value, size_t offset);
-  zx_status_t Clone(StrictSimpleXUnion* result) const;
+  static void Decode(::fidl::Decoder* _decoder, StrictSimpleUnion* value, size_t offset);
+  zx_status_t Clone(StrictSimpleUnion* result) const;
 
   bool has_invalid_tag() const {
     return tag_ == Invalid;
   }
 
-  bool is_i() const { return tag_ == ::test::union_::StrictSimpleXUnion::Tag::kI; }
+  bool is_i() const { return tag_ == ::test::union_::StrictSimpleUnion::Tag::kI; }
   
   int32_t& i() {
-    EnsureStorageInitialized(::test::union_::StrictSimpleXUnion::Tag::kI);
+    EnsureStorageInitialized(::test::union_::StrictSimpleUnion::Tag::kI);
     return i_;
   }
   
@@ -1853,12 +1853,12 @@ class StrictSimpleXUnion final {
     ZX_ASSERT(is_i());
     return i_;
   }
-  StrictSimpleXUnion& set_i(int32_t value);
+  StrictSimpleUnion& set_i(int32_t value);
 
-  bool is_f() const { return tag_ == ::test::union_::StrictSimpleXUnion::Tag::kF; }
+  bool is_f() const { return tag_ == ::test::union_::StrictSimpleUnion::Tag::kF; }
   
   float& f() {
-    EnsureStorageInitialized(::test::union_::StrictSimpleXUnion::Tag::kF);
+    EnsureStorageInitialized(::test::union_::StrictSimpleUnion::Tag::kF);
     return f_;
   }
   
@@ -1866,12 +1866,12 @@ class StrictSimpleXUnion final {
     ZX_ASSERT(is_f());
     return f_;
   }
-  StrictSimpleXUnion& set_f(float value);
+  StrictSimpleUnion& set_f(float value);
 
-  bool is_s() const { return tag_ == ::test::union_::StrictSimpleXUnion::Tag::kS; }
+  bool is_s() const { return tag_ == ::test::union_::StrictSimpleUnion::Tag::kS; }
   
   ::std::string& s() {
-    EnsureStorageInitialized(::test::union_::StrictSimpleXUnion::Tag::kS);
+    EnsureStorageInitialized(::test::union_::StrictSimpleUnion::Tag::kS);
     return s_;
   }
   
@@ -1879,11 +1879,11 @@ class StrictSimpleXUnion final {
     ZX_ASSERT(is_s());
     return s_;
   }
-  StrictSimpleXUnion& set_s(::std::string value);
+  StrictSimpleUnion& set_s(::std::string value);
 
-  ::test::union_::StrictSimpleXUnion::Tag Which() const {
+  ::test::union_::StrictSimpleUnion::Tag Which() const {
     
-    return ::test::union_::StrictSimpleXUnion::Tag(tag_);
+    return ::test::union_::StrictSimpleUnion::Tag(tag_);
     
   }
 
@@ -1893,13 +1893,13 @@ class StrictSimpleXUnion final {
     return tag_;
   }
 
-  friend ::fidl::Equality<::test::union_::StrictSimpleXUnion>;
+  friend ::fidl::Equality<::test::union_::StrictSimpleUnion>;
 
  private:
   void Destroy();
   void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
 
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictSimpleXUnion::Tag::Invalid);
+  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictSimpleUnion::Tag::Invalid);
   union {
     int32_t i_;
     float f_;
@@ -1907,12 +1907,12 @@ class StrictSimpleXUnion final {
   };
 };
 
-inline zx_status_t Clone(const ::test::union_::StrictSimpleXUnion& value,
-                         ::test::union_::StrictSimpleXUnion* result) {
+inline zx_status_t Clone(const ::test::union_::StrictSimpleUnion& value,
+                         ::test::union_::StrictSimpleUnion* result) {
   return value.Clone(result);
 }
 
-using StrictSimpleXUnionPtr = ::std::unique_ptr<StrictSimpleXUnion>;
+using StrictSimpleUnionPtr = ::std::unique_ptr<StrictSimpleUnion>;
 
 
 
@@ -1939,18 +1939,18 @@ using EmptyPtr = ::std::unique_ptr<Empty>;
 
 
 
-class XUnionContainingEmptyStruct final {
+class UnionContainingEmptyStruct final {
  public:
   static const fidl_type_t* FidlType;
 
-  XUnionContainingEmptyStruct();
-  ~XUnionContainingEmptyStruct();
+  UnionContainingEmptyStruct();
+  ~UnionContainingEmptyStruct();
 
-  XUnionContainingEmptyStruct(XUnionContainingEmptyStruct&&);
-  XUnionContainingEmptyStruct& operator=(XUnionContainingEmptyStruct&&);
+  UnionContainingEmptyStruct(UnionContainingEmptyStruct&&);
+  UnionContainingEmptyStruct& operator=(UnionContainingEmptyStruct&&);
 
   
-  static XUnionContainingEmptyStruct WithEmpty(::test::union_::Empty&&);
+  static UnionContainingEmptyStruct WithEmpty(::test::union_::Empty&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
   kUnknown = 0,
@@ -1959,21 +1959,21 @@ class XUnionContainingEmptyStruct final {
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  static inline ::std::unique_ptr<XUnionContainingEmptyStruct> New() { return ::std::make_unique<XUnionContainingEmptyStruct>(); }
+  static inline ::std::unique_ptr<UnionContainingEmptyStruct> New() { return ::std::make_unique<UnionContainingEmptyStruct>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, XUnionContainingEmptyStruct* value, size_t offset);
-  zx_status_t Clone(XUnionContainingEmptyStruct* result) const;
+  static void Decode(::fidl::Decoder* _decoder, UnionContainingEmptyStruct* value, size_t offset);
+  zx_status_t Clone(UnionContainingEmptyStruct* result) const;
 
   bool has_invalid_tag() const {
     return tag_ == Invalid;
   }
 
-  bool is_empty() const { return tag_ == ::test::union_::XUnionContainingEmptyStruct::Tag::kEmpty; }
+  bool is_empty() const { return tag_ == ::test::union_::UnionContainingEmptyStruct::Tag::kEmpty; }
   
   ::test::union_::Empty& empty() {
-    EnsureStorageInitialized(::test::union_::XUnionContainingEmptyStruct::Tag::kEmpty);
+    EnsureStorageInitialized(::test::union_::UnionContainingEmptyStruct::Tag::kEmpty);
     return empty_;
   }
   
@@ -1981,17 +1981,17 @@ class XUnionContainingEmptyStruct final {
     ZX_ASSERT(is_empty());
     return empty_;
   }
-  XUnionContainingEmptyStruct& set_empty(::test::union_::Empty value);
-  XUnionContainingEmptyStruct& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
+  UnionContainingEmptyStruct& set_empty(::test::union_::Empty value);
+  UnionContainingEmptyStruct& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
-  ::test::union_::XUnionContainingEmptyStruct::Tag Which() const {
+  ::test::union_::UnionContainingEmptyStruct::Tag Which() const {
     
     switch (tag_) {
-      case ::test::union_::XUnionContainingEmptyStruct::Tag::Invalid:
-      case ::test::union_::XUnionContainingEmptyStruct::Tag::kEmpty:
-        return ::test::union_::XUnionContainingEmptyStruct::Tag(tag_);
+      case ::test::union_::UnionContainingEmptyStruct::Tag::Invalid:
+      case ::test::union_::UnionContainingEmptyStruct::Tag::kEmpty:
+        return ::test::union_::UnionContainingEmptyStruct::Tag(tag_);
       default:
-        return ::test::union_::XUnionContainingEmptyStruct::Tag::kUnknown;
+        return ::test::union_::UnionContainingEmptyStruct::Tag::kUnknown;
     }
     
   }
@@ -2002,46 +2002,46 @@ class XUnionContainingEmptyStruct final {
     return tag_;
   }
   const std::vector<uint8_t>* UnknownBytes() const {
-    if (Which() != ::test::union_::XUnionContainingEmptyStruct::Tag::kUnknown) {
+    if (Which() != ::test::union_::UnionContainingEmptyStruct::Tag::kUnknown) {
       return nullptr;
     }
     return &unknown_data_;
   }
 
-  friend ::fidl::Equality<::test::union_::XUnionContainingEmptyStruct>;
+  friend ::fidl::Equality<::test::union_::UnionContainingEmptyStruct>;
 
  private:
   void Destroy();
   void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
 
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::XUnionContainingEmptyStruct::Tag::Invalid);
+  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::UnionContainingEmptyStruct::Tag::Invalid);
   union {
     ::test::union_::Empty empty_;
     std::vector<uint8_t> unknown_data_;
   };
 };
 
-inline zx_status_t Clone(const ::test::union_::XUnionContainingEmptyStruct& value,
-                         ::test::union_::XUnionContainingEmptyStruct* result) {
+inline zx_status_t Clone(const ::test::union_::UnionContainingEmptyStruct& value,
+                         ::test::union_::UnionContainingEmptyStruct* result) {
   return value.Clone(result);
 }
 
-using XUnionContainingEmptyStructPtr = ::std::unique_ptr<XUnionContainingEmptyStruct>;
+using UnionContainingEmptyStructPtr = ::std::unique_ptr<UnionContainingEmptyStruct>;
 
 
 
-class StrictBoundedXUnion final {
+class StrictBoundedUnion final {
  public:
   static const fidl_type_t* FidlType;
 
-  StrictBoundedXUnion();
-  ~StrictBoundedXUnion();
+  StrictBoundedUnion();
+  ~StrictBoundedUnion();
 
-  StrictBoundedXUnion(StrictBoundedXUnion&&);
-  StrictBoundedXUnion& operator=(StrictBoundedXUnion&&);
+  StrictBoundedUnion(StrictBoundedUnion&&);
+  StrictBoundedUnion& operator=(StrictBoundedUnion&&);
 
   
-  static StrictBoundedXUnion WithV(::std::vector<uint8_t>&&);
+  static StrictBoundedUnion WithV(::std::vector<uint8_t>&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
   
@@ -2049,21 +2049,21 @@ class StrictBoundedXUnion final {
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  static inline ::std::unique_ptr<StrictBoundedXUnion> New() { return ::std::make_unique<StrictBoundedXUnion>(); }
+  static inline ::std::unique_ptr<StrictBoundedUnion> New() { return ::std::make_unique<StrictBoundedUnion>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, StrictBoundedXUnion* value, size_t offset);
-  zx_status_t Clone(StrictBoundedXUnion* result) const;
+  static void Decode(::fidl::Decoder* _decoder, StrictBoundedUnion* value, size_t offset);
+  zx_status_t Clone(StrictBoundedUnion* result) const;
 
   bool has_invalid_tag() const {
     return tag_ == Invalid;
   }
 
-  bool is_v() const { return tag_ == ::test::union_::StrictBoundedXUnion::Tag::kV; }
+  bool is_v() const { return tag_ == ::test::union_::StrictBoundedUnion::Tag::kV; }
   
   ::std::vector<uint8_t>& v() {
-    EnsureStorageInitialized(::test::union_::StrictBoundedXUnion::Tag::kV);
+    EnsureStorageInitialized(::test::union_::StrictBoundedUnion::Tag::kV);
     return v_;
   }
   
@@ -2071,11 +2071,11 @@ class StrictBoundedXUnion final {
     ZX_ASSERT(is_v());
     return v_;
   }
-  StrictBoundedXUnion& set_v(::std::vector<uint8_t> value);
+  StrictBoundedUnion& set_v(::std::vector<uint8_t> value);
 
-  ::test::union_::StrictBoundedXUnion::Tag Which() const {
+  ::test::union_::StrictBoundedUnion::Tag Which() const {
     
-    return ::test::union_::StrictBoundedXUnion::Tag(tag_);
+    return ::test::union_::StrictBoundedUnion::Tag(tag_);
     
   }
 
@@ -2085,70 +2085,70 @@ class StrictBoundedXUnion final {
     return tag_;
   }
 
-  friend ::fidl::Equality<::test::union_::StrictBoundedXUnion>;
+  friend ::fidl::Equality<::test::union_::StrictBoundedUnion>;
 
  private:
   void Destroy();
   void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
 
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictBoundedXUnion::Tag::Invalid);
+  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::StrictBoundedUnion::Tag::Invalid);
   union {
     ::std::vector<uint8_t> v_;
   };
 };
 
-inline zx_status_t Clone(const ::test::union_::StrictBoundedXUnion& value,
-                         ::test::union_::StrictBoundedXUnion* result) {
+inline zx_status_t Clone(const ::test::union_::StrictBoundedUnion& value,
+                         ::test::union_::StrictBoundedUnion* result) {
   return value.Clone(result);
 }
 
-using StrictBoundedXUnionPtr = ::std::unique_ptr<StrictBoundedXUnion>;
+using StrictBoundedUnionPtr = ::std::unique_ptr<StrictBoundedUnion>;
 
 
 
-class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse final {
+class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::union_::StrictBoundedXUnion xu;
+  ::test::union_::StrictBoundedUnion xu;
 
-  static inline ::std::unique_ptr<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> New() { return ::std::make_unique<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>(); }
+  static inline ::std::unique_ptr<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> New() { return ::std::make_unique<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
                cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse* value, size_t _offset);
-  zx_status_t Clone(TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse* result) const;
+  static void Decode(::fidl::Decoder* _decoder, TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse* value, size_t _offset);
+  zx_status_t Clone(TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse* result) const;
 };
 
-inline zx_status_t Clone(const ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& _value,
-                         ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse* _result) {
+inline zx_status_t Clone(const ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& _value,
+                         ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse* _result) {
   return _value.Clone(_result);
 }
 
-using TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponsePtr = ::std::unique_ptr<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>;
+using TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponsePtr = ::std::unique_ptr<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>;
 
 
 
-class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse final {
+class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse final {
  public:
   static const fidl_type_t* FidlType;
   
   ::test::union_::OlderSimpleUnion xu;
 
-  static inline ::std::unique_ptr<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> New() { return ::std::make_unique<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>(); }
+  static inline ::std::unique_ptr<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> New() { return ::std::make_unique<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
                cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse* value, size_t _offset);
-  zx_status_t Clone(TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse* result) const;
+  static void Decode(::fidl::Decoder* _decoder, TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse* value, size_t _offset);
+  zx_status_t Clone(TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse* result) const;
 };
 
-inline zx_status_t Clone(const ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& _value,
-                         ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse* _result) {
+inline zx_status_t Clone(const ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& _value,
+                         ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse* _result) {
   return _value.Clone(_result);
 }
 
-using TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponsePtr = ::std::unique_ptr<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>;
+using TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponsePtr = ::std::unique_ptr<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>;
 
 
 #ifdef __Fuchsia__
@@ -2160,43 +2160,43 @@ using TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponsePtr = ::
 
 class TestProtocol_RequestEncoder {
  public:
-  static ::fidl::HLCPPOutgoingMessage StrictXUnionHenceResponseMayBeStackAllocated(::fidl::MessageEncoder* _encoder) {
+  static ::fidl::HLCPPOutgoingMessage StrictUnionHenceResponseMayBeStackAllocated(::fidl::MessageEncoder* _encoder) {
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage FlexibleXUnionHenceResponseMustBeHeapAllocated(::fidl::MessageEncoder* _encoder) {
+  static ::fidl::HLCPPOutgoingMessage FlexibleUnionHenceResponseMustBeHeapAllocated(::fidl::MessageEncoder* _encoder) {
 
     return _encoder->GetMessage();
   }
 };
   namespace _internal {
-__LOCAL extern "C" const fidl_type_t test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable;
+__LOCAL extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
   
-__LOCAL extern "C" const fidl_type_t test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable;
+__LOCAL extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
 }  // namespace _internal
 
 class TestProtocol_ResponseEncoder {
  public:
-  static ::fidl::HLCPPOutgoingMessage StrictXUnionHenceResponseMayBeStackAllocated(::fidl::MessageEncoder* _encoder, ::test::union_::StrictBoundedXUnion* xu) {
+  static ::fidl::HLCPPOutgoingMessage StrictUnionHenceResponseMayBeStackAllocated(::fidl::MessageEncoder* _encoder, ::test::union_::StrictBoundedUnion* xu) {
     fidl_trace(WillHLCPPEncode);
 
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, xu, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::union_::_internal::test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
+    fidl_trace(DidHLCPPEncode, &::test::union_::_internal::test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
-  static ::fidl::HLCPPOutgoingMessage FlexibleXUnionHenceResponseMustBeHeapAllocated(::fidl::MessageEncoder* _encoder, ::test::union_::OlderSimpleUnion* xu) {
+  static ::fidl::HLCPPOutgoingMessage FlexibleUnionHenceResponseMustBeHeapAllocated(::fidl::MessageEncoder* _encoder, ::test::union_::OlderSimpleUnion* xu) {
     fidl_trace(WillHLCPPEncode);
 
     _encoder->Alloc(16);
     ::fidl::Encode(_encoder, xu, 0 + sizeof(fidl_message_header_t));
     
 
-    fidl_trace(DidHLCPPEncode, &::test::union_::_internal::test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
+    fidl_trace(DidHLCPPEncode, &::test::union_::_internal::test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable, _encoder->GetPtr<const char>(0), _encoder->CurrentLength(), _encoder->CurrentHandleCount());
 
     return _encoder->GetMessage();
   }
@@ -2207,42 +2207,42 @@ class TestProtocol_ResponseEncoder {
 
 
 
-class StructWithNullableXUnion final {
+class StructWithNullableUnion final {
  public:
   static const fidl_type_t* FidlType;
   
   ::std::unique_ptr<::test::union_::OlderSimpleUnion> x1;
 
-  static inline ::std::unique_ptr<StructWithNullableXUnion> New() { return ::std::make_unique<StructWithNullableXUnion>(); }
+  static inline ::std::unique_ptr<StructWithNullableUnion> New() { return ::std::make_unique<StructWithNullableUnion>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
                cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, StructWithNullableXUnion* value, size_t _offset);
-  zx_status_t Clone(StructWithNullableXUnion* result) const;
+  static void Decode(::fidl::Decoder* _decoder, StructWithNullableUnion* value, size_t _offset);
+  zx_status_t Clone(StructWithNullableUnion* result) const;
 };
 
-inline zx_status_t Clone(const ::test::union_::StructWithNullableXUnion& _value,
-                         ::test::union_::StructWithNullableXUnion* _result) {
+inline zx_status_t Clone(const ::test::union_::StructWithNullableUnion& _value,
+                         ::test::union_::StructWithNullableUnion* _result) {
   return _value.Clone(_result);
 }
 
-using StructWithNullableXUnionPtr = ::std::unique_ptr<StructWithNullableXUnion>;
+using StructWithNullableUnionPtr = ::std::unique_ptr<StructWithNullableUnion>;
 
 
 
-class ExplicitXUnion final {
+class ExplicitFlexibleUnion final {
  public:
   static const fidl_type_t* FidlType;
 
-  ExplicitXUnion();
-  ~ExplicitXUnion();
+  ExplicitFlexibleUnion();
+  ~ExplicitFlexibleUnion();
 
-  ExplicitXUnion(ExplicitXUnion&&);
-  ExplicitXUnion& operator=(ExplicitXUnion&&);
+  ExplicitFlexibleUnion(ExplicitFlexibleUnion&&);
+  ExplicitFlexibleUnion& operator=(ExplicitFlexibleUnion&&);
 
   
-  static ExplicitXUnion WithI(int64_t&&);
-  static ExplicitXUnion WithF(float&&);
+  static ExplicitFlexibleUnion WithI(int64_t&&);
+  static ExplicitFlexibleUnion WithF(float&&);
 
   enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
   kUnknown = 0,
@@ -2252,21 +2252,21 @@ class ExplicitXUnion final {
     Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  static inline ::std::unique_ptr<ExplicitXUnion> New() { return ::std::make_unique<ExplicitXUnion>(); }
+  static inline ::std::unique_ptr<ExplicitFlexibleUnion> New() { return ::std::make_unique<ExplicitFlexibleUnion>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
               cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ExplicitXUnion* value, size_t offset);
-  zx_status_t Clone(ExplicitXUnion* result) const;
+  static void Decode(::fidl::Decoder* _decoder, ExplicitFlexibleUnion* value, size_t offset);
+  zx_status_t Clone(ExplicitFlexibleUnion* result) const;
 
   bool has_invalid_tag() const {
     return tag_ == Invalid;
   }
 
-  bool is_i() const { return tag_ == ::test::union_::ExplicitXUnion::Tag::kI; }
+  bool is_i() const { return tag_ == ::test::union_::ExplicitFlexibleUnion::Tag::kI; }
   
   int64_t& i() {
-    EnsureStorageInitialized(::test::union_::ExplicitXUnion::Tag::kI);
+    EnsureStorageInitialized(::test::union_::ExplicitFlexibleUnion::Tag::kI);
     return i_;
   }
   
@@ -2274,12 +2274,12 @@ class ExplicitXUnion final {
     ZX_ASSERT(is_i());
     return i_;
   }
-  ExplicitXUnion& set_i(int64_t value);
+  ExplicitFlexibleUnion& set_i(int64_t value);
 
-  bool is_f() const { return tag_ == ::test::union_::ExplicitXUnion::Tag::kF; }
+  bool is_f() const { return tag_ == ::test::union_::ExplicitFlexibleUnion::Tag::kF; }
   
   float& f() {
-    EnsureStorageInitialized(::test::union_::ExplicitXUnion::Tag::kF);
+    EnsureStorageInitialized(::test::union_::ExplicitFlexibleUnion::Tag::kF);
     return f_;
   }
   
@@ -2287,18 +2287,18 @@ class ExplicitXUnion final {
     ZX_ASSERT(is_f());
     return f_;
   }
-  ExplicitXUnion& set_f(float value);
-  ExplicitXUnion& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
+  ExplicitFlexibleUnion& set_f(float value);
+  ExplicitFlexibleUnion& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
 
-  ::test::union_::ExplicitXUnion::Tag Which() const {
+  ::test::union_::ExplicitFlexibleUnion::Tag Which() const {
     
     switch (tag_) {
-      case ::test::union_::ExplicitXUnion::Tag::Invalid:
-      case ::test::union_::ExplicitXUnion::Tag::kI:
-      case ::test::union_::ExplicitXUnion::Tag::kF:
-        return ::test::union_::ExplicitXUnion::Tag(tag_);
+      case ::test::union_::ExplicitFlexibleUnion::Tag::Invalid:
+      case ::test::union_::ExplicitFlexibleUnion::Tag::kI:
+      case ::test::union_::ExplicitFlexibleUnion::Tag::kF:
+        return ::test::union_::ExplicitFlexibleUnion::Tag(tag_);
       default:
-        return ::test::union_::ExplicitXUnion::Tag::kUnknown;
+        return ::test::union_::ExplicitFlexibleUnion::Tag::kUnknown;
     }
     
   }
@@ -2309,19 +2309,19 @@ class ExplicitXUnion final {
     return tag_;
   }
   const std::vector<uint8_t>* UnknownBytes() const {
-    if (Which() != ::test::union_::ExplicitXUnion::Tag::kUnknown) {
+    if (Which() != ::test::union_::ExplicitFlexibleUnion::Tag::kUnknown) {
       return nullptr;
     }
     return &unknown_data_;
   }
 
-  friend ::fidl::Equality<::test::union_::ExplicitXUnion>;
+  friend ::fidl::Equality<::test::union_::ExplicitFlexibleUnion>;
 
  private:
   void Destroy();
   void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
 
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitXUnion::Tag::Invalid);
+  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitFlexibleUnion::Tag::Invalid);
   union {
     int64_t i_;
     float f_;
@@ -2329,12 +2329,12 @@ class ExplicitXUnion final {
   };
 };
 
-inline zx_status_t Clone(const ::test::union_::ExplicitXUnion& value,
-                         ::test::union_::ExplicitXUnion* result) {
+inline zx_status_t Clone(const ::test::union_::ExplicitFlexibleUnion& value,
+                         ::test::union_::ExplicitFlexibleUnion* result) {
   return value.Clone(result);
 }
 
-using ExplicitXUnionPtr = ::std::unique_ptr<ExplicitXUnion>;
+using ExplicitFlexibleUnionPtr = ::std::unique_ptr<ExplicitFlexibleUnion>;
 
 
 
@@ -2344,7 +2344,7 @@ class UnionSandwich final {
   
   uint32_t a{};
   
-  ::test::union_::ExplicitXUnion u;
+  ::test::union_::ExplicitFlexibleUnion u;
   
   uint32_t b{};
 
@@ -3610,17 +3610,17 @@ struct Equality<::test::union_::NewerSimpleUnion> {
     }
 };
 template <>
-struct IsFidlXUnion<::test::union_::StrictSimpleXUnion> : public std::true_type {};
+struct IsFidlXUnion<::test::union_::StrictSimpleUnion> : public std::true_type {};
 
 template <>
-struct CodingTraits<::test::union_::StrictSimpleXUnion>
-    : public EncodableCodingTraits<::test::union_::StrictSimpleXUnion, 16> {};
+struct CodingTraits<::test::union_::StrictSimpleUnion>
+    : public EncodableCodingTraits<::test::union_::StrictSimpleUnion, 16> {};
 
 template <>
-struct CodingTraits<std::unique_ptr<::test::union_::StrictSimpleXUnion>> {
+struct CodingTraits<std::unique_ptr<::test::union_::StrictSimpleUnion>> {
   static constexpr size_t inline_size_v2 = 16;
 
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::StrictSimpleXUnion>* value, size_t offset,
+  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::StrictSimpleUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
@@ -3628,39 +3628,39 @@ struct CodingTraits<std::unique_ptr<::test::union_::StrictSimpleXUnion>> {
     }
   }
 
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::StrictSimpleXUnion>* value, size_t offset) {
+  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::StrictSimpleUnion>* value, size_t offset) {
     fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
     }
 
-    value->reset(new ::test::union_::StrictSimpleXUnion);
+    value->reset(new ::test::union_::StrictSimpleUnion);
 
-    ::test::union_::StrictSimpleXUnion::Decode(_decoder, value->get(), offset);
+    ::test::union_::StrictSimpleUnion::Decode(_decoder, value->get(), offset);
   }
 };
 
-inline zx_status_t Clone(const ::test::union_::StrictSimpleXUnion& value,
-                         ::test::union_::StrictSimpleXUnion* result) {
+inline zx_status_t Clone(const ::test::union_::StrictSimpleUnion& value,
+                         ::test::union_::StrictSimpleUnion* result) {
   return ::test::union_::Clone(value, result);
 }
 
 template<>
-struct Equality<::test::union_::StrictSimpleXUnion> {
-  bool operator()(const ::test::union_::StrictSimpleXUnion& _lhs, const ::test::union_::StrictSimpleXUnion& _rhs) const {
+struct Equality<::test::union_::StrictSimpleUnion> {
+  bool operator()(const ::test::union_::StrictSimpleUnion& _lhs, const ::test::union_::StrictSimpleUnion& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
       return false;
     }
 
     switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::union_::StrictSimpleXUnion::Tag::Invalid):
+      case static_cast<fidl_xunion_tag_t>(::test::union_::StrictSimpleUnion::Tag::Invalid):
         return true;
-      case ::test::union_::StrictSimpleXUnion::Tag::kI:
+      case ::test::union_::StrictSimpleUnion::Tag::kI:
         return ::fidl::Equals(_lhs.i_, _rhs.i_);
-      case ::test::union_::StrictSimpleXUnion::Tag::kF:
+      case ::test::union_::StrictSimpleUnion::Tag::kF:
         return ::fidl::Equals(_lhs.f_, _rhs.f_);
-      case ::test::union_::StrictSimpleXUnion::Tag::kS:
+      case ::test::union_::StrictSimpleUnion::Tag::kS:
         return ::fidl::Equals(_lhs.s_, _rhs.s_);
       
       default:
@@ -3696,17 +3696,17 @@ struct Equality<::test::union_::Empty> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::XUnionContainingEmptyStruct> : public std::true_type {};
+struct IsFidlXUnion<::test::union_::UnionContainingEmptyStruct> : public std::true_type {};
 
 template <>
-struct CodingTraits<::test::union_::XUnionContainingEmptyStruct>
-    : public EncodableCodingTraits<::test::union_::XUnionContainingEmptyStruct, 16> {};
+struct CodingTraits<::test::union_::UnionContainingEmptyStruct>
+    : public EncodableCodingTraits<::test::union_::UnionContainingEmptyStruct, 16> {};
 
 template <>
-struct CodingTraits<std::unique_ptr<::test::union_::XUnionContainingEmptyStruct>> {
+struct CodingTraits<std::unique_ptr<::test::union_::UnionContainingEmptyStruct>> {
   static constexpr size_t inline_size_v2 = 16;
 
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::XUnionContainingEmptyStruct>* value, size_t offset,
+  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::UnionContainingEmptyStruct>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
@@ -3714,35 +3714,35 @@ struct CodingTraits<std::unique_ptr<::test::union_::XUnionContainingEmptyStruct>
     }
   }
 
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::XUnionContainingEmptyStruct>* value, size_t offset) {
+  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::UnionContainingEmptyStruct>* value, size_t offset) {
     fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
     }
 
-    value->reset(new ::test::union_::XUnionContainingEmptyStruct);
+    value->reset(new ::test::union_::UnionContainingEmptyStruct);
 
-    ::test::union_::XUnionContainingEmptyStruct::Decode(_decoder, value->get(), offset);
+    ::test::union_::UnionContainingEmptyStruct::Decode(_decoder, value->get(), offset);
   }
 };
 
-inline zx_status_t Clone(const ::test::union_::XUnionContainingEmptyStruct& value,
-                         ::test::union_::XUnionContainingEmptyStruct* result) {
+inline zx_status_t Clone(const ::test::union_::UnionContainingEmptyStruct& value,
+                         ::test::union_::UnionContainingEmptyStruct* result) {
   return ::test::union_::Clone(value, result);
 }
 
 template<>
-struct Equality<::test::union_::XUnionContainingEmptyStruct> {
-  bool operator()(const ::test::union_::XUnionContainingEmptyStruct& _lhs, const ::test::union_::XUnionContainingEmptyStruct& _rhs) const {
+struct Equality<::test::union_::UnionContainingEmptyStruct> {
+  bool operator()(const ::test::union_::UnionContainingEmptyStruct& _lhs, const ::test::union_::UnionContainingEmptyStruct& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
       return false;
     }
 
     switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::union_::XUnionContainingEmptyStruct::Tag::Invalid):
+      case static_cast<fidl_xunion_tag_t>(::test::union_::UnionContainingEmptyStruct::Tag::Invalid):
         return true;
-      case ::test::union_::XUnionContainingEmptyStruct::Tag::kEmpty:
+      case ::test::union_::UnionContainingEmptyStruct::Tag::kEmpty:
         return ::fidl::Equals(_lhs.empty_, _rhs.empty_);
       default:
         return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
@@ -3750,17 +3750,17 @@ struct Equality<::test::union_::XUnionContainingEmptyStruct> {
     }
 };
 template <>
-struct IsFidlXUnion<::test::union_::StrictBoundedXUnion> : public std::true_type {};
+struct IsFidlXUnion<::test::union_::StrictBoundedUnion> : public std::true_type {};
 
 template <>
-struct CodingTraits<::test::union_::StrictBoundedXUnion>
-    : public EncodableCodingTraits<::test::union_::StrictBoundedXUnion, 16> {};
+struct CodingTraits<::test::union_::StrictBoundedUnion>
+    : public EncodableCodingTraits<::test::union_::StrictBoundedUnion, 16> {};
 
 template <>
-struct CodingTraits<std::unique_ptr<::test::union_::StrictBoundedXUnion>> {
+struct CodingTraits<std::unique_ptr<::test::union_::StrictBoundedUnion>> {
   static constexpr size_t inline_size_v2 = 16;
 
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::StrictBoundedXUnion>* value, size_t offset,
+  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::StrictBoundedUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
@@ -3768,35 +3768,35 @@ struct CodingTraits<std::unique_ptr<::test::union_::StrictBoundedXUnion>> {
     }
   }
 
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::StrictBoundedXUnion>* value, size_t offset) {
+  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::StrictBoundedUnion>* value, size_t offset) {
     fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
     }
 
-    value->reset(new ::test::union_::StrictBoundedXUnion);
+    value->reset(new ::test::union_::StrictBoundedUnion);
 
-    ::test::union_::StrictBoundedXUnion::Decode(_decoder, value->get(), offset);
+    ::test::union_::StrictBoundedUnion::Decode(_decoder, value->get(), offset);
   }
 };
 
-inline zx_status_t Clone(const ::test::union_::StrictBoundedXUnion& value,
-                         ::test::union_::StrictBoundedXUnion* result) {
+inline zx_status_t Clone(const ::test::union_::StrictBoundedUnion& value,
+                         ::test::union_::StrictBoundedUnion* result) {
   return ::test::union_::Clone(value, result);
 }
 
 template<>
-struct Equality<::test::union_::StrictBoundedXUnion> {
-  bool operator()(const ::test::union_::StrictBoundedXUnion& _lhs, const ::test::union_::StrictBoundedXUnion& _rhs) const {
+struct Equality<::test::union_::StrictBoundedUnion> {
+  bool operator()(const ::test::union_::StrictBoundedUnion& _lhs, const ::test::union_::StrictBoundedUnion& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
       return false;
     }
 
     switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::union_::StrictBoundedXUnion::Tag::Invalid):
+      case static_cast<fidl_xunion_tag_t>(::test::union_::StrictBoundedUnion::Tag::Invalid):
         return true;
-      case ::test::union_::StrictBoundedXUnion::Tag::kV:
+      case ::test::union_::StrictBoundedUnion::Tag::kV:
         return ::fidl::Equals(_lhs.v_, _rhs.v_);
       
       default:
@@ -3805,29 +3805,29 @@ struct Equality<::test::union_::StrictBoundedXUnion> {
     }
 };
 template <>
-struct CodingTraits<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>
-    : public EncodableCodingTraits<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, 16> {};
+struct CodingTraits<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>
+    : public EncodableCodingTraits<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16> {};
 
 
 template<>
-struct HasPadding<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
+struct HasPadding<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 
 
 
 template<>
-struct IsMemcpyCompatible<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> : public internal::BoolConstant<
-    !HasPadding<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::value
-    && IsMemcpyCompatible<::test::union_::StrictBoundedXUnion>::value> {};
+struct IsMemcpyCompatible<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public internal::BoolConstant<
+    !HasPadding<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::value
+    && IsMemcpyCompatible<::test::union_::StrictBoundedUnion>::value> {};
 
 
-inline zx_status_t Clone(const ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& value,
-                         ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse* result) {
+inline zx_status_t Clone(const ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& value,
+                         ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse* result) {
   return ::test::union_::Clone(value, result);
 }
 
 template<>
-struct Equality<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
-  bool operator()(const ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& _lhs, const ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& _rhs) const {
+struct Equality<::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
+  bool operator()(const ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& _lhs, const ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& _rhs) const {
     if (!::fidl::Equals(_lhs.xu, _rhs.xu)) {
       return false;
     }
@@ -3835,29 +3835,29 @@ struct Equality<::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackA
   }
 };
 template <>
-struct CodingTraits<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>
-    : public EncodableCodingTraits<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, 16> {};
+struct CodingTraits<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>
+    : public EncodableCodingTraits<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16> {};
 
 
 template<>
-struct HasPadding<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
+struct HasPadding<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 
 
 
 template<>
-struct IsMemcpyCompatible<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> : public internal::BoolConstant<
-    !HasPadding<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::value
+struct IsMemcpyCompatible<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public internal::BoolConstant<
+    !HasPadding<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::value
     && IsMemcpyCompatible<::test::union_::OlderSimpleUnion>::value> {};
 
 
-inline zx_status_t Clone(const ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& value,
-                         ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse* result) {
+inline zx_status_t Clone(const ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& value,
+                         ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse* result) {
   return ::test::union_::Clone(value, result);
 }
 
 template<>
-struct Equality<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
-  bool operator()(const ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& _lhs, const ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& _rhs) const {
+struct Equality<::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
+  bool operator()(const ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& _lhs, const ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& _rhs) const {
     if (!::fidl::Equals(_lhs.xu, _rhs.xu)) {
       return false;
     }
@@ -3865,29 +3865,29 @@ struct Equality<::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHea
   }
 };
 template <>
-struct CodingTraits<::test::union_::StructWithNullableXUnion>
-    : public EncodableCodingTraits<::test::union_::StructWithNullableXUnion, 16> {};
+struct CodingTraits<::test::union_::StructWithNullableUnion>
+    : public EncodableCodingTraits<::test::union_::StructWithNullableUnion, 16> {};
 
 
 template<>
-struct HasPadding<::test::union_::StructWithNullableXUnion> : public std::true_type {};
+struct HasPadding<::test::union_::StructWithNullableUnion> : public std::true_type {};
 
 
 
 template<>
-struct IsMemcpyCompatible<::test::union_::StructWithNullableXUnion> : public internal::BoolConstant<
-    !HasPadding<::test::union_::StructWithNullableXUnion>::value
+struct IsMemcpyCompatible<::test::union_::StructWithNullableUnion> : public internal::BoolConstant<
+    !HasPadding<::test::union_::StructWithNullableUnion>::value
     && IsMemcpyCompatible<::std::unique_ptr<::test::union_::OlderSimpleUnion>>::value> {};
 
 
-inline zx_status_t Clone(const ::test::union_::StructWithNullableXUnion& value,
-                         ::test::union_::StructWithNullableXUnion* result) {
+inline zx_status_t Clone(const ::test::union_::StructWithNullableUnion& value,
+                         ::test::union_::StructWithNullableUnion* result) {
   return ::test::union_::Clone(value, result);
 }
 
 template<>
-struct Equality<::test::union_::StructWithNullableXUnion> {
-  bool operator()(const ::test::union_::StructWithNullableXUnion& _lhs, const ::test::union_::StructWithNullableXUnion& _rhs) const {
+struct Equality<::test::union_::StructWithNullableUnion> {
+  bool operator()(const ::test::union_::StructWithNullableUnion& _lhs, const ::test::union_::StructWithNullableUnion& _rhs) const {
     if (!::fidl::Equals(_lhs.x1, _rhs.x1)) {
       return false;
     }
@@ -3895,17 +3895,17 @@ struct Equality<::test::union_::StructWithNullableXUnion> {
   }
 };
 template <>
-struct IsFidlXUnion<::test::union_::ExplicitXUnion> : public std::true_type {};
+struct IsFidlXUnion<::test::union_::ExplicitFlexibleUnion> : public std::true_type {};
 
 template <>
-struct CodingTraits<::test::union_::ExplicitXUnion>
-    : public EncodableCodingTraits<::test::union_::ExplicitXUnion, 16> {};
+struct CodingTraits<::test::union_::ExplicitFlexibleUnion>
+    : public EncodableCodingTraits<::test::union_::ExplicitFlexibleUnion, 16> {};
 
 template <>
-struct CodingTraits<std::unique_ptr<::test::union_::ExplicitXUnion>> {
+struct CodingTraits<std::unique_ptr<::test::union_::ExplicitFlexibleUnion>> {
   static constexpr size_t inline_size_v2 = 16;
 
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::ExplicitXUnion>* value, size_t offset,
+  static void Encode(Encoder* encoder, std::unique_ptr<::test::union_::ExplicitFlexibleUnion>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
@@ -3913,37 +3913,37 @@ struct CodingTraits<std::unique_ptr<::test::union_::ExplicitXUnion>> {
     }
   }
 
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::ExplicitXUnion>* value, size_t offset) {
+  static void Decode(Decoder* _decoder, std::unique_ptr<::test::union_::ExplicitFlexibleUnion>* value, size_t offset) {
     fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
     }
 
-    value->reset(new ::test::union_::ExplicitXUnion);
+    value->reset(new ::test::union_::ExplicitFlexibleUnion);
 
-    ::test::union_::ExplicitXUnion::Decode(_decoder, value->get(), offset);
+    ::test::union_::ExplicitFlexibleUnion::Decode(_decoder, value->get(), offset);
   }
 };
 
-inline zx_status_t Clone(const ::test::union_::ExplicitXUnion& value,
-                         ::test::union_::ExplicitXUnion* result) {
+inline zx_status_t Clone(const ::test::union_::ExplicitFlexibleUnion& value,
+                         ::test::union_::ExplicitFlexibleUnion* result) {
   return ::test::union_::Clone(value, result);
 }
 
 template<>
-struct Equality<::test::union_::ExplicitXUnion> {
-  bool operator()(const ::test::union_::ExplicitXUnion& _lhs, const ::test::union_::ExplicitXUnion& _rhs) const {
+struct Equality<::test::union_::ExplicitFlexibleUnion> {
+  bool operator()(const ::test::union_::ExplicitFlexibleUnion& _lhs, const ::test::union_::ExplicitFlexibleUnion& _rhs) const {
     if (_lhs.Ordinal() != _rhs.Ordinal()) {
       return false;
     }
 
     switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitXUnion::Tag::Invalid):
+      case static_cast<fidl_xunion_tag_t>(::test::union_::ExplicitFlexibleUnion::Tag::Invalid):
         return true;
-      case ::test::union_::ExplicitXUnion::Tag::kI:
+      case ::test::union_::ExplicitFlexibleUnion::Tag::kI:
         return ::fidl::Equals(_lhs.i_, _rhs.i_);
-      case ::test::union_::ExplicitXUnion::Tag::kF:
+      case ::test::union_::ExplicitFlexibleUnion::Tag::kF:
         return ::fidl::Equals(_lhs.f_, _rhs.f_);
       default:
         return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
@@ -3964,7 +3964,7 @@ template<>
 struct IsMemcpyCompatible<::test::union_::UnionSandwich> : public internal::BoolConstant<
     !HasPadding<::test::union_::UnionSandwich>::value
     && IsMemcpyCompatible<uint32_t>::value
-    && IsMemcpyCompatible<::test::union_::ExplicitXUnion>::value> {};
+    && IsMemcpyCompatible<::test::union_::ExplicitFlexibleUnion>::value> {};
 
 
 inline zx_status_t Clone(const ::test::union_::UnionSandwich& value,
@@ -4165,13 +4165,13 @@ class TestProtocol_SyncProxy;
 
 namespace internal {
 
-constexpr uint64_t kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal = 0x816ec730baa90ddlu;
+constexpr uint64_t kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal = 0x5bfca9479251b9c3lu;
 
-constexpr ::fidl::MessageDynamicFlags kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+constexpr ::fidl::MessageDynamicFlags kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-constexpr uint64_t kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal = 0x6ad517317388ea05lu;
+constexpr uint64_t kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal = 0x694fede3b8829ce2lu;
 
-constexpr ::fidl::MessageDynamicFlags kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;}  // namespace internal
+constexpr ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;}  // namespace internal
 
 #endif  // __Fuchsia__
 
@@ -4184,14 +4184,14 @@ class TestProtocol {
   using EventSender_ = ::test::union_::TestProtocol_EventSender;
   using Sync_ = ::test::union_::TestProtocol_Sync;
   virtual ~TestProtocol();
-  using StrictXUnionHenceResponseMayBeStackAllocatedCallback =
-      fit::function<void(::test::union_::StrictBoundedXUnion)>;
+  using StrictUnionHenceResponseMayBeStackAllocatedCallback =
+      fit::function<void(::test::union_::StrictBoundedUnion)>;
       
-  virtual void StrictXUnionHenceResponseMayBeStackAllocated(StrictXUnionHenceResponseMayBeStackAllocatedCallback callback) = 0;
-  using FlexibleXUnionHenceResponseMustBeHeapAllocatedCallback =
+  virtual void StrictUnionHenceResponseMayBeStackAllocated(StrictUnionHenceResponseMayBeStackAllocatedCallback callback) = 0;
+  using FlexibleUnionHenceResponseMustBeHeapAllocatedCallback =
       fit::function<void(::test::union_::OlderSimpleUnion)>;
       
-  virtual void FlexibleXUnionHenceResponseMustBeHeapAllocated(FlexibleXUnionHenceResponseMustBeHeapAllocatedCallback callback) = 0;
+  virtual void FlexibleUnionHenceResponseMustBeHeapAllocated(FlexibleUnionHenceResponseMustBeHeapAllocatedCallback callback) = 0;
 
   
 };
@@ -4201,8 +4201,8 @@ class TestProtocol_RequestDecoder {
   TestProtocol_RequestDecoder() = default;
   virtual ~TestProtocol_RequestDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal, bool* out_needs_response, bool* is_known);
-  virtual void StrictXUnionHenceResponseMayBeStackAllocated() = 0;
-  virtual void FlexibleXUnionHenceResponseMustBeHeapAllocated() = 0;
+  virtual void StrictUnionHenceResponseMayBeStackAllocated() = 0;
+  virtual void FlexibleUnionHenceResponseMustBeHeapAllocated() = 0;
 };
 
 class TestProtocol_ResponseDecoder {
@@ -4210,8 +4210,8 @@ class TestProtocol_ResponseDecoder {
   TestProtocol_ResponseDecoder() = default;
   virtual ~TestProtocol_ResponseDecoder() = default;
   static const fidl_type_t* GetType(uint64_t ordinal);
-  virtual void StrictXUnionHenceResponseMayBeStackAllocated(::test::union_::StrictBoundedXUnion xu) = 0;
-  virtual void FlexibleXUnionHenceResponseMustBeHeapAllocated(::test::union_::OlderSimpleUnion xu) = 0;
+  virtual void StrictUnionHenceResponseMayBeStackAllocated(::test::union_::StrictBoundedUnion xu) = 0;
+  virtual void FlexibleUnionHenceResponseMustBeHeapAllocated(::test::union_::OlderSimpleUnion xu) = 0;
 };
 
 class TestProtocol_EventSender {
@@ -4223,8 +4223,8 @@ class TestProtocol_Sync {
  public:
   using Proxy_ = ::test::union_::TestProtocol_SyncProxy;
   virtual ~TestProtocol_Sync();
-  virtual zx_status_t StrictXUnionHenceResponseMayBeStackAllocated(::test::union_::StrictBoundedXUnion* out_xu) = 0;
-  virtual zx_status_t FlexibleXUnionHenceResponseMustBeHeapAllocated(::test::union_::OlderSimpleUnion* out_xu) = 0;
+  virtual zx_status_t StrictUnionHenceResponseMayBeStackAllocated(::test::union_::StrictBoundedUnion* out_xu) = 0;
+  virtual zx_status_t FlexibleUnionHenceResponseMustBeHeapAllocated(::test::union_::OlderSimpleUnion* out_xu) = 0;
 };
 
 class TestProtocol_Proxy final : public ::fidl::internal::Proxy, public TestProtocol {
@@ -4233,10 +4233,10 @@ class TestProtocol_Proxy final : public ::fidl::internal::Proxy, public TestProt
   ~TestProtocol_Proxy() override;
 
   zx_status_t Dispatch_(::fidl::HLCPPIncomingMessage message) override;
-  // cts-coverage-fidl-name:test.union/TestProtocol.StrictXUnionHenceResponseMayBeStackAllocated
-  void StrictXUnionHenceResponseMayBeStackAllocated(StrictXUnionHenceResponseMayBeStackAllocatedCallback callback) override;
-  // cts-coverage-fidl-name:test.union/TestProtocol.FlexibleXUnionHenceResponseMustBeHeapAllocated
-  void FlexibleXUnionHenceResponseMustBeHeapAllocated(FlexibleXUnionHenceResponseMustBeHeapAllocatedCallback callback) override;
+  // cts-coverage-fidl-name:test.union/TestProtocol.StrictUnionHenceResponseMayBeStackAllocated
+  void StrictUnionHenceResponseMayBeStackAllocated(StrictUnionHenceResponseMayBeStackAllocatedCallback callback) override;
+  // cts-coverage-fidl-name:test.union/TestProtocol.FlexibleUnionHenceResponseMustBeHeapAllocated
+  void FlexibleUnionHenceResponseMustBeHeapAllocated(FlexibleUnionHenceResponseMustBeHeapAllocatedCallback callback) override;
 
   
 
@@ -4265,10 +4265,10 @@ class TestProtocol_SyncProxy : public ::test::union_::TestProtocol_Sync {
  public:
   explicit TestProtocol_SyncProxy(::zx::channel channel);
   ~TestProtocol_SyncProxy() override;
-  // cts-coverage-fidl-name:test.union/TestProtocol.StrictXUnionHenceResponseMayBeStackAllocated
-  zx_status_t StrictXUnionHenceResponseMayBeStackAllocated(::test::union_::StrictBoundedXUnion* out_xu) override;
-  // cts-coverage-fidl-name:test.union/TestProtocol.FlexibleXUnionHenceResponseMustBeHeapAllocated
-  zx_status_t FlexibleXUnionHenceResponseMustBeHeapAllocated(::test::union_::OlderSimpleUnion* out_xu) override;
+  // cts-coverage-fidl-name:test.union/TestProtocol.StrictUnionHenceResponseMayBeStackAllocated
+  zx_status_t StrictUnionHenceResponseMayBeStackAllocated(::test::union_::StrictBoundedUnion* out_xu) override;
+  // cts-coverage-fidl-name:test.union/TestProtocol.FlexibleUnionHenceResponseMustBeHeapAllocated
+  zx_status_t FlexibleUnionHenceResponseMustBeHeapAllocated(::test::union_::OlderSimpleUnion* out_xu) override;
 
   private:
   ::fidl::internal::SynchronousProxy proxy_;

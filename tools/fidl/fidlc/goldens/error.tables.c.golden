@@ -4,8 +4,8 @@
 
 
 __LOCAL extern const struct FidlCodedStruct test_error_Example_foo_ResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_error_Example_foo_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_error_Example_foo_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_error_Example_foo_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_error_Example_foo_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_error_ExampleFooTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_error_ExampleFooRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_error_ExamplefooRequestMessageTable;
@@ -17,16 +17,16 @@ static const struct FidlCodedString String4294967295nonnullableTable = {.tag=kFi
 
 const struct FidlCodedStruct test_error_Example_foo_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.error/Example_foo_Response"};
 
-static const struct FidlXUnionField Fields29test_error_Example_foo_Result[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_error_Example_foo_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+static const struct FidlUnionField Fields29test_error_Example_foo_Result[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_error_Example_foo_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_error_Example_foo_ResultTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields29test_error_Example_foo_Result, .nullable=kFidlNullability_Nonnullable, .name="test.error/Example_foo_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields40test_error_Example_foo_ResultNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_error_Example_foo_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+const struct FidlCodedUnion test_error_Example_foo_ResultTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields29test_error_Example_foo_Result, .nullable=kFidlNullability_Nonnullable, .name="test.error/Example_foo_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields40test_error_Example_foo_ResultNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_error_Example_foo_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_error_Example_foo_ResultNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields40test_error_Example_foo_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.error/Example_foo_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_error_Example_foo_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields40test_error_Example_foo_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.error/Example_foo_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields32test_error_ExampleFooTopResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_error_Example_foo_ResultTable)}}
 };

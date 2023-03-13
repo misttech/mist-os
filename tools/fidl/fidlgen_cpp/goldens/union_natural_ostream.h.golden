@@ -89,36 +89,36 @@ struct fidl::ostream::Formatter<::test_union::NewerSimpleUnion> {
   static std::ostream& Format(std::ostream& os, const ::test_union::NewerSimpleUnion& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_union::StrictSimpleXUnion> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::StrictSimpleXUnion& value);
+struct fidl::ostream::Formatter<::test_union::StrictSimpleUnion> {
+  static std::ostream& Format(std::ostream& os, const ::test_union::StrictSimpleUnion& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_union::Empty> {
   static std::ostream& Format(std::ostream& os, const ::test_union::Empty& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_union::XUnionContainingEmptyStruct> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::XUnionContainingEmptyStruct& value);
+struct fidl::ostream::Formatter<::test_union::UnionContainingEmptyStruct> {
+  static std::ostream& Format(std::ostream& os, const ::test_union::UnionContainingEmptyStruct& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_union::StrictBoundedXUnion> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::StrictBoundedXUnion& value);
+struct fidl::ostream::Formatter<::test_union::StrictBoundedUnion> {
+  static std::ostream& Format(std::ostream& os, const ::test_union::StrictBoundedUnion& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& value);
+struct fidl::ostream::Formatter<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& value);
+struct fidl::ostream::Formatter<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
+  static std::ostream& Format(std::ostream& os, const ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_union::StructWithNullableXUnion> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::StructWithNullableXUnion& value);
+struct fidl::ostream::Formatter<::test_union::StructWithNullableUnion> {
+  static std::ostream& Format(std::ostream& os, const ::test_union::StructWithNullableUnion& value);
 };
 template <>
-struct fidl::ostream::Formatter<::test_union::ExplicitXUnion> {
-  static std::ostream& Format(std::ostream& os, const ::test_union::ExplicitXUnion& value);
+struct fidl::ostream::Formatter<::test_union::ExplicitFlexibleUnion> {
+  static std::ostream& Format(std::ostream& os, const ::test_union::ExplicitFlexibleUnion& value);
 };
 template <>
 struct fidl::ostream::Formatter<::test_union::UnionSandwich> {
@@ -177,21 +177,21 @@ std::ostream& operator<<(std::ostream& os, const ::test_union::OlderSimpleUnion&
 
 std::ostream& operator<<(std::ostream& os, const ::test_union::NewerSimpleUnion& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_union::StrictSimpleXUnion& value);
+std::ostream& operator<<(std::ostream& os, const ::test_union::StrictSimpleUnion& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_union::Empty& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_union::XUnionContainingEmptyStruct& value);
+std::ostream& operator<<(std::ostream& os, const ::test_union::UnionContainingEmptyStruct& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_union::StrictBoundedXUnion& value);
+std::ostream& operator<<(std::ostream& os, const ::test_union::StrictBoundedUnion& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& value);
+std::ostream& operator<<(std::ostream& os, const ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& value);
+std::ostream& operator<<(std::ostream& os, const ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_union::StructWithNullableXUnion& value);
+std::ostream& operator<<(std::ostream& os, const ::test_union::StructWithNullableUnion& value);
 
-std::ostream& operator<<(std::ostream& os, const ::test_union::ExplicitXUnion& value);
+std::ostream& operator<<(std::ostream& os, const ::test_union::ExplicitFlexibleUnion& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_union::UnionSandwich& value);
 

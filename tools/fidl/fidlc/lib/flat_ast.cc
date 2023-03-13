@@ -107,7 +107,7 @@ FieldShape Union::Member::Used::fieldshape(WireFormat wire_format) const {
   return FieldShape(*this, wire_format);
 }
 
-std::vector<std::reference_wrapper<const Union::Member>> Union::MembersSortedByXUnionOrdinal()
+std::vector<std::reference_wrapper<const Union::Member>> Union::MembersSortedByUnionOrdinal()
     const {
   std::vector<std::reference_wrapper<const Member>> sorted_members(members.cbegin(),
                                                                    members.cend());

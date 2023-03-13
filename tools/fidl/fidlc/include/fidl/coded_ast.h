@@ -99,8 +99,8 @@ struct TableField {
   const uint32_t ordinal;
 };
 
-struct XUnionField {
-  explicit XUnionField(const Type* type) : type(type) {}
+struct UnionField {
+  explicit UnionField(const Type* type) : type(type) {}
 
   const Type* type;
 };
@@ -118,7 +118,7 @@ struct Type {
     kRequestHandle,
     kStruct,
     kTable,
-    kXUnion,
+    kUnion,
     kStructPointer,
     kProtocol,
     kArray,
@@ -266,22 +266,22 @@ struct TableType : public Type {
   types::Resourceness resourceness;
 };
 
-struct XUnionType : public Type {
-  XUnionType(std::string name, std::vector<XUnionField> fields, std::string qname,
-             types::Nullability nullability, types::Strictness strictness,
-             types::Resourceness resourceness)
-      : Type(Kind::kXUnion, std::move(name), 16u, true, false),
+struct UnionType : public Type {
+  UnionType(std::string name, std::vector<UnionField> fields, std::string qname,
+            types::Nullability nullability, types::Strictness strictness,
+            types::Resourceness resourceness)
+      : Type(Kind::kUnion, std::move(name), 16u, true, false),
         fields(std::move(fields)),
         qname(std::move(qname)),
         nullability(nullability),
         strictness(strictness),
         resourceness(resourceness) {}
 
-  std::vector<XUnionField> fields;
+  std::vector<UnionField> fields;
   const std::string qname;
   types::Nullability nullability;
   types::Strictness strictness;
-  XUnionType* maybe_reference_type = nullptr;
+  UnionType* maybe_reference_type = nullptr;
   types::Resourceness resourceness;
 };
 

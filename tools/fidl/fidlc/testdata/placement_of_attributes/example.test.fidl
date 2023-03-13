@@ -46,9 +46,3 @@ type ExampleUnion = strict union {
     @on_union_member
     1: variant uint32;
 };
-
-@on_x_union
-type ExampleXUnion = flexible union {
-    @on_x_union_member
-    1: variant uint32;
-};

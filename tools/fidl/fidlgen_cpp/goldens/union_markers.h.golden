@@ -20,8 +20,8 @@ class TestProtocol final {
 
   static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
 
-  class StrictXUnionHenceResponseMayBeStackAllocated final {
-    StrictXUnionHenceResponseMayBeStackAllocated() = delete;
+  class StrictUnionHenceResponseMayBeStackAllocated final {
+    StrictUnionHenceResponseMayBeStackAllocated() = delete;
 
    public:
     using Protocol = ::test_union::TestProtocol;
@@ -34,8 +34,8 @@ class TestProtocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
-  class FlexibleXUnionHenceResponseMustBeHeapAllocated final {
-    FlexibleXUnionHenceResponseMustBeHeapAllocated() = delete;
+  class FlexibleUnionHenceResponseMustBeHeapAllocated final {
+    FlexibleUnionHenceResponseMustBeHeapAllocated() = delete;
 
    public:
     using Protocol = ::test_union::TestProtocol;

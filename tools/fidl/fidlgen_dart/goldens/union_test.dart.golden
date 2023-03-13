@@ -30,20 +30,20 @@ import './fidl_async.dart';
 
 class TestProtocol$TestBase extends TestProtocol {
   @override
-  $async.Future<StrictBoundedXUnion>
-      strictXUnionHenceResponseMayBeStackAllocated() {
+  $async.Future<StrictBoundedUnion>
+      strictUnionHenceResponseMayBeStackAllocated() {
     return $async.Future.error(
         UnimplementedError(
-            r'strictXUnionHenceResponseMayBeStackAllocated not implemented on TestProtocol test base. Please implement.'),
+            r'strictUnionHenceResponseMayBeStackAllocated not implemented on TestProtocol test base. Please implement.'),
         StackTrace.current);
   }
 
   @override
   $async.Future<OlderSimpleUnion>
-      flexibleXUnionHenceResponseMustBeHeapAllocated() {
+      flexibleUnionHenceResponseMustBeHeapAllocated() {
     return $async.Future.error(
         UnimplementedError(
-            r'flexibleXUnionHenceResponseMustBeHeapAllocated not implemented on TestProtocol test base. Please implement.'),
+            r'flexibleUnionHenceResponseMustBeHeapAllocated not implemented on TestProtocol test base. Please implement.'),
         StackTrace.current);
   }
 }

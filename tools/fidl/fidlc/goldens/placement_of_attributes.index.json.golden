@@ -115,33 +115,6 @@
           }
         }
       ]
-    },
-    {
-      "is_anonymous": false,
-      "identifier": "test.placementofattributes/ExampleXUnion",
-      "location": {
-        "is_virtual": false,
-        "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
-        "data": "ExampleXUnion",
-        "start_offset": 775,
-        "end_offset": 788
-      },
-      "members": [
-        {
-          "is_reserved": false,
-          "name": "variant",
-          "location": {
-            "is_virtual": false,
-            "file": "../../tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl",
-            "data": "variant",
-            "start_offset": 838,
-            "end_offset": 845
-          },
-          "type": {
-            "kind": "primitive"
-          }
-        }
-      ]
     }
   ],
   "tables": [

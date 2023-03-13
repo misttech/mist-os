@@ -4,13 +4,13 @@
 
 
 __LOCAL extern const struct FidlCodedStruct test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_errorsyntax_ExampleUseOfErrorSyntaxComposedCallWhichMayFailRequestMessageTable;
@@ -24,16 +24,16 @@ static const struct FidlCodedString String4294967295nonnullableTable = {.tag=kFi
 
 const struct FidlCodedStruct test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Response"};
 
-static const struct FidlXUnionField Fields64test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_Result[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+static const struct FidlUnionField Fields64test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_Result[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields64test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_Result, .nullable=kFidlNullability_Nonnullable, .name="test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields75test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+const struct FidlCodedUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields64test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_Result, .nullable=kFidlNullability_Nonnullable, .name="test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields75test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields75test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields75test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.errorsyntax/ExampleUseOfErrorSyntax_CallWhichMayFail_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields67test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable)}}
 };

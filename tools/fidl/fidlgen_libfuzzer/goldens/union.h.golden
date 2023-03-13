@@ -37,14 +37,14 @@ using ExplicitFoo = ::test::union_::ExplicitFoo;
 using ExplicitStrictFoo = ::test::union_::ExplicitStrictFoo;
 using OlderSimpleUnion = ::test::union_::OlderSimpleUnion;
 using NewerSimpleUnion = ::test::union_::NewerSimpleUnion;
-using StrictSimpleXUnion = ::test::union_::StrictSimpleXUnion;
+using StrictSimpleUnion = ::test::union_::StrictSimpleUnion;
 using Empty = ::test::union_::Empty;
-using XUnionContainingEmptyStruct = ::test::union_::XUnionContainingEmptyStruct;
-using StrictBoundedXUnion = ::test::union_::StrictBoundedXUnion;
-using TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse = ::test::union_::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse;
-using TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse = ::test::union_::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse;
-using StructWithNullableXUnion = ::test::union_::StructWithNullableXUnion;
-using ExplicitXUnion = ::test::union_::ExplicitXUnion;
+using UnionContainingEmptyStruct = ::test::union_::UnionContainingEmptyStruct;
+using StrictBoundedUnion = ::test::union_::StrictBoundedUnion;
+using TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse = ::test::union_::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
+using TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse = ::test::union_::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
+using StructWithNullableUnion = ::test::union_::StructWithNullableUnion;
+using ExplicitFlexibleUnion = ::test::union_::ExplicitFlexibleUnion;
 using UnionSandwich = ::test::union_::UnionSandwich;
 using UnionWithAttributes = ::test::union_::UnionWithAttributes;
 using EmptyFlexibleUnion = ::test::union_::EmptyFlexibleUnion;
@@ -645,24 +645,24 @@ struct Allocate<NewerSimpleUnion> {
   }
 };
 template <>
-struct MinSize<StrictSimpleXUnion> {
+struct MinSize<StrictSimpleUnion> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int32_t>(), MinSize<float>(), MinSize<::std::string>()};
     return 1 + *std::max_element(sizes, sizes + 3 + 1);
   }
 };
 template <>
-struct Allocate<StrictSimpleXUnion> {
+struct Allocate<StrictSimpleUnion> {
   static_assert(3 > 0, "xunion must have at least one member");
 
-  StrictSimpleXUnion operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<StrictSimpleXUnion>());
+  StrictSimpleUnion operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<StrictSimpleUnion>());
 
     uint8_t selector;
     ZX_ASSERT(src->CopyBytes(&selector, 1));
     (*size)++;
 
-    StrictSimpleXUnion out;
+    StrictSimpleUnion out;
     switch (selector % 3) {
       case 0: {
         out.set_i(Allocate<int32_t>{}(src, size));
@@ -700,24 +700,24 @@ struct Allocate<Empty> {
   }
 };
 template <>
-struct MinSize<XUnionContainingEmptyStruct> {
+struct MinSize<UnionContainingEmptyStruct> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::test::union_::Empty>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
 template <>
-struct Allocate<XUnionContainingEmptyStruct> {
+struct Allocate<UnionContainingEmptyStruct> {
   static_assert(1 > 0, "xunion must have at least one member");
 
-  XUnionContainingEmptyStruct operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<XUnionContainingEmptyStruct>());
+  UnionContainingEmptyStruct operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<UnionContainingEmptyStruct>());
 
     uint8_t selector;
     ZX_ASSERT(src->CopyBytes(&selector, 1));
     (*size)++;
 
-    XUnionContainingEmptyStruct out;
+    UnionContainingEmptyStruct out;
     switch (selector % 1) {
       case 0: {
         out.set_empty(Allocate<::test::union_::Empty>{}(src, size));
@@ -729,24 +729,24 @@ struct Allocate<XUnionContainingEmptyStruct> {
   }
 };
 template <>
-struct MinSize<StrictBoundedXUnion> {
+struct MinSize<StrictBoundedUnion> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<::std::vector<uint8_t>>()};
     return 1 + *std::max_element(sizes, sizes + 1 + 1);
   }
 };
 template <>
-struct Allocate<StrictBoundedXUnion> {
+struct Allocate<StrictBoundedUnion> {
   static_assert(1 > 0, "xunion must have at least one member");
 
-  StrictBoundedXUnion operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<StrictBoundedXUnion>());
+  StrictBoundedUnion operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<StrictBoundedUnion>());
 
     uint8_t selector;
     ZX_ASSERT(src->CopyBytes(&selector, 1));
     (*size)++;
 
-    StrictBoundedXUnion out;
+    StrictBoundedUnion out;
     switch (selector % 1) {
       case 0: {
         out.set_v(Allocate<::std::vector<uint8_t>>{}(src, size));
@@ -758,35 +758,35 @@ struct Allocate<StrictBoundedXUnion> {
   }
 };
 template <>
-struct MinSize<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
+struct MinSize<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
   operator size_t() {
-    return MinSize<::test::union_::StrictBoundedXUnion>();
+    return MinSize<::test::union_::StrictBoundedUnion>();
   }
 };
 template <>
-struct Allocate<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>());
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse out;
-    const size_t slack_per_member = (*size - MinSize<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>()) / 1;
+struct Allocate<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
+  TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>());
+    TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse out;
+    const size_t slack_per_member = (*size - MinSize<TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>()) / 1;
     size_t out_size;
-    out_size = MinSize<::test::union_::StrictBoundedXUnion>() + slack_per_member;
-    out.xu = Allocate<::test::union_::StrictBoundedXUnion>{}(src, &out_size);
+    out_size = MinSize<::test::union_::StrictBoundedUnion>() + slack_per_member;
+    out.xu = Allocate<::test::union_::StrictBoundedUnion>{}(src, &out_size);
     return out;
   }
 };
 template <>
-struct MinSize<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
+struct MinSize<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
   operator size_t() {
     return MinSize<::test::union_::OlderSimpleUnion>();
   }
 };
 template <>
-struct Allocate<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>());
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse out;
-    const size_t slack_per_member = (*size - MinSize<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>()) / 1;
+struct Allocate<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
+  TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>());
+    TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse out;
+    const size_t slack_per_member = (*size - MinSize<TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>()) / 1;
     size_t out_size;
     out_size = MinSize<::test::union_::OlderSimpleUnion>() + slack_per_member;
     out.xu = Allocate<::test::union_::OlderSimpleUnion>{}(src, &out_size);
@@ -794,17 +794,17 @@ struct Allocate<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedRespon
   }
 };
 template <>
-struct MinSize<StructWithNullableXUnion> {
+struct MinSize<StructWithNullableUnion> {
   operator size_t() {
     return MinSize<::std::unique_ptr<::test::union_::OlderSimpleUnion>>();
   }
 };
 template <>
-struct Allocate<StructWithNullableXUnion> {
-  StructWithNullableXUnion operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<StructWithNullableXUnion>());
-    StructWithNullableXUnion out;
-    const size_t slack_per_member = (*size - MinSize<StructWithNullableXUnion>()) / 1;
+struct Allocate<StructWithNullableUnion> {
+  StructWithNullableUnion operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<StructWithNullableUnion>());
+    StructWithNullableUnion out;
+    const size_t slack_per_member = (*size - MinSize<StructWithNullableUnion>()) / 1;
     size_t out_size;
     out_size = MinSize<::std::unique_ptr<::test::union_::OlderSimpleUnion>>() + slack_per_member;
     out.x1 = Allocate<::std::unique_ptr<::test::union_::OlderSimpleUnion>>{}(src, &out_size);
@@ -812,24 +812,24 @@ struct Allocate<StructWithNullableXUnion> {
   }
 };
 template <>
-struct MinSize<ExplicitXUnion> {
+struct MinSize<ExplicitFlexibleUnion> {
   operator size_t() {
     size_t sizes[] = {0, MinSize<int64_t>(), MinSize<float>()};
     return 1 + *std::max_element(sizes, sizes + 2 + 1);
   }
 };
 template <>
-struct Allocate<ExplicitXUnion> {
+struct Allocate<ExplicitFlexibleUnion> {
   static_assert(2 > 0, "xunion must have at least one member");
 
-  ExplicitXUnion operator()(FuzzInput* src, size_t* size) {
-    ZX_ASSERT(*size >= MinSize<ExplicitXUnion>());
+  ExplicitFlexibleUnion operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ExplicitFlexibleUnion>());
 
     uint8_t selector;
     ZX_ASSERT(src->CopyBytes(&selector, 1));
     (*size)++;
 
-    ExplicitXUnion out;
+    ExplicitFlexibleUnion out;
     switch (selector % 2) {
       case 0: {
         out.set_i(Allocate<int64_t>{}(src, size));
@@ -847,7 +847,7 @@ struct Allocate<ExplicitXUnion> {
 template <>
 struct MinSize<UnionSandwich> {
   operator size_t() {
-    return MinSize<uint32_t>() + MinSize<::test::union_::ExplicitXUnion>() + MinSize<uint32_t>();
+    return MinSize<uint32_t>() + MinSize<::test::union_::ExplicitFlexibleUnion>() + MinSize<uint32_t>();
   }
 };
 template <>
@@ -859,8 +859,8 @@ struct Allocate<UnionSandwich> {
     size_t out_size;
     out_size = MinSize<uint32_t>() + slack_per_member;
     out.a = Allocate<uint32_t>{}(src, &out_size);
-    out_size = MinSize<::test::union_::ExplicitXUnion>() + slack_per_member;
-    out.u = Allocate<::test::union_::ExplicitXUnion>{}(src, &out_size);
+    out_size = MinSize<::test::union_::ExplicitFlexibleUnion>() + slack_per_member;
+    out.u = Allocate<::test::union_::ExplicitFlexibleUnion>{}(src, &out_size);
     out_size = MinSize<uint32_t>() + slack_per_member;
     out.b = Allocate<uint32_t>{}(src, &out_size);
     return out;

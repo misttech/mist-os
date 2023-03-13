@@ -208,13 +208,13 @@ TEST(DeclarationOrderTest, GoodNonnullableUnion) {
     auto source = namer.mangle(R"FIDL(
 library example;
 
-type #Xunion# = resource union {
+type #Union# = resource union {
   1: req server_end:#Protocol#;
   2: foo #Payload#;
 };
 
 protocol #Protocol# {
-  SomeMethod(resource struct { req #Xunion#; });
+  SomeMethod(resource struct { req #Union#; });
 };
 
 type #Payload# = struct {
@@ -227,7 +227,7 @@ type #Payload# = struct {
     auto decl_order = library.declaration_order();
     ASSERT_EQ(4, decl_order.size());
     ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Xunion"));
+    ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
     ASSERT_MANGLED_DECL_NAME(decl_order[2], "ProtocolSomeMethodRequest");
     ASSERT_DECL_NAME(decl_order[3], namer.of("Protocol"));
   }
@@ -239,13 +239,13 @@ TEST(DeclarationOrderTest, GoodNullableUnion) {
     auto source = namer.mangle(R"FIDL(
 library example;
 
-type #Xunion# = resource union {
+type #Union# = resource union {
   1: req server_end:#Protocol#;
   2: foo #Payload#;
 };
 
 protocol #Protocol# {
-  SomeMethod(resource struct { req #Xunion#:optional; });
+  SomeMethod(resource struct { req #Union#:optional; });
 };
 
 type #Payload# = struct {
@@ -258,24 +258,24 @@ type #Payload# = struct {
     auto decl_order = library.declaration_order();
     ASSERT_EQ(4, decl_order.size());
 
-    // Since the Xunion argument is nullable, Protocol does not have any
+    // Since the Union argument is nullable, Protocol does not have any
     // dependencies, and we therefore have two independent declaration
     // sub-graphs:
-    //   a. Payload <- Xunion
+    //   a. Payload <- Union
     //   b. ProtocolSomeMethodRequest <- Protocol
     // Because of random prefixes, either (a) or (b) will be selected to
     // be first in the declaration order.
     bool payload_is_first = strcmp(DECL_NAME(decl_order[0]), namer.of("Payload")) == 0;
     if (payload_is_first) {
       ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[1], namer.of("Xunion"));
+      ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
       ASSERT_MANGLED_DECL_NAME(decl_order[2], "ProtocolSomeMethodRequest");
       ASSERT_DECL_NAME(decl_order[3], namer.of("Protocol"));
     } else {
       ASSERT_MANGLED_DECL_NAME(decl_order[0], "ProtocolSomeMethodRequest");
       ASSERT_DECL_NAME(decl_order[1], namer.of("Protocol"));
       ASSERT_DECL_NAME(decl_order[2], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[3], namer.of("Xunion"));
+      ASSERT_DECL_NAME(decl_order[3], namer.of("Union"));
     }
   }
 }
@@ -295,10 +295,10 @@ protocol #Protocol# {
 };
 
 type #Request# = struct {
-  xu #Xunion#;
+  u #Union#;
 };
 
-type #Xunion# = union {
+type #Union# = union {
   1: foo #Payload#;
 };
 
@@ -308,7 +308,7 @@ type #Xunion# = union {
     auto decl_order = library.declaration_order();
     ASSERT_EQ(5, decl_order.size());
     ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Xunion"));
+    ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
     ASSERT_DECL_NAME(decl_order[2], namer.of("Request"));
     ASSERT_MANGLED_DECL_NAME(decl_order[3], "ProtocolSomeMethodRequest");
     ASSERT_DECL_NAME(decl_order[4], namer.of("Protocol"));
@@ -330,10 +330,10 @@ protocol #Protocol# {
 };
 
 type #Request# = struct {
-  xu #Xunion#:optional;
+  u #Union#:optional;
 };
 
-type #Xunion# = union {
+type #Union# = union {
   1: foo #Payload#;
 };
 
@@ -343,17 +343,17 @@ type #Xunion# = union {
     auto decl_order = library.declaration_order();
     ASSERT_EQ(5, decl_order.size());
 
-    // Since the Xunion field is nullable, Request does not have any
+    // Since the Union field is nullable, Request does not have any
     // dependencies, and we therefore have two independent declaration
     // sub-graphs:
-    //   a. Payload <- Xunion
+    //   a. Payload <- Union
     //   b. Request <- ProtocolSomeMethodRequest <- Protocol
     // Because of random prefixes, either (a) or (b) will be selected to
     // be first in the declaration order.
     bool payload_is_first = strcmp(DECL_NAME(decl_order[0]), namer.of("Payload")) == 0;
     if (payload_is_first) {
       ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[1], namer.of("Xunion"));
+      ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
       ASSERT_DECL_NAME(decl_order[2], namer.of("Request"));
       ASSERT_MANGLED_DECL_NAME(decl_order[3], "ProtocolSomeMethodRequest");
       ASSERT_DECL_NAME(decl_order[4], namer.of("Protocol"));
@@ -362,7 +362,7 @@ type #Xunion# = union {
       ASSERT_MANGLED_DECL_NAME(decl_order[1], "ProtocolSomeMethodRequest");
       ASSERT_DECL_NAME(decl_order[2], namer.of("Protocol"));
       ASSERT_DECL_NAME(decl_order[3], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[4], namer.of("Xunion"));
+      ASSERT_DECL_NAME(decl_order[4], namer.of("Union"));
     }
   }
 }

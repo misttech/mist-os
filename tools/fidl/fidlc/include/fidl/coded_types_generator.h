@@ -39,14 +39,14 @@ class CodedTypesGenerator {
   void CompileFields(const flat::Decl* decl);
   void CompileStructFields(const flat::Struct* struct_decl, coded::StructType* coded_struct);
   void CompileTableFields(const flat::Table* table_decl, coded::TableType* coded_table);
-  void CompileUnionFields(const flat::Union* union_decl, coded::XUnionType* coded_union);
+  void CompileUnionFields(const flat::Union* union_decl, coded::UnionType* coded_union);
 
   void CompileDecl(const flat::Decl* decl);
   static std::unique_ptr<coded::StructType> CompileStructDecl(const flat::Struct* struct_decl,
                                                               std::string name, std::string qname);
-  static std::unique_ptr<coded::XUnionType> CompileUnionDecl(
+  static std::unique_ptr<coded::UnionType> CompileUnionDecl(
       const flat::Union* union_decl, std::string name, std::string qname,
-      types::Nullability nullability, coded::XUnionType* reference_type = nullptr);
+      types::Nullability nullability, coded::UnionType* reference_type = nullptr);
 
   void CompileXRef(const coded::Type* type);
 

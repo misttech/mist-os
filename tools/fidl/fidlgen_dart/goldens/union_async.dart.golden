@@ -100,6 +100,101 @@ const $fidl.NullableUnionType<EmptyFlexibleUnion> kEmptyFlexibleUnion_OptType =
   resource: false,
 );
 
+enum ExplicitFlexibleUnionTag {
+  $unknown,
+  i, // 0x1
+  f, // 0x4
+}
+
+const Map<int, ExplicitFlexibleUnionTag> _ExplicitFlexibleUnionTag_map = {
+  1: ExplicitFlexibleUnionTag.i,
+  4: ExplicitFlexibleUnionTag.f,
+};
+
+class ExplicitFlexibleUnion extends $fidl.Union {
+  const ExplicitFlexibleUnion.withI(int value)
+      : _ordinal = 1,
+        _data = value;
+
+  const ExplicitFlexibleUnion.withF(double value)
+      : _ordinal = 4,
+        _data = value;
+  const ExplicitFlexibleUnion.with$UnknownData(
+      this._ordinal, $fidl.UnknownRawData data)
+      : _data = data;
+
+  ExplicitFlexibleUnion._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ExplicitFlexibleUnionTag get $tag =>
+      _ExplicitFlexibleUnionTag_map[_ordinal] ??
+      ExplicitFlexibleUnionTag.$unknown;
+
+  int? get i {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  double? get f {
+    if (_ordinal != 4) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+      case 4:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ExplicitFlexibleUnion _ctor(int ordinal, Object data) {
+    return ExplicitFlexibleUnion._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ExplicitFlexibleUnion> kExplicitFlexibleUnion_Type =
+    $fidl.UnionType<ExplicitFlexibleUnion>(
+  members: <int, $fidl.FidlType>{
+    1: $fidl.Int64Type(),
+    4: $fidl.Float32Type(),
+  },
+  ctor: ExplicitFlexibleUnion._ctor,
+  flexible: true,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ExplicitFlexibleUnion>
+    kExplicitFlexibleUnion_OptType =
+    $fidl.NullableUnionType<ExplicitFlexibleUnion>(
+  members: <int, $fidl.FidlType>{
+    1: $fidl.Int64Type(),
+    4: $fidl.Float32Type(),
+  },
+  ctor: ExplicitFlexibleUnion._ctor,
+  flexible: true,
+  resource: false,
+);
+
 enum ExplicitFooTag {
   $unknown,
   i, // 0x1
@@ -454,99 +549,6 @@ const $fidl.NullableUnionType<ExplicitUnion> kExplicitUnion_OptType =
   },
   ctor: ExplicitUnion._ctor,
   flexible: false,
-  resource: false,
-);
-
-enum ExplicitXUnionTag {
-  $unknown,
-  i, // 0x1
-  f, // 0x4
-}
-
-const Map<int, ExplicitXUnionTag> _ExplicitXUnionTag_map = {
-  1: ExplicitXUnionTag.i,
-  4: ExplicitXUnionTag.f,
-};
-
-class ExplicitXUnion extends $fidl.Union {
-  const ExplicitXUnion.withI(int value)
-      : _ordinal = 1,
-        _data = value;
-
-  const ExplicitXUnion.withF(double value)
-      : _ordinal = 4,
-        _data = value;
-  const ExplicitXUnion.with$UnknownData(
-      this._ordinal, $fidl.UnknownRawData data)
-      : _data = data;
-
-  ExplicitXUnion._(int ordinal, Object data)
-      : _ordinal = ordinal,
-        _data = data;
-
-  final int _ordinal;
-  final _data;
-
-  ExplicitXUnionTag get $tag =>
-      _ExplicitXUnionTag_map[_ordinal] ?? ExplicitXUnionTag.$unknown;
-
-  int? get i {
-    if (_ordinal != 1) {
-      return null;
-    }
-    return _data;
-  }
-
-  double? get f {
-    if (_ordinal != 4) {
-      return null;
-    }
-    return _data;
-  }
-
-  $fidl.UnknownRawData? get $unknownData {
-    switch (_ordinal) {
-      case 1:
-      case 4:
-        return null;
-      default:
-        return _data;
-    }
-  }
-
-  @override
-  int get $ordinal => _ordinal;
-
-  @override
-  Object get $data => _data;
-
-  static ExplicitXUnion _ctor(int ordinal, Object data) {
-    return ExplicitXUnion._(ordinal, data);
-  }
-}
-
-// See fxbug.dev/7644:
-// ignore: recursive_compile_time_constant
-const $fidl.UnionType<ExplicitXUnion> kExplicitXUnion_Type =
-    $fidl.UnionType<ExplicitXUnion>(
-  members: <int, $fidl.FidlType>{
-    1: $fidl.Int64Type(),
-    4: $fidl.Float32Type(),
-  },
-  ctor: ExplicitXUnion._ctor,
-  flexible: true,
-  resource: false,
-);
-// See fxbug.dev/7644:
-// ignore: recursive_compile_time_constant
-const $fidl.NullableUnionType<ExplicitXUnion> kExplicitXUnion_OptType =
-    $fidl.NullableUnionType<ExplicitXUnion>(
-  members: <int, $fidl.FidlType>{
-    1: $fidl.Int64Type(),
-    4: $fidl.Float32Type(),
-  },
-  ctor: ExplicitXUnion._ctor,
-  flexible: true,
   resource: false,
 );
 
@@ -1362,27 +1364,27 @@ const $fidl.NullableUnionType<ReverseOrdinalUnion>
   resource: false,
 );
 
-enum StrictBoundedXUnionTag {
+enum StrictBoundedUnionTag {
   v, // 0x1
 }
 
-const Map<int, StrictBoundedXUnionTag> _StrictBoundedXUnionTag_map = {
-  1: StrictBoundedXUnionTag.v,
+const Map<int, StrictBoundedUnionTag> _StrictBoundedUnionTag_map = {
+  1: StrictBoundedUnionTag.v,
 };
 
-class StrictBoundedXUnion extends $fidl.Union {
-  const StrictBoundedXUnion.withV(Uint8List value)
+class StrictBoundedUnion extends $fidl.Union {
+  const StrictBoundedUnion.withV(Uint8List value)
       : _ordinal = 1,
         _data = value;
 
-  StrictBoundedXUnion._(int ordinal, Object data)
+  StrictBoundedUnion._(int ordinal, Object data)
       : _ordinal = ordinal,
         _data = data;
 
   final int _ordinal;
   final _data;
 
-  StrictBoundedXUnionTag get $tag => _StrictBoundedXUnionTag_map[_ordinal]!;
+  StrictBoundedUnionTag get $tag => _StrictBoundedUnionTag_map[_ordinal]!;
 
   Uint8List? get v {
     if (_ordinal != 1) {
@@ -1406,32 +1408,32 @@ class StrictBoundedXUnion extends $fidl.Union {
   @override
   Object get $data => _data;
 
-  static StrictBoundedXUnion _ctor(int ordinal, Object data) {
-    return StrictBoundedXUnion._(ordinal, data);
+  static StrictBoundedUnion _ctor(int ordinal, Object data) {
+    return StrictBoundedUnion._(ordinal, data);
   }
 }
 
 // See fxbug.dev/7644:
 // ignore: recursive_compile_time_constant
-const $fidl.UnionType<StrictBoundedXUnion> kStrictBoundedXUnion_Type =
-    $fidl.UnionType<StrictBoundedXUnion>(
+const $fidl.UnionType<StrictBoundedUnion> kStrictBoundedUnion_Type =
+    $fidl.UnionType<StrictBoundedUnion>(
   members: <int, $fidl.FidlType>{
     1: $fidl.VectorType<int, Uint8List>(
         element: $fidl.Uint8Type(), maybeElementCount: 10),
   },
-  ctor: StrictBoundedXUnion._ctor,
+  ctor: StrictBoundedUnion._ctor,
   flexible: false,
   resource: false,
 );
 // See fxbug.dev/7644:
 // ignore: recursive_compile_time_constant
-const $fidl.NullableUnionType<StrictBoundedXUnion>
-    kStrictBoundedXUnion_OptType = $fidl.NullableUnionType<StrictBoundedXUnion>(
+const $fidl.NullableUnionType<StrictBoundedUnion> kStrictBoundedUnion_OptType =
+    $fidl.NullableUnionType<StrictBoundedUnion>(
   members: <int, $fidl.FidlType>{
     1: $fidl.VectorType<int, Uint8List>(
         element: $fidl.Uint8Type(), maybeElementCount: 10),
   },
-  ctor: StrictBoundedXUnion._ctor,
+  ctor: StrictBoundedUnion._ctor,
   flexible: false,
   resource: false,
 );
@@ -1611,39 +1613,39 @@ const $fidl.NullableUnionType<StrictPizzaOrPasta> kStrictPizzaOrPasta_OptType =
   resource: false,
 );
 
-enum StrictSimpleXUnionTag {
+enum StrictSimpleUnionTag {
   i, // 0x1
   f, // 0x2
   s, // 0x3
 }
 
-const Map<int, StrictSimpleXUnionTag> _StrictSimpleXUnionTag_map = {
-  1: StrictSimpleXUnionTag.i,
-  2: StrictSimpleXUnionTag.f,
-  3: StrictSimpleXUnionTag.s,
+const Map<int, StrictSimpleUnionTag> _StrictSimpleUnionTag_map = {
+  1: StrictSimpleUnionTag.i,
+  2: StrictSimpleUnionTag.f,
+  3: StrictSimpleUnionTag.s,
 };
 
-class StrictSimpleXUnion extends $fidl.Union {
-  const StrictSimpleXUnion.withI(int value)
+class StrictSimpleUnion extends $fidl.Union {
+  const StrictSimpleUnion.withI(int value)
       : _ordinal = 1,
         _data = value;
 
-  const StrictSimpleXUnion.withF(double value)
+  const StrictSimpleUnion.withF(double value)
       : _ordinal = 2,
         _data = value;
 
-  const StrictSimpleXUnion.withS(String value)
+  const StrictSimpleUnion.withS(String value)
       : _ordinal = 3,
         _data = value;
 
-  StrictSimpleXUnion._(int ordinal, Object data)
+  StrictSimpleUnion._(int ordinal, Object data)
       : _ordinal = ordinal,
         _data = data;
 
   final int _ordinal;
   final _data;
 
-  StrictSimpleXUnionTag get $tag => _StrictSimpleXUnionTag_map[_ordinal]!;
+  StrictSimpleUnionTag get $tag => _StrictSimpleUnionTag_map[_ordinal]!;
 
   int? get i {
     if (_ordinal != 1) {
@@ -1683,34 +1685,34 @@ class StrictSimpleXUnion extends $fidl.Union {
   @override
   Object get $data => _data;
 
-  static StrictSimpleXUnion _ctor(int ordinal, Object data) {
-    return StrictSimpleXUnion._(ordinal, data);
+  static StrictSimpleUnion _ctor(int ordinal, Object data) {
+    return StrictSimpleUnion._(ordinal, data);
   }
 }
 
 // See fxbug.dev/7644:
 // ignore: recursive_compile_time_constant
-const $fidl.UnionType<StrictSimpleXUnion> kStrictSimpleXUnion_Type =
-    $fidl.UnionType<StrictSimpleXUnion>(
+const $fidl.UnionType<StrictSimpleUnion> kStrictSimpleUnion_Type =
+    $fidl.UnionType<StrictSimpleUnion>(
   members: <int, $fidl.FidlType>{
     1: $fidl.Int32Type(),
     2: $fidl.Float32Type(),
     3: $fidl.StringType(maybeElementCount: null),
   },
-  ctor: StrictSimpleXUnion._ctor,
+  ctor: StrictSimpleUnion._ctor,
   flexible: false,
   resource: false,
 );
 // See fxbug.dev/7644:
 // ignore: recursive_compile_time_constant
-const $fidl.NullableUnionType<StrictSimpleXUnion> kStrictSimpleXUnion_OptType =
-    $fidl.NullableUnionType<StrictSimpleXUnion>(
+const $fidl.NullableUnionType<StrictSimpleUnion> kStrictSimpleUnion_OptType =
+    $fidl.NullableUnionType<StrictSimpleUnion>(
   members: <int, $fidl.FidlType>{
     1: $fidl.Int32Type(),
     2: $fidl.Float32Type(),
     3: $fidl.StringType(maybeElementCount: null),
   },
-  ctor: StrictSimpleXUnion._ctor,
+  ctor: StrictSimpleUnion._ctor,
   flexible: false,
   resource: false,
 );
@@ -1930,6 +1932,87 @@ const $fidl.NullableUnionType<Union> kUnion_OptType =
   resource: false,
 );
 
+enum UnionContainingEmptyStructTag {
+  $unknown,
+  empty, // 0x1
+}
+
+const Map<int, UnionContainingEmptyStructTag>
+    _UnionContainingEmptyStructTag_map = {
+  1: UnionContainingEmptyStructTag.empty,
+};
+
+class UnionContainingEmptyStruct extends $fidl.Union {
+  const UnionContainingEmptyStruct.withEmpty(Empty value)
+      : _ordinal = 1,
+        _data = value;
+  const UnionContainingEmptyStruct.with$UnknownData(
+      this._ordinal, $fidl.UnknownRawData data)
+      : _data = data;
+
+  UnionContainingEmptyStruct._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  UnionContainingEmptyStructTag get $tag =>
+      _UnionContainingEmptyStructTag_map[_ordinal] ??
+      UnionContainingEmptyStructTag.$unknown;
+
+  Empty? get empty {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static UnionContainingEmptyStruct _ctor(int ordinal, Object data) {
+    return UnionContainingEmptyStruct._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<UnionContainingEmptyStruct>
+    kUnionContainingEmptyStruct_Type =
+    $fidl.UnionType<UnionContainingEmptyStruct>(
+  members: <int, $fidl.FidlType>{
+    1: kEmpty_Type,
+  },
+  ctor: UnionContainingEmptyStruct._ctor,
+  flexible: true,
+  resource: false,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<UnionContainingEmptyStruct>
+    kUnionContainingEmptyStruct_OptType =
+    $fidl.NullableUnionType<UnionContainingEmptyStruct>(
+  members: <int, $fidl.FidlType>{
+    1: kEmpty_Type,
+  },
+  ctor: UnionContainingEmptyStruct._ctor,
+  flexible: true,
+  resource: false,
+);
+
 enum UnionWithAttributesTag {
   $unknown,
   x, // 0x1
@@ -2003,87 +2086,6 @@ const $fidl.NullableUnionType<UnionWithAttributes>
     1: $fidl.Int64Type(),
   },
   ctor: UnionWithAttributes._ctor,
-  flexible: true,
-  resource: false,
-);
-
-enum XUnionContainingEmptyStructTag {
-  $unknown,
-  empty, // 0x1
-}
-
-const Map<int, XUnionContainingEmptyStructTag>
-    _XUnionContainingEmptyStructTag_map = {
-  1: XUnionContainingEmptyStructTag.empty,
-};
-
-class XUnionContainingEmptyStruct extends $fidl.Union {
-  const XUnionContainingEmptyStruct.withEmpty(Empty value)
-      : _ordinal = 1,
-        _data = value;
-  const XUnionContainingEmptyStruct.with$UnknownData(
-      this._ordinal, $fidl.UnknownRawData data)
-      : _data = data;
-
-  XUnionContainingEmptyStruct._(int ordinal, Object data)
-      : _ordinal = ordinal,
-        _data = data;
-
-  final int _ordinal;
-  final _data;
-
-  XUnionContainingEmptyStructTag get $tag =>
-      _XUnionContainingEmptyStructTag_map[_ordinal] ??
-      XUnionContainingEmptyStructTag.$unknown;
-
-  Empty? get empty {
-    if (_ordinal != 1) {
-      return null;
-    }
-    return _data;
-  }
-
-  $fidl.UnknownRawData? get $unknownData {
-    switch (_ordinal) {
-      case 1:
-        return null;
-      default:
-        return _data;
-    }
-  }
-
-  @override
-  int get $ordinal => _ordinal;
-
-  @override
-  Object get $data => _data;
-
-  static XUnionContainingEmptyStruct _ctor(int ordinal, Object data) {
-    return XUnionContainingEmptyStruct._(ordinal, data);
-  }
-}
-
-// See fxbug.dev/7644:
-// ignore: recursive_compile_time_constant
-const $fidl.UnionType<XUnionContainingEmptyStruct>
-    kXUnionContainingEmptyStruct_Type =
-    $fidl.UnionType<XUnionContainingEmptyStruct>(
-  members: <int, $fidl.FidlType>{
-    1: kEmpty_Type,
-  },
-  ctor: XUnionContainingEmptyStruct._ctor,
-  flexible: true,
-  resource: false,
-);
-// See fxbug.dev/7644:
-// ignore: recursive_compile_time_constant
-const $fidl.NullableUnionType<XUnionContainingEmptyStruct>
-    kXUnionContainingEmptyStruct_OptType =
-    $fidl.NullableUnionType<XUnionContainingEmptyStruct>(
-  members: <int, $fidl.FidlType>{
-    1: kEmpty_Type,
-  },
-  ctor: XUnionContainingEmptyStruct._ctor,
   flexible: true,
   resource: false,
 );
@@ -2296,29 +2298,29 @@ class Pizza extends $fidl.Struct {
 const $fidl.StructType<Pizza> kPizza_Type =
     $fidl.StructType<Pizza>(inlineSize: 16, structDecode: Pizza._structDecode);
 
-class StructWithNullableXUnion extends $fidl.Struct {
-  const StructWithNullableXUnion({
+class StructWithNullableUnion extends $fidl.Struct {
+  const StructWithNullableUnion({
     this.x1,
   });
-  StructWithNullableXUnion.clone(
-    StructWithNullableXUnion $orig, {
+  StructWithNullableUnion.clone(
+    StructWithNullableUnion $orig, {
     OlderSimpleUnion? x1,
   }) : this(
           x1: x1 ?? $orig.x1,
         );
 
-  StructWithNullableXUnion.cloneWithout(
-    StructWithNullableXUnion $orig, {
+  StructWithNullableUnion.cloneWithout(
+    StructWithNullableUnion $orig, {
     bool x1 = false,
   }) : this(
           x1: x1 ? null : $orig.x1,
         );
 
-  StructWithNullableXUnion $cloneWith({
+  StructWithNullableUnion $cloneWith({
     $fidl.OptionalNullable<OlderSimpleUnion?> x1 =
         const $fidl.OptionalNullable.undefined(),
   }) {
-    return StructWithNullableXUnion(
+    return StructWithNullableUnion(
       x1: x1.or(this.x1),
     );
   }
@@ -2339,11 +2341,11 @@ class StructWithNullableXUnion extends $fidl.Struct {
     $fieldType0.encode($encoder, x1, $offset + 0, $depth);
   }
 
-  static StructWithNullableXUnion _structDecode(
+  static StructWithNullableUnion _structDecode(
       $fidl.Decoder $decoder, int $offset, int $depth) {
     switch ($decoder.wireFormat) {
       case $fidl.WireFormat.v2:
-        return StructWithNullableXUnion(
+        return StructWithNullableUnion(
             x1: $fieldType0.decode($decoder, $offset + 0, $depth));
     }
   }
@@ -2351,9 +2353,9 @@ class StructWithNullableXUnion extends $fidl.Struct {
 
 // See fxbug.dev/7644:
 // ignore: recursive_compile_time_constant
-const $fidl.StructType<StructWithNullableXUnion>
-    kStructWithNullableXUnion_Type = $fidl.StructType<StructWithNullableXUnion>(
-        inlineSize: 16, structDecode: StructWithNullableXUnion._structDecode);
+const $fidl.StructType<StructWithNullableUnion> kStructWithNullableUnion_Type =
+    $fidl.StructType<StructWithNullableUnion>(
+        inlineSize: 16, structDecode: StructWithNullableUnion._structDecode);
 
 class UnionSandwich extends $fidl.Struct {
   const UnionSandwich({
@@ -2364,7 +2366,7 @@ class UnionSandwich extends $fidl.Struct {
   UnionSandwich.clone(
     UnionSandwich $orig, {
     int? a,
-    ExplicitXUnion? u,
+    ExplicitFlexibleUnion? u,
     int? b,
   }) : this(
           a: a ?? $orig.a,
@@ -2374,7 +2376,7 @@ class UnionSandwich extends $fidl.Struct {
 
   UnionSandwich $cloneWith({
     int? a,
-    ExplicitXUnion? u,
+    ExplicitFlexibleUnion? u,
     int? b,
   }) {
     return UnionSandwich(
@@ -2385,7 +2387,7 @@ class UnionSandwich extends $fidl.Struct {
   }
 
   final int a;
-  final ExplicitXUnion u;
+  final ExplicitFlexibleUnion u;
   final int b;
 
   @override
@@ -2398,7 +2400,7 @@ class UnionSandwich extends $fidl.Struct {
   }
 
   static const $fieldType0 = $fidl.Uint32Type();
-  static const $fieldType1 = kExplicitXUnion_Type;
+  static const $fieldType1 = kExplicitFlexibleUnion_Type;
   static const $fieldType2 = $fidl.Uint32Type();
 
   @override
@@ -2429,43 +2431,42 @@ const $fidl.StructType<UnionSandwich> kUnionSandwich_Type =
     $fidl.StructType<UnionSandwich>(
         inlineSize: 32, structDecode: UnionSandwich._structDecode);
 
-// strictXUnionHenceResponseMayBeStackAllocated: () -> (StrictBoundedXUnion xu)
-const int _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal =
-    0x816ec730baa90dd;
+// strictUnionHenceResponseMayBeStackAllocated: () -> (StrictBoundedUnion xu)
+const int _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal =
+    0x5bfca9479251b9c3;
 const $fidl.MethodType
-    _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type =
+    _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type =
     $fidl.MethodType(
   request: [],
   response: <$fidl.MemberType>[
-    $fidl.MemberType<StrictBoundedXUnion>(
-        type: kStrictBoundedXUnion_Type, offset: 0),
+    $fidl.MemberType<StrictBoundedUnion>(
+        type: kStrictBoundedUnion_Type, offset: 0),
   ],
-  name: r"TestProtocol.StrictXUnionHenceResponseMayBeStackAllocated",
+  name: r"TestProtocol.StrictUnionHenceResponseMayBeStackAllocated",
   requestInlineSizeV2: 0,
   responseInlineSizeV2: 16,
 );
-// flexibleXUnionHenceResponseMustBeHeapAllocated: () -> (OlderSimpleUnion xu)
-const int
-    _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal =
-    0x6ad517317388ea05;
+// flexibleUnionHenceResponseMustBeHeapAllocated: () -> (OlderSimpleUnion xu)
+const int _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal =
+    0x694fede3b8829ce2;
 const $fidl.MethodType
-    _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type =
+    _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type =
     $fidl.MethodType(
   request: [],
   response: <$fidl.MemberType>[
     $fidl.MemberType<OlderSimpleUnion>(type: kOlderSimpleUnion_Type, offset: 0),
   ],
-  name: r"TestProtocol.FlexibleXUnionHenceResponseMustBeHeapAllocated",
+  name: r"TestProtocol.FlexibleUnionHenceResponseMustBeHeapAllocated",
   requestInlineSizeV2: 0,
   responseInlineSizeV2: 16,
 );
 
 abstract class TestProtocol {
   $fidl.ServiceData? get $serviceData => TestProtocolData();
-  $async.Future<StrictBoundedXUnion>
-      strictXUnionHenceResponseMayBeStackAllocated();
+  $async.Future<StrictBoundedUnion>
+      strictUnionHenceResponseMayBeStackAllocated();
   $async.Future<OlderSimpleUnion>
-      flexibleXUnionHenceResponseMustBeHeapAllocated();
+      flexibleUnionHenceResponseMustBeHeapAllocated();
 } // TODO: Remove ServiceData for non-service
 
 class TestProtocolData implements $fidl.ServiceData<TestProtocol> {
@@ -2514,51 +2515,51 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
       return;
     }
     switch ($message.ordinal) {
-      case _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal:
+      case _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal:
         final String _name =
-            _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+            _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                 .name;
         $fidl.performCtrlWithExceptionHandling(
             _name, ctrl, 'method response', $completer.completeError, () {
           final List<$fidl.MemberType> $types =
-              _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+              _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal',
+                r'Unexpected byte overflow for _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal',
                 $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
-              _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+              _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
           $completer.complete($response);
         });
         break;
-      case _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal:
+      case _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal:
         final String _name =
-            _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+            _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                 .name;
         $fidl.performCtrlWithExceptionHandling(
             _name, ctrl, 'method response', $completer.completeError, () {
           final List<$fidl.MemberType> $types =
-              _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+              _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                   .response!;
           final $wireFormat = $message.parseWireFormat();
           // ignore: prefer_const_declarations
 
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal',
+                r'Unexpected byte overflow for _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal',
                 $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $response = $fidl.decodeMessage(
               $message,
-              _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+              _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                   .responseInlineSize($wireFormat),
               $types[0]);
           $completer.complete($response);
@@ -2572,8 +2573,8 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
   }
 
   @override
-  $async.Future<StrictBoundedXUnion>
-      strictXUnionHenceResponseMayBeStackAllocated() {
+  $async.Future<StrictBoundedUnion>
+      strictUnionHenceResponseMayBeStackAllocated() {
     if (!ctrl.isBound) {
       return $async.Future.error(
           $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
@@ -2582,17 +2583,17 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
 
     final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
     $encoder.encodeMessageHeader(
-        _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal,
+        _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal,
         0,
         $fidl.CallStrictness.strict);
-    final $completer = $async.Completer<StrictBoundedXUnion>();
+    final $completer = $async.Completer<StrictBoundedUnion>();
     ctrl.sendMessageWithResponse($encoder.message, $completer);
     return $completer.future;
   }
 
   @override
   $async.Future<OlderSimpleUnion>
-      flexibleXUnionHenceResponseMustBeHeapAllocated() {
+      flexibleUnionHenceResponseMustBeHeapAllocated() {
     if (!ctrl.isBound) {
       return $async.Future.error(
           $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
@@ -2601,7 +2602,7 @@ class TestProtocolProxy extends $fidl.AsyncProxy<TestProtocol>
 
     final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
     $encoder.encodeMessageHeader(
-        _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal,
+        _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal,
         0,
         $fidl.CallStrictness.strict);
     final $completer = $async.Completer<OlderSimpleUnion>();
@@ -2618,43 +2619,43 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
       $fidl.IncomingMessage $message, $fidl.OutgoingMessageSink $respond) {
     final $wireFormat = $message.parseWireFormat();
     switch ($message.ordinal) {
-      case _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal:
+      case _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal:
         final String _name =
-            _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+            _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                 .name;
         $fidl.performWithExceptionHandling(_name, () {
           final List<$fidl.MemberType> $types =
-              _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+              _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal',
+                r'Unexpected byte overflow for _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal',
                 $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<
-              StrictBoundedXUnion> $future = $fidl.decodeMessageWithCallback<
-                  $async.Future<StrictBoundedXUnion>>(
+              StrictBoundedUnion> $future = $fidl.decodeMessageWithCallback<
+                  $async.Future<StrictBoundedUnion>>(
               $message,
-              _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+              _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                   .requestInlineSize($wireFormat),
               ($fidl.Decoder $decoder, int $offset) {
-            return _impl.strictXUnionHenceResponseMayBeStackAllocated();
+            return _impl.strictUnionHenceResponseMayBeStackAllocated();
           });
           $future.then(($response) {
             final $fidl.Encoder $encoder =
                 $fidl.Encoder($fidl.kWireFormatDefault);
             $encoder.encodeMessageHeader(
-                _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Ordinal,
+                _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal,
                 $message.txid,
                 $fidl.CallStrictness.strict);
             final List<$fidl.MemberType> $types =
-                _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+                _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                     .response!;
             $fidl.encodeMessage(
                 $encoder,
-                _kTestProtocol_StrictXUnionHenceResponseMayBeStackAllocated_Type
+                _kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Type
                     .responseInlineSize($encoder.wireFormat),
                 $types[0],
                 $response);
@@ -2664,43 +2665,43 @@ class TestProtocolBinding extends $fidl.AsyncBinding<TestProtocol> {
           });
         }, close);
         break;
-      case _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal:
+      case _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal:
         final String _name =
-            _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+            _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                 .name;
         $fidl.performWithExceptionHandling(_name, () {
           final List<$fidl.MemberType> $types =
-              _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+              _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                   .request!;
           // ignore: prefer_const_declarations
           final _impl = impl!;
           if ($message.overflowing == $fidl.CallOverflowing.large) {
             throw $fidl.FidlError(
-                r'Unexpected byte overflow for _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal',
+                r'Unexpected byte overflow for _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal',
                 $fidl.FidlErrorCode.fidlLargeMessageImpossible);
           }
           final $async.Future<
               OlderSimpleUnion> $future = $fidl.decodeMessageWithCallback<
                   $async.Future<OlderSimpleUnion>>(
               $message,
-              _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+              _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                   .requestInlineSize($wireFormat),
               ($fidl.Decoder $decoder, int $offset) {
-            return _impl.flexibleXUnionHenceResponseMustBeHeapAllocated();
+            return _impl.flexibleUnionHenceResponseMustBeHeapAllocated();
           });
           $future.then(($response) {
             final $fidl.Encoder $encoder =
                 $fidl.Encoder($fidl.kWireFormatDefault);
             $encoder.encodeMessageHeader(
-                _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Ordinal,
+                _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal,
                 $message.txid,
                 $fidl.CallStrictness.strict);
             final List<$fidl.MemberType> $types =
-                _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+                _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                     .response!;
             $fidl.encodeMessage(
                 $encoder,
-                _kTestProtocol_FlexibleXUnionHenceResponseMustBeHeapAllocated_Type
+                _kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Type
                     .responseInlineSize($encoder.wireFormat),
                 $types[0],
                 $response);

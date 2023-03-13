@@ -259,7 +259,7 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
       auto identifier_type = static_cast<const flat::IdentifierType*>(type);
       auto iter = named_coded_types_.find(identifier_type->name);
       ZX_ASSERT_MSG(iter != named_coded_types_.end(), "identifier type not found");
-      // We may need to set the emit-pointer bit on structs, unions, and xunions now.
+      // We may need to set the emit-pointer bit on structs and unions now.
       auto coded_type = iter->second.get();
       switch (coded_type->kind) {
         case coded::Type::Kind::kStruct: {
@@ -284,12 +284,12 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
           ZX_ASSERT(identifier_type->nullability != types::Nullability::kNullable);
           return coded_type;
         }
-        case coded::Type::Kind::kXUnion: {
+        case coded::Type::Kind::kUnion: {
           if (identifier_type->nullability != types::Nullability::kNullable) {
             return coded_type;
           }
-          auto coded_xunion_type = static_cast<coded::XUnionType*>(coded_type);
-          return coded_xunion_type->maybe_reference_type;
+          auto coded_union_type = static_cast<coded::UnionType*>(coded_type);
+          return coded_union_type->maybe_reference_type;
         }
         case coded::Type::Kind::kProtocol: {
           auto iter = protocol_type_map_.find(identifier_type);
@@ -361,7 +361,7 @@ void CodedTypesGenerator::CompileFields(const flat::Decl* decl) {
                 break;
               }
               case flat::Decl::Kind::kUnion: {
-                auto coded_union = static_cast<coded::XUnionType*>(coded_message.get());
+                auto coded_union = static_cast<coded::UnionType*>(coded_message.get());
                 auto union_decl = static_cast<const flat::Union*>(id->type_decl);
                 CompileUnionFields(union_decl, coded_union);
                 is_noop = false;
@@ -408,14 +408,13 @@ void CodedTypesGenerator::CompileFields(const flat::Decl* decl) {
     case flat::Decl::Kind::kUnion: {
       auto union_decl = static_cast<const flat::Union*>(decl);
       auto type = named_coded_types_[decl->name].get();
-      coded::XUnionType* coded_xunion = static_cast<coded::XUnionType*>(type);
-      coded::XUnionType* nullable_coded_xunion = coded_xunion->maybe_reference_type;
-      ZX_ASSERT_MSG(nullable_coded_xunion != nullptr,
-                    "named coded xunion must have a reference type");
-      ZX_ASSERT_MSG(coded_xunion->fields.empty(),
-                    "the coded xunion fields are being compiled twice");
-      CompileUnionFields(union_decl, coded_xunion);
-      CompileUnionFields(union_decl, nullable_coded_xunion);
+      coded::UnionType* coded_union = static_cast<coded::UnionType*>(type);
+      coded::UnionType* nullable_coded_union = coded_union->maybe_reference_type;
+      ZX_ASSERT_MSG(nullable_coded_union != nullptr,
+                    "named coded union must have a reference type");
+      ZX_ASSERT_MSG(coded_union->fields.empty(), "the coded union fields are being compiled twice");
+      CompileUnionFields(union_decl, coded_union);
+      CompileUnionFields(union_decl, nullable_coded_union);
       break;
     }
     default: {
@@ -475,10 +474,10 @@ void CodedTypesGenerator::CompileTableFields(const flat::Table* table_decl,
 }
 
 void CodedTypesGenerator::CompileUnionFields(const flat::Union* union_decl,
-                                             coded::XUnionType* coded_union) {
+                                             coded::UnionType* coded_union) {
   std::set<uint32_t> members;
 
-  for (const auto& member_ref : union_decl->MembersSortedByXUnionOrdinal()) {
+  for (const auto& member_ref : union_decl->MembersSortedByUnionOrdinal()) {
     const auto& member = member_ref.get();
     auto [_, inserted] = members.emplace(member.ordinal->value);
     ZX_ASSERT_MSG(inserted, "duplicate union ordinal");
@@ -617,14 +616,14 @@ void CodedTypesGenerator::CompileDecl(const flat::Decl* decl) {
       std::string qname = NameFlatName(union_decl->name);
 
       // Always create the reference type
-      std::unique_ptr<coded::XUnionType> nullable_xunion_type =
+      std::unique_ptr<coded::UnionType> nullable_union_type =
           CompileUnionDecl(union_decl, NameCodedNullableName(union_decl->name), qname,
                            types::Nullability::kNullable);
-      coded::XUnionType* nullable_xunion_ptr = nullable_xunion_type.get();
-      coded_types_.push_back(std::move(nullable_xunion_type));
+      coded::UnionType* nullable_union_ptr = nullable_union_type.get();
+      coded_types_.push_back(std::move(nullable_union_type));
       named_coded_types_.emplace(
           decl->name, CompileUnionDecl(union_decl, NameCodedName(union_decl->name), qname,
-                                       types::Nullability::kNonnullable, nullable_xunion_ptr));
+                                       types::Nullability::kNonnullable, nullable_union_ptr));
       break;
     }
     case flat::Decl::Kind::kNewType: {
@@ -654,16 +653,16 @@ std::unique_ptr<coded::StructType> CodedTypesGenerator::CompileStructDecl(
                                              std::move(qname));
 }
 
-std::unique_ptr<coded::XUnionType> CodedTypesGenerator::CompileUnionDecl(
+std::unique_ptr<coded::UnionType> CodedTypesGenerator::CompileUnionDecl(
     const flat::Union* union_decl, std::string name, std::string qname,
-    types::Nullability nullability, coded::XUnionType* reference_type) {
-  auto xunion_type = std::make_unique<coded::XUnionType>(
-      std::move(name), std::vector<coded::XUnionField>(), std::move(qname), nullability,
+    types::Nullability nullability, coded::UnionType* reference_type) {
+  auto union_type = std::make_unique<coded::UnionType>(
+      std::move(name), std::vector<coded::UnionField>(), std::move(qname), nullability,
       union_decl->strictness, union_decl->resourceness.value());
   if (reference_type != nullptr) {
-    xunion_type->maybe_reference_type = reference_type;
+    union_type->maybe_reference_type = reference_type;
   }
-  return xunion_type;
+  return union_type;
 }
 
 void CodedTypesGenerator::CompileCodedTypes() {

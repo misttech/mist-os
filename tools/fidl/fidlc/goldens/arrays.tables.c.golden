@@ -3,10 +3,10 @@
 #include <lib/fidl/internal.h>
 
 
-__LOCAL extern const struct FidlCodedXUnion test_arrays_UnionSmallArrayTable;
-__LOCAL extern const struct FidlCodedXUnion test_arrays_UnionSmallArrayNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_arrays_UnionLargeArrayTable;
-__LOCAL extern const struct FidlCodedXUnion test_arrays_UnionLargeArrayNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_arrays_UnionSmallArrayTable;
+__LOCAL extern const struct FidlCodedUnion test_arrays_UnionSmallArrayNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_arrays_UnionLargeArrayTable;
+__LOCAL extern const struct FidlCodedUnion test_arrays_UnionLargeArrayNullableRefTable;
 __LOCAL extern const struct FidlCodedTable test_arrays_TableSmallArrayTable;
 __LOCAL extern const struct FidlCodedTable test_arrays_TableLargeArrayTable;
 __LOCAL extern const struct FidlCodedStruct test_arrays_StructSmallArrayTable;
@@ -18,22 +18,22 @@ static const struct FidlCodedArray Array8_6uint32Table __attribute__((unused)) =
 static const struct FidlCodedArray Array400_6uint32Table __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&fidl_internal_kUint32Table), .array_size_v2=400u, .element_size_v2=4u};
 
 
-static const struct FidlXUnionField Fields27test_arrays_UnionSmallArray[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Array8_6uint32Table)}
+static const struct FidlUnionField Fields27test_arrays_UnionSmallArray[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Array8_6uint32Table)}
 };
-const struct FidlCodedXUnion test_arrays_UnionSmallArrayTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields27test_arrays_UnionSmallArray, .nullable=kFidlNullability_Nonnullable, .name="test.arrays/UnionSmallArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields38test_arrays_UnionSmallArrayNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Array8_6uint32Table)}
+const struct FidlCodedUnion test_arrays_UnionSmallArrayTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields27test_arrays_UnionSmallArray, .nullable=kFidlNullability_Nonnullable, .name="test.arrays/UnionSmallArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields38test_arrays_UnionSmallArrayNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Array8_6uint32Table)}
 };
-const struct FidlCodedXUnion test_arrays_UnionSmallArrayNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields38test_arrays_UnionSmallArrayNullableRef, .nullable=kFidlNullability_Nullable, .name="test.arrays/UnionSmallArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields27test_arrays_UnionLargeArray[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Array400_6uint32Table)}
+const struct FidlCodedUnion test_arrays_UnionSmallArrayNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields38test_arrays_UnionSmallArrayNullableRef, .nullable=kFidlNullability_Nullable, .name="test.arrays/UnionSmallArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields27test_arrays_UnionLargeArray[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Array400_6uint32Table)}
 };
-const struct FidlCodedXUnion test_arrays_UnionLargeArrayTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields27test_arrays_UnionLargeArray, .nullable=kFidlNullability_Nonnullable, .name="test.arrays/UnionLargeArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields38test_arrays_UnionLargeArrayNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Array400_6uint32Table)}
+const struct FidlCodedUnion test_arrays_UnionLargeArrayTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields27test_arrays_UnionLargeArray, .nullable=kFidlNullability_Nonnullable, .name="test.arrays/UnionLargeArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields38test_arrays_UnionLargeArrayNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Array400_6uint32Table)}
 };
-const struct FidlCodedXUnion test_arrays_UnionLargeArrayNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields38test_arrays_UnionLargeArrayNullableRef, .nullable=kFidlNullability_Nullable, .name="test.arrays/UnionLargeArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_arrays_UnionLargeArrayNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields38test_arrays_UnionLargeArrayNullableRef, .nullable=kFidlNullability_Nullable, .name="test.arrays/UnionLargeArray", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlTableField Fields27test_arrays_TableSmallArray[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&Array8_6uint32Table), .ordinal=1u}
 };

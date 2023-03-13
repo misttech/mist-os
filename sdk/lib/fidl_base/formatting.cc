@@ -249,7 +249,7 @@ void FormatTypeName(StringBuilder* str, const fidl_type_t* type) {
       FormatTableName(str, &type->coded_table());
       break;
     case kFidlTypeXUnion:
-      FormatXUnionName(str, &type->coded_xunion());
+      FormatXUnionName(str, &type->coded_union());
       break;
     case kFidlTypePrimitive:
       ZX_PANIC("unrecognized tag");

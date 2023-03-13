@@ -16,13 +16,13 @@ class WireTestBase<::test_union::TestProtocol> : public ::fidl::WireServer<::tes
  public:
   virtual ~WireTestBase<::test_union::TestProtocol>() = default;
   virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) = 0;
-  virtual void StrictXUnionHenceResponseMayBeStackAllocated(
-      StrictXUnionHenceResponseMayBeStackAllocatedCompleter::Sync& completer) override {
-    NotImplemented_("StrictXUnionHenceResponseMayBeStackAllocated", completer);
+  virtual void StrictUnionHenceResponseMayBeStackAllocated(
+      StrictUnionHenceResponseMayBeStackAllocatedCompleter::Sync& completer) override {
+    NotImplemented_("StrictUnionHenceResponseMayBeStackAllocated", completer);
   }
-  virtual void FlexibleXUnionHenceResponseMustBeHeapAllocated(
-      FlexibleXUnionHenceResponseMustBeHeapAllocatedCompleter::Sync& completer) override {
-    NotImplemented_("FlexibleXUnionHenceResponseMustBeHeapAllocated", completer);
+  virtual void FlexibleUnionHenceResponseMustBeHeapAllocated(
+      FlexibleUnionHenceResponseMustBeHeapAllocatedCompleter::Sync& completer) override {
+    NotImplemented_("FlexibleUnionHenceResponseMustBeHeapAllocated", completer);
   }
 };
 

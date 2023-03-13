@@ -10,16 +10,16 @@ __LOCAL extern const struct FidlCodedStruct test_protocols_WithProtocolEndsServe
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithProtocolEndsClientEndsResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithProtocolEndsClientEndsRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntaxResponseAsStructTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntax_HandleInResult_ResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntaxHandleInResultTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseTable;
@@ -42,8 +42,8 @@ __LOCAL extern const struct FidlCodedStruct test_protocols_TransitionalRequestRe
 __LOCAL extern const struct FidlCodedStruct test_protocols_TransitionalRequestResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_TransitionalOneWayRequestMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_TransitionalEventEventMessageTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_TheUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_TheUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_TheUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_TheUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_MethodWithUnionUnionMethodRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_SyscallProtocolMethodCRequestTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_SyscallProtocolMethodCRequestMessageTable;
@@ -70,8 +70,8 @@ __LOCAL extern const struct FidlCodedStruct test_protocols_HandleRightsProtocolR
 __LOCAL extern const struct FidlCodedStruct test_protocols_HandleRightsProtocolResponseMethodResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_HandleRightsProtocolAnEventEventMessageTable;
 __LOCAL extern const struct FidlCodedEnum test_protocols_ErrorEnumTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntaxErrorAsEnumTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntaxResponseAsStructResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_protocols_WithErrorSyntaxErrorAsPrimitiveResponseMessageTable;
@@ -134,16 +134,16 @@ const struct FidlCodedStruct test_protocols_WithProtocolEndsClientEndsRequestTab
 
 const struct FidlCodedStruct test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=24u, .name="test.protocols/WithErrorSyntax_ResponseAsStruct_Response"};
 
-static const struct FidlXUnionField Fields54test_protocols_WithErrorSyntax_ResponseAsStruct_Result[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+static const struct FidlUnionField Fields54test_protocols_WithErrorSyntax_ResponseAsStruct_Result[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields54test_protocols_WithErrorSyntax_ResponseAsStruct_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_ResponseAsStruct_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields65test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields54test_protocols_WithErrorSyntax_ResponseAsStruct_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_ResponseAsStruct_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields65test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields65test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_ResponseAsStruct_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields65test_protocols_WithErrorSyntax_ResponseAsStruct_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_ResponseAsStruct_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields57test_protocols_WithErrorSyntaxResponseAsStructTopResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable)}}
 };
@@ -154,16 +154,16 @@ static const struct FidlStructElement Fields54test_protocols_WithErrorSyntax_Han
 };
 const struct FidlCodedStruct test_protocols_WithErrorSyntax_HandleInResult_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields54test_protocols_WithErrorSyntax_HandleInResult_Response, .element_count=1u, .size_v2=4u, .name="test.protocols/WithErrorSyntax_HandleInResult_Response"};
 
-static const struct FidlXUnionField Fields52test_protocols_WithErrorSyntax_HandleInResult_Result[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_HandleInResult_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+static const struct FidlUnionField Fields52test_protocols_WithErrorSyntax_HandleInResult_Result[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_HandleInResult_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_HandleInResult_ResultTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields52test_protocols_WithErrorSyntax_HandleInResult_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_HandleInResult_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_Resource};
-static const struct FidlXUnionField Fields63test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_HandleInResult_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_HandleInResult_ResultTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields52test_protocols_WithErrorSyntax_HandleInResult_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_HandleInResult_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_Resource};
+static const struct FidlUnionField Fields63test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_HandleInResult_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields63test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_HandleInResult_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_Resource};
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields63test_protocols_WithErrorSyntax_HandleInResult_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_HandleInResult_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_Resource};
 static const struct FidlStructElement Fields55test_protocols_WithErrorSyntaxHandleInResultTopResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_HandleInResult_ResultTable)}}
 };
@@ -171,16 +171,16 @@ const struct FidlCodedStruct test_protocols_WithErrorSyntaxHandleInResultTopResp
 
 const struct FidlCodedStruct test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.protocols/WithErrorSyntax_ErrorAsPrimitive_Response"};
 
-static const struct FidlXUnionField Fields54test_protocols_WithErrorSyntax_ErrorAsPrimitive_Result[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+static const struct FidlUnionField Fields54test_protocols_WithErrorSyntax_ErrorAsPrimitive_Result[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields54test_protocols_WithErrorSyntax_ErrorAsPrimitive_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields65test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields54test_protocols_WithErrorSyntax_ErrorAsPrimitive_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields65test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields65test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields65test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_ErrorAsPrimitive_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields57test_protocols_WithErrorSyntaxErrorAsPrimitiveTopResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable)}}
 };
@@ -264,14 +264,14 @@ const struct FidlCodedStruct test_protocols_TransitionalOneWayRequestMessageTabl
 
 const struct FidlCodedStruct test_protocols_TransitionalEventEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocols/TransitionalEventEventMessage"};
 
-static const struct FidlXUnionField Fields23test_protocols_TheUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+static const struct FidlUnionField Fields23test_protocols_TheUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_TheUnionTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields23test_protocols_TheUnion, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/TheUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields34test_protocols_TheUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+const struct FidlCodedUnion test_protocols_TheUnionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields23test_protocols_TheUnion, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/TheUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields34test_protocols_TheUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_protocols_TheUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields34test_protocols_TheUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/TheUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_protocols_TheUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields34test_protocols_TheUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/TheUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields48test_protocols_MethodWithUnionUnionMethodRequest[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocols_TheUnionTable)}}
 };
@@ -446,16 +446,16 @@ static bool EnumValidatorFor_test_protocols_ErrorEnum(uint64_t v) {
 
 const struct FidlCodedEnum test_protocols_ErrorEnumTable = {.tag=kFidlTypeEnum, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Strict, .validate=&EnumValidatorFor_test_protocols_ErrorEnum, .name="test.protocols/ErrorEnum"};
 
-static const struct FidlXUnionField Fields49test_protocols_WithErrorSyntax_ErrorAsEnum_Result[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_ErrorEnumTable)}
+static const struct FidlUnionField Fields49test_protocols_WithErrorSyntax_ErrorAsEnum_Result[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_ErrorEnumTable)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields49test_protocols_WithErrorSyntax_ErrorAsEnum_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_ErrorAsEnum_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields60test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_protocols_ErrorEnumTable)}
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields49test_protocols_WithErrorSyntax_ErrorAsEnum_Result, .nullable=kFidlNullability_Nonnullable, .name="test.protocols/WithErrorSyntax_ErrorAsEnum_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields60test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocols_ErrorEnumTable)}
 };
-const struct FidlCodedXUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields60test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_ErrorAsEnum_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields60test_protocols_WithErrorSyntax_ErrorAsEnum_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocols/WithErrorSyntax_ErrorAsEnum_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields52test_protocols_WithErrorSyntaxErrorAsEnumTopResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable)}}
 };

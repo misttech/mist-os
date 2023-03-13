@@ -3,8 +3,8 @@
 #include <lib/fidl/internal.h>
 
 
-__LOCAL extern const struct FidlCodedXUnion test_anonymous_UnionMemberTable;
-__LOCAL extern const struct FidlCodedXUnion test_anonymous_UnionMemberNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_anonymous_UnionMemberTable;
+__LOCAL extern const struct FidlCodedUnion test_anonymous_UnionMemberNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_anonymous_TableDataTable;
 __LOCAL extern const struct FidlCodedTable test_anonymous_TableMemberTable;
 __LOCAL extern const struct FidlCodedStruct test_anonymous_SomeProtocolSomeMethodRequestTable;
@@ -13,12 +13,12 @@ __LOCAL extern const struct FidlCodedEnum test_anonymous_OpTable;
 __LOCAL extern const struct FidlCodedStruct test_anonymous_OverrideTestTable;
 __LOCAL extern const struct FidlCodedBits test_anonymous_FlagsTable;
 __LOCAL extern const struct FidlCodedTable test_anonymous_FunctionApplicationTable;
-__LOCAL extern const struct FidlCodedXUnion test_anonymous_ExpressionTable;
-__LOCAL extern const struct FidlCodedXUnion test_anonymous_ExpressionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_anonymous_ExpressionTable;
+__LOCAL extern const struct FidlCodedUnion test_anonymous_ExpressionNullableRefTable;
 __LOCAL extern const struct FidlCodedBits test_anonymous_BitsMemberTable;
 __LOCAL extern const struct FidlCodedStruct test_anonymous_SomeProtocol_SomeMethod_ResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_anonymous_SomeProtocol_SomeMethod_ResultTable;
-__LOCAL extern const struct FidlCodedXUnion test_anonymous_SomeProtocol_SomeMethod_ResultNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_anonymous_SomeProtocol_SomeMethod_ResultTable;
+__LOCAL extern const struct FidlCodedUnion test_anonymous_SomeProtocol_SomeMethod_ResultNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_anonymous_SomeProtocolSomeMethodTopResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_anonymous_SomeProtocolSomeMethodRequestMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_anonymous_SomeProtocolSomeMethodResponseMessageTable;
@@ -31,16 +31,16 @@ static const struct FidlCodedString String100nonnullableTable = {.tag=kFidlTypeS
 static const struct FidlCodedVector Vector5nonnullable36test_anonymous_ExpressionNullableRefTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_anonymous_ExpressionNullableRefTable), .max_count=5u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
 
 
-static const struct FidlXUnionField Fields26test_anonymous_UnionMember[] = {
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint8Table)}
+static const struct FidlUnionField Fields26test_anonymous_UnionMember[] = {
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint8Table)}
 };
-const struct FidlCodedXUnion test_anonymous_UnionMemberTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields26test_anonymous_UnionMember, .nullable=kFidlNullability_Nonnullable, .name="test.anonymous/UnionMember", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields37test_anonymous_UnionMemberNullableRef[] = {
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint8Table)}
+const struct FidlCodedUnion test_anonymous_UnionMemberTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields26test_anonymous_UnionMember, .nullable=kFidlNullability_Nonnullable, .name="test.anonymous/UnionMember", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields37test_anonymous_UnionMemberNullableRef[] = {
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint8Table)}
 };
-const struct FidlCodedXUnion test_anonymous_UnionMemberNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields37test_anonymous_UnionMemberNullableRef, .nullable=kFidlNullability_Nullable, .name="test.anonymous/UnionMember", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_anonymous_UnionMemberNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields37test_anonymous_UnionMemberNullableRef, .nullable=kFidlNullability_Nullable, .name="test.anonymous/UnionMember", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedStruct test_anonymous_TableDataTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.anonymous/TableData"};
 
 static const struct FidlTableField Fields26test_anonymous_TableMember[] = {
@@ -75,18 +75,18 @@ static const struct FidlTableField Fields34test_anonymous_FunctionApplication[] 
 };
 const struct FidlCodedTable test_anonymous_FunctionApplicationTable = {.tag=kFidlTypeTable, .fields=Fields34test_anonymous_FunctionApplication, .field_count=3u, .is_resource=kFidlIsResource_NotResource, .name="test.anonymous/FunctionApplication"};
 
-static const struct FidlXUnionField Fields25test_anonymous_Expression[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint64Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_OverrideTestTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_FunctionApplicationTable)}
+static const struct FidlUnionField Fields25test_anonymous_Expression[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint64Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_OverrideTestTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_FunctionApplicationTable)}
 };
-const struct FidlCodedXUnion test_anonymous_ExpressionTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields25test_anonymous_Expression, .nullable=kFidlNullability_Nonnullable, .name="test.anonymous/Expression", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields36test_anonymous_ExpressionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint64Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_OverrideTestTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_FunctionApplicationTable)}
+const struct FidlCodedUnion test_anonymous_ExpressionTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields25test_anonymous_Expression, .nullable=kFidlNullability_Nonnullable, .name="test.anonymous/Expression", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields36test_anonymous_ExpressionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint64Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_OverrideTestTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_FunctionApplicationTable)}
 };
-const struct FidlCodedXUnion test_anonymous_ExpressionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields36test_anonymous_ExpressionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.anonymous/Expression", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_anonymous_ExpressionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields36test_anonymous_ExpressionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.anonymous/Expression", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedBits test_anonymous_BitsMemberTable = {.tag=kFidlTypeBits, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Flexible, .mask=3ul, .name="test.anonymous/BitsMember"};
 
 static const struct FidlStructElement Fields47test_anonymous_SomeProtocol_SomeMethod_Response[] = {
@@ -94,16 +94,16 @@ static const struct FidlStructElement Fields47test_anonymous_SomeProtocol_SomeMe
 };
 const struct FidlCodedStruct test_anonymous_SomeProtocol_SomeMethod_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields47test_anonymous_SomeProtocol_SomeMethod_Response, .element_count=1u, .size_v2=4u, .name="test.anonymous/SomeProtocol_SomeMethod_Response"};
 
-static const struct FidlXUnionField Fields45test_anonymous_SomeProtocol_SomeMethod_Result[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ErrorTable)}
+static const struct FidlUnionField Fields45test_anonymous_SomeProtocol_SomeMethod_Result[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ErrorTable)}
 };
-const struct FidlCodedXUnion test_anonymous_SomeProtocol_SomeMethod_ResultTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields45test_anonymous_SomeProtocol_SomeMethod_Result, .nullable=kFidlNullability_Nonnullable, .name="test.anonymous/SomeProtocol_SomeMethod_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields56test_anonymous_SomeProtocol_SomeMethod_ResultNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ResponseTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ErrorTable)}
+const struct FidlCodedUnion test_anonymous_SomeProtocol_SomeMethod_ResultTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields45test_anonymous_SomeProtocol_SomeMethod_Result, .nullable=kFidlNullability_Nonnullable, .name="test.anonymous/SomeProtocol_SomeMethod_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields56test_anonymous_SomeProtocol_SomeMethod_ResultNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ResponseTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ErrorTable)}
 };
-const struct FidlCodedXUnion test_anonymous_SomeProtocol_SomeMethod_ResultNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields56test_anonymous_SomeProtocol_SomeMethod_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.anonymous/SomeProtocol_SomeMethod_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_anonymous_SomeProtocol_SomeMethod_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields56test_anonymous_SomeProtocol_SomeMethod_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.anonymous/SomeProtocol_SomeMethod_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields48test_anonymous_SomeProtocolSomeMethodTopResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_anonymous_SomeProtocol_SomeMethod_ResultTable)}}
 };

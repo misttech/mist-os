@@ -117,16 +117,6 @@ struct HLCPPToNaturalTraits<::test::placementofattributes::ExampleUnion> {
   using NaturalType = ::test_placementofattributes::ExampleUnion;
   static inline ::test_placementofattributes::ExampleUnion Convert(::test::placementofattributes::ExampleUnion&&);
 };
-template <>
-struct NaturalToHLCPPTraits<::test_placementofattributes::ExampleXUnion> {
-  using HLCPPType = ::test::placementofattributes::ExampleXUnion;
-  static inline ::test::placementofattributes::ExampleXUnion Convert(::test_placementofattributes::ExampleXUnion&&);
-};
-template <>
-struct HLCPPToNaturalTraits<::test::placementofattributes::ExampleXUnion> {
-  using NaturalType = ::test_placementofattributes::ExampleXUnion;
-  static inline ::test_placementofattributes::ExampleXUnion Convert(::test::placementofattributes::ExampleXUnion&&);
-};
 
 ::test::placementofattributes::ExampleProtocolMethodRequest NaturalToHLCPPTraits<::test_placementofattributes::ExampleProtocolMethodRequest>::Convert(::test_placementofattributes::ExampleProtocolMethodRequest&& value) {
   ::test::placementofattributes::ExampleProtocolMethodRequest hlcpp;
@@ -186,28 +176,6 @@ struct HLCPPToNaturalTraits<::test::placementofattributes::ExampleXUnion> {
           ::fidl::HLCPPToNatural(std::move(value.variant())));
     default:
       ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::placementofattributes::ExampleUnion");
-  }
-}
-::test::placementofattributes::ExampleXUnion NaturalToHLCPPTraits<::test_placementofattributes::ExampleXUnion>::Convert(::test_placementofattributes::ExampleXUnion&& value) {
-  ::test::placementofattributes::ExampleXUnion hlcpp;
-  switch (value.Which()) {
-    case ::test_placementofattributes::ExampleXUnion::Tag::kVariant:
-      hlcpp.set_variant(::fidl::NaturalToHLCPP(std::move(value.variant().value())));
-      break;
-    default:
-      break;
-  }
-  return hlcpp;
-}
-
-::test_placementofattributes::ExampleXUnion HLCPPToNaturalTraits<::test::placementofattributes::ExampleXUnion>::Convert(::test::placementofattributes::ExampleXUnion&& value) {
-  using _NaturalUnion = ::test_placementofattributes::ExampleXUnion;
-  switch (value.Which()) {
-    case ::test::placementofattributes::ExampleXUnion::Tag::kVariant:
-      return _NaturalUnion::WithVariant(
-          ::fidl::HLCPPToNatural(std::move(value.variant())));
-    default:
-      return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
   }
 }
 

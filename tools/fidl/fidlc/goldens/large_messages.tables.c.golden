@@ -6,10 +6,10 @@
 __LOCAL extern const struct FidlCodedBits zx_rightsTable;
 __LOCAL extern const struct FidlCodedEnum zx_obj_typeTable;
 __LOCAL extern const struct FidlCodedStruct test_largemessages_UnboundedMaybeLargeValueTable;
-__LOCAL extern const struct FidlCodedXUnion test_largemessages_SemiBoundedMaybeLargeTable;
-__LOCAL extern const struct FidlCodedXUnion test_largemessages_SemiBoundedMaybeLargeNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_largemessages_SemiBoundedBelievedToBeSmallTable;
-__LOCAL extern const struct FidlCodedXUnion test_largemessages_SemiBoundedBelievedToBeSmallNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_largemessages_SemiBoundedMaybeLargeTable;
+__LOCAL extern const struct FidlCodedUnion test_largemessages_SemiBoundedMaybeLargeNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_largemessages_SemiBoundedBelievedToBeSmallTable;
+__LOCAL extern const struct FidlCodedUnion test_largemessages_SemiBoundedBelievedToBeSmallNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_largemessages_ElementsTable;
 __LOCAL extern const struct FidlCodedStruct test_largemessages_UnboundedMaybeLargeResourceTable;
 __LOCAL extern const struct FidlCodedStruct test_largemessages_BoundedMaybeLargeTable;
@@ -38,22 +38,22 @@ static const struct FidlStructElement Fields43test_largemessages_UnboundedMaybeL
 };
 const struct FidlCodedStruct test_largemessages_UnboundedMaybeLargeValueTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields43test_largemessages_UnboundedMaybeLargeValue, .element_count=1u, .size_v2=16u, .name="test.largemessages/UnboundedMaybeLargeValue"};
 
-static const struct FidlXUnionField Fields40test_largemessages_SemiBoundedMaybeLarge[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector65489nonnullable5uint8Table)}
+static const struct FidlUnionField Fields40test_largemessages_SemiBoundedMaybeLarge[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector65489nonnullable5uint8Table)}
 };
-const struct FidlCodedXUnion test_largemessages_SemiBoundedMaybeLargeTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields40test_largemessages_SemiBoundedMaybeLarge, .nullable=kFidlNullability_Nonnullable, .name="test.largemessages/SemiBoundedMaybeLarge", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields51test_largemessages_SemiBoundedMaybeLargeNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector65489nonnullable5uint8Table)}
+const struct FidlCodedUnion test_largemessages_SemiBoundedMaybeLargeTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields40test_largemessages_SemiBoundedMaybeLarge, .nullable=kFidlNullability_Nonnullable, .name="test.largemessages/SemiBoundedMaybeLarge", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields51test_largemessages_SemiBoundedMaybeLargeNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector65489nonnullable5uint8Table)}
 };
-const struct FidlCodedXUnion test_largemessages_SemiBoundedMaybeLargeNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields51test_largemessages_SemiBoundedMaybeLargeNullableRef, .nullable=kFidlNullability_Nullable, .name="test.largemessages/SemiBoundedMaybeLarge", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields47test_largemessages_SemiBoundedBelievedToBeSmall[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector65488nonnullable5uint8Table)}
+const struct FidlCodedUnion test_largemessages_SemiBoundedMaybeLargeNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields51test_largemessages_SemiBoundedMaybeLargeNullableRef, .nullable=kFidlNullability_Nullable, .name="test.largemessages/SemiBoundedMaybeLarge", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields47test_largemessages_SemiBoundedBelievedToBeSmall[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector65488nonnullable5uint8Table)}
 };
-const struct FidlCodedXUnion test_largemessages_SemiBoundedBelievedToBeSmallTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields47test_largemessages_SemiBoundedBelievedToBeSmall, .nullable=kFidlNullability_Nonnullable, .name="test.largemessages/SemiBoundedBelievedToBeSmall", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields58test_largemessages_SemiBoundedBelievedToBeSmallNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector65488nonnullable5uint8Table)}
+const struct FidlCodedUnion test_largemessages_SemiBoundedBelievedToBeSmallTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields47test_largemessages_SemiBoundedBelievedToBeSmall, .nullable=kFidlNullability_Nonnullable, .name="test.largemessages/SemiBoundedBelievedToBeSmall", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields58test_largemessages_SemiBoundedBelievedToBeSmallNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector65488nonnullable5uint8Table)}
 };
-const struct FidlCodedXUnion test_largemessages_SemiBoundedBelievedToBeSmallNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields58test_largemessages_SemiBoundedBelievedToBeSmallNullableRef, .nullable=kFidlNullability_Nullable, .name="test.largemessages/SemiBoundedBelievedToBeSmall", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_largemessages_SemiBoundedBelievedToBeSmallNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields58test_largemessages_SemiBoundedBelievedToBeSmallNullableRef, .nullable=kFidlNullability_Nullable, .name="test.largemessages/SemiBoundedBelievedToBeSmall", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields27test_largemessages_Elements[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Handlehandle2147483648nullableTable)}},
     /*FidlStructPadding*/{.padding=/*FidlStructPadding*/{.offset_v2=4u, .header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Padding32,.is_resource=kFidlIsResource_NotResource},.mask_32=4294967295u}},

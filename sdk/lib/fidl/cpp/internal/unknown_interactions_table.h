@@ -9,7 +9,7 @@
 
 __BEGIN_CDECLS
 
-extern const struct FidlCodedXUnion kFidlInternalUnknownMethodResponseTable;
+extern const FidlCodedXUnion kFidlInternalUnknownMethodResponseTable;
 
 __END_CDECLS
 

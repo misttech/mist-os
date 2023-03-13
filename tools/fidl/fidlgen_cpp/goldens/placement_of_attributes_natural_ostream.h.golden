@@ -37,10 +37,6 @@ template <>
 struct fidl::ostream::Formatter<::test_placementofattributes::ExampleUnion> {
   static std::ostream& Format(std::ostream& os, const ::test_placementofattributes::ExampleUnion& value);
 };
-template <>
-struct fidl::ostream::Formatter<::test_placementofattributes::ExampleXUnion> {
-  static std::ostream& Format(std::ostream& os, const ::test_placementofattributes::ExampleXUnion& value);
-};
 
 namespace test_placementofattributes {
 
@@ -55,8 +51,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::E
 std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::ExampleTable& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::ExampleUnion& value);
-
-std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::ExampleXUnion& value);
 
 }  // namespace test_placementofattributes
 

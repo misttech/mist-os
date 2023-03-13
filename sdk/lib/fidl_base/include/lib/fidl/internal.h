@@ -288,7 +288,7 @@ struct FidlTableField {
   uint32_t ordinal;
 };
 
-struct FidlXUnionField {
+struct FidlUnionField {
   const fidl_type_t* type;
 };
 
@@ -305,6 +305,7 @@ static const uint8_t kFidlTypeHandle = 7;
 static const uint8_t kFidlTypeVector = 8;
 static const uint8_t kFidlTypeTable = 9;
 static const uint8_t kFidlTypeXUnion = 10;
+static const uint8_t kFidlTypeUnion = 10;
 
 // TODO(fxbug.dev/42793): Consider starting enum values for FidlCodedPrimitive from 1, not 0.
 typedef uint8_t FidlCodedPrimitiveSubtype;
@@ -341,7 +342,7 @@ struct FidlCodedBits;
 struct FidlCodedStruct;
 struct FidlCodedStructPointer;
 struct FidlCodedTable;
-struct FidlCodedXUnion;
+struct FidlCodedUnion;
 struct FidlCodedArray;
 struct FidlCodedHandle;
 struct FidlCodedString;
@@ -360,7 +361,7 @@ struct fidl_type {
   constexpr const FidlCodedStruct& coded_struct() const;
   constexpr const FidlCodedStructPointer& coded_struct_pointer() const;
   constexpr const FidlCodedTable& coded_table() const;
-  constexpr const FidlCodedXUnion& coded_xunion() const;
+  constexpr const FidlCodedUnion& coded_union() const;
   constexpr const FidlCodedArray& coded_array() const;
   constexpr const FidlCodedHandle& coded_handle() const;
   constexpr const FidlCodedString& coded_string() const;
@@ -443,14 +444,14 @@ struct FidlCodedTable FIDL_INTERNAL_INHERIT_TYPE_T {
   const char* name;  // may be nullptr if omitted at compile time
 };
 
-struct FidlCodedXUnion FIDL_INTERNAL_INHERIT_TYPE_T {
+struct FidlCodedUnion FIDL_INTERNAL_INHERIT_TYPE_T {
   const FidlTypeTag tag;
   const FidlNullability nullable;
   const FidlStrictness strictness;
   const FidlIsResource is_resource;
   const uint32_t field_count;
   // The fields are in ordinal order, with ordinal 1 at index 0.
-  const struct FidlXUnionField* const fields;
+  const struct FidlUnionField* const fields;
   const char* name;  // may be nullptr if omitted at compile time
 };
 
@@ -530,8 +531,8 @@ __ALWAYS_INLINE constexpr const FidlCodedTable& fidl_type::coded_table() const {
   return *static_cast<const FidlCodedTable*>(this);
 }
 
-__ALWAYS_INLINE constexpr const FidlCodedXUnion& fidl_type::coded_xunion() const {
-  return *static_cast<const FidlCodedXUnion*>(this);
+__ALWAYS_INLINE constexpr const FidlCodedUnion& fidl_type::coded_union() const {
+  return *static_cast<const FidlCodedUnion*>(this);
 }
 
 __ALWAYS_INLINE constexpr const FidlCodedArray& fidl_type::coded_array() const {
@@ -566,6 +567,10 @@ extern const struct FidlCodedPrimitive fidl_internal_kFloat64Table;
 
 extern const struct FidlCodedEnum fidl_internal_kTransportErrTable;
 
+// Backwards-compatible names
+typedef struct FidlCodedUnion FidlCodedXUnion;
+typedef struct FidlUnionField FidlXUnionField;
+
 __END_CDECLS
 
 #ifdef __cplusplus
@@ -575,7 +580,7 @@ static_assert(std::is_standard_layout<FidlStructField>::value, "");
 static_assert(std::is_standard_layout<FidlTableField>::value, "");
 static_assert(std::is_standard_layout<FidlCodedStruct>::value, "");
 static_assert(std::is_standard_layout<FidlCodedStructPointer>::value, "");
-static_assert(std::is_standard_layout<FidlCodedXUnion>::value, "");
+static_assert(std::is_standard_layout<FidlCodedUnion>::value, "");
 static_assert(std::is_standard_layout<FidlCodedArray>::value, "");
 static_assert(std::is_standard_layout<FidlCodedVector>::value, "");
 static_assert(std::is_standard_layout<FidlCodedString>::value, "");
@@ -585,7 +590,7 @@ static_assert(std::is_standard_layout<FidlStructElement>::value, "");
 
 static_assert(offsetof(struct FidlCodedStruct, tag) == 0, "");
 static_assert(offsetof(struct FidlCodedStructPointer, tag) == 0, "");
-static_assert(offsetof(struct FidlCodedXUnion, tag) == 0, "");
+static_assert(offsetof(struct FidlCodedUnion, tag) == 0, "");
 static_assert(offsetof(struct FidlCodedArray, tag) == 0, "");
 static_assert(offsetof(struct FidlCodedVector, tag) == 0, "");
 static_assert(offsetof(struct FidlCodedString, tag) == 0, "");
@@ -600,7 +605,7 @@ static_assert(sizeof(struct FidlCodedEnum) == 24, "");
 static_assert(sizeof(struct FidlCodedBits) == 24, "");
 static_assert(sizeof(struct FidlCodedStruct) == 32, "");
 static_assert(sizeof(struct FidlCodedStructPointer) == 16, "");
-static_assert(sizeof(struct FidlCodedXUnion) == 24, "");
+static_assert(sizeof(struct FidlCodedUnion) == 24, "");
 static_assert(sizeof(struct FidlCodedArray) == 16, "");
 static_assert(sizeof(struct FidlCodedVector) == 24, "");
 static_assert(sizeof(struct FidlCodedString) == 8, "");
@@ -608,7 +613,7 @@ static_assert(sizeof(struct FidlCodedHandle) == 12, "");
 
 static_assert(sizeof(struct FidlStructField) == 16, "");
 static_assert(sizeof(struct FidlTableField) == 16, "");
-static_assert(sizeof(struct FidlXUnionField) == 8, "");
+static_assert(sizeof(struct FidlUnionField) == 8, "");
 
 static_assert(sizeof(struct FidlStructElement) == 16, "");
 

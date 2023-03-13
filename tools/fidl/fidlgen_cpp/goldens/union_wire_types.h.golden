@@ -50,13 +50,13 @@ struct NullableUnionStruct;
 struct Empty;
 
 
-struct TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse;
+struct TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
 
 
-struct TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse;
+struct TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
 
 
-struct StructWithNullableXUnion;
+struct StructWithNullableUnion;
 
 
 struct UnionSandwich;
@@ -112,16 +112,16 @@ class OlderSimpleUnion;
 class NewerSimpleUnion;
 
 
-class StrictSimpleXUnion;
+class StrictSimpleUnion;
 
 
-class XUnionContainingEmptyStruct;
+class UnionContainingEmptyStruct;
 
 
-class StrictBoundedXUnion;
+class StrictBoundedUnion;
 
 
-class ExplicitXUnion;
+class ExplicitFlexibleUnion;
 
 
 class UnionWithAttributes;
@@ -1599,17 +1599,17 @@ class NewerSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_StrictSimpleXUnionTable;
+extern "C" const fidl_type_t test_union_StrictSimpleUnionTable;
 
-class StrictSimpleXUnion {
+class StrictSimpleUnion {
   public:
 
-  StrictSimpleXUnion() : ordinal_(::test_union::wire::StrictSimpleXUnion::Ordinal::Invalid), envelope_{} {}
+  StrictSimpleUnion() : ordinal_(::test_union::wire::StrictSimpleUnion::Ordinal::Invalid), envelope_{} {}
 
-  StrictSimpleXUnion(const StrictSimpleXUnion&) = default;
-  StrictSimpleXUnion& operator=(const StrictSimpleXUnion&) = default;
-  StrictSimpleXUnion(StrictSimpleXUnion&&) = default;
-  StrictSimpleXUnion& operator=(StrictSimpleXUnion&&) = default;
+  StrictSimpleUnion(const StrictSimpleUnion&) = default;
+  StrictSimpleUnion& operator=(const StrictSimpleUnion&) = default;
+  StrictSimpleUnion(StrictSimpleUnion&&) = default;
+  StrictSimpleUnion& operator=(StrictSimpleUnion&&) = default;
 
   enum class Tag : fidl_xunion_tag_t {
     kI = 1,  // 0x1
@@ -1617,74 +1617,74 @@ class StrictSimpleXUnion {
     kS = 3,  // 0x3
   };
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::Invalid; }
+  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::Invalid; }
 
-  bool is_i() const { return ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kI; }
+  bool is_i() const { return ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kI; }
   
-  static StrictSimpleXUnion WithI(int32_t val) {
-    StrictSimpleXUnion result;
-    result.ordinal_ = ::test_union::wire::StrictSimpleXUnion::Ordinal::kI;
+  static StrictSimpleUnion WithI(int32_t val) {
+    StrictSimpleUnion result;
+    result.ordinal_ = ::test_union::wire::StrictSimpleUnion::Ordinal::kI;
     result.envelope_.As<int32_t>().set_data(std::move(val));
     return result;
   }
 
 
   int32_t& i() {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kI);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kI);
     return envelope_.As<int32_t>().get_data();
   }
   const int32_t& i() const {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kI);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kI);
     return envelope_.As<int32_t>().get_data();
   }
 
-  bool is_f() const { return ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kF; }
+  bool is_f() const { return ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kF; }
   
-  static StrictSimpleXUnion WithF(float val) {
-    StrictSimpleXUnion result;
-    result.ordinal_ = ::test_union::wire::StrictSimpleXUnion::Ordinal::kF;
+  static StrictSimpleUnion WithF(float val) {
+    StrictSimpleUnion result;
+    result.ordinal_ = ::test_union::wire::StrictSimpleUnion::Ordinal::kF;
     result.envelope_.As<float>().set_data(std::move(val));
     return result;
   }
 
 
   float& f() {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kF);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kF);
     return envelope_.As<float>().get_data();
   }
   const float& f() const {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kF);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kF);
     return envelope_.As<float>().get_data();
   }
 
-  bool is_s() const { return ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kS; }
+  bool is_s() const { return ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kS; }
   
-  static StrictSimpleXUnion WithS(::fidl::ObjectView<::fidl::StringView> val) {
-    StrictSimpleXUnion result;
-    result.ordinal_ = ::test_union::wire::StrictSimpleXUnion::Ordinal::kS;
+  static StrictSimpleUnion WithS(::fidl::ObjectView<::fidl::StringView> val) {
+    StrictSimpleUnion result;
+    result.ordinal_ = ::test_union::wire::StrictSimpleUnion::Ordinal::kS;
     result.envelope_.As<::fidl::StringView>().set_data(std::move(val));
     return result;
   }
 
   
   template <typename... Args>
-  static StrictSimpleXUnion WithS(::fidl::AnyArena& allocator, Args&&... args) {
+  static StrictSimpleUnion WithS(::fidl::AnyArena& allocator, Args&&... args) {
     return WithS(::fidl::ObjectView<::fidl::StringView>(allocator,
                                          std::forward<Args>(args)...));
   }
 
 
   ::fidl::StringView& s() {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kS);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kS);
     return envelope_.As<::fidl::StringView>().get_data();
   }
   const ::fidl::StringView& s() const {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleXUnion::Ordinal::kS);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictSimpleUnion::Ordinal::kS);
     return envelope_.As<::fidl::StringView>().get_data();
   }
-  ::test_union::wire::StrictSimpleXUnion::Tag Which() const {
+  ::test_union::wire::StrictSimpleUnion::Tag Which() const {
     ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_union::wire::StrictSimpleXUnion::Tag>(ordinal_);
+    return static_cast<::test_union::wire::StrictSimpleUnion::Tag>(ordinal_);
   }
 
  private:
@@ -1696,54 +1696,54 @@ class StrictSimpleXUnion {
   };
 
   static void SizeAndOffsetAssertionHelper();
-  ::test_union::wire::StrictSimpleXUnion::Ordinal ordinal_;
+  ::test_union::wire::StrictSimpleUnion::Ordinal ordinal_;
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
 
 
 
-extern "C" const fidl_type_t test_union_XUnionContainingEmptyStructTable;
+extern "C" const fidl_type_t test_union_UnionContainingEmptyStructTable;
 
-class XUnionContainingEmptyStruct {
+class UnionContainingEmptyStruct {
   public:
 
-  XUnionContainingEmptyStruct() : ordinal_(::test_union::wire::XUnionContainingEmptyStruct::Ordinal::Invalid), envelope_{} {}
+  UnionContainingEmptyStruct() : ordinal_(::test_union::wire::UnionContainingEmptyStruct::Ordinal::Invalid), envelope_{} {}
 
-  XUnionContainingEmptyStruct(const XUnionContainingEmptyStruct&) = default;
-  XUnionContainingEmptyStruct& operator=(const XUnionContainingEmptyStruct&) = default;
-  XUnionContainingEmptyStruct(XUnionContainingEmptyStruct&&) = default;
-  XUnionContainingEmptyStruct& operator=(XUnionContainingEmptyStruct&&) = default;
+  UnionContainingEmptyStruct(const UnionContainingEmptyStruct&) = default;
+  UnionContainingEmptyStruct& operator=(const UnionContainingEmptyStruct&) = default;
+  UnionContainingEmptyStruct(UnionContainingEmptyStruct&&) = default;
+  UnionContainingEmptyStruct& operator=(UnionContainingEmptyStruct&&) = default;
 
   enum class Tag : fidl_xunion_tag_t {
     kEmpty = 1,  // 0x1
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
   constexpr bool IsUnknown() const {
-    return Which() == ::test_union::wire::XUnionContainingEmptyStruct::Tag::_do_not_handle_this__write_a_default_case_instead;
+    return Which() == ::test_union::wire::UnionContainingEmptyStruct::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::XUnionContainingEmptyStruct::Ordinal::Invalid; }
+  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::UnionContainingEmptyStruct::Ordinal::Invalid; }
 
-  bool is_empty() const { return ordinal_ == ::test_union::wire::XUnionContainingEmptyStruct::Ordinal::kEmpty; }
+  bool is_empty() const { return ordinal_ == ::test_union::wire::UnionContainingEmptyStruct::Ordinal::kEmpty; }
   
-  static XUnionContainingEmptyStruct WithEmpty(::test_union::wire::Empty val) {
-    XUnionContainingEmptyStruct result;
-    result.ordinal_ = ::test_union::wire::XUnionContainingEmptyStruct::Ordinal::kEmpty;
+  static UnionContainingEmptyStruct WithEmpty(::test_union::wire::Empty val) {
+    UnionContainingEmptyStruct result;
+    result.ordinal_ = ::test_union::wire::UnionContainingEmptyStruct::Ordinal::kEmpty;
     result.envelope_.As<::test_union::wire::Empty>().set_data(std::move(val));
     return result;
   }
 
 
   ::test_union::wire::Empty& empty() {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::XUnionContainingEmptyStruct::Ordinal::kEmpty);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::UnionContainingEmptyStruct::Ordinal::kEmpty);
     return envelope_.As<::test_union::wire::Empty>().get_data();
   }
   const ::test_union::wire::Empty& empty() const {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::XUnionContainingEmptyStruct::Ordinal::kEmpty);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::UnionContainingEmptyStruct::Ordinal::kEmpty);
     return envelope_.As<::test_union::wire::Empty>().get_data();
   }
-  ::test_union::wire::XUnionContainingEmptyStruct::Tag Which() const;
+  ::test_union::wire::UnionContainingEmptyStruct::Tag Which() const;
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
@@ -1752,59 +1752,59 @@ class XUnionContainingEmptyStruct {
   };
 
   static void SizeAndOffsetAssertionHelper();
-  ::test_union::wire::XUnionContainingEmptyStruct::Ordinal ordinal_;
+  ::test_union::wire::UnionContainingEmptyStruct::Ordinal ordinal_;
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
 
 
 
-extern "C" const fidl_type_t test_union_StrictBoundedXUnionTable;
+extern "C" const fidl_type_t test_union_StrictBoundedUnionTable;
 
-class StrictBoundedXUnion {
+class StrictBoundedUnion {
   public:
 
-  StrictBoundedXUnion() : ordinal_(::test_union::wire::StrictBoundedXUnion::Ordinal::Invalid), envelope_{} {}
+  StrictBoundedUnion() : ordinal_(::test_union::wire::StrictBoundedUnion::Ordinal::Invalid), envelope_{} {}
 
-  StrictBoundedXUnion(const StrictBoundedXUnion&) = default;
-  StrictBoundedXUnion& operator=(const StrictBoundedXUnion&) = default;
-  StrictBoundedXUnion(StrictBoundedXUnion&&) = default;
-  StrictBoundedXUnion& operator=(StrictBoundedXUnion&&) = default;
+  StrictBoundedUnion(const StrictBoundedUnion&) = default;
+  StrictBoundedUnion& operator=(const StrictBoundedUnion&) = default;
+  StrictBoundedUnion(StrictBoundedUnion&&) = default;
+  StrictBoundedUnion& operator=(StrictBoundedUnion&&) = default;
 
   enum class Tag : fidl_xunion_tag_t {
     kV = 1,  // 0x1
   };
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::StrictBoundedXUnion::Ordinal::Invalid; }
+  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::StrictBoundedUnion::Ordinal::Invalid; }
 
-  bool is_v() const { return ordinal_ == ::test_union::wire::StrictBoundedXUnion::Ordinal::kV; }
+  bool is_v() const { return ordinal_ == ::test_union::wire::StrictBoundedUnion::Ordinal::kV; }
   
-  static StrictBoundedXUnion WithV(::fidl::ObjectView<::fidl::VectorView<uint8_t>> val) {
-    StrictBoundedXUnion result;
-    result.ordinal_ = ::test_union::wire::StrictBoundedXUnion::Ordinal::kV;
+  static StrictBoundedUnion WithV(::fidl::ObjectView<::fidl::VectorView<uint8_t>> val) {
+    StrictBoundedUnion result;
+    result.ordinal_ = ::test_union::wire::StrictBoundedUnion::Ordinal::kV;
     result.envelope_.As<::fidl::VectorView<uint8_t>>().set_data(std::move(val));
     return result;
   }
 
   
   template <typename... Args>
-  static StrictBoundedXUnion WithV(::fidl::AnyArena& allocator, Args&&... args) {
+  static StrictBoundedUnion WithV(::fidl::AnyArena& allocator, Args&&... args) {
     return WithV(::fidl::ObjectView<::fidl::VectorView<uint8_t>>(allocator,
                                          std::forward<Args>(args)...));
   }
 
 
   ::fidl::VectorView<uint8_t>& v() {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictBoundedXUnion::Ordinal::kV);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictBoundedUnion::Ordinal::kV);
     return envelope_.As<::fidl::VectorView<uint8_t>>().get_data();
   }
   const ::fidl::VectorView<uint8_t>& v() const {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictBoundedXUnion::Ordinal::kV);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::StrictBoundedUnion::Ordinal::kV);
     return envelope_.As<::fidl::VectorView<uint8_t>>().get_data();
   }
-  ::test_union::wire::StrictBoundedXUnion::Tag Which() const {
+  ::test_union::wire::StrictBoundedUnion::Tag Which() const {
     ZX_ASSERT(!has_invalid_tag());
-    return static_cast<::test_union::wire::StrictBoundedXUnion::Tag>(ordinal_);
+    return static_cast<::test_union::wire::StrictBoundedUnion::Tag>(ordinal_);
   }
 
  private:
@@ -1814,24 +1814,24 @@ class StrictBoundedXUnion {
   };
 
   static void SizeAndOffsetAssertionHelper();
-  ::test_union::wire::StrictBoundedXUnion::Ordinal ordinal_;
+  ::test_union::wire::StrictBoundedUnion::Ordinal ordinal_;
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitXUnionTable;
+extern "C" const fidl_type_t test_union_ExplicitFlexibleUnionTable;
 
-class ExplicitXUnion {
+class ExplicitFlexibleUnion {
   public:
 
-  ExplicitXUnion() : ordinal_(::test_union::wire::ExplicitXUnion::Ordinal::Invalid), envelope_{} {}
+  ExplicitFlexibleUnion() : ordinal_(::test_union::wire::ExplicitFlexibleUnion::Ordinal::Invalid), envelope_{} {}
 
-  ExplicitXUnion(const ExplicitXUnion&) = default;
-  ExplicitXUnion& operator=(const ExplicitXUnion&) = default;
-  ExplicitXUnion(ExplicitXUnion&&) = default;
-  ExplicitXUnion& operator=(ExplicitXUnion&&) = default;
+  ExplicitFlexibleUnion(const ExplicitFlexibleUnion&) = default;
+  ExplicitFlexibleUnion& operator=(const ExplicitFlexibleUnion&) = default;
+  ExplicitFlexibleUnion(ExplicitFlexibleUnion&&) = default;
+  ExplicitFlexibleUnion& operator=(ExplicitFlexibleUnion&&) = default;
 
   enum class Tag : fidl_xunion_tag_t {
     kI = 1,  // 0x1
@@ -1839,56 +1839,56 @@ class ExplicitXUnion {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
   constexpr bool IsUnknown() const {
-    return Which() == ::test_union::wire::ExplicitXUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+    return Which() == ::test_union::wire::ExplicitFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::ExplicitXUnion::Ordinal::Invalid; }
+  bool has_invalid_tag() const { return ordinal_ == ::test_union::wire::ExplicitFlexibleUnion::Ordinal::Invalid; }
 
-  bool is_i() const { return ordinal_ == ::test_union::wire::ExplicitXUnion::Ordinal::kI; }
+  bool is_i() const { return ordinal_ == ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kI; }
   
-  static ExplicitXUnion WithI(::fidl::ObjectView<int64_t> val) {
-    ExplicitXUnion result;
-    result.ordinal_ = ::test_union::wire::ExplicitXUnion::Ordinal::kI;
+  static ExplicitFlexibleUnion WithI(::fidl::ObjectView<int64_t> val) {
+    ExplicitFlexibleUnion result;
+    result.ordinal_ = ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kI;
     result.envelope_.As<int64_t>().set_data(std::move(val));
     return result;
   }
 
   
   template <typename... Args>
-  static ExplicitXUnion WithI(::fidl::AnyArena& allocator, Args&&... args) {
+  static ExplicitFlexibleUnion WithI(::fidl::AnyArena& allocator, Args&&... args) {
     return WithI(::fidl::ObjectView<int64_t>(allocator,
                                          std::forward<Args>(args)...));
   }
 
 
   int64_t& i() {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitXUnion::Ordinal::kI);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kI);
     return envelope_.As<int64_t>().get_data();
   }
   const int64_t& i() const {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitXUnion::Ordinal::kI);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kI);
     return envelope_.As<int64_t>().get_data();
   }
 
-  bool is_f() const { return ordinal_ == ::test_union::wire::ExplicitXUnion::Ordinal::kF; }
+  bool is_f() const { return ordinal_ == ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kF; }
   
-  static ExplicitXUnion WithF(float val) {
-    ExplicitXUnion result;
-    result.ordinal_ = ::test_union::wire::ExplicitXUnion::Ordinal::kF;
+  static ExplicitFlexibleUnion WithF(float val) {
+    ExplicitFlexibleUnion result;
+    result.ordinal_ = ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kF;
     result.envelope_.As<float>().set_data(std::move(val));
     return result;
   }
 
 
   float& f() {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitXUnion::Ordinal::kF);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kF);
     return envelope_.As<float>().get_data();
   }
   const float& f() const {
-    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitXUnion::Ordinal::kF);
+    ZX_ASSERT(ordinal_ == ::test_union::wire::ExplicitFlexibleUnion::Ordinal::kF);
     return envelope_.As<float>().get_data();
   }
-  ::test_union::wire::ExplicitXUnion::Tag Which() const;
+  ::test_union::wire::ExplicitFlexibleUnion::Tag Which() const;
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
@@ -1898,7 +1898,7 @@ class ExplicitXUnion {
   };
 
   static void SizeAndOffsetAssertionHelper();
-  ::test_union::wire::ExplicitXUnion::Ordinal ordinal_;
+  ::test_union::wire::ExplicitFlexibleUnion::Ordinal ordinal_;
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
@@ -2072,19 +2072,19 @@ struct NullableUnionStruct {
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable;
+extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 
-struct TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse {
+struct TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
 
-    ::test_union::wire::StrictBoundedXUnion xu = {};
+    ::test_union::wire::StrictBoundedUnion xu = {};
 };
     
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable;
+extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
-struct TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
+struct TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
 
     ::test_union::wire::OlderSimpleUnion xu = {};
 };
@@ -2092,9 +2092,9 @@ struct TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
 
 
 
-extern "C" const fidl_type_t test_union_StructWithNullableXUnionTable;
+extern "C" const fidl_type_t test_union_StructWithNullableUnionTable;
 
-struct StructWithNullableXUnion {
+struct StructWithNullableUnion {
 
     ::fidl::WireOptional<::test_union::wire::OlderSimpleUnion> x1 = {};
 };
@@ -2108,7 +2108,7 @@ struct UnionSandwich {
 
     uint32_t a = {};
 
-    ::test_union::wire::ExplicitXUnion u = {};
+    ::test_union::wire::ExplicitFlexibleUnion u = {};
 
     uint32_t b = {};
 };
@@ -2344,12 +2344,12 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::Empty, ::fidl::int
 
 // TODO(fxbug.dev/95833) Remove this.
 template<>
-struct DeprecatedCTypeTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable;
+struct DeprecatedCTypeTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>{
+  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 };
 
 template<>
-struct TypeTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
+struct TypeTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
@@ -2363,33 +2363,33 @@ struct TypeTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBe
 };
 
 template <>
-struct IsFidlType<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
+struct IsFidlType<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>);
-static_assert(offsetof(::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, xu) == 0);
-static_assert(sizeof(::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse) == TypeTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>::kPrimarySize);
+struct IsStruct<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>);
+static_assert(offsetof(::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, xu) == 0);
+static_assert(sizeof(::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse) == TypeTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>::kPrimarySize);
 
 template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t inline_size = 16;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_union::wire::StrictBoundedXUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_union::wire::StrictBoundedUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
   static constexpr bool kHasPadding = false;
-  using Base = WireStructCodingTraitsBase<::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  using Base = WireStructCodingTraitsBase<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
   static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
 
   static void Encode(
-    internal::WireEncoder* encoder, ::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    internal::WireEncoder* encoder, ::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     if constexpr (is_memcpy_compatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_union::wire::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse));
+      memcpy(position.As<void>(), value, sizeof(::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse));
     } else {
-      internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->xu, position + 0, recursion_depth);
+      internal::WireCodingTraits<::test_union::wire::StrictBoundedUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->xu, position + 0, recursion_depth);
     }
   }
   static void Decode(
     internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+      internal::WireCodingTraits<::test_union::wire::StrictBoundedUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
         decoder, position + 0, recursion_depth);
     }
   }
@@ -2398,12 +2398,12 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolStrict
 
 // TODO(fxbug.dev/95833) Remove this.
 template<>
-struct DeprecatedCTypeTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable;
+struct DeprecatedCTypeTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>{
+  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 };
 
 template<>
-struct TypeTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
+struct TypeTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
@@ -2417,25 +2417,25 @@ struct TypeTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMus
 };
 
 template <>
-struct IsFidlType<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
+struct IsFidlType<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 template <>
-struct IsStruct<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>);
-static_assert(offsetof(::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, xu) == 0);
-static_assert(sizeof(::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse) == TypeTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>::kPrimarySize);
+struct IsStruct<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>);
+static_assert(offsetof(::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, xu) == 0);
+static_assert(sizeof(::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse) == TypeTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>::kPrimarySize);
 
 template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t inline_size = 16;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::test_union::wire::OlderSimpleUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>());
   static constexpr bool kHasPadding = false;
-  using Base = WireStructCodingTraitsBase<::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  using Base = WireStructCodingTraitsBase<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
   static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
 
   static void Encode(
-    internal::WireEncoder* encoder, ::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    internal::WireEncoder* encoder, ::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     if constexpr (is_memcpy_compatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_union::wire::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse));
+      memcpy(position.As<void>(), value, sizeof(::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse));
     } else {
       internal::WireCodingTraits<::test_union::wire::OlderSimpleUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->xu, position + 0, recursion_depth);
     }
@@ -2452,12 +2452,12 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::TestProtocolFlexib
 
 // TODO(fxbug.dev/95833) Remove this.
 template<>
-struct DeprecatedCTypeTraits<::test_union::wire::StructWithNullableXUnion>{
-  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_StructWithNullableXUnionTable;
+struct DeprecatedCTypeTraits<::test_union::wire::StructWithNullableUnion>{
+  static constexpr const fidl_type_t* kType = &::test_union::wire::test_union_StructWithNullableUnionTable;
 };
 
 template<>
-struct TypeTraits<::test_union::wire::StructWithNullableXUnion> {
+struct TypeTraits<::test_union::wire::StructWithNullableUnion> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
@@ -2471,25 +2471,25 @@ struct TypeTraits<::test_union::wire::StructWithNullableXUnion> {
 };
 
 template <>
-struct IsFidlType<::test_union::wire::StructWithNullableXUnion> : public std::true_type {};
+struct IsFidlType<::test_union::wire::StructWithNullableUnion> : public std::true_type {};
 template <>
-struct IsStruct<::test_union::wire::StructWithNullableXUnion> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_union::wire::StructWithNullableXUnion>);
-static_assert(offsetof(::test_union::wire::StructWithNullableXUnion, x1) == 0);
-static_assert(sizeof(::test_union::wire::StructWithNullableXUnion) == TypeTraits<::test_union::wire::StructWithNullableXUnion>::kPrimarySize);
+struct IsStruct<::test_union::wire::StructWithNullableUnion> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_union::wire::StructWithNullableUnion>);
+static_assert(offsetof(::test_union::wire::StructWithNullableUnion, x1) == 0);
+static_assert(sizeof(::test_union::wire::StructWithNullableUnion) == TypeTraits<::test_union::wire::StructWithNullableUnion>::kPrimarySize);
 
 template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::StructWithNullableXUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::StructWithNullableUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t inline_size = 16;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<::fidl::WireOptional<::test_union::wire::OlderSimpleUnion>, fidl::internal::WireCodingConstraintUnion<true>, IsRecursive>());
   static constexpr bool kHasPadding = false;
-  using Base = WireStructCodingTraitsBase<::test_union::wire::StructWithNullableXUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
+  using Base = WireStructCodingTraitsBase<::test_union::wire::StructWithNullableUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
   static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
 
   static void Encode(
-    internal::WireEncoder* encoder, ::test_union::wire::StructWithNullableXUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+    internal::WireEncoder* encoder, ::test_union::wire::StructWithNullableUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     if constexpr (is_memcpy_compatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_union::wire::StructWithNullableXUnion));
+      memcpy(position.As<void>(), value, sizeof(::test_union::wire::StructWithNullableUnion));
     } else {
       internal::WireCodingTraits<::fidl::WireOptional<::test_union::wire::OlderSimpleUnion>, fidl::internal::WireCodingConstraintUnion<true>, IsRecursive>::Encode(encoder, &value->x1, position + 0, recursion_depth);
     }
@@ -2537,7 +2537,7 @@ static_assert(sizeof(::test_union::wire::UnionSandwich) == TypeTraits<::test_uni
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionSandwich, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t inline_size = 32;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>(), ::fidl::internal::WireStructMemberCodingInfo<::test_union::wire::ExplicitXUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>(), ::fidl::internal::WireStructMemberCodingInfo<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::WireStructMemberCodingInfo<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>(), ::fidl::internal::WireStructMemberCodingInfo<::test_union::wire::ExplicitFlexibleUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>(), ::fidl::internal::WireStructMemberCodingInfo<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>());
   static constexpr bool kHasPadding = true;
   using Base = WireStructCodingTraitsBase<::test_union::wire::UnionSandwich, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
   static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
@@ -2550,7 +2550,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionSandwich, ::f
       internal::WireZeroPadding<uint64_t>(encoder, position + 0);
       internal::WireZeroPadding<uint64_t>(encoder, position + 24);
       internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->a, position + 0, recursion_depth);
-      internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->u, position + 8, recursion_depth);
+      internal::WireCodingTraits<::test_union::wire::ExplicitFlexibleUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Encode(encoder, &value->u, position + 8, recursion_depth);
       internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->b, position + 24, recursion_depth);
     }
   }
@@ -2559,7 +2559,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionSandwich, ::f
     if constexpr (!Base::are_members_memcpy_compatible) {
       internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
         decoder, position + 0, recursion_depth);
-      internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
+      internal::WireCodingTraits<::test_union::wire::ExplicitFlexibleUnion, fidl::internal::WireCodingConstraintUnion<false>, IsRecursive>::Decode(
         decoder, position + 8, recursion_depth);
       internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
         decoder, position + 24, recursion_depth);
@@ -4625,7 +4625,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::NewerSimpleUnion, 
 
 
 template <>
-struct TypeTraits<::test_union::wire::StrictSimpleXUnion> {
+struct TypeTraits<::test_union::wire::StrictSimpleUnion> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
@@ -4639,17 +4639,17 @@ struct TypeTraits<::test_union::wire::StrictSimpleXUnion> {
 };
 
 template <>
-struct IsFidlType<::test_union::wire::StrictSimpleXUnion> : public std::true_type {};
+struct IsFidlType<::test_union::wire::StrictSimpleUnion> : public std::true_type {};
 template <>
-struct IsUnion<::test_union::wire::StrictSimpleXUnion> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_union::wire::StrictSimpleXUnion>);
+struct IsUnion<::test_union::wire::StrictSimpleUnion> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_union::wire::StrictSimpleUnion>);
 
 template <typename Constraint, bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion, Constraint, IsRecursive> {
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleUnion, Constraint, IsRecursive> {
   static constexpr size_t inline_size = 16;
   static constexpr bool is_memcpy_compatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictSimpleXUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictSimpleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
 
     if (unlikely(u->tag == 0)) {
@@ -4671,13 +4671,13 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion
     
     size_t encode_inline_size;
     switch (u->tag) {
-      case 1: // ::test_union::wire::StrictSimpleXUnion::Tag::kI
+      case 1: // ::test_union::wire::StrictSimpleUnion::Tag::kI
         encode_inline_size = ::fidl::internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
-      case 2: // ::test_union::wire::StrictSimpleXUnion::Tag::kF
+      case 2: // ::test_union::wire::StrictSimpleUnion::Tag::kF
         encode_inline_size = ::fidl::internal::WireCodingTraits<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
-      case 3: // ::test_union::wire::StrictSimpleXUnion::Tag::kS
+      case 3: // ::test_union::wire::StrictSimpleUnion::Tag::kS
         encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::StringView, fidl::internal::WireCodingConstraintString<false>, IsRecursive>::inline_size;
         break;
       default:
@@ -4686,13 +4686,13 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
     switch (u->tag) {
-      case 1: // ::test_union::wire::StrictSimpleXUnion::Tag::kI
+      case 1: // ::test_union::wire::StrictSimpleUnion::Tag::kI
         encode_fn = ::fidl::internal::MakeEncodeFn<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
-      case 2: // ::test_union::wire::StrictSimpleXUnion::Tag::kF
+      case 2: // ::test_union::wire::StrictSimpleUnion::Tag::kF
         encode_fn = ::fidl::internal::MakeEncodeFn<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
-      case 3: // ::test_union::wire::StrictSimpleXUnion::Tag::kS
+      case 3: // ::test_union::wire::StrictSimpleUnion::Tag::kS
         encode_fn = ::fidl::internal::MakeEncodeFn<::fidl::StringView, fidl::internal::WireCodingConstraintString<false>, IsRecursive>();
         break;
       default:
@@ -4703,7 +4703,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_union::wire::StrictSimpleXUnion::Tag tag = *position.As<::test_union::wire::StrictSimpleXUnion::Tag>();
+    ::test_union::wire::StrictSimpleUnion::Tag tag = *position.As<::test_union::wire::StrictSimpleUnion::Tag>();
     if (unlikely(static_cast<uint64_t>(tag) == 0)) {
       if constexpr (!Constraint::is_optional) {
         decoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4724,13 +4724,13 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion
     
     size_t decode_inline_size;
     switch (tag) {
-      case ::test_union::wire::StrictSimpleXUnion::Tag::kI:
+      case ::test_union::wire::StrictSimpleUnion::Tag::kI:
         decode_inline_size = ::fidl::internal::WireCodingTraits<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
-      case ::test_union::wire::StrictSimpleXUnion::Tag::kF:
+      case ::test_union::wire::StrictSimpleUnion::Tag::kF:
         decode_inline_size = ::fidl::internal::WireCodingTraits<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
-      case ::test_union::wire::StrictSimpleXUnion::Tag::kS:
+      case ::test_union::wire::StrictSimpleUnion::Tag::kS:
         decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::StringView, fidl::internal::WireCodingConstraintString<false>, IsRecursive>::inline_size;
         break;
       default:
@@ -4739,13 +4739,13 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion
     }
     DecodeFn<IsRecursive> decode_fn;
     switch(tag) {
-      case ::test_union::wire::StrictSimpleXUnion::Tag::kI:
+      case ::test_union::wire::StrictSimpleUnion::Tag::kI:
         decode_fn = ::fidl::internal::MakeDecodeFn<int32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
-      case ::test_union::wire::StrictSimpleXUnion::Tag::kF:
+      case ::test_union::wire::StrictSimpleUnion::Tag::kF:
         decode_fn = ::fidl::internal::MakeDecodeFn<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
-      case ::test_union::wire::StrictSimpleXUnion::Tag::kS:
+      case ::test_union::wire::StrictSimpleUnion::Tag::kS:
         decode_fn = ::fidl::internal::MakeDecodeFn<::fidl::StringView, fidl::internal::WireCodingConstraintString<false>, IsRecursive>();
         break;
       default:
@@ -4758,12 +4758,12 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion
 
 // Top-level union.
 template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleXUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
 
 template <>
-struct TypeTraits<::test_union::wire::XUnionContainingEmptyStruct> {
+struct TypeTraits<::test_union::wire::UnionContainingEmptyStruct> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
@@ -4777,17 +4777,17 @@ struct TypeTraits<::test_union::wire::XUnionContainingEmptyStruct> {
 };
 
 template <>
-struct IsFidlType<::test_union::wire::XUnionContainingEmptyStruct> : public std::true_type {};
+struct IsFidlType<::test_union::wire::UnionContainingEmptyStruct> : public std::true_type {};
 template <>
-struct IsUnion<::test_union::wire::XUnionContainingEmptyStruct> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_union::wire::XUnionContainingEmptyStruct>);
+struct IsUnion<::test_union::wire::UnionContainingEmptyStruct> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_union::wire::UnionContainingEmptyStruct>);
 
 template <typename Constraint, bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEmptyStruct, Constraint, IsRecursive> {
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionContainingEmptyStruct, Constraint, IsRecursive> {
   static constexpr size_t inline_size = 16;
   static constexpr bool is_memcpy_compatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::XUnionContainingEmptyStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::UnionContainingEmptyStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
 
     if (unlikely(u->tag == 0)) {
@@ -4809,7 +4809,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEm
     
     size_t encode_inline_size;
     switch (u->tag) {
-      case 1: // ::test_union::wire::XUnionContainingEmptyStruct::Tag::kEmpty
+      case 1: // ::test_union::wire::UnionContainingEmptyStruct::Tag::kEmpty
         encode_inline_size = ::fidl::internal::WireCodingTraits<::test_union::wire::Empty, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
@@ -4818,7 +4818,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEm
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
     switch (u->tag) {
-      case 1: // ::test_union::wire::XUnionContainingEmptyStruct::Tag::kEmpty
+      case 1: // ::test_union::wire::UnionContainingEmptyStruct::Tag::kEmpty
         encode_fn = ::fidl::internal::MakeEncodeFn<::test_union::wire::Empty, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
       default:
@@ -4829,7 +4829,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEm
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_union::wire::XUnionContainingEmptyStruct::Tag tag = *position.As<::test_union::wire::XUnionContainingEmptyStruct::Tag>();
+    ::test_union::wire::UnionContainingEmptyStruct::Tag tag = *position.As<::test_union::wire::UnionContainingEmptyStruct::Tag>();
     if (unlikely(static_cast<uint64_t>(tag) == 0)) {
       if constexpr (!Constraint::is_optional) {
         decoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4850,7 +4850,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEm
     
     size_t decode_inline_size;
     switch (tag) {
-      case ::test_union::wire::XUnionContainingEmptyStruct::Tag::kEmpty:
+      case ::test_union::wire::UnionContainingEmptyStruct::Tag::kEmpty:
         decode_inline_size = ::fidl::internal::WireCodingTraits<::test_union::wire::Empty, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
@@ -4859,7 +4859,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEm
     }
     DecodeFn<IsRecursive> decode_fn;
     switch(tag) {
-      case ::test_union::wire::XUnionContainingEmptyStruct::Tag::kEmpty:
+      case ::test_union::wire::UnionContainingEmptyStruct::Tag::kEmpty:
         decode_fn = ::fidl::internal::MakeDecodeFn<::test_union::wire::Empty, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
       default:
@@ -4872,12 +4872,12 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEm
 
 // Top-level union.
 template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEmptyStruct, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public ::fidl::internal::WireCodingTraits<::test_union::wire::XUnionContainingEmptyStruct, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionContainingEmptyStruct, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_union::wire::UnionContainingEmptyStruct, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
 
 template <>
-struct TypeTraits<::test_union::wire::StrictBoundedXUnion> {
+struct TypeTraits<::test_union::wire::StrictBoundedUnion> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
@@ -4891,17 +4891,17 @@ struct TypeTraits<::test_union::wire::StrictBoundedXUnion> {
 };
 
 template <>
-struct IsFidlType<::test_union::wire::StrictBoundedXUnion> : public std::true_type {};
+struct IsFidlType<::test_union::wire::StrictBoundedUnion> : public std::true_type {};
 template <>
-struct IsUnion<::test_union::wire::StrictBoundedXUnion> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_union::wire::StrictBoundedXUnion>);
+struct IsUnion<::test_union::wire::StrictBoundedUnion> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_union::wire::StrictBoundedUnion>);
 
 template <typename Constraint, bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnion, Constraint, IsRecursive> {
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedUnion, Constraint, IsRecursive> {
   static constexpr size_t inline_size = 16;
   static constexpr bool is_memcpy_compatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictBoundedXUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictBoundedUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
 
     if (unlikely(u->tag == 0)) {
@@ -4923,7 +4923,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnio
     
     size_t encode_inline_size;
     switch (u->tag) {
-      case 1: // ::test_union::wire::StrictBoundedXUnion::Tag::kV
+      case 1: // ::test_union::wire::StrictBoundedUnion::Tag::kV
         encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::VectorView<uint8_t>, fidl::internal::WireCodingConstraintVector<fidl::internal::WireCodingConstraintEmpty, false, 10>, IsRecursive>::inline_size;
         break;
       default:
@@ -4932,7 +4932,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnio
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
     switch (u->tag) {
-      case 1: // ::test_union::wire::StrictBoundedXUnion::Tag::kV
+      case 1: // ::test_union::wire::StrictBoundedUnion::Tag::kV
         encode_fn = ::fidl::internal::MakeEncodeFn<::fidl::VectorView<uint8_t>, fidl::internal::WireCodingConstraintVector<fidl::internal::WireCodingConstraintEmpty, false, 10>, IsRecursive>();
         break;
       default:
@@ -4943,7 +4943,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnio
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_union::wire::StrictBoundedXUnion::Tag tag = *position.As<::test_union::wire::StrictBoundedXUnion::Tag>();
+    ::test_union::wire::StrictBoundedUnion::Tag tag = *position.As<::test_union::wire::StrictBoundedUnion::Tag>();
     if (unlikely(static_cast<uint64_t>(tag) == 0)) {
       if constexpr (!Constraint::is_optional) {
         decoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4964,7 +4964,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnio
     
     size_t decode_inline_size;
     switch (tag) {
-      case ::test_union::wire::StrictBoundedXUnion::Tag::kV:
+      case ::test_union::wire::StrictBoundedUnion::Tag::kV:
         decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::VectorView<uint8_t>, fidl::internal::WireCodingConstraintVector<fidl::internal::WireCodingConstraintEmpty, false, 10>, IsRecursive>::inline_size;
         break;
       default:
@@ -4973,7 +4973,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnio
     }
     DecodeFn<IsRecursive> decode_fn;
     switch(tag) {
-      case ::test_union::wire::StrictBoundedXUnion::Tag::kV:
+      case ::test_union::wire::StrictBoundedUnion::Tag::kV:
         decode_fn = ::fidl::internal::MakeDecodeFn<::fidl::VectorView<uint8_t>, fidl::internal::WireCodingConstraintVector<fidl::internal::WireCodingConstraintEmpty, false, 10>, IsRecursive>();
         break;
       default:
@@ -4986,12 +4986,12 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnio
 
 // Top-level union.
 template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedXUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
 
 template <>
-struct TypeTraits<::test_union::wire::ExplicitXUnion> {
+struct TypeTraits<::test_union::wire::ExplicitFlexibleUnion> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
@@ -5005,17 +5005,17 @@ struct TypeTraits<::test_union::wire::ExplicitXUnion> {
 };
 
 template <>
-struct IsFidlType<::test_union::wire::ExplicitXUnion> : public std::true_type {};
+struct IsFidlType<::test_union::wire::ExplicitFlexibleUnion> : public std::true_type {};
 template <>
-struct IsUnion<::test_union::wire::ExplicitXUnion> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_union::wire::ExplicitXUnion>);
+struct IsUnion<::test_union::wire::ExplicitFlexibleUnion> : public std::true_type {};
+static_assert(std::is_standard_layout_v<::test_union::wire::ExplicitFlexibleUnion>);
 
 template <typename Constraint, bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, Constraint, IsRecursive> {
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitFlexibleUnion, Constraint, IsRecursive> {
   static constexpr size_t inline_size = 16;
   static constexpr bool is_memcpy_compatible = false;
 
-  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ExplicitXUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
+  static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ExplicitFlexibleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
     fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
 
     if (unlikely(u->tag == 0)) {
@@ -5037,10 +5037,10 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, Co
     
     size_t encode_inline_size;
     switch (u->tag) {
-      case 1: // ::test_union::wire::ExplicitXUnion::Tag::kI
+      case 1: // ::test_union::wire::ExplicitFlexibleUnion::Tag::kI
         encode_inline_size = ::fidl::internal::WireCodingTraits<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
-      case 4: // ::test_union::wire::ExplicitXUnion::Tag::kF
+      case 4: // ::test_union::wire::ExplicitFlexibleUnion::Tag::kF
         encode_inline_size = ::fidl::internal::WireCodingTraits<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
@@ -5049,10 +5049,10 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, Co
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
     switch (u->tag) {
-      case 1: // ::test_union::wire::ExplicitXUnion::Tag::kI
+      case 1: // ::test_union::wire::ExplicitFlexibleUnion::Tag::kI
         encode_fn = ::fidl::internal::MakeEncodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
-      case 4: // ::test_union::wire::ExplicitXUnion::Tag::kF
+      case 4: // ::test_union::wire::ExplicitFlexibleUnion::Tag::kF
         encode_fn = ::fidl::internal::MakeEncodeFn<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
       default:
@@ -5063,7 +5063,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, Co
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    ::test_union::wire::ExplicitXUnion::Tag tag = *position.As<::test_union::wire::ExplicitXUnion::Tag>();
+    ::test_union::wire::ExplicitFlexibleUnion::Tag tag = *position.As<::test_union::wire::ExplicitFlexibleUnion::Tag>();
     if (unlikely(static_cast<uint64_t>(tag) == 0)) {
       if constexpr (!Constraint::is_optional) {
         decoder->SetError(kCodingErrorInvalidUnionTag);
@@ -5084,10 +5084,10 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, Co
     
     size_t decode_inline_size;
     switch (tag) {
-      case ::test_union::wire::ExplicitXUnion::Tag::kI:
+      case ::test_union::wire::ExplicitFlexibleUnion::Tag::kI:
         decode_inline_size = ::fidl::internal::WireCodingTraits<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
-      case ::test_union::wire::ExplicitXUnion::Tag::kF:
+      case ::test_union::wire::ExplicitFlexibleUnion::Tag::kF:
         decode_inline_size = ::fidl::internal::WireCodingTraits<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
@@ -5096,10 +5096,10 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, Co
     }
     DecodeFn<IsRecursive> decode_fn;
     switch(tag) {
-      case ::test_union::wire::ExplicitXUnion::Tag::kI:
+      case ::test_union::wire::ExplicitFlexibleUnion::Tag::kI:
         decode_fn = ::fidl::internal::MakeDecodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
-      case ::test_union::wire::ExplicitXUnion::Tag::kF:
+      case ::test_union::wire::ExplicitFlexibleUnion::Tag::kF:
         decode_fn = ::fidl::internal::MakeDecodeFn<float, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
         break;
       default:
@@ -5112,8 +5112,8 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, Co
 
 // Top-level union.
 template <bool IsRecursive>
-struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
-  : public ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitXUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitFlexibleUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
+  : public ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitFlexibleUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
 
 
 template <>

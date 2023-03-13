@@ -3,8 +3,8 @@
 #include <lib/fidl/internal.h>
 
 
-__LOCAL extern const struct FidlCodedXUnion test_newtype_UnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_newtype_UnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_newtype_UnionTable;
+__LOCAL extern const struct FidlCodedUnion test_newtype_UnionNullableRefTable;
 __LOCAL extern const struct FidlCodedTable test_newtype_TableTable;
 __LOCAL extern const struct FidlCodedStruct test_newtype_StructTable;
 __LOCAL extern const struct FidlCodedEnum test_newtype_EnumTable;
@@ -27,14 +27,14 @@ static const struct FidlCodedHandle Protocol23test_newtype_Calculatornonnullable
 static const struct FidlCodedString String4294967295nonnullableTable = {.tag=kFidlTypeString, .max_size=4294967295u, .nullable=kFidlNullability_Nonnullable};
 
 
-static const struct FidlXUnionField Fields18test_newtype_Union[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
+static const struct FidlUnionField Fields18test_newtype_Union[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
 };
-const struct FidlCodedXUnion test_newtype_UnionTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields18test_newtype_Union, .nullable=kFidlNullability_Nonnullable, .name="test.newtype/Union", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields29test_newtype_UnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
+const struct FidlCodedUnion test_newtype_UnionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields18test_newtype_Union, .nullable=kFidlNullability_Nonnullable, .name="test.newtype/Union", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields29test_newtype_UnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
 };
-const struct FidlCodedXUnion test_newtype_UnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields29test_newtype_UnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.newtype/Union", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_newtype_UnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields29test_newtype_UnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.newtype/Union", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedTable test_newtype_TableTable = {.tag=kFidlTypeTable, .fields=NULL, .field_count=0u, .is_resource=kFidlIsResource_NotResource, .name="test.newtype/Table"};
 
 static const struct FidlStructElement Fields19test_newtype_Struct[] = {

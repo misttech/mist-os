@@ -756,7 +756,7 @@ struct Union final : public TypeDecl {
   // the unions's members.
   std::optional<types::Resourceness> resourceness;
 
-  std::vector<std::reference_wrapper<const Member>> MembersSortedByXUnionOrdinal() const;
+  std::vector<std::reference_wrapper<const Member>> MembersSortedByUnionOrdinal() const;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 

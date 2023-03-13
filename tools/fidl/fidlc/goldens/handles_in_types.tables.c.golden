@@ -4,12 +4,12 @@
 
 
 __LOCAL extern const struct FidlCodedEnum test_handlesintypes_obj_typeTable;
-__LOCAL extern const struct FidlCodedXUnion test_handlesintypes_UnionWithHandleTable;
-__LOCAL extern const struct FidlCodedXUnion test_handlesintypes_UnionWithHandleNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_handlesintypes_UnionWithHandleTable;
+__LOCAL extern const struct FidlCodedUnion test_handlesintypes_UnionWithHandleNullableRefTable;
 __LOCAL extern const struct FidlCodedTable test_handlesintypes_TableWithHandleTable;
 __LOCAL extern const struct FidlCodedStruct test_handlesintypes_HandlesInTypesTable;
-__LOCAL extern const struct FidlCodedXUnion test_handlesintypes_EmptyResourceUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_handlesintypes_EmptyResourceUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_handlesintypes_EmptyResourceUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_handlesintypes_EmptyResourceUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedTable test_handlesintypes_EmptyResourceTableTable;
 __LOCAL extern const struct FidlCodedStruct test_handlesintypes_EmptyResourceStructTable;
 
@@ -35,14 +35,14 @@ static bool EnumValidatorFor_test_handlesintypes_obj_type(uint64_t v) {
 
 const struct FidlCodedEnum test_handlesintypes_obj_typeTable = {.tag=kFidlTypeEnum, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Strict, .validate=&EnumValidatorFor_test_handlesintypes_obj_type, .name="test.handlesintypes/obj_type"};
 
-static const struct FidlXUnionField Fields35test_handlesintypes_UnionWithHandle[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable)}
+static const struct FidlUnionField Fields35test_handlesintypes_UnionWithHandle[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable)}
 };
-const struct FidlCodedXUnion test_handlesintypes_UnionWithHandleTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields35test_handlesintypes_UnionWithHandle, .nullable=kFidlNullability_Nonnullable, .name="test.handlesintypes/UnionWithHandle", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
-static const struct FidlXUnionField Fields46test_handlesintypes_UnionWithHandleNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable)}
+const struct FidlCodedUnion test_handlesintypes_UnionWithHandleTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields35test_handlesintypes_UnionWithHandle, .nullable=kFidlNullability_Nonnullable, .name="test.handlesintypes/UnionWithHandle", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
+static const struct FidlUnionField Fields46test_handlesintypes_UnionWithHandleNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable)}
 };
-const struct FidlCodedXUnion test_handlesintypes_UnionWithHandleNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields46test_handlesintypes_UnionWithHandleNullableRef, .nullable=kFidlNullability_Nullable, .name="test.handlesintypes/UnionWithHandle", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
+const struct FidlCodedUnion test_handlesintypes_UnionWithHandleNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields46test_handlesintypes_UnionWithHandleNullableRef, .nullable=kFidlNullability_Nullable, .name="test.handlesintypes/UnionWithHandle", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
 static const struct FidlTableField Fields35test_handlesintypes_TableWithHandle[] = {
     /*FidlTableField*/{.type=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable), .ordinal=1u}
 };
@@ -60,8 +60,8 @@ static const struct FidlStructElement Fields34test_handlesintypes_HandlesInTypes
 };
 const struct FidlCodedStruct test_handlesintypes_HandlesInTypesTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_handlesintypes_HandlesInTypes, .element_count=8u, .size_v2=96u, .name="test.handlesintypes/HandlesInTypes"};
 
-const struct FidlCodedXUnion test_handlesintypes_EmptyResourceUnionTable = {.tag=kFidlTypeXUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nonnullable, .name="test.handlesintypes/EmptyResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
-const struct FidlCodedXUnion test_handlesintypes_EmptyResourceUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nullable, .name="test.handlesintypes/EmptyResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
+const struct FidlCodedUnion test_handlesintypes_EmptyResourceUnionTable = {.tag=kFidlTypeUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nonnullable, .name="test.handlesintypes/EmptyResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
+const struct FidlCodedUnion test_handlesintypes_EmptyResourceUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nullable, .name="test.handlesintypes/EmptyResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
 const struct FidlCodedTable test_handlesintypes_EmptyResourceTableTable = {.tag=kFidlTypeTable, .fields=NULL, .field_count=0u, .is_resource=kFidlIsResource_Resource, .name="test.handlesintypes/EmptyResourceTable"};
 
 const struct FidlCodedStruct test_handlesintypes_EmptyResourceStructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.handlesintypes/EmptyResourceStruct"};

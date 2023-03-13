@@ -102,8 +102,8 @@ TEST(UtilsTests, UpperCamelCase) {
   ASSERT_CASE(upper_camel, "real3_d", "Real3D");
   ASSERT_CASE(upper_camel, "real_3d", "Real3d");
   ASSERT_CASE(upper_camel, "real_3_d", "Real3D");
-  ASSERT_CASE(upper_camel, "sample_x_union", "SampleXUnion");
-  ASSERT_CASE(upper_camel, "sample_xunion", "SampleXunion");
+  ASSERT_CASE(upper_camel, "hello_e_world", "HelloEWorld");
+  ASSERT_CASE(upper_camel, "hello_eworld", "HelloEworld");
   ASSERT_CASE(upper_camel, "URLLoader", "UrlLoader");
   ASSERT_CASE(upper_camel, "is_21Jump_street", "Is21JumpStreet");
   ASSERT_CASE(upper_camel, "URLloader", "UrLloader");
@@ -133,8 +133,8 @@ TEST(UtilsTests, LowerCamelCase) {
   ASSERT_CASE(lower_camel, "REAL3_D", "real3D");
   ASSERT_CASE(lower_camel, "REAL_3D", "real3D");
   ASSERT_CASE(lower_camel, "REAL_3_D", "real3D");
-  ASSERT_CASE(lower_camel, "SAMPLE_X_UNION", "sampleXUnion");
-  ASSERT_CASE(lower_camel, "SAMPLE_XUNION", "sampleXunion");
+  ASSERT_CASE(lower_camel, "HELLO_E_WORLD", "helloEWorld");
+  ASSERT_CASE(lower_camel, "HELLO_EWORLD", "helloEworld");
   ASSERT_CASE(lower_camel, "URLLoader", "urlLoader");
   ASSERT_CASE(lower_camel, "is_21Jump_street", "is21JumpStreet");
   ASSERT_CASE(lower_camel, "URLloader", "urLloader");
@@ -163,8 +163,8 @@ TEST(UtilsTests, UpperSnakeCase) {
   ASSERT_CASE(upper_snake, "real3D", "REAL3_D");
   ASSERT_CASE(upper_snake, "real_3d", "REAL_3D");
   ASSERT_CASE(upper_snake, "real_3D", "REAL_3_D");
-  ASSERT_CASE(upper_snake, "sampleXUnion", "SAMPLE_X_UNION");
-  ASSERT_CASE(upper_snake, "sampleXunion", "SAMPLE_XUNION");
+  ASSERT_CASE(upper_snake, "helloEWorld", "HELLO_E_WORLD");
+  ASSERT_CASE(upper_snake, "helloEworld", "HELLO_EWORLD");
   ASSERT_CASE(upper_snake, "URLLoader", "URL_LOADER");
   ASSERT_CASE(upper_snake, "is_21Jump_street", "IS_21_JUMP_STREET");
   ASSERT_CASE(upper_snake, "URLloader", "UR_LLOADER");
@@ -193,8 +193,8 @@ TEST(UtilsTests, LowerSnakeCase) {
   ASSERT_CASE(lower_snake, "Real3D", "real3_d");
   ASSERT_CASE(lower_snake, "Real_3d", "real_3d");
   ASSERT_CASE(lower_snake, "Real_3D", "real_3_d");
-  ASSERT_CASE(lower_snake, "SampleXUnion", "sample_x_union");
-  ASSERT_CASE(lower_snake, "SampleXunion", "sample_xunion");
+  ASSERT_CASE(lower_snake, "HelloEWorld", "hello_e_world");
+  ASSERT_CASE(lower_snake, "HelloEworld", "hello_eworld");
   ASSERT_CASE(lower_snake, "URLLoader", "url_loader");
   ASSERT_CASE(lower_snake, "is_21Jump_street", "is_21_jump_street");
   ASSERT_CASE(lower_snake, "URLloader", "ur_lloader");

@@ -96,8 +96,6 @@ class ExampleTable;
 
 class ExampleUnion;
 
-class ExampleXUnion;
-
 constexpr uint32_t EXAMPLE_CONST = 0u;
 
 class ExampleProtocolMethodRequest final {
@@ -317,92 +315,6 @@ inline zx_status_t Clone(const ::test::placementofattributes::ExampleUnion& valu
 
 using ExampleUnionPtr = ::std::unique_ptr<ExampleUnion>;
 
-class ExampleXUnion final {
- public:
-  static const fidl_type_t* FidlType;
-
-  ExampleXUnion();
-  ~ExampleXUnion();
-
-  ExampleXUnion(ExampleXUnion&&);
-  ExampleXUnion& operator=(ExampleXUnion&&);
-
-  static ExampleXUnion WithVariant(uint32_t&&);
-
-  enum __attribute__((enum_extensibility(closed))) Tag : fidl_xunion_tag_t {
-    kUnknown = 0,
-
-    kVariant = 1,  // 0x1
-    Invalid = ::std::numeric_limits<::fidl_union_tag_t>::max(),
-  };
-
-  static inline ::std::unique_ptr<ExampleXUnion> New() { return ::std::make_unique<ExampleXUnion>(); }
-
-  void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
-  static void Decode(::fidl::Decoder* _decoder, ExampleXUnion* value, size_t offset);
-  zx_status_t Clone(ExampleXUnion* result) const;
-
-  bool has_invalid_tag() const {
-    return tag_ == Invalid;
-  }
-
-  bool is_variant() const { return tag_ == ::test::placementofattributes::ExampleXUnion::Tag::kVariant; }
-
-  uint32_t& variant() {
-    EnsureStorageInitialized(::test::placementofattributes::ExampleXUnion::Tag::kVariant);
-    return variant_;
-  }
-
-  const uint32_t& variant() const {
-    ZX_ASSERT(is_variant());
-    return variant_;
-  }
-  ExampleXUnion& set_variant(uint32_t value);
-  ExampleXUnion& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
-
-  ::test::placementofattributes::ExampleXUnion::Tag Which() const {
-    switch (tag_) {
-      case ::test::placementofattributes::ExampleXUnion::Tag::Invalid:
-      case ::test::placementofattributes::ExampleXUnion::Tag::kVariant:
-        return ::test::placementofattributes::ExampleXUnion::Tag(tag_);
-      default:
-        return ::test::placementofattributes::ExampleXUnion::Tag::kUnknown;
-    }
-  }
-
-  // You probably want to use Which() method instead of Ordinal(). Use Ordinal() only when you need
-  // access to the raw integral ordinal value.
-  fidl_xunion_tag_t Ordinal() const {
-    return tag_;
-  }
-  const std::vector<uint8_t>* UnknownBytes() const {
-    if (Which() != ::test::placementofattributes::ExampleXUnion::Tag::kUnknown) {
-      return nullptr;
-    }
-    return &unknown_data_;
-  }
-
-  friend ::fidl::Equality<::test::placementofattributes::ExampleXUnion>;
-
- private:
-  void Destroy();
-  void EnsureStorageInitialized(::fidl_xunion_tag_t tag);
-
-  ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::placementofattributes::ExampleXUnion::Tag::Invalid);
-  union {
-    uint32_t variant_;
-    std::vector<uint8_t> unknown_data_;
-  };
-};
-
-inline zx_status_t Clone(const ::test::placementofattributes::ExampleXUnion& value,
-                         ::test::placementofattributes::ExampleXUnion* result) {
-  return value.Clone(result);
-}
-
-using ExampleXUnionPtr = ::std::unique_ptr<ExampleXUnion>;
-
 }  // namespace placementofattributes
 }  // namespace test
 namespace fidl {
@@ -583,60 +495,6 @@ struct Equality<::test::placementofattributes::ExampleUnion> {
 
       default:
         return false;
-    }
-  }
-};
-template <>
-struct IsFidlXUnion<::test::placementofattributes::ExampleXUnion> : public std::true_type {};
-
-template <>
-struct CodingTraits<::test::placementofattributes::ExampleXUnion>
-    : public EncodableCodingTraits<::test::placementofattributes::ExampleXUnion, 16> {};
-
-template <>
-struct CodingTraits<std::unique_ptr<::test::placementofattributes::ExampleXUnion>> {
-  static constexpr size_t inline_size_v2 = 16;
-
-  static void Encode(Encoder* encoder, std::unique_ptr<::test::placementofattributes::ExampleXUnion>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
-    auto&& p_xunion = *value;
-    if (p_xunion) {
-      p_xunion->Encode(encoder, offset);
-    }
-  }
-
-  static void Decode(Decoder* _decoder, std::unique_ptr<::test::placementofattributes::ExampleXUnion>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
-    if (encoded->tag == 0) {
-      value->reset(nullptr);
-      return;
-    }
-
-    value->reset(new ::test::placementofattributes::ExampleXUnion);
-
-    ::test::placementofattributes::ExampleXUnion::Decode(_decoder, value->get(), offset);
-  }
-};
-
-inline zx_status_t Clone(const ::test::placementofattributes::ExampleXUnion& value,
-                         ::test::placementofattributes::ExampleXUnion* result) {
-  return ::test::placementofattributes::Clone(value, result);
-}
-
-template <>
-struct Equality<::test::placementofattributes::ExampleXUnion> {
-  bool operator()(const ::test::placementofattributes::ExampleXUnion& _lhs, const ::test::placementofattributes::ExampleXUnion& _rhs) const {
-    if (_lhs.Ordinal() != _rhs.Ordinal()) {
-      return false;
-    }
-
-    switch (_lhs.Ordinal()) {
-      case static_cast<fidl_xunion_tag_t>(::test::placementofattributes::ExampleXUnion::Tag::Invalid):
-        return true;
-      case ::test::placementofattributes::ExampleXUnion::Tag::kVariant:
-        return ::fidl::Equals(_lhs.variant_, _rhs.variant_);
-      default:
-        return ::fidl::Equals(_lhs.unknown_data_, _rhs.unknown_data_);
     }
   }
 };

@@ -55,7 +55,7 @@ std::string InternalSubtypeToString(fidl::types::InternalSubtype subtype) {
   }
 }
 
-// When generating coding tables for containers employing envelopes (xunions & tables),
+// When generating coding tables for containers employing envelopes (unions & tables),
 // we need to reference coding tables for primitives, in addition to types that need coding.
 // This function handles naming coding tables for both cases.
 std::string CodedNameForEnvelope(const fidl::coded::Type* type) {
@@ -110,8 +110,8 @@ std::string TableTypeName([[maybe_unused]] const Type& type) {
     return "FidlCodedStructPointer";
   if constexpr (std::is_same_v<T, fidl::coded::TableType>)
     return "FidlCodedTable";
-  if constexpr (std::is_same_v<T, fidl::coded::XUnionType>)
-    return "FidlCodedXUnion";
+  if constexpr (std::is_same_v<T, fidl::coded::UnionType>)
+    return "FidlCodedUnion";
   if constexpr (std::is_same_v<T, fidl::coded::ZxExperimentalPointerType>)
     return "FidlCodedZxExperimentalPointer";
 }
@@ -307,31 +307,31 @@ void TablesGenerator::Generate(const coded::TableType& table_type) {
   Emit(&tables_file_, "\"};\n\n");
 }
 
-void TablesGenerator::Generate(const coded::XUnionType& xunion_type) {
-  std::string fields_array_name = NameFields(xunion_type.coded_name);
+void TablesGenerator::Generate(const coded::UnionType& union_type) {
+  std::string fields_array_name = NameFields(union_type.coded_name);
 
-  if (!xunion_type.fields.empty()) {
-    Emit(&tables_file_, "static const struct FidlXUnionField ");
+  if (!union_type.fields.empty()) {
+    Emit(&tables_file_, "static const struct FidlUnionField ");
     Emit(&tables_file_, fields_array_name);
     Emit(&tables_file_, "[] = ");
-    GenerateArray(xunion_type.fields);
+    GenerateArray(union_type.fields);
     Emit(&tables_file_, ";\n");
   }
 
-  Emit(&tables_file_, "const struct FidlCodedXUnion ");
-  Emit(&tables_file_, NameTable(xunion_type.coded_name));
-  Emit(&tables_file_, " = {.tag=kFidlTypeXUnion, .field_count=");
-  Emit(&tables_file_, static_cast<uint32_t>(xunion_type.fields.size()));
+  Emit(&tables_file_, "const struct FidlCodedUnion ");
+  Emit(&tables_file_, NameTable(union_type.coded_name));
+  Emit(&tables_file_, " = {.tag=kFidlTypeUnion, .field_count=");
+  Emit(&tables_file_, static_cast<uint32_t>(union_type.fields.size()));
   Emit(&tables_file_, ", .fields=");
-  Emit(&tables_file_, xunion_type.fields.empty() ? "NULL" : fields_array_name);
+  Emit(&tables_file_, union_type.fields.empty() ? "NULL" : fields_array_name);
   Emit(&tables_file_, ", .nullable=");
-  Emit(&tables_file_, xunion_type.nullability);
+  Emit(&tables_file_, union_type.nullability);
   Emit(&tables_file_, ", .name=\"");
-  Emit(&tables_file_, xunion_type.qname);
+  Emit(&tables_file_, union_type.qname);
   Emit(&tables_file_, "\", .strictness=");
-  Emit(&tables_file_, xunion_type.strictness);
+  Emit(&tables_file_, union_type.strictness);
   Emit(&tables_file_, ", .is_resource=");
-  Emit(&tables_file_, xunion_type.resourceness);
+  Emit(&tables_file_, union_type.resourceness);
   Emit(&tables_file_, "};\n");
 }
 
@@ -503,15 +503,15 @@ void TablesGenerator::Generate(const coded::TableField& field) {
   Emit(&tables_file_, "}");
 }
 
-void TablesGenerator::Generate(const coded::XUnionField& field) {
-  Emit(&tables_file_, "/*FidlXUnionField*/{.type=");
+void TablesGenerator::Generate(const coded::UnionField& field) {
+  Emit(&tables_file_, "/*FidlUnionField*/{.type=");
   Generate(field.type);
   Emit(&tables_file_, "}");
 }
 
 template <class T>
 std::string ForwardDecls(const T& t) {
-  // Since we always generate nullable xunions they may be unused
+  // Since we always generate nullable unions they may be unused
   return "__LOCAL extern const struct " + TableTypeName(t) + " " + NameTable(t.coded_name) + ";\n";
 }
 
@@ -531,8 +531,8 @@ void TablesGenerator::GenerateForward(const coded::TableType& table_type) {
   Emit(&tables_file_, ForwardDecls(table_type));
 }
 
-void TablesGenerator::GenerateForward(const coded::XUnionType& xunion_type) {
-  Emit(&tables_file_, ForwardDecls(xunion_type));
+void TablesGenerator::GenerateForward(const coded::UnionType& union_type) {
+  Emit(&tables_file_, ForwardDecls(union_type));
 }
 
 void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
@@ -554,12 +554,12 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
       case coded::Type::Kind::kTable:
         GenerateForward(*static_cast<const coded::TableType*>(coded_type));
         break;
-      case coded::Type::Kind::kXUnion: {
+      case coded::Type::Kind::kUnion: {
         // Generate forward declarations for both the non-nullable and nullable variants
-        const auto& xunion_type = *static_cast<const coded::XUnionType*>(coded_type);
-        GenerateForward(xunion_type);
-        if (xunion_type.maybe_reference_type)
-          GenerateForward(*xunion_type.maybe_reference_type);
+        const auto& union_type = *static_cast<const coded::UnionType*>(coded_type);
+        GenerateForward(union_type);
+        if (union_type.maybe_reference_type)
+          GenerateForward(*union_type.maybe_reference_type);
         break;
       }
       case coded::Type::Kind::kProtocol: {
@@ -574,8 +574,8 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
               GenerateForward(*static_cast<const coded::TableType*>(message));
               break;
             }
-            case coded::Type::Kind::kXUnion: {
-              GenerateForward(*static_cast<const coded::XUnionType*>(message));
+            case coded::Type::Kind::kUnion: {
+              GenerateForward(*static_cast<const coded::UnionType*>(message));
               break;
             }
             default: {
@@ -605,8 +605,8 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
         }
         break;
       }
-      case coded::Type::Kind::kXUnion: {
-        // Nullable xunions have the same wire representation as non-nullable ones,
+      case coded::Type::Kind::kUnion: {
+        // Nullable unions have the same wire representation as non-nullable ones,
         // hence have the same fields and dependencies in their coding tables.
         // As such, we will generate them in the next phase, to maintain the correct
         // declaration order.
@@ -632,7 +632,7 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
       case coded::Type::Kind::kStruct:
       case coded::Type::Kind::kTable:
       case coded::Type::Kind::kStructPointer:
-      case coded::Type::Kind::kXUnion:
+      case coded::Type::Kind::kUnion:
         // These are generated in the next phase.
         break;
       case coded::Type::Kind::kProtocol:
@@ -689,12 +689,12 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
       case coded::Type::Kind::kTable:
         Generate(*static_cast<const coded::TableType*>(coded_type));
         break;
-      case coded::Type::Kind::kXUnion: {
-        const auto& xunion_type = *static_cast<const coded::XUnionType*>(coded_type);
-        Generate(xunion_type);
+      case coded::Type::Kind::kUnion: {
+        const auto& union_type = *static_cast<const coded::UnionType*>(coded_type);
+        Generate(union_type);
 
-        if (xunion_type.maybe_reference_type)
-          Generate(*xunion_type.maybe_reference_type);
+        if (union_type.maybe_reference_type)
+          Generate(*union_type.maybe_reference_type);
 
         break;
       }
@@ -710,8 +710,8 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
               Generate(*static_cast<const coded::TableType*>(message));
               break;
             }
-            case coded::Type::Kind::kXUnion: {
-              Generate(*static_cast<const coded::XUnionType*>(message));
+            case coded::Type::Kind::kUnion: {
+              Generate(*static_cast<const coded::UnionType*>(message));
               break;
             }
             default: {

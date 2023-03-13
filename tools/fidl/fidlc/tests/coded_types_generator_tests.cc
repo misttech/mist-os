@@ -285,8 +285,8 @@ protocol UseOfProtocol {
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type0->coded_name.c_str());
   EXPECT_TRUE(type0->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type0->kind);
-  auto type0_union = static_cast<const fidl::coded::XUnionType*>(type0);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type0->kind);
+  auto type0_union = static_cast<const fidl::coded::UnionType*>(type0);
   ASSERT_EQ(fidl::types::Nullability::kNullable, type0_union->nullability);
   EXPECT_EQ(16, type0->size_v2);
   ASSERT_EQ(2, type0_union->fields.size());
@@ -482,13 +482,13 @@ protocol UseOfProtocolEnds {
 TEST(CodedTypesGeneratorTests, GoodCodedTypesOfUnions) {
   TestLibrary library(R"FIDL(library example;
 
-type MyXUnion = strict union {
+type MyUnion = strict union {
     1: foo bool;
     2: bar int32;
 };
 
-type MyXUnionStruct = struct {
-  u MyXUnion;
+type MyUnionStruct = struct {
+  u MyUnion;
 };
 
 )FIDL");
@@ -499,11 +499,11 @@ type MyXUnionStruct = struct {
   ASSERT_EQ(3, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
-  ASSERT_STREQ("example_MyXUnionNullableRef", type0->coded_name.c_str());
+  ASSERT_STREQ("example_MyUnionNullableRef", type0->coded_name.c_str());
   ASSERT_TRUE(type0->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type0->kind);
-  auto nullable_xunion = static_cast<const fidl::coded::XUnionType*>(type0);
-  ASSERT_EQ(fidl::types::Nullability::kNullable, nullable_xunion->nullability);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type0->kind);
+  auto nullable_union = static_cast<const fidl::coded::UnionType*>(type0);
+  ASSERT_EQ(fidl::types::Nullability::kNullable, nullable_union->nullability);
 
   auto type1 = gen.coded_types().at(1).get();
   ASSERT_STREQ("bool", type1->coded_name.c_str());
@@ -519,30 +519,30 @@ type MyXUnionStruct = struct {
   auto type1_primitive = static_cast<const fidl::coded::PrimitiveType*>(type2);
   ASSERT_EQ(fidl::types::PrimitiveSubtype::kInt32, type1_primitive->subtype);
 
-  auto name = fidl::flat::Name::Key(library.LookupLibrary("example"), "MyXUnion");
+  auto name = fidl::flat::Name::Key(library.LookupLibrary("example"), "MyUnion");
   auto type = gen.CodedTypeFor(name);
   ASSERT_NOT_NULL(type);
-  ASSERT_STREQ("example_MyXUnion", type->coded_name.c_str());
+  ASSERT_STREQ("example_MyUnion", type->coded_name.c_str());
   ASSERT_TRUE(type->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type->kind);
-  auto coded_xunion = static_cast<const fidl::coded::XUnionType*>(type);
-  ASSERT_EQ(2, coded_xunion->fields.size());
-  auto xunion_field0 = coded_xunion->fields.at(0);
-  ASSERT_EQ(fidl::coded::Type::Kind::kPrimitive, xunion_field0.type->kind);
-  auto xunion_field0_primitive = static_cast<const fidl::coded::PrimitiveType*>(xunion_field0.type);
-  ASSERT_EQ(fidl::types::PrimitiveSubtype::kBool, xunion_field0_primitive->subtype);
-  auto xunion_field1 = coded_xunion->fields.at(1);
-  ASSERT_EQ(fidl::coded::Type::Kind::kPrimitive, xunion_field1.type->kind);
-  auto xunion_field1_primitive = static_cast<const fidl::coded::PrimitiveType*>(xunion_field1.type);
-  ASSERT_EQ(fidl::types::PrimitiveSubtype::kInt32, xunion_field1_primitive->subtype);
-  ASSERT_STREQ("example/MyXUnion", coded_xunion->qname.c_str());
-  ASSERT_EQ(fidl::types::Nullability::kNonnullable, coded_xunion->nullability);
-  ASSERT_NOT_NULL(coded_xunion->maybe_reference_type);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type->kind);
+  auto coded_union = static_cast<const fidl::coded::UnionType*>(type);
+  ASSERT_EQ(2, coded_union->fields.size());
+  auto union_field0 = coded_union->fields.at(0);
+  ASSERT_EQ(fidl::coded::Type::Kind::kPrimitive, union_field0.type->kind);
+  auto union_field0_primitive = static_cast<const fidl::coded::PrimitiveType*>(union_field0.type);
+  ASSERT_EQ(fidl::types::PrimitiveSubtype::kBool, union_field0_primitive->subtype);
+  auto union_field1 = coded_union->fields.at(1);
+  ASSERT_EQ(fidl::coded::Type::Kind::kPrimitive, union_field1.type->kind);
+  auto union_field1_primitive = static_cast<const fidl::coded::PrimitiveType*>(union_field1.type);
+  ASSERT_EQ(fidl::types::PrimitiveSubtype::kInt32, union_field1_primitive->subtype);
+  ASSERT_STREQ("example/MyUnion", coded_union->qname.c_str());
+  ASSERT_EQ(fidl::types::Nullability::kNonnullable, coded_union->nullability);
+  ASSERT_NOT_NULL(coded_union->maybe_reference_type);
 
-  auto struct_name = fidl::flat::Name::Key(library.LookupLibrary("example"), "MyXUnionStruct");
+  auto struct_name = fidl::flat::Name::Key(library.LookupLibrary("example"), "MyUnionStruct");
   auto struct_type = gen.CodedTypeFor(struct_name);
   ASSERT_NOT_NULL(struct_type);
-  ASSERT_STREQ("example_MyXUnionStruct", struct_type->coded_name.c_str());
+  ASSERT_STREQ("example_MyUnionStruct", struct_type->coded_name.c_str());
   ASSERT_TRUE(struct_type->is_coding_needed);
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, struct_type->kind);
   auto struct_type_struct = static_cast<const fidl::coded::StructType*>(struct_type);
@@ -556,34 +556,34 @@ type MyXUnionStruct = struct {
 TEST(CodedTypesGeneratorTests, GoodCodedTypesOfNullableUnions) {
   TestLibrary library(R"FIDL(library example;
 
-type MyXUnion = strict union {
+type MyUnion = strict union {
     1: foo bool;
     2: bar int32;
 };
 
 type Wrapper1 = struct {
-    xu MyXUnion:optional;
+    xu MyUnion:optional;
 };
 
-// This ensures that MyXUnion? doesn't show up twice in the coded types.
+// This ensures that MyUnion? doesn't show up twice in the coded types.
 type Wrapper2 = struct {
-    xu MyXUnion:optional;
+    xu MyUnion:optional;
 };
 )FIDL");
   ASSERT_COMPILED(library);
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  // 3 == size of {bool, int32, MyXUnion?}, which is all of the types used in
+  // 3 == size of {bool, int32, MyUnion?}, which is all of the types used in
   // the example.
   ASSERT_EQ(3, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
-  ASSERT_STREQ("example_MyXUnionNullableRef", type0->coded_name.c_str());
+  ASSERT_STREQ("example_MyUnionNullableRef", type0->coded_name.c_str());
   ASSERT_TRUE(type0->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type0->kind);
-  auto nullable_xunion = static_cast<const fidl::coded::XUnionType*>(type0);
-  ASSERT_EQ(fidl::types::Nullability::kNullable, nullable_xunion->nullability);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type0->kind);
+  auto nullable_union = static_cast<const fidl::coded::UnionType*>(type0);
+  ASSERT_EQ(fidl::types::Nullability::kNullable, nullable_union->nullability);
 
   auto type1 = gen.coded_types().at(1).get();
   ASSERT_STREQ("bool", type1->coded_name.c_str());
@@ -615,31 +615,26 @@ type MyUnion = strict union {
     2: bar int32;
 };
 
-type MyXUnion = flexible union {
-    1: foo bool;
-    2: bar int32;
-};
-
 type Wrapper1 = struct {
     ms box<MyStruct>;
     mu MyUnion:optional;
-    xu MyXUnion:optional;
+    xu MyUnion:optional;
 };
 
-// This ensures that MyXUnion? doesn't show up twice in the coded types.
+// This ensures that MyUnion? doesn't show up twice in the coded types.
 type Wrapper2 = struct {
     ms box<MyStruct>;
     mu MyUnion:optional;
-    xu MyXUnion:optional;
+    xu MyUnion:optional;
 };
 )FIDL");
   ASSERT_COMPILED(library);
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  // 5 == size of {bool, int32, MyStruct?, MyUnion?, MyXUnion?},
+  // 4 == size of {bool, int32, MyStruct?, MyUnion?},
   // which are all the coded types in the example.
-  ASSERT_EQ(5, gen.coded_types().size());
+  ASSERT_EQ(4, gen.coded_types().size());
 }
 
 TEST(CodedTypesGeneratorTests, GoodCodedHandle) {
@@ -957,7 +952,7 @@ type OuterStruct = resource struct {
   EXPECT_EQ(std::get<uint16_t>(padding(struct_outer_struct->elements[0]).mask), 0xff00);
   EXPECT_EQ(field(struct_outer_struct->elements[1]).type->kind, fidl::coded::Type::Kind::kHandle);
   EXPECT_EQ(field(struct_outer_struct->elements[1]).offset_v2, 4);
-  EXPECT_EQ(field(struct_outer_struct->elements[2]).type->kind, fidl::coded::Type::Kind::kXUnion);
+  EXPECT_EQ(field(struct_outer_struct->elements[2]).type->kind, fidl::coded::Type::Kind::kUnion);
   EXPECT_EQ(field(struct_outer_struct->elements[2]).offset_v2, 8);
   EXPECT_EQ(padding(struct_outer_struct->elements[3]).offset_v2, 24);
   EXPECT_EQ(std::get<uint16_t>(padding(struct_outer_struct->elements[3]).mask), 0xff00);
@@ -1173,9 +1168,9 @@ type MyUnion = strict union {
   ASSERT_NOT_NULL(type);
   EXPECT_STREQ("example_MyUnion", type->coded_name.c_str());
   EXPECT_TRUE(type->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type->kind);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type->kind);
 
-  auto coded_union = static_cast<const fidl::coded::XUnionType*>(type);
+  auto coded_union = static_cast<const fidl::coded::UnionType*>(type);
   ASSERT_EQ(3, coded_union->fields.size());
 
   auto union_field0 = coded_union->fields.at(0);
@@ -1281,9 +1276,9 @@ type NonResourceUnion = strict union {
     auto name = fidl::flat::Name::Key(library.LookupLibrary("example"), "ResourceUnion");
     auto type = gen.CodedTypeFor(name);
     ASSERT_NOT_NULL(type);
-    ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type->kind);
+    ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type->kind);
 
-    auto coded_union = static_cast<const fidl::coded::XUnionType*>(type);
+    auto coded_union = static_cast<const fidl::coded::UnionType*>(type);
     EXPECT_EQ(fidl::types::Resourceness::kResource, coded_union->resourceness);
   }
 
@@ -1291,9 +1286,9 @@ type NonResourceUnion = strict union {
     auto name = fidl::flat::Name::Key(library.LookupLibrary("example"), "NonResourceUnion");
     auto type = gen.CodedTypeFor(name);
     ASSERT_NOT_NULL(type);
-    ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type->kind);
+    ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type->kind);
 
-    auto coded_union = static_cast<const fidl::coded::XUnionType*>(type);
+    auto coded_union = static_cast<const fidl::coded::UnionType*>(type);
     EXPECT_EQ(fidl::types::Resourceness::kValue, coded_union->resourceness);
   }
 }
@@ -1408,8 +1403,8 @@ protocol UseOfProtocol {
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type0->coded_name.c_str());
   EXPECT_TRUE(type0->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type0->kind);
-  auto type0_union = static_cast<const fidl::coded::XUnionType*>(type0);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type0->kind);
+  auto type0_union = static_cast<const fidl::coded::UnionType*>(type0);
   ASSERT_EQ(fidl::types::Nullability::kNullable, type0_union->nullability);
   EXPECT_EQ(16, type0->size_v2);
   ASSERT_EQ(2, type0_union->fields.size());
@@ -1524,8 +1519,8 @@ protocol UseOfProtocol {
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type0->coded_name.c_str());
   EXPECT_TRUE(type0->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type0->kind);
-  auto type0_union = static_cast<const fidl::coded::XUnionType*>(type0);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type0->kind);
+  auto type0_union = static_cast<const fidl::coded::UnionType*>(type0);
   ASSERT_EQ(fidl::types::Nullability::kNullable, type0_union->nullability);
   EXPECT_EQ(16, type0->size_v2);
   ASSERT_EQ(2, type0_union->fields.size());
@@ -1594,8 +1589,8 @@ protocol UseOfProtocol {
   EXPECT_STREQ("example_UseOfProtocolCallRequestMessage", anon_payload->coded_name.c_str());
   EXPECT_TRUE(anon_payload->is_coding_needed);
   EXPECT_EQ(16, anon_payload->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, anon_payload->kind);
-  auto anon_payload_message = static_cast<const fidl::coded::XUnionType*>(anon_payload);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, anon_payload->kind);
+  auto anon_payload_message = static_cast<const fidl::coded::UnionType*>(anon_payload);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, anon_payload_message->nullability);
   EXPECT_EQ(fidl::types::Resourceness::kValue, anon_payload_message->resourceness);
   EXPECT_STREQ("example/UseOfProtocolCallRequestMessage", anon_payload_message->qname.c_str());
@@ -1610,8 +1605,8 @@ protocol UseOfProtocol {
   EXPECT_STREQ("example_OnReceivePayload", type_named_payload->coded_name.c_str());
   EXPECT_TRUE(type_named_payload->is_coding_needed);
   EXPECT_EQ(16, type_named_payload->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type_named_payload->kind);
-  auto type_named_payload_message = static_cast<const fidl::coded::XUnionType*>(type_named_payload);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type_named_payload->kind);
+  auto type_named_payload_message = static_cast<const fidl::coded::UnionType*>(type_named_payload);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, type_named_payload_message->nullability);
   EXPECT_EQ(fidl::types::Resourceness::kValue, type_named_payload_message->resourceness);
   EXPECT_STREQ("example/OnReceivePayload", type_named_payload_message->qname.c_str());
@@ -1638,8 +1633,8 @@ protocol UseOfProtocol {
   auto type1 = gen.coded_types().at(1).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type1->coded_name.c_str());
   EXPECT_TRUE(type1->is_coding_needed);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type1->kind);
-  auto type1_union = static_cast<const fidl::coded::XUnionType*>(type1);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type1->kind);
+  auto type1_union = static_cast<const fidl::coded::UnionType*>(type1);
   ASSERT_EQ(fidl::types::Nullability::kNullable, type1_union->nullability);
   EXPECT_EQ(16, type1->size_v2);
   ASSERT_EQ(2, type1_union->fields.size());
@@ -1671,8 +1666,8 @@ protocol UseOfProtocol {
   EXPECT_STREQ("example_UseOfProtocol_Method_Response", type_anon_payload->coded_name.c_str());
   EXPECT_TRUE(type_anon_payload->is_coding_needed);
   EXPECT_EQ(16, type_anon_payload->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kXUnion, type_anon_payload->kind);
-  auto type_anon_payload_message = static_cast<const fidl::coded::XUnionType*>(type_anon_payload);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type_anon_payload->kind);
+  auto type_anon_payload_message = static_cast<const fidl::coded::UnionType*>(type_anon_payload);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, type_anon_payload_message->nullability);
   EXPECT_EQ(fidl::types::Resourceness::kValue, type_anon_payload_message->resourceness);
   EXPECT_STREQ("example/UseOfProtocol_Method_Response", type_anon_payload_message->qname.c_str());

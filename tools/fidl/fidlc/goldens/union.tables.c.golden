@@ -3,62 +3,62 @@
 #include <lib/fidl/internal.h>
 
 
-__LOCAL extern const struct FidlCodedXUnion test_union_UnionWithAttributesTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_UnionWithAttributesNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_UnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_UnionNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_union_StructWithNullableXUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictSimpleXUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictSimpleXUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictFooTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictFooNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictBoundedXUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictBoundedXUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ReverseOrdinalUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ReverseOrdinalUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_UnionWithAttributesTable;
+__LOCAL extern const struct FidlCodedUnion test_union_UnionWithAttributesNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_UnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_UnionNullableRefTable;
+__LOCAL extern const struct FidlCodedStruct test_union_StructWithNullableUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictSimpleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictSimpleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictFooTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictFooNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictBoundedUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictBoundedUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ReverseOrdinalUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ReverseOrdinalUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_union_PizzaTable;
 __LOCAL extern const struct FidlCodedStruct test_union_PastaTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictPizzaOrPastaTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_StrictPizzaOrPastaNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_PizzaOrPastaTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_PizzaOrPastaNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FlexiblePizzaOrPastaTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FlexiblePizzaOrPastaNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitPizzaOrPastaTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitPizzaOrPastaNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_OnlyReservedFlexibleUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_OnlyReservedFlexibleUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_OlderSimpleUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_OlderSimpleUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable;
-__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseMessageTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictPizzaOrPastaTable;
+__LOCAL extern const struct FidlCodedUnion test_union_StrictPizzaOrPastaNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_PizzaOrPastaTable;
+__LOCAL extern const struct FidlCodedUnion test_union_PizzaOrPastaNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FlexiblePizzaOrPastaTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FlexiblePizzaOrPastaNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitPizzaOrPastaTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitPizzaOrPastaNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_OlderSimpleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_OlderSimpleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
+__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseMessageTable;
+__LOCAL extern const struct FidlCodedStruct test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_union_NullableUnionStructTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_NewerSimpleUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_NewerSimpleUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FlexibleUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FlexibleUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FlexibleFooTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FlexibleFooNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FieldCollisionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_FieldCollisionNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitXUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitXUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_NewerSimpleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_NewerSimpleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FlexibleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FlexibleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FlexibleFooTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FlexibleFooNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FieldCollisionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_FieldCollisionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitStrictFooTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitStrictFooNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitFooTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitFooNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitFlexibleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_ExplicitFlexibleUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_union_UnionSandwichTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitUnionNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitStrictFooTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitStrictFooNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitFooTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_ExplicitFooNullableRefTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_EmptyFlexibleUnionTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_EmptyFlexibleUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_EmptyFlexibleUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_union_EmptyFlexibleUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_union_EmptyTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_XUnionContainingEmptyStructTable;
-__LOCAL extern const struct FidlCodedXUnion test_union_XUnionContainingEmptyStructNullableRefTable;
+__LOCAL extern const struct FidlCodedUnion test_union_UnionContainingEmptyStructTable;
+__LOCAL extern const struct FidlCodedUnion test_union_UnionContainingEmptyStructNullableRefTable;
 
 
 static const struct FidlCodedString String4294967295nonnullableTable = {.tag=kFidlTypeString, .max_size=4294967295u, .nullable=kFidlNullability_Nonnullable};
@@ -72,90 +72,90 @@ static const struct FidlCodedString String16nonnullableTable = {.tag=kFidlTypeSt
 static const struct FidlCodedVector Vector4294967295nonnullable19String16nonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&String16nonnullableTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
 
 
-static const struct FidlXUnionField Fields30test_union_UnionWithAttributes[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=NULL}
+static const struct FidlUnionField Fields30test_union_UnionWithAttributes[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=NULL}
 };
-const struct FidlCodedXUnion test_union_UnionWithAttributesTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields30test_union_UnionWithAttributes, .nullable=kFidlNullability_Nonnullable, .name="test.union/UnionWithAttributes", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields41test_union_UnionWithAttributesNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=NULL}
+const struct FidlCodedUnion test_union_UnionWithAttributesTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields30test_union_UnionWithAttributes, .nullable=kFidlNullability_Nonnullable, .name="test.union/UnionWithAttributes", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields41test_union_UnionWithAttributesNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=NULL}
 };
-const struct FidlCodedXUnion test_union_UnionWithAttributesNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields41test_union_UnionWithAttributesNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/UnionWithAttributes", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields16test_union_Union[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_UnionWithAttributesNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields41test_union_UnionWithAttributesNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/UnionWithAttributes", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields16test_union_Union[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_UnionTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields16test_union_Union, .nullable=kFidlNullability_Nonnullable, .name="test.union/Union", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields27test_union_UnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_UnionTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields16test_union_Union, .nullable=kFidlNullability_Nonnullable, .name="test.union/Union", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields27test_union_UnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_UnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields27test_union_UnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/Union", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields35test_union_StructWithNullableXUnion[] = {
+const struct FidlCodedUnion test_union_UnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields27test_union_UnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/Union", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlStructElement Fields34test_union_StructWithNullableUnion[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_OlderSimpleUnionNullableRefTable)}}
 };
-const struct FidlCodedStruct test_union_StructWithNullableXUnionTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields35test_union_StructWithNullableXUnion, .element_count=1u, .size_v2=16u, .name="test.union/StructWithNullableXUnion"};
+const struct FidlCodedStruct test_union_StructWithNullableUnionTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_union_StructWithNullableUnion, .element_count=1u, .size_v2=16u, .name="test.union/StructWithNullableUnion"};
 
-static const struct FidlXUnionField Fields22test_union_StrictUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+static const struct FidlUnionField Fields22test_union_StrictUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_StrictUnionTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields22test_union_StrictUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields33test_union_StrictUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_StrictUnionTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields22test_union_StrictUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields33test_union_StrictUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_StrictUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields33test_union_StrictUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields29test_union_StrictSimpleXUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_StrictUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields33test_union_StrictUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields28test_union_StrictSimpleUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_StrictSimpleXUnionTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields29test_union_StrictSimpleXUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictSimpleXUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields40test_union_StrictSimpleXUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_StrictSimpleUnionTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields28test_union_StrictSimpleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictSimpleUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields39test_union_StrictSimpleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_StrictSimpleXUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields40test_union_StrictSimpleXUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictSimpleXUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields20test_union_StrictFoo[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_union_StrictSimpleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields39test_union_StrictSimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictSimpleUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields20test_union_StrictFoo[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_union_StrictFooTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields20test_union_StrictFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields31test_union_StrictFooNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_union_StrictFooTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields20test_union_StrictFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields31test_union_StrictFooNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_union_StrictFooNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields31test_union_StrictFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields30test_union_StrictBoundedXUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector10nonnullable5uint8Table)}
+const struct FidlCodedUnion test_union_StrictFooNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields31test_union_StrictFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields29test_union_StrictBoundedUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector10nonnullable5uint8Table)}
 };
-const struct FidlCodedXUnion test_union_StrictBoundedXUnionTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields30test_union_StrictBoundedXUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictBoundedXUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields41test_union_StrictBoundedXUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector10nonnullable5uint8Table)}
+const struct FidlCodedUnion test_union_StrictBoundedUnionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields29test_union_StrictBoundedUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictBoundedUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields40test_union_StrictBoundedUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector10nonnullable5uint8Table)}
 };
-const struct FidlCodedXUnion test_union_StrictBoundedXUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields41test_union_StrictBoundedXUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictBoundedXUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields75test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_StrictBoundedXUnionTable)}}
+const struct FidlCodedUnion test_union_StrictBoundedUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields40test_union_StrictBoundedUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictBoundedUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlStructElement Fields74test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse[] = {
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_StrictBoundedUnionTable)}}
 };
-const struct FidlCodedStruct test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields75test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse"};
+const struct FidlCodedStruct test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields74test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse"};
 
-static const struct FidlXUnionField Fields30test_union_ReverseOrdinalUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+static const struct FidlUnionField Fields30test_union_ReverseOrdinalUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_union_ReverseOrdinalUnionTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields30test_union_ReverseOrdinalUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/ReverseOrdinalUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields41test_union_ReverseOrdinalUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
+const struct FidlCodedUnion test_union_ReverseOrdinalUnionTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields30test_union_ReverseOrdinalUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/ReverseOrdinalUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields41test_union_ReverseOrdinalUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
-const struct FidlCodedXUnion test_union_ReverseOrdinalUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields41test_union_ReverseOrdinalUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ReverseOrdinalUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_union_ReverseOrdinalUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields41test_union_ReverseOrdinalUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ReverseOrdinalUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields16test_union_Pizza[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable19String16nonnullableTable)}}
 };
@@ -166,196 +166,196 @@ static const struct FidlStructElement Fields16test_union_Pasta[] = {
 };
 const struct FidlCodedStruct test_union_PastaTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields16test_union_Pasta, .element_count=1u, .size_v2=16u, .name="test.union/Pasta"};
 
-static const struct FidlXUnionField Fields29test_union_StrictPizzaOrPasta[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+static const struct FidlUnionField Fields29test_union_StrictPizzaOrPasta[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_StrictPizzaOrPastaTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields29test_union_StrictPizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields40test_union_StrictPizzaOrPastaNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+const struct FidlCodedUnion test_union_StrictPizzaOrPastaTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields29test_union_StrictPizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/StrictPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields40test_union_StrictPizzaOrPastaNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_StrictPizzaOrPastaNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields40test_union_StrictPizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields23test_union_PizzaOrPasta[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+const struct FidlCodedUnion test_union_StrictPizzaOrPastaNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields40test_union_StrictPizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/StrictPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields23test_union_PizzaOrPasta[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_PizzaOrPastaTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields23test_union_PizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/PizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields34test_union_PizzaOrPastaNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+const struct FidlCodedUnion test_union_PizzaOrPastaTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields23test_union_PizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/PizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields34test_union_PizzaOrPastaNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_PizzaOrPastaNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields34test_union_PizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/PizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields31test_union_FlexiblePizzaOrPasta[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+const struct FidlCodedUnion test_union_PizzaOrPastaNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields34test_union_PizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/PizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields31test_union_FlexiblePizzaOrPasta[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_FlexiblePizzaOrPastaTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields31test_union_FlexiblePizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/FlexiblePizzaOrPasta", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields42test_union_FlexiblePizzaOrPastaNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+const struct FidlCodedUnion test_union_FlexiblePizzaOrPastaTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields31test_union_FlexiblePizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/FlexiblePizzaOrPasta", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields42test_union_FlexiblePizzaOrPastaNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_FlexiblePizzaOrPastaNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields42test_union_FlexiblePizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FlexiblePizzaOrPasta", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields31test_union_ExplicitPizzaOrPasta[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+const struct FidlCodedUnion test_union_FlexiblePizzaOrPastaNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields42test_union_FlexiblePizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FlexiblePizzaOrPasta", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields31test_union_ExplicitPizzaOrPasta[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_ExplicitPizzaOrPastaTable = {.tag=kFidlTypeXUnion, .field_count=4u, .fields=Fields31test_union_ExplicitPizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields42test_union_ExplicitPizzaOrPastaNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
+const struct FidlCodedUnion test_union_ExplicitPizzaOrPastaTable = {.tag=kFidlTypeUnion, .field_count=4u, .fields=Fields31test_union_ExplicitPizzaOrPasta, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields42test_union_ExplicitPizzaOrPastaNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PizzaTable)},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_PastaTable)}
 };
-const struct FidlCodedXUnion test_union_ExplicitPizzaOrPastaNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=4u, .fields=Fields42test_union_ExplicitPizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields36test_union_OnlyReservedFlexibleUnion[] = {
-    /*FidlXUnionField*/{.type=NULL}
+const struct FidlCodedUnion test_union_ExplicitPizzaOrPastaNullableRefTable = {.tag=kFidlTypeUnion, .field_count=4u, .fields=Fields42test_union_ExplicitPizzaOrPastaNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitPizzaOrPasta", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields36test_union_OnlyReservedFlexibleUnion[] = {
+    /*FidlUnionField*/{.type=NULL}
 };
-const struct FidlCodedXUnion test_union_OnlyReservedFlexibleUnionTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields36test_union_OnlyReservedFlexibleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/OnlyReservedFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields47test_union_OnlyReservedFlexibleUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=NULL}
+const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields36test_union_OnlyReservedFlexibleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/OnlyReservedFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields47test_union_OnlyReservedFlexibleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=NULL}
 };
-const struct FidlCodedXUnion test_union_OnlyReservedFlexibleUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields47test_union_OnlyReservedFlexibleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/OnlyReservedFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields27test_union_OlderSimpleUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+const struct FidlCodedUnion test_union_OnlyReservedFlexibleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields47test_union_OnlyReservedFlexibleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/OnlyReservedFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields27test_union_OlderSimpleUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
 };
-const struct FidlCodedXUnion test_union_OlderSimpleUnionTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields27test_union_OlderSimpleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/OlderSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields38test_union_OlderSimpleUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+const struct FidlCodedUnion test_union_OlderSimpleUnionTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields27test_union_OlderSimpleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/OlderSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields38test_union_OlderSimpleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
 };
-const struct FidlCodedXUnion test_union_OlderSimpleUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields38test_union_OlderSimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/OlderSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlStructElement Fields77test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse[] = {
+const struct FidlCodedUnion test_union_OlderSimpleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields38test_union_OlderSimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/OlderSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlStructElement Fields76test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_OlderSimpleUnionTable)}}
 };
-const struct FidlCodedStruct test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields77test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse"};
+const struct FidlCodedStruct test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields76test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse"};
 
-static const struct FidlStructElement Fields82test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_StrictBoundedXUnionTable)}}
+static const struct FidlStructElement Fields81test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseMessage[] = {
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_StrictBoundedUnionTable)}}
 };
-const struct FidlCodedStruct test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields82test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseMessage, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseMessage"};
+const struct FidlCodedStruct test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields81test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseMessage, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseMessage"};
 
-static const struct FidlStructElement Fields84test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseMessage[] = {
+static const struct FidlStructElement Fields83test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseMessage[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_OlderSimpleUnionTable)}}
 };
-const struct FidlCodedStruct test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields84test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseMessage, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseMessage"};
+const struct FidlCodedStruct test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields83test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseMessage, .element_count=1u, .size_v2=16u, .name="test.union/TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseMessage"};
 
 static const struct FidlStructElement Fields30test_union_NullableUnionStruct[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_union_UnionNullableRefTable)}}
 };
 const struct FidlCodedStruct test_union_NullableUnionStructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields30test_union_NullableUnionStruct, .element_count=1u, .size_v2=16u, .name="test.union/NullableUnionStruct"};
 
-static const struct FidlXUnionField Fields27test_union_NewerSimpleUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+static const struct FidlUnionField Fields27test_union_NewerSimpleUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_NewerSimpleUnionTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields27test_union_NewerSimpleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/NewerSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields38test_union_NewerSimpleUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_NewerSimpleUnionTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields27test_union_NewerSimpleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/NewerSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields38test_union_NewerSimpleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_NewerSimpleUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields38test_union_NewerSimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/NewerSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields24test_union_FlexibleUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_NewerSimpleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields38test_union_NewerSimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/NewerSimpleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields24test_union_FlexibleUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_FlexibleUnionTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields24test_union_FlexibleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields35test_union_FlexibleUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
+const struct FidlCodedUnion test_union_FlexibleUnionTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields24test_union_FlexibleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields35test_union_FlexibleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_FlexibleUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields35test_union_FlexibleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields22test_union_FlexibleFoo[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_union_FlexibleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields35test_union_FlexibleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields22test_union_FlexibleFoo[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_union_FlexibleFooTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields22test_union_FlexibleFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/FlexibleFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields33test_union_FlexibleFooNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_union_FlexibleFooTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields22test_union_FlexibleFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/FlexibleFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields33test_union_FlexibleFooNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_union_FlexibleFooNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=2u, .fields=Fields33test_union_FlexibleFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FlexibleFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields25test_union_FieldCollision[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_union_FlexibleFooNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields33test_union_FlexibleFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FlexibleFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields25test_union_FieldCollision[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_union_FieldCollisionTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields25test_union_FieldCollision, .nullable=kFidlNullability_Nonnullable, .name="test.union/FieldCollision", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields36test_union_FieldCollisionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
+const struct FidlCodedUnion test_union_FieldCollisionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields25test_union_FieldCollision, .nullable=kFidlNullability_Nonnullable, .name="test.union/FieldCollision", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields36test_union_FieldCollisionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
-const struct FidlCodedXUnion test_union_FieldCollisionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields36test_union_FieldCollisionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FieldCollision", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields25test_union_ExplicitXUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+const struct FidlCodedUnion test_union_FieldCollisionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields36test_union_FieldCollisionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/FieldCollision", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields24test_union_ExplicitUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_ExplicitXUnionTable = {.tag=kFidlTypeXUnion, .field_count=4u, .fields=Fields25test_union_ExplicitXUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitXUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields36test_union_ExplicitXUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+const struct FidlCodedUnion test_union_ExplicitUnionTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields24test_union_ExplicitUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields35test_union_ExplicitUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
 };
-const struct FidlCodedXUnion test_union_ExplicitXUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=4u, .fields=Fields36test_union_ExplicitXUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitXUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_union_ExplicitUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields35test_union_ExplicitUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields28test_union_ExplicitStrictFoo[] = {
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
+};
+const struct FidlCodedUnion test_union_ExplicitStrictFooTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields28test_union_ExplicitStrictFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitStrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields39test_union_ExplicitStrictFooNullableRef[] = {
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
+};
+const struct FidlCodedUnion test_union_ExplicitStrictFooNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields39test_union_ExplicitStrictFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitStrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields22test_union_ExplicitFoo[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=NULL}
+};
+const struct FidlCodedUnion test_union_ExplicitFooTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields22test_union_ExplicitFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields33test_union_ExplicitFooNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
+    /*FidlUnionField*/{.type=NULL}
+};
+const struct FidlCodedUnion test_union_ExplicitFooNullableRefTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields33test_union_ExplicitFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields32test_union_ExplicitFlexibleUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+};
+const struct FidlCodedUnion test_union_ExplicitFlexibleUnionTable = {.tag=kFidlTypeUnion, .field_count=4u, .fields=Fields32test_union_ExplicitFlexibleUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields43test_union_ExplicitFlexibleUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt64Table)},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=NULL},
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
+};
+const struct FidlCodedUnion test_union_ExplicitFlexibleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=4u, .fields=Fields43test_union_ExplicitFlexibleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 static const struct FidlStructElement Fields24test_union_UnionSandwich[] = {
     /*FidlStructPadding*/{.padding=/*FidlStructPadding*/{.offset_v2=4u, .header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Padding32,.is_resource=kFidlIsResource_NotResource},.mask_32=4294967295u}},
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=8u, .field_type=(fidl_type_t*)(&test_union_ExplicitXUnionTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=8u, .field_type=(fidl_type_t*)(&test_union_ExplicitFlexibleUnionTable)}},
     /*FidlStructPadding*/{.padding=/*FidlStructPadding*/{.offset_v2=28u, .header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Padding32,.is_resource=kFidlIsResource_NotResource},.mask_32=4294967295u}}
 };
 const struct FidlCodedStruct test_union_UnionSandwichTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields24test_union_UnionSandwich, .element_count=3u, .size_v2=32u, .name="test.union/UnionSandwich"};
 
-static const struct FidlXUnionField Fields24test_union_ExplicitUnion[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
-};
-const struct FidlCodedXUnion test_union_ExplicitUnionTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields24test_union_ExplicitUnion, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields35test_union_ExplicitUnionNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
-};
-const struct FidlCodedXUnion test_union_ExplicitUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields35test_union_ExplicitUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields28test_union_ExplicitStrictFoo[] = {
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
-};
-const struct FidlCodedXUnion test_union_ExplicitStrictFooTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields28test_union_ExplicitStrictFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitStrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields39test_union_ExplicitStrictFooNullableRef[] = {
-    /*FidlXUnionField*/{.type=NULL},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)}
-};
-const struct FidlCodedXUnion test_union_ExplicitStrictFooNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields39test_union_ExplicitStrictFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitStrictFoo", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields22test_union_ExplicitFoo[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=NULL}
-};
-const struct FidlCodedXUnion test_union_ExplicitFooTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields22test_union_ExplicitFoo, .nullable=kFidlNullability_Nonnullable, .name="test.union/ExplicitFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields33test_union_ExplicitFooNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&String4294967295nonnullableTable)},
-    /*FidlXUnionField*/{.type=NULL}
-};
-const struct FidlCodedXUnion test_union_ExplicitFooNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=3u, .fields=Fields33test_union_ExplicitFooNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/ExplicitFoo", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedXUnion test_union_EmptyFlexibleUnionTable = {.tag=kFidlTypeXUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nonnullable, .name="test.union/EmptyFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedXUnion test_union_EmptyFlexibleUnionNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nullable, .name="test.union/EmptyFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_union_EmptyFlexibleUnionTable = {.tag=kFidlTypeUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nonnullable, .name="test.union/EmptyFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_union_EmptyFlexibleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nullable, .name="test.union/EmptyFlexibleUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedStruct test_union_EmptyTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.union/Empty"};
 
-static const struct FidlXUnionField Fields38test_union_XUnionContainingEmptyStruct[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_EmptyTable)}
+static const struct FidlUnionField Fields37test_union_UnionContainingEmptyStruct[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_EmptyTable)}
 };
-const struct FidlCodedXUnion test_union_XUnionContainingEmptyStructTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields38test_union_XUnionContainingEmptyStruct, .nullable=kFidlNullability_Nonnullable, .name="test.union/XUnionContainingEmptyStruct", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlXUnionField Fields49test_union_XUnionContainingEmptyStructNullableRef[] = {
-    /*FidlXUnionField*/{.type=(fidl_type_t*)(&test_union_EmptyTable)}
+const struct FidlCodedUnion test_union_UnionContainingEmptyStructTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields37test_union_UnionContainingEmptyStruct, .nullable=kFidlNullability_Nonnullable, .name="test.union/UnionContainingEmptyStruct", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+static const struct FidlUnionField Fields48test_union_UnionContainingEmptyStructNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_union_EmptyTable)}
 };
-const struct FidlCodedXUnion test_union_XUnionContainingEmptyStructNullableRefTable = {.tag=kFidlTypeXUnion, .field_count=1u, .fields=Fields49test_union_XUnionContainingEmptyStructNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/XUnionContainingEmptyStruct", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
+const struct FidlCodedUnion test_union_UnionContainingEmptyStructNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields48test_union_UnionContainingEmptyStructNullableRef, .nullable=kFidlNullability_Nullable, .name="test.union/UnionContainingEmptyStruct", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};

@@ -43,13 +43,13 @@ class NullableUnionStruct;
 class Empty;
 
 
-class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse;
+class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
 
 
-class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse;
+class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse;
 
 
-class StructWithNullableXUnion;
+class StructWithNullableUnion;
 
 
 class UnionSandwich;
@@ -122,19 +122,19 @@ class NewerSimpleUnion;
 
 
 
-class StrictSimpleXUnion;
+class StrictSimpleUnion;
 
 
 
-class XUnionContainingEmptyStruct;
+class UnionContainingEmptyStruct;
 
 
 
-class StrictBoundedXUnion;
+class StrictBoundedUnion;
 
 
 
-class ExplicitXUnion;
+class ExplicitFlexibleUnion;
 
 
 
@@ -2556,10 +2556,10 @@ class NewerSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_StrictSimpleXUnionTable;
+extern "C" const fidl_type_t test_union_StrictSimpleUnionTable;
 
 
-class StrictSimpleXUnion {
+class StrictSimpleUnion {
  private:
   using Storage_ =
     std::variant<
@@ -2576,36 +2576,36 @@ class StrictSimpleXUnion {
     kS = 3,  // 0x3
   };
 
-  StrictSimpleXUnion(StrictSimpleXUnion&& other) noexcept
-      : StrictSimpleXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+  StrictSimpleUnion(StrictSimpleUnion&& other) noexcept
+      : StrictSimpleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
     *storage_ = std::move(*other.storage_);
   }
-  StrictSimpleXUnion& operator=(StrictSimpleXUnion&& other) noexcept {
+  StrictSimpleUnion& operator=(StrictSimpleUnion&& other) noexcept {
     if (this != &other) {
       *storage_ = std::move(*other.storage_);
     }
     return *this;
   }
-    StrictSimpleXUnion(const StrictSimpleXUnion& other) noexcept : StrictSimpleXUnion(other.CloneStorage_()){}
-    StrictSimpleXUnion& operator=(const StrictSimpleXUnion& other) noexcept {
+    StrictSimpleUnion(const StrictSimpleUnion& other) noexcept : StrictSimpleUnion(other.CloneStorage_()){}
+    StrictSimpleUnion& operator=(const StrictSimpleUnion& other) noexcept {
       if (this != &other) {
         storage_ = other.CloneStorage_();
       }
       return *this;
     }
 
-    bool operator==(const StrictSimpleXUnion& other) const noexcept {
+    bool operator==(const StrictSimpleUnion& other) const noexcept {
       return *storage_ == *other.storage_;
     }
-    bool operator!=(const StrictSimpleXUnion& other) const noexcept {
+    bool operator!=(const StrictSimpleUnion& other) const noexcept {
       return *storage_ != *other.storage_;
     }
 
-  constexpr ::test_union::StrictSimpleXUnion::Tag Which() const {
-    return StrictSimpleXUnion::IndexToTag(storage_->index()).value();
+  constexpr ::test_union::StrictSimpleUnion::Tag Which() const {
+    return StrictSimpleUnion::IndexToTag(storage_->index()).value();
   }
-    static StrictSimpleXUnion WithI(int32_t val) {
-      return StrictSimpleXUnion(std::make_shared<Storage_>(
+    static StrictSimpleUnion WithI(int32_t val) {
+      return StrictSimpleUnion(std::make_shared<Storage_>(
         std::in_place_index_t<1>{},
         std::move(val)));
     }
@@ -2621,12 +2621,12 @@ class StrictSimpleXUnion {
     // Sets the union to hold the i member.
     //
     
-    StrictSimpleXUnion& i(int32_t value) {
+    StrictSimpleUnion& i(int32_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static StrictSimpleXUnion WithF(float val) {
-      return StrictSimpleXUnion(std::make_shared<Storage_>(
+    static StrictSimpleUnion WithF(float val) {
+      return StrictSimpleUnion(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
@@ -2642,12 +2642,12 @@ class StrictSimpleXUnion {
     // Sets the union to hold the f member.
     //
     
-    StrictSimpleXUnion& f(float value) {
+    StrictSimpleUnion& f(float value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static StrictSimpleXUnion WithS(::std::string val) {
-      return StrictSimpleXUnion(std::make_shared<Storage_>(
+    static StrictSimpleUnion WithS(::std::string val) {
+      return StrictSimpleUnion(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
@@ -2663,31 +2663,31 @@ class StrictSimpleXUnion {
     // Sets the union to hold the s member.
     //
     
-    StrictSimpleXUnion& s(::std::string value) {
+    StrictSimpleUnion& s(::std::string value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
 
-  StrictSimpleXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+  StrictSimpleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
       : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
     std::shared_ptr<Storage_> CloneStorage_() const;
-  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictSimpleXUnion>;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictSimpleUnion>;
   static constexpr auto kMembers = std::make_tuple(
     ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
       , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
       , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
       , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintString<>>());
 
-  explicit StrictSimpleXUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit StrictSimpleUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::StrictSimpleXUnion::Tag tag) {
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::StrictSimpleUnion::Tag tag) {
     switch (tag) {
-        case ::test_union::StrictSimpleXUnion::Tag::kI: return 1;
-        case ::test_union::StrictSimpleXUnion::Tag::kF: return 2;
-        case ::test_union::StrictSimpleXUnion::Tag::kS: return 3;
+        case ::test_union::StrictSimpleUnion::Tag::kI: return 1;
+        case ::test_union::StrictSimpleUnion::Tag::kF: return 2;
+        case ::test_union::StrictSimpleUnion::Tag::kS: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -2695,11 +2695,11 @@ class StrictSimpleXUnion {
     }
   }
 
-  static constexpr std::optional<::test_union::StrictSimpleXUnion::Tag> IndexToTag(size_t index) {
+  static constexpr std::optional<::test_union::StrictSimpleUnion::Tag> IndexToTag(size_t index) {
     switch (index) {
-        case 1: return ::test_union::StrictSimpleXUnion::Tag::kI;
-        case 2: return ::test_union::StrictSimpleXUnion::Tag::kF;
-        case 3: return ::test_union::StrictSimpleXUnion::Tag::kS;
+        case 1: return ::test_union::StrictSimpleUnion::Tag::kI;
+        case 2: return ::test_union::StrictSimpleUnion::Tag::kF;
+        case 3: return ::test_union::StrictSimpleUnion::Tag::kS;
         default: return std::nullopt;
     }
   }
@@ -2783,10 +2783,10 @@ class Empty {
 
 
 
-extern "C" const fidl_type_t test_union_XUnionContainingEmptyStructTable;
+extern "C" const fidl_type_t test_union_UnionContainingEmptyStructTable;
 
 
-class XUnionContainingEmptyStruct {
+class UnionContainingEmptyStruct {
  private:
   using Storage_ =
     std::variant<
@@ -2800,39 +2800,39 @@ class XUnionContainingEmptyStruct {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  XUnionContainingEmptyStruct(XUnionContainingEmptyStruct&& other) noexcept
-      : XUnionContainingEmptyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+  UnionContainingEmptyStruct(UnionContainingEmptyStruct&& other) noexcept
+      : UnionContainingEmptyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
     *storage_ = std::move(*other.storage_);
   }
-  XUnionContainingEmptyStruct& operator=(XUnionContainingEmptyStruct&& other) noexcept {
+  UnionContainingEmptyStruct& operator=(UnionContainingEmptyStruct&& other) noexcept {
     if (this != &other) {
       *storage_ = std::move(*other.storage_);
     }
     return *this;
   }
-    XUnionContainingEmptyStruct(const XUnionContainingEmptyStruct& other) noexcept : XUnionContainingEmptyStruct(other.CloneStorage_()){}
-    XUnionContainingEmptyStruct& operator=(const XUnionContainingEmptyStruct& other) noexcept {
+    UnionContainingEmptyStruct(const UnionContainingEmptyStruct& other) noexcept : UnionContainingEmptyStruct(other.CloneStorage_()){}
+    UnionContainingEmptyStruct& operator=(const UnionContainingEmptyStruct& other) noexcept {
       if (this != &other) {
         storage_ = other.CloneStorage_();
       }
       return *this;
     }
 
-    bool operator==(const XUnionContainingEmptyStruct& other) const noexcept {
+    bool operator==(const UnionContainingEmptyStruct& other) const noexcept {
       return *storage_ == *other.storage_;
     }
-    bool operator!=(const XUnionContainingEmptyStruct& other) const noexcept {
+    bool operator!=(const UnionContainingEmptyStruct& other) const noexcept {
       return *storage_ != *other.storage_;
     }
   constexpr bool IsUnknown() const {
-    return Which() == ::test_union::XUnionContainingEmptyStruct::Tag::_do_not_handle_this__write_a_default_case_instead;
+    return Which() == ::test_union::UnionContainingEmptyStruct::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  constexpr ::test_union::XUnionContainingEmptyStruct::Tag Which() const {
-    return XUnionContainingEmptyStruct::IndexToTag(storage_->index()).value();
+  constexpr ::test_union::UnionContainingEmptyStruct::Tag Which() const {
+    return UnionContainingEmptyStruct::IndexToTag(storage_->index()).value();
   }
-    static XUnionContainingEmptyStruct WithEmpty(::test_union::Empty val) {
-      return XUnionContainingEmptyStruct(std::make_shared<Storage_>(
+    static UnionContainingEmptyStruct WithEmpty(::test_union::Empty val) {
+      return UnionContainingEmptyStruct(std::make_shared<Storage_>(
         std::in_place_index_t<1>{},
         std::move(val)));
     }
@@ -2848,37 +2848,37 @@ class XUnionContainingEmptyStruct {
     // Sets the union to hold the empty member.
     //
     
-    XUnionContainingEmptyStruct& empty(::test_union::Empty value) {
+    UnionContainingEmptyStruct& empty(::test_union::Empty value) {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
 
-  XUnionContainingEmptyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+  UnionContainingEmptyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
       : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
     std::shared_ptr<Storage_> CloneStorage_() const;
-  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::XUnionContainingEmptyStruct>;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::UnionContainingEmptyStruct>;
   static constexpr auto kMembers = std::make_tuple(
     ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
       , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit XUnionContainingEmptyStruct(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit UnionContainingEmptyStruct(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::XUnionContainingEmptyStruct::Tag tag) {
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::UnionContainingEmptyStruct::Tag tag) {
     switch (tag) {
-        case ::test_union::XUnionContainingEmptyStruct::Tag::kEmpty: return 1;
+        case ::test_union::UnionContainingEmptyStruct::Tag::kEmpty: return 1;
       default: {
         return 0;
       }
     }
   }
 
-  static constexpr std::optional<::test_union::XUnionContainingEmptyStruct::Tag> IndexToTag(size_t index) {
+  static constexpr std::optional<::test_union::UnionContainingEmptyStruct::Tag> IndexToTag(size_t index) {
     switch (index) {
-        case 1: return ::test_union::XUnionContainingEmptyStruct::Tag::kEmpty;
-        default: return ::test_union::XUnionContainingEmptyStruct::Tag::_do_not_handle_this__write_a_default_case_instead;
+        case 1: return ::test_union::UnionContainingEmptyStruct::Tag::kEmpty;
+        default: return ::test_union::UnionContainingEmptyStruct::Tag::_do_not_handle_this__write_a_default_case_instead;
     }
   }
 
@@ -2891,10 +2891,10 @@ class XUnionContainingEmptyStruct {
 
 
 
-extern "C" const fidl_type_t test_union_StrictBoundedXUnionTable;
+extern "C" const fidl_type_t test_union_StrictBoundedUnionTable;
 
 
-class StrictBoundedXUnion {
+class StrictBoundedUnion {
  private:
   using Storage_ =
     std::variant<
@@ -2907,36 +2907,36 @@ class StrictBoundedXUnion {
     kV = 1,  // 0x1
   };
 
-  StrictBoundedXUnion(StrictBoundedXUnion&& other) noexcept
-      : StrictBoundedXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+  StrictBoundedUnion(StrictBoundedUnion&& other) noexcept
+      : StrictBoundedUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
     *storage_ = std::move(*other.storage_);
   }
-  StrictBoundedXUnion& operator=(StrictBoundedXUnion&& other) noexcept {
+  StrictBoundedUnion& operator=(StrictBoundedUnion&& other) noexcept {
     if (this != &other) {
       *storage_ = std::move(*other.storage_);
     }
     return *this;
   }
-    StrictBoundedXUnion(const StrictBoundedXUnion& other) noexcept : StrictBoundedXUnion(other.CloneStorage_()){}
-    StrictBoundedXUnion& operator=(const StrictBoundedXUnion& other) noexcept {
+    StrictBoundedUnion(const StrictBoundedUnion& other) noexcept : StrictBoundedUnion(other.CloneStorage_()){}
+    StrictBoundedUnion& operator=(const StrictBoundedUnion& other) noexcept {
       if (this != &other) {
         storage_ = other.CloneStorage_();
       }
       return *this;
     }
 
-    bool operator==(const StrictBoundedXUnion& other) const noexcept {
+    bool operator==(const StrictBoundedUnion& other) const noexcept {
       return *storage_ == *other.storage_;
     }
-    bool operator!=(const StrictBoundedXUnion& other) const noexcept {
+    bool operator!=(const StrictBoundedUnion& other) const noexcept {
       return *storage_ != *other.storage_;
     }
 
-  constexpr ::test_union::StrictBoundedXUnion::Tag Which() const {
-    return StrictBoundedXUnion::IndexToTag(storage_->index()).value();
+  constexpr ::test_union::StrictBoundedUnion::Tag Which() const {
+    return StrictBoundedUnion::IndexToTag(storage_->index()).value();
   }
-    static StrictBoundedXUnion WithV(::std::vector<uint8_t> val) {
-      return StrictBoundedXUnion(std::make_shared<Storage_>(
+    static StrictBoundedUnion WithV(::std::vector<uint8_t> val) {
+      return StrictBoundedUnion(std::make_shared<Storage_>(
         std::in_place_index_t<1>{},
         std::move(val)));
     }
@@ -2952,27 +2952,27 @@ class StrictBoundedXUnion {
     // Sets the union to hold the v member.
     //
     
-    StrictBoundedXUnion& v(::std::vector<uint8_t> value) {
+    StrictBoundedUnion& v(::std::vector<uint8_t> value) {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
 
-  StrictBoundedXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+  StrictBoundedUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
       : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
     std::shared_ptr<Storage_> CloneStorage_() const;
-  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictBoundedXUnion>;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictBoundedUnion>;
   static constexpr auto kMembers = std::make_tuple(
     ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
       , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintVector<fidl::internal::NaturalCodingConstraintEmpty, 10>>());
 
-  explicit StrictBoundedXUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit StrictBoundedUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::StrictBoundedXUnion::Tag tag) {
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::StrictBoundedUnion::Tag tag) {
     switch (tag) {
-        case ::test_union::StrictBoundedXUnion::Tag::kV: return 1;
+        case ::test_union::StrictBoundedUnion::Tag::kV: return 1;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -2980,9 +2980,9 @@ class StrictBoundedXUnion {
     }
   }
 
-  static constexpr std::optional<::test_union::StrictBoundedXUnion::Tag> IndexToTag(size_t index) {
+  static constexpr std::optional<::test_union::StrictBoundedUnion::Tag> IndexToTag(size_t index) {
     switch (index) {
-        case 1: return ::test_union::StrictBoundedXUnion::Tag::kV;
+        case 1: return ::test_union::StrictBoundedUnion::Tag::kV;
         default: return std::nullopt;
     }
   }
@@ -2994,62 +2994,62 @@ class StrictBoundedXUnion {
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable;
+extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 
 
-class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse {
+class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
  private:
   struct Storage_;
  public:
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept;
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedXUnion xu) noexcept;
+  TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept;
+    TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedUnion xu) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse| only if all of its members are default constructible.
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse() = default;
+  // Default constructs a |TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse| only if all of its members are default constructible.
+  TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse() = default;
 #pragma clang diagnostic pop
 
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&&) noexcept = default;
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& operator=(TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&&) noexcept = default;
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept;
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& operator=(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept;
+  TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse&&) noexcept = default;
+  TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& operator=(TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse&&) noexcept = default;
+    TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(const TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept;
+    TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& operator=(const TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept;
 
-    bool operator==(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) const noexcept {
-      return ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, 16>::Equal(this, &other);
+    bool operator==(const TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16>::Equal(this, &other);
     }
-    bool operator!=(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) const noexcept {
-      return !::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, 16>::Equal(this, &other);
+    bool operator!=(const TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16>::Equal(this, &other);
     }
     
-      const ::test_union::StrictBoundedXUnion &
+      const ::test_union::StrictBoundedUnion &
     xu() const {
       return storage_.xu;
     }
 
     
-    ::test_union::StrictBoundedXUnion& xu() {
+    ::test_union::StrictBoundedUnion& xu() {
       return storage_.xu;
     }
 
     // Setter for xu.
     //
     
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& xu(::test_union::StrictBoundedXUnion value);
+    TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& xu(::test_union::StrictBoundedUnion value);
 
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::test_union::StrictBoundedXUnion xu;
+      ::test_union::StrictBoundedUnion xu;
   };
 
   Storage_ storage_;
     Storage_ CloneStorage_() const;
 
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>;
-  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_union::StrictBoundedXUnion, fidl::internal::NaturalCodingConstraintEmpty>{
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>;
+  static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_union::StrictBoundedUnion, fidl::internal::NaturalCodingConstraintEmpty>{
         &Storage_::xu, 0
       });
   static constexpr auto kPadding = std::make_tuple();
@@ -3063,32 +3063,32 @@ class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse {
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable;
+extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
 
-class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
+class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
  private:
   struct Storage_;
  public:
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept;
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept;
+  TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept;
+    TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse| only if all of its members are default constructible.
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse() = default;
+  // Default constructs a |TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse| only if all of its members are default constructible.
+  TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse() = default;
 #pragma clang diagnostic pop
 
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&&) noexcept = default;
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& operator=(TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&&) noexcept = default;
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept;
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& operator=(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept;
+  TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse&&) noexcept = default;
+  TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& operator=(TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse&&) noexcept = default;
+    TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(const TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept;
+    TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& operator=(const TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept;
 
-    bool operator==(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) const noexcept {
-      return ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, 16>::Equal(this, &other);
+    bool operator==(const TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16>::Equal(this, &other);
     }
-    bool operator!=(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) const noexcept {
-      return !::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, 16>::Equal(this, &other);
+    bool operator!=(const TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16>::Equal(this, &other);
     }
     
       const ::test_union::OlderSimpleUnion &
@@ -3104,9 +3104,9 @@ class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
     // Setter for xu.
     //
     
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& xu(::test_union::OlderSimpleUnion value);
+    TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& xu(::test_union::OlderSimpleUnion value);
 
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3116,8 +3116,8 @@ class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
   Storage_ storage_;
     Storage_ CloneStorage_() const;
 
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>;
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::test_union::OlderSimpleUnion, fidl::internal::NaturalCodingConstraintEmpty>{
         &Storage_::xu, 0
       });
@@ -3135,32 +3135,32 @@ class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
 
 
 
-extern "C" const fidl_type_t test_union_StructWithNullableXUnionTable;
+extern "C" const fidl_type_t test_union_StructWithNullableUnionTable;
 
 
-class StructWithNullableXUnion {
+class StructWithNullableUnion {
  private:
   struct Storage_;
  public:
-  StructWithNullableXUnion(Storage_ storage) noexcept;
-    StructWithNullableXUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept;
+  StructWithNullableUnion(Storage_ storage) noexcept;
+    StructWithNullableUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
-  // Default constructs a |StructWithNullableXUnion| only if all of its members are default constructible.
-  StructWithNullableXUnion() = default;
+  // Default constructs a |StructWithNullableUnion| only if all of its members are default constructible.
+  StructWithNullableUnion() = default;
 #pragma clang diagnostic pop
 
-  StructWithNullableXUnion(StructWithNullableXUnion&&) noexcept = default;
-  StructWithNullableXUnion& operator=(StructWithNullableXUnion&&) noexcept = default;
-    StructWithNullableXUnion(const StructWithNullableXUnion& other) noexcept;
-    StructWithNullableXUnion& operator=(const StructWithNullableXUnion& other) noexcept;
+  StructWithNullableUnion(StructWithNullableUnion&&) noexcept = default;
+  StructWithNullableUnion& operator=(StructWithNullableUnion&&) noexcept = default;
+    StructWithNullableUnion(const StructWithNullableUnion& other) noexcept;
+    StructWithNullableUnion& operator=(const StructWithNullableUnion& other) noexcept;
 
-    bool operator==(const StructWithNullableXUnion& other) const noexcept {
-      return ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableXUnion, 16>::Equal(this, &other);
+    bool operator==(const StructWithNullableUnion& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableUnion, 16>::Equal(this, &other);
     }
-    bool operator!=(const StructWithNullableXUnion& other) const noexcept {
-      return !::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableXUnion, 16>::Equal(this, &other);
+    bool operator!=(const StructWithNullableUnion& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableUnion, 16>::Equal(this, &other);
     }
     
       const ::fidl::Box<::test_union::OlderSimpleUnion> &
@@ -3176,9 +3176,9 @@ class StructWithNullableXUnion {
     // Setter for x1.
     //
     
-    StructWithNullableXUnion& x1(::fidl::Box<::test_union::OlderSimpleUnion> value);
+    StructWithNullableUnion& x1(::fidl::Box<::test_union::OlderSimpleUnion> value);
 
-  StructWithNullableXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
+  StructWithNullableUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3188,8 +3188,8 @@ class StructWithNullableXUnion {
   Storage_ storage_;
     Storage_ CloneStorage_() const;
 
-  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableXUnion, 16>;
-  friend struct ::fidl::internal::MemberVisitor<::test_union::StructWithNullableXUnion>;
+  friend struct ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableUnion, 16>;
+  friend struct ::fidl::internal::MemberVisitor<::test_union::StructWithNullableUnion>;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, ::fidl::Box<::test_union::OlderSimpleUnion>, fidl::internal::NaturalCodingConstraintEmpty>{
         &Storage_::x1, 0
       });
@@ -3206,10 +3206,10 @@ class StructWithNullableXUnion {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitXUnionTable;
+extern "C" const fidl_type_t test_union_ExplicitFlexibleUnionTable;
 
 
-class ExplicitXUnion {
+class ExplicitFlexibleUnion {
  private:
   using Storage_ =
     std::variant<
@@ -3225,39 +3225,39 @@ class ExplicitXUnion {
     _do_not_handle_this__write_a_default_case_instead = ::std::numeric_limits<::fidl_union_tag_t>::max(),
   };
 
-  ExplicitXUnion(ExplicitXUnion&& other) noexcept
-      : ExplicitXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+  ExplicitFlexibleUnion(ExplicitFlexibleUnion&& other) noexcept
+      : ExplicitFlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
     *storage_ = std::move(*other.storage_);
   }
-  ExplicitXUnion& operator=(ExplicitXUnion&& other) noexcept {
+  ExplicitFlexibleUnion& operator=(ExplicitFlexibleUnion&& other) noexcept {
     if (this != &other) {
       *storage_ = std::move(*other.storage_);
     }
     return *this;
   }
-    ExplicitXUnion(const ExplicitXUnion& other) noexcept : ExplicitXUnion(other.CloneStorage_()){}
-    ExplicitXUnion& operator=(const ExplicitXUnion& other) noexcept {
+    ExplicitFlexibleUnion(const ExplicitFlexibleUnion& other) noexcept : ExplicitFlexibleUnion(other.CloneStorage_()){}
+    ExplicitFlexibleUnion& operator=(const ExplicitFlexibleUnion& other) noexcept {
       if (this != &other) {
         storage_ = other.CloneStorage_();
       }
       return *this;
     }
 
-    bool operator==(const ExplicitXUnion& other) const noexcept {
+    bool operator==(const ExplicitFlexibleUnion& other) const noexcept {
       return *storage_ == *other.storage_;
     }
-    bool operator!=(const ExplicitXUnion& other) const noexcept {
+    bool operator!=(const ExplicitFlexibleUnion& other) const noexcept {
       return *storage_ != *other.storage_;
     }
   constexpr bool IsUnknown() const {
-    return Which() == ::test_union::ExplicitXUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+    return Which() == ::test_union::ExplicitFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
   }
 
-  constexpr ::test_union::ExplicitXUnion::Tag Which() const {
-    return ExplicitXUnion::IndexToTag(storage_->index()).value();
+  constexpr ::test_union::ExplicitFlexibleUnion::Tag Which() const {
+    return ExplicitFlexibleUnion::IndexToTag(storage_->index()).value();
   }
-    static ExplicitXUnion WithI(int64_t val) {
-      return ExplicitXUnion(std::make_shared<Storage_>(
+    static ExplicitFlexibleUnion WithI(int64_t val) {
+      return ExplicitFlexibleUnion(std::make_shared<Storage_>(
         std::in_place_index_t<1>{},
         std::move(val)));
     }
@@ -3273,12 +3273,12 @@ class ExplicitXUnion {
     // Sets the union to hold the i member.
     //
     
-    ExplicitXUnion& i(int64_t value) {
+    ExplicitFlexibleUnion& i(int64_t value) {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static ExplicitXUnion WithF(float val) {
-      return ExplicitXUnion(std::make_shared<Storage_>(
+    static ExplicitFlexibleUnion WithF(float val) {
+      return ExplicitFlexibleUnion(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
@@ -3294,40 +3294,40 @@ class ExplicitXUnion {
     // Sets the union to hold the f member.
     //
     
-    ExplicitXUnion& f(float value) {
+    ExplicitFlexibleUnion& f(float value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
 
-  ExplicitXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+  ExplicitFlexibleUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
       : storage_(std::make_shared<Storage_>()) {}
 
  private:
   std::shared_ptr<Storage_> storage_;
     std::shared_ptr<Storage_> CloneStorage_() const;
-  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitXUnion>;
+  friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitFlexibleUnion>;
   static constexpr auto kMembers = std::make_tuple(
     ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>()
       , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>()
       , ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
 
-  explicit ExplicitXUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit ExplicitFlexibleUnion(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::ExplicitXUnion::Tag tag) {
+  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_union::ExplicitFlexibleUnion::Tag tag) {
     switch (tag) {
-        case ::test_union::ExplicitXUnion::Tag::kI: return 1;
-        case ::test_union::ExplicitXUnion::Tag::kF: return 2;
+        case ::test_union::ExplicitFlexibleUnion::Tag::kI: return 1;
+        case ::test_union::ExplicitFlexibleUnion::Tag::kF: return 2;
       default: {
         return 0;
       }
     }
   }
 
-  static constexpr std::optional<::test_union::ExplicitXUnion::Tag> IndexToTag(size_t index) {
+  static constexpr std::optional<::test_union::ExplicitFlexibleUnion::Tag> IndexToTag(size_t index) {
     switch (index) {
-        case 1: return ::test_union::ExplicitXUnion::Tag::kI;
-        case 2: return ::test_union::ExplicitXUnion::Tag::kF;
-        default: return ::test_union::ExplicitXUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+        case 1: return ::test_union::ExplicitFlexibleUnion::Tag::kI;
+        case 2: return ::test_union::ExplicitFlexibleUnion::Tag::kF;
+        default: return ::test_union::ExplicitFlexibleUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
     }
   }
 
@@ -3346,7 +3346,7 @@ class UnionSandwich {
   struct Storage_;
  public:
   UnionSandwich(Storage_ storage) noexcept;
-    UnionSandwich(uint32_t a, ::test_union::ExplicitXUnion u, uint32_t b) noexcept;
+    UnionSandwich(uint32_t a, ::test_union::ExplicitFlexibleUnion u, uint32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3381,20 +3381,20 @@ class UnionSandwich {
     
     UnionSandwich& a(uint32_t value);
     
-      const ::test_union::ExplicitXUnion &
+      const ::test_union::ExplicitFlexibleUnion &
     u() const {
       return storage_.u;
     }
 
     
-    ::test_union::ExplicitXUnion& u() {
+    ::test_union::ExplicitFlexibleUnion& u() {
       return storage_.u;
     }
 
     // Setter for u.
     //
     
-    UnionSandwich& u(::test_union::ExplicitXUnion value);
+    UnionSandwich& u(::test_union::ExplicitFlexibleUnion value);
     
       uint32_t
     b() const {
@@ -3417,7 +3417,7 @@ class UnionSandwich {
   struct Storage_ final {
       uint32_t a
         = {};
-      ::test_union::ExplicitXUnion u;
+      ::test_union::ExplicitFlexibleUnion u;
       uint32_t b
         = {};
   };
@@ -3429,7 +3429,7 @@ class UnionSandwich {
   friend struct ::fidl::internal::MemberVisitor<::test_union::UnionSandwich>;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalStructMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{
         &Storage_::a, 0
-      }, ::fidl::internal::NaturalStructMember<Storage_, ::test_union::ExplicitXUnion, fidl::internal::NaturalCodingConstraintEmpty>{
+      }, ::fidl::internal::NaturalStructMember<Storage_, ::test_union::ExplicitFlexibleUnion, fidl::internal::NaturalCodingConstraintEmpty>{
         &Storage_::u, 8
       }, ::fidl::internal::NaturalStructMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{
         &Storage_::b, 24
@@ -3868,21 +3868,21 @@ class OnlyReservedFlexibleUnion {
 
   
 
-  inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedXUnion xu) noexcept
+  inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedUnion xu) noexcept
     : storage_({
       .xu = std::move(xu)
     }) {}
-    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(const ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept : ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(other.CloneStorage_()){}
-    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::operator=(const ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept {
+    inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(const ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept : ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(other.CloneStorage_()){}
+    inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::operator=(const ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept {
       storage_ = other.CloneStorage_();
       return *this;
     }
 
-  inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_{
+  inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(Storage_{
       .xu =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
   }) {}
-    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::xu(::test_union::StrictBoundedXUnion value) {
+    inline TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse& TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::xu(::test_union::StrictBoundedUnion value) {
       storage_.xu = std::move(value);
       return *this;
     }
@@ -3894,21 +3894,21 @@ class OnlyReservedFlexibleUnion {
 
   
 
-  inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept
+  inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept
     : storage_({
       .xu = std::move(xu)
     }) {}
-    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(const ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept : ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(other.CloneStorage_()){}
-    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::operator=(const ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept {
+    inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(const ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept : ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(other.CloneStorage_()){}
+    inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::operator=(const ::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept {
       storage_ = other.CloneStorage_();
       return *this;
     }
 
-  inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_{
+  inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse(Storage_{
       .xu =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
   }) {}
-    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::xu(::test_union::OlderSimpleUnion value) {
+    inline TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse& TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse::xu(::test_union::OlderSimpleUnion value) {
       storage_.xu = std::move(value);
       return *this;
     }
@@ -3922,21 +3922,21 @@ class OnlyReservedFlexibleUnion {
 
   
 
-  inline StructWithNullableXUnion::StructWithNullableXUnion(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline StructWithNullableXUnion::StructWithNullableXUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept
+  inline StructWithNullableUnion::StructWithNullableUnion(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline StructWithNullableUnion::StructWithNullableUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept
     : storage_({
       .x1 = std::move(x1)
     }) {}
-    inline StructWithNullableXUnion::StructWithNullableXUnion(const ::test_union::StructWithNullableXUnion& other) noexcept : ::test_union::StructWithNullableXUnion(other.CloneStorage_()){}
-    inline StructWithNullableXUnion& ::test_union::StructWithNullableXUnion::operator=(const ::test_union::StructWithNullableXUnion& other) noexcept {
+    inline StructWithNullableUnion::StructWithNullableUnion(const ::test_union::StructWithNullableUnion& other) noexcept : ::test_union::StructWithNullableUnion(other.CloneStorage_()){}
+    inline StructWithNullableUnion& ::test_union::StructWithNullableUnion::operator=(const ::test_union::StructWithNullableUnion& other) noexcept {
       storage_ = other.CloneStorage_();
       return *this;
     }
 
-  inline StructWithNullableXUnion::StructWithNullableXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableXUnion(Storage_{
+  inline StructWithNullableUnion::StructWithNullableUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableUnion(Storage_{
       .x1 ={},
   }) {}
-    inline StructWithNullableXUnion& StructWithNullableXUnion::x1(::fidl::Box<::test_union::OlderSimpleUnion> value) {
+    inline StructWithNullableUnion& StructWithNullableUnion::x1(::fidl::Box<::test_union::OlderSimpleUnion> value) {
       storage_.x1 = std::move(value);
       return *this;
     }
@@ -3951,7 +3951,7 @@ class OnlyReservedFlexibleUnion {
   
 
   inline UnionSandwich::UnionSandwich(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    inline UnionSandwich::UnionSandwich(uint32_t a, ::test_union::ExplicitXUnion u, uint32_t b) noexcept
+    inline UnionSandwich::UnionSandwich(uint32_t a, ::test_union::ExplicitFlexibleUnion u, uint32_t b) noexcept
     : storage_({
       .a = std::move(a), 
       .u = std::move(u), 
@@ -3972,7 +3972,7 @@ class OnlyReservedFlexibleUnion {
       storage_.a = std::move(value);
       return *this;
     }
-    inline UnionSandwich& UnionSandwich::u(::test_union::ExplicitXUnion value) {
+    inline UnionSandwich& UnionSandwich::u(::test_union::ExplicitFlexibleUnion value) {
       storage_.u = std::move(value);
       return *this;
     }
@@ -4100,14 +4100,14 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_union_TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponseTable;
+  extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 
   
   template <>
-  struct IsFidlType<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
+  struct IsFidlType<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 
   template<>
-  struct TypeTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> {
+  struct TypeTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
     static constexpr uint32_t kMaxNumHandles = 0;
     static constexpr uint32_t kMaxDepth = 2;
     static constexpr uint32_t kPrimarySize = 16;
@@ -4117,23 +4117,23 @@ namespace fidl {
   };
 
   template <>
-  struct IsStruct<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
+  struct IsStruct<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 
   template <>
-  struct internal::NaturalCodingTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, 16> {};
+  struct internal::NaturalCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, 16> {};
 
   
   
 
-  extern "C" const fidl_type_t test_union_TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponseTable;
+  extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
   
   template <>
-  struct IsFidlType<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
+  struct IsFidlType<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 
   template<>
-  struct TypeTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> {
+  struct TypeTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> {
     static constexpr uint32_t kMaxNumHandles = 0;
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
@@ -4143,23 +4143,23 @@ namespace fidl {
   };
 
   template <>
-  struct IsStruct<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
+  struct IsStruct<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 
   template <>
-  struct internal::NaturalCodingTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, 16> {};
+  struct internal::NaturalCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse, 16> {};
 
   
   
 
-  extern "C" const fidl_type_t test_union_StructWithNullableXUnionTable;
+  extern "C" const fidl_type_t test_union_StructWithNullableUnionTable;
 
   
   template <>
-  struct IsFidlType<::test_union::StructWithNullableXUnion> : public std::true_type {};
+  struct IsFidlType<::test_union::StructWithNullableUnion> : public std::true_type {};
 
   template<>
-  struct TypeTraits<::test_union::StructWithNullableXUnion> {
+  struct TypeTraits<::test_union::StructWithNullableUnion> {
     static constexpr uint32_t kMaxNumHandles = 0;
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
@@ -4169,11 +4169,11 @@ namespace fidl {
   };
 
   template <>
-  struct IsStruct<::test_union::StructWithNullableXUnion> : public std::true_type {};
+  struct IsStruct<::test_union::StructWithNullableUnion> : public std::true_type {};
 
   template <>
-  struct internal::NaturalCodingTraits<::test_union::StructWithNullableXUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableXUnion, 16> {};
+  struct internal::NaturalCodingTraits<::test_union::StructWithNullableUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableUnion, 16> {};
 
   
   
@@ -4622,14 +4622,14 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_StrictSimpleXUnionTable;
+  extern "C" const fidl_type_t test_union_StrictSimpleUnionTable;
 
   
   template <>
-  struct IsFidlType<::test_union::StrictSimpleXUnion> : public std::true_type {};
+  struct IsFidlType<::test_union::StrictSimpleUnion> : public std::true_type {};
 
   template<>
-  struct TypeTraits<::test_union::StrictSimpleXUnion> {
+  struct TypeTraits<::test_union::StrictSimpleUnion> {
     static constexpr uint32_t kMaxNumHandles = 0;
     static constexpr uint32_t kMaxDepth = 2;
     static constexpr uint32_t kPrimarySize = 16;
@@ -4639,23 +4639,23 @@ namespace fidl {
   };
 
   template <>
-  struct IsUnion<::test_union::StrictSimpleXUnion> : public std::true_type {};
+  struct IsUnion<::test_union::StrictSimpleUnion> : public std::true_type {};
 
   template <>
-  struct internal::NaturalCodingTraits<::test_union::StrictSimpleXUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictSimpleXUnion> {};
+  struct internal::NaturalCodingTraits<::test_union::StrictSimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictSimpleUnion> {};
 
 
   
 
-  extern "C" const fidl_type_t test_union_XUnionContainingEmptyStructTable;
+  extern "C" const fidl_type_t test_union_UnionContainingEmptyStructTable;
 
   
   template <>
-  struct IsFidlType<::test_union::XUnionContainingEmptyStruct> : public std::true_type {};
+  struct IsFidlType<::test_union::UnionContainingEmptyStruct> : public std::true_type {};
 
   template<>
-  struct TypeTraits<::test_union::XUnionContainingEmptyStruct> {
+  struct TypeTraits<::test_union::UnionContainingEmptyStruct> {
     static constexpr uint32_t kMaxNumHandles = 0;
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
@@ -4665,23 +4665,23 @@ namespace fidl {
   };
 
   template <>
-  struct IsUnion<::test_union::XUnionContainingEmptyStruct> : public std::true_type {};
+  struct IsUnion<::test_union::UnionContainingEmptyStruct> : public std::true_type {};
 
   template <>
-  struct internal::NaturalCodingTraits<::test_union::XUnionContainingEmptyStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::XUnionContainingEmptyStruct> {};
+  struct internal::NaturalCodingTraits<::test_union::UnionContainingEmptyStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::UnionContainingEmptyStruct> {};
 
 
   
 
-  extern "C" const fidl_type_t test_union_StrictBoundedXUnionTable;
+  extern "C" const fidl_type_t test_union_StrictBoundedUnionTable;
 
   
   template <>
-  struct IsFidlType<::test_union::StrictBoundedXUnion> : public std::true_type {};
+  struct IsFidlType<::test_union::StrictBoundedUnion> : public std::true_type {};
 
   template<>
-  struct TypeTraits<::test_union::StrictBoundedXUnion> {
+  struct TypeTraits<::test_union::StrictBoundedUnion> {
     static constexpr uint32_t kMaxNumHandles = 0;
     static constexpr uint32_t kMaxDepth = 2;
     static constexpr uint32_t kPrimarySize = 16;
@@ -4691,23 +4691,23 @@ namespace fidl {
   };
 
   template <>
-  struct IsUnion<::test_union::StrictBoundedXUnion> : public std::true_type {};
+  struct IsUnion<::test_union::StrictBoundedUnion> : public std::true_type {};
 
   template <>
-  struct internal::NaturalCodingTraits<::test_union::StrictBoundedXUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictBoundedXUnion> {};
+  struct internal::NaturalCodingTraits<::test_union::StrictBoundedUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::StrictBoundedUnion> {};
 
 
   
 
-  extern "C" const fidl_type_t test_union_ExplicitXUnionTable;
+  extern "C" const fidl_type_t test_union_ExplicitFlexibleUnionTable;
 
   
   template <>
-  struct IsFidlType<::test_union::ExplicitXUnion> : public std::true_type {};
+  struct IsFidlType<::test_union::ExplicitFlexibleUnion> : public std::true_type {};
 
   template<>
-  struct TypeTraits<::test_union::ExplicitXUnion> {
+  struct TypeTraits<::test_union::ExplicitFlexibleUnion> {
     static constexpr uint32_t kMaxNumHandles = 0;
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
@@ -4717,11 +4717,11 @@ namespace fidl {
   };
 
   template <>
-  struct IsUnion<::test_union::ExplicitXUnion> : public std::true_type {};
+  struct IsUnion<::test_union::ExplicitFlexibleUnion> : public std::true_type {};
 
   template <>
-  struct internal::NaturalCodingTraits<::test_union::ExplicitXUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
-    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitXUnion> {};
+  struct internal::NaturalCodingTraits<::test_union::ExplicitFlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
+    : public ::fidl::internal::NaturalUnionCodingTraits<::test_union::ExplicitFlexibleUnion> {};
 
 
   
