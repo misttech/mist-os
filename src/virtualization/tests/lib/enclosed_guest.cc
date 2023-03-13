@@ -677,58 +677,25 @@ zx_status_t TerminaEnclosedGuest::BuildLaunchInfo(GuestLaunchInfo* launch_info) 
   launch_info->interface_name = fuchsia::virtualization::TerminaGuestManager::Name_;
   launch_info->config.set_virtio_gpu(false);
 
-  // Add the block device that contains the VM extras
-  {
-    fbl::unique_fd fd(open("/pkg/data/vm_extras.img", O_RDONLY));
-    if (!fd.is_valid()) {
-      return ZX_ERR_BAD_STATE;
-    }
-    zx::channel client;
-    zx_status_t status = fdio_get_service_handle(fd.get(), client.reset_and_get_address());
-    if (status != ZX_OK) {
+  for (auto [path, id] : {
+           // Add the block device that contains the VM extras
+           {"/pkg/data/vm_extras.img", "vm_extras"},
+           // Add the block device that contains the test binaries.
+           {"/pkg/data/linux_tests.img", "linux_tests"},
+           // Add non-prebuilt test extras.
+           {"/pkg/data/extras.img", "extras"},
+       }) {
+    fidl::InterfaceHandle<fuchsia::io::File> file;
+    if (zx_status_t status =
+            fdio_open(path, static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
+                      file.NewRequest().TakeChannel().release());
+        status != ZX_OK) {
       return status;
     }
     launch_info->config.mutable_block_devices()->push_back({
-        .id = "vm_extras",
+        .id = id,
         .mode = fuchsia::virtualization::BlockMode::READ_ONLY,
-        .format = fuchsia::virtualization::BlockFormat::WithFile(
-            fidl::InterfaceHandle<fuchsia::io::File>(std::move(client))),
-    });
-  }
-  // Add the block device that contains the test binaries.
-  {
-    fbl::unique_fd fd(open("/pkg/data/linux_tests.img", O_RDONLY));
-    if (!fd.is_valid()) {
-      return ZX_ERR_BAD_STATE;
-    }
-    zx::channel client;
-    zx_status_t status = fdio_get_service_handle(fd.get(), client.reset_and_get_address());
-    if (status != ZX_OK) {
-      return status;
-    }
-    launch_info->config.mutable_block_devices()->push_back({
-        .id = "linux_tests",
-        .mode = fuchsia::virtualization::BlockMode::READ_ONLY,
-        .format = fuchsia::virtualization::BlockFormat::WithFile(
-            fidl::InterfaceHandle<fuchsia::io::File>(std::move(client))),
-    });
-  }
-  {
-    // Add non-prebuilt test extras.
-    fbl::unique_fd fd(open("/pkg/data/extras.img", O_RDONLY));
-    if (!fd.is_valid()) {
-      return ZX_ERR_BAD_STATE;
-    }
-    zx::channel client;
-    zx_status_t status = fdio_get_service_handle(fd.get(), client.reset_and_get_address());
-    if (status != ZX_OK) {
-      return status;
-    }
-    launch_info->config.mutable_block_devices()->push_back({
-        .id = "extras",
-        .mode = fuchsia::virtualization::BlockMode::READ_ONLY,
-        .format = fuchsia::virtualization::BlockFormat::WithFile(
-            fidl::InterfaceHandle<fuchsia::io::File>(std::move(client))),
+        .format = fuchsia::virtualization::BlockFormat::WithFile(std::move(file)),
     });
   }
 
