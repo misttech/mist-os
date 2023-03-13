@@ -241,39 +241,77 @@ perfetto::TraceStats MakeTraceStats(size_t buffer_size, size_t bytes_written, si
   return stats;
 }
 
+struct ExpectedDataSource {
+  std::string name;
+  std::optional<std::string> provider_filter;
+  std::vector<std::string> enabled_categories;
+};
+
 TEST_F(ConsumerAdapterTest, TraceConfig) {
   ASSERT_FALSE(mock_endpoint_);
-  fuchsia_tracing_->provider_config()->categories = {"foo*", "bar"};
+  fuchsia_tracing_->provider_config()->categories = {"foo*", "bar", "provider1/category1",
+                                                     "provider1/category2", "provider2/categoryX"};
   fuchsia_tracing_->ChangeTraceState(TRACE_STARTED);
   RunLoopUntilIdle();
   ASSERT_TRUE(mock_endpoint_);
 
-  const auto& data_source_config = mock_endpoint_->config().data_sources().front().config();
-  EXPECT_EQ(data_source_config.name(), "org.chromium.trace_event");
+  const std::vector<ExpectedDataSource> kExpectedDataSources = {
+      {.name = "track_event", .enabled_categories = {"foo*", "bar"}},
+      {.name = "track_event", .provider_filter = "provider2", .enabled_categories = {"categoryX"}},
+      {.name = "track_event",
+       .provider_filter = "provider1",
+       .enabled_categories = {"category1", "category2"}},
+      {.name = "org.chromium.trace_event", .enabled_categories = {"foo*", "bar"}},
+      {.name = "org.chromium.trace_event",
+       .provider_filter = "provider2",
+       .enabled_categories = {"categoryX"}},
+      {.name = "org.chromium.trace_event",
+       .provider_filter = "provider1",
+       .enabled_categories = {"category1", "category2"}},
+  };
 
-  // Verify TrackEventConfig.
-  perfetto::protos::gen::TrackEventConfig track_event_config;
-  ASSERT_TRUE(track_event_config.ParseFromString(data_source_config.track_event_config_raw()));
-  EXPECT_THAT(track_event_config.enabled_categories(), ElementsAre("foo*", "bar"));
-  EXPECT_THAT(track_event_config.disabled_categories(), ElementsAre("*"));
+  const auto& actual_data_sources = mock_endpoint_->config().data_sources();
+  ASSERT_EQ(kExpectedDataSources.size(), actual_data_sources.size());
 
-  // Verify Chrome JSON config.
-  const auto& chrome_config = data_source_config.chrome_config();
-  rapidjson::Document chrome_config_parsed;
-  FX_LOGS(INFO) << chrome_config.trace_config().data();
-  chrome_config_parsed.Parse(chrome_config.trace_config().data(),
-                             chrome_config.trace_config().size());
-  ASSERT_FALSE(chrome_config_parsed.HasParseError());
-  ASSERT_TRUE(chrome_config_parsed["included_categories"].IsArray());
-  auto included_categories = chrome_config_parsed["included_categories"].GetArray();
-  EXPECT_EQ(included_categories.Size(), 2u);
-  EXPECT_EQ(std::string(included_categories[0].GetString()), "foo*");
-  EXPECT_EQ(std::string(included_categories[1].GetString()), "bar");
+  for (size_t i = 0; i < kExpectedDataSources.size(); ++i) {
+    const auto& expected_data_source = kExpectedDataSources[i];
+    const auto& actual_data_source = actual_data_sources[i];
 
-  ASSERT_TRUE(chrome_config_parsed["excluded_categories"].IsArray());
-  auto excluded_categories = chrome_config_parsed["excluded_categories"].GetArray();
-  EXPECT_EQ(excluded_categories.Size(), 1u);
-  EXPECT_EQ(std::string(excluded_categories[0].GetString()), "*");
+    ASSERT_EQ(expected_data_source.name, actual_data_source.config().name());
+    if (expected_data_source.provider_filter) {
+      EXPECT_EQ(std::vector{expected_data_source.provider_filter.value()},
+                actual_data_source.producer_name_filter());
+    }
+
+    if (expected_data_source.name == "track_event") {
+      perfetto::protos::gen::TrackEventConfig track_event_config;
+      ASSERT_TRUE(
+          track_event_config.ParseFromString(actual_data_source.config().track_event_config_raw()));
+      EXPECT_EQ(expected_data_source.enabled_categories, track_event_config.enabled_categories());
+      EXPECT_THAT(track_event_config.disabled_categories(), ElementsAre("*"));
+    } else if (expected_data_source.name == "org.chromium.trace_event") {
+      const auto& chrome_config = actual_data_source.config().chrome_config();
+      rapidjson::Document chrome_config_parsed;
+      FX_LOGS(INFO) << chrome_config.trace_config().data();
+      chrome_config_parsed.Parse(chrome_config.trace_config().data(),
+                                 chrome_config.trace_config().size());
+      ASSERT_FALSE(chrome_config_parsed.HasParseError());
+      ASSERT_TRUE(chrome_config_parsed["included_categories"].IsArray());
+      auto included_categories = chrome_config_parsed["included_categories"].GetArray();
+      std::vector<std::string> included_categories_vector;
+      for (const auto& included_category : included_categories) {
+        included_categories_vector.emplace_back(included_category.GetString());
+      }
+      EXPECT_EQ(expected_data_source.enabled_categories, included_categories_vector);
+
+      ASSERT_TRUE(chrome_config_parsed["excluded_categories"].IsArray());
+      const auto excluded_categories = chrome_config_parsed["excluded_categories"].GetArray();
+      EXPECT_EQ(excluded_categories.Size(), 1u);
+      EXPECT_EQ(std::string(excluded_categories[0].GetString()), "*");
+    } else {
+      ASSERT_TRUE(false) << "got an unexpected data source name";
+    }
+  }
 }
 
 TEST_F(ConsumerAdapterTest, BufferUtilizationTriggersRead) {

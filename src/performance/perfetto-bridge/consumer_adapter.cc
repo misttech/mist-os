@@ -52,6 +52,7 @@ constexpr uint32_t kIncrementalStateClearMs = 4000;
 
 constexpr char kBlobName[] = "perfetto-bridge";
 constexpr char kChromiumTraceEvent[] = "org.chromium.trace_event";
+constexpr char kTrackEvent[] = "track_event";
 
 class EmptyConsumer : public perfetto::Consumer {
  private:
@@ -111,16 +112,65 @@ std::string GetChromeTraceConfigString(
 }
 
 perfetto::protos::gen::TrackEventConfig GetTrackEventConfig(
-    const trace::ProviderConfig& provider_config) {
+    const std::vector<std::string>& enabled_categories) {
   perfetto::protos::gen::TrackEventConfig track_event_config;
-  if (!provider_config.categories.empty()) {
+  if (!enabled_categories.empty()) {
     // Disable all categories that aren't added to `enabled_categories`
     track_event_config.add_disabled_categories("*");
   }
-  for (const auto& enabled_category : provider_config.categories) {
+  for (const auto& enabled_category : enabled_categories) {
     track_event_config.add_enabled_categories(enabled_category);
   }
   return track_event_config;
+}
+
+perfetto::protos::gen::TraceConfig_DataSource* AddDataSource(
+    perfetto::TraceConfig& trace_config, const std::string& data_source_name,
+    const std::vector<std::string>& enabled_categories) {
+  perfetto::protos::gen::TraceConfig_DataSource* data_source = trace_config.add_data_sources();
+  perfetto::protos::gen::DataSourceConfig* data_source_config = data_source->mutable_config();
+  data_source_config->set_name(data_source_name);
+
+  const auto track_event_config = GetTrackEventConfig(enabled_categories);
+  data_source_config->set_track_event_config_raw(track_event_config.SerializeAsString());
+
+  // TODO(fxbug.dev/115525): Remove this once the migration to track_event_config is complete.
+  if (data_source_name == kChromiumTraceEvent) {
+    data_source_config->mutable_chrome_config()->set_trace_config(
+        GetChromeTraceConfigString(track_event_config));
+  }
+  return data_source;
+}
+
+void AddTargetedDataSource(perfetto::TraceConfig& trace_config, const std::string& data_source_name,
+                           const std::string& producer_name,
+                           const std::vector<std::string>& enabled_categories) {
+  auto data_source = AddDataSource(trace_config, data_source_name, enabled_categories);
+  data_source->add_producer_name_filter(producer_name);
+}
+
+void AddDataSources(perfetto::TraceConfig& trace_config,
+                    const trace::ProviderConfig& provider_config) {
+  std::vector<std::string> umbrella_categories;
+  std::unordered_map<std::string, std::vector<std::string>> producer_specific_categories;
+
+  for (const auto& enabled_category : provider_config.categories) {
+    auto separator_pos = enabled_category.find('/');
+    if (separator_pos == std::string::npos) {
+      umbrella_categories.push_back(enabled_category);
+    } else {
+      std::string producer_name = enabled_category.substr(0, separator_pos);
+      std::string category = enabled_category.substr(separator_pos + 1);
+      producer_specific_categories[producer_name].push_back(category);
+    }
+  }
+
+  for (const auto data_source_name : std::vector{kTrackEvent, kChromiumTraceEvent}) {
+    AddDataSource(trace_config, data_source_name, umbrella_categories);
+    for (const auto& [producer_name, enabled_categories] : producer_specific_categories) {
+      AddTargetedDataSource(trace_config, data_source_name, producer_name, enabled_categories);
+    }
+  }
 }
 
 class FuchsiaTracingImpl : public FuchsiaTracing {
@@ -338,18 +388,7 @@ void ConsumerAdapter::OnStartTracing() {
   // bad state in the event of consumer buffer saturation (e.g. if there is a burst of data).
   buffer_config->set_fill_policy(perfetto::TraceConfig::BufferConfig::RING_BUFFER);
 
-  perfetto::protos::gen::DataSourceConfig* data_source_config =
-      trace_config.add_data_sources()->mutable_config();
-  // The data source name is necessary and hardcoded for now, but it should
-  // be sourced from FXT somehow.
-  data_source_config->set_name("org.chromium.trace_event");
-
-  const auto track_event_config = GetTrackEventConfig(fuchsia_tracing_->GetProviderConfig());
-  data_source_config->set_track_event_config_raw(track_event_config.SerializeAsString());
-
-  // TODO(fxbug.dev/115525): Remove this once the migration to track_event_config is complete.
-  data_source_config->mutable_chrome_config()->set_trace_config(
-      GetChromeTraceConfigString(track_event_config));
+  AddDataSources(trace_config, fuchsia_tracing_->GetProviderConfig());
 
   FX_CHECK(!consumer_endpoint_);
   consumer_endpoint_ = connect_callback_(this);
