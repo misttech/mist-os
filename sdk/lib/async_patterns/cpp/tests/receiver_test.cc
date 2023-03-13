@@ -189,4 +189,236 @@ TEST(Receiver, BindLambda) {
   EXPECT_EQ(owner.count(), 1);
 }
 
+class DiagnosticsExample {
+ public:
+  explicit DiagnosticsExample(async_dispatcher_t* dispatcher) : receiver_{this, dispatcher} {}
+
+  async_patterns::Function<std::string> StreamLogs() {
+    return receiver_.Repeating(&DiagnosticsExample::OnLog);
+  }
+
+  async_patterns::Function<std::string> StreamLogsWithLambda() {
+    return receiver_.Repeating(
+        [](DiagnosticsExample* self, std::string log) { self->OnLog(std::move(log)); });
+  }
+
+  async_patterns::Function<std::unique_ptr<std::string>> StreamUniqueLogs() {
+    return receiver_.Repeating(&DiagnosticsExample::OnUniqueLog);
+  }
+
+  async_patterns::Function<std::unique_ptr<std::string>> StreamUniqueLogsWithLambda() {
+    return receiver_.Repeating([](DiagnosticsExample* self, std::unique_ptr<std::string> log) {
+      self->OnUniqueLog(std::move(log));
+    });
+  }
+
+  const std::vector<std::string>& logs() const { return logs_; }
+
+ private:
+  void OnLog(std::string log) { logs_.push_back(std::move(log)); }
+
+  void OnUniqueLog(std::unique_ptr<std::string> log) { OnLog(std::move(*log)); }
+
+  async_patterns::Receiver<DiagnosticsExample> receiver_;
+  std::vector<std::string> logs_;
+};
+
+TEST(Receiver, RepeatingConstruction) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  DiagnosticsExample diag{loop.dispatcher()};
+  async_patterns::Function<std::string> log = diag.StreamLogs();
+  static_assert(std::is_move_constructible_v<decltype(log)>);
+  static_assert(std::is_copy_constructible_v<decltype(log)>);
+}
+
+TEST(Receiver, Repeating) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  DiagnosticsExample diag{loop.dispatcher()};
+  async_patterns::Function<std::string> log = diag.StreamLogs();
+
+  {
+    log(std::string{"hello"});
+    EXPECT_EQ(diag.logs().size(), 0u);
+    ASSERT_OK(loop.RunUntilIdle());
+    std::vector<std::string> expected{"hello"};
+    EXPECT_EQ(diag.logs(), expected);
+  }
+
+  // |Function| can be copied.
+  {
+    async_patterns::Function<std::string> log2 = log;
+    log2(std::string{"world"});
+    log(std::string{"abc"});
+    ASSERT_OK(loop.RunUntilIdle());
+    std::vector<std::string> expected{"hello", "world", "abc"};
+    EXPECT_EQ(diag.logs(), expected);
+  }
+}
+
+TEST(Receiver, RepeatingMoveOnly) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  DiagnosticsExample diag{loop.dispatcher()};
+  async_patterns::Function<std::unique_ptr<std::string>> log = diag.StreamUniqueLogs();
+  log(std::make_unique<std::string>("abc"));
+  ASSERT_OK(loop.RunUntilIdle());
+  std::vector<std::string> expected{"abc"};
+  EXPECT_EQ(diag.logs(), expected);
+}
+
+TEST(Receiver, RepeatingLambda) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  DiagnosticsExample diag{loop.dispatcher()};
+  async_patterns::Function<std::string> log = diag.StreamLogsWithLambda();
+
+  log(std::string{"hello"});
+  EXPECT_EQ(diag.logs().size(), 0u);
+  ASSERT_OK(loop.RunUntilIdle());
+  std::vector<std::string> expected{"hello"};
+  EXPECT_EQ(diag.logs(), expected);
+}
+
+TEST(Receiver, RepeatingLambdaMoveOnly) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  DiagnosticsExample diag{loop.dispatcher()};
+  async_patterns::Function<std::unique_ptr<std::string>> log = diag.StreamUniqueLogsWithLambda();
+
+  log(std::make_unique<std::string>("hello"));
+  EXPECT_EQ(diag.logs().size(), 0u);
+  ASSERT_OK(loop.RunUntilIdle());
+  std::vector<std::string> expected{"hello"};
+  EXPECT_EQ(diag.logs(), expected);
+}
+
+TEST(Receiver, RepeatingConvertToFitFunction) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  DiagnosticsExample diag{loop.dispatcher()};
+  async_patterns::Function<std::string> function = diag.StreamLogs();
+
+  // Since |function| is just a functor, it should be adaptable to our standard
+  // function types.
+  fit::function<void(std::string)> fit_function{std::move(function)};
+
+  fit_function(std::string("abc"));
+  EXPECT_EQ(diag.logs().size(), 0u);
+  ASSERT_OK(loop.RunUntilIdle());
+  std::vector<std::string> expected{"abc"};
+  EXPECT_EQ(diag.logs(), expected);
+}
+
+TEST(Receiver, OnceManyArgs) {
+  class Owner {
+   public:
+    explicit Owner(async_dispatcher_t* dispatcher) : receiver_{this, dispatcher} {}
+
+    async_patterns::Callback<int, const std::string&, float> Test() {
+      return receiver_.Once(&Owner::OnTest);
+    }
+
+    int count() const { return count_; }
+
+   private:
+    void OnTest(int a, const std::string& b, float c) {
+      EXPECT_EQ(a, 1);
+      EXPECT_EQ(b, "2");
+      EXPECT_EQ(c, 3.0);
+      count_++;
+    }
+
+    async_patterns::Receiver<Owner> receiver_;
+    int count_ = 0;
+  };
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  Owner owner{loop.dispatcher()};
+  async_patterns::Callback f = owner.Test();
+  EXPECT_EQ(owner.count(), 0);
+  f(1, std::string{"2"}, 3.0);
+  EXPECT_EQ(owner.count(), 0);
+  ASSERT_OK(loop.RunUntilIdle());
+  EXPECT_EQ(owner.count(), 1);
+
+  ASSERT_DEATH(f(1, std::string{"2"}, 3.0), "");
+}
+
+TEST(Receiver, RepeatingManyArgs) {
+  class Owner {
+   public:
+    explicit Owner(async_dispatcher_t* dispatcher) : receiver_{this, dispatcher} {}
+
+    async_patterns::Function<int, const std::string&, float> Test() {
+      return receiver_.Repeating(&Owner::OnTest);
+    }
+
+    int count() const { return count_; }
+
+   private:
+    void OnTest(int a, const std::string& b, float c) {
+      EXPECT_EQ(a, 1);
+      EXPECT_EQ(b, "2");
+      EXPECT_EQ(c, 3.0);
+      count_++;
+    }
+
+    async_patterns::Receiver<Owner> receiver_;
+    int count_ = 0;
+  };
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  Owner owner{loop.dispatcher()};
+  async_patterns::Function f = owner.Test();
+  EXPECT_EQ(owner.count(), 0);
+  f(1, std::string{"2"}, 3.0);
+  EXPECT_EQ(owner.count(), 0);
+  ASSERT_OK(loop.RunUntilIdle());
+  EXPECT_EQ(owner.count(), 1);
+
+  f(1, std::string{"2"}, 3.0);
+  ASSERT_OK(loop.RunUntilIdle());
+  EXPECT_EQ(owner.count(), 2);
+}
+
+TEST(Receiver, OrderingAcrossCallbacksAndFunctions) {
+  class Owner {
+   public:
+    explicit Owner(async_dispatcher_t* dispatcher) : receiver_{this, dispatcher} {}
+
+    async_patterns::Function<const std::string&> Method1() {
+      return receiver_.Repeating(&Owner::LogMethodCall);
+    }
+    async_patterns::Callback<const std::string&> Method2() {
+      return receiver_.Once(&Owner::LogMethodCall);
+    }
+    async_patterns::Function<const std::string&> Method3() {
+      return receiver_.Repeating(&Owner::LogMethodCall);
+    }
+
+    const std::vector<std::string>& logs() const { return logs_; }
+
+   private:
+    void LogMethodCall(const std::string& b) { logs_.push_back(b); }
+
+    async_patterns::Receiver<Owner> receiver_;
+    std::vector<std::string> logs_;
+  };
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  Owner owner{loop.dispatcher()};
+
+  async_patterns::Function method_1 = owner.Method1();
+  async_patterns::Callback method_2 = owner.Method2();
+  async_patterns::Function method_3 = owner.Method3();
+
+  method_3("1");
+  method_1("2");
+  method_1("3");
+  method_3("4");
+  method_1("5");
+  method_2("6");
+  method_3("7");
+
+  ASSERT_OK(loop.RunUntilIdle());
+  std::vector<std::string> expected{"1", "2", "3", "4", "5", "6", "7"};
+  EXPECT_EQ(owner.logs(), expected);
+}
+
 }  // namespace

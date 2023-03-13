@@ -5,8 +5,6 @@
 #ifndef LIB_ASYNC_PATTERNS_CPP_CALLBACK_H_
 #define LIB_ASYNC_PATTERNS_CPP_CALLBACK_H_
 
-#include <lib/async/cpp/task.h>
-#include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 #include <zircon/assert.h>
 
@@ -20,14 +18,17 @@ class Receiver;
 
 // An asynchronous |Callback| that will always execute on the async dispatcher
 // associated with a |Receiver|. Invoking this callback translates to posting a
-// task to the destination dispatcher.
+// task to the destination dispatcher. It will not block the caller.
 //
 // The receiver may not necessarily receive the callback. The callback will be
 // a no-op if:
 // - The |Receiver| object goes out of scope.
 // - The async dispatcher of the |Receiver| shuts down.
 //
-// A callback can only be invoked once.
+// A callback can only be invoked once. It is akin to a one-shot,
+// uni-directional channel. Calls posted to the same |Receiver| will be
+// processed in the order they are made, regardless which |Function|s and
+// |Callback|s they are made from.
 template <typename... Args>
 class Callback {
  public:

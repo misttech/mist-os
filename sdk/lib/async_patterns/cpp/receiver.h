@@ -12,6 +12,7 @@
 #include <memory>
 
 #include <sdk/lib/async_patterns/cpp/callback.h>
+#include <sdk/lib/async_patterns/cpp/function.h>
 #include <sdk/lib/async_patterns/cpp/internal/receiver_base.h>
 
 namespace async_patterns {
@@ -24,6 +25,12 @@ namespace async_patterns {
 //
 // The |Receiver| is thread-unsafe, and must be used and managed from a
 // [synchronized dispatcher][synchronized-dispatcher].
+//
+// Calls posted to the same |Receiver| will be processed in the order they are
+// made, regardless which |Function|s and |Callback|s they are made from.
+//
+// Calls posted to different |Receiver|s living on the same dispatcher are not
+// guaranteed to be processed before or after one another.
 //
 // [synchronized-dispatcher]:
 // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
@@ -50,7 +57,7 @@ class Receiver : private internal::ReceiverBase {
   // number of arguments.
   template <typename Member>
   auto Once(Member Owner::*member) {
-    return Once(std::mem_fn(member), typename fit::callable_traits<Member>::args{});
+    return BindImpl<Callback>(std::mem_fn(member), typename fit::callable_traits<Member>::args{});
   }
 
   // Mints a |Callback| object that holds a capability to send |Args| to the
@@ -67,18 +74,50 @@ class Receiver : private internal::ReceiverBase {
     // they're safe.
     static_assert(internal::is_stateless<StatelessLambda>,
                   "|callable| must not capture any state.");
-    return Once(callable,
-                typename Pop<typename fit::callable_traits<StatelessLambda>::args>::pack{});
+    return BindImpl<Callback>(
+        callable, typename Pop<typename fit::callable_traits<StatelessLambda>::args>::pack{});
+  }
+
+  // Mints a |Function| object that holds a capability to send |Args| to the
+  // owner object repeatedly. When the resulting |Function| is invoked on some
+  // other thread, |member| is scheduled to be called on the |dispatcher|.
+  //
+  // |member| should be a pointer to member function. It should have the
+  // function signature `void Owner::SomeMember(Args...)` where Args are some
+  // number of arguments.
+  template <typename Member>
+  auto Repeating(Member Owner::*member) {
+    return BindImpl<Function>(std::mem_fn(member), typename fit::callable_traits<Member>::args{});
+  }
+
+  // Mints a |Function| object that holds a capability to send |Args| to the
+  // owner object repeatedly. When the resulting |Function| is invoked on some
+  // other thread, |callable| is scheduled to be called on the |dispatcher|.
+  //
+  // |callable| should be a lambda without any captures. It should have the
+  // function signature `void(Owner*, Args...)` where Args are some number of
+  // arguments.
+  template <typename StatelessLambda>
+  auto Repeating(StatelessLambda callable) {
+    // TODO(fxbug.dev/119641): We'll be able to support lambda with captures
+    // given compiler tooling that inspects the capture list and determine
+    // they're safe.
+    static_assert(internal::is_stateless<StatelessLambda>,
+                  "|callable| must not capture any state.");
+    return BindImpl<Function>(
+        callable, typename Pop<typename fit::callable_traits<StatelessLambda>::args>::pack{});
   }
 
  private:
-  template <typename Callable, typename... Args>
-  Callback<Args...> Once(Callable&& callable, fit::parameter_pack<Args...>) {
-    return Callback<Args...>{task_queue_handle(), [callable = std::forward<Callable>(callable),
-                                                   owner = owner_](Args... args) mutable {
-                               internal::CheckArguments<Args...>::Check();
-                               callable(owner, std::forward<Args>(args)...);
-                             }};
+  template <template <typename... Args> typename FunctionOrCallback, typename Callable,
+            typename... Args>
+  FunctionOrCallback<Args...> BindImpl(Callable&& callable, fit::parameter_pack<Args...>) {
+    return FunctionOrCallback<Args...>{
+        task_queue_handle(),
+        [callable = std::forward<Callable>(callable), owner = owner_](Args... args) mutable {
+          internal::CheckArguments<Args...>::Check();
+          callable(owner, std::forward<Args>(args)...);
+        }};
   }
 
   // |Pop| pops off the first element of a |fit::parameter_pack|.

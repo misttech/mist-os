@@ -12,6 +12,7 @@ sdk_source_set("cpp") {
   sources = [
     "callback.h",
     "dispatcher_bound.h",
+    "function.h",
     "internal/dispatcher_bound_storage.cc",
     "internal/dispatcher_bound_storage.h",
     "internal/receiver_base.cc",
