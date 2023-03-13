@@ -307,9 +307,14 @@ libc_test("gwp_asan-unittests") {
   # TODO(fxbug.dev/122829): Add tests/never_allocated.cpp to sources after gwp_asan
   # successfully rolls.
   if (submodules) {
-    gwp_asan_git_revision =
-        read_file("//.git/modules/third_party%2fscudo%2fgwp_asan/HEAD",
-                  "list lines")
+    gwp_asan_git_link_path_list =
+        read_file("${gwp_asan_common_vars.dir}/.git", "list lines")
+    gwp_asan_git_link_path = gwp_asan_git_link_path_list[0]
+    gwp_asan_relative_git_dir_split = string_split(gwp_asan_git_link_path)
+    gwp_asan_relative_git_dir = gwp_asan_relative_git_dir_split[1]
+    gwp_asan_git_dir =
+        "${gwp_asan_common_vars.dir}/${gwp_asan_relative_git_dir}"
+    gwp_asan_git_revision = read_file("${gwp_asan_git_dir}/HEAD", "list lines")
   } else {
     gwp_asan_git_revision =
         read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
