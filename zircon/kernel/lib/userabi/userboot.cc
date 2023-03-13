@@ -391,7 +391,7 @@ void userboot_init(uint) {
     status = vmar->Map(0, ktl::move(stack_vmo), 0, stack_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
                        &stack_mapping);
     ASSERT(status == ZX_OK);
-    stack_base = stack_mapping->base();
+    stack_base = stack_mapping->base_locking();
   }
   uintptr_t sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_size);
 

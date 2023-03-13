@@ -678,7 +678,11 @@ void VmAspace::InitializeAslr() {
 
 uintptr_t VmAspace::vdso_base_address() const {
   Guard<CriticalMutex> guard{&lock_};
-  return VDso::base_address(vdso_code_mapping_);
+  if (vdso_code_mapping_) {
+    AssertHeld(vdso_code_mapping_->lock_ref());
+    return VDso::base_address(vdso_code_mapping_);
+  }
+  return 0;
 }
 
 uintptr_t VmAspace::vdso_code_address() const {

@@ -597,13 +597,14 @@ static bool vmaspace_merge_mapping_test() {
           // Validate sizes to ensure any expected merging happened.
           for (int j = 0; j < 3; j++) {
             if (test.mappings[j].vmo) {
-              EXPECT_EQ(mappings[j]->size(), expected_size[j]);
+              EXPECT_EQ(mappings[j]->size_locking(), expected_size[j]);
               if (expected_size[j] == 0) {
                 EXPECT_EQ(nullptr, mappings[j]->vmo().get());
               } else {
                 EXPECT_EQ(mappings[j]->vmo().get(), test.mappings[j].vmo.get());
               }
-              EXPECT_EQ(mappings[j]->base(), vmar->base() + test.mappings[j].vmar_offset);
+              EXPECT_EQ(mappings[j]->base_locking(),
+                        vmar->base_locking() + test.mappings[j].vmar_offset);
             }
           }
         }
@@ -722,7 +723,7 @@ static bool vmaspace_priority_unmap_test() {
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
 
-  const vaddr_t base = mapping->base();
+  const vaddr_t base = mapping->base_locking();
 
   // Unmap one page from either end of the mapping, ensuring memory priority did not change.
   EXPECT_OK(vmar->Unmap(base, PAGE_SIZE, VmAddressRegionOpChildren::No));
@@ -787,9 +788,9 @@ static bool vmaspace_priority_mapping_overwrite_test() {
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo2);
   ASSERT_OK(status);
 
-  status = vmar->CreateVmMapping(mapping->base() - vmar->base(), mapping->size(), 0,
-                                 VMAR_FLAG_SPECIFIC_OVERWRITE, vmo2, 0, kArchRwUserFlags,
-                                 "test-mapping2", &mapping);
+  status = vmar->CreateVmMapping(mapping->base_locking() - vmar->base_locking(),
+                                 mapping->size_locking(), 0, VMAR_FLAG_SPECIFIC_OVERWRITE, vmo2, 0,
+                                 kArchRwUserFlags, "test-mapping2", &mapping);
   ASSERT_OK(status);
 
   // Original VMO should have lost its priority, and the VMO for our new mapping should have gained.
@@ -844,7 +845,7 @@ static bool vmaspace_priority_merged_mapping_test() {
   ASSERT(region);
   mapping = region->as_vm_mapping();
   ASSERT(mapping);
-  EXPECT_EQ(static_cast<size_t>(PAGE_SIZE * 2u), mapping->size());
+  EXPECT_EQ(static_cast<size_t>(PAGE_SIZE * 2u), mapping->size_locking());
 
   // Now destroy the mapping and check the VMO loses priority.
   EXPECT_OK(mapping->Destroy());
@@ -1173,7 +1174,7 @@ static bool vm_mapping_attribution_commit_decommit_test() {
 
   // Decommit pages in the vmo via the mapping.
   // Should increment the vmo generation count, not the mapping generation count.
-  status = mapping->DecommitRange(0, mapping->size());
+  status = mapping->DecommitRange(0, mapping->size_locking());
   ASSERT_EQ(ZX_OK, status);
   ++expected_vmo_gen_count;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_vmo_gen_count,
@@ -1185,7 +1186,7 @@ static bool vm_mapping_attribution_commit_decommit_test() {
   // Should increment the mapping generation count, and invalidate the cached attribution.
   status = mapping->Destroy();
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(0ul, mapping->size());
+  EXPECT_EQ(0ul, mapping->size_locking());
   ++expected_mapping_gen_count;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_vmo_gen_count,
                                                  AttributionCounts{2u, 0u}));
@@ -1239,7 +1240,7 @@ static bool vm_mapping_attribution_map_unmap_test() {
 
   // Commit pages in the vmo via the mapping.
   // Should increment the vmo generation count, not the mapping generation count.
-  status = mapping->MapRange(0, mapping->size(), true);
+  status = mapping->MapRange(0, mapping->size_locking(), true);
   ASSERT_EQ(ZX_OK, status);
   expected_vmo_gen_count += 8;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_vmo_gen_count,
@@ -1250,11 +1251,11 @@ static bool vm_mapping_attribution_map_unmap_test() {
 
   // Unmap from the right end of the mapping.
   // Should increment the mapping generation count.
-  auto old_base = mapping->base();
-  status = mapping->Unmap(mapping->base() + mapping->size() - PAGE_SIZE, PAGE_SIZE);
+  auto old_base = mapping->base_locking();
+  status = mapping->Unmap(mapping->base_locking() + mapping->size_locking() - PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(old_base, mapping->base());
-  EXPECT_EQ(7ul * PAGE_SIZE, mapping->size());
+  EXPECT_EQ(old_base, mapping->base_locking());
+  EXPECT_EQ(7ul * PAGE_SIZE, mapping->size_locking());
   ++expected_mapping_gen_count;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_vmo_gen_count,
                                                  AttributionCounts{8u, 0u}));
@@ -1264,10 +1265,10 @@ static bool vm_mapping_attribution_map_unmap_test() {
 
   // Unmap from the center of the mapping.
   // Should increment the mapping generation count.
-  status = mapping->Unmap(mapping->base() + 4 * PAGE_SIZE, PAGE_SIZE);
+  status = mapping->Unmap(mapping->base_locking() + 4 * PAGE_SIZE, PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(old_base, mapping->base());
-  EXPECT_EQ(4ul * PAGE_SIZE, mapping->size());
+  EXPECT_EQ(old_base, mapping->base_locking());
+  EXPECT_EQ(4ul * PAGE_SIZE, mapping->size_locking());
   ++expected_mapping_gen_count;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_vmo_gen_count,
                                                  AttributionCounts{8u, 0u}));
@@ -1277,10 +1278,10 @@ static bool vm_mapping_attribution_map_unmap_test() {
 
   // Unmap from the left end of the mapping.
   // Should increment the mapping generation count.
-  status = mapping->Unmap(mapping->base(), PAGE_SIZE);
+  status = mapping->Unmap(mapping->base_locking(), PAGE_SIZE);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_NE(old_base, mapping->base());
-  EXPECT_EQ(3ul * PAGE_SIZE, mapping->size());
+  EXPECT_NE(old_base, mapping->base_locking());
+  EXPECT_EQ(3ul * PAGE_SIZE, mapping->size_locking());
   ++expected_mapping_gen_count;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_vmo_gen_count,
                                                  AttributionCounts{8u, 0u}));
@@ -1906,11 +1907,12 @@ class EnumeratorTestHelper {
       if (!next.has_value()) {
         return false;
       }
-      if (next->region_or_mapping->base() !=
+      AssertHeld(next->region_or_mapping->lock_ref());
+      if (next->region_or_mapping->base_locked() !=
           test_vmar_->base() + region.page_offset_begin * PAGE_SIZE) {
         return false;
       }
-      if (next->region_or_mapping->size() !=
+      if (next->region_or_mapping->size_locked() !=
           (region.page_offset_end - region.page_offset_begin) * PAGE_SIZE) {
         return false;
       }

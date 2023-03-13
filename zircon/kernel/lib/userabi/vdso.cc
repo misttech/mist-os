@@ -343,7 +343,7 @@ const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles) {
 }
 
 uintptr_t VDso::base_address(const fbl::RefPtr<VmMapping>& code_mapping) {
-  return code_mapping ? code_mapping->base() - VDSO_CODE_START : 0;
+  return code_mapping->base_locked() - VDSO_CODE_START;
 }
 
 // Each vDSO variant VMO is made via a COW clone of the next vDSO

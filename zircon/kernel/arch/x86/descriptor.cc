@@ -192,7 +192,7 @@ void gdt_setup() {
   status = ro_mapping->MapRange(0, gdt_ro_size, /*commit*/ false);
   ASSERT(status == ZX_OK);
 
-  gdt = mapping->base();
+  gdt = mapping->base_locking();
   gdt_load(gdt_get());
 }
 

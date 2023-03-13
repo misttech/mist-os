@@ -33,8 +33,9 @@ class VDso : public RoDso {
     return instance_->RoDso::valid_code_mapping(vmo_offset, size);
   }
 
-  // Given VmAspace::vdso_code_mapping_, return the vDSO base address or 0.
-  static uintptr_t base_address(const fbl::RefPtr<VmMapping>& code_mapping);
+  // Given VmAspace::vdso_code_mapping_, return the vDSO base address.
+  static uintptr_t base_address(const fbl::RefPtr<VmMapping>& code_mapping)
+      TA_REQ(code_mapping->lock());
 
   // Forward declaration of generated class.
   // This class is defined in the file vdso-valid-sysret.h,

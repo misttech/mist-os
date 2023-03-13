@@ -91,7 +91,7 @@ zx_status_t create_valid_msi_vmo(fbl::RefPtr<VmObject>* out_vmo,
 
   *out_vmo = ktl::move(vmo);
   *out_mapping = ktl::move(mapping);
-  *out_cap = reinterpret_cast<MsiCapability*>(out_mapping->get()->base());
+  *out_cap = reinterpret_cast<MsiCapability*>(out_mapping->get()->base_locking());
   (*out_cap)->id = kMsiCapabilityId;
 
   return ZX_OK;

@@ -866,7 +866,7 @@ static bool vmo_demand_paged_map_test() {
                                                &mapping);
   ASSERT_EQ(status, ZX_OK, "mapping object");
 
-  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base()));
+  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base_locking()));
 
   // fill with known pattern and test
   if (!fill_and_test_user(uptr, alloc_size)) {
@@ -2900,7 +2900,7 @@ static bool vmo_discard_failure_test() {
   ASSERT_EQ(ZX_OK, status);
 
   // Fill with a known pattern through the mapping, and verify the contents.
-  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base()));
+  auto uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base_locking()));
   fill_region_user(0x88, uptr, kMapSize);
   EXPECT_TRUE(test_region_user(0x88, uptr, kMapSize));
 
@@ -2960,7 +2960,7 @@ static bool vmo_discard_failure_test() {
   EXPECT_TRUE(test_region_user(0xaa, uptr, kMapSize));
 
   // Verify contents via the second mapping created when discarded.
-  uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping2->base()));
+  uptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping2->base_locking()));
   EXPECT_TRUE(test_region_user(0xaa, uptr, kMapSize));
 
   // The unmapped pages should still be intact after the Write() above.

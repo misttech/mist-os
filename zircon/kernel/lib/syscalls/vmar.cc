@@ -188,7 +188,8 @@ zx_status_t sys_vmar_map(zx_handle_t handle, zx_vm_option_t options, uint64_t vm
     }
   }
 
-  status = mapped_addr.copy_to_user(vm_mapping->base());
+  status = mapped_addr.copy_to_user(vm_mapping->base_locking());
+
   if (status != ZX_OK) {
     return status;
   }

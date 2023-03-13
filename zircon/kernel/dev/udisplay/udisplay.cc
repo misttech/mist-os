@@ -65,7 +65,8 @@ zx_status_t udisplay_set_framebuffer(fbl::RefPtr<VmObject> vmo) {
     return status;
   }
 
-  g_udisplay.framebuffer_virt = reinterpret_cast<void*>(mapping->base());
+  g_udisplay.framebuffer_virt = reinterpret_cast<void*>(mapping->base_locking());
+
   g_udisplay.framebuffer_size = size;
   g_udisplay.framebuffer_vmo_mapping = mapping;
   return ZX_OK;

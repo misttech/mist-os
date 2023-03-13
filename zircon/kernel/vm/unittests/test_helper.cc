@@ -33,7 +33,10 @@ zx_status_t AllocUser(VmAspace* aspace, const char* name, size_t size, user_inou
     return status;
   }
 
-  *ptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base()));
+  {
+    Guard<CriticalMutex> guard{mapping->lock()};
+    *ptr = make_user_inout_ptr(reinterpret_cast<void*>(mapping->base_locked()));
+  }
   return ZX_OK;
 }
 

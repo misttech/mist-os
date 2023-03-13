@@ -520,7 +520,7 @@ static bool test_large_region_atomic() {
     status = mapping->MapRange(0, alloc_size, false);
     ASSERT_OK(status);
 
-    const vaddr_t va = mapping->base();
+    const vaddr_t va = mapping->base_locking();
 
     auto cleanup_mapping = fit::defer([&] { mapping->Destroy(); });
 

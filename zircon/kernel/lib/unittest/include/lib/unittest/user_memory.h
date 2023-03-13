@@ -36,7 +36,8 @@ class UserMemory {
   virtual ~UserMemory();
 
   vaddr_t base() const {
-    vaddr_t base = mapping_->base();
+    Guard<CriticalMutex> guard{mapping_->lock()};
+    vaddr_t base = mapping_->base_locked();
 #if defined(__aarch64__)
     base |= static_cast<vaddr_t>(tag_) << kTbiBit;
 #endif
