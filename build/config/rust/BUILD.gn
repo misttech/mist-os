@@ -194,3 +194,16 @@ config("output_dir_sensitive") {
 config("allow_simd") {
   rustflags = [ "-Zallow-features=stdsimd,aarch64_target_feature" ]
 }
+
+# TODO(https://fxbug.dev/123519)
+config("async_fn_in_trait") {
+  rustflags = [ "-Zallow-features=async_fn_in_trait" ]
+
+  # Per https://fxbug.dev/123519#c1, any additions to this list must also
+  # include a point of contact for assisting with refactors or removal of usages
+  # of the feature.
+  visibility = [
+    # akonradi@ is the point of contact for Netstack3 changes.
+    "//src/connectivity/network/netstack3:*",
+  ]
+}
