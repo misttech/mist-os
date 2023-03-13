@@ -113,18 +113,18 @@ You may optionally specify [`subdir`](#subdirectories).
 Directory rights enable components to control access to directories as they are
 routed throughout the system. Directory rights are applied as follows:
 
--   [`capabilities`][manifest-capabilities]: *Required*.
-    Provides the base set of rights available for the directory. Any rights
-    specified in a `use`, `offer`, or `expose` must be a subset of what is
-    declared here.
--   [`use`][manifest-use]: *Required*.
-    Describes the access rights requested by the consuming component.
--   [`offer`][manifest-offer]: *Optional*.
-    Modified rights available to the destination component. Rights are inherited
-    from the `offer` source if not present.
--   [`expose`][manifest-expose]: *Optional*.
-    Modified rights available to the destination component. Rights are inherited
-    from the `expose` source if not present.
+* [`capabilities`][manifest-capabilities]: *Required*.
+  Provides the base set of rights available for the directory. Any rights
+  specified in a `use`, `offer`, or `expose` must be a subset of what is
+  declared here.
+* [`use`][manifest-use]: *Required*.
+  Describes the access rights requested by the consuming component.
+* [`offer`][manifest-offer]: *Optional*.
+  Modified rights available to the destination component. Rights are inherited
+  from the `offer` source if not present.
+* [`expose`][manifest-expose]: *Optional*.
+  Modified rights available to the destination component. Rights are inherited
+  from the `expose` source if not present.
 
 The `rights` field can contain any combination of the following
 [`fuchsia.io.Rights`][fidl-io-rights] tokens:
@@ -238,37 +238,12 @@ You may `expose` or `offer` a directory capability by a different name:
 }
 ```
 
-## Framework directories {#framework}
-
-A *framework directory* is a directory provided by the component framework.
-Any component may `use` these capabilities by setting `framework` as the source
-without an accompanying `offer` from its parent.
-Fuchsia supports the following framework directories:
-
--   [hub][doc-hub]: Allows a component to perform runtime introspection of
-    itself and its children.
-
-```json5
-{
-    use: [
-        {
-            directory: "hub",
-            from: "framework",
-            rights: ["r*"],
-            path: "/hub",
-        },
-    ],
-}
-```
-
 [glossary.directory-capability]: /docs/glossary/README.md#directory-capability
 [glossary.outgoing-directory]: /docs/glossary/README.md#outgoing-directory
 [capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing
-[doc-hub]: /docs/concepts/components/v2/hub.md
 [fidl-io-rights]: /sdk/fidl/fuchsia.io/rights-abilities.fidl
 [manifest-capabilities]: https://fuchsia.dev/reference/cml#capabilities
 [manifest-expose]: https://fuchsia.dev/reference/cml#expose
 [manifest-offer]: https://fuchsia.dev/reference/cml#offer
 [manifest-use]: https://fuchsia.dev/reference/cml#use
-[routing-example]: /examples/components/routing
 [storage-capabilities]: /docs/concepts/components/v2/capabilities/storage.md
