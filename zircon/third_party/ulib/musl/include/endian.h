@@ -3,15 +3,26 @@
 
 #include <features.h>
 
-#define __LITTLE_ENDIAN 1234
-#define __BIG_ENDIAN 4321
-#define __PDP_ENDIAN 3412
-
-#if defined(__GNUC__) && defined(__BYTE_ORDER__)
-#define __BYTE_ORDER __BYTE_ORDER__
-#else
-#include <bits/endian.h>
+#ifndef __BYTE_ORDER__
+#error "Compiler must define __BYTE_ORDER__"
 #endif
+
+#ifndef __ORDER_LITTLE_ENDIAN__
+#error "Compiler must define __ORDER_LITTLE_ENDIAN__"
+#endif
+
+#ifndef __ORDER_BIG_ENDIAN__
+#error "Compiler must define __ORDER_BIG_ENDIAN__"
+#endif
+
+#ifndef __ORDER_PDP_ENDIAN__
+#error "Compiler must define __ORDER_PDP_ENDIAN__"
+#endif
+
+#define __BYTE_ORDER __BYTE_ORDER__
+#define __LITTLE_ENDIAN __ORDER_LITTLE_ENDIAN__
+#define __BIG_ENDIAN __ORDER_BIG_ENDIAN__
+#define __PDP_ENDIAN __ORDER_PDP_ENDIAN__
 
 #if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
 
