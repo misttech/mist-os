@@ -212,10 +212,10 @@ For [flexible](#strict-flexible) enums:
 * Bindings MAY expose the (possibly unknown) underlying raw value of the enum.
 * Bindings MUST provide a way to obtain a valid unknown enum, without the
   user needing to provide an explicit unknown raw primitive value. If one of the
-  enum members is annotated with the [`[Unknown]`][unknown-attr] attribute,
+  enum members is annotated with the [`@unknown`][unknown-attr] attribute,
   then this unknown enum constructor MUST use the value of the annotated
   member. Otherwise, the value used by the unknown constructor is unspecified.
-* The `[Unknown]` member MUST be treated as unknown in any
+* The `@unknown` member MUST be treated as unknown in any
   function that determines whether a value is unknown.
 
 ### Struct support
@@ -265,19 +265,15 @@ Examples of this exist for the
 
 For [flexible unions](#strict-flexible):
 
-* Bindings MAY provide a constructor to create a union with an unknown variant
-  with specified ordinal, bytes, and handles.
-  * Such a constructor is useful not just for testing the bindings, but also for
-    end-developer testing needs (e.g. to check that unknown data is handled
-    correctly in a proxy).
-  * Having a constructor also prevents end-developers from constructing unions
-    with unknown variants in roundabout ways, such as by manually decoding raw
-    bytes.
-  * Usage of this constructor is discouraged in production code.
-* Bindings MUST provide a way to determine whether the union has an unknown
-  variant.
-* Bindings MAY provide getters and setters for the unknown variant,
-  similar to methods generated for the union's known variants.
+* When the ordinal is unknown, decoding MUST succeed, but re-encoding MUST fail.
+* Bindings MUST provide a way to determine if the union has an unknown variant.
+* Bindings MAY provide a way to access the unknown variant's ordinal.
+* Bindings MAY provide a constructor to create a union with an unknown variant.
+  * The constructor MUST be named to discourage use in production code, e.g.
+    `unknown_variant_for_testing()`.
+  * The constructor MUST NOT allow the user to choose the ordinal.
+  * Having a constructor prevents end-developers from constructing unions with
+    unknown variants in roundabout ways, such as by manually decoding raw bytes.
 
 ### Table support
 
@@ -291,7 +287,7 @@ operations:
 
 Bindings MAY provide constructors for tables that only require specifying values
 for fields that have a value. For example, in Rust this can be accomplished
-using the `::empty()` constructor along with struct update syntax. Supporting
+using the `::EMTPY` constant along with struct update syntax. Supporting
 construction this ways allows users to write code that is robust against
 addition of new fields to the table.
 
@@ -299,44 +295,35 @@ addition of new fields to the table.
 
 All tables are [flexible](#strict-flexible).
 
-Bindings MUST provide a way to determine whether the table included any
-unknown fields during decoding.
+When there are unknown fields, decoding and re-encoding MUST succeed.
+Re-encoding MUST omit the unknown fields.
 
-For bindings that store the unknown data in the decoded value,
-bindings MAY provide a way for users to read and write the unknown ordinals,
-bytes, and handles. Being able to modify the unknown data is useful for
-testing, but should be discouraged in production code.
+Bindings MAY provide a way to determine whether the table included any unknown
+fields during decoding. They MAY provide a way to access their ordinals.
+
+Bindings MUST NOT provide a way to create a table with unknown fields or to set
+unknown fields on an existing table.
 
 ### Strict and flexible types {#strict-flexible}
 
-Examples of FIDL types and their corresponding unknown data include:
-
-FIDL Type | Unknown Data | Unknown Data Type
-----------|--------------|-------------------
-union | unknown variant | ordinal, bytes, and handles
-table | unknown fields | map from ordinal to corresponding bytes and handles
-enum | unknown variant | same as the underlying type of the `enum`
-bits | unknown bits | same as the underlying type of the `bits`
-
 Strict types MUST fail to decode when encountering any unknown data.
-Flexible types MUST succeed when decoding a value with unknown data (with
-one exception, see [value types and resource types](#value-resource)).
+Flexible types MUST succeed when decoding a value with unknown data.
+
+Examples of flexible FIDL types and their behavior with respect to unknowns:
+
+FIDL type      | Access to unknowns  | Re-encode fidelity
+---------------|---------------------|-------------------
+flexible bits  | raw integer         | lossless
+flexible enum  | raw integer         | lossless
+flexible union | boolean or ordinal  | _fails_
+table          | boolean or ordinals | lossy
 
 In general, the underlying unknown data can either be discarded during decoding,
 or be stored within the decoded type. In either case, the type SHOULD indicate
-whether it encountered unknown data or not when decoding.
-If the unknown data is stored, bindings MAY provide ways for the user to
-access this data, though bindings SHOULD either provide access to all of the
-parts of the unknown data (e.g. for unions and tables: handles, bytes, and
-ordinals) or to none of them. Refer to the
-[enum support](#unknown-enums), [bits support](#unknown-bits),
-[union support](#unknown-unions), and [table support](#unknown-tables) sections
-for specific guidance on the design of these APIs.
-
-If any part of the unknown data is discarded, the decoded value SHOULD
-fail to re-encode rather than send a message with missing data. On the other
-hand, if all of the unknown data is stored, the decoded value SHOULD
-support re-encoding back onto the wire.
+whether it encountered unknown data or not when decoding. Refer to the [enum
+support](#unknown-enums), [bits support](#unknown-bits), [union
+support](#unknown-unions), and [table support](#unknown-tables) sections for
+specific guidance on the design of these APIs.
 
 Bindings authors SHOULD favor optimizing `strict` types, possibly at the expense
 of `flexible` types. For example, if there is a design tradeoff between the two,
@@ -346,18 +333,11 @@ Changing a type from strict to flexible MUST be [transitionable][soft-transition
 
 ### Value types and resource types {#value-resource}
 
-Value types MUST NOT contain handles, and resource types MAY contain
-handles.
+Value types MUST NOT contain handles, and resource types MAY contain handles.
 
-In the interaction between value types and flexible types, the requirements of
-the value type supersedes the requirements of the flexible type when they are
-in conflict. In other words, in the case where:
-
-* a type stores unknown data, and encounters handles in the unknown data during
-  decoding, and
-* the type is value type.
-
-decoding MUST fail.
+In the interaction between value types and flexible types, the flexible type
+requirements takes priority. Specifically, decoding a flexible value type that
+contains unknown handles MUST succeed.
 
 ## Protocol support
 
@@ -420,18 +400,24 @@ By comparison, domain errors found in a method declaration are not terminal.
 
 ### Terminal error handling
 
-Bindings MUST provide client and server APIs that own the underlying endpoint.
-When a terminal error occurs over a connection, the client and server APIs MUST
-teardown the connection by closing the underlying endpoint.
+Bindings MUST provide asynchronous client and server APIs that own the
+underlying endpoint. When a terminal error occurs over a connection, the client
+and server APIs MUST teardown the connection by closing the underlying endpoint.
 
 Because the IPC transport model of FIDL does not contain transient errors, there
 is no value in e.g. retrying sending the same reply. Triggering teardown on
 error encourages this way of bindings usage and simplifies error handling.
 
+Bindings MAY provide synchronous client and server APIs. In synchronous APIs,
+closing the endpoint on terminal errors generally requires taking locks. If that
+is undesirable for performance reasons, those APIs MAY leave the connection open
+on terminal errors, and SHOULD be clearly documented accordingly. The
+asynchronous flavors SHOULD be the recommended flavors of APIs.
+
 Bindings MAY provide client and server APIs that do not own the underlying
 endpoint, to cater to low level use cases. Those APIs cannot close the endpoint
-on errors, and SHOULD be clearly documented accordingly. The owning flavors
-SHOULD be the recommended flavors of APIs.
+on terminal errors, and SHOULD be clearly documented accordingly. The owning
+flavors SHOULD be the recommended flavors of APIs.
 
 ### Peer closed special handling
 
