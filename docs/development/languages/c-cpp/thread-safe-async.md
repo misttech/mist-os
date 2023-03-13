@@ -21,7 +21,9 @@ would call functions over the `async_dispatcher_t*` interface.
 ### Thread safety
 
 The reader should familiarize themselves with the terminology around
-[thread safety][thread-safety] if needed.
+[thread safety][thread-safety] if needed. See [CppCon 2018: Geoffrey Romer
+“What do you mean "thread-safe"?”] for a definition of thread safety that is
+endorsed by Google's C++ team.
 
 A program that upholds thread safety avoids data races: broadly, reading and
 writing the same data without a defined ordering between those operations (see
@@ -270,3 +272,4 @@ tasks in Chrome][chrome].
 [java]: https://openjdk.org/jeps/425
 [golang]: https://go.dev/blog/codelab-share
 [synchronization-checker]: /zircon/system/ulib/async/include/lib/async/cpp/sequence_checker.h
+[CppCon 2018: Geoffrey Romer “What do you mean "thread-safe"?”]: https://youtube.com/watch?v=s5PCh_FaMfM
