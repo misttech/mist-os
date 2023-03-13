@@ -813,7 +813,7 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
         device: &DeviceId<FakeNonSyncCtx>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        self.frame_ctx_mut().push(device.clone(), frame.as_ref().to_vec());
+        self.frame_ctx_mut().push(device.clone(), frame.into_inner());
         Ok(())
     }
 }
