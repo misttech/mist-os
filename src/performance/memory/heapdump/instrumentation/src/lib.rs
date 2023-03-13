@@ -8,21 +8,23 @@ use std::cell::RefCell;
 
 mod allocations_table;
 mod profiler;
+mod recursion_guard;
 
 // Do not include the hooks in the tests' executable, to avoid instrumenting the test framework.
 #[cfg(not(test))]
 mod hooks;
 
 use crate::profiler::{PerThreadData, Profiler};
+use crate::recursion_guard::with_recursion_guard;
 
 // WARNING! Do not change this to use once_cell: once_cell uses parking_lot, which may allocate in
 // the contended case.
 lazy_static! {
-    pub static ref PROFILER: Profiler = Default::default();
+    pub static ref PROFILER: Profiler = with_recursion_guard(Default::default);
 }
 
 thread_local! {
-    pub static THREAD_DATA: RefCell<PerThreadData> = RefCell::new(Default::default());
+    pub static THREAD_DATA: RefCell<PerThreadData> = with_recursion_guard(Default::default);
 }
 
 #[derive(Clone, Copy, Default)]
@@ -58,12 +60,15 @@ pub unsafe extern "C" fn heapdump_get_stats(
     global: *mut heapdump_global_stats,
     local: *mut heapdump_thread_local_stats,
 ) {
-    if global != std::ptr::null_mut() {
-        *global = PROFILER.get_global_stats();
-    }
-    if local != std::ptr::null_mut() {
-        THREAD_DATA.with(|thread_data| {
-            *local = thread_data.borrow().get_local_stats();
+    let profiler = &*PROFILER;
+    THREAD_DATA.with(|thread_data| {
+        with_recursion_guard(|| {
+            if global != std::ptr::null_mut() {
+                *global = profiler.get_global_stats();
+            }
+            if local != std::ptr::null_mut() {
+                *local = thread_data.borrow().get_local_stats();
+            }
         });
-    }
+    });
 }
