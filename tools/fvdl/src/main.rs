@@ -13,6 +13,10 @@ async fn main() -> Result<()> {
 }
 
 async fn process_command(command: VDLCommand, is_sdk: bool) -> Result<()> {
+    if !is_sdk {
+        println!("fvdl is not longer supported in-tree. Please use `ffx emu start`.");
+        std::process::exit(1)
+    }
     match command {
         VDLCommand::Start(start_command) => std::process::exit(
             VDLFiles::new(is_sdk, start_command.verbose)?.start_emulator(&start_command).await?,
