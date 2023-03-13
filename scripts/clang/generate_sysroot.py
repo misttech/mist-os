@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
+import glob
 import json
 import os
 import shutil
@@ -63,12 +64,13 @@ class SysrootGenerator:
                 path)
 
     def _copy_headers(self, other_arch, other_headers):
-        # TODO: this doesn't yet handle target-specific headers and headers that have
-        # arch-specific guards.
         self._copy_files(other_arch, other_headers, "headers")
 
     def _copy_link_libs(self, other_arch, other_link_libs):
         self._copy_files(other_arch, other_link_libs, "link_libs")
+        self._make_Scrt1()
+
+    def _make_Scrt1(self):
         # For bringing up new architectures executables won't be run anyway, this just creates
         # an empty Scrt1.o.
         Scrt1 = os.path.join(
@@ -79,25 +81,52 @@ class SysrootGenerator:
         self.sdk_dir = sdk_dir
         self.arch_name = arch_name
 
-    def create(self):
-        with open(os.path.join(self.sdk_dir, "pkg", "sysroot",
-                               "meta.json")) as f:
+    def _create_from_dir_structure(self):
+        other_arch = os.listdir(os.path.join(self.sdk_dir, "arch"))[0]
+
+        def make_src_dst(dir):
+            return os.path.join(
+                self.sdk_dir, "arch", other_arch, "sysroot", dir), os.path.join(
+                    self.sdk_dir, "arch", self.arch_name, "sysroot", dir)
+
+        src, dst = make_src_dst("include")
+        shutil.copytree(src, dst)
+
+        src, dst = make_src_dst("lib")
+        shutil.copytree(src, dst)
+        self._make_Scrt1()
+
+    def _create_from_meta_json(self, meta_json):
+        with open(meta_json) as f:
             self.sysroot_meta = json.load(f)
-        other_arch, other_version = next(
-            iter(self.sysroot_meta["versions"].items()))
-        other_headers, other_link_libs = other_version[
-            "headers"], other_version["link_libs"]
-        self.sysroot_meta["versions"][self.arch_name] = {
-            "debug_libs": [],
-            "dist_dir": f"arch/{self.arch_name}/sysroot",
-            "dist_libs": [],
-            "headers": [],
-            "include_dir": f"arch/{self.arch_name}/sysroot/include",
-            "link_libs": [],
-            "root": f"arch/{self.arch_name}/sysroot"
-        }
+            other_arch, other_version = next(
+                iter(self.sysroot_meta["versions"].items()))
+            other_headers, other_link_libs = other_version[
+                "headers"], other_version["link_libs"]
+            self.sysroot_meta["versions"][self.arch_name] = {
+                "debug_libs": [],
+                "dist_dir": f"arch/{self.arch_name}/sysroot",
+                "dist_libs": [],
+                "headers": [],
+                "include_dir": f"arch/{self.arch_name}/sysroot/include",
+                "link_libs": [],
+                "root": f"arch/{self.arch_name}/sysroot"
+            }
         self._copy_headers(other_arch, other_headers)
         self._copy_link_libs(other_arch, other_link_libs)
+
+    def create(self):
+        meta_json = os.path.join(self.sdk_dir, "pkg", "sysroot", "meta.json")
+        if os.path.exists(meta_json):
+            self.emit_meta_json = True
+            self._create_from_meta_json(meta_json)
+        else:
+            pkg_sysroot = os.path.join(self.sdk_dir, "pkg", "sysroot")
+            self.emit_meta_json = False
+            self.sysroot_meta = {
+                "ifs_files": glob.glob("*.ifs", root_dir=pkg_sysroot)
+            }
+            self._create_from_dir_structure()
 
     def add_stubs(self, create_stub):
         for ifs_file in self.sysroot_meta["ifs_files"]:
@@ -108,6 +137,8 @@ class SysrootGenerator:
             create_stub(source, dest)
 
     def finish(self):
+        if not self.emit_meta_json:
+            return
         with open(os.path.join(self.sdk_dir, "pkg", "sysroot", "meta.json"),
                   "w") as f:
             json.dump(self.sysroot_meta, f)
@@ -140,6 +171,10 @@ def main():
         "--arch", required=True, help="ifs target to use for generating stubs")
     parser.add_argument("--ifs-path", default="llvm-ifs")
     args = parser.parse_args()
+
+    if os.path.exists(os.path.join(args.sdk_dir, "arch", args.arch)):
+        print(f"arch/{args.arch} already exists!")
+        return 1
 
     def write_stub(src, dest):
         subprocess.check_call(
