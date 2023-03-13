@@ -318,6 +318,11 @@ void DriverRunner::ScheduleBaseDriversBinding() {
 }
 
 void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callback) {
+  if (orphaned_nodes_.empty()) {
+    result_callback(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>());
+    return;
+  }
+
   // Clear our stored vector of orphaned nodes, we will repopulate it with the
   // new orphans.
   std::vector<std::weak_ptr<Node>> orphaned_nodes = std::move(orphaned_nodes_);

@@ -9,6 +9,7 @@ use {
     args::RegisterCommand,
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr,
     fidl_fuchsia_pkg as fpkg,
+    fuchsia_zircon_status::Status,
     std::io::Write,
 };
 
@@ -29,18 +30,36 @@ pub async fn register(
         }
     }
 
+    let mut existing = false;
+    let restart_result = driver_development_proxy.restart_driver_hosts(cmd.url.as_str()).await?;
+    match restart_result {
+        Ok(count) => {
+            if count > 0 {
+                existing = true;
+                writeln!(writer, "Successfully restarted {} driver hosts with the driver.", count)?;
+            }
+        }
+        Err(err) => {
+            return Err(format_err!(
+                "Failed to restart existing drivers: {:?}",
+                Status::from_raw(err)
+            ));
+        }
+    }
+
     let bind_result = driver_development_proxy.bind_all_unbound_nodes().await?;
 
     match bind_result {
         Ok(result) => {
             if result.is_empty() {
-                writeln!(
-                    writer,
-                    "{}\n{}\n{}",
-                    "No new nodes were bound to the driver being registered.",
-                    "Re-binding already bound nodes is not supported currently.",
-                    "Reboot your device if you are updating an already registered driver."
-                )?;
+                if !existing {
+                    writeln!(
+                        writer,
+                        "{}\n{}",
+                        "There are no existing driver hosts with this driver.",
+                        "No new nodes were bound to the driver being registered.",
+                    )?;
+                }
             } else {
                 writeln!(writer, "Successfully bound:")?;
                 for info in result {
@@ -54,7 +73,7 @@ pub async fn register(
             }
         }
         Err(err) => {
-            return Err(format_err!("Failed to bind nodes: {:?}", err));
+            return Err(format_err!("Failed to bind nodes: {:?}", Status::from_raw(err)));
         }
     };
     Ok(())
