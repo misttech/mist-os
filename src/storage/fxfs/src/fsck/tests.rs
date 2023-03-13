@@ -1126,7 +1126,7 @@ async fn test_attribute_on_directory() {
             &fs,
             store.as_ref(),
             vec![Item::new(
-                ObjectKey::attribute(store.root_directory_object_id(), 1, AttributeKey::Attribute),
+                ObjectKey::attribute(store.root_directory_object_id(), 1, AttributeKey::Size),
                 ObjectValue::attribute(100),
             )],
         )
@@ -1154,7 +1154,7 @@ async fn test_orphaned_attribute() {
             &fs,
             store.as_ref(),
             vec![Item::new(
-                ObjectKey::attribute(10, 1, AttributeKey::Attribute),
+                ObjectKey::attribute(10, 1, AttributeKey::Size),
                 ObjectValue::attribute(100),
             )],
         )
@@ -1187,7 +1187,7 @@ async fn test_records_for_tombstoned_object() {
             vec![
                 Item::new(ObjectKey::object(10), ObjectValue::None),
                 Item::new(
-                    ObjectKey::attribute(10, 1, AttributeKey::Attribute),
+                    ObjectKey::attribute(10, 1, AttributeKey::Size),
                     ObjectValue::attribute(100),
                 ),
             ],
@@ -1355,11 +1355,7 @@ async fn test_file_length_mismatch() {
         transaction.add(
             store.store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(
-                    handle.object_id(),
-                    handle.attribute_id(),
-                    AttributeKey::Attribute,
-                ),
+                ObjectKey::attribute(handle.object_id(), handle.attribute_id(), AttributeKey::Size),
                 ObjectValue::attribute(123),
             ),
         );

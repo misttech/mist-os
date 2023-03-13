@@ -5,7 +5,6 @@
 #ifndef SRC_LIB_STORAGE_FS_MANAGEMENT_CPP_VOLUMES_H_
 #define SRC_LIB_STORAGE_FS_MANAGEMENT_CPP_VOLUMES_H_
 
-#include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 
@@ -35,7 +34,7 @@ __EXPORT zx::result<> CreateVolume(fidl::UnownedClientEnd<fuchsia_io::Directory>
 __EXPORT zx::result<> OpenVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
                                  std::string_view name,
                                  fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
-                                 fuchsia_fxfs::wire::MountOptions options);
+                                 zx::channel crypt_client = {});
 
 // Checks volume |name| in the filesystem instance.  |crypt_client| is an optional channel to
 // a Crypt service instance, in which case the volume is decrypted using that service.

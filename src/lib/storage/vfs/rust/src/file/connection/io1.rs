@@ -304,10 +304,6 @@ where
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
         self.as_file().query_filesystem()
     }
-
-    fn event(&self) -> Result<Option<zx::Event>, Status> {
-        self.as_file().event()
-    }
 }
 
 /// On a fuchsia.io/Node.Clone request, the `FileConnection` needs to clone the `Arc` of the
@@ -715,7 +711,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             Ok(fio::NodeInfoDeprecated::Service(fio::Service))
         } else {
             let stream = self.file.duplicate_stream()?;
-            Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: self.file.event()?, stream }))
+            Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: None, stream }))
         }
     }
 
@@ -741,11 +737,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             fio::FileRequest::Describe { responder } => {
                 fuchsia_trace::duration!("storage", "File::Describe");
                 let stream = self.file.duplicate_stream()?;
-                responder.send(fio::FileInfo {
-                    stream,
-                    observer: self.file.event()?,
-                    ..fio::FileInfo::EMPTY
-                })?;
+                responder.send(fio::FileInfo { stream, ..fio::FileInfo::EMPTY })?;
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetConnectionInfo");

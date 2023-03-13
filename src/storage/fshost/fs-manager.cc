@@ -122,9 +122,6 @@ zx_status_t FsManager::Initialize(
   } else {
     fs_dir_->AddEntry(MountPointPath(MountPoint::kFactory), fbl::MakeRefCounted<fs::PseudoDir>());
   }
-  if (config.fxfs_blob()) {
-    mount_points.push_back(MountPoint::kBlob);
-  }
 
   for (const auto& point : mount_points) {
     zx::result endpoints_or = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -351,8 +348,6 @@ const char* FsManager::MountPointPath(FsManager::MountPoint point) {
       return "data";
     case MountPoint::kFactory:
       return "factory";
-    case MountPoint::kBlob:
-      return "blob";
   }
 }
 

@@ -66,21 +66,17 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         self.cache.read(offset, buf, &self.handle).await
     }
 
-    pub async fn read_uncached(
-        &self,
-        range: std::ops::Range<u64>,
-    ) -> Result<(Buffer<'_>, usize), Error> {
+    pub async fn read_uncached(&self, range: std::ops::Range<u64>) -> Result<Buffer<'_>, Error> {
         let mut buffer = self.allocate_buffer((range.end - range.start) as usize);
         let read = self.handle.read(range.start, buffer.as_mut()).await?;
         buffer.as_mut_slice()[read..].fill(0);
-        Ok((buffer, read))
+        Ok(buffer)
     }
 
     pub fn uncached_size(&self) -> u64 {
         self.handle.get_size()
     }
 
-    /// Returns the number of bytes successfully written.
     pub async fn write_or_append_cached(
         &self,
         offset: Option<u64>,
@@ -240,7 +236,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
                         ObjectKey::attribute(
                             self.handle.object_id,
                             self.handle.attribute_id,
-                            AttributeKey::Attribute,
+                            AttributeKey::Size,
                         ),
                         ObjectValue::attribute(content_size),
                     ),
@@ -257,14 +253,7 @@ impl<S: HandleOwner> CachingObjectHandle<S> {
         }
 
         if let Some(data) = flushable.data.as_mut() {
-            self.handle
-                .multi_write(
-                    &mut transaction,
-                    self.handle.attribute_id,
-                    &data.ranges,
-                    data.buffer.as_mut(),
-                )
-                .await?;
+            self.handle.multi_write(&mut transaction, &data.ranges, data.buffer.as_mut()).await?;
         }
 
         debug_assert_not_too_long!(locks.commit_prepare());
@@ -1106,11 +1095,10 @@ mod tests {
         object.flush().await.expect("flush failed");
 
         // The tail of the file should have been zeroed.
-        let (buf, size) = object
+        let buf = object
             .read_uncached(object_size - 2 * block_size..object_size)
             .await
             .expect("read_uncached failed");
-        assert_eq!(size, buf.len());
         assert_eq!(buf.as_slice(), &vec![0; 2 * block_size as usize]);
 
         fsck_with_options(

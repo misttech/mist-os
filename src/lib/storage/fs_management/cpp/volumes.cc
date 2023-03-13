@@ -5,6 +5,7 @@
 #include "src/lib/storage/fs_management/cpp/volumes.h"
 
 #include <fidl/fuchsia.fxfs/cpp/markers.h>
+#include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
@@ -72,7 +73,7 @@ zx::result<> CreateVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_
 __EXPORT
 zx::result<> OpenVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
                         std::string_view name, fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
-                        fuchsia_fxfs::wire::MountOptions options) {
+                        zx::channel crypt_client) {
   std::string path = "volumes/" + std::string(name);
   if (auto status = CheckExists(exposed_dir, path); status.is_error()) {
     return status.take_error();
@@ -81,6 +82,9 @@ zx::result<> OpenVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_di
   auto client = component::ConnectAt<fuchsia_fxfs::Volume>(exposed_dir, path.c_str());
   if (client.is_error())
     return client.take_error();
+  fuchsia_fxfs::wire::MountOptions options{
+      .crypt = fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client)),
+  };
   auto result = fidl::WireCall(*client)->Mount(std::move(outgoing_dir), std::move(options));
   if (!result.ok())
     return zx::error(result.error().status());

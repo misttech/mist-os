@@ -25,7 +25,7 @@ use {
             self,
             directory::{self, ObjectDescriptor, ReplacedChild},
             transaction::{LockKey, Options, Transaction},
-            Directory, ObjectStore, Timestamp,
+            ObjectStore, Timestamp,
         },
     },
     std::{
@@ -37,7 +37,7 @@ use {
         directory::{
             dirents_sink::{self, AppendResult, Sink},
             entry::{DirectoryEntry, EntryInfo},
-            entry_container::{DirectoryWatcher, MutableDirectory},
+            entry_container::{Directory, DirectoryWatcher, MutableDirectory},
             mutable::connection::io1::MutableConnection,
             traversal_position::TraversalPosition,
             watchers::{event_producers::SingleNameEventProducer, Watchers},
@@ -67,7 +67,7 @@ impl FxDirectory {
         }
     }
 
-    pub fn directory(&self) -> &object_store::Directory<FxVolume> {
+    pub(super) fn directory(&self) -> &object_store::Directory<FxVolume> {
         &self.directory
     }
 
@@ -75,7 +75,7 @@ impl FxDirectory {
         self.directory.owner()
     }
 
-    pub fn store(&self) -> &ObjectStore {
+    fn store(&self) -> &ObjectStore {
         self.directory.store()
     }
 
@@ -545,7 +545,7 @@ impl DirectoryEntry for FxDirectory {
 }
 
 #[async_trait]
-impl vfs::directory::entry_container::Directory for FxDirectory {
+impl Directory for FxDirectory {
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
@@ -683,12 +683,6 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
             store.object_count(),
             self.volume().id(),
         ))
-    }
-}
-
-impl From<Directory<FxVolume>> for FxDirectory {
-    fn from(dir: Directory<FxVolume>) -> Self {
-        Self::new(None, dir)
     }
 }
 

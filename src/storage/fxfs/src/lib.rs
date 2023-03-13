@@ -13,10 +13,6 @@
 pub mod checksum;
 pub mod data_buffer;
 pub mod drop_event;
-
-#[macro_use]
-mod debug_assert_not_too_long;
-
 pub mod errors;
 pub mod filesystem;
 pub mod fsck;
@@ -32,3 +28,5 @@ pub mod serialized_types;
 mod testing;
 #[macro_use]
 mod trace;
+#[macro_use]
+mod debug_assert_not_too_long;

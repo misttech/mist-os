@@ -740,9 +740,6 @@ zx_status_t BlockDevice::MountFilesystem() {
 // attempt to mount is made, without checking mount success.
 zx_status_t BlockDevice::MountData(const fs_management::MountOptions& options,
                                    fidl::ClientEnd<fuchsia_hardware_block::Block> block_device) {
-  if (device_config_->fxfs_blob()) {
-    return mounter_->MountData(std::move(block_device), options, format_);
-  }
   const uint8_t* guid = GetTypeGuid().value.data();
   FX_LOGS(INFO) << "Detected type GUID " << gpt::KnownGuid::TypeDescription(guid)
                 << " for data partition";

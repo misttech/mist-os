@@ -588,65 +588,8 @@ pub async fn replace_child<'a, S: HandleOwner>(
     src: Option<(&'a Directory<S>, &str)>,
     dst: (&'a Directory<S>, &str),
 ) -> Result<ReplacedChild, Error> {
-    let mut sub_dirs_delta: i64 = 0;
-    let now = Timestamp::now();
-
-    let src = if let Some((src_dir, src_name)) = src {
-        let store_id = dst.0.store().store_object_id();
-        assert_eq!(store_id, src_dir.store().store_object_id());
-        transaction.add(
-            store_id,
-            Mutation::replace_or_insert_object(
-                ObjectKey::child(src_dir.object_id, src_name),
-                ObjectValue::None,
-            ),
-        );
-        let (id, descriptor) = src_dir.lookup(src_name).await?.ok_or(FxfsError::NotFound)?;
-        if src_dir.object_id() != dst.0.object_id() {
-            src_dir
-                .update_attributes(transaction, None, Some(now.clone()), |item| {
-                    if let ObjectDescriptor::Directory = descriptor {
-                        if let ObjectItem {
-                            value: ObjectValue::Object {
-                                kind: ObjectKind::Directory { sub_dirs },
-                                ..
-                            },
-                            ..
-                        } = item
-                        {
-                            *sub_dirs = sub_dirs.saturating_sub(1);
-                            sub_dirs_delta += 1;
-                        } else {
-                            panic!("Expected directory");
-                        }
-                    }
-                })
-                .await?;
-        }
-        Some((id, descriptor))
-    } else {
-        None
-    };
-
-    replace_child_with_object(transaction, src, dst, sub_dirs_delta, now).await
-}
-
-/// Replaces dst.0/dst.1 with the given object, or unlinks if `src` is None.
-///
-/// If |dst.0| already has a child |dst.1|, it is removed from dst.0.  For files, if this was their
-/// last reference, the file is moved to the graveyard.  For directories, the removed directory will
-/// be deleted permanently (and must be empty).
-///
-/// `sub_dirs_delta` can be used if `src` is a directory and happened to already be a child of
-/// `dst`.
-pub async fn replace_child_with_object<'a, S: HandleOwner>(
-    transaction: &mut Transaction<'a>,
-    src: Option<(u64, ObjectDescriptor)>,
-    dst: (&'a Directory<S>, &str),
-    mut sub_dirs_delta: i64,
-    timestamp: Timestamp,
-) -> Result<ReplacedChild, Error> {
     let deleted_id_and_descriptor = dst.0.lookup(dst.1).await?;
+    let mut sub_dirs_delta: i64 = 0;
     let result = match deleted_id_and_descriptor {
         Some((old_id, ObjectDescriptor::File)) => {
             let was_last_ref = dst.0.store().adjust_refs(transaction, old_id, -1).await?;
@@ -684,16 +627,48 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
         }
     };
     let store_id = dst.0.store().store_object_id();
-    let new_value = match src {
-        Some((id, descriptor)) => ObjectValue::child(id, descriptor),
-        None => ObjectValue::None,
+    let now = Timestamp::now();
+    let new_value = if let Some((src_dir, src_name)) = src {
+        assert_eq!(store_id, src_dir.store().store_object_id());
+        transaction.add(
+            store_id,
+            Mutation::replace_or_insert_object(
+                ObjectKey::child(src_dir.object_id, src_name),
+                ObjectValue::None,
+            ),
+        );
+        let (id, descriptor) = src_dir.lookup(src_name).await?.ok_or(FxfsError::NotFound)?;
+        if src_dir.object_id() != dst.0.object_id() {
+            src_dir
+                .update_attributes(transaction, None, Some(now.clone()), |item| {
+                    if let ObjectDescriptor::Directory = descriptor {
+                        if let ObjectItem {
+                            value: ObjectValue::Object {
+                                kind: ObjectKind::Directory { sub_dirs },
+                                ..
+                            },
+                            ..
+                        } = item
+                        {
+                            *sub_dirs = sub_dirs.saturating_sub(1);
+                            sub_dirs_delta += 1;
+                        } else {
+                            panic!("Expected directory");
+                        }
+                    }
+                })
+                .await?;
+        }
+        ObjectValue::child(id, descriptor)
+    } else {
+        ObjectValue::None
     };
     transaction.add(
         store_id,
         Mutation::replace_or_insert_object(ObjectKey::child(dst.0.object_id, dst.1), new_value),
     );
     dst.0
-        .update_attributes(transaction, None, Some(timestamp), |item| {
+        .update_attributes(transaction, None, Some(now), |item| {
             if sub_dirs_delta != 0 {
                 if let ObjectItem {
                     value: ObjectValue::Object { kind: ObjectKind::Directory { sub_dirs }, .. },

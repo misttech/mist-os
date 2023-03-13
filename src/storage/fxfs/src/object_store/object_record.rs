@@ -67,8 +67,7 @@ pub enum ObjectKeyDataV5 {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum AttributeKey {
-    // Order here is important: code expects Attribute to precede Extent.
-    Attribute,
+    Size,
     Extent(ExtentKey),
 }
 

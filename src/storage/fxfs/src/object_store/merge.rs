@@ -995,12 +995,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_merge_size_records() {
-        let left = &[Item::new(
-            ObjectKey::attribute(1, 0, AttributeKey::Attribute),
-            ObjectValue::attribute(5),
-        )];
+        let left =
+            &[Item::new(ObjectKey::attribute(1, 0, AttributeKey::Size), ObjectValue::attribute(5))];
         let right = &[Item::new(
-            ObjectKey::attribute(1, 0, AttributeKey::Attribute),
+            ObjectKey::attribute(1, 0, AttributeKey::Size),
             ObjectValue::attribute(10),
         )];
         let tree = LSMTree::new(merge);
@@ -1009,14 +1007,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_different_attributes_not_merged() {
-        let left = Item::new(
-            ObjectKey::attribute(1, 0, AttributeKey::Attribute),
-            ObjectValue::attribute(5),
-        );
-        let right = Item::new(
-            ObjectKey::attribute(1, 1, AttributeKey::Attribute),
-            ObjectValue::attribute(10),
-        );
+        let left =
+            Item::new(ObjectKey::attribute(1, 0, AttributeKey::Size), ObjectValue::attribute(5));
+        let right =
+            Item::new(ObjectKey::attribute(1, 1, AttributeKey::Size), ObjectValue::attribute(10));
         let tree = LSMTree::new(merge);
         test_merge(&tree, &[left.clone()], &[right.clone()], &[left, right]).await;
 
@@ -1045,7 +1039,7 @@ mod tests {
                     ObjectValue::file(1, 100, Timestamp::default(), Timestamp::default(), 0),
                 ),
                 Item::new(
-                    ObjectKey::attribute(1, 0, AttributeKey::Attribute),
+                    ObjectKey::attribute(1, 0, AttributeKey::Size),
                     ObjectValue::attribute(100),
                 ),
                 other_object.clone(),

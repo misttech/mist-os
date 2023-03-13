@@ -17,7 +17,6 @@ use {
         serialized_types::LATEST_VERSION,
     },
     fxfs_platform::{
-        blob::init_vmex_resource,
         component::{new_block_client, Component},
         RemoteCrypt,
     },
@@ -91,11 +90,6 @@ async fn main() -> Result<(), Error> {
     let args: TopLevel = argh::from_env();
 
     if let TopLevel { nested: SubCommand::Component(_), .. } = args {
-        // Tests won't be able to get the VMEX resource, so logging errors will be spam.  Only log
-        // success.
-        if init_vmex_resource().await.is_ok() {
-            info!("Got vmex resource");
-        }
         return Component::new()
             .run(
                 fuchsia_runtime::take_startup_handle(HandleType::DirectoryRequest.into())

@@ -107,7 +107,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         transaction.add_with_object(
             self.store().store_object_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Size),
                 ObjectValue::attribute(new_size),
             ),
             AssocObj::Borrowed(self),
@@ -232,7 +232,6 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
     async fn deallocate_old_extents(
         &self,
         transaction: &mut Transaction<'_>,
-        attribute_id: u64,
         range: Range<u64>,
     ) -> Result<u64, Error> {
         let block_size = self.block_size();
@@ -246,7 +245,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         let key = ExtentKey { range };
         let lower_bound = ObjectKey::attribute(
             self.object_id,
-            attribute_id,
+            self.attribute_id,
             AttributeKey::Extent(key.search_key()),
         );
         let mut merger = layer_set.merger();
@@ -258,13 +257,13 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
             key:
                 ObjectKey {
                     object_id,
-                    data: ObjectKeyData::Attribute(attr_id, AttributeKey::Extent(extent_key)),
+                    data: ObjectKeyData::Attribute(attribute_id, AttributeKey::Extent(extent_key)),
                 },
             value: ObjectValue::Extent(value),
             ..
         }) = iter.get()
         {
-            if *object_id != self.object_id || *attr_id != attribute_id {
+            if *object_id != self.object_id || *attribute_id != self.attribute_id {
                 break;
             }
             if let ExtentValue::Some { device_offset, .. } = value {
@@ -301,8 +300,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         transaction: &mut Transaction<'_>,
         range: Range<u64>,
     ) -> Result<(), Error> {
-        let deallocated =
-            self.deallocate_old_extents(transaction, self.attribute_id, range.clone()).await?;
+        let deallocated = self.deallocate_old_extents(transaction, range.clone()).await?;
         if deallocated > 0 {
             self.update_allocated_size(transaction, 0, deallocated).await?;
             transaction.add(
@@ -435,16 +433,12 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
             return Ok(());
         }
         let (aligned, mut transfer_buf) = self.align_buffer(offset, buf).await?;
-        self.multi_write(transaction, self.attribute_id, &[aligned], transfer_buf.as_mut()).await?;
+        self.multi_write(transaction, &[aligned], transfer_buf.as_mut()).await?;
         if offset + buf.len() as u64 > self.txn_get_size(transaction) {
             transaction.add_with_object(
                 self.store().store_object_id,
                 Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id,
-                        self.attribute_id,
-                        AttributeKey::Attribute,
-                    ),
+                    ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Size),
                     ObjectValue::attribute(offset + buf.len() as u64),
                 ),
                 AssocObj::Borrowed(self),
@@ -459,7 +453,6 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
     pub async fn multi_write<'a>(
         &'a self,
         transaction: &mut Transaction<'a>,
-        attribute_id: u64,
         ranges: &[Range<u64>],
         mut buf: MutableBufferRef<'_>,
     ) -> Result<(), Error> {
@@ -532,7 +525,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
                         mutations.push(Mutation::merge_object(
                             ObjectKey::extent(
                                 self.object_id,
-                                attribute_id,
+                                self.attribute_id,
                                 current_range.start..current_range.start + l,
                             ),
                             ObjectValue::Extent(ExtentValue::with_checksum(
@@ -550,15 +543,8 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
             },
             async {
                 let mut deallocated = 0;
-                let aligned_size = round_up(self.txn_get_size(transaction), block_size)
-                    .ok_or(anyhow!(FxfsError::Inconsistent).context("flush: Bad size"))?;
                 for r in ranges {
-                    // TODO(fxbug.dev/122125): This check might be unnecessary.
-                    if r.start < aligned_size {
-                        deallocated += self
-                            .deallocate_old_extents(transaction, attribute_id, r.clone())
-                            .await?;
-                    }
+                    deallocated += self.deallocate_old_extents(transaction, r.clone()).await?;
                 }
                 Result::<_, Error>::Ok(deallocated)
             }
@@ -787,7 +773,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         transaction
             .get_object_mutation(
                 self.store().store_object_id,
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Size),
             )
             .and_then(|m| {
                 if let ObjectItem { value: ObjectValue::Attribute { size }, .. } = m.item {
@@ -886,7 +872,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         transaction.add_with_object(
             store.store_object_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Size),
                 ObjectValue::attribute(size),
             ),
             AssocObj::Borrowed(self),
@@ -894,7 +880,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         Ok(NeedsTrim(needs_trim))
     }
 
-    pub async fn grow<'a>(
+    async fn grow<'a>(
         &'a self,
         transaction: &mut Transaction<'a>,
         old_size: u64,
@@ -950,7 +936,6 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
                     buf.as_mut_slice()[(old_size % block_size) as usize..].fill(0);
                     self.multi_write(
                         transaction,
-                        *attribute_id,
                         &[aligned_old_size..aligned_old_size + block_size],
                         buf.as_mut(),
                     )
@@ -961,7 +946,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         transaction.add_with_object(
             store.store_object_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Attribute),
+                ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Size),
                 ObjectValue::attribute(size),
             ),
             AssocObj::Borrowed(self),
@@ -1092,11 +1077,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
             transaction.add_with_object(
                 self.store().store_object_id,
                 Mutation::replace_or_insert_object(
-                    ObjectKey::attribute(
-                        self.object_id,
-                        self.attribute_id,
-                        AttributeKey::Attribute,
-                    ),
+                    ObjectKey::attribute(self.object_id, self.attribute_id, AttributeKey::Size),
                     ObjectValue::attribute(file_range.end),
                 ),
                 AssocObj::Borrowed(self),
@@ -1164,90 +1145,6 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
     /// Flushes the underlying device.  This is expensive and should be used sparingly.
     pub async fn flush_device(&self) -> Result<(), Error> {
         self.store().device().flush().await
-    }
-
-    /// Reads an entire attribute.
-    pub async fn read_attr(&self, attribute_id: u64) -> Result<Option<Box<[u8]>>, Error> {
-        let store = self.store();
-        let tree = &store.tree;
-        let layer_set = tree.layer_set();
-        let mut merger = layer_set.merger();
-        let key = ObjectKey::attribute(self.object_id, attribute_id, AttributeKey::Attribute);
-        let mut iter = merger.seek(Bound::Included(&key)).await?;
-        let (mut buffer, size) = match iter.get() {
-            Some(item) if item.key == &key => match item.value {
-                ObjectValue::Attribute { size } => {
-                    // TODO(fxbug.dev/122125): size > max buffer size
-                    (
-                        store
-                            .device
-                            .allocate_buffer(round_up(*size, self.block_size()).unwrap() as usize),
-                        *size as usize,
-                    )
-                }
-                _ => bail!(FxfsError::Inconsistent),
-            },
-            _ => return Ok(None),
-        };
-        let mut last_offset = 0;
-        loop {
-            iter.advance().await?;
-            match iter.get() {
-                Some(ItemRef {
-                    key:
-                        ObjectKey {
-                            object_id,
-                            data:
-                                ObjectKeyData::Attribute(attr_id, AttributeKey::Extent(extent_key)),
-                        },
-                    value: ObjectValue::Extent(extent_value),
-                    ..
-                }) if *object_id == self.object_id && *attr_id == attribute_id => {
-                    if let ExtentValue::Some { device_offset, key_id, .. } = extent_value {
-                        let offset = extent_key.range.start as usize;
-                        buffer.as_mut_slice()[last_offset..offset].fill(0);
-                        let end = std::cmp::min(extent_key.range.end as usize, buffer.len());
-                        self.read_and_decrypt(
-                            *device_offset,
-                            extent_key.range.start,
-                            buffer.subslice_mut(offset..end as usize),
-                            *key_id,
-                        )
-                        .await?;
-                        last_offset = end;
-                        if last_offset >= size {
-                            break;
-                        }
-                    }
-                }
-                _ => break,
-            }
-        }
-        buffer.as_mut_slice()[std::cmp::min(last_offset, size)..].fill(0);
-        Ok(Some(buffer.as_slice().into()))
-    }
-
-    /// Writes an entire attribute.
-    pub async fn write_attr(&self, attribute_id: u64, data: &[u8]) -> Result<(), Error> {
-        // Must be different attribute otherwise cached size gets out of date.
-        assert_ne!(attribute_id, self.attribute_id);
-        let rounded_len = round_up(data.len() as u64, self.block_size()).unwrap();
-        let mut buffer = self.store().device.allocate_buffer(rounded_len as usize);
-        let slice = buffer.as_mut_slice();
-        slice[..data.len()].copy_from_slice(data);
-        slice[data.len()..].fill(0);
-        let mut transaction = self.new_transaction().await?;
-        self.multi_write(&mut transaction, attribute_id, &[0..rounded_len], buffer.as_mut())
-            .await?;
-        transaction.add(
-            self.store().store_object_id,
-            Mutation::replace_or_insert_object(
-                ObjectKey::attribute(self.object_id, attribute_id, AttributeKey::Attribute),
-                ObjectValue::attribute(data.len() as u64),
-            ),
-        );
-        transaction.commit().await?;
-        Ok(())
     }
 
     async fn read_and_decrypt(
@@ -3085,17 +2982,5 @@ mod tests {
         assert_eq!(allocated, false);
 
         fs.close().await.expect("close failed");
-    }
-
-    #[fuchsia::test(threads = 10)]
-    async fn test_read_write_attr() {
-        let (_fs, object) = test_filesystem_and_object().await;
-        let data = [0xffu8; 16_384];
-        object.write_attr(20, &data).await.expect("write_attr failed");
-        let rdata =
-            object.read_attr(20).await.expect("read_attr failed").expect("no attribute data found");
-        assert_eq!(&data[..], &rdata[..]);
-
-        assert_eq!(object.read_attr(21).await.expect("read_attr failed"), None);
     }
 }

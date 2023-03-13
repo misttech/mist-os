@@ -15,11 +15,6 @@ use {
 /// The common case for extents which cover the data payload of some object.
 pub const DEFAULT_DATA_ATTRIBUTE_ID: u64 = 0;
 
-/// For Blobs in Fxfs, we store the merkle tree at a well-known attribute.
-/// TODO(fxbug.dev/122125): Is this the best place to store the merkle tree?  What about inline with
-/// data?
-pub const BLOB_MERKLE_ATTRIBUTE_ID: u64 = 1;
-
 /// ExtentKey is a child of ObjectKey for Object attributes that have attached extents
 /// (at time of writing this was only the used for file contents).
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TypeHash)]

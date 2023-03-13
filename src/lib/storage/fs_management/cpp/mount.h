@@ -5,7 +5,6 @@
 #ifndef SRC_LIB_STORAGE_FS_MANAGEMENT_CPP_MOUNT_H_
 #define SRC_LIB_STORAGE_FS_MANAGEMENT_CPP_MOUNT_H_
 
-#include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <zircon/compiler.h>
@@ -169,13 +168,12 @@ class __EXPORT StartedMultiVolumeFilesystem {
   // Returns the connection to the service directory offered by the filesystem.
   const fidl::ClientEnd<fuchsia_io::Directory>& ServiceDirectory() const { return exposed_dir_; }
 
-  // Opens the volume if present.  |options.crypt| is an optional connection to a crypt service used
+  // Opens the volume if present.  |crypt_client| is an optional connection to a crypt service used
   // to unlock the volume; if unset, the volume is assumed to be unencrypted.
   //
   // Returns a pointer to the volume if it was opened.  The lifetime of the pointer is less than
   // this object.
-  zx::result<MountedVolume*> OpenVolume(std::string_view name,
-                                        fuchsia_fxfs::wire::MountOptions options);
+  zx::result<MountedVolume*> OpenVolume(std::string_view name, zx::channel crypt_client);
 
   // Creates a volume.  |crypt_client| is an optional connection to a crypt service used
   // to unlock the volume; if unset, the volume is assumed to be unencrypted.
