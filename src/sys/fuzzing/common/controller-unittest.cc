@@ -159,15 +159,14 @@ TEST_F(ControllerTest, AddToCorpus) {
   auto seed_corpus = runner()->GetCorpus(CorpusType::SEED);
   auto live_corpus = runner()->GetCorpus(CorpusType::LIVE);
 
-  ASSERT_EQ(seed_corpus.size(), 3U);
-  EXPECT_EQ(seed_corpus[0].ToHex(), input0.ToHex());
+  // Returned corpora are sorted and do not include empty inputs.
+  ASSERT_EQ(seed_corpus.size(), 2U);
   EXPECT_EQ(seed_corpus[1].ToHex(), seed_input1.ToHex());
-  EXPECT_EQ(seed_corpus[2].ToHex(), seed_input2.ToHex());
+  EXPECT_EQ(seed_corpus[0].ToHex(), seed_input2.ToHex());
 
-  ASSERT_EQ(live_corpus.size(), 3U);
-  EXPECT_EQ(live_corpus[0].ToHex(), input0.ToHex());
+  ASSERT_EQ(live_corpus.size(), 2U);
   EXPECT_EQ(live_corpus[1].ToHex(), live_input3.ToHex());
-  EXPECT_EQ(live_corpus[2].ToHex(), live_input4.ToHex());
+  EXPECT_EQ(live_corpus[0].ToHex(), live_input4.ToHex());
 }
 
 TEST_F(ControllerTest, ReadCorpus) {
@@ -195,16 +194,17 @@ TEST_F(ControllerTest, ReadCorpus) {
   FUZZING_EXPECT_OK(live_bridge.consumer.promise_or(fpromise::error()));
   RunUntilIdle();
 
+  // Returned corpora are sorted.
   const auto& seed_corpus = seed_reader.corpus();
   ASSERT_EQ(seed_corpus.size(), 3U);
-  EXPECT_EQ(seed_corpus[0], input1);
-  EXPECT_EQ(seed_corpus[1], input2);
+  EXPECT_EQ(seed_corpus[0], input2);
+  EXPECT_EQ(seed_corpus[1], input1);
   EXPECT_EQ(seed_corpus[2], input0);
 
   const auto& live_corpus = live_reader.corpus();
   ASSERT_EQ(live_corpus.size(), 3U);
-  EXPECT_EQ(live_corpus[0], input3);
-  EXPECT_EQ(live_corpus[1], input4);
+  EXPECT_EQ(live_corpus[0], input4);
+  EXPECT_EQ(live_corpus[1], input3);
   EXPECT_EQ(live_corpus[2], input0);
 }
 

@@ -16,6 +16,9 @@
 
 namespace fuzzing {
 
+// Fake command line argument recognized by this runner.
+extern const char* kFakeRunnerFlag;
+
 // This class implements |Runner| without actually running anything. For the fuzzing workflows, it
 // simply returns whatever results are preloaded by a unit test.
 class FakeRunner final : public Runner {
@@ -25,7 +28,7 @@ class FakeRunner final : public Runner {
   // Factory method.
   static RunnerPtr MakePtr(ExecutorPtr executor);
 
-  static Input valid_dictionary() { return Input("key=\"value\"\n"); }
+  static Input valid_dictionary() { return Input("key1=\"value\"\n"); }
   static Input invalid_dictionary() { return Input("invalid"); }
 
   const std::vector<Input>& get_inputs() const { return inputs_; }

@@ -9,6 +9,11 @@
 
 #include <iostream>
 
+#include <gtest/gtest.h>
+
+#include "src/lib/files/directory.h"
+#include "src/lib/files/file.h"
+#include "src/lib/files/path.h"
 #include "src/sys/fuzzing/common/status.h"
 
 namespace fuzzing {
@@ -54,8 +59,11 @@ std::vector<Input> FakeRunner::GetCorpus(CorpusType corpus_type) {
   std::vector<Input> inputs;
   inputs.reserve(corpus->size());
   for (const auto& input : *corpus) {
-    inputs.emplace_back(input.Duplicate());
+    if (input.size() != 0) {
+      inputs.emplace_back(input.Duplicate());
+    }
   }
+  std::sort(inputs.begin(), inputs.end());
   return inputs;
 }
 
