@@ -248,10 +248,6 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   return library;
 }
 
-bool HasSimpleLayout(const Decl* decl) {
-  return decl->attributes->Get("for_deprecated_c_bindings") != nullptr;
-}
-
 void Library::TraverseElements(const fit::function<void(Element*)>& fn) {
   fn(this);
   for (auto& [name, decl] : declarations.all) {

@@ -93,11 +93,6 @@ struct FieldShape {
 
 constexpr uint32_t kMessageAlign = 8u;
 
-// Returns depth according to the "old" wire format (with static unions). This is currently only
-// supported to calculate the Layout=Simple/ForDeprecatedCBindings attribute constraint.
-uint32_t OldWireFormatDepth(const flat::Object& object);
-uint32_t OldWireFormatDepth(const flat::Object* object);
-
 }  // namespace fidl
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_TYPE_SHAPE_H_

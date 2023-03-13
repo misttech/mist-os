@@ -327,13 +327,13 @@ constexpr RetiredDef<134, const flat::Attribute *> ErrAttributeConstraintNotSati
     "declaration did not satisfy constraint of attribute '{}'");
 constexpr ErrorDef<135, std::string_view> ErrInvalidDiscoverableName(
     "invalid @discoverable name '{}'; must follow the format 'the.library.name.TheProtocolName'");
-constexpr ErrorDef<136, flat::Name> ErrTableCannotBeSimple(
+constexpr RetiredDef<136, flat::Name> ErrTableCannotBeSimple(
     "union '{}' is not a simple type, so it cannot be used in "
     "@for_deprecated_c_bindings");
-constexpr ErrorDef<137, flat::Name> ErrUnionCannotBeSimple(
+constexpr RetiredDef<137, flat::Name> ErrUnionCannotBeSimple(
     "table '{}' is not a simple type, so it cannot be used in "
     "@for_deprecated_c_bindings");
-constexpr ErrorDef<138, std::string_view> ErrElementMustBeSimple(
+constexpr RetiredDef<138, std::string_view> ErrElementMustBeSimple(
     "element '{}' does not have a simple type, so it cannot be used in "
     "@for_deprecated_c_bindings");
 constexpr ErrorDef<139, uint32_t, uint32_t> ErrTooManyBytes(
@@ -441,7 +441,7 @@ constexpr ErrorDef<187> ErrUnicodeEscapeEmpty("Unicode escape must have at least
 constexpr ErrorDef<188> ErrUnicodeEscapeTooLong("Unicode escape must have at most 6 hex digits");
 constexpr ErrorDef<189, std::string_view> ErrUnicodeEscapeTooLarge(
     "invalid Unicode code point '{}'; maximum is 10FFFF");
-constexpr ErrorDef<190, flat::Name> ErrSimpleProtocolMustBeClosed(
+constexpr RetiredDef<190, flat::Name> ErrSimpleProtocolMustBeClosed(
     "@for_deprecated_c_bindings annotated protocol {} must be closed");
 constexpr FixableErrorDef<191, Fixable::Kind::kProtocolModifier, std::string_view>
     ErrMethodMustDefineStrictness(

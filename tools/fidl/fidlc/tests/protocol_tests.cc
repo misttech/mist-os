@@ -826,25 +826,6 @@ protocol Special {
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodOrdinal);
 }
 
-TEST(ProtocolTests, BadSimpleConstraintAppliesToComposedMethodsToo) {
-  TestLibrary library(R"FIDL(
-library example;
-
-protocol NotSimple {
-    Complex(struct { arg vector<uint64>; });
-};
-
-@for_deprecated_c_bindings
-protocol YearningForSimplicity {
-    compose NotSimple;
-    Simple();
-};
-)FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrElementMustBeSimple);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "arg");
-  EXPECT_SUBSTR(library.errors()[0]->msg.c_str(), "for_deprecated_c_bindings");
-}
-
 TEST(ProtocolTests, BadRequestMustBeProtocol) {
   TestLibrary library;
   library.AddFile("bad/fi-0157.test.fidl");
@@ -989,63 +970,6 @@ type Foo = resource struct {
 };
 )FIDL");
   ASSERT_COMPILED(library);
-}
-
-TEST(ProtocolTests, GoodMethodStructSimpleLayout) {
-  TestLibrary library(R"FIDL(
-library example;
-
-@for_deprecated_c_bindings
-protocol MyProtocol {
-  -> OnMyEvent(struct {
-    b bool;
-  });
-};
-)FIDL");
-  ASSERT_COMPILED(library);
-}
-
-TEST(ProtocolTests, BadMethodStructIncludesVector) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0138.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrElementMustBeSimple);
-  EXPECT_SUBSTR(library.errors()[0]->msg.c_str(), "for_deprecated_c_bindings");
-}
-
-TEST(ProtocolTests, GoodClosedSimpleProtocol) {
-  TestLibrary library(R"FIDL(
-library example;
-
-@for_deprecated_c_bindings
-closed protocol MyProtocol {
-  strict MyMethod() -> ();
-};
-)FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_COMPILED(library);
-}
-
-TEST(ProtocolTests, BadOpenSimpleProtocol) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0190.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrSimpleProtocolMustBeClosed);
-}
-
-TEST(ProtocolTests, BadAjarSimpleProtocol) {
-  TestLibrary library(R"FIDL(
-library example;
-
-@for_deprecated_c_bindings
-ajar protocol MyProtocol {
-  strict MyMethod() -> ();
-};
-)FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrSimpleProtocolMustBeClosed);
 }
 
 TEST(ProtocolTests, BadTooManyBytesSimple) {
@@ -1394,13 +1318,6 @@ protocol MyProtocol {
   EXPECT_ERR(library.errors()[4], fidl::ErrTooManyBytes);
 }
 
-TEST(ProtocolTests, BadMethodTableSimpleLayout) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0136.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTableCannotBeSimple);
-  EXPECT_SUBSTR(library.errors()[0]->msg.c_str(), "for_deprecated_c_bindings");
-}
-
 TEST(ProtocolTests, GoodMethodTableRequest) {
   TestLibrary library(R"FIDL(
 library example;
@@ -1549,13 +1466,6 @@ protocol MyProtocol {
   EXPECT_ERR(library.errors()[2], fidl::ErrTooManyBytes);
   EXPECT_ERR(library.errors()[3], fidl::ErrTooManyBytes);
   EXPECT_ERR(library.errors()[4], fidl::ErrTooManyBytes);
-}
-
-TEST(ProtocolTests, BadMethodUnionSimpleLayout) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0137.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnionCannotBeSimple);
-  EXPECT_SUBSTR(library.errors()[0]->msg.c_str(), "for_deprecated_c_bindings");
 }
 
 TEST(ProtocolTests, BadEventErrorSyntax) {

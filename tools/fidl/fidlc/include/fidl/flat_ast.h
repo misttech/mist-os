@@ -52,8 +52,6 @@ struct Library;
 class AttributeSchema;
 class Typespace;
 
-bool HasSimpleLayout(const Decl* decl);
-
 // This is needed (for now) to work around declaration order issues.
 std::string LibraryName(const std::vector<std::string_view>& components,
                         std::string_view separator);

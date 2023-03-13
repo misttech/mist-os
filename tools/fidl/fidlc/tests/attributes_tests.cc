@@ -178,7 +178,6 @@ type ExampleStruct = resource struct {
 
 /// For ExampleProtocol
 @discoverable
-@for_deprecated_c_bindings
 @transport("Syscall")
 protocol ExampleProtocol {
     /// For ExampleMethod
@@ -252,7 +251,6 @@ service ExampleService {
   auto example_protocol = library.LookupProtocol("ExampleProtocol");
   ASSERT_NOT_NULL(example_protocol);
   EXPECT_TRUE(example_protocol->attributes->Get("discoverable"));
-  EXPECT_TRUE(example_protocol->attributes->Get("for_deprecated_c_bindings"));
   EXPECT_TRUE(example_protocol->attributes->Get("doc")->GetArg("value"));
   auto& protocol_doc_value = static_cast<const fidl::flat::DocCommentConstantValue&>(
       example_protocol->attributes->Get("doc")->GetArg("value")->value->Value());
@@ -564,50 +562,49 @@ type E = strict enum : uint32 {
 
 TEST(AttributesTests, BadIncorrectPlacementLayout) {
   TestLibrary library(R"FIDL(
-@for_deprecated_c_bindings // 1
+@selector("test") // 1
 library fidl.test;
 
-// No error; placement on simple constants is allowed
-@for_deprecated_c_bindings
+@selector("test") // 2
 const MyConst uint32 = 0;
 
-@for_deprecated_c_bindings // 2
+@selector("test") // 3
 type MyEnum = enum {
-    @for_deprecated_c_bindings // 3
+    @selector("test") // 4
     MyMember = 5;
 };
 
-@for_deprecated_c_bindings // no error, this placement is allowed
+@selector("test") // 5
 type MyStruct = struct {
-    @for_deprecated_c_bindings // 4
+    @selector("test") // 6
     MyMember int32;
 };
 
-@for_deprecated_c_bindings // 5
+@selector("test") // 7
 type MyUnion = union {
-    @for_deprecated_c_bindings // 6
+    @selector("test") // 8
     1: MyMember int32;
 };
 
-@for_deprecated_c_bindings // 7
+@selector("test") // 9
 type MyTable = table {
-    @for_deprecated_c_bindings // 8
+    @selector("test") // 10
     1: MyMember int32;
 };
 
-@for_deprecated_c_bindings // no error, this placement is allowed
+@selector("test") // 11
 protocol MyProtocol {
-    @for_deprecated_c_bindings // 9
+    @selector("test") // no error, this placement is allowed
     MyMethod();
 };
 
 )FIDL");
   EXPECT_FALSE(library.Compile());
   const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 9);
+  ASSERT_EQ(errors.size(), 11);
   for (const auto& error : errors) {
     ASSERT_ERR(error, fidl::ErrInvalidAttributePlacement);
-    ASSERT_SUBSTR(error->msg.c_str(), "for_deprecated_c_bindings");
+    ASSERT_SUBSTR(error->msg.c_str(), "selector");
   }
 }
 
