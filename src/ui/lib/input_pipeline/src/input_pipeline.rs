@@ -265,7 +265,7 @@ impl InputPipeline {
         inspect_node: fuchsia_inspect::Node,
     ) -> Self {
         let (pipeline_sender, receiver, tasks) = assembly.into_components();
-        
+
         // Add static property `supported_input_devices` to inspect node
         inspect_node.record_string("supported_input_devices", input_device_types.iter().join(", "));
 
