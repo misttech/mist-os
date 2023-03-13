@@ -167,4 +167,16 @@ type AddressParameters = table {
     ///
     /// If not set, interpreted as false.
     2: temporary bool;
+
+    /// True if the subnet route corresponding to the address should be
+    /// installed, and removed once the address is removed.
+    ///
+    /// For example, if `Control#AddAddress` is called with 192.168.1.5/24, and
+    /// `add_subnet_route` is true, then a route with destination 192.168.1.0/24
+    /// will be installed through the interface the address is being added to.
+    /// If the address is removed for any reason, the route will also be
+    /// removed.
+    @deprecated(
+            "TODO(https://fxbug.dev/123319): Do not use this without consulting with the Netstack team.")
+    3: add_subnet_route bool;
 };
