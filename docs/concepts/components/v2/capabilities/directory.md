@@ -108,6 +108,10 @@ containing the shared directory contents.
 You must specify [`rights`](#directory-capability-rights).
 You may optionally specify [`subdir`](#subdirectories).
 
+### Consuming optional directory capabilities
+
+See [Connect Components: Consuming optional capabilities][consuming-optional-capabilities].
+
 ## Directory capability rights {#directory-capability-rights}
 
 Directory rights enable components to control access to directories as they are
@@ -246,4 +250,5 @@ You may `expose` or `offer` a directory capability by a different name:
 [manifest-expose]: https://fuchsia.dev/reference/cml#expose
 [manifest-offer]: https://fuchsia.dev/reference/cml#offer
 [manifest-use]: https://fuchsia.dev/reference/cml#use
+[consuming-optional-capabilities]: /docs/development/components/connect.md#consuming-optional-capabilities
 [storage-capabilities]: /docs/concepts/components/v2/capabilities/storage.md

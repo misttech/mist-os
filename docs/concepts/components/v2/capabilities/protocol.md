@@ -145,6 +145,10 @@ For more information about the open request, see
 Note: For a working example of routing a protocol capability between components,
 see [`//examples/components/routing`][routing-example].
 
+### Consuming optional protocol capabilities
+
+See [Connect Components: Consuming optional capabilities][consuming-optional-capabilities].
+
 ## Framework protocols {#framework}
 
 A *framework protocol* is a protocol provided by the component framework.
@@ -174,6 +178,7 @@ Fuchsia supports the following framework protocols:
 [glossary.protocol]: /docs/glossary/README.md#protocol
 [glossary.protocol-capability]: /docs/glossary/README.md#protocol-capability
 [capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing
+[consuming-optional-capabilities]: /docs/development/components/connect.md#consuming-optional-capabilities
 [fidl-reference]: /docs/reference/fidl/language/language.md
 [fidl-binder]: /sdk/fidl/fuchsia.component/binder.fidl
 [fidl-realm]: /sdk/fidl/fuchsia.component/realm.fidl

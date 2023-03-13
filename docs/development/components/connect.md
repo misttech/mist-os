@@ -138,6 +138,18 @@ offers the capability as `optional`, then the [static capability
 analyzer][static-analyzer] will generate an error and connection attempts at
 runtime will always fail.
 
+##### Consuming optional capabilities {#consuming-optional-capabilities}
+
+In the case that a component's parent has `offer`ed a capabilitity
+with `availability: "optional"`, the capability may not be usable at runtime.
+
+An entry in the component's [namespace][glossary.namespace] will be present
+whether the capability is available or not. Any attempt to open the path for
+that capability will result in the handle provided to the `Directory.Open()`
+call being closed with a `ZX_ERR_UNAVAILABLE` epitaph.
+
+Usage of `libc` methods like `open()` or `stat()` will return `ENOENT`.
+
 ### Route capabilities {#route-capability}
 
 Components may only access capabilities routed to them. Capabilities can originate

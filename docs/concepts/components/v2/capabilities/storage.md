@@ -178,6 +178,10 @@ To request the capability, add a `use` declaration for it:
 This populates the component's namespace with a directory at the provided `path`
 containing the isolated storage contents.
 
+### Consuming optional storage capabilities
+
+See [Connect Components: Consuming optional capabilities][consuming-optional-capabilities].
+
 ## Storage example {#example}
 
 Consider the following example where component `A` requests isolated storage
@@ -231,9 +235,9 @@ For more details on implementing directories, see
 [glossary.component-instance-identifier]: /docs/glossary/README.md#component-instance-identifier
 [glossary.moniker]: /docs/glossary/README.md#moniker
 [glossary.namespace]: /docs/glossary/README.md#namespace
-[glossary.outgoing-directory]: /docs/glossary/README.md#outgoing-directory
 [glossary.storage-capability]: /docs/glossary/README.md#storage-capability
 [capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing
+[consuming-optional-capabilities]: /docs/development/components/connect.md#consuming-optional-capabilities
 [component-reference]: https://fuchsia.dev/reference/cml#references
 [directory-capabilities]: /docs/concepts/components/v2/capabilities/directory.md
 [component-id-index]: /docs/development/components/component_id_index.md
