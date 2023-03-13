@@ -16,27 +16,25 @@ load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 # Base source for running ffx assembly product
 _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE = """
 set -e
-ORIG_DIR=$(pwd)
-cd $ARTIFACTS_BASE_PATH
 mkdir -p $FFX_ISOLATE_DIR
-$ORIG_DIR/$FFX \
-    --config "assembly_enabled=true,sdk.root=$ORIG_DIR/$SDK_ROOT" \
+$FFX \
+    --config "assembly_enabled=true,sdk.root=$SDK_ROOT" \
     --isolate-dir $FFX_ISOLATE_DIR \
     assembly \
     product \
-    --product $ORIG_DIR/$PRODUCT_CONFIG_PATH \
+    --product $PRODUCT_CONFIG_PATH \
     {board_config_arg} \
-    --legacy-bundle $ORIG_DIR/$LEGACY_AIB \
-    --input-bundles-dir $ORIG_DIR/$PLATFORM_AIB_DIR \
-    --outdir $ORIG_DIR/$OUTDIR
-$ORIG_DIR/$FFX \
-    --config "assembly_enabled=true,sdk.root=$ORIG_DIR/$SDK_ROOT" \
+    --legacy-bundle $LEGACY_AIB \
+    --input-bundles-dir $PLATFORM_AIB_DIR \
+    --outdir $OUTDIR
+$FFX \
+    --config "assembly_enabled=true,sdk.root=$SDK_ROOT" \
     --isolate-dir $FFX_ISOLATE_DIR \
     assembly \
     create-system \
-    --image-assembly-config $ORIG_DIR/$OUTDIR/image_assembly.json \
-    --images $ORIG_DIR/$IMAGES_CONFIG_PATH \
-    --outdir $ORIG_DIR/$OUTDIR
+    --image-assembly-config $OUTDIR/image_assembly.json \
+    --images $IMAGES_CONFIG_PATH \
+    --outdir $OUTDIR
 """
 
 def _fuchsia_product_image_impl(ctx):
@@ -52,7 +50,7 @@ def _fuchsia_product_image_impl(ctx):
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
     board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config if ctx.attr.board_config else None
     shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
-        board_config_arg = "--board-info $ORIG_DIR/$BOARD_CONFIG_PATH" if board_config_file else "",
+        board_config_arg = "--board-info $BOARD_CONFIG_PATH" if board_config_file else "",
     )
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
@@ -72,7 +70,6 @@ def _fuchsia_product_image_impl(ctx):
         "LEGACY_AIB": legacy_aib.dir.path,
         "PLATFORM_AIB_DIR": platform_aibs.dir.path,
         "IMAGES_CONFIG_PATH": images_config_file.path,
-        "ARTIFACTS_BASE_PATH": ctx.attr.artifacts_base_path,
     }
     if board_config_file:
         shell_env["BOARD_CONFIG_PATH"] = board_config_file.path
@@ -130,10 +127,6 @@ fuchsia_product_image = rule(
             doc = "Platform AIBs for this product.",
             providers = [FuchsiaProductAssemblyBundleInfo],
             mandatory = True,
-        ),
-        "artifacts_base_path": attr.string(
-            doc = "Artifacts base directories that items in config files are relative to.",
-            default = ".",
         ),
         "_sdk_manifest": attr.label(
             allow_single_file = True,
