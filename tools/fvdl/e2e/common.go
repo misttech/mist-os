@@ -96,17 +96,10 @@ func setUp(t *testing.T, intree bool) {
 		if _, err := os.Stat(kernel); os.IsNotExist(err) {
 			t.Fatal(err)
 		}
-		packages := filepath.Join(fuchsiaBuildDir, "packages.tar.gz")
-		if _, err := os.Stat(packages); os.IsNotExist(err) {
-			t.Fatal(err)
-		}
-		if err := os.Mkdir(filepath.Join(runtimeDir, ".jiri_root"), 0o755); err != nil && !os.IsExist(err) {
-			t.Fatal(err)
-		}
-		if err := e2etest.ExtractPackage(packages, fuchsiaBuildDir); err != nil {
-			t.Fatal(err)
-		}
 		amberFiles = filepath.Join(fuchsiaBuildDir, "amber-files")
+		if err := os.Mkdir(amberFiles, 0o755); err != nil && !os.IsExist(err) {
+			t.Fatal(err)
+		}
 		if intree {
 			if err := e2etest.GenerateFakeArgsFile(filepath.Join(fuchsiaBuildDir, "args.gn")); err != nil {
 				t.Fatal(err)
