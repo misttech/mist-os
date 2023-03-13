@@ -56,6 +56,16 @@ pub struct RecordCommand {
         default = "fidl_fuchsia_audio_ffxdaemon::ClockType::Flexible(fidl_fuchsia_audio_ffxdaemon::Flexible)"
     )]
     pub clock: fidl_fuchsia_audio_ffxdaemon::ClockType,
+
+    #[argh(
+        option,
+        description = "gain (decibels) for the capturer. Default: 0 dB",
+        default = "0.0f32"
+    )]
+    pub gain: f32,
+
+    #[argh(option, description = "mute the capturer. Default: false", default = "false")]
+    pub mute: bool,
 }
 
 #[derive(Debug, PartialEq)]

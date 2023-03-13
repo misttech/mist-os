@@ -93,6 +93,21 @@ impl AudioDaemon {
         let capturer_proxy = client_end.into_proxy()?;
         capturer_proxy.set_pcm_stream_type(&mut stream_type)?;
 
+        if let Some(gain_settings) = request.gain_settings {
+            let (gain_control_client_end, gain_control_server_end) =
+                fidl::endpoints::create_endpoints::<fidl_fuchsia_media_audio::GainControlMarker>();
+
+            capturer_proxy.bind_gain_control(gain_control_server_end)?;
+
+            let gain_control_proxy = gain_control_client_end.into_proxy()?;
+            if let Some(gain) = gain_settings.gain {
+                gain_control_proxy.set_gain(gain).ok();
+            }
+            if let Some(mute) = gain_settings.mute {
+                gain_control_proxy.set_mute(mute).ok();
+            }
+        }
+
         if !(loopback) {
             match capturer_usage {
                 Some(capturer_usage) => capturer_proxy.set_usage(capturer_usage)?,

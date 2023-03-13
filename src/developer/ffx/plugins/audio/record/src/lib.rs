@@ -61,6 +61,11 @@ pub async fn record_capture(
         stream_type: Some(AudioStreamType::from(&record_command.format)),
         duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
         canceler: cancel_server,
+        gain_settings: Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
+            mute: Some(record_command.mute),
+            gain: Some(record_command.gain),
+            ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
+        }),
         ..AudioDaemonRecordRequest::EMPTY
     };
 
