@@ -1013,6 +1013,8 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     // that pages outside of the parent limit range won't have their split bits set.
     removed->page_list_.ForEveryPageInRange(
         [removed_offset = removed->parent_offset_, this](auto* page, uint64_t offset) {
+          // Hidden VMO hierarchies do not support intervals.
+          ASSERT(!page->IsInterval());
           AssertHeld(lock_ref());
           // Whether this is a true page, or a marker, we must check |this| for a page as either
           // represents a potential fork, even if we subsequently changed it to a marker.
@@ -1044,6 +1046,8 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
 
       page_list_.ForEveryPageMutable([this, pq, &child, &guard, &compression, &batch_count](
                                          VmPageOrMarkerRef p, uint64_t off) {
+        // Hidden VMO hierarchies do not support intervals.
+        ASSERT(!p->IsInterval());
         // If we have processed our batch limit, drop the page_queue lock to
         // give other threads a chance to perform operations, before
         // re-acquiring the lock and continuing.
@@ -1233,6 +1237,12 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
         const uint64_t cookie = p->Reference().value();
         printf("offset %#" PRIx64 " reference %#" PRIx64 "(%c%c)\n", offset, cookie,
                p->PageOrRefLeftSplit() ? 'L' : '.', p->PageOrRefRightSplit() ? 'R' : '.');
+      } else if (p->IsIntervalStart()) {
+        printf("offset %#" PRIx64 " page interval start\n", offset);
+      } else if (p->IsIntervalEnd()) {
+        printf("offset %#" PRIx64 " page interval end\n", offset);
+      } else if (p->IsIntervalSlot()) {
+        printf("offset %#" PRIx64 " single page interval slot\n", offset);
       }
       return ZX_ERR_NEXT;
     };
@@ -1923,6 +1933,8 @@ VmPageOrMarkerRef VmCowPages::FindInitialPageContentLocked(uint64_t offset, VmCo
       *owner_length = ktl::min(*owner_length, cur->parent_limit_ - cur_offset);
       cur->page_list_.ForEveryPageInRange(
           [owner_length, cur_offset](const VmPageOrMarker* p, uint64_t off) {
+            // VMO children do not support page intervals.
+            ASSERT(!p->IsInterval());
             *owner_length = off - cur_offset;
             return ZX_ERR_STOP;
           },
@@ -2621,8 +2633,7 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
         if (max_request_len > PAGE_SIZE) {
           [[maybe_unused]] zx_status_t status = page_owner->page_list_.ForEveryPageInRange(
               [&max_request_len, owner_offset](const VmPageOrMarker* p, uint64_t off) {
-                DEBUG_ASSERT(!p->IsEmpty());
-
+                // TODO(fxbug.dev/122842): Add appropriate check for interval here.
                 max_request_len = off - owner_offset;
                 return ZX_ERR_STOP;
               },
@@ -4554,8 +4565,11 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   }
   VmCompression* compression = pmm_page_compression();
 
+  // TODO(fxbug.dev/122842): Ensure that the range does not entirely fall in an interval.
   page_list_.ForEveryPageInRangeMutable(
       [&compression, this](VmPageOrMarkerRef p, uint64_t off) {
+        // Splice lists do not support page intervals.
+        ASSERT(!p->IsInterval());
         if (p->IsPage()) {
           DEBUG_ASSERT(p->Page()->object.pin_count == 0);
           AssertHeld(lock_ref());
@@ -6253,8 +6267,8 @@ bool VmCowPages::DebugValidateBacklinksLocked() const {
   canary_.Assert();
   bool result = true;
   page_list_.ForEveryPage([this, &result](const auto* p, uint64_t offset) {
-    // Markers and references don't have backlinks.
-    if (p->IsReference() || p->IsMarker()) {
+    // Markers, references, and intervals don't have backlinks.
+    if (p->IsReference() || p->IsMarker() || p->IsInterval()) {
       return ZX_ERR_NEXT;
     }
     vm_page_t* page = p->Page();
