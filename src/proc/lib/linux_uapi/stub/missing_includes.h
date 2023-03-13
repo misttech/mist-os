@@ -82,4 +82,33 @@ const __u32 _BINDER_ENABLE_ONEWAY_SPAM_DETECTION = BINDER_ENABLE_ONEWAY_SPAM_DET
 #undef BINDER_ENABLE_ONEWAY_SPAM_DETECTION
 const __u32 BINDER_ENABLE_ONEWAY_SPAM_DETECTION = _BINDER_ENABLE_ONEWAY_SPAM_DETECTION;
 
+const __u32 _EVIOCGVERSION = EVIOCGVERSION;
+#undef EVIOCGVERSION
+const __u32 EVIOCGVERSION = _EVIOCGVERSION;
+
+const __u32 _EVIOCGID = EVIOCGID;
+#undef EVIOCGID
+const __u32 EVIOCGID = _EVIOCGID;
+
+// `EVIOCGBIT` and `EVIOCGPROP` are invoked with various paraemters to query metadata about
+// an input device. Create Rust symbols for the commonly used invocations.
+//
+// These invocations specify a `size` _just_ large enough to report all off the feature bits
+// for that attribute.
+//
+// TODO(quiche): Eventually, it will probably be better to provide a way to parse the fields
+// within an `ioctl()`'s `request` parameter. That would allow, e.g., the input code to
+// response to any request for `EV_KEY` feature bits, even if the caller provided a buffer
+// larger than that needed for the available bits.
+#define N_BYTES(BITS) (((BITS) + CHAR_BIT - 1) / CHAR_BIT)
+const __u32 EVIOCGBIT_EV_KEY = EVIOCGBIT(EV_KEY, N_BYTES(KEY_MAX));
+const __u32 EVIOCGBIT_EV_ABS = EVIOCGBIT(EV_ABS, N_BYTES(ABS_MAX));
+const __u32 EVIOCGBIT_EV_REL = EVIOCGBIT(EV_REL, N_BYTES(REL_MAX));
+const __u32 EVIOCGBIT_EV_SW = EVIOCGBIT(EV_SW, N_BYTES(SW_MAX));
+const __u32 EVIOCGBIT_EV_LED = EVIOCGBIT(EV_LED, N_BYTES(LED_MAX));
+const __u32 EVIOCGBIT_EV_FF = EVIOCGBIT(EV_FF, N_BYTES(FF_MAX));
+const __u32 EVIOCGBIT_EV_MSC = EVIOCGBIT(EV_MSC, N_BYTES(MSC_MAX));
+const __u32 EVIOCGPROP = EVIOCGPROP(N_BYTES(INPUT_PROP_MAX));
+#undef N_BYTES
+
 #endif  // SRC_PROC_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_
