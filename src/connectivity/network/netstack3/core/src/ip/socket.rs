@@ -1094,13 +1094,11 @@ pub(crate) mod testutil {
             for (device, state, addrs) in devices {
                 for ip in addrs {
                     let subnet = Subnet::new(ip.get(), <I::Addr as IpAddress>::BYTES * 8).unwrap();
+                    let entry =
+                        crate::ip::types::Entry { subnet, device: device.clone(), gateway: None };
                     assert_eq!(
-                        table.add_device_route(subnet.clone(), device.clone(),),
-                        Ok(&crate::ip::types::Entry {
-                            subnet,
-                            device: device.clone(),
-                            gateway: None
-                        })
+                        crate::ip::forwarding::testutil::add_entry(&mut table, entry.clone()),
+                        Ok(&entry)
                     );
                 }
                 assert!(
@@ -1660,14 +1658,14 @@ mod tests {
         )
         .unwrap();
         match subnet.into() {
-            SubnetEither::V4(subnet) => crate::ip::add_device_route::<Ipv4, _, _>(
+            SubnetEither::V4(subnet) => crate::ip::forwarding::add_device_route::<Ipv4, _, _>(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 subnet,
                 device_id.clone(),
             )
             .expect("install IPv4 device route on a fresh stack without routes"),
-            SubnetEither::V6(subnet) => crate::ip::add_device_route::<Ipv6, _, _>(
+            SubnetEither::V6(subnet) => crate::ip::forwarding::add_device_route::<Ipv6, _, _>(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 subnet,

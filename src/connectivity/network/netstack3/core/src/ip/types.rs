@@ -4,7 +4,7 @@
 
 //! Common types for dealing with ip table entries.
 
-use core::fmt::Debug;
+use core::fmt::{Debug, Display, Formatter};
 
 use net_types::{
     ip::{
@@ -97,7 +97,18 @@ pub struct Entry<A: IpAddress, D> {
     /// The destination device.
     pub device: D,
     /// An optional gateway if the subnet is not on link.
+    // TODO (https://fxbug.dev/123288): Restrict `gateway` to `UnicastAddr`.
     pub gateway: Option<SpecifiedAddr<A>>,
+}
+
+impl<A: IpAddress, D: Debug> Display for Entry<A, D> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+        let Entry { subnet, device, gateway } = self;
+        match gateway {
+            Some(gateway) => write!(f, "{:?} (via {}) -> {}", device, gateway, subnet),
+            None => write!(f, "{:?} -> {}", device, subnet),
+        }
+    }
 }
 
 /// An IPv4 forwarding entry or an IPv6 forwarding entry.

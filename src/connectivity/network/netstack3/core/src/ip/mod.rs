@@ -60,7 +60,7 @@ use crate::{
     error::{ExistsError, NotFoundError},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
-        forwarding::{AddRouteError, Destination, ForwardingTable},
+        forwarding::{Destination, ForwardingTable},
         gmp::igmp::IgmpPacketHandler,
         icmp::{
             BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpSockets,
@@ -2460,44 +2460,6 @@ fn lookup_route_table<
     dst_ip: SpecifiedAddr<I::Addr>,
 ) -> Option<Destination<I::Addr, SC::DeviceId>> {
     sync_ctx.with_ip_routing_table(|sync_ctx, table| table.lookup(sync_ctx, device, dst_ip))
-}
-
-/// Add a route to the forwarding table, returning `Err` if the subnet
-/// is already in the table.
-pub(crate) fn add_route<
-    I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    subnet: Subnet<I::Addr>,
-    next_hop: SpecifiedAddr<I::Addr>,
-) -> Result<(), AddRouteError> {
-    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
-        table
-            .add_route(sync_ctx, subnet, next_hop)
-            .map(|entry| ctx.on_event(IpLayerEvent::RouteAdded(entry.clone())))
-    })
-}
-
-/// Add a device route to the forwarding table, returning `Err` if the
-/// subnet is already in the table.
-pub(crate) fn add_device_route<
-    I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    subnet: Subnet<I::Addr>,
-    device: SC::DeviceId,
-) -> Result<(), ExistsError> {
-    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table.add_device_route(subnet, device.clone()).map(|entry| {
-            ctx.on_event(IpLayerEvent::RouteAdded(entry.clone()));
-        })
-    })
 }
 
 /// Delete a route from the forwarding table, returning `Err` if no

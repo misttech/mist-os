@@ -504,16 +504,16 @@ pub fn add_route<NonSyncCtx: NonSyncContext>(
     match (device, gateway) {
         (Some(device), None) => map_addr_version!(
             subnet: SubnetEither;
-            crate::ip::add_device_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, device),
-            crate::ip::add_device_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, device)
+            crate::ip::forwarding::add_device_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, device),
+            crate::ip::forwarding::add_device_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, device)
         )
         .map_err(From::from),
         (None, Some(next_hop)) => {
             let next_hop = next_hop.into();
             map_addr_version!(
                 (subnet: SubnetEither, next_hop: IpAddr);
-                crate::ip::add_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, next_hop),
-                crate::ip::add_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, next_hop),
+                crate::ip::forwarding::add_gateway_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, next_hop),
+                crate::ip::forwarding::add_gateway_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, next_hop),
                 unreachable!()
             )
         }
@@ -538,13 +538,21 @@ pub fn del_route<NonSyncCtx: NonSyncContext>(
 
 #[cfg(test)]
 mod tests {
+    use ip_test_macro::ip_test;
+    use net_declare::{net_subnet_v4, net_subnet_v6};
     use net_types::{
         ip::{Ip, Ipv4, Ipv6},
         Witness,
     };
 
     use super::*;
-    use crate::testutil::{TestIpExt, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE};
+    use crate::{
+        ip::{
+            forwarding::AddRouteError,
+            types::{AddableEntry, AddableEntryEither},
+        },
+        testutil::{FakeCtx, TestIpExt, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
+    };
 
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {
         let config = I::FAKE_CONFIG;
@@ -623,5 +631,62 @@ mod tests {
     #[test]
     fn test_add_remove_ipv6_addresses() {
         test_add_remove_ip_addresses::<Ipv6>();
+    }
+
+    #[ip_test]
+    fn add_gateway_route<I: Ip + TestIpExt>() {
+        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(crate::StackStateBuilder::default());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+
+        let gateway_subnet = I::map_ip(
+            (),
+            |()| net_subnet_v4!("10.0.0.0/16"),
+            |()| net_subnet_v6!("::0a00:0000/112"),
+        );
+
+        // Attempt to add the gateway route when there is no known route to the
+        // gateway.
+        assert_eq!(
+            crate::add_route(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                AddableEntryEither::from(AddableEntry::with_gateway(
+                    gateway_subnet,
+                    None,
+                    I::FAKE_CONFIG.remote_ip.into()
+                ))
+            ),
+            Err(AddRouteError::GatewayNotNeighbor)
+        );
+
+        // Then, add a route to the gateway, and try again, expecting success.
+        let device_id = sync_ctx.state.device.add_ethernet_device(
+            I::FAKE_CONFIG.local_mac,
+            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+        );
+        assert_eq!(
+            crate::add_route(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                AddableEntryEither::from(AddableEntry::without_gateway(
+                    I::FAKE_CONFIG.subnet.into(),
+                    device_id.clone()
+                ))
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            crate::add_route(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                AddableEntryEither::from(AddableEntry::with_gateway(
+                    gateway_subnet,
+                    None,
+                    I::FAKE_CONFIG.remote_ip.into()
+                ))
+            ),
+            Ok(())
+        );
     }
 }
