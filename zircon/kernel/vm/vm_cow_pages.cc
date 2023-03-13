@@ -1361,6 +1361,8 @@ uint64_t VmCowPages::CountAttributedAncestorPagesLocked(uint64_t offset, uint64_
           AssertHeld(cur->lock_ref());
           AssertHeld(sib.lock_ref());
           AssertHeld(parent->lock_ref());
+          // Hidden VMO hierarchies don't support page intervals.
+          ASSERT(!p->IsInterval());
           if (p->IsMarker()) {
             return ZX_ERR_NEXT;
           }
@@ -3858,6 +3860,8 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
 
         // Reference content is not pinned by definition, and so we cannot unpin it.
         ASSERT(!page->IsReference());
+        // Intervals are sparse ranges without any committed pages, so cannot be pinned/unpinned.
+        ASSERT(!page->IsInterval());
 
         vm_page_t* p = page->Page();
         ASSERT(p->object.pin_count > 0);
@@ -4461,18 +4465,27 @@ zx_status_t VmCowPages::LookupReadableLocked(uint64_t offset, uint64_t len,
   const uint64_t end_page_offset = ROUNDUP(offset + len, PAGE_SIZE);
 
   while (current_page_offset != end_page_offset) {
-    // Attempt to process any pages we have first.
-    zx_status_t status = page_list_.ForEveryPageAndGapInRange(
+    // Attempt to process any pages we have first. Skip over anything that's not a page since the
+    // lookup_fn only applies to actual pages.
+    zx_status_t status = page_list_.ForEveryPageInRange(
         [&lookup_fn, &current_page_offset](const VmPageOrMarker* page_or_marker, uint64_t offset) {
+          // The offset can advance ahead if we encounter gaps or sparse intervals.
+          if (offset != current_page_offset) {
+            if (!page_or_marker->IsIntervalEnd()) {
+              // There was a gap before this offset. End the traversal.
+              return ZX_ERR_STOP;
+            }
+            // Otherwise, we can advance our cursor to the interval end.
+            offset = current_page_offset;
+          }
           DEBUG_ASSERT(offset == current_page_offset);
-          current_page_offset += PAGE_SIZE;
+          current_page_offset = offset + PAGE_SIZE;
           if (!page_or_marker->IsPage()) {
             return ZX_ERR_NEXT;
           }
           return lookup_fn(offset, page_or_marker->Page()->paddr());
         },
-        [](uint64_t gap_start, uint64_t gap_end) { return ZX_ERR_STOP; }, current_page_offset,
-        end_page_offset);
+        current_page_offset, end_page_offset);
 
     // Check if we've processed the whole range.
     if (current_page_offset == end_page_offset) {
@@ -4486,6 +4499,11 @@ zx_status_t VmCowPages::LookupReadableLocked(uint64_t offset, uint64_t len,
 
     // We do not care about the return value, all we are interested in is the populated out
     // variables that we pass in.
+    //
+    // Note that page intervals are only supported in root VMOs, so if we ended the page list
+    // traversal above partway into an interval, we will be able to continue the traversal over the
+    // rest of the interval after this call - since we're the root, we will be the owner and the
+    // owner length won't be clipped.
     FindInitialPageContentLocked(current_page_offset, &owner, &owner_offset, &owner_length);
 
     // This should always get filled out.
@@ -5869,11 +5887,12 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_
                                                    non_loaned_len);
   }
 
+  // TODO(fxbug.dev/122842): Also return ZX_ERR_BAD_STATE if the entire range lies in an interval.
   *non_loaned_len = 0;
   return page_list_.ForEveryPageAndGapInRange(
       [page_request, non_loaned_len, this](const VmPageOrMarker* p, uint64_t off) {
         // We only expect committed pages in the specified range.
-        if (p->IsMarker() || p->IsReference()) {
+        if (p->IsMarker() || p->IsReference() || p->IsInterval()) {
           return ZX_ERR_BAD_STATE;
         }
         vm_page_t* page = p->Page();
