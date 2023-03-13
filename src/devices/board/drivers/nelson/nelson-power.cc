@@ -1,7 +1,6 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
@@ -10,14 +9,20 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
+#include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
+#include <bind/fuchsia/codec/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/power/sensor/cpp/bind.h>
+#include <bind/fuchsia/ti/platform/cpp/bind.h>
+#include <ddktl/device.h>
+
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/brownout_protection_bind.h"
 #include "src/devices/board/drivers/nelson/ti_ina231_mlb_bind.h"
 #include "src/devices/board/drivers/nelson/ti_ina231_mlb_proto_bind.h"
 #include "src/devices/board/drivers/nelson/ti_ina231_speakers_bind.h"
 #include "src/devices/power/drivers/ti-ina231/ti-ina231-metadata.h"
-
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
@@ -92,40 +97,8 @@ constexpr composite_device_desc_t speakers_power_sensor_dev = {
     .metadata_count = std::size(kAudioMetadata),
 };
 
-constexpr composite_device_desc_t mlb_power_sensor_proto_dev = {
-    .props = props,
-    .props_count = std::size(props),
-    .fragments = ti_ina231_mlb_proto_fragments,
-    .fragments_count = std::size(ti_ina231_mlb_proto_fragments),
-    .primary_fragment = "i2c",
-    .spawn_colocated = false,
-    .metadata_list = kMlbMetadata,
-    .metadata_count = std::size(kMlbMetadata),
-};
-
-constexpr zx_device_prop_t brownout_protection_props[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GOOGLE},
-    {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_NELSON},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_GOOGLE_BROWNOUT},
-};
-
-constexpr composite_device_desc_t brownout_protection_dev = {
-    .props = brownout_protection_props,
-    .props_count = std::size(brownout_protection_props),
-    .fragments = brownout_protection_fragments,
-    .fragments_count = std::size(brownout_protection_fragments),
-    .primary_fragment = "codec",  // ???
-    .spawn_colocated = false,
-};
-
 zx_status_t Nelson::PowerInit() {
-  zx_status_t status;
-  if (GetBoardRev() == BOARD_REV_P1) {
-    status = DdkAddComposite("ti-ina231-mlb", &mlb_power_sensor_proto_dev);
-  } else {
-    status = DdkAddComposite("ti-ina231-mlb", &mlb_power_sensor_dev);
-  }
-
+  zx_status_t status = DdkAddComposite("ti-ina231-mlb", &mlb_power_sensor_dev);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s DdkAddComposite failed %d", __FUNCTION__, status);
     return status;
@@ -135,9 +108,44 @@ zx_status_t Nelson::PowerInit() {
     zxlogf(ERROR, "%s DdkAddComposite failed %d", __FUNCTION__, status);
     return status;
   }
+  const ddk::BindRule kGpioRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_10),
+  };
+  const ddk::BindRule kCodecRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS58XX),
+  };
+  const ddk::BindRule kPowerSensorRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_hardware_power_sensor::BIND_FIDL_PROTOCOL_DEVICE),
+  };
+  const device_bind_prop_t kGpioProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_ALERT_PWR_L),
+  };
 
-  if ((status = DdkAddComposite("brownout-protection", &brownout_protection_dev)) != ZX_OK) {
-    zxlogf(ERROR, "%s DdkAddComposite failed %d", __FUNCTION__, status);
+  const device_bind_prop_t kCodecProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_codec::BIND_PROTOCOL_DEVICE),
+  };
+
+  const device_bind_prop_t kPowerSensorProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_hardware_power_sensor::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::POWER_SENSOR_DOMAIN,
+                        bind_fuchsia_amlogic_platform_s905d3::BIND_POWER_SENSOR_DOMAIN_AUDIO),
+  };
+
+  status = DdkAddCompositeNodeSpec("brownout_protection",
+                                   ddk::CompositeNodeSpec(kCodecRules, kCodecProperties)
+                                       .AddParentSpec(kGpioRules, kGpioProperties)
+                                       .AddParentSpec(kPowerSensorRules, kPowerSensorProperties));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s AddCompositeSpec (brownout-protection)  %d", __FUNCTION__, status);
     return status;
   }
 

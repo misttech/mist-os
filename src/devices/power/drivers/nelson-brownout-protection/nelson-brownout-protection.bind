@@ -1,10 +1,25 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// found in the LICENSE file
 
-using fuchsia.google.platform;
+composite brownout_protection;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.NELSON;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.BROWNOUT;
+using fuchsia.codec;
+using fuchsia.ti.platform;
+using fuchsia.amlogic.platform.s905d3;
+using fuchsia.gpio;
+using fuchsia.hardware.power.sensor;
+
+primary node "codec" {
+  fuchsia.BIND_PROTOCOL == fuchsia.codec.BIND_PROTOCOL.DEVICE;
+}
+
+node "power-sensor" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.power.sensor.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_POWER_SENSOR_DOMAIN == fuchsia.amlogic.platform.s905d3.BIND_POWER_SENSOR_DOMAIN.AUDIO;
+}
+
+node "alert-gpio" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.GPIO_ALERT_PWR_L;
+}

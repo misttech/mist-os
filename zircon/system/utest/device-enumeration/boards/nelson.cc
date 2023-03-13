@@ -91,7 +91,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/03:0a:27/thermistor-device/therm-audio",
 
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
-      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout-protection",
+      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
 
       "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0",
       "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52811-radio/ot-radio",
