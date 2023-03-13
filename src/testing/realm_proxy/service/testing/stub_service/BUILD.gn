@@ -1,0 +1,34 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# A stub fuchsia.test service that exposes these protocols:
+# * fuchsia.test.ProtocolA
+# * fuchsia.test.ProtocolB
+# * fuchsia.test.ProtocolC
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  testonly = true
+  edition = "2021"
+  name = "stub_service"
+  sources = [ "src/main.rs" ]
+  deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/testing/realm_proxy/service/testing/stub_fidl:fuchsia.test_rust",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_component("stub_service") {
+  testonly = true
+  component_name = "stub-service"
+  manifest = "meta/stub-service.cml"
+  deps = [ ":bin" ]
+}

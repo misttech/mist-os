@@ -1,0 +1,69 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
+import("//build/testing/fuchsia_test_realm_proxy.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":test-realm-proxy-tests" ]
+}
+
+rustc_test("bin") {
+  testonly = true
+  edition = "2021"
+  name = "test_realm_proxy_test"
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/testing/realm_proxy",
+    "//src/testing/realm_proxy/service/testing/stub_fidl:fuchsia.test_rust",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
+  ]
+}
+
+fuchsia_component("test-suite-component") {
+  testonly = true
+  component_name = "default"
+  manifest = "meta/test-suite.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("test-suite") {
+  testonly = true
+  deps = [ ":test-suite-component" ]
+}
+
+fuchsia_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+}
+
+fuchsia_test_realm_proxy("test-realm-proxy") {
+  proxied_component = "//src/testing/realm_proxy/service/testing/stub_service"
+  proxied_component_name = "stub-service"
+  proxied_protocols = [
+    "fuchsia.test.Exposed",
+    "fuchsia.test.EventPairHolder",
+  ]
+}
+
+fuchsia_test_package("test-realm-proxy-tests") {
+  test_components = [ ":test-root" ]
+  subpackages = [
+    ":test-realm-proxy",
+    ":test-suite",
+  ]
+  test_specs = {
+    log_settings = {
+      # Allows the test proxy to log errors when we connect to unsupported protocols.
+      max_severity = "ERROR"
+    }
+  }
+}

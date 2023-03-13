@@ -1,0 +1,46 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "test_suite",
+            url: "test-suite#meta/default.cm",
+        },
+        {
+            name: "test_realm_proxy",
+            url: "test-realm-proxy#meta/default.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: [
+                "#test_realm_proxy",
+                "#test_suite",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.testing.harness.RealmProxy" ],
+            from: "#test_realm_proxy",
+            to: "#test_suite",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test_suite",
+        },
+    ],
+}

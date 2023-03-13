@@ -1,0 +1,31 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/stub_service",
+    },
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.test.EventPairHolder",
+                "fuchsia.test.Exposed",
+                "fuchsia.test.NotExposed",
+            ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.test.EventPairHolder",
+                "fuchsia.test.Exposed",
+
+                // Clarification: this is exposed here, but not by the test realm proxy.
+                "fuchsia.test.NotExposed",
+            ],
+            from: "self",
+        },
+    ],
+}

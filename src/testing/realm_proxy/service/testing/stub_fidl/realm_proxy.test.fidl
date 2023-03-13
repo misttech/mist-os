@@ -1,0 +1,27 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.test;
+
+using zx;
+
+@discoverable
+protocol Exposed {
+    Call() -> ();
+};
+
+@discoverable
+protocol NotExposed {
+    Call() -> ();
+};
+
+@discoverable
+protocol EventPairHolder {
+    /// Passes the event pair to this EventPairHolder.
+    /// When this service goes away, the client's side of the event pair will
+    /// be signaled with PEER_CLOSED.
+    Hold(resource struct {
+        event_pair zx.handle:EVENTPAIR;
+    });
+};

@@ -40,11 +40,8 @@ impl RealmProxyClient {
         &self,
     ) -> Result<ClientEnd<T>, Error> {
         let (client, server) = create_endpoints::<T>();
-        let res = self
-            .inner
-            .connect_to_named_protocol(T::PROTOCOL_NAME, server.into_channel())
-            .await
-            .expect("connect_to_named_protocol");
+        let res =
+            self.inner.connect_to_named_protocol(T::PROTOCOL_NAME, server.into_channel()).await?;
 
         if let Some(op_err) = res.err() {
             bail!("{:?}", op_err);

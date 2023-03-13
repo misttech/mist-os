@@ -3,29 +3,44 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_binary.gni")
 
-rustc_library("realm_proxy") {
+rustc_binary("main") {
   testonly = true
   edition = "2021"
-  sources = [
-    "src/client.rs",
-    "src/lib.rs",
-    "src/service.rs",
-  ]
+  name = "default_test_realm_proxy"
+  sources = [ "src/main.rs" ]
   deps = [
+    ":config_lib",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
-    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 }
 
+fuchsia_component_manifest("manifest") {
+  testonly = true
+  component_name = "default"
+  manifest = "meta/default.cml"
+}
+
+fuchsia_structured_config_rust_lib("config_lib") {
+  testonly = true
+  cm_label = ":manifest"
+}
+
+fuchsia_component("component") {
+  testonly = true
+  cm_label = ":manifest"
+  deps = [ ":main" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ "service:tests" ]
+  deps = [ "tests" ]
 }
