@@ -14,16 +14,15 @@ declare_args() {
   enable_netstack2_tracing = false
 }
 
-# TODO(https://fxbug.dev/85450): Convert this to a platform configuration
-# option in Product Assembly.
-_system_netstack_package = ":netstack2"
+_netstack_package = ":netstack2"
+_netstack2_component = "netstack:component"
 assert(!(enable_netstack2_tracing && use_netstack3),
        "cannot enable both Netstack3 and tracing in Netstack2")
 if (use_netstack3) {
-  _system_netstack_package = ":netstack3"
+  _netstack_package = ":netstack3"
 }
 if (enable_netstack2_tracing) {
-  _system_netstack_package = ":netstack2-with-tracing"
+  _netstack2_component = "netstack:component-with-tracing"
 }
 
 fuchsia_component("component") {
@@ -96,17 +95,11 @@ network_package("network-basic") {
 
 fuchsia_package("netstack2") {
   package_name = "netstack"
-  deps = [ "netstack:component" ]
+  deps = [ _netstack2_component ]
   visibility = [
     ":*",
     "//bundles/assembly:*",
   ]
-}
-
-fuchsia_package("netstack2-with-tracing") {
-  package_name = "netstack"
-  deps = [ "netstack:component-with-tracing" ]
-  visibility = [ ":*" ]
 }
 
 fuchsia_package("netstack3") {
@@ -118,8 +111,10 @@ fuchsia_package("netstack3") {
   ]
 }
 
+# TODO(https://fxbug.dev/85450): Remove this and move usages to select which
+# netstack package to use according to product assembly.
 group("netstack") {
-  deps = [ _system_netstack_package ]
+  deps = [ _netstack_package ]
 }
 
 core_shard("virtualization-core-shard") {
