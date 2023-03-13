@@ -746,32 +746,6 @@ pub struct NamespaceEntry {
     pub path: String,
 }
 
-/// Returns the handle for the given FIDL service, or a Zircon Error Status. This function takes
-/// ownership of 'service' because the File is released when acquiring the service handle.
-///
-/// This corresponds with fdio_get_service_handle in C.
-pub fn get_service_handle(service: File) -> Result<zx::Channel, zx::Status> {
-    let fd = service.into_raw_fd();
-    // we expect fdio to initialize this to a legal value.
-    let mut handle = MaybeUninit::new(zx::Handle::invalid().raw_handle());
-    // Safety: fdio_get_service_handle() is an unsafe function because its 'out' parameter is a raw
-    // pointer and because it closes the given file descriptor. This invocation is safe because:
-    // 1) the supplied 'out' value, "&mut handle", is guaranteed to be valid,
-    // 2) fdio_get_service_handle() does not retain a copy of `out`, and
-    // 3) 'fd' is not used following this invocation.
-    let status = {
-        let handle = handle.as_mut_ptr();
-        unsafe { fdio_sys::fdio_get_service_handle(fd, handle) }
-    };
-    let () = zx::Status::ok(status)?;
-    // Safety: from_raw() is an unsafe function because it assumes the given raw handle is valid.
-    // Above, fdio_get_service_handle()'s return value was ok, so 'handle' must be valid.
-    let handle = unsafe { handle.assume_init() };
-    let handle = unsafe { zx::Handle::from_raw(handle) };
-    debug_assert!(!handle.is_invalid(), "({:?}).is_invalid()", handle);
-    Ok(zx::Channel::from(handle))
-}
-
 #[cfg(test)]
 mod tests {
     use {
@@ -964,20 +938,5 @@ mod tests {
 
         let _: File = open_fd_at(&pkg_fd, "bin", fio::OpenFlags::RIGHT_READABLE)
             .expect("Failed to open bin/ subdirectory using fdio_open_fd_at");
-    }
-
-    // Tests success & error handling of the get_service_handle function. This does not exhaustively
-    // test the underlying FDIO function, as that is tested alongside its C implementation.
-    #[test]
-    fn fdio_get_service_handle() {
-        // Setup two handles to the same underlying file.
-        let service = File::open("/svc").expect("failed to open /svc");
-        let clone = service.try_clone().expect("failed to clone /svc service");
-
-        // 'service' keeps the file busy during 'get_service_handle(clone)'.
-        assert_eq!(get_service_handle(clone), Err(zx::Status::UNAVAILABLE));
-        // 'clone' released its handle to the file above; 'service' now holds the sole handle.
-        let _: zx::Channel =
-            get_service_handle(service).expect("failed to get fdio service handle");
     }
 }
