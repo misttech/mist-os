@@ -1,0 +1,12 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This file defines base configs used on multiple riscv64-based targets.
+
+import("//build/board.gni")
+import("//build/suspend/config.gni")
+
+has_board = true
+
+target_cpu = "riscv64"

@@ -185,6 +185,11 @@ resource("vmm-resources") {
       "arch/x64/asl/mcfg.aml",
     ]
   }
+  if (target_cpu == "riscv64") {
+    sources = [
+      # TODO(121729): Implement this
+    ]
+  }
   outputs = [ "data/{{source_file_part}}" ]
 }
 

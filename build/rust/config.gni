@@ -96,8 +96,8 @@ assert(
         (current_os == "unknown" && current_cpu == "wasm32") ||
         current_os == "win",
     "current_os was neither mac, linux, unknown, nor fuchsia")
-assert(
-    current_cpu == "x64" || current_cpu == "arm64" || current_cpu == "wasm32")
+assert(current_cpu == "x64" || current_cpu == "arm64" ||
+       current_cpu == "wasm32" || current_cpu == "riscv64")
 if (current_os == "mac") {
   _suffix = "apple-darwin"
 } else if (current_os == "linux") {
@@ -111,6 +111,9 @@ if (current_cpu == "x64") {
   rust_target = "x86_64-${_suffix}"
 } else if (current_cpu == "arm64") {
   rust_target = "aarch64-${_suffix}"
+} else if (current_cpu == "riscv64") {
+  # The name below is not a typo, see https://github.com/rust-lang/rust/pull/108722/files
+  rust_target = "riscv64gc-${_suffix}"
 } else if (current_cpu == "wasm32" && current_os == "unknown") {
   rust_target = "wasm32-unknown-unknown"
 }

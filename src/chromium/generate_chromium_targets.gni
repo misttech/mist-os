@@ -262,6 +262,19 @@ if (is_host) {
       }
     }
   }
+} else if (target_cpu == "riscv64") {
+  # The real generate_test_targets() definition below fails at `gn gen` time
+  # because prebuilt_test_manifest() uses read_file() to parse a manifest
+  # file that does not exist for riscv64 yet.
+  #
+  # TODO(fxbug.dev/121729): Provide riscv64 Chromium prebuilts
+  # Alternatively, move this check up in the dependency chain
+  template("generate_test_targets") {
+    not_needed([ "target_name" ])
+    not_needed(invoker, "*")
+    group("tests") {
+    }
+  }
 } else {
   # Generates targets for Chromium test prebuilts and manifests.
   #

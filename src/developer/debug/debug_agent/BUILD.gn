@@ -97,6 +97,12 @@ static_library("lib") {
       "arch_arm64.cc",
       "debug_registers_arm64.cc",
     ]
+  } else if (current_cpu == "riscv64") {
+    # TODO(https://fxbug.dev/123097): Implement this
+    sources += [
+      # "arch_riscv64.cc",
+      # "debug_registers_riscv64.cc",
+    ]
   } else {
     assert(false, "Un-supported CPU: ${current_cpu}")
   }
@@ -266,6 +272,12 @@ test("unit_tests") {
     sources += [
       "arch_arm64_unittest.cc",
       "debug_registers_arm64_unittest.cc",
+    ]
+  } else if (current_cpu == "riscv64") {
+    # TODO(https://fxbug.dev/123097): Implement this.
+    sources += [
+      # "arch_riscv64_unittest.cc",
+      # "debug_registers_riscv64_unittest.cc",
     ]
   } else {
     assert(false, "Un-supported CPU: ${current_cpu}")

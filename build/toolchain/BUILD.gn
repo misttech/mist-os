@@ -10,6 +10,9 @@ clang_host_toolchain_suite("host_x64") {
 clang_host_toolchain_suite("host_arm64") {
   toolchain_cpu = "arm64"
 }
+clang_host_toolchain_suite("host_riscv64") {
+  toolchain_cpu = "riscv64"
+}
 
 clang_toolchain_suite("linux_x64") {
   toolchain_cpu = "x64"
@@ -30,6 +33,12 @@ clang_toolchain_suite("win_x64") {
 
 clang_toolchain_suite("linux_arm64") {
   toolchain_cpu = "arm64"
+  toolchain_os = "linux"
+  use_strip = true
+}
+
+clang_toolchain_suite("linux_riscv64") {
+  toolchain_cpu = "riscv64"
   toolchain_os = "linux"
   use_strip = true
 }

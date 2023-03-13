@@ -8,6 +8,8 @@ if (target_cpu == "x64") {
   target_linux_toolchain = "//build/toolchain:linux_x64"
 } else if (target_cpu == "arm64") {
   target_linux_toolchain = "//build/toolchain:linux_arm64"
+} else if (target_cpu == "riscv64") {
+  target_linux_toolchain = "//build/toolchain:linux_riscv64"
 } else {
   assert(false, "Need definition for target linux toolchain for $target_cpu")
 }

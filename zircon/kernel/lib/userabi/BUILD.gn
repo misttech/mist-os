@@ -172,7 +172,7 @@ rodso("vdso") {
   deps = [ "vdso" ]
 }
 
-if (is_kernel && !kernel_no_userabi) {
+if (is_kernel) {
   # Support for loading embedded ELF files, used for both vdso and userboot.
   source_set("rodso") {
     visibility = [ ":*" ]

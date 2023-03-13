@@ -13,12 +13,17 @@ executable("hypervisor_integration_tests") {
     "common_tests.cc",
     "constants.h",
     "main.cc",
-
-    # Arch-specific code.
-    "arch/${target_cpu}/arch.cc",
-    "arch/${target_cpu}/arch_tests.cc",
-    "arch/${target_cpu}/guest_code.S",
   ]
+
+  # TODO(fxbug.dev/123449): Implement riscv64 support.
+  if (target_cpu != "riscv64") {
+    sources += [
+      # Arch-specific code.
+      "arch/${target_cpu}/arch.cc",
+      "arch/${target_cpu}/arch_tests.cc",
+      "arch/${target_cpu}/guest_code.S",
+    ]
+  }
   deps = [
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
