@@ -97,7 +97,7 @@ void scanner_print_stats() {
   printf("[SCAN]: Found %lu locked pages in discardable vmos\n", counts.locked);
   printf("[SCAN]: Found %lu unlocked pages in discardable vmos\n", counts.unlocked);
   pmm_page_queues()->Dump();
-  if (VmCompression *compression = pmm_page_compression()) {
+  if (VmCompression* compression = pmm_page_compression()) {
     compression->Dump();
   }
 }
@@ -115,7 +115,7 @@ zx_time_t calc_next_pt_evict_deadline(zx_time_t current, bool pt_enable_override
   }
 }
 
-int scanner_request_thread(void *) {
+int scanner_request_thread(void*) {
   bool disabled = false;
   bool pt_eviction_enabled = false;
   zx_time_t last_pt_evict = ZX_TIME_INFINITE_PAST;
@@ -362,7 +362,7 @@ void scanner_pop_disable_count() {
 }
 
 static void scanner_init_func(uint level) {
-  Thread *thread =
+  Thread* thread =
       Thread::Create("scanner-request-thread", scanner_request_thread, nullptr, LOW_PRIORITY);
   DEBUG_ASSERT(thread);
   zero_page_scans_per_second = gBootOptions->page_scanner_zero_page_scans_per_second;
@@ -438,7 +438,7 @@ static void scanner_init_func(uint level) {
 // on the scanner running.
 LK_INIT_HOOK(scanner_init, &scanner_init_func, LK_INIT_LEVEL_USER - 1)
 
-static int cmd_scanner(int argc, const cmd_args *argv, uint32_t flags) {
+static int cmd_scanner(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
   usage:
     printf("not enough arguments\n");
