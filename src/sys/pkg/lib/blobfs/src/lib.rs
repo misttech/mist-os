@@ -238,7 +238,7 @@ impl Client {
                             Some(info) => match *info {
                                 fio::NodeInfoDeprecated::File(fio::FileObject {
                                     event: Some(event),
-                                    stream: None,
+                                    stream: _, // TODO(fxbug.dev/122125): Use stream
                                 }) => event,
                                 _ => return false,
                             },

@@ -41,7 +41,7 @@ use {
         sync::{Arc, Mutex, Weak},
         time::Duration,
     },
-    vfs::execution_scope::ExecutionScope,
+    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
 
 #[derive(Clone)]
@@ -84,7 +84,7 @@ pub struct FxVolume {
     parent: Weak<VolumesDirectory>,
     cache: NodeCache,
     store: Arc<ObjectStore>,
-    pager: Pager<FxFile>,
+    pager: Pager,
     executor: fasync::EHandle,
 
     // A tuple of the actual task and a channel to signal to terminate the task.
@@ -98,7 +98,7 @@ pub struct FxVolume {
 }
 
 impl FxVolume {
-    fn new(
+    pub fn new(
         parent: Weak<VolumesDirectory>,
         store: Arc<ObjectStore>,
         fs_id: u64,
@@ -107,7 +107,7 @@ impl FxVolume {
             parent,
             cache: NodeCache::new(),
             store,
-            pager: Pager::<FxFile>::new(PagerExecutor::global_instance())?,
+            pager: Pager::new(PagerExecutor::global_instance())?,
             executor: fasync::EHandle::local(),
             flush_task: Mutex::new(None),
             fs_id,
@@ -123,7 +123,7 @@ impl FxVolume {
         &self.cache
     }
 
-    pub fn pager(&self) -> &Pager<FxFile> {
+    pub fn pager(&self) -> &Pager {
         &self.pager
     }
 
@@ -375,28 +375,45 @@ impl FsInspectVolume for FxVolume {
     }
 }
 
+pub trait RootDir: FxNode + DirectoryEntry {
+    fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry>;
+
+    fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
+}
+
+impl<T: FxNode + DirectoryEntry> RootDir for T {
+    fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry> {
+        self as Arc<dyn DirectoryEntry>
+    }
+
+    fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
+        self as Arc<dyn FxNode>
+    }
+}
+
 #[derive(Clone)]
 pub struct FxVolumeAndRoot {
     volume: Arc<FxVolume>,
-    root: Arc<FxDirectory>,
+    root: Arc<dyn RootDir>,
 }
 
 impl FxVolumeAndRoot {
-    pub async fn new(
-        parent: Weak<VolumesDirectory>,
+    pub async fn new<T: From<Directory<FxVolume>> + RootDir>(
+        _parent: Weak<VolumesDirectory>,
         store: Arc<ObjectStore>,
         unique_id: u64,
     ) -> Result<Self, Error> {
-        let volume = Arc::new(FxVolume::new(parent, store, unique_id)?);
+        let volume = Arc::new(FxVolume::new(Weak::new(), store, unique_id)?);
         let root_object_id = volume.store().root_directory_object_id();
         let root_dir = Directory::open(&volume, root_object_id).await?;
-        let root = Arc::new(FxDirectory::new(None, root_dir));
-        match volume.cache.get_or_reserve(root_object_id).await {
-            GetResult::Node(_) => unreachable!(),
-            GetResult::Placeholder(placeholder) => {
-                placeholder.commit(&(root.clone() as Arc<dyn FxNode>))
-            }
-        }
+        let root = Arc::<T>::new(root_dir.into()) as Arc<dyn RootDir>;
+        volume
+            .cache
+            .get_or_reserve(root_object_id)
+            .await
+            .placeholder()
+            .unwrap()
+            .commit(&root.clone().as_node());
         Ok(Self { volume, root })
     }
 
@@ -404,8 +421,13 @@ impl FxVolumeAndRoot {
         &self.volume
     }
 
-    pub fn root(&self) -> &Arc<FxDirectory> {
+    pub fn root(&self) -> &Arc<dyn RootDir> {
         &self.root
+    }
+
+    // The same as root but downcasted to FxDirectory.
+    pub fn root_dir(&self) -> Arc<FxDirectory> {
+        self.root().clone().into_any().downcast::<FxDirectory>().expect("Invalid type for root")
     }
 
     fn get_fs(&self) -> Arc<dyn Filesystem> {
@@ -464,7 +486,7 @@ impl FxVolumeAndRoot {
         nodes: u64,
     ) -> Result<(), Error> {
         let store = self.volume.store();
-        let root_id = self.root.directory().object_id();
+        let root_id = self.root.clone().as_node().object_id();
         let mut transaction = self
             .get_fs()
             .new_transaction(
@@ -490,7 +512,7 @@ impl FxVolumeAndRoot {
     /// given `project_id`. Fails if the project is still in use by one or more nodes.
     async fn clear_project_limit(&self, project_id: u64) -> Result<(), Error> {
         let store = self.volume.store();
-        let root_id = self.root.directory().object_id();
+        let root_id = self.root.clone().as_node().object_id();
         let mut transaction = self
             .get_fs()
             .new_transaction(
@@ -514,7 +536,7 @@ impl FxVolumeAndRoot {
     /// enable searching for it.
     async fn set_project_for_node(&self, node_id: u64, project_id: u64) -> Result<(), Error> {
         let store = self.volume.store();
-        let root_id = self.root.directory().object_id();
+        let root_id = self.root.clone().as_node().object_id();
         let mut transaction = self
             .get_fs()
             .new_transaction(
@@ -599,7 +621,7 @@ impl FxVolumeAndRoot {
     /// currently associated with any project id.
     async fn clear_project_for_node(&self, node_id: u64) -> Result<(), Error> {
         let store = self.volume.store();
-        let root_id = self.root.directory().object_id();
+        let root_id = self.root.clone().as_node().object_id();
         // Need to know the project_id up front, so that we can lock properly.
         let project_id = self.get_project_for_node(node_id).await?;
         let mut transaction = self
@@ -704,6 +726,7 @@ pub fn info_to_filesystem_info(
 mod tests {
     use {
         crate::fuchsia::{
+            directory::FxDirectory,
             file::FxFile,
             memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
             testing::{
@@ -1015,7 +1038,8 @@ mod tests {
             .expect("create_object failed")
             .object_id();
             transaction.commit().await.expect("commit failed");
-            let vol = FxVolumeAndRoot::new(Weak::new(), volume.clone(), 0).await.unwrap();
+            let vol =
+                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), volume.clone(), 0).await.unwrap();
 
             let file = vol
                 .volume()
@@ -1092,7 +1116,8 @@ mod tests {
             .expect("create_object failed")
             .object_id();
             transaction.commit().await.expect("commit failed");
-            let vol = FxVolumeAndRoot::new(Weak::new(), volume.clone(), 0).await.unwrap();
+            let vol =
+                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), volume.clone(), 0).await.unwrap();
 
             let file = vol
                 .volume()
@@ -1187,7 +1212,8 @@ mod tests {
             .expect("create_object failed")
             .object_id();
             transaction.commit().await.expect("commit failed");
-            let vol = FxVolumeAndRoot::new(Weak::new(), volume.clone(), 0).await.unwrap();
+            let vol =
+                FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), volume.clone(), 0).await.unwrap();
 
             let file = vol
                 .volume()
@@ -1338,7 +1364,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end)
+                .serve_volume(&volume_and_root, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1464,7 +1490,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create dir proxy to succeed");
                 volumes_directory
-                    .serve_volume(&volume_and_root, dir_server_end)
+                    .serve_volume(&volume_and_root, dir_server_end, false)
                     .await
                     .expect("serve_volume failed");
 
@@ -1566,7 +1592,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end)
+                .serve_volume(&volume_and_root, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 
@@ -1711,7 +1737,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create dir proxy to succeed");
                 volumes_directory
-                    .serve_volume(&volume_and_root, dir_server_end)
+                    .serve_volume(&volume_and_root, dir_server_end, false)
                     .await
                     .expect("serve_volume failed");
 
@@ -1877,7 +1903,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume_and_root, dir_server_end)
+                .serve_volume(&volume_and_root, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 

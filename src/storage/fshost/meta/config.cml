@@ -106,5 +106,8 @@
 
         // If true, use derecated blob format (padded Merkle tree at start) when formatting Blobfs.
         blobfs_use_deprecated_padded_format: { type: "bool" },
+
+        // If true, blobfs is stored on fxfs.
+        fxfs_blob: { type: "bool" },
     },
 }

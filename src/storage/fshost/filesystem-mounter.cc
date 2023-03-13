@@ -221,6 +221,29 @@ zx_status_t FilesystemMounter::MountData(
           return data_volume.status_value();
         }
       }
+      if (config_.fxfs_blob()) {
+        zx::result volume = fs->OpenVolume("blob", fuchsia_fxfs::wire::MountOptions{
+                                                       .as_blob = true,
+                                                   });
+        if (volume.is_error()) {
+          FX_PLOGS(ERROR, volume.status_value()) << "Failed to mount blob";
+          return volume.status_value();
+        }
+        std::optional mount_point_ends =
+            fshost_.TakeMountPointServerEnd(FsManager::MountPoint::kBlob);
+        if (!mount_point_ends) {
+          FX_LOGS(ERROR) << "TakeMountPointServerEnd failed";
+          return ZX_ERR_BAD_STATE;
+        }
+        const fidl::Status result =
+            fidl::WireCall(volume->ExportRoot())
+                ->Clone(
+                    fuchsia_io::wire::OpenFlags::kCloneSameRights,
+                    fidl::ServerEnd<fuchsia_io::Node>(mount_point_ends->server_end.TakeChannel()));
+        if (!result.ok()) {
+          return result.status();
+        }
+      }
       export_root = (*data_volume)->ExportRoot();
       data_root = (*data_volume)->DataRoot();
     } else {

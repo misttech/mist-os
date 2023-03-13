@@ -173,7 +173,10 @@ zx::result<fs_management::MountedVolume*> UnwrapOrInitDataVolume(
     fs_management::StartedMultiVolumeFilesystem& fs, const fshost_config::Config& config,
     const bool create) {
   auto volume_fn = [&](const char* name, zx::channel crypt) {
-    return create ? fs.CreateVolume(name, std::move(crypt)) : fs.OpenVolume(name, std::move(crypt));
+    return create ? fs.CreateVolume(name, std::move(crypt))
+                  : fs.OpenVolume(
+                        name, fuchsia_fxfs::wire::MountOptions{
+                                  .crypt = fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt))});
   };
   const auto op = create ? "create" : "unwrap";
 

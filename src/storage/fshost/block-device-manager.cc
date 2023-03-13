@@ -492,6 +492,15 @@ BlockDeviceManager::BlockDeviceManager(const fshost_config::Config* config) : co
   auto gpt =
       std::make_unique<PartitionMapMatcher>(fs_management::kDiskFormatGpt, config_.gpt_all(), "",
                                             /*ramdisk_required=*/false);
+
+  if (config_.fxfs_blob()) {
+    if (!config_.netboot()) {
+      matchers_.push_back(std::make_unique<PartitionMapMatcher>(
+          fs_management::kDiskFormatFxfs, /*allow_multiple=*/false, "/fvm", config_.fvm_ramdisk()));
+    }
+    return;
+  }
+
   auto fvm = std::make_unique<PartitionMapMatcher>(
       fs_management::kDiskFormatFvm, /*allow_multiple=*/false, "/fvm", config_.fvm_ramdisk());
 

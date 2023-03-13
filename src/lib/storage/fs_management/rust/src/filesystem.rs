@@ -666,7 +666,7 @@ impl ServingMultiVolumeFilesystem {
             self.exposed_dir.as_ref().unwrap(),
             &path,
         )?
-        .mount(server, &mut MountOptions { crypt })
+        .mount(server, &mut MountOptions { crypt, as_blob: false })
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
 

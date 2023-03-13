@@ -67,6 +67,12 @@ pub trait File: Send + Sync {
     fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
         Err(Status::NOT_SUPPORTED)
     }
+
+    /// Returns an optional event for the file which signals `fuchsia.io2.FileSignal` events to
+    /// clients (e.g. when a file becomes readable).  See `fuchsia.io2.File.Describe`.
+    fn event(&self) -> Result<Option<zx::Event>, Status> {
+        Ok(None)
+    }
 }
 
 // Trait for handling reads and writes to a file. Files that support Streams should handle reads and

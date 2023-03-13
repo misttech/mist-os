@@ -18,12 +18,12 @@ mod testing;
 pub mod transaction;
 mod tree;
 pub mod volume;
-mod writeback_cache;
+pub mod writeback_cache;
 
 pub use caching_object_handle::CachingObjectHandle;
 pub use directory::Directory;
 pub use object_record::{ObjectDescriptor, Timestamp};
-pub use store_object_handle::StoreObjectHandle;
+pub use store_object_handle::{DirectWriter, StoreObjectHandle};
 
 use {
     crate::{
@@ -79,7 +79,9 @@ use {
 
 // Exposed for serialized_types.
 pub use allocator::{AllocatorInfo, AllocatorKey, AllocatorValue};
-pub use extent_record::{ExtentKey, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID};
+pub use extent_record::{
+    ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
+};
 pub use journal::{
     JournalRecord, JournalRecordV20, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV5,
 };
@@ -778,7 +780,11 @@ impl ObjectStore {
     async fn get_file_size(&self, object_id: u64) -> Result<u64, Error> {
         let item = self
             .tree
-            .find(&ObjectKey::attribute(object_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Size))
+            .find(&ObjectKey::attribute(
+                object_id,
+                DEFAULT_DATA_ATTRIBUTE_ID,
+                AttributeKey::Attribute,
+            ))
             .await?
             .ok_or(FxfsError::NotFound)?;
         if let ObjectValue::Attribute { size } = item.value {
@@ -816,7 +822,11 @@ impl ObjectStore {
 
         let item = store
             .tree
-            .find(&ObjectKey::attribute(object_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Size))
+            .find(&ObjectKey::attribute(
+                object_id,
+                DEFAULT_DATA_ATTRIBUTE_ID,
+                AttributeKey::Attribute,
+            ))
             .await?
             .ok_or(FxfsError::NotFound)?;
         if let ObjectValue::Attribute { size } = item.value {
@@ -879,7 +889,7 @@ impl ObjectStore {
         transaction.add(
             store.store_object_id(),
             Mutation::insert_object(
-                ObjectKey::attribute(object_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Size),
+                ObjectKey::attribute(object_id, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute),
                 ObjectValue::attribute(0),
             ),
         );
@@ -1045,7 +1055,7 @@ impl ObjectStore {
                     .seek(Bound::Included(&ObjectKey::attribute(
                         object_id,
                         attribute_id,
-                        AttributeKey::Size,
+                        AttributeKey::Attribute,
                     )))
                     .await?;
                 if let Some(item_ref) = iter.get() {
@@ -1057,7 +1067,7 @@ impl ObjectStore {
                         key:
                             ObjectKey {
                                 data:
-                                    ObjectKeyData::Attribute(size_attribute_id, AttributeKey::Size),
+                                    ObjectKeyData::Attribute(size_attribute_id, AttributeKey::Attribute),
                                 ..
                             },
                         value: ObjectValue::Attribute { size },
@@ -1715,7 +1725,7 @@ impl ObjectStore {
     }
 
     /// Adds the specified object to the graveyard.
-    fn add_to_graveyard(&self, transaction: &mut Transaction<'_>, object_id: u64) {
+    pub fn add_to_graveyard(&self, transaction: &mut Transaction<'_>, object_id: u64) {
         let graveyard_id = self.graveyard_directory_object_id();
         assert_ne!(graveyard_id, INVALID_OBJECT_ID);
         transaction.add(
@@ -1739,7 +1749,7 @@ impl ObjectStore {
     /// actually be:
     ///
     ///     3. Replace with Trim graveyard entry.
-    fn remove_from_graveyard(&self, transaction: &mut Transaction<'_>, object_id: u64) {
+    pub fn remove_from_graveyard(&self, transaction: &mut Transaction<'_>, object_id: u64) {
         transaction.add(
             self.store_object_id,
             Mutation::replace_or_insert_object(

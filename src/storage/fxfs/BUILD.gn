@@ -12,6 +12,7 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_macro.gni")
 import("//src/storage/fs_test/suite.gni")
 import("//src/storage/testing/driver_test_realm.gni")
+import("//tools/cmc/build/cmc.gni")
 
 fxfs_deps = [
   ":fxfs_macros",
@@ -28,6 +29,7 @@ fxfs_deps = [
   "//third_party/rust_crates:either",
   "//third_party/rust_crates:event-listener",
   "//third_party/rust_crates:futures",
+  "//third_party/rust_crates:num-traits",
   "//third_party/rust_crates:once_cell",
   "//third_party/rust_crates:pin-project",
   "//third_party/rust_crates:rand",
@@ -200,9 +202,34 @@ rustc_binary("fxfs") {
   features = [ "tracing" ]
 }
 
-fuchsia_component("fxfs_component") {
-  manifest = "meta/fxfs.cml"
+cmc_merge("fxfs_with_vmex.cml") {
+  sources = [
+    "meta/fxfs.cml",
+    "meta/use_vmex.shard.cml",
+  ]
+  visibility = [ ":*" ]
+}
+
+fuchsia_component_manifest("fxfs_with_vmex_manifest") {
   component_name = "fxfs"
+  deps = [ ":fxfs_with_vmex.cml" ]
+  _target_outputs = get_target_outputs(":fxfs_with_vmex.cml")
+  manifest = _target_outputs[0]
+  visibility = [ ":*" ]
+}
+
+# TODO(fxbug.dev/122055): Don't give vmex to Fxfs
+fuchsia_component("fxfs_with_vmex_component") {
+  cm_label = ":fxfs_with_vmex_manifest"
+  deps = [
+    ":fxfs",
+    ":fxfs_with_vmex_manifest",
+  ]
+}
+
+fuchsia_component("fxfs_component") {
+  component_name = "fxfs"
+  manifest = "meta/fxfs.cml"
   deps = [ ":fxfs" ]
 }
 

@@ -8,7 +8,7 @@ use {
         errors::map_to_status,
         node::{FxNode, OpenedNode},
         paged_object_handle::PagedObjectHandle,
-        pager::PagerBackedVmo,
+        pager::{PagerBackedVmo, TransferBuffers, TRANSFER_BUFFER_MAX_SIZE},
         volume::{info_to_filesystem_info, FxVolume},
     },
     anyhow::Error,
@@ -30,7 +30,7 @@ use {
         ops::Range,
         sync::{
             atomic::{AtomicBool, AtomicUsize, Ordering},
-            Arc, Mutex,
+            Arc,
         },
     },
     vfs::{
@@ -47,79 +47,6 @@ use {
         path::Path,
     },
 };
-
-// Transfer buffers are to be used with supply_pages. supply_pages only works with pages that are
-// unmapped, but we need the pages to be mapped so that we can decrypt and potentially verify
-// checksums.  To keep things simple, the buffers are fixed size at 1 MiB which should cover most
-// requests.
-const TRANSFER_BUFFER_MAX_SIZE: u64 = 1_048_576;
-
-// The number of transfer buffers we support.
-const TRANSFER_BUFFER_COUNT: u64 = 8;
-
-struct TransferBuffers {
-    vmo: zx::Vmo,
-    free_list: Mutex<Vec<u64>>,
-    event: event_listener::Event,
-}
-
-impl TransferBuffers {
-    fn new() -> Self {
-        const VMO_SIZE: u64 = TRANSFER_BUFFER_COUNT * TRANSFER_BUFFER_MAX_SIZE;
-        Self {
-            vmo: zx::Vmo::create(VMO_SIZE).unwrap(),
-            free_list: Mutex::new(
-                (0..VMO_SIZE).step_by(TRANSFER_BUFFER_MAX_SIZE as usize).collect(),
-            ),
-            event: event_listener::Event::new(),
-        }
-    }
-
-    async fn get(&self) -> TransferBuffer<'_> {
-        loop {
-            let listener = self.event.listen();
-            if let Some(offset) = self.free_list.lock().unwrap().pop() {
-                return TransferBuffer { buffers: self, offset };
-            }
-            listener.await;
-        }
-    }
-}
-
-struct TransferBuffer<'a> {
-    buffers: &'a TransferBuffers,
-
-    // The offset this buffer starts at in the VMO.
-    offset: u64,
-}
-
-impl TransferBuffer<'_> {
-    fn vmo(&self) -> &zx::Vmo {
-        &self.buffers.vmo
-    }
-
-    fn offset(&self) -> u64 {
-        self.offset
-    }
-
-    // Allocating pages in the kernel is time-consuming, so it can help to commit pages first,
-    // whilst other work is occurring in the background, and then copy later which is relatively
-    // fast.
-    fn commit(&self, size: u64) {
-        let _ignore_error = self.buffers.vmo.op_range(
-            zx::VmoOp::COMMIT,
-            self.offset,
-            std::cmp::min(size, TRANSFER_BUFFER_MAX_SIZE),
-        );
-    }
-}
-
-impl Drop for TransferBuffer<'_> {
-    fn drop(&mut self) {
-        self.buffers.free_list.lock().unwrap().push(self.offset);
-        self.buffers.event.notify(1);
-    }
-}
 
 // When the top bit of the open count is set, it means the file has been deleted and when the count
 // drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
@@ -439,7 +366,7 @@ impl PagerBackedVmo for FxFile {
         self.handle.vmo()
     }
 
-    async fn page_in(self: &Arc<Self>, mut range: Range<u64>) {
+    async fn page_in(self: Arc<Self>, mut range: Range<u64>) {
         async_enter!("page_in");
         const ZERO_VMO_SIZE: u64 = TRANSFER_BUFFER_MAX_SIZE;
         static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
@@ -518,7 +445,7 @@ impl PagerBackedVmo for FxFile {
         }
     }
 
-    async fn mark_dirty(self: &Arc<Self>, range: Range<u64>) {
+    async fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
         async_enter!("mark_dirty");
         self.has_written.store(true, Ordering::Relaxed);
         self.handle.mark_dirty(range).await;

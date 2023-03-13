@@ -15,6 +15,7 @@ rustc_library("platform") {
   if (is_fuchsia) {
     sources += [
       "src/fuchsia.rs",
+      "src/fuchsia/blob.rs",
       "src/fuchsia/component.rs",
       "src/fuchsia/device.rs",
       "src/fuchsia/directory.rs",
@@ -36,6 +37,7 @@ rustc_library("platform") {
       "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
       "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
       "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+      "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
       "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_rust",
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
@@ -54,8 +56,11 @@ rustc_library("platform") {
       "//src/storage/fxfs:fuchsia.fxfs_rust",
       "//src/storage/fxfs:lib",
       "//src/storage/fxfs/crypto",
+      "//src/sys/pkg/lib/fuchsia-hash",
+      "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
+      "//third_party/rust_crates:bincode",
       "//third_party/rust_crates:bitflags",
       "//third_party/rust_crates:either",
       "//third_party/rust_crates:event-listener",
@@ -63,7 +68,10 @@ rustc_library("platform") {
       "//third_party/rust_crates:linked-hash-map",
       "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:scopeguard",
+      "//third_party/rust_crates:serde",
       "//third_party/rust_crates:tracing",
+      "//third_party/rust_crates:zstd",
+      "//third_party/zstd",
     ]
     if (is_debug) {
       deps += [ "//zircon/system/ulib/backtrace-request/rust" ]
@@ -80,8 +88,8 @@ rustc_library("platform") {
       "//src/storage/fxfs-crypt:lib",
       "//src/storage/fxfs/crypto/insecure",
       "//src/sys/pkg/lib/fuchsia-merkle",
+      "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:rand",
-      "//third_party/zstd",
     ]
   }
 

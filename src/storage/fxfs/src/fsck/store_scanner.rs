@@ -306,7 +306,7 @@ impl<'a> ScannedStore<'a> {
                     ))?;
                 }
             }
-            ObjectKeyData::Attribute(attribute_id, AttributeKey::Size) => {
+            ObjectKeyData::Attribute(attribute_id, AttributeKey::Attribute) => {
                 match value {
                     ObjectValue::Attribute { size } => {
                         match self.objects.get_mut(&key.object_id) {

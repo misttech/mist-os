@@ -37,13 +37,22 @@ template("fshost_cml") {
     if (!defined(options.bootfs_only) || !options.bootfs_only) {
       if (options.data_filesystem_format == "minfs") {
         sources += [
+          "//src/storage/fshost/meta/blobfs_fshost.cml",
           "//src/storage/fshost/meta/minfs_fshost.cml",
           "//src/storage/fshost/meta/non_fxfs_fshost.cml",
         ]
       } else if (options.data_filesystem_format == "fxfs") {
-        sources += [ "//src/storage/fshost/meta/fxfs_fshost.cml" ]
+        if (defined(options.fxfs_blob) && options.fxfs_blob) {
+          sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost.cml" ]
+        } else {
+          sources += [
+            "//src/storage/fshost/meta/blobfs_fshost.cml",
+            "//src/storage/fshost/meta/fxfs_fshost.cml",
+          ]
+        }
       } else if (options.data_filesystem_format == "f2fs") {
         sources += [
+          "//src/storage/fshost/meta/blobfs_fshost.cml",
           "//src/storage/fshost/meta/f2fs_fshost.cml",
           "//src/storage/fshost/meta/non_fxfs_fshost.cml",
         ]
@@ -67,9 +76,14 @@ template("fshost_cml") {
       ]
 
       if (options.data_filesystem_format == "fxfs") {
+        _fxfs_component_label = "//src/storage/fxfs:fxfs_component"
+        if (defined(options.fxfs_blob) && options.fxfs_blob) {
+          # TODO(fxbug.dev/122055): Don't provide vmex to Fxfs.
+          _fxfs_component_label = "//src/storage/fxfs:fxfs_with_vmex_component"
+        }
         deps += [
-          "//src/storage/fxfs:fxfs_component",
           "//src/storage/fxfs-crypt",
+          _fxfs_component_label,
         ]
       } else if (options.data_filesystem_format == "f2fs") {
         deps += [ "//src/storage/bin/f2fs:f2fs-component" ]

@@ -1,0 +1,107 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "fxfs",
+            url: "#meta/fxfs.cm",
+        },
+    ],
+    collections: [
+        {
+            name: "fxfs-crypt",
+            durability: "transient",
+        },
+    ],
+    capabilities: [
+        {
+            directory: "blob",
+            rights: [ "rw*" ],
+            path: "/fs/blob",
+        },
+        {
+            directory: "blob-exec",
+            rights: [
+                "execute",
+                "rw*",
+            ],
+            path: "/fs/blob",
+        },
+        {
+            protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.fs.startup.Startup",
+            from: "#fxfs",
+            path: "/fxfs/svc/fuchsia.fs.startup.Startup",
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+
+        // Required for inspect data and to migrate data.
+        {
+            directory: "root",
+            from: "#fxfs",
+            rights: [ "rw*" ],
+            path: "/data_root",
+        },
+        {
+            directory: "volumes",
+            from: "#fxfs",
+            rights: [ "rw*" ],
+            path: "/volumes",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#fxfs",
+                "#fxfs-crypt",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.kernel.VmexResource" ],
+            from: "parent",
+            to: [ "#fxfs" ],
+        },
+        {
+            protocol: [
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+            to: "#fxfs",
+            availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            directory: [
+                "blob",
+                "blob-exec",
+            ],
+            from: "self",
+        },
+        {
+            directory: "volumes",
+            from: "#fxfs",
+        },
+        {
+            protocol: "fuchsia.fxfs.Volumes",
+            from: "#fxfs",
+        },
+
+        // TODO(fxbug.dev/122125): Do we need this?
+        {
+            protocol: "fuchsia.update.verify.BlobfsVerifier",
+            from: "self",
+        },
+    ],
+}

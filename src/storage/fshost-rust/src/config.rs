@@ -24,6 +24,7 @@ pub fn default_config() -> fshost_config::Config {
         fvm: true,
         fvm_ramdisk: false,
         fvm_slice_size: 1024 * 1024, // Default to 1 MiB slice size for tests.
+        fxfs_blob: false,
         gpt: true,
         gpt_all: false,
         mbr: false,

@@ -90,6 +90,13 @@ class FilesystemMounter {
                                 std::string_view device_path);
 
  private:
+  // Performs the mechanical action of mounting a filesystem, without
+  // validating the type of filesystem being mounted.
+  zx_status_t MountFilesystem(FsManager::MountPoint point, const char* binary,
+                              const fs_management::MountOptions& options,
+                              zx::channel block_device_client,
+                              fidl::ClientEnd<fuchsia_fxfs::Crypt> crypt_client = {});
+
   // Mounts a filesystem in the legacy mode (i.e. launching as a process directly).
   // Componentized filesystems should use LaunchFsComponent and the fuchsia.fs.startup.Startup
   // protocol.
