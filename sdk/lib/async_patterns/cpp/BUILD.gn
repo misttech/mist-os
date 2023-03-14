@@ -22,6 +22,8 @@ sdk_source_set("cpp") {
     "internal/task_queue.h",
     "receiver.h",
     "sendable.h",
+    "task_scope.cc",
+    "task_scope.h",
   ]
 
   public_deps = [
