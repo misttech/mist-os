@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/python/python_host_test.gni")
+import("//build/python/python_binary.gni")
 import("//build/python/python_library.gni")
+import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   python_library("api_infra") {
@@ -15,30 +16,9 @@ if (is_host) {
     library_deps = [ "//third_party/mobly" ]
   }
 
-  python_host_test("api_mobly_test") {
-    main_source = "api_mobly_test.py"
-    sources = [ "api_mobly.py" ]
-    libraries = [
-      ":api_mobly",
-      "//third_party/parameterized",
-    ]
-  }
-
   python_library("mobly_driver_lib") {
     sources = [ "mobly_driver_lib.py" ]
     library_deps = [ "drivers:base_mobly_driver" ]
-  }
-
-  python_host_test("mobly_driver_lib_test") {
-    main_source = "mobly_driver_lib_test.py"
-    sources = [
-      "drivers/base_mobly_driver.py",
-      "mobly_driver_lib.py",
-    ]
-    libraries = [
-      ":mobly_driver_lib",
-      "//third_party/parameterized",
-    ]
   }
 
   python_library("driver_factory") {
@@ -48,22 +28,6 @@ if (is_host) {
       "drivers:common",
       "drivers:infra_driver",
       "drivers:local_driver",
-    ]
-  }
-
-  python_host_test("driver_factory_test") {
-    main_source = "driver_factory_test.py"
-    sources = [
-      "api_infra.py",
-      "driver_factory.py",
-      "drivers/base_mobly_driver.py",
-      "drivers/common.py",
-      "drivers/infra_driver.py",
-      "drivers/local_driver.py",
-    ]
-    libraries = [
-      ":driver_factory",
-      "//third_party/parameterized",
     ]
   }
 
@@ -104,10 +68,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":api_mobly_test($host_toolchain)",
-    ":driver_factory_test($host_toolchain)",
-    ":mobly_driver_lib_test($host_toolchain)",
-    "drivers:tests",
-  ]
+  public_deps = [ "tests/unit_tests:tests" ]
 }

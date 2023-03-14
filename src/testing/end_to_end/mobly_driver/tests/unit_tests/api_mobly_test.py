@@ -52,23 +52,25 @@ class ApiMoblyTest(unittest.TestCase):
                     'param': 'value'
                 }),
             (
-                'success_multiple_controllers_same_type',
-                [{
-                    'type': 'FuchsiaDevice',
-                    'nodename': 'fuchsia_abcd'
-                }, {
-                    'type': 'FuchsiaDevice',
-                    'nodename': 'fuchsia_bcde'
-                }], {}),
+                'success_multiple_controllers_same_type', [
+                    {
+                        'type': 'FuchsiaDevice',
+                        'nodename': 'fuchsia_abcd'
+                    }, {
+                        'type': 'FuchsiaDevice',
+                        'nodename': 'fuchsia_bcde'
+                    }
+                ], {}),
             (
-                'success_multiple_controllers_different_types',
-                [{
-                    'type': 'FuchsiaDevice',
-                    'nodename': 'fuchsia_abcd'
-                }, {
-                    'type': 'AccessPoint',
-                    'ip': '192.168.42.11'
-                }], {}),
+                'success_multiple_controllers_different_types', [
+                    {
+                        'type': 'FuchsiaDevice',
+                        'nodename': 'fuchsia_abcd'
+                    }, {
+                        'type': 'AccessPoint',
+                        'ip': '192.168.42.11'
+                    }
+                ], {}),
         ])
     def test_new_testbed_config(self, name, controllers, params_dict):
         config_obj = api_mobly.new_testbed_config(
