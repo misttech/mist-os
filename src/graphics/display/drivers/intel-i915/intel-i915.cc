@@ -40,6 +40,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
+#include "fidl/fuchsia.sysmem/cpp/markers.h"
 #include "fuchsia/hardware/display/controller/c/banjo.h"
 #include "src/graphics/display/drivers/intel-i915/clock/cdclk.h"
 #include "src/graphics/display/drivers/intel-i915/ddi.h"
@@ -904,19 +905,14 @@ zx_status_t Controller::DisplayControllerImplImportImage2(image_t* image, uint64
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplImportImage(image, it->second.client_end().borrow().handle()->get(),
-                                          index);
-}
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
-                                                         uint32_t index) {
   if (!(image->type == IMAGE_TYPE_SIMPLE || image->type == IMAGE_TYPE_X_TILED ||
         image->type == IMAGE_TYPE_Y_LEGACY_TILED || image->type == IMAGE_TYPE_YF_TILED)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{zx::unowned_channel(handle)};
-  fidl::WireResult check_result = fidl::WireCall(collection)->CheckBuffersAllocated();
+  fidl::WireResult check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -933,7 +929,7 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, zx_unow
     return check_response.status;
   }
 
-  fidl::WireResult wait_result = fidl::WireCall(collection)->WaitForBuffersAllocated();
+  fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -1854,12 +1850,8 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints2(
            collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplSetBufferCollectionConstraints(
-      config, it->second.client_end().borrow().handle()->get());
-}
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, zx_unowned_handle_t collection) {
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
   constraints.usage.display = fuchsia_sysmem::kDisplayUsageLayer;
   constraints.has_buffer_memory_constraints = true;
@@ -1961,9 +1953,7 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
   }
   constraints.image_format_constraints_count = image_constraints_count;
 
-  auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>(
-                                   zx::unowned_channel(collection)))
-                    ->SetConstraints(true, constraints);
+  auto result = collection->SetConstraints(true, constraints);
 
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to set constraints, %s", result.FormatDescription().c_str());

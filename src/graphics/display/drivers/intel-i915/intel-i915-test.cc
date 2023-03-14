@@ -140,6 +140,8 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
         .token_client = std::move(request->token),
         .mock_buffer_collection = std::make_unique<MockNoCpuBufferCollection>(),
     };
+    most_recent_buffer_collection_ =
+        active_buffer_collections_.at(buffer_collection_id).mock_buffer_collection.get();
 
     fidl::BindServer(
         dispatcher_, std::move(request->buffer_collection_request),
@@ -155,6 +157,12 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   void SetDebugClientInfo(SetDebugClientInfoRequestView request,
                           SetDebugClientInfoCompleter::Sync& completer) override {
     EXPECT_EQ(request->name.get().find("intel-i915"), 0u);
+  }
+
+  // Returns the most recent created BufferCollection server.
+  // This may go out of scope if the caller releases the BufferCollection.
+  MockNoCpuBufferCollection* GetMostRecentBufferCollection() const {
+    return most_recent_buffer_collection_;
   }
 
   std::vector<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>>
@@ -193,6 +201,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   using BufferCollectionId = int;
 
+  MockNoCpuBufferCollection* most_recent_buffer_collection_ = nullptr;
   std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_;
   std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
       inactive_buffer_collection_tokens_;
@@ -230,8 +239,8 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
 class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
  protected:
   IntegrationTest()
-      : loop_(&kAsyncLoopConfigNeverAttachToThread),
-        sysmem_(loop_.dispatcher()),
+      : pci_loop_(&kAsyncLoopConfigNeverAttachToThread),
+        sysmem_(dispatcher()),
         outgoing_(dispatcher()) {}
 
   void SetUp() final {
@@ -255,7 +264,7 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
 
     zx::result service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
         fuchsia_hardware_sysmem::Service::InstanceHandler(
-            {.sysmem = sysmem_.bind_handler(loop_.dispatcher())}));
+            {.sysmem = sysmem_.bind_handler(dispatcher())}));
     ASSERT_EQ(service_result.status_value(), ZX_OK);
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -267,7 +276,7 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
 
     service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
         fuchsia_hardware_pci::Service::InstanceHandler(
-            {.device = pci_.bind_handler(loop_.dispatcher())}));
+            {.device = pci_.bind_handler(pci_loop_.dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
 
     endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -276,18 +285,22 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
 
     parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
                             "pci");
-    loop_.StartThread("pci-fidl-server-thread");
+    pci_loop_.StartThread("pci-fidl-server-thread");
   }
 
   void TearDown() override {
-    loop_.Shutdown();
+    loop().Shutdown();
+    pci_loop_.Shutdown();
+
     parent_ = nullptr;
   }
 
   MockDevice* parent() const { return parent_.get(); }
 
+  FakeSysmem* sysmem() { return &sysmem_; }
+
  private:
-  async::Loop loop_;
+  async::Loop pci_loop_;
   // Emulated parent protocols.
   pci::FakePciProtocol pci_;
   FakeSysmem sysmem_;
@@ -297,22 +310,43 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
   std::shared_ptr<MockDevice> parent_;
 };
 
-TEST(IntelI915Display, ImportBufferCollection) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  FakeSysmem fake_sysmem(loop.dispatcher());
+// Test fixture for tests that only uses fake sysmem but doesn't have any
+// other dependency, so that we won't need a fully-fledged device tree.
+class FakeSysmemSingleThreadedTest : public testing::Test {
+ public:
+  FakeSysmemSingleThreadedTest()
+      : loop_(&kAsyncLoopConfigAttachToCurrentThread),
+        sysmem_(loop_.dispatcher()),
+        display_(nullptr) {}
 
-  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-  ASSERT_TRUE(sysmem_endpoints.is_ok());
-  auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
-  fidl::BindServer(loop.dispatcher(), std::move(sysmem_server), &fake_sysmem);
+  void SetUp() override {
+    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+    ASSERT_TRUE(sysmem_endpoints.is_ok());
+    auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
+    fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &sysmem_);
 
-  // Initialize display controller and sysmem allocator.
-  Controller display(nullptr);
-  ASSERT_OK(display.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
-  EXPECT_OK(loop.RunUntilIdle());
+    ASSERT_OK(display_.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
+    EXPECT_OK(loop_.RunUntilIdle());
+  }
 
-  EXPECT_EQ(fake_sysmem.mock_allocators().size(), 1u);
-  const MockAllocator& allocator = fake_sysmem.mock_allocators().front();
+  void TearDown() override {
+    // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
+    // may still have pending callbacks.
+    loop_.Shutdown();
+  }
+
+ protected:
+  async::Loop loop_;
+
+  FakeSysmem sysmem_;
+  Controller display_;
+};
+
+using ControllerWithFakeSysmemTest = FakeSysmemSingleThreadedTest;
+
+TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
+  EXPECT_EQ(sysmem_.mock_allocators().size(), 1u);
+  const MockAllocator& allocator = sysmem_.mock_allocators().front();
 
   zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
@@ -321,15 +355,15 @@ TEST(IntelI915Display, ImportBufferCollection) {
 
   // Test ImportBufferCollection().
   constexpr uint64_t kValidBufferCollectionId = 1u;
-  EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
+  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
       kValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(display.DisplayControllerImplImportBufferCollection(
+  EXPECT_EQ(display_.DisplayControllerImplImportBufferCollection(
                 kValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
-  loop.RunUntilIdle();
+  loop_.RunUntilIdle();
 
   // Verify that the current buffer collection token is used.
   {
@@ -355,11 +389,11 @@ TEST(IntelI915Display, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   constexpr uint64_t kInvalidBufferCollectionId = 2u;
-  EXPECT_EQ(display.DisplayControllerImplReleaseBufferCollection(kInvalidBufferCollectionId),
+  EXPECT_EQ(display_.DisplayControllerImplReleaseBufferCollection(kInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kValidBufferCollectionId));
+  EXPECT_OK(display_.DisplayControllerImplReleaseBufferCollection(kValidBufferCollectionId));
 
-  loop.RunUntilIdle();
+  loop_.RunUntilIdle();
 
   // Verify that the current buffer collection token is released.
   {
@@ -382,10 +416,6 @@ TEST(IntelI915Display, ImportBufferCollection) {
     EXPECT_EQ(client_koid, server_related_koid);
     EXPECT_EQ(server_koid, client_related_koid);
   }
-
-  // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
-  // may still have pending callbacks.
-  loop.Shutdown();
 }
 
 fdf::MmioBuffer MakeMmioBuffer(uint8_t* buffer, size_t size) {
@@ -493,89 +523,102 @@ TEST(IntelI915Display, ImportImage) {
   loop.Shutdown();
 }
 
-TEST(IntelI915Display, SysmemRequirements) {
-  Controller display(nullptr);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_channel, server_channel] = endpoints.value();
+TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
 
-  MockNoCpuBufferCollection collection;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
+      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+
+  loop_.RunUntilIdle();
 
   image_t image = {};
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
-      &image, client_channel.channel().get()));
+  EXPECT_OK(
+      display_.DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
 
-  loop.RunUntilIdle();
-  EXPECT_TRUE(collection.set_constraints_called());
+  loop_.RunUntilIdle();
+
+  MockAllocator& allocator = sysmem_.mock_allocators().front();
+  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  ASSERT_TRUE(collection);
+  EXPECT_TRUE(collection->set_constraints_called());
 }
 
-TEST(IntelI915Display, SysmemNoneFormat) {
-  Controller display(nullptr);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_channel, server_channel] = endpoints.value();
+TEST_F(ControllerWithFakeSysmemTest, SysmemNoneFormat) {
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
 
-  MockNoCpuBufferCollection collection;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
+      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+
+  loop_.RunUntilIdle();
 
   image_t image = {};
   image.pixel_format = ZX_PIXEL_FORMAT_NONE;
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
-      &image, client_channel.channel().get()));
+  EXPECT_OK(
+      display_.DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
 
-  loop.RunUntilIdle();
-  EXPECT_TRUE(collection.set_constraints_called());
+  loop_.RunUntilIdle();
+
+  MockAllocator& allocator = sysmem_.mock_allocators().front();
+  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  ASSERT_TRUE(collection);
+  EXPECT_TRUE(collection->set_constraints_called());
 }
 
-TEST(IntelI915Display, SysmemInvalidFormat) {
-  Controller display(nullptr);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_channel, server_channel] = endpoints.value();
+TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidFormat) {
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
 
-  MockNoCpuBufferCollection collection;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
+      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+
+  loop_.RunUntilIdle();
 
   image_t image = {};
   image.pixel_format = UINT32_MAX;
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
 
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &image, client_channel.channel().get()));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints2(
+                                     &image, kBufferCollectionId));
 
-  loop.RunUntilIdle();
-  EXPECT_FALSE(collection.set_constraints_called());
+  loop_.RunUntilIdle();
+
+  MockAllocator& allocator = sysmem_.mock_allocators().front();
+  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  ASSERT_TRUE(collection);
+  EXPECT_FALSE(collection->set_constraints_called());
 }
 
-TEST(IntelI915Display, SysmemInvalidType) {
-  Controller display(nullptr);
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [client_channel, server_channel] = endpoints.value();
+TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
 
-  MockNoCpuBufferCollection collection;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
+      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+
+  loop_.RunUntilIdle();
 
   image_t image = {};
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
   image.type = 1000000;
-  ASSERT_OK(
-      fidl::BindSingleInFlightOnly(loop.dispatcher(), std::move(server_channel), &collection));
+  image.pixel_format = UINT32_MAX;
 
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &image, client_channel.channel().get()));
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints2(
+                                     &image, kBufferCollectionId));
 
-  loop.RunUntilIdle();
-  EXPECT_FALSE(collection.set_constraints_called());
+  loop_.RunUntilIdle();
+
+  MockAllocator& allocator = sysmem_.mock_allocators().front();
+  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  ASSERT_TRUE(collection);
+  EXPECT_FALSE(collection->set_constraints_called());
 }
 
 // Tests that DDK basic DDK lifecycle hooks function as expected.
@@ -653,24 +696,28 @@ TEST_F(IntegrationTest, SysmemImport) {
   auto dev = parent()->GetLatestChild();
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_OK(endpoints.status_value());
-
-  MockNoCpuBufferCollection collection;
+  // Import buffer collection.
+  constexpr uint64_t kBufferCollectionId = 1u;
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
+  EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
+      kBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   image_t image = {};
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
   image.width = 128;
   image.height = kImageHeight;
-  ASSERT_OK(fidl::BindSingleInFlightOnly(dispatcher(), std::move(endpoints->server), &collection));
-
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(
-      &image, endpoints->client.channel().get()));
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(collection.set_constraints_called());
+
+  MockAllocator& allocator = sysmem()->mock_allocators().front();
+  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  ASSERT_TRUE(collection);
+  EXPECT_TRUE(collection->set_constraints_called());
+
   PerformBlockingWork([&] {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, endpoints->client.channel().get(), 0));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage2(&image, kBufferCollectionId, /*index=*/0));
   });
 
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_IDENTITY);
@@ -688,11 +735,19 @@ TEST_F(IntegrationTest, SysmemRotated) {
   auto dev = parent()->GetLatestChild();
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  ASSERT_OK(endpoints.status_value());
+  // Import buffer collection.
+  constexpr uint64_t kBufferCollectionId = 1u;
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
+  EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
+      kBufferCollectionId, token_endpoints->client.TakeChannel()));
 
-  MockNoCpuBufferCollection collection;
-  collection.set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
+  RunLoopUntilIdle();
+
+  MockAllocator& allocator = sysmem()->mock_allocators().front();
+  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  ASSERT_TRUE(collection);
+  collection->set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
 
   image_t image = {};
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
@@ -700,16 +755,15 @@ TEST_F(IntegrationTest, SysmemRotated) {
   image.height = kImageHeight;
   // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
-  ASSERT_OK(fidl::BindSingleInFlightOnly(dispatcher(), std::move(endpoints->server), &collection));
 
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(
-      &image, endpoints->client.channel().get()));
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(collection.set_constraints_called());
+  EXPECT_TRUE(collection->set_constraints_called());
+
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
   PerformBlockingWork([&]() mutable {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, endpoints->client.channel().get(), 0));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage2(&image, kBufferCollectionId, /*index=*/0));
   });
 
   // Check that rotating the image doesn't hang.
