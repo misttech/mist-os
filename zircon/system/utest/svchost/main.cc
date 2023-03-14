@@ -6,7 +6,6 @@
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/debuglog.h>

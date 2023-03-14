@@ -5,9 +5,9 @@
 #ifndef SRC_BRINGUP_BIN_SVCHOST_INCLUDE_CRASHSVC_CRASHSVC_H_
 #define SRC_BRINGUP_BIN_SVCHOST_INCLUDE_CRASHSVC_CRASHSVC_H_
 
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/zx/job.h>
-#include <threads.h>
-#include <zircon/types.h>
 
 // Initialize the crash service, this supersedes the standalone service with
 // the same name that lived in zircon/system/core/crashsvc/crashsvc.cpp
@@ -22,11 +22,8 @@
 //
 // Which one depends if |exception_handler_svc| is a valid channel handle, which
 // svchost sets depending on "use_system".
-//
-// The crash service thread will exit when |root_job| is terminated.
-//
-// On success, returns ZX_OK and fills |thread| with the crash service thread.
-// The caller is responsible for either detaching or joining the thread.
-zx_status_t start_crashsvc(zx::job root_job, zx_handle_t exception_handler_svc, thrd_t* thread);
+zx::result<std::unique_ptr<async::Wait>> start_crashsvc(
+    async_dispatcher_t* dispatcher, zx::channel exception_channel,
+    fidl::ClientEnd<fuchsia_io::Directory> exception_handler_svc);
 
 #endif  // SRC_BRINGUP_BIN_SVCHOST_INCLUDE_CRASHSVC_CRASHSVC_H_

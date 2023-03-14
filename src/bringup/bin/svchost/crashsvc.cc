@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/async/cpp/wait.h>
 #include <lib/backtrace-request/backtrace-request-utils.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/exception.h>
@@ -13,10 +10,8 @@
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
-#include <threads.h>
 #include <zircon/status.h>
 #include <zircon/syscalls/exception.h>
-#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -36,11 +31,6 @@ namespace {
 //
 // This value was picked as something that seems reasonable. It may need to be adjusted.
 constexpr auto kExceptionHandlerTimeout = zx::sec(8);
-
-struct crash_ctx {
-  zx::channel exception_channel;
-  zx_handle_t exception_handler_svc;
-};
 
 // Cleans up and resumes a thread in a manual backtrace request.
 //
@@ -70,8 +60,8 @@ bool ResumeIfBacktraceRequest(const zx::thread& thread, const zx::exception& exc
   return false;
 }
 
-void HandOffException(zx::exception exception, const zx_exception_info_t& info,
-                      ExceptionHandler& handler, async::Loop& loop) {
+void HandOffException(async_dispatcher_t* dispatcher, zx::exception exception,
+                      const zx_exception_info_t& info, ExceptionHandler& handler) {
   zx::process process;
   if (const zx_status_t status = exception.get_process(&process); status != ZX_OK) {
     LogError("failed to get exception process when receiving exception", info, status);
@@ -138,7 +128,7 @@ void HandOffException(zx::exception exception, const zx_exception_info_t& info,
     // Delay releasing the exception to give the stack trace a chance to propagate to the previous
     // boot logs. The kernel won't terminate the process until we release the exception.
     async::PostDelayedTask(
-        loop.dispatcher(), [exception = std::move(exception)]() mutable { exception.reset(); },
+        dispatcher, [exception = std::move(exception)]() mutable { exception.reset(); },
         zx::sec(5));
 
     return;
@@ -150,82 +140,54 @@ void HandOffException(zx::exception exception, const zx_exception_info_t& info,
   //
   // This is done asynchronously to give queued tasks, like the reconnection logic, a chance to
   // execute.
-  async::PostTask(loop.dispatcher(), [&handler, info, exception = std::move(exception)]() mutable {
+  async::PostTask(dispatcher, [&handler, info, exception = std::move(exception)]() mutable {
     handler.Handle(std::move(exception), info);
   });
 }
 
-int crash_svc(void* arg) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-
-  auto ctx = std::unique_ptr<crash_ctx>(reinterpret_cast<crash_ctx*>(arg));
-  ExceptionHandler handler(loop.dispatcher(), ctx->exception_handler_svc, kExceptionHandlerTimeout);
-  async::Wait wait_for_exceptions(ctx->exception_channel.get(),
-                                  ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED, /*options=*/0u);
-
-  wait_for_exceptions.set_handler([&loop, &handler, &ctx](async_dispatcher_t* dispatcher,
-                                                          async::Wait* wait, zx_status_t status,
-                                                          const zx_packet_signal_t* signal) {
-    if (status == ZX_ERR_CANCELED) {
-      loop.Shutdown();
-      return;
-    }
-
-    if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-      // We should only get here in crashsvc's unit tests. In production, our job is actually the
-      // root job so the system will halt before closing its exception channel.
-      loop.Shutdown();
-      return;
-    }
-
-    zx_exception_info_t info;
-    zx::exception exception;
-    if (const zx_status_t status = ctx->exception_channel.read(
-            0, &info, exception.reset_and_get_address(), sizeof(info), 1, nullptr, nullptr);
-        status != ZX_OK) {
-      LogError("failed to read from the exception channel", status);
-      return;
-    }
-
-    HandOffException(std::move(exception), info, handler, loop);
-
-    if (const zx_status_t status = wait->Begin(loop.dispatcher()); status != ZX_OK) {
-      LogError("Failed to restart wait, crashsvc won't continue", status);
-      loop.Shutdown();
-      return;
-    }
-  });
-
-  if (const zx_status_t status = wait_for_exceptions.Begin(loop.dispatcher()); status != ZX_OK) {
-    LogError("Failed to being wait, crashsvc won't start", status);
-    return status;
-  }
-
-  loop.Run();
-
-  return 0;
-}
-
 }  // namespace
 
-zx_status_t start_crashsvc(zx::job root_job, zx_handle_t exception_handler_svc, thrd_t* thread) {
-  zx::channel exception_channel;
-  if (const zx_status_t status = root_job.create_exception_channel(0, &exception_channel);
-      status != ZX_OK) {
-    LogError("failed to create exception channel", status);
-    return status;
+zx::result<std::unique_ptr<async::Wait>> start_crashsvc(
+    async_dispatcher_t* dispatcher, zx::channel exception_channel,
+    fidl::ClientEnd<fuchsia_io::Directory> exception_handler_svc) {
+  std::unique_ptr wait = std::make_unique<async::Wait>(
+      exception_channel.get(), ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED, /*options=*/0u,
+      [exception_channel = std::move(exception_channel),
+       handler = std::make_unique<ExceptionHandler>(dispatcher, std::move(exception_handler_svc),
+                                                    kExceptionHandlerTimeout)](
+          async_dispatcher_t* dispatcher, async::Wait* wait, zx_status_t status,
+          const zx_packet_signal_t* signal) {
+        if (status == ZX_ERR_CANCELED) {
+          return;
+        }
+
+        if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+          // We should only get here in crashsvc's unit tests. In production, our job is actually
+          // the root job so the system will halt before closing its exception channel.
+          return;
+        }
+
+        zx_exception_info_t info;
+        zx::exception exception;
+        if (const zx_status_t status = exception_channel.read(
+                0, &info, exception.reset_and_get_address(), sizeof(info), 1, nullptr, nullptr);
+            status != ZX_OK) {
+          LogError("failed to read from the exception channel", status);
+          return;
+        }
+
+        HandOffException(dispatcher, std::move(exception), info, *handler);
+
+        if (const zx_status_t status = wait->Begin(dispatcher); status != ZX_OK) {
+          LogError("Failed to restart wait, crashsvc won't continue", status);
+          return;
+        }
+      });
+
+  if (const zx_status_t status = wait->Begin(dispatcher); status != ZX_OK) {
+    LogError("Failed to being wait, crashsvc won't start", status);
+    return zx::error(status);
   }
 
-  auto ctx = new crash_ctx{
-      std::move(exception_channel),
-      exception_handler_svc,
-  };
-
-  if (const zx_status_t status =
-          thrd_status_to_zx_status(thrd_create_with_name(thread, crash_svc, ctx, "crash-svc"));
-      status != ZX_OK) {
-    delete ctx;
-    return status;
-  }
-  return ZX_OK;
+  return zx::ok(std::move(wait));
 }

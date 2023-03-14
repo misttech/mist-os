@@ -6,6 +6,7 @@
 #define SRC_BRINGUP_BIN_SVCHOST_INCLUDE_CRASHSVC_EXCEPTION_HANDLER_H_
 
 #include <fidl/fuchsia.exception/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/client.h>
@@ -19,7 +20,8 @@
 
 class ExceptionHandler : public fidl::WireAsyncEventHandler<fuchsia_exception::Handler> {
  public:
-  ExceptionHandler(async_dispatcher_t* dispatcher, zx_handle_t exception_handler_svc,
+  ExceptionHandler(async_dispatcher_t* dispatcher,
+                   fidl::ClientEnd<fuchsia_io::Directory> exception_handler_svc,
                    zx::duration is_active_timeout);
 
   void Handle(zx::exception exception, const zx_exception_info_t& info);
@@ -36,7 +38,7 @@ class ExceptionHandler : public fidl::WireAsyncEventHandler<fuchsia_exception::H
   void on_fidl_error(fidl::UnbindInfo info) override;
 
   async_dispatcher_t* dispatcher_;
-  zx_handle_t exception_handler_svc_;
+  fidl::ClientEnd<fuchsia_io::Directory> exception_handler_svc_;
 
   // Becomes true if exceptions cannot be sent to the exception handling service. Once we reach that
   // state, we will never handle exceptions again.

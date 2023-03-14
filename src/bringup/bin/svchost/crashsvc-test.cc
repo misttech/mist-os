@@ -128,7 +128,7 @@ class FakeService {
   }
 
   StubExceptionHandler& exception_handler() { return exception_handler_; }
-  const zx::channel& service_channel() const { return svc_local_.channel(); }
+  fidl::ClientEnd<fuchsia_io::Directory> take_service_channel() { return std::move(svc_local_); }
 
  private:
   StubExceptionHandler exception_handler_;
@@ -155,15 +155,23 @@ class TestBase : public zxtest::Test, public loop_fixture::RealLoop {
   }
 
   // Synchronously creates a process under |job_| that requests a backtrace.
-  void GenerateBacktraceRequest() const {
+  void GenerateBacktraceRequest() {
     zx::channel command_channel;
     zx::process process;
     zx::thread thread;
     ASSERT_NO_FATAL_FAILURE(CreateMiniProcess(&process, &thread, &command_channel));
 
-    // Use mini_process_cmd() here to send and block until we get a response.
     printf("Intentionally dumping test thread '%s', the following dump is expected\n", kTaskName);
-    ASSERT_OK(mini_process_cmd(command_channel.get(), MINIP_CMD_BACKTRACE_REQUEST, nullptr));
+    ASSERT_OK(mini_process_cmd_send(command_channel.get(), MINIP_CMD_BACKTRACE_REQUEST));
+    RunLoopUntil([&]() {
+      zx_status_t status =
+          command_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr);
+      if (status != ZX_OK) {
+        EXPECT_STATUS(ZX_ERR_TIMED_OUT, status);
+      }
+      return status != ZX_ERR_TIMED_OUT;
+    });
+    ASSERT_OK(mini_process_cmd_read_reply(command_channel.get(), nullptr));
   }
 
   // Generates a new exception so the ExceptionHandler FIDL message sent by crashsvc can be
@@ -208,7 +216,9 @@ class TestBase : public zxtest::Test, public loop_fixture::RealLoop {
     return zx::ok(std::make_pair(std::move(exception), info));
   }
 
-  const zx::channel& svc_channel() const { return fake_service_.service_channel(); }
+  fidl::ClientEnd<fuchsia_io::Directory> take_service_channel() {
+    return fake_service_.take_service_channel();
+  }
 
   StubExceptionHandler& stub_handler() { return fake_service_.exception_handler(); }
 
@@ -259,30 +269,30 @@ class CrashsvcTest : public TestBase {
   void TearDown() final {
     // Kill |job_| to stop exception handling and crashsvc
     ASSERT_OK(job().kill());
-    if (crashsvc_thread_.has_value()) {
-      int exit_code = -1;
-      ASSERT_EQ(thrd_join(*crashsvc_thread_, &exit_code), thrd_success);
-      ASSERT_EQ(exit_code, 0);
+  }
+
+  void StartCrashsvc(bool with_svc = false) {
+    zx::channel exception_channel;
+    ASSERT_OK(job().create_exception_channel(0, &exception_channel));
+    fidl::ClientEnd<fuchsia_io::Directory> svc;
+    if (with_svc) {
+      svc = take_service_channel();
     }
+    async::PostTask(loop().dispatcher(), [dispatcher = loop().dispatcher(),
+                                          exception_channel = std::move(exception_channel),
+                                          svc = std::move(svc)]() mutable {
+      zx::result result = start_crashsvc(dispatcher, std::move(exception_channel), std::move(svc));
+      ASSERT_OK(result);
+      // Move the wait onto the dispatcher so that it is destroyed on its thread.
+      async::PostDelayedTask(
+          dispatcher, [wait = std::move(result.value())]() {}, zx::duration::infinite());
+    });
   }
-
-  void StartCrashsvc(const zx_handle_t svc_channel = ZX_HANDLE_INVALID) {
-    zx::job job_copy;
-    ASSERT_OK(job().duplicate(ZX_RIGHT_SAME_RIGHTS, &job_copy));
-
-    thrd_t& thread = crashsvc_thread_.emplace();
-    ASSERT_OK(start_crashsvc(std::move(job_copy), svc_channel, &thread));
-  }
-
-  void StartCrashsvc(const zx::channel& svc_channel) { StartCrashsvc(svc_channel.get()); }
 
   zx_status_t CheckPendingException(const zx::duration limit) {
     const auto exception = ReadPendingException(limit);
     return exception.status_value();
   }
-
- private:
-  std::optional<thrd_t> crashsvc_thread_{std::nullopt};
 };
 
 TEST_F(CrashsvcTest, StartAndStop) { ASSERT_NO_FATAL_FAILURE(StartCrashsvc()); }
@@ -303,7 +313,7 @@ TEST_F(CrashsvcTest, ThreadBacktraceNoExceptionHandler) {
 
 TEST_F(CrashsvcTest, ExceptionHandlerSuccess) {
   // crashsvc should pass the exception to the stub handler.
-  ASSERT_NO_FATAL_FAILURE(StartCrashsvc(svc_channel()));
+  ASSERT_NO_FATAL_FAILURE(StartCrashsvc(true));
   ASSERT_NO_FATAL_FAILURE(AnalyzeCrash());
 
   RunLoopUntilIdle();
@@ -315,7 +325,7 @@ TEST_F(CrashsvcTest, ExceptionHandlerAsync) {
   // crashsvc from further processing other exceptions.
   stub_handler().SetRespondSync(false);
 
-  ASSERT_NO_FATAL_FAILURE(StartCrashsvc(svc_channel()));
+  ASSERT_NO_FATAL_FAILURE(StartCrashsvc(true));
 
   ASSERT_NO_FATAL_FAILURE(AnalyzeCrash());
   ASSERT_NO_FATAL_FAILURE(AnalyzeCrash());
@@ -332,7 +342,7 @@ TEST_F(CrashsvcTest, ExceptionHandlerAsync) {
 }
 
 TEST_F(CrashsvcTest, MultipleThreadExceptionHandler) {
-  StartCrashsvc(svc_channel());
+  ASSERT_NO_FATAL_FAILURE(StartCrashsvc(true));
 
   // Make sure crashsvc continues to loop no matter what the exception handler does.
   ASSERT_NO_FATAL_FAILURE(AnalyzeCrash());
@@ -346,7 +356,7 @@ TEST_F(CrashsvcTest, MultipleThreadExceptionHandler) {
 
 TEST_F(CrashsvcTest, ThreadBacktraceExceptionHandler) {
   // Thread backtrace requests shouldn't be sent out to the exception handler.
-  ASSERT_NO_FATAL_FAILURE(StartCrashsvc(svc_channel()));
+  ASSERT_NO_FATAL_FAILURE(StartCrashsvc(true));
   ASSERT_NO_FATAL_FAILURE(GenerateBacktraceRequest());
 
   RunLoopUntilIdle();
@@ -360,7 +370,7 @@ class ExceptionHandlerTest : public TestBase {
 };
 
 TEST_F(ExceptionHandlerTest, ExceptionHandlerReconnects) {
-  ExceptionHandler handler(loop().dispatcher(), svc_channel().get(), kExceptionHandlerTimeout);
+  ExceptionHandler handler(loop().dispatcher(), take_service_channel(), kExceptionHandlerTimeout);
 
   RunLoopUntil([&stub = stub_handler()] { return stub.HasClient(); });
   ASSERT_TRUE(stub_handler().HasClient());
@@ -379,7 +389,7 @@ TEST_F(ExceptionHandlerTest, ExceptionHandlerReconnects) {
 }
 
 TEST_F(ExceptionHandlerTest, ExceptionHandlerWaitsForIsActive) {
-  ExceptionHandler handler(loop().dispatcher(), svc_channel().get(), kExceptionHandlerTimeout);
+  ExceptionHandler handler(loop().dispatcher(), take_service_channel(), kExceptionHandlerTimeout);
 
   zx::channel exception_channel_self;
   ASSERT_OK(zx::job::default_job()->create_exception_channel(0, &exception_channel_self));
@@ -404,7 +414,7 @@ TEST_F(ExceptionHandlerTest, ExceptionHandlerWaitsForIsActive) {
 }
 
 TEST_F(ExceptionHandlerTest, ExceptionHandlerIsActiveTimeOut) {
-  ExceptionHandler handler(loop().dispatcher(), svc_channel().get(), kExceptionHandlerTimeout);
+  ExceptionHandler handler(loop().dispatcher(), take_service_channel(), kExceptionHandlerTimeout);
 
   zx::channel exception_channel_self;
   ASSERT_OK(zx::job::default_job()->create_exception_channel(0, &exception_channel_self));

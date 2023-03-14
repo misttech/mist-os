@@ -3,22 +3,19 @@
 // found in the LICENSE file.
 
 #include <lib/async/cpp/task.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <zircon/status.h>
 
 #include <crashsvc/exception_handler.h>
 #include <crashsvc/logging.h>
 
 ExceptionHandler::ExceptionHandler(async_dispatcher_t* dispatcher,
-                                   zx_handle_t exception_handler_svc,
+                                   fidl::ClientEnd<fuchsia_io::Directory> exception_handler_svc,
                                    const zx::duration is_active_timeout)
     : dispatcher_(dispatcher),
-      exception_handler_svc_(exception_handler_svc),
+      exception_handler_svc_(std::move(exception_handler_svc)),
       // We are in a build without a server for fuchsia.exception.Handler, e.g., bringup.
-      drop_exceptions_(exception_handler_svc_ == ZX_HANDLE_INVALID),
-      connection_(),
+      drop_exceptions_(!exception_handler_svc_.is_valid()),
       is_active_timeout_(is_active_timeout) {
   SetUpClient();
   ConnectToServer();
@@ -66,11 +63,9 @@ void ExceptionHandler::ConnectToServer() {
     return;
   }
 
-  if (const zx_status_t status = fdio_service_connect_at(
-          exception_handler_svc_, fidl::DiscoverableProtocolName<fuchsia_exception::Handler>,
-          server_endpoint_.channel().release());
-      status != ZX_OK) {
-    LogError("unable to connect to fuchsia.exception.Handler", status);
+  zx::result result = component::ConnectAt(exception_handler_svc_, std::move(server_endpoint_));
+  if (result.is_error()) {
+    LogError("unable to connect to fuchsia.exception.Handler", result.error_value());
     drop_exceptions_ = true;
     return;
   }

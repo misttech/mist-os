@@ -24,7 +24,7 @@ zx_library("crashsvc") {
 
   deps = [
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp_wire",
-    "//sdk/lib/fdio",
+    "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",
@@ -63,11 +63,9 @@ executable("svchost") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fdio",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/kcounter",
     "//zircon/system/ulib/kernel-debug",
     "//zircon/system/ulib/ktrace",
