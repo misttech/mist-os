@@ -45,10 +45,6 @@ common_deps = [
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
   "//zircon/system/ulib/backtrace-request/rust",
-
-  # TODO(https://fxbug.dev/122464): Replace this with
-  # #![feature(async_fn_in_trait)] when available.
-  "//third_party/rust_crates:async-trait",
 ]
 
 common_test_deps = [
@@ -98,6 +94,7 @@ rustc_binary("bin") {
   test_deps = common_test_deps
 
   sources = common_sources
+  configs += [ "//build/config/rust:async_fn_in_trait" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
@@ -112,6 +109,7 @@ rustc_binary("bin-instrumented") {
   test_deps = common_test_deps
 
   sources = common_sources
+  configs += [ "//build/config/rust:async_fn_in_trait" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
@@ -170,6 +168,7 @@ rustc_binary("netstack3-benchmarks") {
     "core:netstack3-core-benchmarks",
     "//src/developer/fuchsia-criterion",
   ]
+  configs += [ "//build/config/rust:async_fn_in_trait" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 

@@ -19,12 +19,10 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use assert_matches::assert_matches;
-// TODO(https://fxbug.dev/122464): Use #![feature(async_fn_in_trait)] when
-// available.
-use async_trait::async_trait;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
 use fidl_fuchsia_unknown::CloseableCloseResult;
+use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use log::{error, trace, warn};
 use net_types::{
@@ -1434,18 +1432,27 @@ pub(super) fn spawn_worker(
 ) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
-            SocketWorker::<BindingData<Ipv4, Udp>>::spawn(ctx, properties, events)
+            fasync::Task::spawn(SocketWorker::<BindingData<Ipv4, Udp>>::serve_stream(
+                ctx, properties, events,
+            ))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
-            SocketWorker::<BindingData<Ipv6, Udp>>::spawn(ctx, properties, events)
+            fasync::Task::spawn(SocketWorker::<BindingData<Ipv6, Udp>>::serve_stream(
+                ctx, properties, events,
+            ))
         }
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            SocketWorker::<BindingData<Ipv4, IcmpEcho>>::spawn(ctx, properties, events)
+            fasync::Task::spawn(SocketWorker::<BindingData<Ipv4, IcmpEcho>>::serve_stream(
+                ctx, properties, events,
+            ))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            SocketWorker::<BindingData<Ipv6, IcmpEcho>>::spawn(ctx, properties, events)
+            fasync::Task::spawn(SocketWorker::<BindingData<Ipv6, IcmpEcho>>::serve_stream(
+                ctx, properties, events,
+            ))
         }
     }
+    .detach();
     Ok(())
 }
 
@@ -1455,7 +1462,6 @@ impl worker::CloseResponder for fposix_socket::SynchronousDatagramSocketCloseRes
     }
 }
 
-#[async_trait]
 impl<I, T> worker::SocketWorkerHandler for BindingData<I, T>
 where
     I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,

@@ -4,12 +4,10 @@
 
 use std::ops::{ControlFlow, DerefMut};
 
-use async_trait::async_trait;
 use async_utils::stream::OneOrMany;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_unknown::CloseableCloseResult;
-use fuchsia_async as fasync;
-use futures::{StreamExt as _, TryFutureExt as _};
+use futures::StreamExt as _;
 use log::error;
 use netstack3_core::{Ctx, SyncCtx};
 
@@ -33,7 +31,6 @@ pub(crate) struct SocketWorker<Data> {
 /// handler instance.
 // TODO(https://fxbug.dev/122464): Use #![feature(async_fn_in_trait)] when
 // available.
-#[async_trait]
 pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// The type of request that this worker can handle.
     type Request: Send;
@@ -95,21 +92,22 @@ pub(crate) trait CloseResponder: Send {
 
 impl<H: SocketWorkerHandler> SocketWorker<H> {
     /// Starts servicing events from the provided event stream.
-    pub(crate) fn spawn(
+    pub(crate) async fn serve_stream(
         ctx: NetstackContext,
         properties: SocketWorkerProperties,
         events: H::RequestStream,
     ) {
-        Self::spawn_with(
+        Self::serve_stream_with(
             ctx,
             |sync_ctx, non_sync_ctx, properties| H::new(sync_ctx, non_sync_ctx, properties),
             properties,
             events,
-        );
+        )
+        .await
     }
 
     /// Starts servicing events from the provided state and event stream.
-    pub(crate) fn spawn_with<
+    pub(crate) async fn serve_stream_with<
         F: FnOnce(
                 &mut SyncCtx<BindingsNonSyncCtxImpl>,
                 &mut BindingsNonSyncCtxImpl,
@@ -123,27 +121,22 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
         properties: SocketWorkerProperties,
         events: H::RequestStream,
     ) {
-        fasync::Task::spawn(
-            async move {
-                let data = {
-                    let mut guard = ctx.lock().await;
-                    let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+        let data = {
+            let mut guard = ctx.lock().await;
+            let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
 
-                    make_data(sync_ctx, non_sync_ctx, properties)
-                };
-                let worker = Self { ctx, data };
+            make_data(sync_ctx, non_sync_ctx, properties)
+        };
+        let worker = Self { ctx, data };
 
-                worker.handle_stream(events).await
-            }
-            // When the closure above finishes, that means `self` goes out of
-            // scope and is dropped, meaning that the event stream's underlying
-            // channel is closed. If any errors occurred as a result of the
-            // closure, we just log them.
-            .unwrap_or_else(|e: fidl::Error| error!("socket control request error: {:?}", e)),
-        )
-        // TODO(https://fxbug.dev/122464): Move the detach higher up so callers
-        // have to deal with it.
-        .detach();
+        // When the worker finishes, that means `self` goes out of scope and is
+        // dropped, meaning that the event stream's underlying channel is
+        // closed. If any errors occurred as a result of the closure, we just
+        // log them.
+        worker
+            .handle_stream(events)
+            .await
+            .unwrap_or_else(|e: fidl::Error| error!("socket control request error: {:?}", e))
     }
 
     /// Handles a stream of POSIX socket requests.

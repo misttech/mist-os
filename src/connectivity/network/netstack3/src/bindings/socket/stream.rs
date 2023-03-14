@@ -13,7 +13,6 @@ use std::{
 };
 
 use assert_matches::assert_matches;
-use async_trait::async_trait;
 use explicit::ResultExt as _;
 use fidl::{
     endpoints::{ClientEnd, RequestStream as _},
@@ -486,9 +485,6 @@ impl CloseResponder for fposix_socket::StreamSocketCloseResponder {
     }
 }
 
-// TODO(https://fxbug.dev/122464): Use #![feature(async_fn_in_trait)] when
-// available.
-#[async_trait]
 impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
 where
     DeviceId<BindingsNonSyncCtxImpl>:
@@ -553,12 +549,21 @@ pub(super) async fn spawn_worker(
 {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
-            SocketWorker::<BindingData<Ipv4>>::spawn(ctx, SocketWorkerProperties {}, request_stream)
+            fasync::Task::spawn(SocketWorker::<BindingData<Ipv4>>::serve_stream(
+                ctx,
+                SocketWorkerProperties {},
+                request_stream,
+            ))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp) => {
-            SocketWorker::<BindingData<Ipv6>>::spawn(ctx, SocketWorkerProperties {}, request_stream)
+            fasync::Task::spawn(SocketWorker::<BindingData<Ipv6>>::serve_stream(
+                ctx,
+                SocketWorkerProperties {},
+                request_stream,
+            ))
         }
     }
+    .detach()
 }
 
 impl IntoErrno for AcceptError {
@@ -842,17 +847,7 @@ where
                     fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
                         .expect("failed to create new fidl endpoints");
                 spawn_send_task::<I>(ctx.clone(), socket, watcher, accepted);
-                SocketWorker::<BindingData<I>>::spawn_with(
-                    ctx.clone(),
-                    move |_: &mut SyncCtx<_>,
-                          _: &mut BindingsNonSyncCtxImpl,
-                          SocketWorkerProperties {}| BindingData {
-                        id: SocketId::Connection(accepted, true),
-                        peer,
-                    },
-                    SocketWorkerProperties {},
-                    request_stream,
-                );
+                spawn_connected_socket_task(ctx.clone(), accepted, peer, request_stream);
                 Ok((want_addr.then(|| Box::new(addr.into_sock_addr())), client))
             }
             SocketId::Unbound(_, _) | SocketId::Connection(_, _) | SocketId::Bound(_, _) => {
@@ -1500,6 +1495,28 @@ where
             SocketId::Listener(id) => with_socket_options(sync_ctx, id, f),
         }
     }
+}
+
+fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
+    ctx: NetstackContext,
+    accepted: ConnectionId<I>,
+    peer: zx::Socket,
+    request_stream: fposix_socket::StreamSocketRequestStream,
+) where
+    DeviceId<BindingsNonSyncCtxImpl>:
+        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    WeakDeviceId<BindingsNonSyncCtxImpl>:
+        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+{
+    fasync::Task::spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
+        ctx,
+        move |_: &mut SyncCtx<_>, _: &mut BindingsNonSyncCtxImpl, SocketWorkerProperties {}| {
+            BindingData { id: SocketId::Connection(accepted, true), peer }
+        },
+        SocketWorkerProperties {},
+        request_stream,
+    ))
+    .detach();
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
