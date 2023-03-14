@@ -52,7 +52,7 @@ pub async fn get_first_matching_iface_id<F: Fn(&QueryIfaceResponse) -> bool>(
     // Sleep between queries to make main future yield.
     let mut infinite_timeout =
         super::test_utils::RetryWithBackoff::infinite_with_max_interval(10.seconds());
-    // Verbose logging of DeviceServiceProxy calls inserted to assist debugging
+    // Verbose logging of DeviceMonitorProxy calls inserted to assist debugging
     // flakes such as https://fxbug.dev/85468.
     let mut attempt = 1;
     loop {

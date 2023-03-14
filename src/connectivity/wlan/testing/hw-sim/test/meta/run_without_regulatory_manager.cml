@@ -85,10 +85,7 @@
         {
             protocol: "fuchsia.wlan.device.service.DeviceService",
             from: "#wlanstack",
-            to: [
-                "#wlancfg",
-                "#wlandevicemonitor",
-            ],
+            to: "#wlandevicemonitor",
             dependency: "weak",
         },
         {

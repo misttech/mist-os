@@ -152,11 +152,6 @@
             to: "#sl4f",
         },
         {
-            protocol: [ "fuchsia.wlan.device.service.DeviceService" ],
-            from: "#wlanstack",
-            to: "#sl4f",
-        },
-        {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",

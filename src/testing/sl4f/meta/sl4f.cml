@@ -92,7 +92,6 @@
                 "fuchsia.weave.Stack",
                 "fuchsia.web.ContextProvider",
                 "fuchsia.wlan.device.service.DeviceMonitor",
-                "fuchsia.wlan.device.service.DeviceService",
                 "fuchsia.wlan.policy.AccessPointListener",
                 "fuchsia.wlan.policy.AccessPointProvider",
                 "fuchsia.wlan.policy.ClientListener",

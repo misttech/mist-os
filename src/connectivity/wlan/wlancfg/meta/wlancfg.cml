@@ -31,7 +31,6 @@
                 "fuchsia.power.clientlevel.Connector",
                 "fuchsia.stash.SecureStore",
                 "fuchsia.wlan.device.service.DeviceMonitor",
-                "fuchsia.wlan.device.service.DeviceService",
             ],
         },
         {

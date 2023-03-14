@@ -3568,7 +3568,7 @@ mod tests {
             let fut = iface_manager.handle_removed_iface(removed_iface_id);
             pin_mut!(fut);
 
-            // Expect a DeviceService request an SME proxy.
+            // Expect a DeviceMonitor request an SME proxy.
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
             assert_variant!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
@@ -3581,7 +3581,7 @@ mod tests {
                 }
             );
 
-            // Expected a DeviceService request to get iface info.
+            // Expected a DeviceMonitor request to get iface info.
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
             let features_server = assert_variant!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),
@@ -3644,7 +3644,7 @@ mod tests {
             let fut = iface_manager.handle_removed_iface(removed_iface_id);
             pin_mut!(fut);
 
-            // Expect a DeviceService request an SME proxy.
+            // Expect a DeviceMonitor request an SME proxy.
             assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
             assert_variant!(
                 exec.run_until_stalled(&mut test_values.monitor_service_stream.next()),

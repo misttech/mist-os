@@ -342,7 +342,7 @@ mod tests {
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
         pin_mut!(regulatory_fut);
 
-        // Receive first `RegulatoryRegionWatcher` update, and propagate it to `DeviceService`.
+        // Receive first `RegulatoryRegionWatcher` update, and propagate it to `IfaceManager`.
         {
             assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 
@@ -371,7 +371,7 @@ mod tests {
             Poll::Ready(Ok(()))
         );
 
-        // Receive second `RegulatoryRegionWatcher` update, and propagate it to `DeviceService`.
+        // Receive second `RegulatoryRegionWatcher` update, and propagate it to `IfaceManager`.
         {
             assert!(context.executor.run_until_stalled(&mut regulatory_fut).is_pending());
 

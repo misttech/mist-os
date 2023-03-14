@@ -6624,7 +6624,7 @@ mod tests {
 
         let (monitor_svc_proxy, monitor_svc_stream) =
             create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
-                .expect("failed to create DeviceService proxy");
+                .expect("failed to create DeviceMonitor proxy");
 
         let (cobalt_1dot1_proxy, cobalt_1dot1_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
