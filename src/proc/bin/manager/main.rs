@@ -9,6 +9,7 @@ use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
+use fidl_fuchsia_starnix_container as _;
 use fidl_fuchsia_starnix_developer as fstardev;
 use fidl_fuchsia_starnix_galaxy as fstargalaxy;
 use fuchsia_async as fasync;

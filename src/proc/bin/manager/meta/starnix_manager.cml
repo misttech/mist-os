@@ -84,6 +84,30 @@
             dependency: "weak",
         },
         {
+            protocol: "fuchsia.starnix.container.Controller",
+            from: "#bionic",
+            path: "/bionic/fuchsia.starnix.container.Controller",
+            dependency: "weak",
+        },
+        {
+            protocol: "fuchsia.starnix.container.Controller",
+            from: "#stardroid",
+            path: "/stardroid/fuchsia.starnix.container.Controller",
+            dependency: "weak",
+        },
+        {
+            protocol: "fuchsia.starnix.container.Controller",
+            from: "#chromiumos",
+            path: "/chromiumos/fuchsia.starnix.container.Controller",
+            dependency: "weak",
+        },
+        {
+            protocol: "fuchsia.starnix.container.Controller",
+            from: "#empty_container",
+            path: "/empty_container/fuchsia.starnix.container.Controller",
+            dependency: "weak",
+        },
+        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },

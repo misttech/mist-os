@@ -7,6 +7,7 @@ use fidl::{endpoints::ControlHandle, AsyncChannel};
 use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_binder as fbinder;
+use fidl_fuchsia_starnix_container as fstarcontainer;
 use fidl_fuchsia_starnix_galaxy as fstargalaxy;
 use fuchsia_async::{self as fasync, DurationExt};
 use futures::TryStreamExt;
@@ -46,13 +47,29 @@ pub async fn serve_component_runner(
     Ok(())
 }
 
-pub async fn serve_container_controller(
+pub async fn serve_galaxy_controller(
     mut request_stream: fstargalaxy::ControllerRequestStream,
     container: Arc<Container>,
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
             fstargalaxy::ControllerRequest::VsockConnect { port, bridge_socket, .. } => {
+                connect_to_vsock(port, bridge_socket, &container).await.unwrap_or_else(|e| {
+                    log_error!("failed to connect to vsock {:?}", e);
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn serve_container_controller(
+    mut request_stream: fstarcontainer::ControllerRequestStream,
+    container: Arc<Container>,
+) -> Result<(), Error> {
+    while let Some(event) = request_stream.try_next().await? {
+        match event {
+            fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. } => {
                 connect_to_vsock(port, bridge_socket, &container).await.unwrap_or_else(|e| {
                     log_error!("failed to connect to vsock {:?}", e);
                 });

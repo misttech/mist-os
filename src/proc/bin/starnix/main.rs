@@ -92,7 +92,7 @@ async fn main() -> Result<(), Error> {
         fasync::Task::local(async move {
             execution::serve_container_controller(stream, container)
                 .await
-                .expect("failed to start manager.")
+                .expect("failed to start container controller.")
         })
         .detach();
     });
@@ -100,7 +100,17 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc").add_fidl_service(|stream| {
         let container = container.clone();
         fasync::Task::local(async move {
-            execution::serve_dev_binder(stream, container).await.expect("failed to start manager.")
+            execution::serve_galaxy_controller(stream, container)
+                .await
+                .expect("failed to start container controller.")
+        })
+        .detach();
+    });
+
+    fs.dir("svc").add_fidl_service(|stream| {
+        let container = container.clone();
+        fasync::Task::local(async move {
+            execution::serve_dev_binder(stream, container).await.expect("failed to start binder.")
         })
         .detach();
     });

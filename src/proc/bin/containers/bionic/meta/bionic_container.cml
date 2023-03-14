@@ -27,6 +27,7 @@
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
                 "fuchsia.starnix.binder.DevBinder",
+                "fuchsia.starnix.container.Controller",
                 "fuchsia.starnix.galaxy.Controller",
             ],
         },
@@ -39,6 +40,7 @@
         {
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.starnix.container.Controller",
                 "fuchsia.starnix.galaxy.Controller",
             ],
             from: "self",
