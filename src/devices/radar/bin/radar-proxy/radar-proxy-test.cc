@@ -50,18 +50,16 @@ class TestRadarDeviceConnector : public RadarDeviceConnector {
  public:
   TestRadarDeviceConnector() : driver_binding_(&fake_driver_) {}
 
-  fuchsia::hardware::radar::RadarBurstReaderProviderPtr ConnectToRadarDevice(
-      int dir_fd, const std::string& filename) override {
-    return ConnectToFirstRadarDevice();
+  void ConnectToRadarDevice(int dir_fd, const std::filesystem::path& path,
+                            ConnectDeviceCallback connect_device) override {
+    ConnectToFirstRadarDevice(std::move(connect_device));
   }
 
-  fuchsia::hardware::radar::RadarBurstReaderProviderPtr ConnectToFirstRadarDevice() override {
+  void ConnectToFirstRadarDevice(ConnectDeviceCallback connect_device) override {
     if (connect_fail_) {
-      return {};
+    } else {
+      connect_device(driver_binding_.NewBinding());
     }
-    fuchsia::hardware::radar::RadarBurstReaderProviderPtr radar_client;
-    radar_client.Bind(driver_binding_.NewBinding().TakeChannel());
-    return radar_client;
   }
 
  private:

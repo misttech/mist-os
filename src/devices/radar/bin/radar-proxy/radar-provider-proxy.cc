@@ -4,24 +4,11 @@
 
 #include "radar-provider-proxy.h"
 
-#include <dirent.h>
-#include <lib/async/default.h>
-#include <lib/async/time.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/zx/channel.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include <fbl/unique_fd.h>
 
 namespace radar {
 
-using fuchsia::hardware::radar::RadarBurstReaderProviderPtr;
-
-RadarProviderProxy::RadarProviderProxy(RadarDeviceConnector* connector)
-    : connector_(connector == nullptr ? &default_connector_ : connector) {
+RadarProviderProxy::RadarProviderProxy(RadarDeviceConnector* connector) : connector_(connector) {
   radar_client_.set_error_handler([&](zx_status_t status) { ErrorHandler(status); });
 }
 
@@ -44,59 +31,22 @@ void RadarProviderProxy::Connect(
 }
 
 void RadarProviderProxy::DeviceAdded(int dir_fd, const std::string& filename) {
-  if (radar_client_.is_bound()) {
-    new_devices_ = true;
-    return;
+  if (!radar_client_.is_bound()) {
+    connector_->ConnectToRadarDevice(dir_fd, filename, [&](auto client_end) {
+      radar_client_.Bind(std::move(client_end));
+      return true;
+    });
   }
-
-  RadarBurstReaderProviderPtr radar_client = connector_->ConnectToRadarDevice(dir_fd, filename);
-  if (radar_client.is_bound()) {
-    radar_client_ = std::move(radar_client);
-  }
-}
-
-RadarBurstReaderProviderPtr RadarProviderProxy::DefaultRadarDeviceConnector::ConnectToRadarDevice(
-    int dir_fd, const std::string& filename) {
-  fdio_cpp::UnownedFdioCaller caller(dir_fd);
-  RadarBurstReaderProviderPtr radar_client;
-  if (zx_status_t status =
-          fdio_service_connect_at(caller.directory().channel()->get(), filename.c_str(),
-                                  radar_client.NewRequest().TakeChannel().release());
-      status != ZX_OK) {
-    return {};
-  }
-
-  return radar_client;
-}
-
-RadarBurstReaderProviderPtr
-RadarProviderProxy::DefaultRadarDeviceConnector::ConnectToFirstRadarDevice() {
-  DIR* const devices_dir = opendir(kRadarDeviceDirectory);
-  if (!devices_dir) {
-    return {};
-  }
-
-  for (const dirent* device = readdir(devices_dir); device; device = readdir(devices_dir)) {
-    RadarBurstReaderProviderPtr radar_client =
-        ConnectToRadarDevice(dirfd(devices_dir), device->d_name);
-    if (radar_client.is_bound()) {
-      closedir(devices_dir);
-      return radar_client;
-    }
-  }
-
-  closedir(devices_dir);
-  return {};
 }
 
 void RadarProviderProxy::ErrorHandler(zx_status_t status) {
   FX_PLOGS(ERROR, status) << "Connection to radar device closed, attempting to reconnect";
   // Check for available devices now, just in case one was added before the connection closed. If
   // not, the DeviceWatcher will signal to connect when a new device becomes available.
-  RadarBurstReaderProviderPtr radar_client = connector_->ConnectToFirstRadarDevice();
-  if (radar_client.is_bound()) {
-    radar_client_ = std::move(radar_client);
-  }
+  connector_->ConnectToFirstRadarDevice([&](auto client_end) {
+    radar_client_.Bind(std::move(client_end));
+    return true;
+  });
 }
 
 }  // namespace radar
