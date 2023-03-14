@@ -47,7 +47,11 @@ test("radar-proxy-test-bin") {
     "radar-proxy-test.cc",
     "radar-proxy.cc",
   ]
-  deps = _common_deps + [ "//zircon/system/ulib/zxtest" ]
+  deps = [
+           "//sdk/lib/driver/runtime/testing/runtime",
+           "//src/devices/bin/driver_runtime",
+           "//zircon/system/ulib/zxtest",
+         ] + _common_deps
 }
 
 fuchsia_unittest_package("radar-proxy-test") {
