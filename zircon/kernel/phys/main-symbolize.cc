@@ -17,20 +17,20 @@ namespace {
 #ifdef __ELF__
 
 // These are defined by the phys.ld linker script.
-extern "C" ktl::byte __code_start[], _edata[], _end[];
+extern "C" ktl::byte __executable_start[], _edata[], _end[];
 extern "C" const ktl::byte __start_note_gnu_build_id[];
 extern "C" const ktl::byte __stop_note_gnu_build_id[];
 
 void InitSelf(MainSymbolize& main) {
   using Phdr = elfldltl::Elf<>::Phdr;
 
-  auto memory = elfldltl::Self<>::Memory(__code_start, _end);
+  auto memory = elfldltl::Self<>::Memory(__executable_start, _end);
   auto bias = elfldltl::Self<>::LoadBias();
 
   Phdr load_segment = {
       .type = elfldltl::ElfPhdrType::kLoad,
       .vaddr = memory.base(),
-      .filesz = _edata - __code_start,
+      .filesz = _edata - __executable_start,
       .memsz = memory.image().size_bytes(),
   };
   load_segment.flags = Phdr::kRead | Phdr::kWrite | Phdr::kExecute;

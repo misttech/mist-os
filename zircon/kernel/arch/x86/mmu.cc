@@ -96,7 +96,7 @@ uint64_t kernel_relocated_base = 0xffffffff00000000;
 
 /* kernel base top level page table in physical space */
 static const paddr_t kernel_pt_phys =
-    (vaddr_t)KERNEL_PT - (vaddr_t)__code_start + KERNEL_LOAD_OFFSET;
+    (vaddr_t)KERNEL_PT - (vaddr_t)__executable_start + KERNEL_LOAD_OFFSET;
 
 paddr_t x86_kernel_cr3() { return kernel_pt_phys; }
 

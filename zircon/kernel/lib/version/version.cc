@@ -102,7 +102,7 @@ void print_version() {
 }
 
 void PrintSymbolizerContext(FILE* f) {
-  const uintptr_t bias = KERNEL_BASE - reinterpret_cast<uintptr_t>(__code_start);
+  const uintptr_t bias = KERNEL_BASE - reinterpret_cast<uintptr_t>(__executable_start);
   fprintf(f, "{{{reset}}}\n");
   print_module(f, gElfBuildIdString);
   // These four mappings match the mappings printed by vm_init().
@@ -119,7 +119,7 @@ void print_backtrace_version_info(FILE* f) {
   if (gElfBuildIdString[0] != '\0') {
     PrintSymbolizerContext(f);
     fprintf(f, "dso: id=%s base=%#lx name=zircon.elf\n", gElfBuildIdString,
-            reinterpret_cast<uintptr_t>(__code_start));
+            reinterpret_cast<uintptr_t>(__executable_start));
   }
 }
 

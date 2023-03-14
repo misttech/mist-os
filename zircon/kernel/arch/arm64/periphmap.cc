@@ -294,7 +294,7 @@ STATIC_COMMAND_END(pm)
 
 zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
   // peripheral ranges are allocated below the kernel image.
-  uintptr_t base_virt = (uintptr_t)__code_start;
+  uintptr_t base_virt = (uintptr_t)__executable_start;
 
   // give ourselves an extra gap of space to try to catch overruns
   base_virt -= 0x10000;

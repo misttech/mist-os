@@ -20,7 +20,7 @@ SECTIONS {
    * fixed position or to 0 for the relocatable case.
    */
   . = PHYS_LOAD_ADDRESS;
-  PROVIDE_HIDDEN(__code_start = .);
+  PROVIDE_HIDDEN(__executable_start = .);
 
   /*
    * This overrides the definition from //src/lib/elfldltl/self-base.ld

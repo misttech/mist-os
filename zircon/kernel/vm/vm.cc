@@ -151,6 +151,7 @@ void vm_init_preheap_vmars() {
   // program's various segments (code, rodata, data, bss, etc.), inclusive of any gaps between
   // them.
   const size_t kernel_image_size = get_kernel_size();
+  const uintptr_t kernel_vaddr = reinterpret_cast<uintptr_t>(__executable_start);
   // Create a VMAR that covers the address space occupied by the kernel program segments (code,
   // rodata, data, bss ,etc.). By creating this VMAR, we are effectively marking these addresses as
   // off limits to the VM. That way, the VM won't inadvertently use them for something else. This is
@@ -160,9 +161,8 @@ void vm_init_preheap_vmars() {
   // Note: Even though there might be usable gaps in between the segments, we're covering the whole
   // regions. The thinking is that it's both simpler and safer to not use the address space that
   // exists between kernel program segments.
-  vmar = fbl::AdoptRef<VmAddressRegion>(
-      &kernel_image_vmar.Initialize(*root_vmar, kernel_regions[0].base, kernel_image_size,
-                                    kKernelVmarFlags, "kernel region vmar"));
+  vmar = fbl::AdoptRef<VmAddressRegion>(&kernel_image_vmar.Initialize(
+      *root_vmar, kernel_vaddr, kernel_image_size, kKernelVmarFlags, "kernel region vmar"));
   {
     Guard<CriticalMutex> guard(kernel_image_vmar->lock());
     kernel_image_vmar->Activate();
@@ -281,6 +281,10 @@ void vm_init() {
 
   // Finish reserving the sections in the kernel_region
   for (const auto& region : kernel_regions) {
+    if (region.size == 0) {
+      continue;
+    }
+
     ASSERT(IS_PAGE_ALIGNED(region.base));
 
     dprintf(ALWAYS,

@@ -158,7 +158,7 @@ void __sanitizer_cov_trace_pc_guard(uint32_t* guard_ptr) {
         kReturnAddressBias -
         // Adjust it from runtime to link-time addresses so no
         // further adjustment is needed to decode the data.
-        reinterpret_cast<uintptr_t>(__code_start) + KERNEL_BASE;
+        reinterpret_cast<uintptr_t>(__executable_start) + KERNEL_BASE;
   }
 }
 

@@ -21,7 +21,7 @@ SECTIONS {
      * this is taken as an offset from the actual load address.
      * In the legacy fixed-address protocol, it's an exact address.
      */
-    QUAD(_start - __code_start + PHYS_LOAD_ADDRESS);
+    QUAD(_start - __executable_start + PHYS_LOAD_ADDRESS);
     QUAD(PHYS_RESERVE_MEMORY_SIZE);
   }
 } INSERT AFTER .boot.header

@@ -117,7 +117,7 @@ void lk_main(paddr_t handoff_paddr) {
   // At this point, the kernel command line and serial are set up.
 
   dprintf(INFO, "\nwelcome to Zircon\n\n");
-  dprintf(SPEW, "KASLR: .text section at %p\n", __code_start);
+  dprintf(SPEW, "KASLR: Kernel image at %p\n", __executable_start);
 
   // Perform any additional arch and platform-specific set up that needs to be done
   // before virtual memory or the heap are set up.

@@ -1589,7 +1589,8 @@ static bool vm_kernel_region_test() {
   BEGIN_TEST;
 
   fbl::RefPtr<VmAddressRegionOrMapping> kernel_vmar =
-      VmAspace::kernel_aspace()->RootVmar()->FindRegion(reinterpret_cast<vaddr_t>(__code_start));
+      VmAspace::kernel_aspace()->RootVmar()->FindRegion(
+          reinterpret_cast<vaddr_t>(__executable_start));
   EXPECT_NE(kernel_vmar.get(), nullptr);
   EXPECT_FALSE(kernel_vmar->is_mapping());
   for (vaddr_t base = reinterpret_cast<vaddr_t>(__code_start);
@@ -1597,7 +1598,7 @@ static bool vm_kernel_region_test() {
     bool within_region = false;
     for (const auto& kernel_region : kernel_regions) {
       // This would not overflow because the region base and size are hard-coded.
-      if (base >= kernel_region.base &&
+      if (kernel_region.size != 0 && base >= kernel_region.base &&
           base + PAGE_SIZE <= kernel_region.base + kernel_region.size) {
         // If this page exists within a kernel region, then it should be within a VmMapping with
         // the correct arch MMU flags.

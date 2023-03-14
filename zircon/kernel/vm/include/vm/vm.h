@@ -58,10 +58,11 @@ static_assert(KERNEL_ASPACE_BASE + (KERNEL_ASPACE_SIZE - 1) > KERNEL_ASPACE_BASE
 static_assert(USER_ASPACE_BASE + (USER_ASPACE_SIZE - 1) > USER_ASPACE_BASE, "");
 
 // linker script provided variables for various virtual kernel addresses
-extern char __code_start[];
-extern char __code_end[];
-extern char __rodata_start[];
-extern char __rodata_end[];
+extern const char __executable_start[];
+extern const char __code_start[];
+extern const char __code_end[];
+extern const char __rodata_start[];
+extern const char __rodata_end[];
 extern char __data_start[];
 extern char __data_end[];
 extern char __bss_start[];
@@ -74,7 +75,7 @@ extern vm_page_t* zero_page;
 // return the physical address corresponding to _start
 static inline paddr_t get_kernel_base_phys() { return kernel_base_phys; }
 
-static inline size_t get_kernel_size() { return _end - __code_start; }
+static inline size_t get_kernel_size() { return _end - __executable_start; }
 
 // return a pointer to the zero page
 static inline vm_page_t* vm_get_zero_page(void) { return zero_page; }

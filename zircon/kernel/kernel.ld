@@ -19,6 +19,20 @@
 SECTIONS
 {
     . = KERNEL_BASE;
+
+    /*
+     * This symbol marks the beginning of the whole image, from here to _end.
+     * This name is chosen to match the built-in default in the linkers for
+     * this.  (In normal ELF links __ehdr_start also points here, but in the
+     * GNU linkers __executable_start is defined in links without in-memory ELF
+     * headers, where __ehdr_start is not.)
+     */
+    PROVIDE_HIDDEN(__executable_start = .);
+
+    /*
+     * This symbol marks the beginning of the executable segment, from here
+     * to __code_end.  Future layouts will not necessarily put this first.
+     */
     PROVIDE_HIDDEN(__code_start = .);
 
     /*
@@ -365,6 +379,6 @@ ENTRY(IMAGE_ELF_ENTRY)
  * --just-symbols to the link of image.S.
  */
 
-IMAGE_LOAD_START = __code_start;
+IMAGE_LOAD_START = __executable_start;
 IMAGE_LOAD_KERNEL_END = __data_end;
 IMAGE_MEMORY_END = _end;
