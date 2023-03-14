@@ -4,11 +4,10 @@
 
 #include "ram-info.h"
 
-#include <fcntl.h>
-#include <lib/fdio/fdio.h>
-#include <stdlib.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
-#include <fbl/unique_fd.h>
+#include <filesystem>
+
 #include <soc/aml-common/aml-ram.h>
 
 namespace ram_metrics = fuchsia_hardware_ram_metrics;
@@ -198,17 +197,16 @@ zx::result<std::array<uint64_t, ram_metrics::wire::kMaxCountChannels>> ParseChan
   return zx::ok(channels);
 }
 
-std::tuple<zx::channel, ram_info::RamDeviceInfo> ConnectToRamDevice() {
+std::tuple<fidl::ClientEnd<fuchsia_hardware_ram_metrics::Device>, ram_info::RamDeviceInfo>
+ConnectToRamDevice() {
   for (const auto& info : kDevices) {
-    fbl::unique_fd fd(open(info.devfs_path, O_RDWR));
-    if (fd.get() <= -1) {
+    if (!std::filesystem::exists(info.devfs_path)) {
       continue;
     }
-
-    zx::channel handle;
-    zx_status_t status = fdio_get_service_handle(fd.release(), handle.reset_and_get_address());
-    if (status == ZX_OK) {
-      return {std::move(handle), info};
+    zx::result client_end =
+        component::Connect<fuchsia_hardware_ram_metrics::Device>(info.devfs_path);
+    if (client_end.is_ok()) {
+      return {std::move(client_end.value()), info};
     }
   }
 

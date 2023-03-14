@@ -70,12 +70,11 @@ zx_status_t AocpuTest(MailboxClient client) {
   /* According to the agreement, when A5 sends the command MBX_TEST_DEMO to AOCPU through the
    * mailbox, no matter what the specific content of the sent data is, after receiving the command,
    * AOCPU will respond with the data: Response AOCPU. */
-  if (memcmp(&response->mdata.rx_buffer[0], kAocpuResponse, sizeof(kAocpuResponse) - 1) == 0) {
+  if (memcmp(response->mdata.rx_buffer.data(), kAocpuResponse, sizeof(kAocpuResponse) - 1) == 0) {
     printf("Aocpu testing successfully\n");
     return ZX_OK;
-  } else {
-    return ZX_ERR_UNAVAILABLE;
   }
+  return ZX_ERR_UNAVAILABLE;
 }
 
 zx_status_t DspTest(MailboxClient client) {
@@ -114,12 +113,11 @@ zx_status_t DspTest(MailboxClient client) {
   }
 
   DeviceReceiveDataResponse* response = mbox_receive_result->value();
-  if ((reinterpret_cast<MboxUint*>(&response->mdata.rx_buffer[0]))->sumdata == (sumdata - 1)) {
+  if ((reinterpret_cast<MboxUint*>(response->mdata.rx_buffer.data()))->sumdata == (sumdata - 1)) {
     printf("Dsp testing successfully!!\n");
     return ZX_OK;
-  } else {
-    return ZX_ERR_UNAVAILABLE;
   }
+  return ZX_ERR_UNAVAILABLE;
 }
 
 zx_status_t ScpiTest(MailboxClient client) {
@@ -147,13 +145,12 @@ zx_status_t ScpiTest(MailboxClient client) {
   }
 
   DeviceReceiveDataResponse* response = mbox_receive_result->value();
-  if (strncmp(reinterpret_cast<char*>(&response->mdata.rx_buffer[0]), message, sizeof(message)) ==
-      0) {
+  if (strncmp(reinterpret_cast<char*>(response->mdata.rx_buffer.data()), message,
+              sizeof(message)) == 0) {
     printf("Scpi testing successfully!!\n");
     return ZX_OK;
-  } else {
-    return ZX_ERR_UNAVAILABLE;
   }
+  return ZX_ERR_UNAVAILABLE;
 }
 
 int main(int argc, char** argv) {
@@ -162,25 +159,13 @@ int main(int argc, char** argv) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  int fd = open(argv[1], O_RDWR);
-  if (fd < 0) {
-    fprintf(stderr, "%s: %s\n", argv[1], strerror(errno));
-    return ZX_ERR_BAD_PATH;
+  const char* devpath = argv[1];
+  zx::result client_end = component::Connect<fuchsia_hardware_mailbox::Device>(devpath);
+  if (client_end.is_error()) {
+    fprintf(stderr, "Failed to open %s: %s\n", devpath, client_end.status_string());
+    return -1;
   }
-
-  fbl::unique_fd device(fd);
-  if (!device.is_valid()) {
-    fprintf(stderr, "Failed to open mailbox device: %s\n", strerror(errno));
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  zx::channel svc;
-  zx_status_t st = fdio_get_service_handle(device.release(), svc.reset_and_get_address());
-  if (st != ZX_OK) {
-    fprintf(stderr, "Failed to get service handle: %s\n", zx_status_get_string(st));
-    return ZX_ERR_BAD_HANDLE;
-  }
-  fidl::WireSyncClient<fuchsia_hardware_mailbox::Device> client(std::move(svc));
+  fidl::WireSyncClient client(std::move(client_end.value()));
 
   zx_status_t status;
   switch (argv[2][0]) {
@@ -212,6 +197,5 @@ int main(int argc, char** argv) {
       break;
   }
 
-  close(fd);
   return status;
 }

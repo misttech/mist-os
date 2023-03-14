@@ -4,8 +4,6 @@
 
 #include <optional>
 
-#include <fbl/algorithm.h>
-
 #include "ram-info.h"
 
 namespace ram_metrics = fuchsia_hardware_ram_metrics;

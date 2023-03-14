@@ -5,7 +5,6 @@
 #define SRC_DEVICES_PWM_BIN_PWMCTL_PWMCTL_H_
 
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
-#include <zircon/types.h>
 
 namespace pwmctl {
 

@@ -2,15 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
-#include <lib/fdio/fdio.h>
-#include <lib/zx/channel.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <stdio.h>
-
-#include <string>
-
-#include <fbl/unique_fd.h>
 
 #include "pwmctl.h"
 
@@ -32,22 +26,12 @@ int main(int argc, char const* argv[]) {
     return -1;
   }
 
-  const std::string devpath(argv[1]);
-  fbl::unique_fd device(open(devpath.c_str(), O_RDWR));
-  if (!device.is_valid()) {
-    fprintf(stderr, "Failed to open %s: %s\n", devpath.c_str(), strerror(errno));
+  const char* devpath = argv[1];
+  zx::result client_end = component::Connect<fuchsia_hardware_pwm::Pwm>(devpath);
+  if (client_end.is_error()) {
+    fprintf(stderr, "Failed to open %s: %s\n", devpath, client_end.status_string());
     return -1;
   }
-
-  fidl::ClientEnd<fuchsia_hardware_pwm::Pwm> pwm_client;
-  zx_status_t status =
-      fdio_get_service_handle(device.release(), pwm_client.channel().reset_and_get_address());
-  if (status != ZX_OK) {
-    fprintf(stderr, "Failed to get service handle: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-
-  zx_status_t st = pwmctl::run(argc, argv, std::move(pwm_client));
-
+  zx_status_t st = pwmctl::run(argc, argv, std::move(client_end.value()));
   return st == ZX_OK ? 0 : -1;
 }

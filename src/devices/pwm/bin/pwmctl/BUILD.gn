@@ -7,12 +7,8 @@ import("//build/components.gni")
 group("common") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
+    "//sdk/lib/component/incoming/cpp",
     "//src/devices/lib/amlogic",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
   ]
 }
 
@@ -41,6 +37,7 @@ executable("pwmctl-test-bin") {
   ]
   deps = [
     ":common",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }

@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <ctype.h>
-#include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <getopt.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -15,16 +12,16 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include <fbl/unique_fd.h>
+#include "src/lib/files/directory.h"
 
 using FrequencyInfo = fuchsia_hardware_clock::wire::FrequencyInfo;
 
-typedef enum action {
+using action_t = enum action {
   UNKNOWN,
   MEASURE,
   ENABLE,
   DISABLE,
-} action_t;
+};
 
 int usage(const char* cmd) {
   fprintf(stderr,
@@ -57,37 +54,29 @@ const char* getValue(int argc, char** argv, const char* field) {
   }
   if (i >= argc - 1) {
     printf("NULL\n");
-    return NULL;
-  } else {
-    return argv[i + 1];
+    return nullptr;
   }
+  return argv[i + 1];
 }
 
-char* guess_dev(void) {
-  char path[26];  // strlen("/dev/class/clock-impl/###") + 1
-  DIR* d = opendir("/dev/class/clock-impl");
-  if (!d) {
-    return NULL;
+std::optional<std::string> guess_dev() {
+  const static std::string kDeviceDir = "/dev/class/clock-impl";
+  std::vector<std::string> files;
+  if (!files::ReadDirContents(kDeviceDir, &files)) {
+    return std::nullopt;
   }
 
-  struct dirent* de;
-  while ((de = readdir(d)) != NULL) {
-    if (strlen(de->d_name) != 3) {
+  for (const auto& file : files) {
+    if (file == ".") {
       continue;
     }
-
-    if (isdigit(de->d_name[0]) && isdigit(de->d_name[1]) && isdigit(de->d_name[2])) {
-      sprintf(path, "/dev/class/clock-impl/%.3s", de->d_name);
-      closedir(d);
-      return strdup(path);
-    }
+    return kDeviceDir + '/' + file;
   }
 
-  closedir(d);
-  return NULL;
+  return std::nullopt;
 }
 
-ssize_t measure_clk_util(fidl::WireSyncClient<fuchsia_hardware_clock::Device>& client,
+ssize_t measure_clk_util(const fidl::WireSyncClient<fuchsia_hardware_clock::Device>& client,
                          uint32_t idx) {
   auto measure_result = client->Measure(idx);
 
@@ -109,25 +98,8 @@ ssize_t measure_clk_util(fidl::WireSyncClient<fuchsia_hardware_clock::Device>& c
   return 0;
 }
 
-ssize_t measure_clk(const char* path, uint32_t idx, bool clk) {
-  fbl::unique_fd device(open(path, O_RDWR));
-
-  if (!device.is_valid()) {
-    fprintf(stderr, "Failed to open clock device: %s\n", strerror(errno));
-    return -1;
-  }
-
-  fidl::ClientEnd<fuchsia_hardware_clock::Device> client_end;
-
-  zx_status_t st =
-      fdio_get_service_handle(device.release(), client_end.channel().reset_and_get_address());
-  if (st != ZX_OK) {
-    fprintf(stderr, "Failed to get service handle: %s\n", zx_status_get_string(st));
-    return -1;
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_clock::Device> client(std::move(client_end));
-
+ssize_t measure_clk(const fidl::WireSyncClient<fuchsia_hardware_clock::Device>& client,
+                    uint32_t idx, bool clk) {
   auto clk_count_result = client->GetCount();
   if (!clk_count_result.ok()) {
     fprintf(stderr, "Failed to get count: %s\n", zx_status_get_string(clk_count_result.status()));
@@ -140,40 +112,22 @@ ssize_t measure_clk(const char* path, uint32_t idx, bool clk) {
       return -1;
     }
     return measure_clk_util(client, idx);
-  } else {
-    for (uint32_t i = 0; i < clk_count_result->count; i++) {
-      ssize_t rc = measure_clk_util(client, i);
-      if (rc < 0) {
-        return rc;
-      }
+  }
+  for (uint32_t i = 0; i < clk_count_result->count; i++) {
+    ssize_t rc = measure_clk_util(client, i);
+    if (rc < 0) {
+      return rc;
     }
   }
 
   return 0;
 }
 
-ssize_t toggle_clk(const char* path, uint32_t idx, action_t subcmd) {
+ssize_t toggle_clk(const fidl::WireSyncClient<fuchsia_hardware_clock::Device>& client, uint32_t idx,
+                   action_t subcmd) {
   if (subcmd != ENABLE && subcmd != DISABLE) {
     return -1;
   }
-
-  fbl::unique_fd device(open(path, O_RDWR));
-
-  if (!device.is_valid()) {
-    fprintf(stderr, "Failed to open clock device: %s\n", strerror(errno));
-    return -1;
-  }
-
-  fidl::ClientEnd<fuchsia_hardware_clock::Device> client_end;
-
-  zx_status_t st =
-      fdio_get_service_handle(device.release(), client_end.channel().reset_and_get_address());
-  if (st != ZX_OK) {
-    fprintf(stderr, "Failed to get service handle: %s\n", zx_status_get_string(st));
-    return -1;
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_clock::Device> client(std::move(client_end));
 
   if (subcmd == ENABLE) {
     auto en_result = client->Enable(idx);
@@ -199,8 +153,7 @@ ssize_t toggle_clk(const char* path, uint32_t idx, action_t subcmd) {
 
 int main(int argc, char** argv) {
   const char* cmd = basename(argv[0]);
-  char* path = NULL;
-  const char* index = NULL;
+  const char* index = nullptr;
   action_t subcmd = UNKNOWN;
   bool clk = false;
   uint32_t idx = 0;
@@ -239,16 +192,22 @@ int main(int argc, char** argv) {
   }
 
   // Get the device path.
-  path = guess_dev();
-  if (!path) {
+  std::optional path = guess_dev();
+  if (!path.has_value()) {
     fprintf(stderr, "No CLK device found.\n");
     return usage(cmd);
   }
+  zx::result client_end = component::Connect<fuchsia_hardware_clock::Device>(path.value());
+  if (client_end.is_error()) {
+    fprintf(stderr, "Failed to connect to clock_device: %s\n", client_end.status_string());
+    return -1;
+  }
+  fidl::WireSyncClient client(std::move(client_end.value()));
 
   ssize_t err;
   switch (subcmd) {
     case MEASURE:
-      err = measure_clk(path, idx, clk);
+      err = measure_clk(client, idx, clk);
       if (err) {
         printf("Measure CLK failed.\n");
       }
@@ -261,7 +220,7 @@ int main(int argc, char** argv) {
         return -1;
       }
 
-      err = toggle_clk(path, idx, subcmd);
+      err = toggle_clk(client, idx, subcmd);
       if (err) {
         printf("Clock Toggle failed\n");
       }

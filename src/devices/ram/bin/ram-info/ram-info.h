@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.ram.metrics/cpp/wire.h>
 #include <lib/zx/result.h>
-#include <stdio.h>
 
 #include <array>
 #include <string>
@@ -61,7 +60,8 @@ class CsvPrinter : public Printer {
 zx::result<std::array<uint64_t, fuchsia_hardware_ram_metrics::wire::kMaxCountChannels>>
 ParseChannelString(std::string_view str);
 
-std::tuple<zx::channel, ram_info::RamDeviceInfo> ConnectToRamDevice();
+std::tuple<fidl::ClientEnd<fuchsia_hardware_ram_metrics::Device>, ram_info::RamDeviceInfo>
+ConnectToRamDevice();
 
 zx_status_t MeasureBandwith(
     const Printer* printer, fidl::UnownedClientEnd<fuchsia_hardware_ram_metrics::Device> client_end,

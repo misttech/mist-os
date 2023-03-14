@@ -5,38 +5,35 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-executable("ram-info") {
-  sources = [
-    "main.cc",
-    "ram-info.cc",
+source_set("lib") {
+  sources = [ "ram-info.cc" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp_wire",
+    "//zircon/system/ulib/zx",
   ]
   deps = [
-    "//build/validate:non_production_tag",
-    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp_wire",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
+    "//sdk/lib/component/incoming/cpp",
     "//src/devices/lib/amlogic",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
+  ]
+}
+
+executable("ram-info") {
+  sources = [ "main.cc" ]
+  deps = [
+    ":lib",
+    "//build/validate:non_production_tag",
+    "//sdk/lib/component/incoming/cpp",
   ]
 }
 
 test("ram-info-test-bin") {
   output_name = "ram-info-test"
-  sources = [
-    "ram-info-test.cc",
-    "ram-info.cc",
-  ]
+  sources = [ "ram-info-test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp_wire",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
-    "//src/devices/lib/amlogic",
+    ":lib",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }
