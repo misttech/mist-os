@@ -27,7 +27,6 @@ class StubDevice : public Device {
   // Device implementation.
   async_dispatcher* GetDispatcher() override;
   DeviceInspect* GetInspect() override;
-  bool IsNetworkDeviceBus() const override { return false; }
 
   zx_status_t DeviceInit() override;
   zx_status_t DeviceAdd(device_add_args_t* args, zx_device_t** out_device) override;

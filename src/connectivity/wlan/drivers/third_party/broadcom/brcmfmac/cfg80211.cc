@@ -3918,11 +3918,7 @@ void brcmf_if_eapol_req(net_device* ndev, const wlan_fullmac_eapol_req_t* req) {
   // Ethernet header length + EAPOL PDU length
   packet_length = 2 * ETH_ALEN + sizeof(uint16_t) + req->data_count;
 
-  if (ndev_to_if(ndev)->drvr->device->IsNetworkDeviceBus()) {
-    brcmf_if_eapol_req_netdev(ndev, req, packet_length);
-  } else {
-    ZX_PANIC("brcmfmac should always use network device!");
-  }
+  brcmf_if_eapol_req_netdev(ndev, req, packet_length);
 }
 
 static void brcmf_get_bwcap(struct brcmf_if* ifp, uint32_t bw_cap[]) {
@@ -4409,11 +4405,7 @@ void brcmf_if_query_mac_sublayer_support(net_device* ndev, mac_sublayer_support_
   BRCMF_IFDBG(WLANIF, ndev, "Query MAC sublayer feature support request received from SME.");
 
   memset(resp, 0, sizeof(*resp));
-  if (ndev_to_if(ndev)->drvr->device->IsNetworkDeviceBus()) {
-    resp->data_plane.data_plane_type = DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE;
-  } else {
-    resp->data_plane.data_plane_type = DATA_PLANE_TYPE_ETHERNET_DEVICE;
-  }
+  resp->data_plane.data_plane_type = DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE;
   resp->device.mac_implementation_type = MAC_IMPLEMENTATION_TYPE_FULLMAC;
 }
 

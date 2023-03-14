@@ -74,7 +74,7 @@ Device::~Device() { ShutdownDispatcher(); }
 
 zx_status_t Device::Init() {
   zx_status_t status = DeviceInit();
-  if (status == ZX_OK && IsNetworkDeviceBus()) {
+  if (status == ZX_OK) {
     status = network_device_.Init(kNetDevDriverName);
     if (status != ZX_OK) {
       BRCMF_ERR("Failed to initialize network device %s", zx_status_get_string(status));

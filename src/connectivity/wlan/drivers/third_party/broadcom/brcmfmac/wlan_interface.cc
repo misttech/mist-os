@@ -196,9 +196,7 @@ zx_status_t WlanInterface::Create(Device* device, const char* name, wireless_dev
       return ZX_ERR_INVALID_ARGS;
   }
 
-  if (device->IsNetworkDeviceBus()) {
-    interface->NetworkPort::Init(net_port_role);
-  }
+  interface->NetworkPort::Init(net_port_role);
 
   *out_interface = interface.release();  // This now has its lifecycle managed by the devhost.
   return ZX_OK;
@@ -485,10 +483,8 @@ void WlanInterface::WmmStatusReq() {
 }
 
 void WlanInterface::OnLinkStateChanged(bool online) {
-  if (device_->IsNetworkDeviceBus()) {
-    std::shared_lock<std::shared_mutex> guard(lock_);
-    SetPortOnline(online);
-  }
+  std::shared_lock<std::shared_mutex> guard(lock_);
+  SetPortOnline(online);
 }
 
 uint32_t WlanInterface::PortGetMtu() { return kEthernetMtu; }

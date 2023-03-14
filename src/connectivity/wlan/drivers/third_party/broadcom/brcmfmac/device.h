@@ -62,7 +62,6 @@ class Device : public DeviceType,
   // Virtual state accessors
   virtual async_dispatcher_t* GetDispatcher() = 0;
   virtual DeviceInspect* GetInspect() = 0;
-  virtual bool IsNetworkDeviceBus() const = 0;
 
   // ::ddk::Device implementation.
   void DdkInit(ddk::InitTxn txn);
