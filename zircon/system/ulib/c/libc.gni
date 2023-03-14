@@ -8,6 +8,11 @@ libc = "//zircon/system/ulib/c"
 # Root source directory for llvm-libc.
 llvm_libc = "//third_party/llvm-libc/src"
 
+declare_args() {
+  # **NOTE: Experimental** Use the llvm-libc implementations of string functions.
+  use_llvm_libc_string_functions = current_cpu == "riscv64"
+}
+
 libc_configs = [
   # These configs are needed for the expectations of the source code,
   # whether compiled into libc.so or into unit test code.

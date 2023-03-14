@@ -1,0 +1,24 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../libc.gni")
+
+llvm_libc_source_set("string") {
+  functions = [
+    "strcat",
+    "strcspn",
+    "strcpy",
+    "strdup",
+    "strncat",
+    "strncpy",
+    "strpbrk",
+    "strrchr",
+    "strspn",
+    "strstr",
+    "strtok",
+    "strtok_r",
+    "strchr",
+    "strcmp",
+  ]
+}

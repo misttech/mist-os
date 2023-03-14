@@ -26,6 +26,14 @@ libc_components = [
   "stdlib",
 ]
 
+libc_testonly_components = []
+
+if (use_llvm_libc_string_functions) {
+  libc_components += [ "string" ]
+} else {
+  libc_testonly_components += [ "string" ]
+}
+
 group("components") {
   visibility = [ ":*" ]
   deps = libc_components
@@ -38,7 +46,7 @@ group("unittests") {
           libc_components + [
                 "sanitizers",
                 "zircon",
-              ]) {
+              ] + libc_testonly_components) {
     deps += [ "$subdir:unittests" ]
   }
 }
