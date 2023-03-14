@@ -15,7 +15,7 @@ use emulator_instance::{
     get_instance_dir, write_to_disk, CpuArchitecture, EmulatorConfiguration, EmulatorInstanceData,
     EmulatorInstanceInfo, EngineState, EngineType, PointingDevice,
 };
-use ffx_emulator_common::config::QEMU_TOOL;
+use ffx_emulator_common::{config::QEMU_TOOL, target::remove_target};
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fidl_fuchsia_developer_ffx as ffx;
 use serde::{Deserialize, Serialize};
@@ -87,7 +87,12 @@ impl EmulatorEngine for QemuEngine {
         <Self as QemuBasedEngine>::show(self, details)
     }
 
-    async fn stop(&mut self) -> Result<()> {
+    async fn stop(&mut self, proxy: &ffx::TargetCollectionProxy) -> Result<()> {
+        let name = &self.emu_config().runtime.name;
+        if let Err(e) = remove_target(proxy, name).await {
+            // Even if we can't remove it, still continue shutting down.
+            tracing::warn!("Couldn't remove target from ffx during shutdown: {:?}", e);
+        }
         self.stop_emulator().await
     }
 

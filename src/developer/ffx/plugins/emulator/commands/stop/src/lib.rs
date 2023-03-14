@@ -8,9 +8,10 @@ use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_emulator_commands::get_engine_by_name;
 use ffx_emulator_stop_args::StopCommand;
+use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 
-#[ffx_plugin()]
-pub async fn stop(cmd: StopCommand) -> Result<()> {
+#[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
+pub async fn stop(cmd: StopCommand, proxy: TargetCollectionProxy) -> Result<()> {
     let mut names = vec![cmd.name];
     if cmd.all {
         names = match get_all_instances().await {
@@ -42,7 +43,7 @@ pub async fn stop(cmd: StopCommand) -> Result<()> {
             }
             Ok(Some(mut engine)) => {
                 println!("Stopping emulator '{}'...", name);
-                if let Err(e) = engine.stop().await {
+                if let Err(e) = engine.stop(&proxy).await {
                     eprintln!("Failed with the following error: {:?}", e);
                 }
             }
@@ -71,12 +72,16 @@ mod tests {
     async fn test_stop_existing() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let mut cmd = StopCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
 
         let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
         let instance_dir = get_instance_dir("one_instance", true).await?;
         write_to_disk(&data, &instance_dir)?;
         cmd.name = Some("one_instance".to_string());
-        stop(cmd).await?;
+        stop(cmd, proxy).await?;
         Ok(())
     }
 
@@ -84,9 +89,12 @@ mod tests {
     async fn test_stop_unknown() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let mut cmd = StopCommand::default();
-
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
         cmd.name = Some("unknown_instance".to_string());
-        stop(cmd).await?;
+        stop(cmd, proxy).await?;
         Ok(())
     }
 
@@ -94,12 +102,16 @@ mod tests {
     async fn test_stop_not_running() -> Result<()> {
         let _env = ffx_config::test_init().await.unwrap();
         let mut cmd = StopCommand::default();
+        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
+            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
+        >()
+        .unwrap();
 
         let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Staged);
         let instance_dir = get_instance_dir("one_instance", true).await?;
         write_to_disk(&data, &instance_dir)?;
         cmd.name = Some("one_instance".to_string());
-        stop(cmd).await?;
+        stop(cmd, proxy).await?;
         Ok(())
     }
 }
