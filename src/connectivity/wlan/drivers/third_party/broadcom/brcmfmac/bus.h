@@ -20,6 +20,8 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/stdcompat/span.h>
+#include <sys/types.h>
+#include <zircon/listnode.h>
 #include <zircon/time.h>
 
 #include <functional>
@@ -27,8 +29,6 @@
 
 #include <wlan/drivers/components/frame.h>
 #include <wlan/drivers/components/frame_container.h>
-
-#include "netbuf.h"
 
 // HW/SW bus in use
 enum brcmf_bus_type { BRCMF_BUS_TYPE_SDIO, BRCMF_BUS_TYPE_SIM };
@@ -70,7 +70,6 @@ struct brcmf_bus_ops {
   // Deprecated entry points.
   zx_status_t (*preinit)(brcmf_bus* bus);
   void (*stop)(brcmf_bus* bus);
-  zx_status_t (*txdata)(brcmf_bus* bus, struct brcmf_netbuf* netbuf);
   zx_status_t (*txframes)(brcmf_bus* bus, cpp20::span<wlan::drivers::components::Frame> frames);
   zx_status_t (*txctl)(brcmf_bus* bus, unsigned char* msg, uint len);
   zx_status_t (*rxctl)(brcmf_bus* bus, unsigned char* msg, uint len, int* rxlen_out);
@@ -129,10 +128,6 @@ static inline zx_status_t brcmf_bus_preinit(struct brcmf_bus* bus) {
 }
 
 static inline void brcmf_bus_stop(struct brcmf_bus* bus) { bus->ops->stop(bus); }
-
-static inline int brcmf_bus_txdata(struct brcmf_bus* bus, struct brcmf_netbuf* netbuf) {
-  return bus->ops->txdata(bus, netbuf);
-}
 
 static inline zx_status_t brcmf_bus_tx_frames(
     struct brcmf_bus* bus, cpp20::span<wlan::drivers::components::Frame> frames) {

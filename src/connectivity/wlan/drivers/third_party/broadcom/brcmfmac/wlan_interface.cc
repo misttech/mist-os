@@ -466,13 +466,7 @@ zx_status_t WlanInterface::SetMulticastPromisc(bool enable) {
 
 void WlanInterface::DataQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                                 ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ != nullptr) {
-    brcmf_if_data_queue_tx(wdev_->netdev, options, netbuf, completion_cb, cookie);
-  } else {
-    // We must fire the completion callback even if the device is being torn down.
-    completion_cb(cookie, ZX_ERR_BAD_STATE, netbuf);
-  }
+  ZX_PANIC("DataQueueTx should not ever be called, we're using netdevice");
 }
 
 void WlanInterface::SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {

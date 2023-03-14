@@ -65,7 +65,6 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil_types.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect/device_inspect.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/linuxisms.h"
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/netbuf.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/proto.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/workqueue.h"
 #include "third_party/bcmdhd/crossdriver/bcmwifi_channels.h"
@@ -3881,18 +3880,6 @@ static void brcmf_populate_eapol_eth_header(uint8_t* dest, const wlan_fullmac_ea
   memcpy(dest + 2 * ETH_ALEN + sizeof(uint16_t), req->data_list, req->data_count);
 }
 
-static void brcmf_if_eapol_req_ethernet(net_device* ndev, const wlan_fullmac_eapol_req_t* req,
-                                        int length) {
-  auto packet_data = std::make_unique<char[]>(length);
-
-  brcmf_populate_eapol_eth_header(reinterpret_cast<uint8_t*>(packet_data.get()), req);
-
-  auto packet = std::make_unique<wlan::brcmfmac::AllocatedNetbuf>(std::move(packet_data), length);
-  brcmf_netdev_start_xmit(ndev, std::move(packet));
-
-  brcmf_send_eapol_confirm(ndev, req, ZX_OK);
-}
-
 static void brcmf_if_eapol_req_netdev(net_device* ndev, const wlan_fullmac_eapol_req_t* req,
                                       int length) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
@@ -3934,7 +3921,7 @@ void brcmf_if_eapol_req(net_device* ndev, const wlan_fullmac_eapol_req_t* req) {
   if (ndev_to_if(ndev)->drvr->device->IsNetworkDeviceBus()) {
     brcmf_if_eapol_req_netdev(ndev, req, packet_length);
   } else {
-    brcmf_if_eapol_req_ethernet(ndev, req, packet_length);
+    ZX_PANIC("brcmfmac should always use network device!");
   }
 }
 
@@ -4739,12 +4726,6 @@ zx_status_t brcmf_if_get_iface_histogram_stats(net_device* ndev,
   out_stats->snr_histograms_list = ndev->stats.snr_histograms.data();
 
   return ZX_OK;
-}
-
-void brcmf_if_data_queue_tx(net_device* ndev, uint32_t options, ethernet_netbuf_t* netbuf,
-                            ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-  auto b = std::make_unique<wlan::brcmfmac::EthernetNetbuf>(netbuf, completion_cb, cookie);
-  brcmf_netdev_start_xmit(ndev, std::move(b));
 }
 
 zx_status_t brcmf_if_sae_handshake_resp(net_device* ndev,

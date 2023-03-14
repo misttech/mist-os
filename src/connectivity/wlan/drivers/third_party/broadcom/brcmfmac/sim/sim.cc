@@ -58,11 +58,6 @@ static const struct brcmf_bus_ops brcmf_sim_bus_ops = {
         },
     .preinit = [](brcmf_bus* bus) { return BUS_OP(bus)->BusPreinit(); },
     .stop = [](brcmf_bus* bus) { return BUS_OP(bus)->BusStop(); },
-    .txdata =
-        [](brcmf_bus* bus, brcmf_netbuf* netbuf) {
-          ZX_PANIC("txdata should not be called");
-          return ZX_ERR_NOT_SUPPORTED;
-        },
     .txframes =
         [](brcmf_bus* bus, cpp20::span<wlan::drivers::components::Frame> frames) {
           return BUS_OP(bus)->BusTxFrames(frames);

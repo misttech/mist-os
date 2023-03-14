@@ -47,7 +47,6 @@
 #include "fweh.h"
 #include "fwil_types.h"
 #include "linuxisms.h"
-#include "netbuf.h"
 #include "recovery/recovery_trigger.h"
 #include "workqueue.h"
 
@@ -90,25 +89,6 @@ static inline bool address_is_broadcast(const uint8_t* address) {
   static_assert(ETH_ALEN == 6, "Oops");
   return !memcmp(address, all_ones, ETH_ALEN);
 }
-
-/**
- * struct brcmf_ampdu_rx_reorder - AMPDU receive reorder info
- *
- * @pktslots: dynamic allocated array for ordering AMPDU packets.
- * @flow_id: AMPDU flow identifier.
- * @cur_idx: last AMPDU index from firmware.
- * @exp_idx: expected next AMPDU index.
- * @max_idx: maximum amount of packets per AMPDU.
- * @pend_pkts: number of packets currently in @pktslots.
- */
-struct brcmf_ampdu_rx_reorder {
-  struct brcmf_netbuf** pktslots;
-  uint8_t flow_id;
-  uint8_t cur_idx;
-  uint8_t exp_idx;
-  uint8_t max_idx;
-  uint8_t pend_pkts;
-};
 
 /* Forward decls for struct brcmf_pub (see below) */
 struct brcmf_proto;     /* device communication protocol info */
@@ -160,8 +140,6 @@ struct brcmf_pub {
   unsigned char proto_buf[BRCMF_DCMD_MAXLEN];
 
   struct brcmf_fweh_info fweh;
-
-  struct brcmf_ampdu_rx_reorder* reorder_flows[BRCMF_AMPDU_RX_REORDER_MAXFLOWS];
 
   uint32_t feat_flags;
   uint32_t chip_quirks;
@@ -266,8 +244,6 @@ void brcmf_write_net_device_name(struct net_device* dev, const char* name);
 struct net_device* brcmf_allocate_net_device(size_t priv_size, const char* name);
 void brcmf_free_net_device(struct net_device* dev);
 void brcmf_netdev_wait_pend8021x(struct brcmf_if* ifp);
-void brcmf_netdev_start_xmit(struct net_device* ndev,
-                             std::unique_ptr<wlan::brcmfmac::Netbuf> netbuf);
 zx_status_t brcmf_start_xmit(struct brcmf_pub* drvr,
                              cpp20::span<wlan::drivers::components::Frame> frames);
 

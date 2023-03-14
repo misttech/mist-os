@@ -25,34 +25,11 @@
 #include "brcmu_utils.h"
 #include "debug.h"
 #include "linuxisms.h"
-#include "netbuf.h"
 
 #define SSID_PREFIX "<ssid-"
 #define SSID_PREFIX_LEN strlen(SSID_PREFIX)
 #define SSID_SUFFIX ">"
 #define SSID_SUFFIX_LEN strlen(SSID_SUFFIX)
-
-struct brcmf_netbuf* brcmu_pkt_buf_get_netbuf(uint len) {
-  struct brcmf_netbuf* netbuf;
-
-  netbuf = brcmf_netbuf_allocate(len);
-  if (netbuf) {
-    brcmf_netbuf_grow_tail(netbuf, len);
-    netbuf->priority = 0;
-  }
-
-  return netbuf;
-}
-
-/* Free the driver packet. Free the tag if present */
-void brcmu_pkt_buf_free_netbuf(struct brcmf_netbuf* netbuf) {
-  if (!netbuf) {
-    return;
-  }
-
-  WARN_ON(brcmf_netbuf_maybe_in_list(netbuf));
-  brcmf_netbuf_free(netbuf);
-}
 
 /* Produce a human-readable string for boardrev */
 char* brcmu_boardrev_str(uint32_t brev, char* buf) {

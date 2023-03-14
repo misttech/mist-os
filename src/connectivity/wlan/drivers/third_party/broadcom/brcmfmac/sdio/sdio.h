@@ -182,6 +182,8 @@
 /* Maximum attempt times for firmware and nvram downloading */
 #define FILE_LOAD_MAX_ATTEMPTS 5
 
+#define SDIOD_SIZE_ALIGNMENT 4
+
 /*
  * enum brcmf_sdiod_state - the state of the bus.
  *

@@ -22,7 +22,6 @@
 
 #include "core.h"
 #include "fwil_types.h"
-#include "netbuf.h"
 
 // The bcme_status_t was introduced to typecheck handling of firmware error codes.
 // Because the firmware uses brcmf_proto_bcdc_dcmd directly, we must ensure
@@ -103,7 +102,6 @@ zx_status_t brcmf_proto_bcdc_attach(brcmf_pub* drvr);
 void brcmf_proto_bcdc_detach(brcmf_pub* drvr);
 zx_status_t brcmf_proto_bcdc_reset(brcmf_pub* drvr);
 void brcmf_proto_bcdc_txflowblock(brcmf_pub* drvr, bool state);
-void brcmf_proto_bcdc_txcomplete(brcmf_pub* drvr, brcmf_netbuf* txp, bool success);
 void brcmf_proto_bcdc_txcomplete(brcmf_pub* drvr,
                                  cpp20::span<wlan::drivers::components::Frame> frames,
                                  zx_status_t result);

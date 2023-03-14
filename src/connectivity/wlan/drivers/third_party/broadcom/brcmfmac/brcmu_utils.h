@@ -18,11 +18,13 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BRCMU_UTILS_H_
 
 #include <fuchsia/hardware/wlan/fullmac/c/banjo.h>
+#include <stdlib.h>
+#include <string.h>
 #include <zircon/compiler.h>
 
-#include <third_party/bcmdhd/crossdriver/dhd.h>
+#include <string>
 
-#include "netbuf.h"
+#include <third_party/bcmdhd/crossdriver/dhd.h>
 
 /*
  * Spin at most 'us' microseconds while 'exp' is true.
@@ -66,10 +68,6 @@
 
 /* 18-bytes of Ethernet address buffer length */
 #define ETHER_ADDR_STR_LEN 18
-
-/* packet primitives */
-struct brcmf_netbuf* brcmu_pkt_buf_get_netbuf(uint len);
-void brcmu_pkt_buf_free_netbuf(struct brcmf_netbuf* netbuf);
 
 /* externs */
 /* ip address */

@@ -61,12 +61,10 @@ source_set("util") {
 source_set("linuxisms") {
   sources = [
     "linuxisms.cc",
-    "netbuf.cc",
     "workqueue.cc",
   ]
   public = [
     "linuxisms.h",
-    "netbuf.h",
     "workqueue.h",
   ]
   deps = [

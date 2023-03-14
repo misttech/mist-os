@@ -39,7 +39,6 @@
 #include "fwil_types.h"
 #include "inspect/device_inspect.h"
 #include "linuxisms.h"
-#include "netbuf.h"
 #include "proto.h"
 #include "workqueue.h"
 
@@ -239,53 +238,6 @@ void brcmf_netdev_set_allmulti(struct net_device* ndev) {
   }
 }
 
-void brcmf_netdev_start_xmit(struct net_device* ndev,
-                             std::unique_ptr<wlan::brcmfmac::Netbuf> netbuf) {
-  zx_status_t ret;
-  struct brcmf_if* ifp = ndev_to_if(ndev);
-  struct brcmf_pub* drvr = ifp->drvr;
-  struct ethhdr eh;
-  const size_t netbuf_size = netbuf->size();
-
-  BRCMF_DBG(DATA, "Enter, bsscfgidx=%d", ifp->bsscfgidx);
-
-  /* Can the device send data? */
-  if (drvr->bus_if->state != BRCMF_BUS_UP) {
-    BRCMF_ERR("xmit rejected state=%d", drvr->bus_if->state);
-    netif_stop_queue(ndev);
-    ret = ZX_ERR_UNAVAILABLE;
-    goto done;
-  }
-
-  /* validate length for ether packet */
-  if (netbuf->size() < sizeof(eh)) {
-    ret = ZX_ERR_INVALID_ARGS;
-    netbuf->Return(ret);
-    goto done;
-  }
-  eh = *(struct ethhdr*)(netbuf->data());
-
-  if (eh.h_proto == htobe16(ETH_P_PAE)) {
-    ifp->pend_8021x_cnt.fetch_add(1);
-  }
-
-  netbuf->SetPriority(wlan::drivers::components::Get80211UserPriority(
-      reinterpret_cast<const uint8_t*>(netbuf->data()), netbuf->size()));
-
-  ret = brcmf_proto_tx_queue_data(drvr, ifp->ifidx, std::move(netbuf));
-  if (ret != ZX_OK) {
-    brcmf_txfinalize(ifp, &eh, false);
-  }
-
-done:
-  if (ret != ZX_OK) {
-    ndev->stats.tx_dropped++;
-  } else {
-    ndev->stats.tx_packets++;
-    ndev->stats.tx_bytes += netbuf_size;
-  }
-  /* No status to return: we always eat the packet */
-}
 
 void brcmf_tx_complete(struct brcmf_pub* drvr, cpp20::span<wlan::drivers::components::Frame> frames,
                        zx_status_t result) {
