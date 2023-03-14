@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/images/zedboot/zedboot_args.gni")
 import("//src/sys/core/build/core.gni")
 
@@ -27,16 +28,22 @@ template("assemble_network_conformance_system") {
     restrict_core_env_to_base = false
   }
 
+  product_assembly_configuration(target_name + ".product_assembly_config") {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "utility"
+    }
+  }
+
   assembled_system(target_name) {
     testonly = true
-    product_assembly_config_label = "//build/assembly:default_product_config"
+    product_assembly_config_label = ":${target_name}.product_assembly_config"
 
     base_packages = [
       "//src/developer/sshd-host",
       "//src/developer/sshd-host:config",
       "//src/sys/process-resolver",
       "//src/connectivity/network",
-      "//src/connectivity/network:netstack",
       "//src/connectivity/network/mdns/bundles:config",
       "//src/connectivity/network/mdns/bundles:services",
       "//src/connectivity/network/netcfg:config-default",
@@ -47,8 +54,6 @@ template("assemble_network_conformance_system") {
       "//src/security/bin/root_ssl_certificates",
       "//src/sys/appmgr:appmgr_scheme_config",
       "//src/sys/appmgr",
-      "//src/sys/pkg/bin/pkg-cache",
-      "//src/sys/pkg/bin/pkg-resolver",
       "//src/sys/full-resolver",
     ]
     base_packages += invoker.additional_base_packages

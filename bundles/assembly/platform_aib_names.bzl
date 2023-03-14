@@ -8,6 +8,7 @@
 PLATFORM_AIB_NAMES = [
     "bootstrap",
     "core_realm",
+    "core_realm_networking",
     "common_minimal",
     "common_minimal_userdebug",
     "empty_live_usb",

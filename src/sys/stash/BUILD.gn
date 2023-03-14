@@ -88,7 +88,6 @@ fuchsia_component("stash2_v2") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("for_transition") {
-  public_deps = [ ":pkg" ]
 }
 
 fuchsia_package("pkg") {

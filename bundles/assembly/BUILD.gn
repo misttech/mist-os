@@ -208,17 +208,6 @@ assembly_input_bundle("core_realm") {
 
     # Build-Information
     "//src/developer/build_info:build-info-service",
-
-    # Hardware Information
-    "//src/hwinfo:hwinfo",
-
-    # System Time
-    "//src/sys/time/timekeeper",
-    "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
-    "//src/sys/time/httpsdate_time_source:httpsdate-time-source-pull",
-
-    # Other
-    "//src/sys/stash:pkg",
   ]
 
   compiled_packages = [
@@ -237,6 +226,33 @@ assembly_input_bundle("core_realm") {
         ]
       }
     },
+  ]
+}
+
+# core_realm_networking
+#
+# This AIB adds all the children of `/core` that are expected to be present if
+# networking is enabled.
+#
+# It does _not_ include either the `network` or `netstack` packages themselves,
+# as which specific variant of those is added is controllable by the product, so
+# they are in separate AIBs.
+#
+# "Utility" systems get this in the 'user' build-type only if they request that
+# networking is added.  All other build-types (and all "minimal" systems) get
+# this AIB by mandatory inclusion.
+assembly_input_bundle("core_realm_networking") {
+  base_packages = [
+    # Hardware Information
+    "//src/hwinfo",
+
+    # System Time
+    "//src/sys/time/timekeeper",
+    "//src/sys/time/httpsdate_time_source:httpsdate-time-source",
+    "//src/sys/time/httpsdate_time_source:httpsdate-time-source-pull",
+
+    # Other
+    "//src/sys/stash:pkg",
   ]
 }
 

@@ -49,7 +49,6 @@ fuchsia_component("build-info") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("for_transition") {
-  public_deps = [ ":build-info-service" ]
 }
 
 fuchsia_package("build-info-service") {
@@ -61,8 +60,9 @@ fuchsia_shell_package("build-info-shell") {
   deps = [ ":shell_bin" ]
 }
 
-core_shard("build_info_core_shard") {
-  shard_file = "meta/build_info.core_shard.cml"
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("build_info_core_shard") {
 }
 
 executable("test-bin") {

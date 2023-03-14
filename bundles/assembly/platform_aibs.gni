@@ -13,8 +13,13 @@ platform_aib_names = [
   # The bootstrap feature-set-level
   "bootstrap",
 
-  # The core realm
+  ## The core realm bundles
+
+  # `/core` itself
   "core_realm",
+
+  # The additional children of core we add when we have networking enabled
+  "core_realm_networking",
 
   # The minimal feature-set-level
   "common_minimal",
