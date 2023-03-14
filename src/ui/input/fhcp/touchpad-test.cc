@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-#include <lib/fdio/fdio.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
+#include <lib/fdio/watcher.h>
 #include <lib/fhcp/cpp/fhcp.h>
 #include <lib/fit/function.h>
 #include <lib/sync/cpp/completion.h>
@@ -147,54 +148,63 @@ void ConnectToTouchpad(fidl::WireSyncClient<fir::InputDevice>* out_client,
 
   // Iterate over the devices in /dev/class/input-report/ looking for the one that corresponds to
   // the touchpad.
-  const char* devfs_path = "/dev/class/input-report/";
-  DIR* dir = opendir(devfs_path);
-  ASSERT_NE(dir, nullptr);
+  constexpr char kInputReportDevPath[] = "/dev/class/input-report";
+  // TODO(https://fxbug.dev/113882): Use a nicer wrapper for this pattern when
+  // it exists.
+  fbl::unique_fd fd;
+  ASSERT_EQ(fdio_open_fd(kInputReportDevPath, /*flags=*/0, fd.reset_and_get_address()), ZX_OK);
+  std::pair out = std::make_pair(out_client, out_midpoints);
+  ASSERT_EQ(fdio_watch_directory(
+                fd.get(),
+                [](int dirfd, int event, const char* fn, void* cookie) {
+                  if (std::string_view{fn} == ".") {
+                    return ZX_OK;
+                  }
+                  if (event != WATCH_EVENT_ADD_FILE) {
+                    return ZX_OK;
+                  }
+                  fdio_cpp::UnownedFdioCaller caller(dirfd);
+                  zx::result client_end =
+                      component::ConnectAt<fir::InputDevice>(caller.directory(), fn);
+                  if (client_end.is_error()) {
+                    return client_end.error_value();
+                  }
+                  fidl::WireSyncClient input_device_client(std::move(client_end.value()));
 
-  struct dirent* de;
-  while ((de = readdir(dir)) != nullptr) {
-    if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, "..")) {
-      continue;
-    }
+                  // Get the device's descriptor and skip devices that aren't touchpads.
+                  const fidl::WireResult descriptor_result = input_device_client->GetDescriptor();
+                  if (!descriptor_result.ok()) {
+                    return descriptor_result.status();
+                  }
+                  const fidl::WireResponse descriptor_response = descriptor_result.value();
+                  if (!descriptor_response.descriptor.has_touch() ||
+                      descriptor_response.descriptor.touch().input().touch_type() !=
+                          fir::TouchType::kTouchpad) {
+                    return ZX_OK;
+                  }
 
-    // Open the /dev/class entry as an InputDevice FIDL client.
-    fbl::unique_fd fd(openat(dirfd(dir), de->d_name, O_RDONLY));
-    ASSERT_TRUE(fd.is_valid());
+                  // Need at least one contact entry to get the dimensions of the touchpad.
+                  if (descriptor_response.descriptor.touch().input().contacts().empty()) {
+                    return ZX_ERR_BAD_STATE;
+                  }
+                  const fir::wire::ContactInputDescriptor& contact =
+                      descriptor_response.descriptor.touch().input().contacts()[0];
+                  int64_t min_x = contact.position_x().range.min;
+                  int64_t max_x = contact.position_x().range.max;
+                  int64_t min_y = contact.position_y().range.min;
+                  int64_t max_y = contact.position_y().range.max;
+                  Midpoints midpoints{
+                      .x_midpoint = (max_x + min_x) / 2,
+                      .y_midpoint = (max_y + min_y) / 2,
+                  };
+                  auto [out_client, out_midpoints] = *reinterpret_cast<decltype(&out)>(cookie);
+                  *out_client = std::move(input_device_client);
+                  *out_midpoints = midpoints;
 
-    zx::channel chan;
-    zx_status_t status = fdio_get_service_handle(fd.release(), chan.reset_and_get_address());
-    ASSERT_EQ(ZX_OK, status);
-
-    auto input_device_client =
-        fidl::WireSyncClient(fidl::ClientEnd<fir::InputDevice>(std::move(chan)));
-
-    // Get the device's descriptor and skip devices that aren't touchpads.
-    auto descriptor_result = input_device_client->GetDescriptor();
-    ASSERT_EQ(ZX_OK, descriptor_result.status());
-    if (!descriptor_result->descriptor.has_touch() ||
-        descriptor_result->descriptor.touch().input().touch_type() != fir::TouchType::kTouchpad) {
-      continue;
-    }
-
-    // Need at least one contact entry to get the dimensions of the touchpad.
-    ASSERT_FALSE(descriptor_result->descriptor.touch().input().contacts().empty());
-    const fir::wire::ContactInputDescriptor& contact =
-        descriptor_result->descriptor.touch().input().contacts()[0];
-    int64_t min_x = contact.position_x().range.min;
-    int64_t max_x = contact.position_x().range.max;
-    int64_t min_y = contact.position_y().range.min;
-    int64_t max_y = contact.position_y().range.max;
-    Midpoints midpoints{
-        .x_midpoint = (max_x + min_x) / 2,
-        .y_midpoint = (max_y + min_y) / 2,
-    };
-
-    *out_client = std::move(input_device_client);
-    *out_midpoints = midpoints;
-    return;
-  }
-
-  FAIL() << "no touchpad device found under " << devfs_path;
+                  return ZX_ERR_STOP;
+                },
+                ZX_TIME_INFINITE, &out),
+            ZX_ERR_STOP);
 }
 
 void ConfigureTouchEvents(fidl::WireSyncClient<fir::InputDevice>& client) {
