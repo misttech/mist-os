@@ -11,8 +11,7 @@ group("tests") {
   deps = []
 
   if (host_os == "linux") {
-    # Disabled: See https://fxbug.dev/118767
-    #deps += [ ":oom_tests($host_toolchain)" ]
+    deps += [ ":oom_tests($host_toolchain)" ]
   }
 }
 
