@@ -135,7 +135,7 @@ Do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx component show qemu_edu.cm
-                  Moniker:  /bootstrap/universe-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl
+                  Moniker:  /bootstrap/full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl
                       URL:  fuchsia-pkg://bazel.pkg.component/qemu_edu#meta/qemu_edu.cm
               Instance ID:  None
                      Type:  CML Component
@@ -161,8 +161,8 @@ Do the following:
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx log --tags qemu-edu dump
    2022-10-27 21:19:30.189][<ffx>]: logger started.
-   [184.040][universe-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:65] edu device version major=1 minor=0
-   [184.073][universe-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:117] Exported devfs_path=sys/platform/pt/PCI0/bus/00:06.0_/qemu-edu service_path=examples.qemuedu.Service/default/device
+   [184.040][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:65] edu device version major=1 minor=0
+   [184.073][full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl][qemu-edu,driver][I]: [src/qemu_edu/drivers/qemu_edu.cc:117] Exported devfs_path=sys/platform/pt/PCI0/bus/00:06.0_/qemu-edu service_path=examples.qemuedu.Service/default/device
    ```
 
 <!-- Reference links -->

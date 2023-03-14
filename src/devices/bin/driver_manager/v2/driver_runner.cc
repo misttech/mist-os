@@ -144,8 +144,8 @@ fidl::StringView CollectionName(Collection collection) {
       return "boot-drivers";
     case Collection::kPackage:
       return "pkg-drivers";
-    case Collection::kUniversePackage:
-      return "universe-pkg-drivers";
+    case Collection::kFullPackage:
+      return "full-pkg-drivers";
   }
 }
 
@@ -364,7 +364,7 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
   // TODO(fxb/98474) Stop doing the url prefix check and just rely on the package_type.
   auto collection = cpp20::starts_with(url, kBootScheme) ? Collection::kBoot : Collection::kPackage;
   if (package_type == fdi::DriverPackageType::kUniverse) {
-    collection = Collection::kUniversePackage;
+    collection = Collection::kFullPackage;
   }
   node.set_collection(collection);
   auto create = CreateComponent(node.MakeComponentMoniker(), collection, std::string(url),

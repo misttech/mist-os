@@ -230,7 +230,7 @@ ffx log --filter qemu_edu
 ```none {:.devsite-disable-click-to-copy}
 [driver_index][driver_index,driver][I] Registered driver successfully: fuchsia-pkg://bazel.pkg.component/qemu_edu#meta/qemu_edu.cm.
 [driver_manager][driver_manager.cm][I]: [driver_runner.cc:959] Binding fuchsia-pkg://bazel.pkg.component/qemu_edu#meta/qemu_edu.cm to  00_06_0_
-{{ '<strong>' }}[universe-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_][qemu-edu,driver][I]: [fuchsia-codelab/qemu_edu/qemu_edu.cc:28] edu driver loaded successfully{{ '</strong>' }}
+{{ '<strong>' }}[full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_][qemu-edu,driver][I]: [fuchsia-codelab/qemu_edu/qemu_edu.cc:28] edu driver loaded successfully{{ '</strong>' }}
 [driver-hosts:driver-host-3][][I]: [../../src/devices/bin/driver_host2/driver_host.cc:349] Started driver url=fuchsia-pkg://bazel.pkg.component/qemu_edu#meta/qemu_edu.cm
 ```
 

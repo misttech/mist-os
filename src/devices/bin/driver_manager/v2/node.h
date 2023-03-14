@@ -86,7 +86,7 @@ enum class Collection {
   // Collection for package drivers.
   kPackage,
   // Collection for universe package drivers.
-  kUniversePackage,
+  kFullPackage,
 };
 
 enum class RemovalSet {

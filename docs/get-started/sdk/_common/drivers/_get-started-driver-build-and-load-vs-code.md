@@ -135,7 +135,7 @@ In VS Code, do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx component show qemu_edu.cm
-                  Moniker:  /bootstrap/universe-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl
+                  Moniker:  /bootstrap/full-pkg-drivers:root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl
                       URL:  fuchsia-pkg://bazel.pkg.component/qemu_edu#meta/qemu_edu.cm
               Instance ID:  None
                      Type:  CML Component

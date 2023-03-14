@@ -80,8 +80,8 @@ const char* CollectionName(Collection collection) {
       return "boot-drivers";
     case Collection::kPackage:
       return "pkg-drivers";
-    case Collection::kUniversePackage:
-      return "universe-pkg-drivers";
+    case Collection::kFullPackage:
+      return "full-pkg-drivers";
   }
 }
 
@@ -552,7 +552,7 @@ void Node::FinishRestart() {
     case Collection::kPackage:
       pkg_type = fuchsia_driver_index::DriverPackageType::kBase;
       break;
-    case Collection::kUniversePackage:
+    case Collection::kFullPackage:
       pkg_type = fuchsia_driver_index::DriverPackageType::kUniverse;
       break;
   }
