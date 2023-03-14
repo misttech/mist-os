@@ -163,7 +163,6 @@ hlcpp_visibility = [
   "//src/devices/bin/driver_manager/v2:*",
   "//src/devices/bus/drivers/platform/test:*",
   "//src/devices/lib/sysmem:*",
-  "//src/devices/radar/bin/radar-proxy:*",
   "//src/devices/securemem/drivers/aml-securemem:*",
   "//src/devices/sysmem/bin/sysmem_connector:*",
   "//src/devices/sysmem/drivers/sysmem:*",
