@@ -98,16 +98,8 @@ void Client::ImportImage2(ImportImage2RequestView request, ImportImage2Completer
   dc_image.pixel_format = request->image_config.pixel_format;
   dc_image.type = request->image_config.type;
 
-  zx_status_t status;
-  if (collections.display_controller_buffer_collection_id) {
-    status = controller_->dc()->ImportImage2(
-        &dc_image, *collections.display_controller_buffer_collection_id, request->index);
-  } else {
-    status = controller_->dc()->ImportImage(
-        &dc_image, collections.driver_fallback.client_end().borrow().channel()->get(),
-        request->index);
-  }
-
+  zx_status_t status = controller_->dc()->ImportImage2(
+      &dc_image, collections.display_controller_buffer_collection_id, request->index);
   if (status != ZX_OK) {
     completer.Reply(status);
     return;
@@ -170,53 +162,17 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
     return;
   }
 
-  std::optional<uint64_t> display_controller_buffer_collection_id =
-      [&]() -> std::optional<uint64_t> {
-    std::vector<zx_rights_t> rights = {ZX_RIGHT_SAME_RIGHTS};
-    auto duplicate_result =
-        fidl::WireCall(request->collection_token)
-            ->DuplicateSync(fidl::VectorView<zx_rights_t>::FromExternal(rights));
-    if (!duplicate_result.ok()) {
-      zxlogf(WARNING, "Cannot duplicate collection token to import to driver: %s",
-             duplicate_result.status_string());
-      return std::nullopt;
-    }
-    auto& duplicate_value = duplicate_result.value();
-    if (duplicate_value.tokens.count() != rights.size()) {
-      zxlogf(WARNING, "Incorrect number of duplicated tokens received: %lu, expected %lu",
-             duplicate_value.tokens.count(), rights.size());
-      return std::nullopt;
-    }
-
-    uint64_t display_controller_buffer_collection_id = controller_->GetNextBufferCollectionId();
-    zx_status_t import_status = controller_->dc()->ImportBufferCollection(
-        display_controller_buffer_collection_id, duplicate_value.tokens[0].TakeChannel());
-    if (import_status != ZX_OK) {
-      zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
-             zx_status_get_string(import_status));
-      return std::nullopt;
-    }
-
-    return display_controller_buffer_collection_id;
-  }();
-
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
-  if (collection_endpoints.is_error()) {
+  uint64_t display_controller_buffer_collection_id = controller_->GetNextBufferCollectionId();
+  zx_status_t import_status = controller_->dc()->ImportBufferCollection(
+      display_controller_buffer_collection_id, request->collection_token.TakeChannel());
+  if (import_status != ZX_OK) {
+    zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
+           zx_status_get_string(import_status));
     completer.Reply(ZX_ERR_INTERNAL);
-    return;
-  }
-  auto& [collection_client, collection_server] = collection_endpoints.value();
-  if (!sysmem_allocator_
-           ->BindSharedCollection(std::move(request->collection_token),
-                                  std::move(collection_server))
-           .ok()) {
-    completer.Reply(ZX_ERR_INTERNAL);
-    return;
   }
 
   collection_map_[request->collection_id] = Collections{
       .display_controller_buffer_collection_id = display_controller_buffer_collection_id,
-      .driver_fallback = fidl::WireSyncClient(std::move(collection_client)),
   };
   completer.Reply(ZX_OK);
 }
@@ -228,15 +184,8 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
     return;
   }
 
-  if (it->second.display_controller_buffer_collection_id) {
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    controller_->dc()->ReleaseBufferCollection(*it->second.display_controller_buffer_collection_id);
-  }
-
-  if (it->second.driver_fallback.is_valid()) {
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-    (void)it->second.driver_fallback->Close();
-  }
+  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  controller_->dc()->ReleaseBufferCollection(it->second.display_controller_buffer_collection_id);
 
   collection_map_.erase(it);
 }
@@ -259,34 +208,14 @@ void Client::SetBufferCollectionConstraints(
 
   zx_status_t status = ZX_ERR_INTERNAL;
 
-  // Try using the imported buffer collection first.
-  if (collections.display_controller_buffer_collection_id) {
-    status = controller_->dc()->SetBufferCollectionConstraints2(
-        &dc_image, *collections.display_controller_buffer_collection_id);
-    if (status != ZX_OK) {
-      zxlogf(WARNING,
-             "Cannot set BufferCollection constraints using imported buffer "
-             "collection (id=%lu). Falling back to old BufferCollection client",
-             request->collection_id);
-      collections.display_controller_buffer_collection_id = std::nullopt;
-    }
+  status = controller_->dc()->SetBufferCollectionConstraints2(
+      &dc_image, collections.display_controller_buffer_collection_id);
+  if (status != ZX_OK) {
+    zxlogf(WARNING,
+           "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
+           request->collection_id, zx_status_get_string(status));
+    completer.Reply(ZX_ERR_INTERNAL);
   }
-
-  if (collections.display_controller_buffer_collection_id) {
-    // Set null BufferCollection constraints for `driver` so that it won't
-    // block sysmem Allocator.
-    fidl::Status set_constraints_status = collections.driver_fallback->SetConstraints(false, {});
-    if (!set_constraints_status.ok()) {
-      zxlogf(ERROR, "Cannot set null BufferCollection constraints for id=%lu",
-             request->collection_id);
-      completer.Reply(ZX_ERR_INTERNAL);
-      return;
-    }
-  } else {
-    status = controller_->dc()->SetBufferCollectionConstraints(
-        &dc_image, collections.driver_fallback.client_end().borrow().channel()->get());
-  }
-
   completer.Reply(status);
 }
 
@@ -789,16 +718,8 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   // capture start/release.
   image_t capture_image = {};
 
-  zx_status_t status;
-  if (collections.display_controller_buffer_collection_id) {
-    status = controller_->dc()->ImportImageForCapture2(
-        *collections.display_controller_buffer_collection_id, request->index,
-        &capture_image.handle);
-  } else {
-    status = controller_->dc()->ImportImageForCapture(
-        collections.driver_fallback.client_end().borrow().channel()->get(), request->index,
-        &capture_image.handle);
-  }
+  zx_status_t status = controller_->dc()->ImportImageForCapture2(
+      collections.display_controller_buffer_collection_id, request->index, &capture_image.handle);
 
   if (status == ZX_OK) {
     auto release_image = fit::defer(
@@ -1403,9 +1324,7 @@ void Client::TearDown() {
 
   // Release all imported buffer collections on display drivers.
   for (const auto& [k, v] : collection_map_) {
-    if (v.display_controller_buffer_collection_id) {
-      controller_->dc()->ReleaseBufferCollection(*v.display_controller_buffer_collection_id);
-    }
+    controller_->dc()->ReleaseBufferCollection(v.display_controller_buffer_collection_id);
   }
   collection_map_.clear();
 

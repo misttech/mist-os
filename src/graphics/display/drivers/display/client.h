@@ -323,24 +323,7 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
   struct Collections {
     // The BufferCollection ID used in fuchsia.hardware.display.Controller
     // protocol.
-    //
-    // If the display device doesn't support importing a BufferCollection,
-    // this field is set to std::nullopt, and display core will use
-    // `driver_fallback` client instead.
-    //
-    // TODO(fxbug.dev/121411): Once all the drivers fully support importing
-    // images using imported buffer collections, remove "std::optional" of
-    // this field.
-    std::optional<uint64_t> display_controller_buffer_collection_id;
-
-    // Borrowed to the hardware driver.
-    //
-    // This BufferCollection client is a fallback only used when
-    // `display_controller_buffer_collection_id` is nullopt.
-    //
-    // TODO(fxbug.dev/121411): Remove once all drivers fully support importing
-    // images using imported buffer collections.
-    fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> driver_fallback;
+    uint64_t display_controller_buffer_collection_id;
   };
   std::map<uint64_t, Collections> collection_map_;
 
