@@ -181,10 +181,10 @@ impl Environment for FshostEnvironment {
     async fn mount_data(&mut self, device: &mut dyn Device) -> Result<(), Error> {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
-        let format = match self.config.data_filesystem_format.as_ref() {
-            "fxfs" => DiskFormat::Fxfs,
-            "f2fs" => DiskFormat::F2fs,
-            // Default to minfs if no format type was provided.
+        // Default to minfs if we don't match expected filesystems.
+        let format: DiskFormat = match self.config.data_filesystem_format.as_str().into() {
+            DiskFormat::Fxfs => DiskFormat::Fxfs,
+            DiskFormat::F2fs => DiskFormat::F2fs,
             _ => DiskFormat::Minfs,
         };
 

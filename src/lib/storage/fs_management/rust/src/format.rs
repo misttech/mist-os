@@ -53,6 +53,29 @@ impl DiskFormat {
     }
 }
 
+/// The inverse of DiskFormat::as_str().
+impl From<&str> for DiskFormat {
+    fn from(s: &str) -> Self {
+        match s {
+            "gpt" => Self::Gpt,
+            "mbr" => Self::Mbr,
+            "minfs" => Self::Minfs,
+            "fat" => Self::Fat,
+            "blobfs" => Self::Blobfs,
+            "fvm" => Self::Fvm,
+            "zxcrypt" => Self::Zxcrypt,
+            "factoryfs" => Self::FactoryFs,
+            "block verity" => Self::BlockVerity,
+            "vbmeta" => Self::VbMeta,
+            "bootpart" => Self::BootPart,
+            "fxfs" => Self::Fxfs,
+            "f2fs" => Self::F2fs,
+            "nand broker" => Self::NandBroker,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 pub fn round_up(val: u64, divisor: u64) -> u64 {
     ((val + (divisor - 1)) / divisor) * divisor
 }
@@ -208,6 +231,30 @@ mod tests {
         select! {
           _ = mock_device => unreachable!(),
           format = detect_disk_format_res(&proxy).fuse() => format,
+        }
+    }
+
+    /// Confirm that we map to/from string consistently.
+    #[test]
+    fn to_from_str_test() {
+        for fmt in vec![
+            DiskFormat::Unknown,
+            DiskFormat::Gpt,
+            DiskFormat::Mbr,
+            DiskFormat::Minfs,
+            DiskFormat::Fat,
+            DiskFormat::Blobfs,
+            DiskFormat::Fvm,
+            DiskFormat::Zxcrypt,
+            DiskFormat::FactoryFs,
+            DiskFormat::BlockVerity,
+            DiskFormat::VbMeta,
+            DiskFormat::BootPart,
+            DiskFormat::Fxfs,
+            DiskFormat::F2fs,
+            DiskFormat::NandBroker,
+        ] {
+            assert_eq!(fmt, fmt.as_str().into());
         }
     }
 
