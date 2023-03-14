@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::hash_map::HashMap;
+use std::{
+    collections::hash_map::HashMap,
+    ops::{Deref as _, DerefMut as _},
+};
 
 use derivative::Derivative;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
@@ -13,7 +16,6 @@ use net_types::{
     SpecifiedAddr, UnicastAddr,
 };
 use netstack3_core::{
-    data_structures::id_map_collection::{Entry, IdMapCollection, IdMapCollectionKey},
     device::{handle_queued_rx_packets, DeviceId},
     Ctx,
 };
@@ -35,25 +37,25 @@ pub type BindingId = u64;
 /// information associated with the device, respectively, and default to the
 /// types used by `EventLoop` for brevity in the main use case. The type
 /// parameters are there to allow testing without dependencies on `core`.
-pub struct Devices<C: IdMapCollectionKey, I = DeviceSpecificInfo> {
-    devices: IdMapCollection<C, DeviceInfo<C, I>>,
-    // invariant: all values in id_map are valid keys in devices.
+pub struct Devices<C> {
     id_map: HashMap<BindingId, C>,
     last_id: BindingId,
 }
 
-impl<C: IdMapCollectionKey, I> Default for Devices<C, I> {
+impl<C> Default for Devices<C> {
     fn default() -> Self {
-        Self { devices: IdMapCollection::new(), id_map: HashMap::new(), last_id: 0 }
+        Self { id_map: HashMap::new(), last_id: 0 }
     }
 }
 
-impl<C, I> Devices<C, I>
+impl<C> Devices<C>
 where
-    C: IdMapCollectionKey + Clone + std::fmt::Debug,
+    C: Clone + std::fmt::Debug + PartialEq,
 {
     /// Allocates a new [`BindingId`].
-    fn alloc_id(last_id: &mut BindingId) -> BindingId {
+    #[must_use]
+    pub fn alloc_new_id(&mut self) -> BindingId {
+        let Self { id_map: _, last_id } = self;
         *last_id += 1;
         *last_id
     }
@@ -64,77 +66,35 @@ where
     /// currently tracked by [`Devices`]). A new [`BindingId`] will be allocated
     /// and a [`DeviceInfo`] struct will be created with the provided `info` and
     /// IDs.
-    pub fn add_device<F: FnOnce(BindingId) -> I>(
-        &mut self,
-        core_id: C,
-        info: F,
-    ) -> Option<BindingId> {
-        let Self { devices, id_map, last_id } = self;
-        match devices.entry(core_id) {
-            Entry::Occupied(_) => None,
-            Entry::Vacant(entry) => {
-                let id = Self::alloc_id(last_id);
-                let core_id = entry.key().clone();
-                assert_matches::assert_matches!(id_map.insert(id, core_id.clone()), None);
-                let _: &mut DeviceInfo<_, _> =
-                    entry.insert(DeviceInfo { id, core_id: core_id, info: info(id) });
-                Some(id)
-            }
-        }
+    pub fn add_device(&mut self, id: BindingId, core_id: C) {
+        let Self { id_map, last_id: _ } = self;
+        assert_matches::assert_matches!(id_map.insert(id, core_id.clone()), None);
     }
 
     /// Removes a device from the internal list.
     ///
     /// Removes a device from the internal [`Devices`] list and returns the
     /// associated [`DeviceInfo`] if `id` is found or `None` otherwise.
-    pub fn remove_device(&mut self, id: BindingId) -> Option<DeviceInfo<C, I>> {
-        let Self { devices, id_map, last_id: _ } = self;
-        id_map.remove(&id).and_then(|core_id| devices.remove(&core_id))
+    pub fn remove_device(&mut self, id: BindingId) -> Option<C> {
+        let Self { id_map, last_id: _ } = self;
+        id_map.remove(&id)
     }
 
     /// Gets an iterator over all tracked devices.
-    #[cfg(test)]
-    pub fn iter_devices(&self) -> impl Iterator<Item = &DeviceInfo<C, I>> {
-        self.devices.iter()
-    }
-
-    /// Retrieve device with [`BindingId`].
-    pub fn get_device(&self, id: BindingId) -> Option<&DeviceInfo<C, I>> {
-        let Self { devices, id_map, last_id: _ } = self;
-        id_map.get(&id).and_then(|device_id| devices.get(&device_id))
-    }
-
-    /// Retrieve mutable reference to device with [`BindingId`].
-    pub fn get_device_mut(&mut self, id: BindingId) -> Option<&mut DeviceInfo<C, I>> {
-        let Self { devices, id_map, last_id: _ } = self;
-        id_map.get(&id).and_then(move |core_id| devices.get_mut(&core_id))
+    pub fn iter_devices(&self) -> impl Iterator<Item = &C> {
+        self.id_map.iter().map(|(_binding_id, c)| c)
     }
 
     /// Retrieve associated `core_id` for [`BindingId`].
     pub fn get_core_id(&self, id: BindingId) -> Option<C> {
         self.id_map.get(&id).cloned()
     }
-
-    /// Retrieve non-mutable reference to device by associated [`CoreId`] `id`.
-    pub fn get_core_device(&self, id: &C) -> Option<&DeviceInfo<C, I>> {
-        self.devices.get(id)
-    }
-
-    /// Retrieve mutable reference to device by associated [`CoreId`] `id`.
-    pub fn get_core_device_mut(&mut self, id: &C) -> Option<&mut DeviceInfo<C, I>> {
-        self.devices.get_mut(id)
-    }
-
-    /// Retrieve associated `binding_id` for `core_id`.
-    pub fn get_binding_id(&self, core_id: C) -> Option<BindingId> {
-        self.devices.get(&core_id).map(|d| d.id)
-    }
 }
 
-impl<C: IdMapCollectionKey> Devices<C, DeviceSpecificInfo> {
+impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
     /// Retrieves the device with the given name.
-    pub fn get_device_by_name(&self, name: &str) -> Option<&DeviceInfo<C, DeviceSpecificInfo>> {
-        self.devices.iter().find(|d| d.info.common_info().name == name)
+    pub fn get_device_by_name(&self, name: &str) -> Option<&DeviceId<BindingsNonSyncCtxImpl>> {
+        self.iter_devices().find(|c| c.external_state().static_common_info().name == name)
     }
 }
 
@@ -146,17 +106,32 @@ pub enum DeviceSpecificInfo {
 }
 
 impl DeviceSpecificInfo {
-    pub fn common_info(&self) -> &CommonInfo {
+    pub fn static_common_info(&self) -> &StaticCommonInfo {
         match self {
-            Self::Netdevice(i) => &i.common_info,
-            Self::Loopback(i) => &i.common_info,
+            Self::Netdevice(i) => &i.static_common_info,
+            Self::Loopback(i) => &i.static_common_info,
         }
     }
 
-    pub fn common_info_mut(&mut self) -> &mut CommonInfo {
+    pub fn with_common_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
         match self {
-            Self::Netdevice(i) => &mut i.common_info,
-            Self::Loopback(i) => &mut i.common_info,
+            Self::Netdevice(i) => {
+                i.with_dynamic_info(|DynamicNetdeviceInfo { phy_up: _, common_info }| {
+                    cb(common_info)
+                })
+            }
+            Self::Loopback(i) => i.with_dynamic_info(cb),
+        }
+    }
+
+    pub fn with_common_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+        match self {
+            Self::Netdevice(i) => {
+                i.with_dynamic_info_mut(|DynamicNetdeviceInfo { phy_up: _, common_info }| {
+                    cb(common_info)
+                })
+            }
+            Self::Loopback(i) => i.with_dynamic_info_mut(cb),
         }
     }
 }
@@ -164,14 +139,15 @@ impl DeviceSpecificInfo {
 pub(crate) fn spawn_rx_task(
     notifier: &NeedsDataNotifier,
     ns: &Netstack,
-    device_id: DeviceId<BindingsNonSyncCtxImpl>,
+    device_id: &DeviceId<BindingsNonSyncCtxImpl>,
 ) {
     let mut watcher = notifier.watcher();
+    let device_id = device_id.downgrade();
 
     let ns = ns.clone();
     fuchsia_async::Task::spawn(async move {
         // Loop while we are woken up to handle enqueued RX packets.
-        while let Some(()) = watcher.next().await {
+        while let Some(device_id) = watcher.next().await.and_then(|()| device_id.upgrade()) {
             let mut ctx = ns.ctx.lock().await;
             let Ctx { sync_ctx, non_sync_ctx } = &mut *ctx;
             handle_queued_rx_packets(sync_ctx, non_sync_ctx, &device_id)
@@ -180,14 +156,20 @@ pub(crate) fn spawn_rx_task(
     .detach()
 }
 
+/// Static information common to all devices.
+#[derive(Debug)]
+pub struct StaticCommonInfo {
+    pub binding_id: BindingId,
+    pub name: String,
+}
+
 /// Information common to all devices.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct CommonInfo {
+pub struct DynamicCommonInfo {
     pub mtu: Mtu,
     pub admin_enabled: bool,
     pub events: super::InterfaceEventProducer,
-    pub name: String,
     // An attach point to send `fuchsia.net.interfaces.admin/Control` handles to the Interfaces
     // Admin worker.
     #[derivative(Debug = "ignore")]
@@ -211,9 +193,20 @@ pub(crate) struct AddressInfo {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct LoopbackInfo {
-    pub common_info: CommonInfo,
+    pub static_common_info: StaticCommonInfo,
+    pub dynamic_common_info: std::sync::RwLock<DynamicCommonInfo>,
     #[derivative(Debug = "ignore")]
     pub rx_notifier: NeedsDataNotifier,
+}
+
+impl LoopbackInfo {
+    pub fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+        cb(self.dynamic_common_info.read().unwrap().deref())
+    }
+
+    pub fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+        cb(self.dynamic_common_info.write().unwrap().deref_mut())
+    }
 }
 
 /// Information associated with FIDL Protocol workers.
@@ -228,130 +221,35 @@ pub(crate) struct FidlWorkerInfo<R> {
     pub cancelation_sender: Option<futures::channel::oneshot::Sender<R>>,
 }
 
+#[derive(Debug)]
+pub struct DynamicNetdeviceInfo {
+    pub phy_up: bool,
+    pub common_info: DynamicCommonInfo,
+}
+
 /// Network device information.
 #[derive(Debug)]
 pub struct NetdeviceInfo {
-    pub common_info: CommonInfo,
     pub handler: super::netdevice_worker::PortHandler,
     pub mac: UnicastAddr<Mac>,
-    pub phy_up: bool,
+    pub static_common_info: StaticCommonInfo,
+    pub dynamic: std::sync::RwLock<DynamicNetdeviceInfo>,
+}
+
+impl NetdeviceInfo {
+    pub fn with_dynamic_info<O, F: FnOnce(&DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
+        let dynamic = self.dynamic.read().unwrap();
+        cb(dynamic.deref())
+    }
+
+    pub fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
+        let mut dynamic = self.dynamic.write().unwrap();
+        cb(dynamic.deref_mut())
+    }
 }
 
 impl From<NetdeviceInfo> for DeviceSpecificInfo {
     fn from(i: NetdeviceInfo) -> Self {
         Self::Netdevice(i)
-    }
-}
-
-/// Device information kept by [`Devices`].
-#[derive(Debug, PartialEq)]
-pub struct DeviceInfo<C, I = DeviceSpecificInfo> {
-    id: BindingId,
-    core_id: C,
-    info: I,
-}
-
-impl<C, I> DeviceInfo<C, I>
-where
-    C: Clone,
-{
-    pub fn core_id(&self) -> &C {
-        &self.core_id
-    }
-
-    pub fn id(&self) -> BindingId {
-        self.id.clone()
-    }
-
-    pub fn info(&self) -> &I {
-        &self.info
-    }
-
-    pub fn into_info(self) -> I {
-        self.info
-    }
-
-    pub fn info_mut(&mut self) -> &mut I {
-        &mut self.info
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use assert_matches::assert_matches;
-    use std::collections::HashSet;
-
-    use super::*;
-
-    type TestDevices = Devices<FakeDeviceId, u64>;
-
-    #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-    struct FakeDeviceId(usize);
-
-    impl IdMapCollectionKey for FakeDeviceId {
-        const VARIANT_COUNT: usize = 1;
-
-        fn get_variant(&self) -> usize {
-            0
-        }
-
-        fn get_id(&self) -> usize {
-            self.0 as usize
-        }
-    }
-
-    #[test]
-    fn test_add_remove_device() {
-        let mut d = TestDevices::default();
-        let core_a = FakeDeviceId(1);
-        let core_b = FakeDeviceId(2);
-        let a = d.add_device(core_a, |id| id + 10).expect("can add device");
-        let b = d.add_device(core_b, |id| id + 20).expect("can add device");
-        assert_ne!(a, b, "allocated same id");
-        assert_eq!(d.add_device(core_a, |id| id + 10), None, "can't add same id again");
-        // check that ids are incrementing
-        assert_eq!(d.last_id, 2);
-
-        // check that devices are correctly inserted and carry the core id.
-        assert_eq!(d.get_device(a).unwrap().core_id, core_a);
-        assert_eq!(d.get_device(b).unwrap().core_id, core_b);
-        assert_eq!(d.get_core_id(a).unwrap(), core_a);
-        assert_eq!(d.get_core_id(b).unwrap(), core_b);
-        assert_eq!(d.get_binding_id(core_a).unwrap(), a);
-        assert_eq!(d.get_binding_id(core_b).unwrap(), b);
-
-        // check that we can retrieve both devices by the core id:
-        assert_matches!(d.get_core_device_mut(&core_a), Some(_));
-        assert_matches!(d.get_core_device_mut(&core_b), Some(_));
-
-        // remove both devices
-        let info_a = d.remove_device(a).expect("can remove device");
-        let info_b = d.remove_device(b).expect("can remove device");
-        assert_eq!(info_a.info, a + 10);
-        assert_eq!(info_b.info, b + 20);
-        assert_eq!(info_a.core_id, core_a);
-        assert_eq!(info_b.core_id, core_b);
-        // removing device again will fail
-        assert_eq!(d.remove_device(a), None);
-
-        // retrieving the devices now should fail:
-        assert_eq!(d.get_device(a), None);
-        assert_eq!(d.get_core_id(a), None);
-        assert_eq!(d.get_core_device_mut(&core_a), None);
-
-        assert!(d.devices.is_empty());
-        assert!(d.id_map.is_empty());
-    }
-
-    #[test]
-    fn test_iter() {
-        let mut d = TestDevices::default();
-        let core_a = FakeDeviceId(1);
-        let a = d.add_device(core_a, |id| id + 10).unwrap();
-        assert_eq!(d.iter_devices().map(|d| d.id).collect::<HashSet<_>>(), HashSet::from([a]));
-
-        let core_b = FakeDeviceId(2);
-        let b = d.add_device(core_b, |id| id + 20).unwrap();
-        assert_eq!(d.iter_devices().map(|d| d.id).collect::<HashSet<_>>(), HashSet::from([a, b]));
     }
 }

@@ -902,7 +902,7 @@ where
                 non_sync_ctx
                     .devices
                     .get_device_by_name(name)
-                    .map(|d| d.core_id().clone())
+                    .map(|d| d.clone())
                     .ok_or(fposix::Errno::Enodev)
             })
             .transpose()?;

@@ -4,6 +4,8 @@
 
 //! A Netstack3 worker to serve fuchsia.net.debug.Interfaces API requests.
 
+use core::ops::Deref as _;
+
 use async_utils::channel::TrySend as _;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _, ServerEnd};
 use fidl_fuchsia_hardware_network as fhardware_network;
@@ -47,9 +49,9 @@ async fn handle_get_admin(
     control: ServerEnd<fnet_interfaces_admin::ControlMarker>,
 ) {
     debug!(interface_id, "handling fuchsia.net.debug.Interfaces::GetAdmin");
-    let mut ctx = ns.ctx.lock().await;
-    let device_info = match ctx.non_sync_ctx.devices.get_device_mut(interface_id) {
-        Some(device_info) => device_info,
+    let ctx = ns.ctx.lock().await;
+    let core_id = match ctx.non_sync_ctx.devices.get_core_id(interface_id) {
+        Some(c) => c,
         None => {
             control.close_with_epitaph(zx::Status::NOT_FOUND).unwrap_or_else(|e| {
                 if e.is_closed() {
@@ -62,13 +64,9 @@ async fn handle_get_admin(
         }
     };
 
-    match device_info
-        .info_mut()
-        .common_info_mut()
-        .control_hook
-        .try_send_fut(interfaces_admin::OwnedControlHandle::new_unowned(control))
-        .await
-    {
+    let mut sender = core_id.external_state().with_common_info(|i| i.control_hook.clone());
+
+    match sender.try_send_fut(interfaces_admin::OwnedControlHandle::new_unowned(control)).await {
         Ok(()) => {}
         Err(owned_control_handle) => {
             owned_control_handle.into_control_handle().shutdown_with_epitaph(zx::Status::NOT_FOUND)
@@ -81,10 +79,10 @@ async fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::Interfa
     let ctx = ns.ctx.lock().await;
     ctx.non_sync_ctx
         .devices
-        .get_device(interface_id)
+        .get_core_id(interface_id)
         .ok_or(fnet_debug::InterfacesGetMacError::NotFound)
-        .map(|device_info| {
-            let mac = match device_info.info() {
+        .map(|core_id| {
+            let mac = match core_id.external_state() {
                 DeviceSpecificInfo::Loopback(_) => LOOPBACK_MAC,
                 DeviceSpecificInfo::Netdevice(info) => info.mac.into(),
             };
@@ -98,13 +96,14 @@ async fn handle_get_port(
     port: ServerEnd<fhardware_network::PortMarker>,
 ) {
     let ctx = ns.ctx.lock().await;
+    let core_id = ctx.non_sync_ctx.devices.get_core_id(interface_id);
     let port_handler =
-        ctx.non_sync_ctx.devices.get_device(interface_id).ok_or(zx::Status::NOT_FOUND).and_then(
-            |device_info| match device_info.info() {
-                DeviceSpecificInfo::Loopback(_) => Err(zx::Status::NOT_SUPPORTED),
-                DeviceSpecificInfo::Netdevice(info) => Ok(&info.handler),
-            },
-        );
+        core_id.as_ref().ok_or(zx::Status::NOT_FOUND).map(|core_id| core_id.external_state());
+    let port_handler =
+        port_handler.as_ref().map_err(Clone::clone).and_then(|state| match state.deref() {
+            DeviceSpecificInfo::Loopback(_) => Err(zx::Status::NOT_SUPPORTED),
+            DeviceSpecificInfo::Netdevice(info) => Ok(&info.handler),
+        });
     match port_handler {
         Ok(port_handler) => port_handler.connect_port(port).unwrap_or_else(
             |e: netdevice_client::Error| warn!(err = ?e, "failed to connect to port"),

@@ -2055,7 +2055,10 @@ mod tests {
         .unwrap();
 
         let expected = if remove_device {
-            crate::device::remove_device(&mut sync_ctx, &mut non_sync_ctx, device_id.clone());
+            // Don't keep any strong device IDs to the device before removing.
+            let device_id = device_id.clone();
+            core::mem::drop(device_ids);
+            crate::device::remove_device(&mut sync_ctx, &mut non_sync_ctx, device_id);
             Err(MmsError::NoDevice(IpSockRouteError::Unroutable(
                 IpSockUnroutableError::NoRouteToRemoteAddr,
             )))

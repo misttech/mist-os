@@ -1248,7 +1248,8 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
         let mut sync_ctx = &sync_ctx;
-        let device_id = sync_ctx.state.device.add_ethernet_device(
+        let device_id = crate::device::add_ethernet_device(
+            sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
         );

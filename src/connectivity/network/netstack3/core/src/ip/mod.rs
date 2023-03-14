@@ -3130,7 +3130,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
-        device::{receive_frame, testutil::receive_frame_or_panic, FrameDestination},
+        device::{receive_frame, testutil::receive_frame_or_panic, FrameDestination, WeakDeviceId},
         ip::{
             device::set_routing_enabled,
             testutil::is_in_ip_multicast,
@@ -3727,6 +3727,11 @@ mod tests {
             bob,
             bob_device_ids[0].clone(),
         );
+        // Make sure the (strongly referenced) device IDs are dropped before
+        // `net`.
+        let alice_device_ids = alice_device_ids;
+        core::mem::drop(bob_device_ids);
+
         let fragment_id = 5;
 
         // Test that packets only get reassembled and dispatched at the
@@ -4944,21 +4949,22 @@ mod tests {
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(crate::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        let device_id = sync_ctx.state.device.add_ethernet_device(
+        let device_id = crate::device::add_ethernet_device(
+            &sync_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
         );
 
         fn take_ip_layer_events<I: Ip>(
             non_sync_ctx: &mut FakeNonSyncCtx,
-        ) -> Vec<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>> {
+        ) -> Vec<IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I>> {
             non_sync_ctx
                 .take_events()
                 .into_iter()
                 .filter_map(|event| {
                     use crate::testutil::DispatchedEvent;
                     #[derive(GenericOverIp)]
-                    struct EventHolder<I: Ip>(IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>);
+                    struct EventHolder<I: Ip>(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I>);
                     let EventHolder(event) = I::map_ip(
                         IpInvariant(event),
                         |IpInvariant(event)| match event {
@@ -4987,11 +4993,12 @@ mod tests {
             ),
             Ok(())
         );
+        let weak_device_id = device_id.downgrade();
         assert_eq!(
             take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
             [IpLayerEvent::RouteAdded(types::Entry {
                 subnet: I::FAKE_CONFIG.subnet.into(),
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 gateway: None
             })]
         );
@@ -5013,7 +5020,7 @@ mod tests {
             take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
             [IpLayerEvent::RouteAdded(types::Entry {
                 subnet: gateway_subnet,
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
             })]
         );
@@ -5022,18 +5029,18 @@ mod tests {
             take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
             [IpLayerEvent::RouteRemoved(types::Entry {
                 subnet: gateway_subnet,
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
             })]
         );
-        crate::device::remove_device(&sync_ctx, &mut non_sync_ctx, device_id.clone());
+        crate::device::remove_device(&sync_ctx, &mut non_sync_ctx, device_id);
         assert_eq!(
             take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
             [IpLayerEvent::RouteRemoved(types::Entry {
                 subnet: I::FAKE_CONFIG.subnet.into(),
-                device: device_id,
+                device: weak_device_id,
                 gateway: None
-            }),]
+            })]
         );
     }
 }

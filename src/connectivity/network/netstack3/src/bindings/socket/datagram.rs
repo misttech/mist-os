@@ -58,7 +58,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, CommonInfo, NetstackContext,
+    BindingsNonSyncCtxImpl, NetstackContext, StaticCommonInfo,
 };
 
 use super::{
@@ -2420,7 +2420,7 @@ where
                 non_sync_ctx
                     .devices
                     .get_device_by_name(name)
-                    .map(|d| d.core_id().clone())
+                    .map(|d| d.clone())
                     .ok_or(fposix::Errno::Enodev)
             })
             .transpose()?;
@@ -2443,15 +2443,9 @@ where
         };
         let index = TryIntoFidlWithContext::<u64>::try_into_fidl_with_ctx(device, &non_sync_ctx)
             .map_err(IntoErrno::into_errno)?;
-        Ok(non_sync_ctx.devices.get_device(index).map(|device_info| {
-            let CommonInfo {
-                name,
-                mtu: _,
-                admin_enabled: _,
-                events: _,
-                control_hook: _,
-                addresses: _,
-            } = device_info.info().common_info();
+        Ok(non_sync_ctx.devices.get_core_id(index).map(|core_id| {
+            let StaticCommonInfo { binding_id: _, name } =
+                core_id.external_state().static_common_info();
             name.to_string()
         }))
     }

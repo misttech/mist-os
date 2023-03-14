@@ -1472,7 +1472,8 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
-        let device_id = sync_ctx.state.device.add_ethernet_device(
+        let device_id = crate::device::add_ethernet_device(
+            sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
         );
@@ -1482,10 +1483,11 @@ mod tests {
         update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true
         });
+        let weak_device_id = device_id.downgrade();
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 ip_enabled: true,
             })]
         );
@@ -1496,7 +1498,7 @@ mod tests {
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 ip_enabled: false,
             })]
         );
@@ -1512,7 +1514,7 @@ mod tests {
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 addr: ipv4_addr_subnet.clone(),
                 state: IpAddressState::Unavailable,
             })]
@@ -1525,11 +1527,11 @@ mod tests {
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: true,
                 }),
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ipv4_addr_subnet.addr().into(),
                     state: IpAddressState::Assigned,
                 }),
@@ -1548,12 +1550,12 @@ mod tests {
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ipv4_addr_subnet.addr().into(),
                     state: IpAddressState::Unavailable,
                 }),
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: false,
                 }),
             ]
@@ -1596,8 +1598,11 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
-        let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+        let device_id = crate::device::add_ethernet_device(
+            sync_ctx,
+            local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        );
         let ll_addr = local_mac.to_ipv6_link_local();
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.gmp_enabled = true;
@@ -1655,16 +1660,17 @@ mod tests {
                 non_sync_ctx.timer_ctx().assert_timers_installed(timers);
             };
         test_enable_device(&mut sync_ctx, &mut non_sync_ctx, None);
+        let weak_device_id = device_id.downgrade();
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ll_addr.to_witness(),
                     state: IpAddressState::Tentative,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: true,
                 })
             ]
@@ -1682,12 +1688,12 @@ mod tests {
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ll_addr.addr().into(),
                     reason: RemovedReason::Manual,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: false,
                 })
             ]
@@ -1735,7 +1741,7 @@ mod tests {
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 addr: ll_addr.to_witness(),
                 state: IpAddressState::Unavailable,
             })]
@@ -1746,12 +1752,12 @@ mod tests {
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ll_addr.addr().into(),
                     state: IpAddressState::Tentative,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: true,
                 })
             ]
@@ -1762,12 +1768,12 @@ mod tests {
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ll_addr.addr().into(),
                     state: IpAddressState::Unavailable,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: false,
                 })
             ]
@@ -1806,12 +1812,12 @@ mod tests {
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ll_addr.addr().into(),
                     state: IpAddressState::Tentative,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: true,
                 })
             ]
@@ -1829,8 +1835,11 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
-        let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+        let device_id = crate::device::add_ethernet_device(
+            sync_ctx,
+            local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        );
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.dad_transmits = NonZeroU8::new(1);
 
@@ -1841,16 +1850,17 @@ mod tests {
         let ll_addr = local_mac.to_ipv6_link_local();
 
         enable_ipv6_device(&mut sync_ctx, &mut non_sync_ctx, &device_id, ll_addr);
+        let weak_device_id = device_id.downgrade();
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     addr: ll_addr.to_witness(),
                     state: IpAddressState::Tentative
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
-                    device: device_id.clone(),
+                    device: weak_device_id.clone(),
                     ip_enabled: true,
                 }),
             ]
@@ -1869,7 +1879,7 @@ mod tests {
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 addr: assigned_addr.to_witness(),
                 state: IpAddressState::Tentative
             })]
@@ -1890,7 +1900,7 @@ mod tests {
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
-                device: device_id.clone(),
+                device: weak_device_id.clone(),
                 addr: assigned_addr.addr(),
                 reason: RemovedReason::DadFailed,
             }),]

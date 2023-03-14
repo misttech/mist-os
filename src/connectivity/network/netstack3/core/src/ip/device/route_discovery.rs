@@ -238,7 +238,7 @@ mod tests {
         context::testutil::{
             FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _,
         },
-        device::FrameDestination,
+        device::{FrameDestination, WeakDeviceId},
         ip::{
             device::Ipv6DeviceTimerId,
             receive_ipv6_packet,
@@ -601,8 +601,11 @@ mod tests {
 
         let mut ctx = crate::testutil::FakeCtx::default();
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+        let device_id = crate::device::add_ethernet_device(
+            sync_ctx,
+            local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        );
         crate::ip::device::update_ipv6_configuration(
             &mut &*sync_ctx,
             non_sync_ctx,
@@ -632,7 +635,7 @@ mod tests {
 
     fn take_route_discovery_events(
         non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
-    ) -> HashSet<Ipv6RouteDiscoveryEvent<DeviceId<crate::testutil::FakeNonSyncCtx>>> {
+    ) -> HashSet<Ipv6RouteDiscoveryEvent<WeakDeviceId<crate::testutil::FakeNonSyncCtx>>> {
         non_sync_ctx
             .take_events()
             .into_iter()
@@ -696,10 +699,11 @@ mod tests {
         );
         let gateway_route =
             Ipv6DiscoveredRoute { subnet: IPV6_DEFAULT_SUBNET, gateway: Some(src_ip) };
+        let weak_device_id = device_id.downgrade();
         assert_eq!(
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([Ipv6RouteDiscoveryEvent {
-                device_id: device_id.clone(),
+                device_id: weak_device_id.clone(),
                 route: gateway_route,
                 action: Ipv6RouteDiscoverAction::Discovered,
             },])
@@ -722,7 +726,7 @@ mod tests {
         assert_eq!(
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([Ipv6RouteDiscoveryEvent {
-                device_id: device_id.clone(),
+                device_id: weak_device_id.clone(),
                 route: on_link_route,
                 action: Ipv6RouteDiscoverAction::Discovered,
             }])
@@ -744,7 +748,7 @@ mod tests {
         assert_eq!(
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([Ipv6RouteDiscoveryEvent {
-                device_id: device_id.clone(),
+                device_id: weak_device_id.clone(),
                 route: gateway_route,
                 action: Ipv6RouteDiscoverAction::Invalidated,
             }])
@@ -780,7 +784,7 @@ mod tests {
         assert_eq!(
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([Ipv6RouteDiscoveryEvent {
-                device_id: device_id.clone(),
+                device_id: weak_device_id.clone(),
                 route: on_link_route,
                 action: Ipv6RouteDiscoverAction::Invalidated,
             }])
@@ -832,16 +836,17 @@ mod tests {
             FrameDestination::Unicast,
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
+        let weak_device_id = device_id.downgrade();
         assert_eq!(
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: gateway_route,
                     action: Ipv6RouteDiscoverAction::Discovered,
                 },
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: on_link_route,
                     action: Ipv6RouteDiscoverAction::Discovered,
                 },
@@ -903,12 +908,12 @@ mod tests {
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: gateway_route,
                     action: Ipv6RouteDiscoverAction::Invalidated,
                 },
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: on_link_route,
                     action: Ipv6RouteDiscoverAction::Invalidated,
                 },
@@ -953,16 +958,17 @@ mod tests {
                 as_secs(ONE_SECOND).into(),
             ),
         );
+        let weak_device_id = device_id.downgrade();
         assert_eq!(
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: gateway_route,
                     action: Ipv6RouteDiscoverAction::Discovered,
                 },
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: on_link_route,
                     action: Ipv6RouteDiscoverAction::Discovered,
                 },
@@ -986,12 +992,12 @@ mod tests {
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: gateway_route,
                     action: Ipv6RouteDiscoverAction::Invalidated,
                 },
                 Ipv6RouteDiscoveryEvent {
-                    device_id: device_id.clone(),
+                    device_id: weak_device_id.clone(),
                     route: on_link_route,
                     action: Ipv6RouteDiscoverAction::Invalidated,
                 },

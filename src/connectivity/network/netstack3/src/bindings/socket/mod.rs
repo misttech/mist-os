@@ -58,9 +58,12 @@ pub(crate) async fn serve(
                     let mut response = {
                         let ctx = ctx.lock().await;
                         let Ctx { sync_ctx: _, non_sync_ctx } = &*ctx;
-                        let result = AsRef::<Devices<_>>::as_ref(&non_sync_ctx)
-                            .get_device(index)
-                            .map(|device_info| device_info.info().common_info().name.clone())
+                        let result = non_sync_ctx
+                            .devices
+                            .get_core_id(index)
+                            .map(|core_id| {
+                                core_id.external_state().static_common_info().name.clone()
+                            })
                             .ok_or(zx::Status::NOT_FOUND.into_raw());
                         result
                     };
@@ -73,7 +76,7 @@ pub(crate) async fn serve(
                         let devices = AsRef::<Devices<_>>::as_ref(&non_sync_ctx);
                         let result = devices
                             .get_device_by_name(&name)
-                            .map(|d| d.id())
+                            .map(|d| d.external_state().static_common_info().binding_id)
                             .ok_or(zx::Status::NOT_FOUND.into_raw());
                         result
                     };

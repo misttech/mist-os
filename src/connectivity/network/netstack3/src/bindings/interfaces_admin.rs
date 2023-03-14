@@ -380,16 +380,13 @@ async fn run_link_state_watcher<
                 match ctx
                     .non_sync_ctx
                     .devices
-                    .get_device_mut(id)
+                    .get_core_id(id)
                     .expect("device not present")
-                    .info_mut()
+                    .external_state()
                 {
-                    devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
-                        common_info: _,
-                        handler: _,
-                        mac: _,
-                        phy_up,
-                    }) => *phy_up = online,
+                    devices::DeviceSpecificInfo::Netdevice(i) => {
+                        i.with_dynamic_info_mut(|i| i.phy_up = online)
+                    }
                     i @ devices::DeviceSpecificInfo::Loopback(_) => {
                         unreachable!("unexpected device info {:?} for interface {}", i, id)
                     }
@@ -575,11 +572,11 @@ pub(crate) async fn run_interface_control(
     };
     // Cancel the `AddressStateProvider` workers and drive them to completion.
     let address_state_providers = {
-        let mut ctx = ctx.lock().await;
-        let device_info =
-            ctx.non_sync_ctx.devices.get_device_mut(id).expect("missing device info for interface");
-        futures::stream::FuturesUnordered::from_iter(
-            device_info.info_mut().common_info_mut().addresses.values_mut().map(
+        let ctx = ctx.lock().await;
+        let core_id =
+            ctx.non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
+        core_id.external_state().with_common_info_mut(|i| {
+            futures::stream::FuturesUnordered::from_iter(i.addresses.values_mut().map(
                 |devices::AddressInfo {
                      address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender },
                      assignment_state_sender: _,
@@ -591,8 +588,8 @@ pub(crate) async fn run_interface_control(
                     }
                     worker.clone()
                 },
-            ),
-        )
+            ))
+        })
     };
     address_state_providers.collect::<()>().await;
     cleanup_fn
@@ -663,22 +660,19 @@ async fn dispatch_control_request(
 
 /// Cleans up and removes the specified NetDevice interface.
 async fn remove_interface(ctx: NetstackContext, id: BindingId) {
-    let device_info = {
+    let state = {
         let mut ctx = ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-        let core_id = non_sync_ctx
-            .devices
-            .get_core_id(id)
-            .expect("device lifetime should be tied to channel lifetime");
-        netstack3_core::device::remove_device(sync_ctx, non_sync_ctx, core_id);
-        non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval")
+        let core_id =
+            non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
+        netstack3_core::device::remove_device(sync_ctx, non_sync_ctx, core_id)
     };
-    let handler = match device_info.into_info() {
+    let handler = match state {
         devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
             handler,
-            common_info: _,
             mac: _,
-            phy_up: _,
+            static_common_info: _,
+            dynamic: _,
         }) => handler,
         i @ devices::DeviceSpecificInfo::Loopback(_) => {
             unreachable!("unexpected device info {:?} for interface {}", i, id)
@@ -694,25 +688,45 @@ async fn remove_interface(ctx: NetstackContext, id: BindingId) {
 /// Returns `true` if the value of `admin_enabled` changed in response to
 /// this call.
 async fn set_interface_enabled(ctx: &NetstackContext, enabled: bool, id: BindingId) -> bool {
+    enum Info<A, B> {
+        Loopback(A),
+        Netdevice(B),
+    }
+
     let mut ctx = ctx.lock().await;
-    let (common_info, port_handler) =
-        match ctx.non_sync_ctx.devices.get_device_mut(id).expect("device not present").info_mut() {
+    let core_id = ctx.non_sync_ctx.devices.get_core_id(id).expect("device not present");
+    let port_handler = {
+        let mut info = match core_id.external_state() {
             devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
-                common_info,
+                static_common_info: _,
+                dynamic_common_info,
                 rx_notifier: _,
-            }) => (common_info, None),
+            }) => Info::Loopback((dynamic_common_info.write().unwrap(), None)),
             devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
-                common_info,
+                static_common_info: _,
                 handler,
                 mac: _,
-                phy_up: _,
-            }) => (common_info, Some(handler)),
+                dynamic,
+            }) => Info::Netdevice((dynamic.write().unwrap(), Some(handler))),
         };
-    // Already set to expected value.
-    if common_info.admin_enabled == enabled {
-        return false;
-    }
-    common_info.admin_enabled = enabled;
+        let (common_info, port_handler) = match info {
+            Info::Loopback((ref mut common_info, port_handler)) => {
+                (common_info.deref_mut(), port_handler)
+            }
+            Info::Netdevice((ref mut dynamic, port_handler)) => {
+                (&mut dynamic.common_info, port_handler)
+            }
+        };
+
+        // Already set to expected value.
+        if common_info.admin_enabled == enabled {
+            return false;
+        }
+        common_info.admin_enabled = enabled;
+
+        port_handler
+    };
+
     if let Some(handler) = port_handler {
         let r = if enabled { handler.attach().await } else { handler.detach().await };
         match r {
@@ -752,18 +766,19 @@ async fn remove_address(ctx: &NetstackContext, id: BindingId, address: fnet::Sub
             return false;
         }
     };
-    let (worker, cancelation_sender) = {
-        let mut ctx = ctx.lock().await;
-        let device_info =
-            ctx.non_sync_ctx.devices.get_device_mut(id).expect("missing device info for interface");
-        match device_info.info_mut().common_info_mut().addresses.get_mut(&specified_addr) {
-            None => return false,
-            Some(devices::AddressInfo {
-                address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender },
-                assignment_state_sender: _,
-            }) => (worker.clone(), cancelation_sender.take()),
-        }
-    };
+    let Some((worker, cancelation_sender)) = ({
+        let ctx = ctx.lock().await;
+        let core_id =
+            ctx.non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
+        core_id.external_state().with_common_info_mut(|i| {
+            i.addresses.get_mut(&specified_addr)
+            .map(|devices::AddressInfo {
+                    address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender },
+                    assignment_state_sender: _,
+                }| (worker.clone(), cancelation_sender.take()),
+            )
+        })
+    }) else { return false };
     let did_cancel_worker = match cancelation_sender {
         Some(cancelation_sender) => {
             cancelation_sender
@@ -842,14 +857,11 @@ async fn add_address(
         }
     }
 
-    let mut locked_ctx = ctx.lock().await;
-    let device_info = locked_ctx
-        .non_sync_ctx
-        .devices
-        .get_device_mut(id)
-        .expect("missing device info for interface");
-    let vacant_address_entry =
-        match device_info.info_mut().common_info_mut().addresses.entry(specified_addr) {
+    let locked_ctx = ctx.lock().await;
+    let core_id =
+        locked_ctx.non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
+    core_id.external_state().with_common_info_mut(|i| {
+        let vacant_address_entry = match i.addresses.entry(specified_addr) {
             hash_map::Entry::Occupied(_occupied) => {
                 close_address_state_provider(
                     address.addr.into_core(),
@@ -861,30 +873,32 @@ async fn add_address(
             }
             hash_map::Entry::Vacant(vacant) => vacant,
         };
-    // Cancelation mechanism for the `AddressStateProvider` worker.
-    let (cancelation_sender, cancelation_receiver) = futures::channel::oneshot::channel();
-    // Sender/receiver for updates in `AddressAssignmentState`, as
-    // published by Core.
-    let (assignment_state_sender, assignment_state_receiver) = futures::channel::mpsc::unbounded();
-    // Spawn the `AddressStateProvider` worker, which during
-    // initialization, will add the address to Core.
-    let worker = fasync::Task::spawn(run_address_state_provider(
-        ctx.clone(),
-        addr_subnet_either,
-        id,
-        control_handle,
-        req_stream,
-        assignment_state_receiver,
-        cancelation_receiver,
-    ))
-    .shared();
-    let _: &mut devices::AddressInfo = vacant_address_entry.insert(devices::AddressInfo {
-        address_state_provider: devices::FidlWorkerInfo {
-            worker,
-            cancelation_sender: Some(cancelation_sender),
-        },
-        assignment_state_sender,
-    });
+        // Cancelation mechanism for the `AddressStateProvider` worker.
+        let (cancelation_sender, cancelation_receiver) = futures::channel::oneshot::channel();
+        // Sender/receiver for updates in `AddressAssignmentState`, as
+        // published by Core.
+        let (assignment_state_sender, assignment_state_receiver) =
+            futures::channel::mpsc::unbounded();
+        // Spawn the `AddressStateProvider` worker, which during
+        // initialization, will add the address to Core.
+        let worker = fasync::Task::spawn(run_address_state_provider(
+            ctx.clone(),
+            addr_subnet_either,
+            id,
+            control_handle,
+            req_stream,
+            assignment_state_receiver,
+            cancelation_receiver,
+        ))
+        .shared();
+        let _: &mut devices::AddressInfo = vacant_address_entry.insert(devices::AddressInfo {
+            address_state_provider: devices::FidlWorkerInfo {
+                worker,
+                cancelation_sender: Some(cancelation_sender),
+            },
+            assignment_state_sender,
+        });
+    })
 }
 
 /// A worker for `fuchsia.net.interfaces.admin/AddressStateProvider`.
@@ -956,11 +970,10 @@ async fn run_address_state_provider(
     // Remove the address.
     let mut ctx = ctx.lock().await;
     let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-    let device_info =
-        non_sync_ctx.devices.get_device_mut(id).expect("missing device info for interface");
+    let core_id = non_sync_ctx.devices.get_core_id(id).expect("missing device info for interface");
     // Don't drop the worker yet; it's what's driving THIS function.
     let _worker: futures::future::Shared<fuchsia_async::Task<()>> =
-        match device_info.info_mut().common_info_mut().addresses.remove(&address) {
+        match core_id.external_state().with_common_info_mut(|i| i.addresses.remove(&address)) {
             Some(devices::AddressInfo {
                 address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender: _ },
                 assignment_state_sender: _,
@@ -1261,30 +1274,35 @@ mod tests {
         let (event_sender, event_receiver) = futures::channel::mpsc::unbounded();
 
         // Add the interface.
-        let build_fake_dev_info = |id| {
-            const LOOPBACK_NAME: &'static str = "lo";
-            devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
-                common_info: devices::CommonInfo {
-                    mtu: DEFAULT_LOOPBACK_MTU,
-                    admin_enabled: true,
-                    events: InterfaceEventProducer::new(id, event_sender),
-                    name: LOOPBACK_NAME.to_string(),
-                    control_hook: control_sender,
-                    addresses: HashMap::new(),
-                },
-                rx_notifier: Default::default(),
-            })
-        };
         let binding_id = {
             let mut ctx = ctx.lock().await;
             let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-            let core_id =
-                netstack3_core::device::add_loopback_device(sync_ctx, DEFAULT_LOOPBACK_MTU)
-                    .expect("failed to add loopback to core");
-            non_sync_ctx
-                .devices
-                .add_device(core_id, build_fake_dev_info)
-                .expect("failed to add loopback to bindings")
+            let binding_id = non_sync_ctx.devices.alloc_new_id();
+            let core_id = netstack3_core::device::add_loopback_device_with_state(
+                sync_ctx,
+                DEFAULT_LOOPBACK_MTU,
+                || {
+                    const LOOPBACK_NAME: &'static str = "lo";
+                    devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
+                        static_common_info: devices::StaticCommonInfo {
+                            binding_id,
+                            name: LOOPBACK_NAME.to_string(),
+                        },
+                        dynamic_common_info: devices::DynamicCommonInfo {
+                            mtu: DEFAULT_LOOPBACK_MTU,
+                            admin_enabled: true,
+                            events: InterfaceEventProducer::new(binding_id, event_sender),
+                            control_hook: control_sender,
+                            addresses: HashMap::new(),
+                        }
+                        .into(),
+                        rx_notifier: Default::default(),
+                    })
+                },
+            )
+            .expect("failed to add loopback to core");
+            non_sync_ctx.devices.add_device(binding_id, core_id);
+            binding_id
         };
 
         // Start the interface control worker.

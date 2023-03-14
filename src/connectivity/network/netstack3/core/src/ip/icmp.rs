@@ -3727,6 +3727,7 @@ mod tests {
             remote,
             remove_device_ids[0].clone(),
         );
+        core::mem::drop((local_device_ids, remove_device_ids));
 
         let icmp_id = 13;
 

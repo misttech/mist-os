@@ -143,11 +143,11 @@ mod tests {
             .unwrap_b()
     }
 
-    impl TryFrom<DeviceId<crate::testutil::FakeNonSyncCtx>> for EthernetDeviceId<FakeInstant> {
+    impl TryFrom<DeviceId<crate::testutil::FakeNonSyncCtx>> for EthernetDeviceId<FakeInstant, ()> {
         type Error = DeviceId<crate::testutil::FakeNonSyncCtx>;
         fn try_from(
             id: DeviceId<crate::testutil::FakeNonSyncCtx>,
-        ) -> Result<EthernetDeviceId<FakeInstant>, DeviceId<crate::testutil::FakeNonSyncCtx>>
+        ) -> Result<EthernetDeviceId<FakeInstant, ()>, DeviceId<crate::testutil::FakeNonSyncCtx>>
         {
             match id.inner() {
                 DeviceIdInner::Ethernet(id) => Ok(id.clone()),
@@ -175,6 +175,9 @@ mod tests {
             remote,
             remote_device_id.clone(),
         );
+        let local_device_id = local_device_id.clone();
+        let remote_device_id = remote_device_id.clone();
+        core::mem::drop((local_device_ids, remote_device_ids));
 
         // Let's try to ping the remote device from the local device:
         let req = IcmpEchoRequest::new(0, 0);
@@ -294,6 +297,10 @@ mod tests {
             remote,
             remote_device_id.clone(),
         );
+        // Make sure the (strongly referenced) device IDs are dropped before
+        // `net`.
+        let local_device_id = local_device_id;
+        let remote_device_id = remote_device_id;
 
         // Create the devices (will start DAD at the same time).
         let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
@@ -344,7 +351,7 @@ mod tests {
     }
 
     fn dad_timer_id(
-        id: EthernetDeviceId<FakeInstant>,
+        id: EthernetDeviceId<FakeInstant, ()>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(
@@ -352,7 +359,9 @@ mod tests {
         )))
     }
 
-    fn rs_timer_id(id: EthernetDeviceId<FakeInstant>) -> TimerId<crate::testutil::FakeNonSyncCtx> {
+    fn rs_timer_id(
+        id: EthernetDeviceId<FakeInstant, ()>,
+    ) -> TimerId<crate::testutil::FakeNonSyncCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(
             crate::ip::device::router_solicitation::RsTimerId { device_id: id.into() },
         )))
@@ -373,7 +382,6 @@ mod tests {
         let (local, local_device_ids) = local.build();
         let (remote, remote_device_ids) = remote.build();
         let local_device_id = &local_device_ids[local_dev_idx];
-        let local_eth_device_id = local_device_id.clone().try_into().expect("expected ethernet ID");
         let remote_device_id = &remote_device_ids[remote_dev_idx];
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             "local",
@@ -383,6 +391,12 @@ mod tests {
             remote,
             remote_device_id.clone(),
         );
+        // Make sure the (strongly referenced) device IDs are dropped before
+        // `net`.
+        let local_device_id = local_device_id.clone();
+        let remote_device_id = remote_device_id.clone();
+        let local_eth_device_id = local_device_id.clone().try_into().expect("expected ethernet ID");
+        core::mem::drop((local_device_ids, remote_device_ids));
 
         // Enable DAD.
         let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
@@ -514,7 +528,7 @@ mod tests {
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
-        let eth_dev_id: EthernetDeviceId<_> =
+        let eth_dev_id: EthernetDeviceId<_, _> =
             dev_id.clone().try_into().expect("expected ethernet ID");
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &dev_id);
 
@@ -559,7 +573,6 @@ mod tests {
         let (local, local_device_ids) = local.build();
         let (remote, remote_device_ids) = remote.build();
         let local_device_id = &local_device_ids[local_dev_idx];
-        let local_eth_device_id = local_device_id.clone().try_into().expect("expected ethernet ID");
         let remote_device_id = &remote_device_ids[remote_dev_idx];
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             "local",
@@ -569,6 +582,12 @@ mod tests {
             remote,
             remote_device_id.clone(),
         );
+        // Make sure the (strongly referenced) device IDs are dropped before
+        // `net`.
+        let local_device_id = local_device_id.clone();
+        let remote_device_id = remote_device_id.clone();
+        let local_eth_device_id = local_device_id.clone().try_into().expect("expected ethernet ID");
+        core::mem::drop((local_device_ids, remote_device_ids));
 
         let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
             ipv6_config.ip_config.ip_enabled = true;
@@ -673,7 +692,7 @@ mod tests {
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
-        let eth_dev_id: EthernetDeviceId<_> =
+        let eth_dev_id: EthernetDeviceId<_, _> =
             dev_id.clone().try_into().expect("expected ethernet ID");
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &dev_id);
 
@@ -788,7 +807,7 @@ mod tests {
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
-        let eth_dev_id: EthernetDeviceId<_> =
+        let eth_dev_id: EthernetDeviceId<_, _> =
             dev_id.clone().try_into().expect("expected ethernet ID");
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &dev_id);
 
@@ -1219,7 +1238,7 @@ mod tests {
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
-        let eth_device_id: EthernetDeviceId<_> =
+        let eth_device_id: EthernetDeviceId<_, _> =
             device_id.clone().try_into().expect("expected ethernet ID");
         crate::device::update_ipv6_configuration(
             &mut sync_ctx,
@@ -1312,7 +1331,7 @@ mod tests {
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
-        let eth_device_id: EthernetDeviceId<_> =
+        let eth_device_id: EthernetDeviceId<_, _> =
             device_id.clone().try_into().expect("expected ethernet ID");
         crate::device::update_ipv6_configuration(
             &mut sync_ctx,
@@ -3037,7 +3056,7 @@ mod tests {
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         );
-        let device_id: EthernetDeviceId<_> = device.clone().try_into().unwrap();
+        let device_id: EthernetDeviceId<_, _> = device.clone().try_into().unwrap();
         // No DAD for the auto-generated link-local address.
         crate::device::update_ipv6_configuration(
             &mut sync_ctx,

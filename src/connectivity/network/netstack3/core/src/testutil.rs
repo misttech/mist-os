@@ -26,11 +26,11 @@ use crate::{
         testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, InstantAndData},
         EventContext, InstantContext, RngContext, TimerContext,
     },
-    device::{ethernet, DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError},
+    device::{ethernet, DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError, WeakDeviceId},
     ip::{
         device::{dad::DadEvent, route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
-        types::AddableEntryEither,
+        types::{AddableEntryEither, Entry},
         IpLayerEvent, SendIpPacketMeta,
     },
     transport::{
@@ -235,11 +235,11 @@ impl NonSyncContext for FakeNonSyncCtx {
 }
 
 impl FakeNonSyncCtx {
-    pub(crate) fn take_frames(&mut self) -> Vec<(DeviceId<FakeNonSyncCtx>, Vec<u8>)> {
+    pub(crate) fn take_frames(&mut self) -> Vec<(WeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
         self.frame_ctx_mut().take_frames()
     }
 
-    pub(crate) fn frames_sent(&self) -> &[(DeviceId<FakeNonSyncCtx>, Vec<u8>)] {
+    pub(crate) fn frames_sent(&self) -> &[(WeakDeviceId<FakeNonSyncCtx>, Vec<u8>)] {
         self.frame_ctx().frames()
     }
 }
@@ -704,8 +704,8 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     }
 }
 
-impl AsMut<FakeFrameCtx<DeviceId<FakeNonSyncCtx>>> for FakeCtx {
-    fn as_mut(&mut self) -> &mut FakeFrameCtx<DeviceId<FakeNonSyncCtx>> {
+impl AsMut<FakeFrameCtx<WeakDeviceId<FakeNonSyncCtx>>> for FakeCtx {
+    fn as_mut(&mut self) -> &mut FakeFrameCtx<WeakDeviceId<FakeNonSyncCtx>> {
         self.non_sync_ctx.frame_ctx_mut()
     }
 }
@@ -724,7 +724,7 @@ impl AsMut<FakeTimerCtx<TimerId<FakeNonSyncCtx>>> for FakeCtx {
 
 impl FakeNetworkContext for FakeCtx {
     type TimerId = TimerId<FakeNonSyncCtx>;
-    type SendMeta = DeviceId<FakeNonSyncCtx>;
+    type SendMeta = WeakDeviceId<FakeNonSyncCtx>;
 }
 
 pub(crate) trait TestutilIpExt: Ip {
@@ -800,6 +800,8 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
 }
 
 impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
+    type DeviceState = ();
+
     fn wake_rx_task(&mut self, device: &DeviceId<FakeNonSyncCtx>) {
         self.state_mut().rx_available.push(device.clone());
     }
@@ -813,7 +815,7 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
         device: &DeviceId<FakeNonSyncCtx>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        self.frame_ctx_mut().push(device.clone(), frame.into_inner());
+        self.frame_ctx_mut().push(device.downgrade(), frame.into_inner());
         Ok(())
     }
 }
@@ -834,47 +836,101 @@ pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNon
 /// Wraps all events emitted by Core into a single enum type.
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(crate) enum DispatchedEvent {
-    Dad(DadEvent<DeviceId<FakeNonSyncCtx>>),
-    IpDeviceIpv4(IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>),
-    IpDeviceIpv6(IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>),
-    IpLayerIpv4(IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>),
-    IpLayerIpv6(IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>),
-    Ipv6RouteDiscovery(Ipv6RouteDiscoveryEvent<DeviceId<FakeNonSyncCtx>>),
+    Dad(DadEvent<WeakDeviceId<FakeNonSyncCtx>>),
+    IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
+    IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
+    IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
+    IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
+    Ipv6RouteDiscovery(Ipv6RouteDiscoveryEvent<WeakDeviceId<FakeNonSyncCtx>>),
 }
 
 impl From<DadEvent<DeviceId<FakeNonSyncCtx>>> for DispatchedEvent {
     fn from(e: DadEvent<DeviceId<FakeNonSyncCtx>>) -> DispatchedEvent {
-        DispatchedEvent::Dad(e)
+        let e = match e {
+            DadEvent::AddressAssigned { device, addr } => {
+                DadEvent::AddressAssigned { device: device.downgrade(), addr }
+            }
+        };
+
+        DispatchedEvent::Dad(e.into())
+    }
+}
+
+impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>
+    for IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I>
+{
+    fn from(
+        e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>,
+    ) -> IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, I> {
+        match e {
+            IpDeviceEvent::AddressAdded { device, addr, state } => {
+                IpDeviceEvent::AddressAdded { device: device.downgrade(), addr, state }
+            }
+            IpDeviceEvent::AddressRemoved { device, addr, reason } => {
+                IpDeviceEvent::AddressRemoved { device: device.downgrade(), addr, reason }
+            }
+            IpDeviceEvent::AddressStateChanged { device, addr, state } => {
+                IpDeviceEvent::AddressStateChanged { device: device.downgrade(), addr, state }
+            }
+            IpDeviceEvent::EnabledChanged { device, ip_enabled } => {
+                IpDeviceEvent::EnabledChanged { device: device.downgrade(), ip_enabled }
+            }
+        }
     }
 }
 
 impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for DispatchedEvent {
     fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) -> DispatchedEvent {
-        DispatchedEvent::IpDeviceIpv4(e)
+        DispatchedEvent::IpDeviceIpv4(e.into())
     }
 }
 
 impl From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for DispatchedEvent {
     fn from(e: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) -> DispatchedEvent {
-        DispatchedEvent::IpDeviceIpv6(e)
+        DispatchedEvent::IpDeviceIpv6(e.into())
+    }
+}
+
+impl<I: Ip> From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>
+    for IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I>
+{
+    fn from(
+        e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>,
+    ) -> IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I> {
+        match e {
+            IpLayerEvent::RouteAdded(Entry { subnet, device, gateway }) => {
+                IpLayerEvent::RouteAdded(Entry { subnet, device: device.downgrade(), gateway })
+            }
+            IpLayerEvent::RouteRemoved(Entry { subnet, device, gateway }) => {
+                IpLayerEvent::RouteRemoved(Entry { subnet, device: device.downgrade(), gateway })
+            }
+        }
     }
 }
 
 impl From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for DispatchedEvent {
     fn from(e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) -> DispatchedEvent {
-        DispatchedEvent::IpLayerIpv4(e)
+        DispatchedEvent::IpLayerIpv4(e.into())
     }
 }
 
 impl From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for DispatchedEvent {
     fn from(e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) -> DispatchedEvent {
-        DispatchedEvent::IpLayerIpv6(e)
+        DispatchedEvent::IpLayerIpv6(e.into())
     }
 }
 
 impl From<Ipv6RouteDiscoveryEvent<DeviceId<FakeNonSyncCtx>>> for DispatchedEvent {
-    fn from(e: Ipv6RouteDiscoveryEvent<DeviceId<FakeNonSyncCtx>>) -> DispatchedEvent {
-        DispatchedEvent::Ipv6RouteDiscovery(e)
+    fn from(
+        Ipv6RouteDiscoveryEvent { device_id, route, action }: Ipv6RouteDiscoveryEvent<
+            DeviceId<FakeNonSyncCtx>,
+        >,
+    ) -> DispatchedEvent {
+        DispatchedEvent::Ipv6RouteDiscovery(Ipv6RouteDiscoveryEvent {
+            device_id: device_id.downgrade(),
+            route,
+            action,
+        })
     }
 }
 
@@ -964,6 +1020,7 @@ mod tests {
             bob_ctx,
             bob_device_ids[0].clone(),
         );
+        core::mem::drop((alice_device_ids, bob_device_ids));
 
         // Alice sends Bob a ping.
 
@@ -1014,6 +1071,7 @@ mod tests {
             ctx_2,
             device_ids_2[0].clone(),
         );
+        core::mem::drop((device_ids_1, device_ids_2));
 
         net.with_context(1, |Ctx { sync_ctx: _, non_sync_ctx }| {
             assert_eq!(
@@ -1089,6 +1147,8 @@ mod tests {
             ctx_2,
             device_ids_2[0].clone(),
         );
+        core::mem::drop((device_ids_1, device_ids_2));
+
         net.with_context(1, |Ctx { sync_ctx: _, non_sync_ctx }| {
             assert_eq!(
                 non_sync_ctx.schedule_timer(Duration::from_secs(1), TimerId(TimerIdInner::Nop(1))),
@@ -1122,13 +1182,16 @@ mod tests {
         let latency = Duration::from_millis(5);
         let (alice_ctx, alice_device_ids) = FAKE_CONFIG_V4.into_builder().build();
         let (bob_ctx, bob_device_ids) = FAKE_CONFIG_V4.swap().into_builder().build();
+        let alice_device_id = alice_device_ids[0].clone();
+        let bob_device_id = bob_device_ids[0].clone();
+        core::mem::drop((alice_device_ids, bob_device_ids));
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx)],
-            |net: &'static str, _device_id: DeviceId<FakeNonSyncCtx>| {
+            move |net: &'static str, _device_id: WeakDeviceId<FakeNonSyncCtx>| {
                 if net == "alice" {
-                    vec![("bob", bob_device_ids[0].clone(), Some(latency))]
+                    vec![("bob", bob_device_id.clone(), Some(latency))]
                 } else {
-                    vec![("alice", alice_device_ids[0].clone(), Some(latency))]
+                    vec![("alice", alice_device_id.clone(), Some(latency))]
                 }
             },
         );
@@ -1188,7 +1251,7 @@ mod tests {
 
         fn assert_full_state<
             'a,
-            L: FakeNetworkLinks<DeviceId<FakeNonSyncCtx>, DeviceId<FakeNonSyncCtx>, &'a str>,
+            L: FakeNetworkLinks<WeakDeviceId<FakeNonSyncCtx>, DeviceId<FakeNonSyncCtx>, &'a str>,
         >(
             net: &mut FakeNetwork<&'a str, DeviceId<FakeNonSyncCtx>, FakeCtx, L>,
             alice_nop: usize,
@@ -1265,6 +1328,7 @@ mod tests {
             FakeNonSyncCtx,
             Buf<Vec<u8>>,
             DeviceId = DeviceId<FakeNonSyncCtx>,
+            WeakDeviceId = WeakDeviceId<FakeNonSyncCtx>,
         >,
     {
         let mac_a = UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 7])).unwrap();
@@ -1289,18 +1353,25 @@ mod tests {
         let (alice_ctx, alice_device_ids) = alice.build();
         let (bob_ctx, bob_device_ids) = bob.build();
         let (calvin_ctx, calvin_device_ids) = calvin.build();
+        let alice_device_id = alice_device_ids[alice_device_idx].clone();
+        let bob_device_id = bob_device_ids[bob_device_idx].clone();
+        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
-            |net: &'static str, _device_id: DeviceId<FakeNonSyncCtx>| match net {
+            move |net: &'static str, _device_id: WeakDeviceId<FakeNonSyncCtx>| match net {
                 "alice" => vec![
-                    ("bob", bob_device_ids[bob_device_idx].clone(), None),
-                    ("calvin", calvin_device_ids[calvin_device_idx].clone(), None),
+                    ("bob", bob_device_id.clone(), None),
+                    ("calvin", calvin_device_id.clone(), None),
                 ],
-                "bob" => vec![("alice", alice_device_ids[alice_device_idx].clone(), None)],
+                "bob" => vec![("alice", alice_device_id.clone(), None)],
                 "calvin" => Vec::new(),
                 _ => unreachable!(),
             },
         );
+        let alice_device_id = alice_device_ids[alice_device_idx].clone();
+        let bob_device_id = bob_device_ids[bob_device_idx].clone();
+        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
+        core::mem::drop((alice_device_ids, bob_device_ids, calvin_device_ids));
 
         net.collect_frames();
         assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
@@ -1311,7 +1382,7 @@ mod tests {
         // Bob and Calvin should get any packet sent by Alice.
 
         net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_a, ip_b, &alice_device_ids[alice_device_idx]);
+            send_packet(sync_ctx, non_sync_ctx, ip_a, ip_b, &alice_device_id);
         });
         assert_eq!(net.non_sync_ctx("alice").frames_sent().len(), 1);
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
@@ -1322,16 +1393,19 @@ mod tests {
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
         assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
         assert_eq!(net.iter_pending_frames().count(), 2);
-        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| (x.dst_context == "bob")
-            && (&x.meta == &bob_device_ids[bob_device_idx])));
-        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| (x.dst_context == "calvin")
-            && (&x.meta == &calvin_device_ids[calvin_device_idx])));
+        assert!(net
+            .iter_pending_frames()
+            .any(|InstantAndData(_, x)| (x.dst_context == "bob") && (&x.meta == &bob_device_id)));
+        assert!(net
+            .iter_pending_frames()
+            .any(|InstantAndData(_, x)| (x.dst_context == "calvin")
+                && (&x.meta == &calvin_device_id)));
 
         // Only Alice should get packets sent by Bob.
 
         net.drop_pending_frames();
         net.with_context("bob", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_b, ip_a, &bob_device_ids[bob_device_idx]);
+            send_packet(sync_ctx, non_sync_ctx, ip_b, ip_a, &bob_device_id);
         });
         assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
         assert_eq!(net.non_sync_ctx("bob").frames_sent().len(), 1);
@@ -1342,14 +1416,15 @@ mod tests {
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
         assert_empty(net.non_sync_ctx("calvin").frames_sent().iter());
         assert_eq!(net.iter_pending_frames().count(), 1);
-        assert!(net.iter_pending_frames().any(|InstantAndData(_, x)| (x.dst_context == "alice")
-            && (&x.meta == &alice_device_ids[alice_device_idx])));
+        assert!(net.iter_pending_frames().any(
+            |InstantAndData(_, x)| (x.dst_context == "alice") && (&x.meta == &alice_device_id)
+        ));
 
         // No one gets packets sent by Calvin.
 
         net.drop_pending_frames();
         net.with_context("calvin", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_c, ip_a, &calvin_device_ids[calvin_device_idx]);
+            send_packet(sync_ctx, non_sync_ctx, ip_c, ip_a, &calvin_device_id);
         });
         assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());

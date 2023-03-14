@@ -1171,8 +1171,11 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+        let device_id = crate::device::add_ethernet_device(
+            sync_ctx,
+            local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        );
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1255,8 +1258,11 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let device_id =
-            sync_ctx.state.device.add_ethernet_device(local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+        let device_id = crate::device::add_ethernet_device(
+            sync_ctx,
+            local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        );
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,

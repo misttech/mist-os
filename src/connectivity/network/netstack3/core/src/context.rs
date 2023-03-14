@@ -311,7 +311,7 @@ pub(crate) mod testutil {
     use super::*;
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-        device::DeviceId,
+        device::{DeviceId, WeakDeviceId},
         testutil::FakeCryptoRng,
         Instant,
     };
@@ -982,7 +982,7 @@ pub(crate) mod testutil {
         rng: FakeCryptoRng<XorShiftRng>,
         timers: FakeTimerCtx<TimerId>,
         events: FakeEventCtx<Event>,
-        frames: FakeFrameCtx<DeviceId<crate::testutil::FakeNonSyncCtx>>,
+        frames: FakeFrameCtx<WeakDeviceId<crate::testutil::FakeNonSyncCtx>>,
         counters: FakeCounterCtx,
         state: State,
     }
@@ -1023,13 +1023,15 @@ pub(crate) mod testutil {
             self.events.take()
         }
 
-        pub(crate) fn frame_ctx(&self) -> &FakeFrameCtx<DeviceId<crate::testutil::FakeNonSyncCtx>> {
+        pub(crate) fn frame_ctx(
+            &self,
+        ) -> &FakeFrameCtx<WeakDeviceId<crate::testutil::FakeNonSyncCtx>> {
             &self.frames
         }
 
         pub(crate) fn frame_ctx_mut(
             &mut self,
-        ) -> &mut FakeFrameCtx<DeviceId<crate::testutil::FakeNonSyncCtx>> {
+        ) -> &mut FakeFrameCtx<WeakDeviceId<crate::testutil::FakeNonSyncCtx>> {
             &mut self.frames
         }
 
@@ -1313,10 +1315,13 @@ pub(crate) mod testutil {
     where
         Links: FakeNetworkLinks<Ctx::SendMeta, RecvMeta, CtxId>,
     {
-        contexts: HashMap<CtxId, Ctx>,
+        links: Links,
         current_time: FakeInstant,
         pending_frames: BinaryHeap<PendingFrame<CtxId, RecvMeta>>,
-        links: Links,
+        // Declare `contexts` last to ensure that it is dropped last. See
+        // https://doc.rust-lang.org/std/ops/trait.Drop.html#drop-order for
+        // details.
+        contexts: HashMap<CtxId, Ctx>,
     }
 
     /// A context which can be used with a [`FakeNetwork`].
@@ -1651,7 +1656,7 @@ pub(crate) mod testutil {
     where
         CtxId: Eq + Hash + Copy + Debug,
         Links: FakeNetworkLinks<
-            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            WeakDeviceId<crate::testutil::FakeNonSyncCtx>,
             DeviceId<crate::testutil::FakeNonSyncCtx>,
             CtxId,
         >,
@@ -1740,7 +1745,7 @@ pub(crate) mod testutil {
         DeviceId<crate::testutil::FakeNonSyncCtx>,
         crate::testutil::FakeCtx,
         impl FakeNetworkLinks<
-            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            WeakDeviceId<crate::testutil::FakeNonSyncCtx>,
             DeviceId<crate::testutil::FakeNonSyncCtx>,
             CtxId,
         >,
@@ -1748,7 +1753,7 @@ pub(crate) mod testutil {
         let contexts = vec![(a_id, a), (b_id, b)].into_iter();
         FakeNetwork::new(
             contexts,
-            move |net, _device_id: DeviceId<crate::testutil::FakeNonSyncCtx>| {
+            move |net, _device_id: WeakDeviceId<crate::testutil::FakeNonSyncCtx>| {
                 if net == a_id {
                     vec![(b_id, b_device_id.clone(), None)]
                 } else {

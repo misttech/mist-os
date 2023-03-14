@@ -16,6 +16,7 @@
 use core::{
     convert::AsRef,
     hash::{Hash, Hasher},
+    num::NonZeroUsize,
     ops::Deref,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -27,8 +28,8 @@ struct Inner<T> {
     data: T,
 }
 
-impl<T> Drop for Inner<T> {
-    fn drop(&mut self) {
+impl<T> Inner<T> {
+    fn pre_drop_check(&mut self) {
         let Inner { marked_for_destruction, data: _ } = self;
 
         // `Ordering::Acquire` because we want to synchronize with with the
@@ -36,6 +37,12 @@ impl<T> Drop for Inner<T> {
         // memory writes before the reference was marked for destruction is
         // visible here.
         assert!(marked_for_destruction.load(Ordering::Acquire), "Must be marked for destruction");
+    }
+}
+
+impl<T> Drop for Inner<T> {
+    fn drop(&mut self) {
+        self.pre_drop_check()
     }
 }
 
@@ -49,12 +56,19 @@ impl<T> Drop for Inner<T> {
 /// strongly held references are dropped.
 // TODO(https://fxbug.dev/122388): Implement the blocking.
 #[derive(Debug)]
-pub struct Primary<T>(alloc::sync::Arc<Inner<T>>);
+pub struct Primary<T> {
+    /// Used to let this `Primary`'s `Drop::drop` implementation know if
+    /// there are any extra (inner) [`alloc::sync::Arc`]s held.
+    extra_refs_on_drops: Option<NonZeroUsize>,
+    inner: alloc::sync::Arc<Inner<T>>,
+}
+
+const ONE_NONZERO_USIZE: NonZeroUsize = nonzero_ext::nonzero!(1_usize);
 
 impl<T> Drop for Primary<T> {
     fn drop(&mut self) {
-        let Self(arc) = self;
-        let Inner { marked_for_destruction, data: _ } = arc.as_ref();
+        let Self { extra_refs_on_drops, inner } = self;
+        let Inner { marked_for_destruction, data: _ } = inner.as_ref();
 
         // `Ordering::Release` because want to make sure that all memory writes
         // before dropping this `Primary` synchronizes with later attempts to
@@ -66,7 +80,24 @@ impl<T> Drop for Primary<T> {
             false,
             marked_for_destruction.swap(true, Ordering::Release),
             "Must not be marked for destruction yet"
-        )
+        );
+
+        // Make sure that this `Killable` is the last thing to hold a strong
+        // reference to the underlying data when it is being dropped.
+        //
+        // Note that this family of reference counted pointers is always used
+        // under a single lock so we know two threads will not concurrently
+        // attempt to handle this drop method and attempt to upgrade a weak
+        // reference.
+        //
+        // TODO(https://fxbug.dev/122388): Require explicit killing of the
+        // reference and support blocking instead of this panic here.
+        assert_eq!(
+            alloc::sync::Arc::strong_count(inner),
+            1 + extra_refs_on_drops.map_or(0, NonZeroUsize::get),
+            "extra_refs_on_drops={:?}",
+            extra_refs_on_drops,
+        );
     }
 }
 
@@ -80,8 +111,8 @@ impl<T> Deref for Primary<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        let Self(arc) = self;
-        let Inner { marked_for_destruction: _, data } = arc.deref();
+        let Self { extra_refs_on_drops: _, inner } = self;
+        let Inner { marked_for_destruction: _, data } = inner.deref();
         data
     }
 }
@@ -89,25 +120,78 @@ impl<T> Deref for Primary<T> {
 impl<T> Primary<T> {
     /// Returns a new strongly-held reference.
     pub fn new(data: T) -> Primary<T> {
-        Primary(alloc::sync::Arc::new(Inner {
-            marked_for_destruction: AtomicBool::new(false),
-            data,
-        }))
+        Primary {
+            extra_refs_on_drops: None,
+            inner: alloc::sync::Arc::new(Inner {
+                marked_for_destruction: AtomicBool::new(false),
+                data,
+            }),
+        }
     }
 
     /// Clones a strongly-held reference.
-    pub fn clone_strong(Self(arc): &Self) -> Strong<T> {
-        Strong(arc.clone())
+    pub fn clone_strong(Self { extra_refs_on_drops: _, inner }: &Self) -> Strong<T> {
+        Strong(alloc::sync::Arc::clone(inner))
     }
 
     /// Returns a weak reference pointing to the same underlying data.
-    pub fn downgrade(Self(arc): &Self) -> Weak<T> {
-        Weak(alloc::sync::Arc::downgrade(arc))
+    pub fn downgrade(Self { extra_refs_on_drops: _, inner }: &Self) -> Weak<T> {
+        Weak(alloc::sync::Arc::downgrade(inner))
     }
 
     /// Returns true if the two pointers point to the same allocation.
-    pub fn ptr_eq(Self(this): &Self, Strong(other): &Strong<T>) -> bool {
+    pub fn ptr_eq(
+        Self { extra_refs_on_drops: _, inner: this }: &Self,
+        Strong(other): &Strong<T>,
+    ) -> bool {
         alloc::sync::Arc::ptr_eq(this, other)
+    }
+
+    /// Returns the inner value if no [`Strong`] references are held.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`Strong`] references are held when this function is called.
+    pub fn unwrap(mut this: Self) -> T {
+        let inner = {
+            let Self { extra_refs_on_drops, inner } = &mut this;
+            let inner = alloc::sync::Arc::clone(inner);
+            // We are going to drop the `Primary` but while holding a reference
+            // to the inner `alloc::sync::Arc`. Let this `Primary`'s `Drop::drop`
+            // impl know that we have an extra reference.
+            assert_eq!(core::mem::replace(extra_refs_on_drops, Some(ONE_NONZERO_USIZE)), None,);
+            core::mem::drop(this);
+            inner
+        };
+
+        match alloc::sync::Arc::try_unwrap(inner) {
+            Ok(mut inner) => {
+                // We cannot destructure `inner` by value since `Inner`
+                // implements `Drop`. As a workaround, we ptr-read `data` and
+                // `core::mem::forget` `inner` to prevent `inner` from being
+                // destroyed which will result in `data` being destroyed as
+                // well.
+                let Inner { marked_for_destruction: _, data } = &inner;
+
+                // Safe because we know the reference points to a valid object.
+                let data = unsafe { core::ptr::read(data) };
+
+                // Forget inner now to prevent its `Drop::drop` impl from being
+                // run which will attempt to destroy `data` but still perform
+                // pre-drop checks on `Inner`'s state.
+                inner.pre_drop_check();
+                core::mem::forget(inner);
+
+                // We now own `data` and its destructor will not run (until
+                // dropped by the caller).
+                data
+            }
+            Err(inner) => {
+                // Unreachable because `Primary`'s drop impl would have panic-ed
+                // if we had any [`Strong`]s held.
+                unreachable!("still had strong refs: {}", alloc::sync::Arc::strong_count(&inner))
+            }
+        }
     }
 }
 
@@ -245,5 +329,28 @@ mod tests {
         assert_eq!(*primary.deref().lock().unwrap(), NEW_VAL);
         assert_eq!(*strong.deref().lock().unwrap(), NEW_VAL);
         assert_eq!(*weak.upgrade().unwrap().deref().lock().unwrap(), NEW_VAL);
+    }
+
+    #[test]
+    fn unwrap_primary_without_strong_held() {
+        const VAL: u16 = 6;
+        let primary = Primary::new(VAL);
+        assert_eq!(Primary::unwrap(primary), VAL);
+    }
+
+    #[test]
+    #[should_panic(expected = "extra_refs_on_drops=Some(1)")]
+    fn unwrap_primary_with_strong_held() {
+        let primary = Primary::new(8);
+        let _strong: Strong<_> = Primary::clone_strong(&primary);
+        let _: u16 = Primary::unwrap(primary);
+    }
+
+    #[test]
+    #[should_panic(expected = "extra_refs_on_drops=None")]
+    fn drop_primary_with_strong_held() {
+        let primary = Primary::new(9);
+        let _strong: Strong<_> = Primary::clone_strong(&primary);
+        core::mem::drop(primary);
     }
 }

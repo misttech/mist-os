@@ -268,9 +268,23 @@ pub struct SyncCtx<NonSyncCtx: NonSyncContext> {
 /// dispatcher which can be used to emit events and schedule timers. A mutable
 /// reference to a `Ctx` is passed to every function in the netstack.
 pub struct Ctx<NonSyncCtx: NonSyncContext> {
+    /// The non-synchronized context.
+    // We put `non_sync_ctx` before `sync_ctx` in non-test builds to make sure
+    // that any bindings-provided state held in the non-synchronized context
+    // is dropped before the synchronized context. This is to make sure any
+    // strongly-referenced (device) IDs are dropped before dropping the
+    // `Killable` reference in `sync_ctx` which may panic if it is dropped
+    // while any `Strong` references exist.
+    #[cfg(not(test))]
+    pub non_sync_ctx: NonSyncCtx,
     /// The synchronized context.
     pub sync_ctx: SyncCtx<NonSyncCtx>,
     /// The non-synchronized context.
+    // We put `non_sync_ctx` after `sync_ctx` in test builds to make sure that
+    // `sync_ctx` is dropped before `non-sync_ctx` so that strongly-referenced
+    // held in `non_sync_ctx` causes test failures, forcing proper cleanup of
+    // device IDs in our unit tests. See `non_sync_ctx` above for more details.
+    #[cfg(test)]
     pub non_sync_ctx: NonSyncCtx,
 }
 
@@ -661,7 +675,8 @@ mod tests {
         );
 
         // Then, add a route to the gateway, and try again, expecting success.
-        let device_id = sync_ctx.state.device.add_ethernet_device(
+        let device_id = crate::device::add_ethernet_device(
+            &sync_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
         );

@@ -582,7 +582,7 @@ pub(crate) trait ConversionContext {
     /// identifier.
     ///
     /// Returns `None` if there is no FIDL mapping equivalent for `core_id`.
-    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> Option<u64>;
+    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> u64;
 }
 
 /// A core type which can be fallibly converted from the FIDL type `F` given a
@@ -865,13 +865,10 @@ impl TryFromFidlWithContext<NonZeroU64> for DeviceId<BindingsNonSyncCtxImpl> {
 }
 
 impl TryIntoFidlWithContext<u64> for DeviceId<BindingsNonSyncCtxImpl> {
-    type Error = DeviceNotFoundError;
+    type Error = Never;
 
-    fn try_into_fidl_with_ctx<C: ConversionContext>(
-        self,
-        ctx: &C,
-    ) -> Result<u64, DeviceNotFoundError> {
-        ctx.get_binding_id(self).ok_or(DeviceNotFoundError)
+    fn try_into_fidl_with_ctx<C: ConversionContext>(self, ctx: &C) -> Result<u64, Never> {
+        Ok(ctx.get_binding_id(self))
     }
 }
 
@@ -882,7 +879,7 @@ impl TryIntoFidlWithContext<NonZeroU64> for DeviceId<BindingsNonSyncCtxImpl> {
         self,
         ctx: &C,
     ) -> Result<NonZeroU64, DeviceNotFoundError> {
-        ctx.get_binding_id(self).and_then(NonZeroU64::new).ok_or(DeviceNotFoundError)
+        NonZeroU64::new(ctx.get_binding_id(self)).ok_or(DeviceNotFoundError)
     }
 }
 
@@ -901,7 +898,7 @@ impl TryIntoFidlWithContext<u64> for WeakDeviceId<BindingsNonSyncCtxImpl> {
         self,
         ctx: &C,
     ) -> Result<u64, DeviceNotFoundError> {
-        self.upgrade().and_then(|d| ctx.get_binding_id(d)).ok_or(DeviceNotFoundError)
+        self.upgrade().map(|d| ctx.get_binding_id(d)).ok_or(DeviceNotFoundError)
     }
 }
 
@@ -913,7 +910,7 @@ impl TryIntoFidlWithContext<NonZeroU64> for WeakDeviceId<BindingsNonSyncCtxImpl>
         ctx: &C,
     ) -> Result<NonZeroU64, DeviceNotFoundError> {
         self.upgrade()
-            .and_then(|d| ctx.get_binding_id(d))
+            .map(|d| ctx.get_binding_id(d))
             .and_then(NonZeroU64::new)
             .ok_or(DeviceNotFoundError)
     }
@@ -997,12 +994,12 @@ impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
 impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
     for EntryEither<DeviceId<BindingsNonSyncCtxImpl>>
 {
-    type Error = DeviceNotFoundError;
+    type Error = Never;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
         self,
         ctx: &C,
-    ) -> Result<fidl_net_stack::ForwardingEntry, DeviceNotFoundError> {
+    ) -> Result<fidl_net_stack::ForwardingEntry, Never> {
         let (subnet, device, gateway) = self.into_subnet_device_gateway();
         let device_id = device.try_into_fidl_with_ctx(ctx)?;
         let next_hop = gateway.map(|next_hop| {
@@ -1032,45 +1029,79 @@ pub(crate) fn fidl_err_log_level(e: &fidl::Error) -> log::Level {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use fidl_fuchsia_net as fidl_net;
     use fidl_fuchsia_net_ext::IntoExt;
+    use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
     use fuchsia_zircon_status as zx_status;
     use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::{
-        ip::{Ipv4Addr, Ipv6Addr, Mtu},
-        UnicastAddr,
-    };
-    use netstack3_core::{device::ethernet, Ctx};
+    use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use test_case::test_case;
 
-    use crate::bindings::NetstackContext;
+    use crate::bindings::{
+        devices, interfaces_admin::OwnedControlHandle, InterfaceEventProducer, NetstackContext,
+        DEFAULT_LOOPBACK_MTU,
+    };
 
     use super::*;
 
     struct FakeConversionContext {
         binding: u64,
         core: DeviceId<BindingsNonSyncCtxImpl>,
-        invalid_core: DeviceId<BindingsNonSyncCtxImpl>,
+        // We hold the netstack even though it is unused because we create
+        // a device in the Netstack to get a device ID.
+        //
+        // Netstack requires that all strongly-referenced IDs are dropped before
+        // the internal reference to the device is dropped. We include netstack
+        // here (at the bottom of this struct) to make sure it is only dropped
+        // after the device IDs are dropped.
+        _netstack: NetstackContext,
     }
 
     impl FakeConversionContext {
-        fn new() -> Self {
+        async fn new() -> Self {
             // We need a valid context to be able to create DeviceIds, so
             // we just create it, get the device id, and then destroy
             // everything.
             let ctx = NetstackContext::default();
-            let mut state = ctx.try_lock().unwrap();
-            let state: &mut Ctx<_> = &mut state;
+            let binding = 1;
+            let core = {
+                let (_control_client_end, control_server_end) =
+                    fnet_interfaces_ext::admin::Control::create_endpoints()
+                        .expect("create control proxy");
+                let (control_sender, _control_receiver) =
+                    OwnedControlHandle::new_channel_with_owned_handle(control_server_end).await;
+                let (event_sender, _event_receiver) = futures::channel::mpsc::unbounded();
 
-            let [core, invalid_core] = [(); 2].map(|()| {
-                netstack3_core::device::add_ethernet_device(
-                    &mut state.sync_ctx,
-                    UnicastAddr::new(Mac::new([2, 3, 4, 5, 6, 7])).unwrap(),
-                    ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
+                let state = ctx.try_lock().unwrap();
+                netstack3_core::device::add_loopback_device_with_state(
+                    &state.sync_ctx,
+                    DEFAULT_LOOPBACK_MTU,
+                    || {
+                        const LOOPBACK_NAME: &'static str = "lo";
+
+                        devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
+                            static_common_info: devices::StaticCommonInfo {
+                                binding_id: binding,
+                                name: LOOPBACK_NAME.to_string(),
+                            },
+                            dynamic_common_info: devices::DynamicCommonInfo {
+                                mtu: DEFAULT_LOOPBACK_MTU,
+                                admin_enabled: true,
+                                events: InterfaceEventProducer::new(binding, event_sender),
+                                control_hook: control_sender,
+                                addresses: HashMap::new(),
+                            }
+                            .into(),
+                            rx_notifier: Default::default(),
+                        })
+                    },
                 )
-            });
+                .expect("failed to add loopback to core")
+            };
 
-            Self { binding: 1, core, invalid_core }
+            Self { binding, core, _netstack: ctx }
         }
     }
 
@@ -1083,12 +1114,8 @@ mod tests {
             }
         }
 
-        fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> Option<u64> {
-            if self.core == core_id {
-                Some(self.binding)
-            } else {
-                None
-            }
+        fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> u64 {
+            core_id.external_state().static_common_info().binding_id
         }
     }
 
@@ -1098,8 +1125,8 @@ mod tests {
             None
         }
 
-        fn get_binding_id(&self, _core_id: DeviceId<BindingsNonSyncCtxImpl>) -> Option<u64> {
-            None
+        fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> u64 {
+            core_id.external_state().static_common_info().binding_id
         }
     }
 
@@ -1229,7 +1256,7 @@ mod tests {
         DeviceId<BindingsNonSyncCtxImpl>:
             TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
     {
-        let ctx = FakeConversionContext::new();
+        let ctx = FakeConversionContext::new().await;
 
         let result: Result<(Option<_>, _), _> = addr.try_into_core_with_ctx(&ctx);
         assert_eq!(result.expect_err("should fail"), expected);
@@ -1285,7 +1312,7 @@ mod tests {
         DeviceId<BindingsNonSyncCtxImpl>:
             TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
     {
-        let ctx = FakeConversionContext::new();
+        let ctx = FakeConversionContext::new().await;
         let zoned = zoned.map(|z| match z {
             ZonedAddr::Unzoned(z) => z.into(),
             ZonedAddr::Zoned(z) => z.map_zone(|ReplaceWithCoreId| ctx.core.clone()).into(),
@@ -1313,18 +1340,6 @@ mod tests {
             (SpecifiedAddr::new(ip), NonZeroU16::new(port).unwrap()).into_fidl(),
             fidl_net::Ipv6SocketAddress { address: ip.into_ext(), port, zone_index: 0 }
         );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn zoned_addr_port_into_fidl_err() {
-        let ctx = FakeConversionContext::new();
-        let zoned = ZonedAddr::Zoned(
-            AddrAndZone::<Ipv6Addr, _>::new(net_ip_v6!("fe80::1"), ctx.invalid_core.clone())
-                .unwrap(),
-        );
-
-        let result = (Some(zoned), 9000).try_into_fidl_with_ctx(&ctx);
-        assert_eq!(result.expect_err("should fail"), DeviceNotFoundError);
     }
 
     #[test]

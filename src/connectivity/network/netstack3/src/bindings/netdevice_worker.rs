@@ -17,7 +17,7 @@ use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     context::RngContext as _,
-    device::ethernet,
+    device::{ethernet, WeakDeviceId},
     ip::device::{
         slaac::{
             SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
@@ -37,7 +37,7 @@ use crate::bindings::{
 struct Inner {
     device: netdevice_client::Client,
     session: netdevice_client::Session,
-    state: Arc<Mutex<netdevice_client::PortSlab<DeviceId<BindingsNonSyncCtxImpl>>>>,
+    state: Arc<Mutex<netdevice_client::PortSlab<WeakDeviceId<BindingsNonSyncCtxImpl>>>>,
 }
 
 /// The worker that receives messages from the ethernet device, and passes them
@@ -124,6 +124,19 @@ impl NetdeviceWorker {
 
             let mut ctx = ctx.lock().await;
             let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+
+            let Some(id) = id.upgrade() else {
+                // This is okay because we hold a weak reference; the device may
+                // be removed under us. Note that when the device removal has
+                // completed, the interface's `PortHandler` will be uninstalled
+                // from the port slab (table of ports for this network device).
+                log::debug!("received frame for device after it has been removed; device_id={:?}", id);
+                // We continue because even though we got frames for a removed
+                // device, this network device may have other ports that will
+                // receive and handle frames.
+                continue;
+            };
+
             netstack3_core::device::receive_frame(
                 sync_ctx,
                 non_sync_ctx,
@@ -263,8 +276,46 @@ impl DeviceHandler {
 
         let max_frame_size = ethernet::MaxFrameSize::new(max_eth_frame_size)
             .ok_or(Error::ConfigurationNotSupported)?;
-        let core_id =
-            netstack3_core::device::add_ethernet_device(sync_ctx, mac_addr, max_frame_size);
+        let core_id = netstack3_core::device::add_ethernet_device_with_state(
+            sync_ctx,
+            mac_addr,
+            max_frame_size,
+            || {
+                let binding_id = non_sync_ctx.devices.alloc_new_id();
+
+                let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
+                devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
+                    handler: PortHandler {
+                        id: binding_id,
+                        port_id: port,
+                        inner: self.inner.clone(),
+                        _mac_proxy: mac_proxy,
+                    },
+                    mac: mac_addr,
+                    dynamic: devices::DynamicNetdeviceInfo {
+                        phy_up,
+                        common_info: devices::DynamicCommonInfo {
+                            mtu: max_frame_size.as_mtu(),
+                            admin_enabled: false,
+                            events: ns.create_interface_event_producer(
+                                binding_id,
+                                crate::bindings::InterfaceProperties {
+                                    name: name.clone(),
+                                    device_class: fnet_interfaces::DeviceClass::Device(
+                                        device_class,
+                                    ),
+                                },
+                            ),
+                            control_hook: control_hook,
+                            addresses: HashMap::new(),
+                        },
+                    }
+                    .into(),
+                    static_common_info: devices::StaticCommonInfo { binding_id, name },
+                })
+                .into()
+            },
+        );
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
@@ -291,43 +342,25 @@ impl DeviceHandler {
                 };
             },
         );
-        state_entry.insert(core_id.clone());
-        let make_info = |id| {
-            let name = name.unwrap_or_else(|| format!("eth{}", id));
+        state_entry.insert(core_id.downgrade());
+
+        match core_id.external_state() {
             devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
-                common_info: devices::CommonInfo {
-                    mtu: max_frame_size.as_mtu(),
-                    admin_enabled: false,
-                    events: ns.create_interface_event_producer(
-                        id,
-                        crate::bindings::InterfaceProperties {
-                            name: name.clone(),
-                            device_class: fnet_interfaces::DeviceClass::Device(device_class),
-                        },
-                    ),
-                    name,
-                    control_hook: control_hook,
-                    addresses: HashMap::new(),
-                },
-                handler: PortHandler {
-                    id,
-                    port_id: port,
-                    inner: self.inner.clone(),
-                    _mac_proxy: mac_proxy,
-                },
-                mac: mac_addr,
-                phy_up,
-            })
-        };
+                static_common_info: devices::StaticCommonInfo { binding_id, .. },
+                handler: _,
+                mac: _,
+                dynamic: _,
+            }) => {
+                non_sync_ctx.devices.add_device(*binding_id, core_id.clone());
 
-        let binding_id = non_sync_ctx
-            .devices
-            .add_device(core_id.clone(), make_info)
-            .expect("duplicate core id in set");
+                add_initial_routes(sync_ctx, non_sync_ctx, &core_id)
+                    .expect("failed to add default routes");
 
-        add_initial_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
-
-        Ok((binding_id, status_stream))
+                Ok((*binding_id, status_stream))
+            }
+            // TODO(https://fxbug.dev/123461): Make this more type-safe.
+            e => unreachable!("added netdev device but got external_state={:?}", e),
+        }
     }
 }
 
@@ -414,7 +447,7 @@ impl PortHandler {
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
         let Self { id: _, port_id, inner: Inner { device: _, session, state }, _mac_proxy: _ } =
             self;
-        let _: DeviceId<_> = assert_matches::assert_matches!(
+        let _: WeakDeviceId<_> = assert_matches::assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
         );

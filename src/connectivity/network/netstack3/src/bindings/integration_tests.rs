@@ -458,18 +458,13 @@ impl TestSetupBuilder {
                 if let Some(addr) = addr {
                     stack
                         .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-                            let device_info =
-                                non_sync_ctx.devices.get_device(if_id).ok_or_else(|| {
+                            let core_id =
+                                non_sync_ctx.devices.get_core_id(if_id).ok_or_else(|| {
                                     format_err!("Failed to get device {} info", if_id)
                                 })?;
 
-                            add_ip_addr_subnet(
-                                sync_ctx,
-                                non_sync_ctx,
-                                &device_info.core_id().clone(),
-                                addr,
-                            )
-                            .context("add interface address")
+                            add_ip_addr_subnet(sync_ctx, non_sync_ctx, &core_id, addr)
+                                .context("add interface address")
                         })
                         .await?;
 
