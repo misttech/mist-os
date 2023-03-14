@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/clamprgb/c/banjo.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/pixelformat.h>
 #include <zircon/types.h>
 
@@ -62,7 +63,9 @@ class FakeDisplay : public DeviceType,
                                                           zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
-                                               uint32_t index);
+                                               uint32_t index) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
                                                 uint32_t index);
   void DisplayControllerImplReleaseImage(image_t* image);
@@ -77,7 +80,9 @@ class FakeDisplay : public DeviceType,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                  uint32_t collection);
+                                                                  uint32_t collection) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
                                                                    uint64_t collection_id);
   zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
@@ -88,7 +93,9 @@ class FakeDisplay : public DeviceType,
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection,
                                                          uint32_t index,
                                                          uint64_t* out_capture_handle)
-      __TA_EXCLUDES(capture_lock_);
+      __TA_EXCLUDES(capture_lock_) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplImportImageForCapture2(uint64_t collection_id, uint32_t index,
                                                           uint64_t* out_capture_handle)
       __TA_EXCLUDES(capture_lock_);
@@ -172,7 +179,7 @@ class FakeDisplay : public DeviceType,
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
-  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+  std::unordered_map<uint64_t, fidl::SyncClient<fuchsia_sysmem::BufferCollection>>
       buffer_collections_;
 
   // Imported Images

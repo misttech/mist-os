@@ -163,7 +163,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(uint64_t co
     return ZX_ERR_INTERNAL;
   }
 
-  buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
+  buffer_collections_[collection_id] = fidl::SyncClient(std::move(collection_client_endpoint));
   return ZX_OK;
 }
 
@@ -184,13 +184,8 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage2(image_t* image, uint6
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplImportImage(image, it->second.client_end().borrow().handle()->get(),
-                                          index);
-}
+  const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image,
-                                                          zx_unowned_handle_t handle,
-                                                          uint32_t index) {
   zx_status_t status = ZX_OK;
   auto import_info = std::make_unique<ImageInfo>();
   if (import_info == nullptr) {
@@ -209,8 +204,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{zx::unowned_channel(handle)};
-  fidl::Result check_result = fidl::Call(collection)->CheckBuffersAllocated();
+  fidl::Result check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -225,7 +219,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image,
     return check_response.status();
   }
 
-  fidl::Result wait_result = fidl::Call(collection)->WaitForBuffersAllocated();
+  fidl::Result wait_result = collection->WaitForBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -341,12 +335,8 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplSetBufferCollectionConstraints(
-      config, it->second.client_end().borrow().handle()->get());
-}
+  const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, zx_unowned_handle_t collection) {
   fuchsia_sysmem::BufferCollectionConstraints constraints;
   if (config->type == IMAGE_TYPE_CAPTURE) {
     constraints.usage().cpu() =
@@ -401,8 +391,7 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     image_constraints.display_height_divisor() = 1;
   }
 
-  auto set_result = fidl::Call(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>(collection))
-                        ->SetConstraints({true, std::move(constraints)});
+  auto set_result = collection->SetConstraints({true, std::move(constraints)});
   if (set_result.is_error()) {
     zxlogf(ERROR, "Failed to set constraints on a sysmem BufferCollection: %s",
            set_result.error_value().status_string());
@@ -437,13 +426,8 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture2(uint64_t co
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplImportImageForCapture(
-      it->second.client_end().borrow().handle()->get(), index, out_capture_handle);
-}
+  const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection,
-                                                                    uint32_t index,
-                                                                    uint64_t* out_capture_handle) {
   auto import_capture = std::make_unique<ImageInfo>();
   if (import_capture == nullptr) {
     return ZX_ERR_NO_MEMORY;
@@ -451,9 +435,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(zx_unowned_h
 
   fbl::AutoLock lock(&capture_lock_);
 
-  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection_client{
-      zx::unowned_channel(collection)};
-  fidl::Result check_result = fidl::Call(collection_client)->CheckBuffersAllocated();
+  fidl::Result check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -468,7 +450,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(zx_unowned_h
     return check_response.status();
   }
 
-  fidl::Result wait_result = fidl::Call(collection_client)->WaitForBuffersAllocated();
+  fidl::Result wait_result = collection->WaitForBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
