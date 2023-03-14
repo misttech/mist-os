@@ -24,7 +24,7 @@ func init() {
 				Config: config.Config{
 					"depth": 8,
 				},
-				Allowlist: []config.Binding{config.LLCPP, config.HLCPP, config.CPP, config.Rust, config.Go, config.Walker, config.Reference, config.Dart},
+				Allowlist: []config.Binding{config.LLCPP, config.HLCPP, config.CPP, config.Rust, config.Go, config.Reference, config.Dart},
 			},
 			{
 				Name:    "StructTree/Depth6",
@@ -32,7 +32,7 @@ func init() {
 				Config: config.Config{
 					"depth": 6,
 				},
-				Allowlist: []config.Binding{config.LLCPP, config.HLCPP, config.CPP, config.Rust, config.Go, config.Walker, config.Reference, config.Dart},
+				Allowlist: []config.Binding{config.LLCPP, config.HLCPP, config.CPP, config.Rust, config.Go, config.Reference, config.Dart},
 			},
 			{
 				Name:    "StructTree/Depth4",
@@ -40,7 +40,7 @@ func init() {
 				Config: config.Config{
 					"depth": 4,
 				},
-				Allowlist: []config.Binding{config.LLCPP, config.HLCPP, config.CPP, config.Rust, config.Go, config.Walker, config.Reference, config.Dart},
+				Allowlist: []config.Binding{config.LLCPP, config.HLCPP, config.CPP, config.Rust, config.Go, config.Reference, config.Dart},
 			},
 		},
 	})

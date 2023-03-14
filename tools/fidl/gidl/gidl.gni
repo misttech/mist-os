@@ -209,19 +209,6 @@ template("gidl_llcpp_benchmarks") {
   }
 }
 
-template("gidl_walker_benchmarks") {
-  _gidl_cc_source_set(target_name) {
-    type = "benchmark"
-    language = "walker"
-    bindings_suffix = "_cpp_wire"
-    forward_variables_from(invoker, "*")
-
-    # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
-    # rather than builders.
-    configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
-  }
-}
-
 template("gidl_reference_benchmarks") {
   _gidl_cc_source_set(target_name) {
     type = "benchmark"

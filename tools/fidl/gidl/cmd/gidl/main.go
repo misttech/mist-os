@@ -25,7 +25,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/llcpp"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/reference"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/rust"
-	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/walker"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/config"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/ir"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/parser"
@@ -59,7 +58,6 @@ var benchmarkGenerators = map[string]Generator{
 	"rust":         rust.GenerateBenchmarks,
 	"dart":         dart.GenerateBenchmarks,
 	"reference":    reference.GenerateBenchmarks,
-	"walker":       walker.GenerateBenchmarks,
 	"driver_cpp":   driver_cpp.GenerateBenchmarks,
 	"driver_llcpp": driver_llcpp.GenerateBenchmarks,
 }

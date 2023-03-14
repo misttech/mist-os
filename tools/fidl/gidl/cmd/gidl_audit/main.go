@@ -38,7 +38,6 @@ var corpusLanguages = map[string][]string{
 		"rust",
 		"dart",
 		"reference",
-		"walker",
 	},
 }
 

@@ -16,6 +16,5 @@ group("benchmarks") {
     "llcpp",
     "reference",
     "rust",
-    "walker",
   ]
 }

@@ -21,7 +21,6 @@ go_library("main") {
     "//tools/fidl/gidl/backend/llcpp",
     "//tools/fidl/gidl/backend/reference",
     "//tools/fidl/gidl/backend/rust",
-    "//tools/fidl/gidl/backend/walker",
     "//tools/fidl/gidl/lib/config",
     "//tools/fidl/gidl/lib/ir",
     "//tools/fidl/gidl/lib/parser",

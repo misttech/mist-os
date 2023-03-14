@@ -6,7 +6,7 @@
 
 // Binary tree with depth 8 (255 elements)
 benchmark("StructTree/Depth8") {
-    bindings_allowlist = [llcpp, hlcpp, cpp, rust, go, walker, reference, dart],
+    bindings_allowlist = [llcpp, hlcpp, cpp, rust, go, reference, dart],
     value = StructTree8{
         left: StructTree7{
             left: StructTree6{
@@ -777,7 +777,7 @@ benchmark("StructTree/Depth8") {
 
 // Binary tree with depth 6 (63 elements)
 benchmark("StructTree/Depth6") {
-    bindings_allowlist = [llcpp, hlcpp, cpp, rust, go, walker, reference, dart],
+    bindings_allowlist = [llcpp, hlcpp, cpp, rust, go, reference, dart],
     value = StructTree6{
         left: StructTree5{
             left: StructTree4{
@@ -972,7 +972,7 @@ benchmark("StructTree/Depth6") {
 
 // Binary tree with depth 4 (15 elements)
 benchmark("StructTree/Depth4") {
-    bindings_allowlist = [llcpp, hlcpp, cpp, rust, go, walker, reference, dart],
+    bindings_allowlist = [llcpp, hlcpp, cpp, rust, go, reference, dart],
     value = StructTree4{
         left: StructTree3{
             left: StructTree2{

@@ -61,8 +61,6 @@ void main(List<String> args) {
       'fuchsia.fidl_microbenchmarks.driver_cpp.txt');
   runPerftestFidlBenchmark('driver_llcpp_fidl_microbenchmarks',
       'fuchsia.fidl_microbenchmarks.driver_llcpp.txt');
-  runPerftestFidlBenchmark(
-      'walker_fidl_microbenchmarks', 'fuchsia.fidl_microbenchmarks.walker.txt');
   runPerftestFidlBenchmark('reference_fidl_microbenchmarks',
       'fuchsia.fidl_microbenchmarks.reference.txt');
 
