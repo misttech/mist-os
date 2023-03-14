@@ -1,5 +1,7 @@
 # Functional test execution in Local mode
 
+[TOC]
+
 ## Setup
 1. Ensure device type that you want to run the test on (will be listed in "device_type" field in test case's BUILD.gn file) is connected to host and detectable by FFX
 ```shell
