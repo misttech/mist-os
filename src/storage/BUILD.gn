@@ -16,7 +16,6 @@ group("tests") {
     "ext4:tests",
     "f2fs:tests",
     "factory:tests",
-    "fshost:tests",
     "fshost-rust:tests",
     "fuchsia-fatfs:tests",
     "fuzzers:tests",
