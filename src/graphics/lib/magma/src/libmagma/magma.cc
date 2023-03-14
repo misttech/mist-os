@@ -96,12 +96,6 @@ void magma_connection_release_context(magma_connection_t connection, uint32_t co
   magma::PlatformConnectionClient::cast(connection)->DestroyContext(context_id);
 }
 
-magma_status_t magma_connection_create_buffer2(magma_connection_t connection, uint64_t size,
-                                               uint64_t* size_out, magma_buffer_t* buffer_out,
-                                               magma_buffer_id_t* buffer_id_out) {
-  return magma_connection_create_buffer(connection, size, size_out, buffer_out, buffer_id_out);
-}
-
 magma_status_t magma_connection_create_buffer(magma_connection_t connection, uint64_t size,
                                               uint64_t* size_out, magma_buffer_t* buffer_out,
                                               magma_buffer_id_t* buffer_id_out) {
@@ -169,14 +163,6 @@ magma_status_t magma_buffer_clean_cache(magma_buffer_t buffer, uint64_t offset, 
 
   bool result = platform_buffer->CleanCache(offset, size, invalidate);
   return result ? MAGMA_STATUS_OK : MAGMA_STATUS_INTERNAL_ERROR;
-}
-
-magma_status_t magma_connection_import_buffer2(magma_connection_t connection,
-                                               uint32_t buffer_handle, uint64_t* size_out,
-                                               magma_buffer_t* buffer_out,
-                                               magma_buffer_id_t* buffer_id_out) {
-  return magma_connection_import_buffer(connection, buffer_handle, size_out, buffer_out,
-                                        buffer_id_out);
 }
 
 magma_status_t magma_connection_import_buffer(magma_connection_t connection, uint32_t buffer_handle,
@@ -302,12 +288,6 @@ magma_status_t magma_connection_execute_immediate_commands(
   uint64_t messages_sent;
   return magma::PlatformConnectionClient::cast(connection)
       ->ExecuteImmediateCommands(context_id, command_count, command_buffers, &messages_sent);
-}
-
-magma_status_t magma_connection_create_semaphore2(magma_connection_t connection,
-                                                  magma_semaphore_t* semaphore_out,
-                                                  magma_semaphore_id_t* id_out) {
-  return magma_connection_create_semaphore(connection, semaphore_out, id_out);
 }
 
 magma_status_t magma_connection_create_semaphore(magma_connection_t connection,
@@ -452,13 +432,6 @@ magma_status_t magma_semaphore_export(magma_semaphore_t semaphore, uint32_t* sem
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "duplicate_handle failed");
 
   return MAGMA_STATUS_OK;
-}
-
-magma_status_t magma_connection_import_semaphore2(magma_connection_t connection,
-                                                  uint32_t semaphore_handle,
-                                                  magma_semaphore_t* semaphore_out,
-                                                  magma_semaphore_id_t* id_out) {
-  return magma_connection_import_semaphore(connection, semaphore_handle, semaphore_out, id_out);
 }
 
 magma_status_t magma_connection_import_semaphore(magma_connection_t connection,
@@ -624,14 +597,6 @@ magma_status_t magma_buffer_get_handle(magma_buffer_t buffer, magma_handle_t* ha
   if (!reinterpret_cast<magma::PlatformBuffer*>(buffer)->duplicate_handle(handle_out))
     return DRET(MAGMA_STATUS_INVALID_ARGS);
   return MAGMA_STATUS_OK;
-}
-
-magma_status_t magma_virt_connection_create_image2(magma_connection_t connection,
-                                                   magma_image_create_info_t* create_info,
-                                                   uint64_t* size_out, magma_buffer_t* image_out,
-                                                   magma_buffer_id_t* buffer_id_out) {
-  return magma_virt_connection_create_image(connection, create_info, size_out, image_out,
-                                            buffer_id_out);
 }
 
 magma_status_t magma_virt_connection_create_image(magma_connection_t connection,

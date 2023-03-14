@@ -806,53 +806,6 @@ extern "C" {
         image_info_out: *mut magma_image_info_t,
     ) -> magma_status_t;
 }
-extern "C" {
-    #[doc = "\n \\brief TODO(fxbug.dev/108279) remove after soft transition.\n \\param connection An open connection.\n \\param size Requested buffer size.\n \\param size_out The returned buffer's actual size.\n \\param buffer_out The returned buffer.\n \\param id_out The buffer id of the buffer.\n"]
-    pub fn magma_connection_create_buffer2(
-        connection: magma_connection_t,
-        size: u64,
-        size_out: *mut u64,
-        buffer_out: *mut magma_buffer_t,
-        id_out: *mut magma_buffer_id_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = "\n \\brief TODO(fxbug.dev/108279) remove after soft transition.\n \\param connection An open connection.\n \\param buffer_handle A valid handle.\n \\param size_out The size of the buffer in bytes.\n \\param buffer_out The returned buffer.\n \\param id_out The buffer id of the buffer.\n"]
-    pub fn magma_connection_import_buffer2(
-        connection: magma_connection_t,
-        buffer_handle: magma_handle_t,
-        size_out: *mut u64,
-        buffer_out: *mut magma_buffer_t,
-        id_out: *mut magma_buffer_id_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = "\n \\brief TODO(fxbug.dev/108279) remove after soft transition.\n \\param connection An open connection.\n \\param semaphore_out The returned semaphore.\n \\param id_out The id of the semaphore.\n"]
-    pub fn magma_connection_create_semaphore2(
-        connection: magma_connection_t,
-        semaphore_out: *mut magma_semaphore_t,
-        id_out: *mut magma_semaphore_id_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = "\n \\brief TODO(fxbug.dev/108279) remove after soft transition.\n \\param connection An open connection.\n \\param semaphore_handle A valid semaphore handle.\n \\param semaphore_out The returned semaphore.\n \\param id_out The id of the semaphore.\n"]
-    pub fn magma_connection_import_semaphore2(
-        connection: magma_connection_t,
-        semaphore_handle: magma_handle_t,
-        semaphore_out: *mut magma_semaphore_t,
-        id_out: *mut magma_semaphore_id_t,
-    ) -> magma_status_t;
-}
-extern "C" {
-    #[doc = "\n \\brief TODO(fxbug.dev/108279) remove after soft transition.\n \\param connection An open connection.\n \\param create_info Input parameters describing the image.\n \\param size_out The size of the image buffer in bytes\n \\param image_out The image buffer.\n \\param buffer_id_out The ID of the image buffer.\n"]
-    pub fn magma_virt_connection_create_image2(
-        connection: magma_connection_t,
-        create_info: *mut magma_image_create_info_t,
-        size_out: *mut u64,
-        image_out: *mut magma_buffer_t,
-        buffer_id_out: *mut magma_buffer_id_t,
-    ) -> magma_status_t;
-}
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_config {
@@ -931,16 +884,6 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE:
     virtio_magma_ctrl_type = 4182;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO:
     virtio_magma_ctrl_type = 4168;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_BUFFER2:
-    virtio_magma_ctrl_type = 4187;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_BUFFER2:
-    virtio_magma_ctrl_type = 4188;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_CREATE_SEMAPHORE2:
-    virtio_magma_ctrl_type = 4189;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE2:
-    virtio_magma_ctrl_type = 4190;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE2:
-    virtio_magma_ctrl_type = 4191;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INTERNAL_RELEASE_HANDLE: virtio_magma_ctrl_type =
     4172;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_INTERNAL_MAP: virtio_magma_ctrl_type = 4173;
@@ -1020,16 +963,6 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE:
     virtio_magma_ctrl_type = 8278;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO:
     virtio_magma_ctrl_type = 8264;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_BUFFER2:
-    virtio_magma_ctrl_type = 8283;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER2:
-    virtio_magma_ctrl_type = 8284;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_CREATE_SEMAPHORE2:
-    virtio_magma_ctrl_type = 8285;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE2:
-    virtio_magma_ctrl_type = 8286;
-pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE2:
-    virtio_magma_ctrl_type = 8287;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INTERNAL_RELEASE_HANDLE: virtio_magma_ctrl_type =
     8268;
 pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_INTERNAL_MAP: virtio_magma_ctrl_type = 8269;
@@ -1814,103 +1747,6 @@ pub struct virtio_magma_virt_connection_get_image_info_resp {
 }
 pub type virtio_magma_virt_connection_get_image_info_resp_t =
     virtio_magma_virt_connection_get_image_info_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_create_buffer2_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub size: u64,
-}
-pub type virtio_magma_connection_create_buffer2_ctrl_t =
-    virtio_magma_connection_create_buffer2_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_create_buffer2_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub size_out: u64,
-    pub buffer_out: u64,
-    pub id_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_create_buffer2_resp_t =
-    virtio_magma_connection_create_buffer2_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_buffer2_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub buffer_handle: u32,
-}
-pub type virtio_magma_connection_import_buffer2_ctrl_t =
-    virtio_magma_connection_import_buffer2_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_buffer2_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub size_out: u64,
-    pub buffer_out: u64,
-    pub id_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_import_buffer2_resp_t =
-    virtio_magma_connection_import_buffer2_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_create_semaphore2_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-}
-pub type virtio_magma_connection_create_semaphore2_ctrl_t =
-    virtio_magma_connection_create_semaphore2_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_create_semaphore2_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub semaphore_out: u64,
-    pub id_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_create_semaphore2_resp_t =
-    virtio_magma_connection_create_semaphore2_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_semaphore2_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub semaphore_handle: u32,
-}
-pub type virtio_magma_connection_import_semaphore2_ctrl_t =
-    virtio_magma_connection_import_semaphore2_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_connection_import_semaphore2_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub semaphore_out: u64,
-    pub id_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_connection_import_semaphore2_resp_t =
-    virtio_magma_connection_import_semaphore2_resp;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_virt_connection_create_image2_ctrl {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub connection: u64,
-    pub create_info: u64,
-}
-pub type virtio_magma_virt_connection_create_image2_ctrl_t =
-    virtio_magma_virt_connection_create_image2_ctrl;
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtio_magma_virt_connection_create_image2_resp {
-    pub hdr: virtio_magma_ctrl_hdr_t,
-    pub size_out: u64,
-    pub image_out: u64,
-    pub buffer_id_out: u64,
-    pub result_return: u64,
-}
-pub type virtio_magma_virt_connection_create_image2_resp_t =
-    virtio_magma_virt_connection_create_image2_resp;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_internal_release_handle_ctrl {
