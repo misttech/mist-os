@@ -25,13 +25,15 @@ source_set("lib") {
   ]
 
   public_deps = [
-    ":fuchsia.camera.test_hlcpp",
+    ":fuchsia.camera.test_cpp",
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
+    "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_cpp",
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",
     "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",

@@ -59,6 +59,7 @@ class DeviceWatcherImpl {
   static fpromise::result<std::unique_ptr<DeviceWatcherImpl>, zx_status_t> Create(
       std::unique_ptr<sys::ComponentContext> context, fuchsia::component::RealmHandle realm,
       async_dispatcher_t* dispatcher);
+
   fpromise::result<CameraType, zx_status_t> GetDeviceInfoAndIdentifyCameraType(
       fuchsia::hardware::camera::DeviceSyncPtr& dev, fuchsia::camera2::DeviceInfo& device_info,
       const std::string& full_path);
@@ -68,9 +69,9 @@ class DeviceWatcherImpl {
 
   sys::ComponentContext* context() { return context_.get(); }
 
- private:
   void OnNewRequest(fidl::InterfaceRequest<fuchsia::camera3::DeviceWatcher> request);
 
+ private:
   void ConnectDynamicChild(fidl::InterfaceRequest<fuchsia::camera3::Device> request,
                            const UniqueDevice& unique_device);
 
