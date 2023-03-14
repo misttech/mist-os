@@ -2019,8 +2019,6 @@ static void brcmf_sdio_bus_stop(brcmf_bus* bus_if) {
 
     sdio_release_host(sdiodev->func1);
   }
-  /* Clear the data packet queues */
-  brcmu_pktq_flush(&bus->txq, true, NULL, NULL);
 
   /* Clear rx control and wake any waiters */
   // spin_lock_bh(&bus->rxctl_lock);
@@ -2084,9 +2082,6 @@ static bool brcmf_sdio_dpc_has_more_work(struct brcmf_sdio* bus) {
   }
   if (!data_ok(bus)) {
     return false;
-  }
-  if (brcmu_pktq_mlen(&bus->txq, ~bus->flowcontrol)) {
-    return true;
   }
   return brcmf_sdio_have_txq(bus);
 }
@@ -3627,8 +3622,6 @@ static zx_status_t brcmf_sdio_probe_attach(struct brcmf_sdio* bus) {
 
   sdio_release_host(sdiodev->func1);
 
-  brcmu_pktq_init(&bus->txq, (PRIOMASK + 1), TXQLEN);
-
   /* allocate header buffer */
   bus->hdrbuf = static_cast<decltype(bus->hdrbuf)>(calloc(1, MAX_HDR_READ + bus->head_align));
   if (!bus->hdrbuf) {
@@ -4028,8 +4021,6 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev) {
     goto fail;
   }
 
-  // spin_lock_init(&bus->rxctl_lock);
-  // spin_lock_init(&bus->txq_lock);
   bus->ctrl_wait = {};
   bus->dcmd_resp_wait = {};
 
@@ -4174,9 +4165,6 @@ void brcmf_sdio_reset(struct brcmf_sdio* bus) {
   // Clean up the data path.
   bus->datawork.Cancel();
   bus->brcmf_wq->Flush();
-
-  // Flush tx queue.
-  brcmu_pktq_flush(&bus->txq, true, NULL, NULL);
 
   // Restart watchdog timer
   brcmf_sdio_wd_timer(bus, true);

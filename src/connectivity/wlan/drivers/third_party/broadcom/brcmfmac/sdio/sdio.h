@@ -567,7 +567,6 @@ struct brcmf_sdio {
   uint16_t blocksize; /* Block size of SDIO transfers */
   uint roundup;       /* Max roundup limit */
 
-  struct pktq txq;     /* Queue length used for flow-control */
   struct brcmf_tx_queue* tx_queue;
 
   uint8_t flowcontrol; /* per prio flow control bitmask */
