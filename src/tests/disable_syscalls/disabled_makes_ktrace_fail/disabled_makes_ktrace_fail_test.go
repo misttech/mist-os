@@ -32,7 +32,7 @@ func TestDisabledMakesKtraceFail(t *testing.T) {
 	if stdout != "" {
 		t.Fatal(stdout)
 	}
-	ensureContains(t, stderr, "ZX_ERR_NOT_SUPPORTED")
+	ensureContains(t, stderr, "ZX_ERR_UNAVAILABLE")
 }
 
 func execDir(t *testing.T) string {

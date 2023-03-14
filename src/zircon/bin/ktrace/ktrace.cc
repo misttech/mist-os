@@ -5,8 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fuchsia/tracing/kernel/cpp/fidl.h>
-#include <lib/fdio/fdio.h>
-#include <lib/zx/channel.h>
+#include <lib/sys/cpp/service_directory.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,8 +16,6 @@
 #include <fbl/unique_fd.h>
 
 namespace {
-constexpr char kKtraceControllerSvc[] = "/svc/fuchsia.tracing.kernel.Controller";
-constexpr char kKtraceReaderSvc[] = "/svc/fuchsia.tracing.kernel.Reader";
 
 constexpr char kUsage[] =
     "\
@@ -38,48 +35,18 @@ Options:\n\
 
 void PrintUsage(FILE* f) { fputs(kUsage, f); }
 
-zx::channel OpenKTraceReader() {
-  int fd{open(kKtraceReaderSvc, O_RDWR)};
-  if (fd < 0) {
-    fprintf(stderr, "Cannot open trace reader %s: %s\n", kKtraceReaderSvc, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  zx::channel channel;
-  zx_status_t status = fdio_get_service_handle(fd, channel.reset_and_get_address());
-  if (status != ZX_OK) {
-    fprintf(stderr, "Unable to obtain channel handle from file descriptor: %s\n",
-            zx_status_get_string(status));
-    exit(EXIT_FAILURE);
-  }
-  return channel;
-}
-
-zx::channel OpenKtraceController() {
-  int fd{open(kKtraceControllerSvc, O_RDWR)};
-  if (fd < 0) {
-    fprintf(stderr, "Cannot open trace controller %s: %s\n", kKtraceControllerSvc, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  zx::channel channel;
-  zx_status_t status = fdio_get_service_handle(fd, channel.reset_and_get_address());
-  if (status != ZX_OK) {
-    fprintf(stderr, "Unable to obtain channel handle from file descriptor: %s\n",
-            zx_status_get_string(status));
-    exit(EXIT_FAILURE);
-  }
-  return channel;
-}
-
 int LogFidlError(zx_status_t status) {
   fprintf(stderr, "Error in FIDL request: %s(%d)\n", zx_status_get_string(status), status);
   return EXIT_FAILURE;
 }
 
-int DoStart(uint32_t group_mask) {
+int DoStart(const sys::ServiceDirectory& svc, uint32_t group_mask) {
   using BufferingMode = fuchsia::tracing::BufferingMode;
 
   fuchsia::tracing::kernel::ControllerSyncPtr controller;
-  controller.Bind(OpenKtraceController());
+  if (zx_status_t status = svc.Connect(controller.NewRequest()); status != ZX_OK) {
+    return LogFidlError(status);
+  }
   zx_status_t start_status;
   zx_status_t status = controller->Start(group_mask, BufferingMode::ONESHOT, &start_status);
   if (status != ZX_OK) {
@@ -93,9 +60,11 @@ int DoStart(uint32_t group_mask) {
   return EXIT_SUCCESS;
 }
 
-int DoStop() {
+int DoStop(const sys::ServiceDirectory& svc) {
   fuchsia::tracing::kernel::ControllerSyncPtr controller;
-  controller.Bind(OpenKtraceController());
+  if (zx_status_t status = svc.Connect(controller.NewRequest()); status != ZX_OK) {
+    return LogFidlError(status);
+  }
   zx_status_t stop_status;
   zx_status_t status = controller->Stop(&stop_status);
   if (status != ZX_OK) {
@@ -109,9 +78,11 @@ int DoStop() {
   return EXIT_SUCCESS;
 }
 
-int DoRewind() {
+int DoRewind(const sys::ServiceDirectory& svc) {
   fuchsia::tracing::kernel::ControllerSyncPtr controller;
-  controller.Bind(OpenKtraceController());
+  if (zx_status_t status = svc.Connect(controller.NewRequest()); status != ZX_OK) {
+    return LogFidlError(status);
+  }
   zx_status_t rewind_status;
   zx_status_t status = controller->Rewind(&rewind_status);
   if (status != ZX_OK) {
@@ -125,9 +96,11 @@ int DoRewind() {
   return EXIT_SUCCESS;
 }
 
-int DoWritten() {
+int DoWritten(const sys::ServiceDirectory& svc) {
   fuchsia::tracing::kernel::ReaderSyncPtr reader;
-  reader.Bind(OpenKTraceReader());
+  if (zx_status_t status = svc.Connect(reader.NewRequest()); status != ZX_OK) {
+    return LogFidlError(status);
+  }
   zx_status_t written_status;
   uint64_t bytes_written;
   zx_status_t status = reader->GetBytesWritten(&written_status, &bytes_written);
@@ -143,9 +116,11 @@ int DoWritten() {
   return EXIT_SUCCESS;
 }
 
-int DoSave(const char* path) {
+int DoSave(const sys::ServiceDirectory& svc, const char* path) {
   fuchsia::tracing::kernel::ReaderSyncPtr reader;
-  reader.Bind(OpenKTraceReader());
+  if (zx_status_t status = svc.Connect(reader.NewRequest()); status != ZX_OK) {
+    return LogFidlError(status);
+  }
   fbl::unique_fd out_fd(open(path, O_CREAT | O_TRUNC | O_WRONLY, 0666));
   if (!out_fd.is_valid()) {
     fprintf(stderr, "Unable to open file for writing: %s, %s\n", path, strerror(errno));
@@ -160,7 +135,7 @@ int DoSave(const char* path) {
   zx_status_t status;
   while ((status = reader->ReadAt(read_size, offset, &out_status, &buf)) == ZX_OK &&
          out_status == ZX_OK) {
-    if (buf.size() == 0) {
+    if (buf.empty()) {
       break;
     }
     offset += buf.size();
@@ -199,6 +174,8 @@ int main(int argc, char** argv) {
   }
   const fbl::String cmd{argv[1]};
 
+  std::shared_ptr svc = sys::ServiceDirectory::CreateFromNamespace();
+
   if (cmd == "start") {
     EnsureNArgs(cmd, argc, 3);
     int group_mask = atoi(argv[2]);
@@ -206,20 +183,20 @@ int main(int argc, char** argv) {
       fprintf(stderr, "Invalid group mask\n");
       return EXIT_FAILURE;
     }
-    return DoStart(group_mask);
+    return DoStart(*svc, group_mask);
   } else if (cmd == "stop") {
     EnsureNArgs(cmd, argc, 2);
-    return DoStop();
+    return DoStop(*svc);
   } else if (cmd == "rewind") {
     EnsureNArgs(cmd, argc, 2);
-    return DoRewind();
+    return DoRewind(*svc);
   } else if (cmd == "written") {
     EnsureNArgs(cmd, argc, 2);
-    return DoWritten();
+    return DoWritten(*svc);
   } else if (cmd == "save") {
     EnsureNArgs(cmd, argc, 3);
     const char* path = argv[2];
-    return DoSave(path);
+    return DoSave(*svc, path);
   }
 
   PrintUsage(stderr);
