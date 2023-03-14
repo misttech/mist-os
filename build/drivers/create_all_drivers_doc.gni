@@ -25,7 +25,6 @@ template("create_all_drivers_doc") {
                            ])
     visibility = [
       ":$target_name",
-      ":create-all-drivers-doc",
       "//bundles:create_all_drivers_doc",
     ]
     outputs = [ all_doc_output ]
