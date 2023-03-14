@@ -215,9 +215,9 @@ class AmlogicDisplay
   fbl::DoublyLinkedList<std::unique_ptr<ImageInfo>> imported_captures_ TA_GUARDED(capture_lock_);
 
   // Objects: only valid if fully_initialized()
-  std::unique_ptr<amlogic_display::Vpu> vpu_;
-  std::unique_ptr<amlogic_display::Osd> osd_;
-  std::unique_ptr<amlogic_display::Vout> vout_;
+  std::unique_ptr<Vpu> vpu_;
+  std::unique_ptr<Osd> osd_;
+  std::unique_ptr<Vout> vout_;
 
   // Monitoring. We create a named "amlogic-display" node to allow for easier filtering
   // of inspect tree when defining selectors and metrics.

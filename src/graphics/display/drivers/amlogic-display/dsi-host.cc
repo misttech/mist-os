@@ -117,10 +117,10 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
 
   // panel_type_ is now canonical.
-  auto lcd_or_status = amlogic_display::Lcd::Create(
-      &ac, self->panel_type_, self->panel_config_->dsi_on, self->panel_config_->dsi_off,
-      fit::bind_member(self.get(), &DsiHost::SetSignalPower), self->dsiimpl_, self->lcd_gpio_,
-      kBootloaderDisplayEnabled);
+  auto lcd_or_status =
+      Lcd::Create(&ac, self->panel_type_, self->panel_config_->dsi_on, self->panel_config_->dsi_off,
+                  fit::bind_member(self.get(), &DsiHost::SetSignalPower), self->dsiimpl_,
+                  self->lcd_gpio_, kBootloaderDisplayEnabled);
   if (!ac.check()) {
     DISP_ERROR("Unable to allocate an LCD object\n");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -131,8 +131,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
   self->lcd_.reset(lcd_or_status.value());
 
-  auto phy_or_status =
-      amlogic_display::MipiPhy::Create(self->pdev_, self->dsiimpl_, kBootloaderDisplayEnabled);
+  auto phy_or_status = MipiPhy::Create(self->pdev_, self->dsiimpl_, kBootloaderDisplayEnabled);
   if (phy_or_status.is_error()) {
     DISP_ERROR("Failed to create PHY object\n");
     return zx::error(phy_or_status.error_value());

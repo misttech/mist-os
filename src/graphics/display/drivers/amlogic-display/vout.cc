@@ -78,7 +78,7 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   dsi_.width = width;
   dsi_.height = height;
 
-  auto dsi_host = amlogic_display::DsiHost::Create(parent, panel_type);
+  auto dsi_host = DsiHost::Create(parent, panel_type);
   if (dsi_host.is_error()) {
     DISP_ERROR("Could not create DSI host: %s\n", dsi_host.status_string());
     return dsi_host.status_value();
@@ -92,7 +92,7 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
     DISP_ERROR("Could not get PDEV protocol\n");
     return status;
   }
-  auto clock = amlogic_display::Clock::Create(pdev, kBootloaderDisplayEnabled);
+  auto clock = Clock::Create(pdev, kBootloaderDisplayEnabled);
   if (clock.is_error()) {
     DISP_ERROR("Could not create Clock: %s\n", clock.status_string());
     return clock.status_value();
@@ -136,8 +136,7 @@ zx_status_t Vout::InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware
   supports_hpd_ = kHdmiSupportedFeatures.hpd;
 
   fbl::AllocChecker ac;
-  hdmi_.hdmi_host =
-      fbl::make_unique_checked<amlogic_display::HdmiHost>(&ac, parent, std::move(hdmi));
+  hdmi_.hdmi_host = fbl::make_unique_checked<HdmiHost>(&ac, parent, std::move(hdmi));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

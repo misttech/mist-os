@@ -132,8 +132,8 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   bool supports_hpd_ = false;
 
   struct dsi_t {
-    std::unique_ptr<amlogic_display::DsiHost> dsi_host;
-    std::unique_ptr<amlogic_display::Clock> clock;
+    std::unique_ptr<DsiHost> dsi_host;
+    std::unique_ptr<Clock> clock;
 
     // display dimensions and format
     uint32_t width = 0;
@@ -144,7 +144,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   } dsi_;
 
   struct hdmi_t {
-    std::unique_ptr<amlogic_display::HdmiHost> hdmi_host;
+    std::unique_ptr<HdmiHost> hdmi_host;
 
     display_mode_t cur_display_mode_;
   } hdmi_;

@@ -95,7 +95,7 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   fbl::AllocChecker ac;
 
   // Setup VPU and VPP units first
-  vpu_ = fbl::make_unique_checked<amlogic_display::Vpu>(&ac);
+  vpu_ = fbl::make_unique_checked<Vpu>(&ac);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -120,9 +120,9 @@ zx_status_t AmlogicDisplay::DisplayInit() {
   // The "osd" node must be created because these metric paths are load-bearing
   // for some triage workflows.
   osd_node_ = root_node_.CreateChild("osd");
-  auto osd_or_status = amlogic_display::Osd::Create(
-      &pdev_, vout_->supports_afbc(), vout_->fb_width(), vout_->fb_height(), vout_->display_width(),
-      vout_->display_height(), &osd_node_);
+  auto osd_or_status =
+      Osd::Create(&pdev_, vout_->supports_afbc(), vout_->fb_width(), vout_->fb_height(),
+                  vout_->display_width(), vout_->display_height(), &osd_node_);
   if (osd_or_status.is_error()) {
     return osd_or_status.status_value();
   }
@@ -943,7 +943,7 @@ int AmlogicDisplay::HpdThread() {
 zx_status_t AmlogicDisplay::Bind() {
   root_node_ = inspector_.GetRoot().CreateChild("amlogic-display");
   fbl::AllocChecker ac;
-  vout_ = fbl::make_unique_checked<amlogic_display::Vout>(&ac);
+  vout_ = fbl::make_unique_checked<Vout>(&ac);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1144,7 +1144,7 @@ zx_status_t AmlogicDisplay::Bind() {
 // main bind function called from dev manager
 zx_status_t amlogic_display_bind(void* ctx, zx_device_t* parent) {
   fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<amlogic_display::AmlogicDisplay>(&ac, parent);
+  auto dev = fbl::make_unique_checked<AmlogicDisplay>(&ac, parent);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
