@@ -18,6 +18,7 @@ use crate::lock::RwLock;
 use crate::logging::set_zx_name;
 use crate::mm::FutexTable;
 use crate::task::*;
+use crate::types::*;
 use crate::types::{DeviceType, Errno, OpenFlags};
 
 pub struct Kernel {
@@ -89,6 +90,46 @@ pub struct Kernel {
 
     /// The thread pool to dispatch blocking calls to.
     pub thread_pool: DynamicThreadPool,
+
+    /// A VMO containing a vDSO implementation, if implemented for a given architecture.
+    pub vdso: Option<Arc<zx::Vmo>>,
+}
+
+fn sync_open_in_namespace(
+    path: &str,
+    flags: fidl_fuchsia_io::OpenFlags,
+) -> Result<fidl_fuchsia_io::DirectorySynchronousProxy, Errno> {
+    let (client, server) = fidl::Channel::create();
+    let dir_proxy = fidl_fuchsia_io::DirectorySynchronousProxy::new(client);
+
+    let namespace = fdio::Namespace::installed().map_err(|_| errno!(EINVAL))?;
+    namespace.open(path, flags, server).map_err(|_| errno!(ENOENT))?;
+    Ok(dir_proxy)
+}
+
+/// For the architectures for which a vDSO is implemented, read it from file and return a backing VMO.
+#[cfg(target_arch = "x86_64")]
+fn load_vdso_from_file() -> Result<Option<Arc<zx::Vmo>>, Errno> {
+    const VDSO_FILENAME: &str = "libvdso.so";
+    const VDSO_LOCATION: &str = "/pkg/data";
+
+    let dir_proxy = sync_open_in_namespace(
+        VDSO_LOCATION,
+        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
+    )?;
+    let vdso_vmo = syncio::directory_open_vmo(
+        &dir_proxy,
+        VDSO_FILENAME,
+        fidl_fuchsia_io::VmoFlags::READ | fidl_fuchsia_io::VmoFlags::EXECUTE,
+        zx::Time::INFINITE,
+    )
+    .map_err(|status| from_status_like_fdio!(status))?;
+    Ok(Some(Arc::new(vdso_vmo)))
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn load_vdso_from_file() -> Result<Option<Arc<zx::Vmo>>, Errno> {
+    Ok(None)
 }
 
 impl Kernel {
@@ -129,6 +170,7 @@ impl Kernel {
             shared_futexes: Default::default(),
             file_server: FileServer::new(kernel.clone()),
             thread_pool: DynamicThreadPool::new(2),
+            vdso: load_vdso_from_file().expect("Couldn't read vDSO from disk"),
         }))
     }
 

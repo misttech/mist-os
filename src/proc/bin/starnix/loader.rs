@@ -418,6 +418,22 @@ pub fn load_executable(
     // but we provide a typical value expected in *nix here.
     const STARNIX_CLOCK_TICKS_PER_SEC: u64 = 100;
 
+    let vdso_base = if let Some(vdso_vmo) = &current_task.kernel().vdso {
+        let vmo_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
+        let map_result = current_task.mm.map(
+            DesiredAddress::Hint(UserAddress::default()),
+            Arc::clone(vdso_vmo),
+            0,
+            vmo_size as usize,
+            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_EXECUTE,
+            MappingOptions::empty(),
+            None,
+        )?;
+        map_result.ptr() as u64
+    } else {
+        0
+    };
+
     let auxv = {
         let creds = current_task.creds();
 
@@ -435,6 +451,7 @@ pub fn load_executable(
                 main_elf.vaddr_bias.wrapping_add(main_elf.headers.file_header().entry) as u64,
             ),
             (AT_CLKTCK, STARNIX_CLOCK_TICKS_PER_SEC),
+            (AT_SYSINFO_EHDR, vdso_base),
             (AT_SECURE, 0),
         ]
     };

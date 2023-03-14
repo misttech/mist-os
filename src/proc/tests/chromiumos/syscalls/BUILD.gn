@@ -75,6 +75,7 @@ test("syscalls_test_bin") {
   if (target_cpu == "x64") {
     include_dirs +=
         [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-x86" ]
+    sources += [ "vdso_test.cc" ]
   }
 }
 

@@ -1,0 +1,21 @@
+SECTIONS {
+  .text : { *(.text*) } :load
+  .note : { *(.note.gnu.build-id) } :load :note
+  .hash : { *(.hash) } :load
+  .dynamic : { *(.dynamic) } :load :dynamic
+  .gnu.hash : { *(.gnu.hash) } :load
+  .dynsym : { *(.dynsym) }
+  .dynstr : { *(.dynstr) }
+  .got : { *(.got.plt) *(.got) }
+
+  /DISCARD/ : {
+    *(.eh_frame)
+  }
+
+}
+
+PHDRS {
+  load PT_LOAD FLAGS(5);        /* PF_R|PF_X */
+  dynamic PT_DYNAMIC FLAGS(4);  /* PF_R */
+  note PT_NOTE FLAGS(4);        /* PF_R */
+}
