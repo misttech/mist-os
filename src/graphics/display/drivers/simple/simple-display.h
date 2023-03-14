@@ -7,6 +7,7 @@
 
 #include <lib/ddk/driver.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/pixelformat.h>
 
 #include "fbl/mutex.h"
@@ -63,7 +64,9 @@ class SimpleDisplay : public DeviceType,
                                                           zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
-                                               uint32_t index);
+                                               uint32_t index) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
                                                 uint32_t index);
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
@@ -89,7 +92,9 @@ class SimpleDisplay : public DeviceType,
   zx_status_t DisplayControllerImplAllocateVmo(uint64_t size, zx::vmo* vmo_out);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                  uint32_t collection);
+                                                                  uint32_t collection) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
                                                                    uint64_t collection_id);
   zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,

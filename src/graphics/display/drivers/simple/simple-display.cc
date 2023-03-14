@@ -29,6 +29,9 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
+#include "fidl/fuchsia.sysmem/cpp/markers.h"
+#include "lib/fidl/cpp/wire/channel.h"
+
 namespace {
 
 static constexpr uint64_t kDisplayId = 1;
@@ -142,15 +145,9 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage2(image_t* image, uin
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplImportImage(image, it->second.client_end().borrow().handle()->get(),
-                                          index);
-}
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-zx_status_t SimpleDisplay::DisplayControllerImplImportImage(image_t* image,
-                                                            zx_unowned_handle_t handle,
-                                                            uint32_t index) {
-  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{zx::unowned_channel(handle)};
-  fidl::WireResult check_result = fidl::WireCall(collection)->CheckBuffersAllocated();
+  fidl::WireResult check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -167,7 +164,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(image_t* image,
     return check_response.status;
   }
 
-  fidl::WireResult wait_result = fidl::WireCall(collection)->WaitForBuffersAllocated();
+  fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -304,12 +301,8 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
            collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplSetBufferCollectionConstraints(
-      config, it->second.client_end().borrow().handle()->get());
-}
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, uint32_t collection) {
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
   constraints.usage.display = fuchsia_sysmem::wire::kDisplayUsageLayer;
   constraints.has_buffer_memory_constraints = true;
@@ -353,9 +346,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   image_constraints.max_bytes_per_row = bytes_per_row;
   constraints.image_format_constraints_count = 1;
 
-  auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>(
-                                   zx::unowned_channel(collection)))
-                    ->SetConstraints(true, constraints);
+  auto result = collection->SetConstraints(true, constraints);
 
   if (!result.ok()) {
     zxlogf(ERROR, "failed to set constraints, %s", result.FormatDescription().c_str());
