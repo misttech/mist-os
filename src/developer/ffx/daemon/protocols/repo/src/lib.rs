@@ -317,7 +317,7 @@ async fn register_target(
 
     let target_nodename = target.nodename.ok_or_else(|| {
         tracing::error!("target {:?} does not have a nodename", target_info.target_identifier);
-        ffx::RepositoryError::InternalError
+        ffx::RepositoryError::TargetCommunicationFailure
     })?;
 
     let listen_addr = match inner.read().await.server.listen_addr() {
@@ -339,7 +339,7 @@ async fn register_target(
                 "target {:?} does not have a host address",
                 target_info.target_identifier
             );
-            ffx::RepositoryError::InternalError
+            ffx::RepositoryError::TargetCommunicationFailure
         })?,
     );
 
