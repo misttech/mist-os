@@ -2,18 +2,23 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Unit tests for Mobly driver's api_mobly.py."""
 
 import unittest
 import json
-import api_mobly
-from mobly import config_parser
+
 from tempfile import NamedTemporaryFile
+from mobly import config_parser
 from parameterized import parameterized
+
+import api_mobly
 
 
 class ApiMoblyTest(unittest.TestCase):
+    """API Mobly tests"""
 
     def test_get_latest_test_output_dir_symlink_path_success(self):
+        """Test case to ensure test output symlink is returned"""
         api_mobly.get_latest_test_output_dir_symlink_path('output_path', 'tb')
 
     @parameterized.expand(
@@ -22,12 +27,14 @@ class ApiMoblyTest(unittest.TestCase):
             ('Testbed name is empty', 'ouput_path', ''),
         ])
     def test_get_latest_test_output_dir_symlink_path_raises_exception(
-            self, name, output_path, tb_name):
-        with self.assertRaises(api_mobly.ApiException) as ctx:
+            self, unused_name, output_path, tb_name):
+        """Test case to ensure exception is raised on test output path errors"""
+        with self.assertRaises(api_mobly.ApiException):
             api_mobly.get_latest_test_output_dir_symlink_path(
                 output_path, tb_name)
 
     def test_get_result_path_success(self):
+        """Test case to ensure test result symlink is returned"""
         api_mobly.get_result_path('output_path', 'tb')
 
     @parameterized.expand(
@@ -36,8 +43,9 @@ class ApiMoblyTest(unittest.TestCase):
             ('Testbed name is empty', 'ouput_path', ''),
         ])
     def test_get_get_result_path_raises_exception(
-            self, name, output_path, tb_name):
-        with self.assertRaises(api_mobly.ApiException) as ctx:
+            self, unused_name, output_path, tb_name):
+        """Test case to ensure exception is raised on test result path errors"""
+        with self.assertRaises(api_mobly.ApiException):
             api_mobly.get_result_path(output_path, tb_name)
 
     @parameterized.expand(
@@ -72,7 +80,8 @@ class ApiMoblyTest(unittest.TestCase):
                     }
                 ], {}),
         ])
-    def test_new_testbed_config(self, name, controllers, params_dict):
+    def test_new_testbed_config(self, unused_name, controllers, params_dict):
+        """Test case for new testbed config generation"""
         config_obj = api_mobly.new_testbed_config(
             'tb_name', 'log_path', controllers, params_dict)
 
@@ -150,7 +159,8 @@ class ApiMoblyTest(unittest.TestCase):
                 }),
         ])
     def test_get_config_with_test_params_success(
-            self, name, config_dict, params_dict, expected_config_dict):
+            self, unused_name, config_dict, params_dict, expected_config_dict):
+        """Test case for testbed config with params"""
         ret = api_mobly.get_config_with_test_params(config_dict, params_dict)
         self.assertDictEqual(ret, expected_config_dict)
 
@@ -159,6 +169,7 @@ class ApiMoblyTest(unittest.TestCase):
         ('Config is empty', {}),
     ])
     def test_get_config_with_test_params_raises_exception(
-            self, name, config_dict):
+            self, unused_name, config_dict):
+        """Test case for exceptions in testbed config generation"""
         with self.assertRaises(api_mobly.ApiException):
             api_mobly.get_config_with_test_params(config_dict, None)

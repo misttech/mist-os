@@ -2,8 +2,8 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Unit tests for Mobly driver's mobly_driver_lib.py."""
 
-import subprocess
 import unittest
 from unittest import mock
 
@@ -13,6 +13,7 @@ import mobly_driver_lib
 
 
 class MoblyDriverLibTest(unittest.TestCase):
+    """Mobly Driver lib tests"""
 
     def setUp(self):
         self.mock_process = mock.Mock()
@@ -22,6 +23,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch('builtins.print')
     @mock.patch('subprocess.Popen')
     def test_run_success(self, mock_popen, mock_print):
+        """Test case to ensure run succeeds"""
         self.mock_process.stdout.readline.return_value = 'TEST_OUTPUT'
         self.mock_process.poll.side_effect = [None, 0]
         mock_popen.return_value.__enter__.return_value = self.mock_process
@@ -40,7 +42,8 @@ class MoblyDriverLibTest(unittest.TestCase):
             ('invalid_timeout', mock.Mock(), '/py/path', '/test/path', -1)
         ])
     def test_run_invalid_argument_raises_exception(
-            self, name, driver, python_path, test_path, timeout_sec):
+            self, unused_name, driver, python_path, test_path, timeout_sec):
+        """Test case to ensure exception raised on invalid args"""
         with self.assertRaises(ValueError):
             mobly_driver_lib.run(
                 driver, python_path, test_path, timeout_sec=timeout_sec)
@@ -49,6 +52,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch('subprocess.Popen')
     def test_run_mobly_test_failure_raises_exception(
             self, mock_popen, *unused_args):
+        """Test case to ensure exception raised on test failure"""
         self.mock_process.poll.return_value = 1
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
@@ -60,6 +64,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch('subprocess.Popen')
     def test_run_mobly_test_timeout_exception(
             self, mock_popen, mock_time, *unused_args):
+        """Test case to ensure exception raised on test timeout"""
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
         mock_time.side_effect = [0, 10]
@@ -73,6 +78,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch('subprocess.Popen')
     def test_run_teardown_runs_despite_subprocess_error(
             self, mock_popen, mock_print):
+        """Test case to ensure teardown always executes"""
         self.mock_process.stdout.readline.return_value = 'MOCK_FAILURE_OUTPUT'
         self.mock_process.poll.side_effect = [None, 1]
         mock_popen.return_value.__enter__.return_value = self.mock_process

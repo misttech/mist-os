@@ -2,17 +2,17 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Unit tests for Mobly driver's infra_driver.py."""
 
 import unittest
-from unittest import mock
 from unittest.mock import call, mock_open, patch
 
-import api_infra
 import common
 import infra_driver
 
 
 class InfraMoblyDriverTest(unittest.TestCase):
+    """Infra Driver tests"""
 
     @patch('yaml.dump', return_value='yaml_str')
     @patch('common.read_json_from_file')
@@ -21,9 +21,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     def test_generate_test_config_with_params_success(
             self, mock_new_config, mock_read_yaml, mock_read_json,
             *unused_args):
-        d = infra_driver.InfraDriver(
+        """Test case for successful config generation"""
+        driver = infra_driver.InfraDriver(
             tb_json_path='tb/json/path', params_path='params/path', log_path='')
-        ret = d.generate_test_config()
+        ret = driver.generate_test_config()
 
         mock_new_config.assert_called_once()
         mock_read_yaml.assert_called_once()
@@ -37,8 +38,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     def test_generate_test_config_without_params_success(
             self, mock_new_config, mock_read_yaml, mock_read_json,
             *unused_args):
-        d = infra_driver.InfraDriver(tb_json_path='tb/json/path', log_path='')
-        ret = d.generate_test_config()
+        """Test case for successful config without params generation"""
+        driver = infra_driver.InfraDriver(
+            tb_json_path='tb/json/path', log_path='')
+        ret = driver.generate_test_config()
 
         mock_new_config.assert_called_once()
         mock_read_yaml.assert_not_called()
@@ -49,37 +52,42 @@ class InfraMoblyDriverTest(unittest.TestCase):
         'common.read_json_from_file', side_effect=common.InvalidFormatException)
     def test_generate_test_config_invalid_json_raises_exception(
             self, *unused_args):
-        d = infra_driver.InfraDriver(tb_json_path='tb/json/path', log_path='')
+        """Test case for exception being raised on invalid JSON content"""
+        driver = infra_driver.InfraDriver(
+            tb_json_path='tb/json/path', log_path='')
         with self.assertRaises(common.InvalidFormatException):
-            d.generate_test_config()
+            driver.generate_test_config()
 
     @patch(
         'common.read_yaml_from_file', side_effect=common.InvalidFormatException)
     @patch('common.read_json_from_file')
     def test_generate_test_config_invalid_yaml_raises_exception(
             self, *unused_args):
-        d = infra_driver.InfraDriver(
+        """Test case for exception being raised on invalid YAML content"""
+        driver = infra_driver.InfraDriver(
             tb_json_path='tb/json/path', params_path='params/path', log_path='')
         with self.assertRaises(common.InvalidFormatException):
-            d.generate_test_config()
+            driver.generate_test_config()
 
     @patch('common.read_json_from_file', side_effect=OSError)
     def test_generate_test_config_invalid_tb_path_raises_exception(
             self, *unused_args):
-        d = infra_driver.InfraDriver(
+        """Test case for exception being raised on invalid testbed JSON path"""
+        driver = infra_driver.InfraDriver(
             tb_json_path='/does/not/exist', log_path='')
         with self.assertRaises(common.DriverException):
-            d.generate_test_config()
+            driver.generate_test_config()
 
     @patch('common.read_yaml_from_file', side_effect=OSError)
     def test_generate_test_config_invalid_params_path_raises_exception(
             self, *unused_args):
-        d = infra_driver.InfraDriver(
+        """Test case for exception being raised on invalid params YAML path"""
+        driver = infra_driver.InfraDriver(
             tb_json_path='/does/not/exist',
             params_path='params/path',
             log_path='')
         with self.assertRaises(common.DriverException):
-            d.generate_test_config()
+            driver.generate_test_config()
 
     @patch('api_mobly.get_result_path')
     @patch(
@@ -90,8 +98,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch('os.remove')
     @patch('builtins.print')
     def test_teardown_success(self, mock_print, mock_rm, *unused_args):
-        d = infra_driver.InfraDriver(tb_json_path='', log_path='')
-        d.teardown()
+        """Test case for teardown"""
+        driver = infra_driver.InfraDriver(tb_json_path='', log_path='')
+        driver.teardown()
 
         self.assertIn(call('---MOCK_PREAMBLE---'), mock_print.call_args_list)
         self.assertIn(call('test_result'), mock_print.call_args_list)
@@ -105,8 +114,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch('builtins.print')
     def test_teardown_success_without_test_results(
             self, mock_print, mock_rm, *unused_args):
-        d = infra_driver.InfraDriver(tb_json_path='', log_path='')
-        d.teardown()
+        """Test case for teardown succeeding despite missing results"""
+        driver = infra_driver.InfraDriver(tb_json_path='', log_path='')
+        driver.teardown()
 
         mock_print.assert_not_called()
         mock_rm.assert_called_once()
