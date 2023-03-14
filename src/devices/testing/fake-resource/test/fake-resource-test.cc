@@ -7,10 +7,7 @@
 #include <lib/zx/resource.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
-#include <zircon/syscalls.h>
 #include <zircon/syscalls/resource.h>
-#include <zircon/syscalls/smc.h>
-#include <zircon/syscalls/types.h>
 #include <zircon/types.h>
 
 #include <array>
@@ -171,89 +168,6 @@ TEST_F(FakeResource, VmoTest) {
   memcpy(reinterpret_cast<uint8_t*>(vaddr), buf.data(), MAP_LEN);
   ASSERT_BYTES_EQ(reinterpret_cast<uint8_t*>(vaddr), buf.data(), MAP_LEN);
   ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, MAP_LEN));
-}
-
-TEST_F(FakeResource, SmcTest) {
-  zx::resource smc;
-  std::string name = "fake smc";
-  zx_smc_parameters_t parameters;
-  zx_smc_result result;
-  ASSERT_OK(
-      zx::resource::create(root_resource, ZX_RSRC_KIND_SMC, 0, 0, name.data(), name.size(), &smc));
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_smc_call(smc.get(), &parameters, /*out_smc_result=*/nullptr));
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS,
-            zx_smc_call(smc.get(), /*parameters=*/nullptr, /*out_smc_result=*/&result));
-  EXPECT_EQ(ZX_ERR_BAD_HANDLE, zx_smc_call(/*handle=*/0xBAD, &parameters, &result));
-  EXPECT_EQ(ZX_ERR_WRONG_TYPE, zx_smc_call(root_resource.get(), &parameters, &result));
-  EXPECT_OK(zx_smc_call(smc.get(), &parameters, &result));
-}
-
-TEST_F(FakeResource, SmcResultTest) {
-  zx::resource smc;
-  ASSERT_OK(zx::resource::create(root_resource, ZX_RSRC_KIND_SMC, 0, 0, /*name=*/nullptr,
-                                 /*namelen=*/0, &smc));
-
-  uint32_t call_count = 0;
-  zx_smc_parameters_t smc_params{};
-  zx_smc_result_t smc_result{};
-
-  auto smc_cb = [&call_count](const zx_smc_parameters_t*, zx_smc_result_t* result) {
-    call_count++;
-    *result = zx_smc_result_t{1, 2, 3, 4, 5};
-    result->arg0 = 1;
-  };
-  ASSERT_OK(fake_smc_set_handler(smc.borrow(), smc_cb));
-  EXPECT_OK(zx_smc_call(smc.get(), &smc_params, &smc_result));
-  EXPECT_EQ(call_count, 1);
-  EXPECT_EQ(smc_result.arg0, 1);
-
-  // Set the parameters -> result mapping in the fake resource library, then
-  // walk the map to ensure we get the results expected. The handler should be
-  // replaced by this set.
-  std::vector<std::pair<zx_smc_parameters_t, zx_smc_result_t>> results;
-  results.emplace_back(zx_smc_parameters_t{.func_id = 1, .arg2 = 2},
-                       zx_smc_result_t{.arg0 = 1, .arg1 = 2, .arg2 = 3, .arg3 = 4, .arg6 = 6});
-  results.emplace_back(zx_smc_parameters_t{.func_id = 7, .arg4 = 8},
-                       zx_smc_result_t{.arg0 = 2, .arg1 = 4, .arg2 = 6, .arg3 = 8, .arg6 = 10});
-
-  ASSERT_OK(fake_smc_set_results(smc.borrow(), results));
-  for (const auto& [params, result] : results) {
-    EXPECT_OK(zx_smc_call(smc.get(), &params, &smc_result));
-    EXPECT_BYTES_EQ(&smc_result, &result, sizeof(smc_result));
-  }
-}
-
-TEST_F(FakeResource, SmcClear) {
-  zx::resource smc;
-  ASSERT_OK(zx::resource::create(root_resource, ZX_RSRC_KIND_SMC, 0, 0, /*name=*/nullptr,
-                                 /*namelen=*/0, &smc));
-  // Does a null setup work?
-  {
-    zx_smc_parameters_t params{};
-    zx_smc_result_t actual{}, expected{};
-    EXPECT_OK(zx_smc_call(smc.get(), &params, &actual));
-    EXPECT_BYTES_EQ(&actual, &expected, sizeof(actual));
-  }
-
-  std::vector<std::pair<zx_smc_parameters_t, zx_smc_result_t>> results;
-  results.emplace_back(zx_smc_parameters_t{.func_id = 1, .arg2 = 2},
-                       zx_smc_result_t{.arg0 = 1, .arg1 = 2, .arg2 = 3, .arg3 = 4, .arg6 = 6});
-  ASSERT_OK(fake_smc_set_results(smc.borrow(), results));
-  {
-    zx_smc_result_t actual{};
-    zx_smc_result_t expected = results[0].second;
-    ASSERT_OK(zx_smc_call(smc.get(), &results[0].first, &actual));
-    EXPECT_BYTES_EQ(&actual, &expected, sizeof(actual));
-  }
-
-  fake_smc_unset(smc.borrow());
-
-  {
-    zx_smc_result_t actual{};
-    zx_smc_result_t expected{};
-    ASSERT_OK(zx_smc_call(smc.get(), &results[0].first, &actual));
-    EXPECT_BYTES_EQ(&actual, &expected, sizeof(actual));
-  }
 }
 
 }  // namespace
