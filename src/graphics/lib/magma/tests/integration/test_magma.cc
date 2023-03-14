@@ -794,22 +794,27 @@ class TestConnection {
   }
 
   void ImmediateCommands() {
-    if (is_virtmagma())
-      GTEST_SKIP();
-
     ASSERT_TRUE(connection_);
 
     uint32_t context_id;
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id));
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
-    magma_inline_command_buffer inline_command_buffer{};
+    uint64_t some_pattern = 0xabcd12345678beef;
+    uint64_t invalid_semaphore_id = 0;
+    magma_inline_command_buffer inline_command_buffer = {
+        .data = &some_pattern,
+        .size = sizeof(some_pattern),
+        .semaphore_ids = &invalid_semaphore_id,
+        .semaphore_count = 1,
+    };
+
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_execute_immediate_commands(
-                                   connection_, context_id, 0, &inline_command_buffer));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
+                                   connection_, context_id, 1, &inline_command_buffer));
+    // Invalid semaphore ID prevents execution of pattern data
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
 
     magma_connection_release_context(connection_, context_id);
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
   }
 
   void Sysmem(bool use_format_modifier) {

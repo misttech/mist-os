@@ -568,6 +568,21 @@ impl FileOps for MagmaFile {
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_COMMAND as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS => {
+                let (control, mut response): (
+                    virtio_magma_connection_execute_immediate_commands_ctrl_t,
+                    virtio_magma_connection_execute_immediate_commands_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                let status = execute_immediate_commands(current_task, control)?;
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_IMMEDIATE_COMMANDS
+                        as u32;
+                response.result_return = status as u64;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_DEVICE_QUERY => {
                 let (control, mut response): (
                     virtio_magma_device_query_ctrl_t,

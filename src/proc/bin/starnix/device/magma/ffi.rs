@@ -253,6 +253,60 @@ pub fn execute_command(
     Ok(())
 }
 
+/// Executes magma immediate commands.
+///
+/// This function bridges between the virtmagma structs and the magma structures. It also copies the
+/// data into starnix in order to be able to pass pointers to the resources, command buffers, and
+/// semaphore ids to magma.
+///
+/// SAFETY: Makes an FFI call to magma_execute_immediate_commands().
+pub fn execute_immediate_commands(
+    current_task: &CurrentTask,
+    control: virtio_magma_connection_execute_immediate_commands_ctrl_t,
+) -> Result<magma_status_t, Errno> {
+    let command_buffers_addr = UserAddress::from(control.command_buffers);
+
+    // For virtio-magma, "command_buffers" is an array of virtmagma_command_descriptor instead of
+    // magma_inline_command_buffer.
+    let descriptors: Vec<virtmagma_command_descriptor> =
+        read_objects(current_task, command_buffers_addr, control.command_count as usize)?;
+
+    let mut commands =
+        vec![magma_inline_command_buffer::default(); std::cmp::max(descriptors.len(), 1)];
+
+    for i in 0..control.command_count as usize {
+        let size = descriptors[i].command_buffer_size;
+        let mut data = current_task.mm.read_buffer(&UserBuffer {
+            address: UserAddress::from(descriptors[i].command_buffers),
+            length: size as usize,
+        })?;
+        commands[i].data = &mut data[0] as *mut u8 as *mut std::ffi::c_void;
+        commands[i].size = size;
+
+        let semaphore_count =
+            (descriptors[i].semaphore_size / core::mem::size_of::<u64>() as u64) as u32;
+        commands[i].semaphore_count = semaphore_count;
+
+        let mut semaphore_ids = read_objects(
+            current_task,
+            UserAddress::from(descriptors[i].semaphores),
+            semaphore_count as usize,
+        )?;
+        commands[i].semaphore_ids = &mut semaphore_ids[0];
+    }
+
+    let status = unsafe {
+        magma_connection_execute_immediate_commands(
+            control.connection,
+            control.context_id,
+            control.command_count,
+            &mut commands[0],
+        )
+    };
+
+    Ok(status)
+}
+
 /// Exports the provided magma buffer into a `zx::Vmo`, which is then wrapped in a file and added
 /// to `current_task`'s files.
 ///
