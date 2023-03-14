@@ -13,7 +13,7 @@ use {
     focus_chain_provider::FocusChainProviderPublisher,
     fuchsia_async as fasync,
     fuchsia_fs::directory::{WatchEvent, Watcher},
-    fuchsia_inspect::NumericProperty,
+    fuchsia_inspect::{NumericProperty, Property},
     fuchsia_syslog::{fx_log_err, fx_log_info, fx_log_warn},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{self, Receiver, Sender, UnboundedReceiver, UnboundedSender},
@@ -318,6 +318,7 @@ impl InputPipeline {
     ) -> Result<Self, Error> {
         // Add non-static properties to inspect node.
         let devices_discovered = inspect_node.create_uint("devices_discovered", 0);
+        let devices_connected = inspect_node.create_uint("devices_connected", 0);
 
         let input_pipeline = Self::new_common(input_device_types, assembly, inspect_node);
         let input_device_types = input_pipeline.input_device_types.clone();
@@ -341,6 +342,7 @@ impl InputPipeline {
                     input_event_sender,
                     input_device_bindings,
                     &devices_discovered,
+                    &devices_connected,
                     false, /* break_on_idle */
                 )
                 .await
@@ -412,6 +414,7 @@ impl InputPipeline {
         input_event_sender: Sender<input_device::InputEvent>,
         bindings: InputDeviceBindingHashMap,
         devices_discovered: &fuchsia_inspect::UintProperty,
+        devices_connected: &fuchsia_inspect::UintProperty,
         break_on_idle: bool,
     ) -> Result<(), Error> {
         while let Some(msg) = device_watcher.try_next().await? {
@@ -434,6 +437,7 @@ impl InputPipeline {
                             &input_event_sender,
                             &bindings,
                             filename.parse::<u32>().unwrap_or_default(),
+                            Some(devices_connected),
                         )
                         .await;
                     }
@@ -490,6 +494,7 @@ impl InputPipeline {
                         input_event_sender,
                         bindings,
                         device_id,
+                        None,
                     )
                     .await;
                 }
@@ -577,6 +582,7 @@ async fn add_device_bindings(
     input_event_sender: &Sender<input_device::InputEvent>,
     bindings: &InputDeviceBindingHashMap,
     device_id: u32,
+    devices_connected: Option<&fuchsia_inspect::UintProperty>,
 ) {
     let mut matched_device_types = vec![];
     if let Ok(descriptor) = device_proxy.get_descriptor().await {
@@ -646,6 +652,10 @@ async fn add_device_bindings(
     if !new_bindings.is_empty() {
         let mut bindings = bindings.lock().await;
         bindings.entry(device_id).or_insert(Vec::new()).extend(new_bindings);
+        match devices_connected {
+            Some(dev_connected) => dev_connected.set(bindings.len() as u64),
+            None => (),
+        };
     }
 }
 
@@ -941,11 +951,13 @@ mod tests {
             supported_device_types.clone().iter().join(", "),
         );
         let devices_discovered = test_node.create_uint("devices_discovered", 0);
-        // Assert that inspect tree is initialized with no devices discovered.
+        let devices_connected = test_node.create_uint("devices_connected", 0);
+        // Assert that inspect tree is initialized with no devices.
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Mouse",
-                devices_discovered: 0u64
+                devices_discovered: 0u64,
+                devices_connected: 0u64
             }
         });
 
@@ -956,6 +968,7 @@ mod tests {
             input_event_sender,
             bindings.clone(),
             &devices_discovered,
+            &devices_connected,
             true, /* break_on_idle */
         )
         .await;
@@ -985,7 +998,8 @@ mod tests {
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Mouse",
-                devices_discovered: 1u64
+                devices_discovered: 1u64,
+                devices_connected: 1u64
             }
         });
     }
@@ -1053,11 +1067,13 @@ mod tests {
             supported_device_types.clone().iter().join(", "),
         );
         let devices_discovered = test_node.create_uint("devices_discovered", 0);
-        // Assert that inspect tree is initialized with no devices discovered.
+        let devices_connected = test_node.create_uint("devices_connected", 0);
+        // Assert that inspect tree is initialized with no devices.
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Keyboard",
-                devices_discovered: 0u64
+                devices_discovered: 0u64,
+                devices_connected: 0u64
             }
         });
 
@@ -1068,6 +1084,7 @@ mod tests {
             input_event_sender,
             bindings.clone(),
             &devices_discovered,
+            &devices_connected,
             true, /* break_on_idle */
         )
         .await;
@@ -1080,7 +1097,8 @@ mod tests {
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Keyboard",
-                devices_discovered: 1u64
+                devices_discovered: 1u64,
+                devices_connected: 0u64
             }
         });
     }
@@ -1184,7 +1202,8 @@ mod tests {
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Touch, ConsumerControls",
-                devices_discovered: 0u64
+                devices_discovered: 0u64,
+                devices_connected: 0u64
             }
         });
     }
