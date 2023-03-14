@@ -10,22 +10,10 @@ group("android") {
   }
 }
 
-fuchsia_component("init") {
-  manifest = "meta/init.cml"
-}
-
 fuchsia_component("sh") {
   manifest = "meta/sh.cml"
 }
 
-fuchsia_component("adbd") {
-  manifest = "meta/adbd.cml"
-}
-
 fuchsia_package("starnix_android") {
-  deps = [
-    ":adbd",
-    ":init",
-    ":sh",
-  ]
+  deps = [ ":sh" ]
 }

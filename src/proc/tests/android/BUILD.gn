@@ -12,7 +12,6 @@ group("tests") {
   if (target_cpu == "x64" && !is_asan) {
     deps = [
       ":android",
-      ":android_with_init",
       "benchmarks",
       "gvisor",
       "wayland",
@@ -50,11 +49,6 @@ fuchsia_test_component_with_expectations("libutils_test") {
   deps = [ "//src/proc/tests:starnix_test_with_expectations" ]
 }
 
-fuchsia_test_component("init_test") {
-  manifest = "meta/init_test.cml"
-  deps = [ "//src/proc/tests:starnix_test" ]
-}
-
 fuchsia_component("sh_test") {
   testonly = true
   check_references = false
@@ -87,24 +81,6 @@ fuchsia_test_package("android") {
     ":binder_smoke_test",
     ":libutils_test",
   ]
-
-  if (target_cpu == "x64") {
-    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
-  }
-
-  deps = [
-    ":container_resources",
-    "//src/lib/testing/expectation:expectation_comparer",
-  ]
-}
-
-fuchsia_test_package("android_with_init") {
-  test_components = [ ":init_test" ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 
   if (target_cpu == "x64") {
     subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
