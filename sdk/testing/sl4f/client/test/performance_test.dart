@@ -31,9 +31,8 @@ class FakePerformanceTools extends Performance {
         super(_sl4f, _dump);
 
   @override
-  Future<bool> runProcess(String executablePath, List<String> args) async {
+  Future<void> runProcess(String executablePath, List<String> args) async {
     _observer.runProcess(executablePath, args);
-    return true;
   }
 }
 

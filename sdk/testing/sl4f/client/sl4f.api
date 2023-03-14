@@ -4322,7 +4322,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "convertTraceFileToJson",
-              "returnType": "Future<File?>",
+              "returnType": "Future<File>",
               "type": "MethodDeclarationImpl"
             },
             "initializeTracing": {
@@ -4538,7 +4538,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "runProcess",
-              "returnType": "Future<bool>",
+              "returnType": "Future<void>",
               "type": "MethodDeclarationImpl"
             },
             "startChromeTrace": {
