@@ -4,7 +4,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl/cpp/binding.h>
+
+#include <optional>
 
 #include <zxtest/zxtest.h>
 
@@ -13,42 +14,36 @@
 
 namespace radar {
 
-class FakeRadar : public fuchsia::hardware::radar::RadarBurstReader {
+class FakeRadar : public fidl::Server<fuchsia_hardware_radar::RadarBurstReader> {
  public:
-  void GetBurstSize(GetBurstSizeCallback callback) override { callback(12345); }
-  void RegisterVmos(std::vector<uint32_t> vmo_ids, std::vector<::zx::vmo> vmos,
-                    RegisterVmosCallback callback) override {}
-  void UnregisterVmos(std::vector<uint32_t> vmo_ids, UnregisterVmosCallback callback) override {}
-  void StartBursts() override {}
-  void StopBursts(StopBurstsCallback callback) override {}
-  void UnlockVmo(uint32_t vmo_id) override {}
+  void GetBurstSize(GetBurstSizeCompleter::Sync& completer) override { completer.Reply(12345); }
+  void RegisterVmos(RegisterVmosRequest& request, RegisterVmosCompleter::Sync& completer) override {
+  }
+  void UnregisterVmos(UnregisterVmosRequest& request,
+                      UnregisterVmosCompleter::Sync& completer) override {}
+  void StartBursts(StartBurstsCompleter::Sync& completer) override {}
+  void StopBursts(StopBurstsCompleter::Sync& completer) override {}
+  void UnlockVmo(UnlockVmoRequest& request, UnlockVmoCompleter::Sync& completer) override {}
 };
 
-class FakeRadarDriver : public fuchsia::hardware::radar::RadarBurstReaderProvider {
+class FakeRadarDriver : public fidl::Server<fuchsia_hardware_radar::RadarBurstReaderProvider> {
  public:
-  FakeRadarDriver() : radar_binding_(&fake_radar_) {}
+  explicit FakeRadarDriver(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
-  void Connect(fidl::InterfaceRequest<fuchsia::hardware::radar::RadarBurstReader> server,
-               ConnectCallback callback) override {
-    fuchsia::hardware::radar::RadarBurstReaderProvider_Connect_Result result;
-    fuchsia::hardware::radar::RadarBurstReaderProvider_Connect_Response response;
-    if (radar_binding_.Bind(std::move(server)) == ZX_OK) {
-      result.set_response(response);
-    } else {
-      result.set_err(fuchsia::hardware::radar::StatusCode::BIND_ERROR);
-    }
-
-    callback(std::move(result));
+  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
+    fidl::BindServer(dispatcher_, std::move(request.server()), &fake_radar_);
+    completer.Reply(fit::ok());
   }
 
  private:
   FakeRadar fake_radar_;
-  fidl::Binding<fuchsia::hardware::radar::RadarBurstReader> radar_binding_;
+  async_dispatcher_t* const dispatcher_;
 };
 
 class TestRadarDeviceConnector : public RadarDeviceConnector {
  public:
-  TestRadarDeviceConnector() : driver_binding_(&fake_driver_) {}
+  explicit TestRadarDeviceConnector(async_dispatcher_t* dispatcher)
+      : fake_driver_(dispatcher), dispatcher_(dispatcher) {}
 
   void ConnectToRadarDevice(int dir_fd, const std::filesystem::path& path,
                             ConnectDeviceCallback connect_device) override {
@@ -57,9 +52,15 @@ class TestRadarDeviceConnector : public RadarDeviceConnector {
 
   void ConnectToFirstRadarDevice(ConnectDeviceCallback connect_device) override {
     if (connect_fail_) {
-    } else {
-      connect_device(driver_binding_.NewBinding());
+      return;
     }
+
+    zx::result endpoints =
+        fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
+    ASSERT_TRUE(endpoints.is_ok());
+
+    driver_binding_ = fidl::BindServer(dispatcher_, std::move(endpoints->server), &fake_driver_);
+    connect_device(std::move(endpoints->client));
   }
 
  private:
@@ -68,34 +69,45 @@ class TestRadarDeviceConnector : public RadarDeviceConnector {
  public:
   // Visible for testing.
   bool connect_fail_ = false;
-  fidl::Binding<fuchsia::hardware::radar::RadarBurstReaderProvider> driver_binding_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_radar::RadarBurstReaderProvider>>
+      driver_binding_;
+  async_dispatcher_t* const dispatcher_;
 };
 
 class RadarProxyTest : public zxtest::Test {
  public:
   RadarProxyTest()
-      : proxy_(&connector_),
-        proxy_binding_(&proxy_),
-        loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
+      : loop_(&kAsyncLoopConfigAttachToCurrentThread),
+        connector_(loop_.dispatcher()),
+        proxy_(loop_.dispatcher(), &connector_) {}
 
   void SetUp() override {
     ASSERT_OK(loop_.StartThread());
     EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
-                  ASSERT_OK(proxy_binding_.Bind(service_client_.NewRequest()));
+                  zx::result endpoints =
+                      fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
+                  ASSERT_TRUE(endpoints.is_ok());
+                  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &proxy_);
+                  service_client_.Bind(std::move(endpoints->client));
                 }).is_ok());
+  }
+
+  void TearDown() override {
+    // Close the binding and make sure the proxy doesn't try to reconnect after the loop has been
+    // stopped.
+    EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
+                  connector_.connect_fail_ = true;
+                  connector_.driver_binding_->Close(ZX_ERR_PEER_CLOSED);
+                }).is_ok());
+    loop_.Shutdown();
   }
 
  protected:
   // Visible for testing.
+  async::Loop loop_;
   TestRadarDeviceConnector connector_;
   RadarProviderProxy proxy_;
-  fuchsia::hardware::radar::RadarBurstReaderProviderSyncPtr service_client_;
-
- private:
-  fidl::Binding<fuchsia::hardware::radar::RadarBurstReaderProvider> proxy_binding_;
-
- protected:
-  async::Loop loop_;
+  fidl::SyncClient<fuchsia_hardware_radar::RadarBurstReaderProvider> service_client_;
 };
 
 TEST_F(RadarProxyTest, Connect) {
@@ -103,14 +115,22 @@ TEST_F(RadarProxyTest, Connect) {
                 proxy_.DeviceAdded(0, "000");
               }).is_ok());
 
-  fuchsia::hardware::radar::RadarBurstReaderSyncPtr radar_client;
-  fuchsia::hardware::radar::RadarBurstReaderProvider_Connect_Result connect_result;
-  EXPECT_OK(service_client_->Connect(radar_client.NewRequest(), &connect_result));
-  EXPECT_TRUE(connect_result.is_response());
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
+  ASSERT_TRUE(endpoints.is_ok());
 
-  uint32_t burst_size = 0;
-  EXPECT_OK(radar_client->GetBurstSize(&burst_size));
-  EXPECT_EQ(burst_size, 12345);
+  fidl::SyncClient<fuchsia_hardware_radar::RadarBurstReader> radar_client(
+      std::move(endpoints->client));
+
+  {
+    auto result = service_client_->Connect(std::move(endpoints->server));
+    EXPECT_TRUE(result.is_ok());
+  }
+
+  {
+    auto result = radar_client->GetBurstSize();
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_EQ(result->burst_size(), 12345);
+  }
 }
 
 TEST_F(RadarProxyTest, Reconnect) {
@@ -118,31 +138,49 @@ TEST_F(RadarProxyTest, Reconnect) {
                 proxy_.DeviceAdded(0, "000");
               }).is_ok());
 
-  fuchsia::hardware::radar::RadarBurstReaderSyncPtr radar_client;
-  fuchsia::hardware::radar::RadarBurstReaderProvider_Connect_Result connect_result;
-  EXPECT_OK(service_client_->Connect(radar_client.NewRequest(), &connect_result));
-  EXPECT_TRUE(connect_result.is_response());
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
+  ASSERT_TRUE(endpoints.is_ok());
 
-  uint32_t burst_size = 0;
-  EXPECT_OK(radar_client->GetBurstSize(&burst_size));
-  EXPECT_EQ(burst_size, 12345);
+  fidl::SyncClient<fuchsia_hardware_radar::RadarBurstReader> radar_client(
+      std::move(endpoints->client));
+
+  {
+    auto result = service_client_->Connect(std::move(endpoints->server));
+    EXPECT_TRUE(result.is_ok());
+  }
+
+  {
+    auto result = radar_client->GetBurstSize();
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_EQ(result->burst_size(), 12345);
+  }
 
   EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
                 // Close the connection between the proxy and the radar driver. Calls to Connect()
                 // should immediately start failing.
                 connector_.connect_fail_ = true;
-                EXPECT_OK(connector_.driver_binding_.Close(ZX_ERR_PEER_CLOSED));
+                connector_.driver_binding_->Close(ZX_ERR_PEER_CLOSED);
               }).is_ok());
 
   // We should still be able to communicate with the radar proxy, but the call to Connect() should
   // return an error.
-  fuchsia::hardware::radar::RadarBurstReaderSyncPtr new_radar_client;
-  EXPECT_OK(service_client_->Connect(new_radar_client.NewRequest(), &connect_result));
-  EXPECT_TRUE(connect_result.is_err());
+  endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
+  ASSERT_TRUE(endpoints.is_ok());
+
+  fidl::SyncClient<fuchsia_hardware_radar::RadarBurstReader> new_radar_client(
+      std::move(endpoints->client));
+
+  {
+    auto result = service_client_->Connect(std::move(endpoints->server));
+    EXPECT_FALSE(result.is_ok());
+  }
 
   // The connection with the radar driver itself should remain open.
-  EXPECT_OK(radar_client->GetBurstSize(&burst_size));
-  EXPECT_EQ(burst_size, 12345);
+  {
+    auto result = radar_client->GetBurstSize();
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_EQ(result->burst_size(), 12345);
+  }
 
   EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
                 // Signal that a new device was added to /dev/class/radar.
@@ -151,10 +189,21 @@ TEST_F(RadarProxyTest, Reconnect) {
               }).is_ok());
 
   // The proxy should now be able to connect to the new radar driver.
-  EXPECT_OK(service_client_->Connect(new_radar_client.NewRequest(), &connect_result));
+  endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
+  ASSERT_TRUE(endpoints.is_ok());
 
-  EXPECT_OK(new_radar_client->GetBurstSize(&burst_size));
-  EXPECT_EQ(burst_size, 12345);
+  new_radar_client = fidl::SyncClient(std::move(endpoints->client));
+
+  {
+    auto result = service_client_->Connect(std::move(endpoints->server));
+    EXPECT_FALSE(result.is_ok());
+  }
+
+  {
+    auto result = radar_client->GetBurstSize();
+    EXPECT_TRUE(result.is_ok());
+    EXPECT_EQ(result->burst_size(), 12345);
+  }
 }
 
 }  // namespace radar

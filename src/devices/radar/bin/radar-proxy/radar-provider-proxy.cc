@@ -8,43 +8,39 @@
 
 namespace radar {
 
-RadarProviderProxy::RadarProviderProxy(RadarDeviceConnector* connector) : connector_(connector) {
-  radar_client_.set_error_handler([&](zx_status_t status) { ErrorHandler(status); });
-}
-
-void RadarProviderProxy::Connect(
-    fidl::InterfaceRequest<fuchsia::hardware::radar::RadarBurstReader> server,
-    ConnectCallback callback) {
-  if (!radar_client_.is_bound()) {
-    fuchsia::hardware::radar::RadarBurstReaderProvider_Connect_Result result;
-    result.set_err(fuchsia::hardware::radar::StatusCode::BIND_ERROR);
-    callback(std::move(result));
+void RadarProviderProxy::Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) {
+  if (!radar_client_) {
+    completer.Reply(fit::error(fuchsia_hardware_radar::StatusCode::kBindError));
     return;
   }
 
-  radar_client_->Connect(
-      std::move(server),
-      [cb = std::move(callback)](
-          fuchsia::hardware::radar::RadarBurstReaderProvider_Connect_Result result) {
-        cb(std::move(result));
+  radar_client_->Connect(std::move(request.server()))
+      .Then([async_completer = completer.ToAsync()](const auto& result) mutable {
+        if (result.is_ok()) {
+          async_completer.Reply(fit::ok());
+        } else if (result.error_value().is_domain_error()) {
+          async_completer.Reply(fit::error(result.error_value().domain_error()));
+        } else {
+          async_completer.Reply(fit::error(fuchsia_hardware_radar::StatusCode::kBindError));
+        }
       });
 }
 
 void RadarProviderProxy::DeviceAdded(int dir_fd, const std::string& filename) {
-  if (!radar_client_.is_bound()) {
+  if (!radar_client_) {
     connector_->ConnectToRadarDevice(dir_fd, filename, [&](auto client_end) {
-      radar_client_.Bind(std::move(client_end));
+      radar_client_.Bind(std::move(client_end), dispatcher_, this);
       return true;
     });
   }
 }
 
-void RadarProviderProxy::ErrorHandler(zx_status_t status) {
-  FX_PLOGS(ERROR, status) << "Connection to radar device closed, attempting to reconnect";
+void RadarProviderProxy::on_fidl_error(fidl::UnbindInfo info) {
+  FX_PLOGS(ERROR, info.status()) << "Connection to radar device closed, attempting to reconnect";
   // Check for available devices now, just in case one was added before the connection closed. If
   // not, the DeviceWatcher will signal to connect when a new device becomes available.
   connector_->ConnectToFirstRadarDevice([&](auto client_end) {
-    radar_client_.Bind(std::move(client_end));
+    radar_client_.Bind(std::move(client_end), dispatcher_, this);
     return true;
   });
 }

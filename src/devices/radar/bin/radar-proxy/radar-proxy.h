@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_RADAR_BIN_RADAR_PROXY_RADAR_PROXY_H_
 #define SRC_DEVICES_RADAR_BIN_RADAR_PROXY_RADAR_PROXY_H_
 
-#include <fuchsia/hardware/radar/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.radar/cpp/fidl.h>
 #include <lib/fit/function.h>
 
 #include <filesystem>
@@ -20,8 +20,8 @@ class RadarDeviceConnector {
   // Called on zero or more eligible radar devices. If true is returned, the device is usable and
   // the callback should not be invoked again. Otherwise, the device is not usable, and the search
   // for a suitable device should continue.
-  using ConnectDeviceCallback = fit::function<bool(
-      fidl::InterfaceHandle<fuchsia::hardware::radar::RadarBurstReaderProvider>)>;
+  using ConnectDeviceCallback =
+      fit::function<bool(fidl::ClientEnd<fuchsia_hardware_radar::RadarBurstReaderProvider>)>;
 
   // Synchronously connects to the given radar device and passes the client end to the callback. The
   // callback is not called if the connection could not be made. The callback return value is
@@ -33,7 +33,7 @@ class RadarDeviceConnector {
   virtual void ConnectToFirstRadarDevice(ConnectDeviceCallback connect_device) = 0;
 };
 
-class RadarProxy : public fuchsia::hardware::radar::RadarBurstReaderProvider {
+class RadarProxy : public fidl::Server<fuchsia_hardware_radar::RadarBurstReaderProvider> {
  public:
   static constexpr char kRadarDeviceDirectory[] = "/dev/class/radar";
 

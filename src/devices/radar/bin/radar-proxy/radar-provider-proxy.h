@@ -5,24 +5,29 @@
 #ifndef SRC_DEVICES_RADAR_BIN_RADAR_PROXY_RADAR_PROVIDER_PROXY_H_
 #define SRC_DEVICES_RADAR_BIN_RADAR_PROXY_RADAR_PROVIDER_PROXY_H_
 
+#include <lib/async/dispatcher.h>
+
 #include "radar-proxy.h"
 
 namespace radar {
 
-class RadarProviderProxy : public RadarProxy {
+class RadarProviderProxy
+    : public RadarProxy,
+      public fidl::AsyncEventHandler<fuchsia_hardware_radar::RadarBurstReaderProvider> {
  public:
-  explicit RadarProviderProxy(RadarDeviceConnector* connector);
+  RadarProviderProxy(async_dispatcher_t* dispatcher, RadarDeviceConnector* connector)
+      : dispatcher_(dispatcher), connector_(connector) {}
 
-  void Connect(fidl::InterfaceRequest<fuchsia::hardware::radar::RadarBurstReader> server,
-               ConnectCallback callback) override;
+  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
 
   void DeviceAdded(int dir_fd, const std::string& filename) override;
 
- private:
-  void ErrorHandler(zx_status_t status);
+  void on_fidl_error(fidl::UnbindInfo info) override;
 
+ private:
+  async_dispatcher_t* const dispatcher_;
   RadarDeviceConnector* const connector_;
-  fuchsia::hardware::radar::RadarBurstReaderProviderPtr radar_client_;
+  fidl::Client<fuchsia_hardware_radar::RadarBurstReaderProvider> radar_client_;
 };
 
 }  // namespace radar

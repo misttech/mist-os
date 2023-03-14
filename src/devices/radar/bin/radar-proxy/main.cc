@@ -5,10 +5,11 @@
 #include <dirent.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
-#include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
+#include <lib/syslog/cpp/macros.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -23,11 +24,16 @@ class DefaultRadarDeviceConnector : public RadarDeviceConnector {
   void ConnectToRadarDevice(int dir_fd, const std::filesystem::path& path,
                             ConnectDeviceCallback connect_device) override {
     fdio_cpp::UnownedFdioCaller caller(dir_fd);
-    fidl::InterfaceHandle<fuchsia::hardware::radar::RadarBurstReaderProvider> client_end;
+    zx::result endpoints =
+        fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
+    if (endpoints.is_error()) {
+      return;
+    }
+
     zx_status_t status = fdio_service_connect_at(caller.directory().channel()->get(), path.c_str(),
-                                                 client_end.NewRequest().TakeChannel().release());
-    if (status == ZX_OK && client_end.is_valid()) {
-      connect_device(std::move(client_end));
+                                                 endpoints->server.TakeChannel().release());
+    if (status == ZX_OK) {
+      connect_device(std::move(endpoints->client));
     }
   }
 
@@ -57,15 +63,25 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   radar::DefaultRadarDeviceConnector connector;
-  radar::RadarProviderProxy proxy(&connector);
+  radar::RadarProviderProxy proxy(loop.dispatcher(), &connector);
 
-  fidl::Binding<fuchsia::hardware::radar::RadarBurstReaderProvider> binding(&proxy);
-  fidl::InterfaceRequestHandler<fuchsia::hardware::radar::RadarBurstReaderProvider> handler =
-      [&](fidl::InterfaceRequest<fuchsia::hardware::radar::RadarBurstReaderProvider> request) {
-        binding.Bind(std::move(request));
-      };
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  context->outgoing()->AddPublicService(std::move(handler));
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
+
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
+    return -1;
+  }
+
+  result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_radar::RadarBurstReaderProvider>(
+      [&](fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReaderProvider> server_end) {
+        fidl::BindServer(loop.dispatcher(), std::move(server_end), &proxy);
+      });
+
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add RadarBurstReaderProvider protocol: " << result.status_string();
+    return -1;
+  }
 
   return loop.Run();
 }

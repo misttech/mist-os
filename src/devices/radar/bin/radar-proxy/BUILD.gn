@@ -7,7 +7,8 @@ import("//build/test.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 _common_deps = [
-  "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_hlcpp",
+  "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp",
+  "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/fdio",
   "//sdk/lib/fit",
   "//sdk/lib/sys/cpp",
