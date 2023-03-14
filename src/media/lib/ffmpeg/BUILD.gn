@@ -51,10 +51,8 @@ group("ffmpeg") {
 
 if (use_prebuilt_ffmpeg) {
   # When use_prebuilt_ffmpeg is false, this is declared in //third_party/ffmpeg.
-  # The default value will change to something like "default" once we have the
-  # product-specific profiles straightened out.
   declare_args() {
-    ffmpeg_profile = "max"
+    ffmpeg_profile = "default"
   }
 
   group("prebuilt_ffmpeg") {

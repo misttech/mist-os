@@ -16,10 +16,7 @@ import("//src/media/lib/ffmpeg/build/profiles.gni")
 # the updated targets.
 #
 ffmpeg_profile_set("profiles") {
-  deps = [
-    ":default",
-    ":max",
-  ]
+  deps = [ ":default" ]
 }
 
 #
@@ -27,17 +24,6 @@ ffmpeg_profile_set("profiles") {
 # demuxes and parsers. It is intended for eng devices.
 #
 ffmpeg_profile("default") {
-  deps = [ ":common_args" ]
-}
-
-#
-# TODO(http://fxbug.dev/87666) Remove when 'default' is the default profile.
-#
-ffmpeg_profile("max") {
-  deps = [ ":common_args" ]
-}
-
-group("common_args") {
   deps = [
     "//src/media/lib/ffmpeg/features:enable_decoder_aac",
     "//src/media/lib/ffmpeg/features:enable_decoder_aac_latm",
