@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/instrumentation.h>
 #include <lib/zx/channel.h>

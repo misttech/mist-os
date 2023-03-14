@@ -6,6 +6,7 @@
 #define SRC_PERFORMANCE_KTRACE_PROVIDER_APP_H_
 
 #include <lib/sys/cpp/component_context.h>
+#include <lib/sys/cpp/service_directory.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/trace/observer.h>
 
@@ -37,6 +38,7 @@ class App {
   // This context keeps the trace context alive until we've written our trace
   // records, which doesn't happen until after tracing has stopped.
   trace_prolonged_context_t* context_ = nullptr;
+  std::shared_ptr<sys::ServiceDirectory> svc_ = sys::ServiceDirectory::CreateFromNamespace();
 
   App(const App&) = delete;
   App(App&&) = delete;

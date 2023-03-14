@@ -4,8 +4,6 @@
 
 #include "src/performance/ktrace_provider/device_reader.h"
 
-#include <fcntl.h>
-#include <lib/fdio/fdio.h>
 #include <lib/syslog/cpp/macros.h>
 #include <limits.h>
 #include <sys/stat.h>
@@ -16,34 +14,12 @@
 
 #include <src/lib/files/eintr_wrapper.h>
 
-#include "src/lib/fxl/macros.h"
-
 namespace ktrace_provider {
 
 DeviceReader::DeviceReader() : Reader(buffer_, kChunkSize) {}
 
-zx_status_t DeviceReader::Init() {
-  auto [status, channel] = OpenKtraceReader();
-  if (status == ZX_OK) {
-    ktrace_reader_.Bind(std::move(channel));
-  }
-  return status;
-}
-
-std::tuple<zx_status_t, zx::channel> DeviceReader::OpenKtraceReader() {
-  int fd = open(kKtraceReaderSvc, O_RDONLY);
-  if (fd < 0) {
-    FX_LOGS(ERROR) << "Failed to open " << kKtraceReaderSvc << ": errno=" << errno;
-    return {ZX_ERR_IO, zx::channel()};
-  }
-  zx::channel channel;
-  zx_status_t status = fdio_get_service_handle(fd, channel.reset_and_get_address());
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to get " << kKtraceReaderSvc
-                   << " channel: " << zx_status_get_string(status);
-    return {ZX_ERR_IO, zx::channel()};
-  }
-  return {ZX_OK, std::move(channel)};
+zx_status_t DeviceReader::Init(const std::shared_ptr<sys::ServiceDirectory>& svc) {
+  return svc->Connect(ktrace_reader_.NewRequest());
 }
 
 void DeviceReader::ReadMoreData() {
@@ -62,7 +38,7 @@ void DeviceReader::ReadMoreData() {
       break;
     }
 
-    if (buf.size() == 0) {
+    if (buf.empty()) {
       break;
     }
 

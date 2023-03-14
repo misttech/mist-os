@@ -6,6 +6,7 @@
 #define SRC_PERFORMANCE_KTRACE_PROVIDER_DEVICE_READER_H_
 
 #include <fuchsia/tracing/kernel/cpp/fidl.h>
+#include <lib/sys/cpp/service_directory.h>
 
 #include "src/performance/ktrace_provider/reader.h"
 
@@ -15,13 +16,11 @@ class DeviceReader : public Reader {
  public:
   DeviceReader();
 
-  zx_status_t Init();
+  zx_status_t Init(const std::shared_ptr<sys::ServiceDirectory>& svc);
 
  private:
-  static constexpr char kKtraceReaderSvc[] = "/svc/fuchsia.tracing.kernel.Reader";
   static constexpr size_t kChunkSize{16 * 4 * 1024};
 
-  std::tuple<zx_status_t, zx::channel> OpenKtraceReader();
   void ReadMoreData() override;
 
   fuchsia::tracing::kernel::ReaderSyncPtr ktrace_reader_;

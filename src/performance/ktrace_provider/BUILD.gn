@@ -23,7 +23,6 @@ executable("bin") {
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.tracing.kernel:fuchsia.tracing.kernel_hlcpp",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
     "//src/performance/lib/fxt",

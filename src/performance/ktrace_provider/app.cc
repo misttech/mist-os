@@ -4,10 +4,8 @@
 
 #include "src/performance/ktrace_provider/app.h"
 
-#include <fcntl.h>
 #include <fuchsia/tracing/kernel/cpp/fidl.h>
 #include <lib/async/default.h>
-#include <lib/fdio/fdio.h>
 #include <lib/fxt/fields.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/instrumentation.h>
@@ -24,8 +22,8 @@
 namespace ktrace_provider {
 namespace {
 
-constexpr char kKtraceControllerSvc[] = "/svc/fuchsia.tracing.kernel.Controller";
-using fuchsia::tracing::kernel::Controller_SyncProxy;
+using fuchsia::tracing::kernel::Controller_Sync;
+using fuchsia::tracing::kernel::ControllerSyncPtr;
 struct KTraceCategory {
   const char* name;
   uint32_t group;
@@ -50,22 +48,6 @@ constexpr char kRetainCategory[] = "kernel:retain";
 
 constexpr char kLogCategory[] = "log";
 
-zx::channel OpenKTraceController() {
-  int fd = open(kKtraceControllerSvc, O_WRONLY);
-  if (fd < 0) {
-    FX_LOGS(ERROR) << "Failed to open " << kKtraceControllerSvc << ": errno=" << errno;
-    return zx::channel();
-  }
-  zx::channel channel;
-  zx_status_t status = fdio_get_service_handle(fd, channel.reset_and_get_address());
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to get " << kKtraceControllerSvc
-                   << " channel: " << zx_status_get_string(status);
-    return zx::channel();
-  }
-  return channel;
-}
-
 void LogFidlFailure(const char* rqst_name, zx_status_t fidl_status, zx_status_t rqst_status) {
   if (fidl_status != ZX_OK) {
     FX_LOGS(ERROR) << "Ktrace FIDL " << rqst_name << " failed: status=" << fidl_status;
@@ -74,19 +56,19 @@ void LogFidlFailure(const char* rqst_name, zx_status_t fidl_status, zx_status_t 
   }
 }
 
-void RequestKtraceStop(Controller_SyncProxy& controller) {
+void RequestKtraceStop(Controller_Sync& controller) {
   zx_status_t stop_status;
   zx_status_t status = controller.Stop(&stop_status);
   LogFidlFailure("stop", status, stop_status);
 }
 
-void RequestKtraceRewind(Controller_SyncProxy& controller) {
+void RequestKtraceRewind(Controller_Sync& controller) {
   zx_status_t rewind_status;
   zx_status_t status = controller.Rewind(&rewind_status);
   LogFidlFailure("rewind", status, rewind_status);
 }
 
-void RequestKtraceStart(Controller_SyncProxy& controller, trace_buffering_mode_t buffering_mode,
+void RequestKtraceStart(Controller_Sync& controller, trace_buffering_mode_t buffering_mode,
                         uint32_t group_mask) {
   using BufferingMode = fuchsia::tracing::BufferingMode;
   zx_status_t start_status;
@@ -121,7 +103,8 @@ std::vector<trace::KnownCategory> GetKnownCategories() {
   };
 
   for (const auto& category : kGroupCategories) {
-    known_categories.push_back({.name = category.name});
+    auto& known_category = known_categories.emplace_back();
+    known_category.name = category.name;
   }
 
   return known_categories;
@@ -132,7 +115,7 @@ App::App(const fxl::CommandLine& command_line)
   trace_observer_.Start(async_get_default_dispatcher(), [this] { UpdateState(); });
 }
 
-App::~App() {}
+App::~App() = default;
 
 void App::UpdateState() {
   uint32_t group_mask = 0;
@@ -140,8 +123,7 @@ void App::UpdateState() {
   bool retain_current_data = false;
   if (trace_state() == TRACE_STARTED) {
     size_t num_enabled_categories = 0;
-    for (size_t i = 0; i < std::size(kGroupCategories); i++) {
-      auto& category = kGroupCategories[i];
+    for (const auto& category : kGroupCategories) {
       if (trace_is_category_enabled(category.name)) {
         group_mask |= category.group;
         ++num_enabled_categories;
@@ -186,11 +168,11 @@ void App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode
 
   FX_LOGS(INFO) << "Starting ktrace";
 
-  zx::channel channel = OpenKTraceController();
-  if (!channel) {
+  ControllerSyncPtr ktrace_controller;
+  if (zx_status_t status = svc_->Connect(ktrace_controller.NewRequest()); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << " failed to connect to ktrace controller";
     return;
   }
-  Controller_SyncProxy ktrace_controller(std::move(channel));
 
   context_ = trace_acquire_prolonged_context();
   if (!context_) {
@@ -199,11 +181,11 @@ void App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode
   }
   current_group_mask_ = group_mask;
 
-  RequestKtraceStop(ktrace_controller);
+  RequestKtraceStop(*ktrace_controller);
   if (!retain_current_data) {
-    RequestKtraceRewind(ktrace_controller);
+    RequestKtraceRewind(*ktrace_controller);
   }
-  RequestKtraceStart(ktrace_controller, buffering_mode, group_mask);
+  RequestKtraceStart(*ktrace_controller, buffering_mode, group_mask);
 
   FX_VLOGS(1) << "Ktrace started";
 }
@@ -217,18 +199,19 @@ void App::StopKTrace() {
   FX_LOGS(INFO) << "Stopping ktrace";
 
   {
-    zx::channel channel = OpenKTraceController();
-    if (channel) {
-      Controller_SyncProxy ktrace_controller(std::move(channel));
-      RequestKtraceStop(ktrace_controller);
+    ControllerSyncPtr ktrace_controller;
+    if (zx_status_t status = svc_->Connect(ktrace_controller.NewRequest()); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << " failed to connect to ktrace controller";
+      return;
     }
+    RequestKtraceStop(*ktrace_controller);
   }
 
   // Acquire a context for writing to the trace buffer.
   auto buffer_context = trace_acquire_context();
 
   DeviceReader reader;
-  if (reader.Init() == ZX_OK) {
+  if (reader.Init(svc_) == ZX_OK) {
     zx::time start = zx::clock::get_monotonic();
     while (const uint64_t* fxt_header = reader.ReadNextRecord()) {
       size_t record_size_bytes = fxt::RecordFields::RecordSize::Get<size_t>(*fxt_header) * 8;
