@@ -21,7 +21,7 @@ fx build
 
 ### Run Fuchsia
 
-Run Fuchsia as normal, for example using `fx serve` and `ffx emu start --net user --headless`.
+Run Fuchsia as normal, for example using `fx serve` and `ffx emu start --headless`.
 
 To monitor starnix, look for log messages with the `starnix` tag:
 
@@ -29,11 +29,12 @@ To monitor starnix, look for log messages with the `starnix` tag:
 ffx log --filter starnix --severity TRACE --select "core/*/starnix*#TRACE"
 ```
 
-When running tests, you will need to modify the selector for the logs.
+When running tests, you will need to pass the log selection parameters to fx test instead:
 
 ```sh
-ffx log --filter starnix --severity TRACE --select "core/test*/*/starnix*#TRACE"
+fx test --min-severity-logs TRACE <test name>
 ```
+
 
 The `--select` arguments contain the moniker for the starnix instance whose minimum severity log
 level you want to change. This affects the logs emitted by starnix, as opposed to `--severity`,
