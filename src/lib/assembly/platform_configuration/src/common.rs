@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
+use serde::Serialize;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use assembly_config_schema::{BoardInformation, BuildType};
@@ -230,7 +231,7 @@ pub type ComponentConfigs = BTreeMap<String, ComponentConfiguration>;
 /// - for each component:
 ///     - Structured Config
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct PackageConfiguration {
     /// A map from manifest paths within the package namespace to the values for the component.
     pub components: ComponentConfigs,
@@ -243,7 +244,7 @@ pub struct PackageConfiguration {
 ///
 /// This holds:
 /// - Structured Config values for this component.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct ComponentConfiguration {
     /// Structured Config key-value pairs.
     pub fields: BTreeMap<String, serde_json::Value>,

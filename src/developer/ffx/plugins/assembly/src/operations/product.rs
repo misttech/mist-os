@@ -82,14 +82,34 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
 
+    // Serialize the builder state for forensic use.
+    let builder_forensics_file_path = outdir.join("assembly_builder_forensics.json");
+
+    if let Some(parent_dir) = builder_forensics_file_path.parent() {
+        std::fs::create_dir_all(parent_dir)
+            .with_context(|| format!("unable to create outdir: {outdir}"))?;
+    }
+    let builder_forensics_file =
+        std::fs::File::create(&builder_forensics_file_path).with_context(|| {
+            format!("Failed to create builder forensics files: {builder_forensics_file_path}")
+        })?;
+    serde_json::to_writer_pretty(builder_forensics_file, &builder).with_context(|| {
+        format!("Writing builder forensics file to: {builder_forensics_file_path}")
+    })?;
+
+    // Do the actual building of everything for the Image Assembly config.
     let image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
     assembly_validate_product::validate_product(&image_assembly)?;
 
+    // Serialize out the Image Assembly configuration.
     let image_assembly_path = outdir.join("image_assembly.json");
-    let image_assembly_file = std::fs::File::create(&image_assembly_path)
-        .context(format!("Failed to create image assembly config file: {image_assembly_path}"))?;
-    serde_json::to_writer_pretty(image_assembly_file, &image_assembly)?;
+    let image_assembly_file = std::fs::File::create(&image_assembly_path).with_context(|| {
+        format!("Failed to create image assembly config file: {image_assembly_path}")
+    })?;
+    serde_json::to_writer_pretty(image_assembly_file, &image_assembly).with_context(|| {
+        format!("Writing image assembly config file: {builder_forensics_file_path}")
+    })?;
 
     Ok(())
 }

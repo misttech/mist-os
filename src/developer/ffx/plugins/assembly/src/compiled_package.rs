@@ -8,9 +8,10 @@ use assembly_config_schema::assembly_config::{CompiledPackageDefinition, MainPac
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
+use serde::Serialize;
 use std::collections::BTreeMap;
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct CompiledPackageBuilder {
     name: String,
     component_shards: BTreeMap<String, Vec<Utf8PathBuf>>,

@@ -22,10 +22,12 @@ use assembly_util::{DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapE
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
 type ConfigDataMap = BTreeMap<String, FileEntryMap>;
 
+#[derive(Debug, Serialize)]
 pub struct ImageAssemblyConfigBuilder {
     /// The base packages from the AssemblyInputBundles
     base: PackageSet,
@@ -614,7 +616,7 @@ fn remove_package_from_sets<'a, 'b: 'a, const N: usize>(
     Ok(matches_name)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct PackageEntry {
     path: Utf8PathBuf,
     manifest: PackageManifest,
@@ -633,7 +635,7 @@ impl PackageEntry {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize)]
 /// A named set of things, which are mapped by a String key.
 
 struct NamedMap<T> {
