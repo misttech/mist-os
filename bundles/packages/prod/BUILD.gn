@@ -202,13 +202,13 @@ group("tracing") {
 group("wlan_fullmac_core_drivers") {
   public_deps = [
     "//src/connectivity/wlan/drivers/wlanif",
-    "//src/connectivity/wlan/drivers/wlanphy:wlanphy_dfv2",
+    "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
   ]
 }
 
 group("wlan_softmac_core_drivers") {
   public_deps = [
-    "//src/connectivity/wlan/drivers/wlanphy:wlanphy_dfv2",
+    "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
     "//src/connectivity/wlan/drivers/wlansoftmac",
   ]
 }
