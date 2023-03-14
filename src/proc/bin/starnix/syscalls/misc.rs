@@ -37,6 +37,26 @@ pub fn sys_uname(current_task: &CurrentTask, name: UserRef<utsname_t>) -> Result
     Ok(())
 }
 
+// Used to read a hostname or domainname from task memory
+fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<Vec<u8>, Errno> {
+    let len = len as usize;
+
+    if len > 65 {
+        return error!(EINVAL);
+    }
+
+    // Read a maximum of 65 characters and mark the null terminator.
+    let mut buffer = [0; 65];
+    let name = current_task.mm.read_c_string(name, &mut buffer)?;
+
+    // Syscall may have specified an even smaller length, so trim to the requested length.
+    if len < name.len() {
+        Ok(name[..len].to_owned())
+    } else {
+        Ok(name.to_owned())
+    }
+}
+
 pub fn sys_sethostname(
     current_task: &CurrentTask,
     hostname: UserCString,
@@ -46,26 +66,11 @@ pub fn sys_sethostname(
         return error!(EPERM);
     }
 
-    let len = len as usize;
-
-    if len > 65 {
-        return error!(EINVAL);
-    }
-
-    // Read a maximum of 65 characters and mark the null terminator.
-    let mut buffer = [0; 65];
-    let new_hostname = current_task.mm.read_c_string(hostname, &mut buffer)?;
-
-    // Syscall may have specified an even smaller length, so trim to the requested length.
-    let new_hostname = if len < new_hostname.len() {
-        new_hostname[..len].to_owned()
-    } else {
-        new_hostname.to_owned()
-    };
+    let hostname = read_name(current_task, hostname, len)?;
 
     let task_state = current_task.read();
     let mut uts_ns = task_state.uts_ns.write();
-    uts_ns.hostname = new_hostname;
+    uts_ns.hostname = hostname;
 
     Ok(SUCCESS)
 }
@@ -79,26 +84,11 @@ pub fn sys_setdomainname(
         return error!(EPERM);
     }
 
-    let len = len as usize;
-
-    if len > 65 {
-        return error!(EINVAL);
-    }
-
-    // Read a maximum of 65 characters and mark the null terminator.
-    let mut buffer = [0; 65];
-    let new_domainname = current_task.mm.read_c_string(domainname, &mut buffer)?;
-
-    // Syscall may have specified an even smaller length, so trim to the requested length.
-    let new_domainname = if len < new_domainname.len() {
-        new_domainname[..len].to_owned()
-    } else {
-        new_domainname.to_owned()
-    };
+    let domainname = read_name(current_task, domainname, len)?;
 
     let task_state = current_task.read();
     let mut uts_ns = task_state.uts_ns.write();
-    uts_ns.domainname = new_domainname;
+    uts_ns.domainname = domainname;
 
     Ok(SUCCESS)
 }
