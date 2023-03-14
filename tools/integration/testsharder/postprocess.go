@@ -30,6 +30,9 @@ const (
 	// validation fails.
 	multipliedTestMaxRuns = 1000
 
+	// The maximum total runs across all automatically multiplied tests.
+	maxMultipliedRunsPerShard = 2000
+
 	// The maximum number of tests that a multiplier can match. testsharder will
 	// fail if this is exceeded.
 	maxMatchesPerMultiplier = 50
@@ -226,6 +229,16 @@ func SplitOutMultipliers(
 					bDuration := testDurations.Get(newShard.Tests[fillUpTestIdxs[b]]).MedianDuration
 					return aDuration > bDuration
 				})
+
+				// If a shard's tests generate many test cases in a short amount
+				// of time, the resulting summary.json file may be too large to
+				// be processed. So we set a limit on the total number of
+				// multiplied test runs across all tests in the shard.
+				maxRunsPerFillUpTest := multipliedTestMaxRuns
+				if len(fillUpTestIdxs) > 0 {
+					maxRunsPerFillUpTest = min(maxRunsPerFillUpTest, divRoundUp(maxMultipliedRunsPerShard, len(fillUpTestIdxs)))
+				}
+
 				for i := len(fillUpTestIdxs) - 1; i >= 0; i-- {
 					idx := fillUpTestIdxs[i]
 					test := newShard.Tests[idx]
@@ -233,8 +246,8 @@ func SplitOutMultipliers(
 						remainingDuration := max(0, int(targetDuration-usedUpDuration))
 						durationPerTest := divRoundUp(remainingDuration, len(fillUpTestIdxs))
 						testDuration := testDurations.Get(test).MedianDuration
-						test.Runs = min(multipliedTestMaxRuns, divRoundUp(durationPerTest, int(testDuration)))
-						usedUpDuration += time.Duration(min(int(testDuration)*multipliedTestMaxRuns, durationPerTest))
+						test.Runs = min(maxRunsPerFillUpTest, divRoundUp(durationPerTest, int(testDuration)))
+						usedUpDuration += time.Duration(min(int(testDuration)*maxRunsPerFillUpTest, durationPerTest))
 						test.Runs = max(1, test.Runs)
 						test.StopRepeatingAfterSecs = int(time.Duration(durationPerTest).Seconds())
 					} else if targetTestCount > 0 {

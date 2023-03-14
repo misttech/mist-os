@@ -287,11 +287,11 @@ func TestSplitOutMultipliers(t *testing.T) {
 			targetDuration: 10 * time.Second,
 			expected: []*Shard{
 				withStopRepeatingAfterSecs(
-					multShard(env1, "fuchsia", 1000, 10, 4, 5, 6, 1, 2, 3),
+					multShard(env1, "fuchsia", 334, 10, 4, 5, 6, 1, 2, 3),
 					// Tests are processed in reverse order (since they all
 					// have the same duration), so the earlier tests are given
 					// more time to repeat.
-					map[int]int{0: 5, 1: 3, 2: 2, 3: 2, 4: 1, 5: 1},
+					map[int]int{0: 8, 1: 4, 2: 2, 3: 2, 4: 1, 5: 1},
 				),
 			},
 		},
@@ -319,8 +319,8 @@ func TestSplitOutMultipliers(t *testing.T) {
 					// tests complete in half the time they were given, the
 					// remaining time was given to test 5 so that it could
 					// run the max times.
-					multShard(env1, "fuchsia", 1000, 10, 4, 5, 1, 2, 3),
-					map[int]int{0: 3, 1: 6, 2: 2, 3: 2, 4: 2},
+					multShard(env1, "fuchsia", 400, 10, 4, 5, 1, 2, 3),
+					map[int]int{0: 4, 1: 8, 2: 3, 3: 2, 4: 2},
 				),
 			},
 		},
