@@ -25,7 +25,7 @@ pub use crate::{
     package_archive::{cmd_package_archive_create, cmd_package_archive_extract},
     package_build::cmd_package_build,
     repo_create::cmd_repo_create,
-    repo_publish::cmd_repo_publish,
+    repo_publish::{cmd_repo_publish, repo_merge},
 };
 
 pub(crate) const PACKAGE_MANIFEST_NAME: &str = "package_manifest.json";

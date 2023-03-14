@@ -180,10 +180,19 @@ pub fn make_package_manifest(
     build_path: &Path,
     subpackages: Vec<(RelativePackageUrl, Hash, PathBuf)>,
 ) -> (PathBuf, PackageManifest) {
+    make_package_manifest_with_api_level(name, build_path, subpackages, 7)
+}
+
+pub fn make_package_manifest_with_api_level(
+    name: &str,
+    build_path: &Path,
+    subpackages: Vec<(RelativePackageUrl, Hash, PathBuf)>,
+    api_level: u64,
+) -> (PathBuf, PackageManifest) {
     let package_path = build_path.join(name);
 
     let mut builder = PackageBuilder::new(name);
-    builder.api_level(7).unwrap();
+    builder.api_level(api_level).unwrap();
 
     builder
         .add_contents_as_blob(

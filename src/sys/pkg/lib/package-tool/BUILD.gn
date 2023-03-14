@@ -19,9 +19,12 @@ if (is_host) {
     with_unit_tests = true
 
     deps = [
+      "//build/sdk/meta:rust",
+      "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//src/lib/fuchsia-async",
       "//src/lib/fuchsia-lockfile:lib",
       "//src/lib/versioning/version-history/rust:version-history",
+      "//src/sys/pkg/lib/fuchsia-hash",
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//src/sys/pkg/lib/fuchsia-repo",
       "//third_party/rust_crates:anyhow",
@@ -41,6 +44,7 @@ if (is_host) {
       ":test_tools",
       "//src/developer/ffx/lib/pkg:empty-repo-keys",
       "//src/developer/ffx/lib/pkg:empty-repo-metadata",
+      "//src/lib/assembly/partitions_config",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-url",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",

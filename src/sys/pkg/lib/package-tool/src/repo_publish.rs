@@ -6,7 +6,9 @@ use {
     crate::args::RepoPublishCommand,
     anyhow::{format_err, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
+    fidl_fuchsia_developer_ffx::ListFields,
     fuchsia_async as fasync,
+    fuchsia_hash::Hash,
     fuchsia_lockfile::Lockfile,
     fuchsia_pkg::PackageManifest,
     fuchsia_repo::{
@@ -17,10 +19,12 @@ use {
         repository::{Error as RepoError, PmRepository},
     },
     futures::StreamExt,
+    sdk_metadata::get_repositories,
     std::{
         collections::BTreeSet,
         fs::File,
         io::{BufReader, BufWriter, Write},
+        str::FromStr,
     },
     tracing::{error, info, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
@@ -116,6 +120,72 @@ async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
     let publish_result = repo_publish_oneshot(cmd).await;
     lock_file.unlock()?;
     publish_result
+}
+
+pub async fn repo_merge(
+    src_repo_path: Utf8PathBuf,
+    src_trusted_root_path: Utf8PathBuf,
+    dest_repo_path: Utf8PathBuf,
+    dest_trusted_keys: Utf8PathBuf,
+    dest_trusted_root_path: Utf8PathBuf,
+) -> Result<()> {
+    // Create repository based on src repository path
+    let blobs_dir = src_repo_path.join("blobs");
+    let src_repos = get_repositories(src_repo_path)?;
+    let mut package_manifests = Vec::new();
+    for src_repo in src_repos {
+        let buf = async_fs::read(&src_trusted_root_path)
+            .await
+            .with_context(|| format!("reading trusted root {src_trusted_root_path}"))?;
+        let trusted_root = RawSignedMetadata::new(buf);
+        let mut client = RepoClient::from_trusted_root(&trusted_root, &src_repo)
+            .await
+            .context("creating the src repo client")?;
+        client.update().await.context("updating the src repo metadata")?;
+        let packages =
+            client.list_packages(ListFields::empty()).await.context("listing packages")?;
+        for package in &packages {
+            package_manifests.push((
+                None,
+                PackageManifest::from_blobs_dir(
+                    blobs_dir.as_std_path(),
+                    Hash::from_str(
+                        &package.hash.clone().expect("package should have hash for meta.far"),
+                    )?,
+                )?,
+            ))
+        }
+    }
+
+    // Publish it to destination repository
+    let dir = dest_repo_path.join("repository");
+    if !dir.exists() {
+        error!("Destination repo dir does not exist: {}", &dir);
+    }
+    let lock_file = lock_repository(&dir).await?;
+
+    let dest_repo = PmRepository::builder(dest_repo_path.clone()).build();
+    let buf = async_fs::read(&dest_trusted_root_path)
+        .await
+        .with_context(|| format!("reading trusted root {dest_trusted_root_path}"))?;
+    let trusted_root = RawSignedMetadata::new(buf);
+    let dest_client = RepoClient::from_trusted_root(&trusted_root, &dest_repo).await?;
+
+    let mut deps = BTreeSet::new();
+    let repo_trusted_keys = read_repo_keys_if_exists(&mut deps, &dest_trusted_keys)?;
+
+    let repo_builder =
+        RepoBuilder::from_database(&dest_repo, &repo_trusted_keys, dest_client.database());
+
+    repo_builder
+        .refresh_metadata(true)
+        .add_package_manifests(package_manifests.into_iter())
+        .await?
+        .commit()
+        .await?;
+
+    lock_file.unlock()?;
+    Ok(())
 }
 
 async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
@@ -278,6 +348,7 @@ fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -
 mod tests {
     use {
         super::*,
+        assembly_partitions_config::PartitionsConfig,
         assert_matches::assert_matches,
         camino::{Utf8Path, Utf8PathBuf},
         chrono::{TimeZone, Utc},
@@ -285,6 +356,10 @@ mod tests {
         fuchsia_pkg::{PackageManifest, PackageManifestList},
         fuchsia_repo::{repository::CopyMode, test_utils},
         futures::FutureExt,
+        sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
+        serde_json::json,
+        std::fs::create_dir_all,
+        tempfile::TempDir,
         tuf::metadata::Metadata as _,
     };
 
@@ -922,5 +997,130 @@ mod tests {
         }
 
         // Test will timeout if the repository is not unlocked because of the error.
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_repo() {
+        // Prepare the package manifests. Initially, src repository contains
+        // package a' and package b, dest repository contains package a.
+        let tempdir = TempDir::new().unwrap();
+        let dir = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        let packages_path = dir.join("packages");
+        create_dir_all(&packages_path).unwrap();
+
+        // Package A
+        let pkga_manifest_path = packages_path.join("packagea.json");
+        let (_, pkga_manifest) = test_utils::make_package_manifest(
+            "packagea",
+            packages_path.join("pkga").as_std_path(),
+            Vec::new(),
+        );
+        serde_json::to_writer(File::create(&pkga_manifest_path).unwrap(), &pkga_manifest).unwrap();
+
+        // Package B
+        let pkgb_manifest_path = packages_path.join("packageb.json");
+        let (_, pkgb_manifest) = test_utils::make_package_manifest(
+            "packageb",
+            packages_path.join("pkgb").as_std_path(),
+            Vec::new(),
+        );
+        serde_json::to_writer(File::create(&pkgb_manifest_path).unwrap(), &pkgb_manifest).unwrap();
+
+        // Package A prime
+        let pkgaprime_manifest_path = packages_path.join("packageaprime.json");
+        let (_, pkgaprime_manifest) = test_utils::make_package_manifest_with_api_level(
+            "packagea",
+            packages_path.join("pkgaprime").as_std_path(),
+            Vec::new(),
+            5,
+        );
+        serde_json::to_writer(File::create(&pkgaprime_manifest_path).unwrap(), &pkgaprime_manifest)
+            .unwrap();
+
+        // Prepare src repo
+        let src_repo_path = dir.join("fuchsia");
+        let src_trusted_root = src_repo_path.join("repository").join("1.root.json");
+        create_dir_all(&src_repo_path).unwrap();
+        test_utils::make_pm_repository(&src_repo_path).await;
+        std::os::unix::fs::symlink(
+            src_repo_path.join("repository").join("blobs"),
+            src_repo_path.join("blobs"),
+        )
+        .unwrap();
+
+        let cmd = RepoPublishCommand {
+            package_manifests: vec![pkgaprime_manifest_path, pkgb_manifest_path],
+            repo_path: src_repo_path.to_path_buf(),
+            clean: true,
+            ..default_command_for_test()
+        };
+        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![Repository {
+                name: "fuchsia.com".into(),
+                metadata_path: src_repo_path.join("repository"),
+                blobs_path: src_repo_path.join("repository").join("blobs"),
+            }],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(&src_repo_path).unwrap();
+
+        // Prepare the dest repo
+        let dest_repo_path = dir.join("dest");
+        create_dir_all(&dest_repo_path).unwrap();
+        test_utils::make_pm_repository(&dest_repo_path).await;
+        let dest_trusted_root = dest_repo_path.join("repository").join("1.root.json");
+        let repo_keys_path = dest_repo_path.join("keys");
+
+        let cmd = RepoPublishCommand {
+            package_manifests: vec![pkga_manifest_path],
+            trusted_root: Some(dest_trusted_root.clone()),
+            trusted_keys: Some(repo_keys_path.clone()),
+            repo_path: dest_repo_path.to_path_buf(),
+            ..default_command_for_test()
+        };
+        repo_publish(&cmd).await.unwrap();
+
+        let repo = PmRepository::new(dest_repo_path.to_path_buf());
+        let mut repo_client = RepoClient::from_trusted_remote(repo).await.unwrap();
+        repo_client.update().await.unwrap();
+
+        let trusted_targets = repo_client.database().trusted_targets().unwrap();
+        assert_eq!(
+            trusted_targets.targets().get("packagea/0").unwrap().custom().get("merkle").unwrap(),
+            &json!("26f71e3012253d673813af8f73d59937b746159a72f25fb92b54459623993235")
+        );
+        assert!(trusted_targets.targets().get("packageb/0").is_none());
+
+        assert_matches!(
+            repo_merge(
+                src_repo_path,
+                src_trusted_root,
+                dest_repo_path,
+                repo_keys_path,
+                dest_trusted_root
+            )
+            .await,
+            Ok(())
+        );
+
+        // Validate merkle of package A is updated, and we can see package B.
+        repo_client.update().await.unwrap();
+        let trusted_targets = repo_client.database().trusted_targets().unwrap();
+        assert_eq!(
+            trusted_targets.targets().get("packagea/0").unwrap().custom().get("merkle").unwrap(),
+            &json!("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9")
+        );
+        assert!(trusted_targets.targets().get("packageb/0").is_some());
     }
 }
