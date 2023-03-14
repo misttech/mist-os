@@ -150,14 +150,6 @@ class __EXPORT VolumeManager {
   zx_status_t OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out);
 
  private:
-  // OpenManager, but using a pre-created fdio_t.
-  zx_status_t OpenClientWithCaller(fdio_cpp::UnownedFdioCaller& caller, const zx::duration& timeout,
-                                   zx::channel& out);
-
-  // Returns the topological path of the underlying block device, relative to
-  // |devfs_root_fd|
-  zx_status_t RelativeTopologicalPath(fdio_cpp::UnownedFdioCaller& caller, fbl::String* out);
-
   // The underlying block device, accessed over FDIO
   fbl::unique_fd block_dev_fd_;
 

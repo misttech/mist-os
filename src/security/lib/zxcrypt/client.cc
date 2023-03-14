@@ -12,7 +12,6 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
 #include <lib/zircon-internal/debug.h>
 #include <lib/zx/channel.h>
 #include <unistd.h>
@@ -24,6 +23,7 @@
 #include <fbl/string_buffer.h>
 #include <fbl/vector.h>
 
+#include "lib/stdcompat/string_view.h"
 #include "src/security/lib/kms-stateless/kms-stateless.h"
 
 #define ZXDEBUG 0
@@ -43,6 +43,25 @@ const char kHardwareKeyInfo[] = "zxcrypt";
 const size_t kMaxKeySourcePolicyLength = 32;
 const char kZxcryptConfigFileLocation1[] = "/pkg/config/zxcrypt";
 const char kZxcryptConfigFileLocation2[] = "/boot/config/zxcrypt";
+
+zx::result<fbl::String> RelativeTopologicalPath(
+    fidl::UnownedClientEnd<fuchsia_device::Controller> controller) {
+  const fidl::WireResult result = fidl::WireCall(controller)->GetTopologicalPath();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    return zx::error(response.error_value());
+  }
+  std::string_view path = response.value()->path.get();
+  constexpr std::string_view kSlashDevSlash = "/dev/";
+  if (!cpp20::starts_with(path, kSlashDevSlash)) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  path.remove_prefix(kSlashDevSlash.size());
+  return zx::ok(fbl::String(path));
+}
 
 }  // namespace
 
@@ -65,24 +84,23 @@ zx::result<KeySourcePolicy> SelectKeySourcePolicy() {
   if (len < 0) {
     xprintf("zxcrypt: couldn't read %s\n", file_used);
     return zx::error(ZX_ERR_IO);
-  } else {
-    // add null terminator
-    key_source_buf[len] = '\0';
-    // Dispatch if recognized
-    if (strcmp(key_source_buf, "null") == 0) {
-      return zx::ok(NullSource);
-    }
-    if (strcmp(key_source_buf, "tee") == 0) {
-      return zx::ok(TeeRequiredSource);
-    }
-    if (strcmp(key_source_buf, "tee-transitional") == 0) {
-      return zx::ok(TeeTransitionalSource);
-    }
-    if (strcmp(key_source_buf, "tee-opportunistic") == 0) {
-      return zx::ok(TeeOpportunisticSource);
-    }
-    return zx::error(ZX_ERR_BAD_STATE);
   }
+  // add null terminator
+  key_source_buf[len] = '\0';
+  // Dispatch if recognized
+  if (strcmp(key_source_buf, "null") == 0) {
+    return zx::ok(NullSource);
+  }
+  if (strcmp(key_source_buf, "tee") == 0) {
+    return zx::ok(TeeRequiredSource);
+  }
+  if (strcmp(key_source_buf, "tee-transitional") == 0) {
+    return zx::ok(TeeTransitionalSource);
+  }
+  if (strcmp(key_source_buf, "tee-opportunistic") == 0) {
+    return zx::ok(TeeOpportunisticSource);
+  }
+  return zx::error(ZX_ERR_BAD_STATE);
 }
 
 // Returns a ordered vector of |KeySource|s, representing all key sources,
@@ -282,19 +300,19 @@ zx_status_t VolumeManager::Unbind() {
 }
 
 zx_status_t VolumeManager::OpenInnerBlockDevice(const zx::duration& timeout, fbl::unique_fd* out) {
-  fbl::String path_base;
-
   fdio_cpp::UnownedFdioCaller caller(block_dev_fd_.get());
   if (!caller) {
     xprintf("could not convert fd to io\n");
     return ZX_ERR_BAD_STATE;
   }
 
-  if (zx_status_t status = RelativeTopologicalPath(caller, &path_base); status != ZX_OK) {
-    xprintf("could not get topological path: %s\n", zx_status_get_string(status));
-    return status;
+  zx::result path_base = RelativeTopologicalPath(caller.borrow_as<fuchsia_device::Controller>());
+  if (path_base.is_error()) {
+    xprintf("could not get topological path: %s\n", path_base.status_string());
+    return path_base.error_value();
   }
-  fbl::String path_block_exposed = fbl::String::Concat({path_base, "/zxcrypt/unsealed/block"});
+  fbl::String path_block_exposed =
+      fbl::String::Concat({path_base.value(), "/zxcrypt/unsealed/block"});
 
   // Wait for the unsealed and block devices to bind
   zx::result channel = device_watcher::RecursiveWaitForFile(devfs_root_fd_.get(),
@@ -318,25 +336,29 @@ zx_status_t VolumeManager::OpenClient(const zx::duration& timeout, zx::channel& 
     xprintf("could not convert fd to io\n");
     return ZX_ERR_BAD_STATE;
   }
-  return OpenClientWithCaller(caller, timeout, out);
-}
 
-zx_status_t VolumeManager::OpenClientWithCaller(fdio_cpp::UnownedFdioCaller& caller,
-                                                const zx::duration& timeout, zx::channel& out) {
-  fbl::String path_base;
-
-  if (zx_status_t status = RelativeTopologicalPath(caller, &path_base); status != ZX_OK) {
-    xprintf("could not get topological path: %s\n", zx_status_get_string(status));
-    return status;
+  zx::result path_base = RelativeTopologicalPath(caller.borrow_as<fuchsia_device::Controller>());
+  if (path_base.is_error()) {
+    xprintf("could not get topological path: %s\n", path_base.status_string());
+    return path_base.error_value();
   }
-  fbl::String path_manager = fbl::String::Concat({path_base, "/zxcrypt"});
+  fbl::String path_manager = fbl::String::Concat({path_base.value(), "/zxcrypt"});
 
-  if (fbl::unique_fd fd(openat(devfs_root_fd_.get(), path_manager.c_str(), O_RDONLY));
-      fd.is_valid()) {
-    if (zx_status_t status = fdio_get_service_handle(fd.release(), out.reset_and_get_address());
+  if (faccessat(devfs_root_fd_.get(), path_manager.c_str(), 0, F_OK) == 0) {
+    fdio_cpp::UnownedFdioCaller caller(devfs_root_fd_.get());
+    if (!caller) {
+      xprintf("could not convert fd to io\n");
+      return ZX_ERR_BAD_STATE;
+    }
+    zx::channel server;
+    if (zx_status_t status = zx::channel::create(0, &out, &server); status != ZX_OK) {
+      xprintf("failed to create channel: %s\n", zx_status_get_string(status));
+      return status;
+    }
+    if (zx_status_t status = fdio_service_connect_at(caller.borrow_channel(), path_manager.c_str(),
+                                                     server.release());
         status != ZX_OK) {
-      xprintf("failed to get service handle for zxcrypt manager: %s\n",
-              zx_status_get_string(status));
+      xprintf("failed to connect to zxcrypt manager: %s\n", zx_status_get_string(status));
       return status;
     }
     return ZX_OK;
@@ -365,51 +387,6 @@ zx_status_t VolumeManager::OpenClientWithCaller(fdio_cpp::UnownedFdioCaller& cal
     return channel.error_value();
   }
   out = std::move(channel.value());
-  return ZX_OK;
-}
-
-zx_status_t VolumeManager::RelativeTopologicalPath(fdio_cpp::UnownedFdioCaller& caller,
-                                                   fbl::String* out) {
-  zx_status_t rc;
-
-  // Get the full device path
-  fbl::StringBuffer<PATH_MAX - 1> path;
-  path.Resize(path.capacity());
-  size_t path_len;
-  auto resp = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->GetTopologicalPath();
-  rc = resp.status();
-  if (rc == ZX_OK) {
-    if (resp->is_error()) {
-      rc = resp->error_value();
-    } else {
-      auto& r = *resp->value();
-      path_len = r.path.size();
-      memcpy(path.data(), r.path.data(), r.path.size());
-    }
-  }
-
-  if (rc != ZX_OK) {
-    xprintf("could not find parent device: %s\n", zx_status_get_string(rc));
-    return rc;
-  }
-
-  // Verify that the path returned starts with "/dev/"
-  const char* kSlashDevSlash = "/dev/";
-  if (path_len < strlen(kSlashDevSlash)) {
-    xprintf("path_len way too short: %lu\n", path_len);
-    return ZX_ERR_INTERNAL;
-  }
-  if (strncmp(path.c_str(), kSlashDevSlash, strlen(kSlashDevSlash)) != 0) {
-    xprintf("Expected device path to start with '/dev/' but got %s\n", path.c_str());
-    return ZX_ERR_INTERNAL;
-  }
-
-  // Strip the leading "/dev/" and return the rest
-  size_t path_len_sans_dev = path_len - strlen(kSlashDevSlash);
-  memmove(path.begin(), path.begin() + strlen(kSlashDevSlash), path_len_sans_dev);
-
-  path.Resize(path_len_sans_dev);
-  *out = path.ToString();
   return ZX_OK;
 }
 
