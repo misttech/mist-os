@@ -6,7 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_GOLDFISH_DISPLAY_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -64,7 +64,9 @@ class Display : public DisplayType,
                                                           zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t collection,
-                                               uint32_t index);
+                                               uint32_t index) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
                                                 uint32_t index);
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
@@ -88,7 +90,9 @@ class Display : public DisplayType,
                                    size_t raw_eld_count) {}  // No ELD required for non-HDA systems.
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                  uint32_t collection);
+                                                                  uint32_t collection) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
                                                                    uint64_t collection_id);
   zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
@@ -206,7 +210,7 @@ class Display : public DisplayType,
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
-  std::unordered_map<uint64_t, fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+  std::unordered_map<uint64_t, fidl::SyncClient<fuchsia_sysmem::BufferCollection>>
       buffer_collections_;
 
   std::unique_ptr<RenderControl> rc_;
