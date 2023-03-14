@@ -349,11 +349,14 @@ TEST_F(DeviceTest, DelayInfo) {
   ASSERT_TRUE(SetControl(device_));
   ConnectToRingBufferAndExpectValidClient();
 
-  RetrieveDelayInfoAndExpect(62500, std::nullopt);
+  // Validate that the device received the expected values.
+  RetrieveDelayInfoAndExpect(0, std::nullopt);
+
+  // Validate that the ControlNotify was sent the expected values.
   ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified of initial delay info";
   ASSERT_TRUE(notify_->delay_info()->internal_delay());
-  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 62500);
-  EXPECT_EQ(notify_->delay_info()->external_delay().value_or(0), 0);
+  EXPECT_FALSE(notify_->delay_info()->external_delay());
+  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 0);
 }
 
 // TODO(fxbug.dev/117826): Unittest CalculateRequiredRingBufferSizes
@@ -438,14 +441,18 @@ TEST_F(DeviceTest, InitialDelayReceivedDuringCreateRingBuffer) {
   EXPECT_TRUE(connected_to_ring_buffer_fidl);
   RunLoopUntilIdle();
 
+  // Validate that the device received the expected values.
   EXPECT_TRUE(created_ring_buffer);
   ASSERT_TRUE(DeviceDelayInfo(device_));
-  EXPECT_EQ(DeviceDelayInfo(device_)->internal_delay().value_or(0), 62500);
-  EXPECT_EQ(DeviceDelayInfo(device_)->external_delay(), std::nullopt);
+  ASSERT_TRUE(DeviceDelayInfo(device_)->internal_delay());
+  EXPECT_FALSE(DeviceDelayInfo(device_)->external_delay());
+  EXPECT_EQ(*DeviceDelayInfo(device_)->internal_delay(), 0);
+
+  // Validate that the ControlNotify was sent the expected values.
   ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified of initial delay info";
   ASSERT_TRUE(notify_->delay_info()->internal_delay());
-  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 62500);
-  EXPECT_EQ(notify_->delay_info()->external_delay().value_or(0), 0);
+  EXPECT_FALSE(notify_->delay_info()->external_delay());
+  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 0);
 }
 
 TEST_F(DeviceTest, DynamicDelayInfo) {
@@ -461,8 +468,10 @@ TEST_F(DeviceTest, DynamicDelayInfo) {
   RunLoopUntilIdle();
 
   EXPECT_TRUE(created_ring_buffer);
-  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 62500);
-  EXPECT_EQ(notify_->delay_info()->external_delay().value_or(0), 0);
+  ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified of initial delay info";
+  ASSERT_TRUE(notify_->delay_info()->internal_delay());
+  EXPECT_FALSE(notify_->delay_info()->external_delay());
+  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 0);
   notify_->delay_info() = std::nullopt;
 
   RunLoopUntilIdle();
@@ -471,10 +480,12 @@ TEST_F(DeviceTest, DynamicDelayInfo) {
   fake_driver_->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
   RunLoopUntilIdle();
   ASSERT_TRUE(DeviceDelayInfo(device_));
+  ASSERT_TRUE(DeviceDelayInfo(device_)->internal_delay());
+  ASSERT_TRUE(DeviceDelayInfo(device_)->external_delay());
   EXPECT_EQ(*DeviceDelayInfo(device_)->internal_delay(), 123'456);
   EXPECT_EQ(*DeviceDelayInfo(device_)->external_delay(), 654'321);
 
-  ASSERT_TRUE(notify_->delay_info());
+  ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified with updated delay info";
   ASSERT_TRUE(notify_->delay_info()->internal_delay());
   ASSERT_TRUE(notify_->delay_info()->external_delay());
   EXPECT_EQ(*notify_->delay_info()->internal_delay(), 123'456);

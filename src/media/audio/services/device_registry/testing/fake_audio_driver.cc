@@ -314,13 +314,15 @@ void FakeAudioDriver::GetProperties(
   if (external_delay_.has_value()) {
     props.set_external_delay(external_delay_->to_nsecs());
   }
-  if (fifo_depth_.has_value()) {
-    props.set_driver_transfer_bytes(*fifo_depth_);
+  if (needs_cache_flush_or_invalidate_.has_value()) {
+    props.set_needs_cache_flush_or_invalidate(*needs_cache_flush_or_invalidate_);
   }
   if (turn_on_delay_.has_value()) {
     props.set_turn_on_delay(turn_on_delay_->to_nsecs());
   }
-  props.set_needs_cache_flush_or_invalidate(false);
+  if (driver_transfer_bytes_.has_value()) {
+    props.set_driver_transfer_bytes(*driver_transfer_bytes_);
+  }
   callback(std::move(props));
 }
 
@@ -447,13 +449,6 @@ void FakeAudioDriver::WatchDelayInfo(WatchDelayInfoCallback callback) {
   if (delay_has_changed_) {
     fuchsia::hardware::audio::DelayInfo delay_info = {};
 
-    if (fifo_depth_) {
-      auto fifo_related_delay =
-          // ns/sec * bytes * sample/byte * frame/sample * sec/frame => nanosec.
-          zx::duration(1'000'000'000ull * *fifo_depth_ / selected_format_->bytes_per_sample /
-                       selected_format_->number_of_channels / selected_format_->frame_rate);
-      internal_delay_ = std::max(internal_delay_.value_or(zx::nsec(0)), fifo_related_delay);
-    }
     if (internal_delay_) {
       delay_info.set_internal_delay(internal_delay_->to_nsecs());
     }

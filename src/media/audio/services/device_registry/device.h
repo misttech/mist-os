@@ -275,8 +275,8 @@ class Device : public std::enable_shared_from_this<Device>,
   std::optional<fuchsia_hardware_audio::Format> driver_format_;
 
   uint64_t bytes_per_frame_ = 0;
-  std::optional<uint32_t> min_ring_buffer_bytes_;
-  uint64_t min_ring_buffer_frames_;
+  std::optional<uint32_t> requested_ring_buffer_bytes_;
+  uint64_t requested_ring_buffer_frames_;
 
   uint64_t ring_buffer_producer_bytes_;
   uint64_t ring_buffer_consumer_bytes_;

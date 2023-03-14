@@ -24,6 +24,7 @@
 #include <string_view>
 
 #include "src/media/audio/lib/clock/real_clock.h"
+#include "src/media/audio/lib/timeline/timeline_rate.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
@@ -36,12 +37,7 @@ uint64_t NextTokenId() {
   return token_id++;
 }
 
-// statics
-//
-// When determining the RingBuffer VMO's size, we include a gap of 10 milliseconds between the
-// zone allocated to the producer and the zone allocated to the consumer.
-static inline constexpr zx::duration kRingBufferProducerConsumerGap = zx::msec(10);
-
+// static
 std::shared_ptr<Device> Device::Create(
     std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
     std::string_view name, fuchsia_audio_device::DeviceType device_type,
@@ -817,14 +813,14 @@ std::shared_ptr<ControlNotify> Device::GetControlNotify() {
 }
 
 bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
-                              uint32_t min_ring_buffer_bytes,
+                              uint32_t requested_ring_buffer_bytes,
                               fit::callback<void(RingBufferInfo)> create_ring_buffer_callback) {
   ADR_LOG_OBJECT(kLogRingBufferMethods);
   if (!ConnectRingBufferFidl(format)) {
     return false;
   }
 
-  min_ring_buffer_bytes_ = min_ring_buffer_bytes;
+  requested_ring_buffer_bytes_ = requested_ring_buffer_bytes;
   create_ring_buffer_callback_ = std::move(create_ring_buffer_callback);
 
   RetrieveRingBufferProperties();
@@ -951,18 +947,18 @@ void Device::RetrieveDelayInfo() {
         }
 
         delay_info_ = result->delay_info();
-        // If min_ring_buffer_bytes_ is already set, but num_ring_buffer_frames_ isn't, then we're
-        // getting delay info as part of creating a ring buffer. Otherwise, min_ring_buffer_bytes_
-        // must be set separately before calling GetVmo.
-        if (min_ring_buffer_bytes_ && !num_ring_buffer_frames_) {
-          // Needed, to set min_ring_buffer_frames_ before calling GetVmo.
+        // If requested_ring_buffer_bytes_ is already set, but num_ring_buffer_frames_ isn't, then
+        // we're getting delay info as part of creating a ring buffer. Otherwise,
+        // requested_ring_buffer_bytes_ must be set separately before calling GetVmo.
+        if (requested_ring_buffer_bytes_ && !num_ring_buffer_frames_) {
+          // Needed, to set requested_ring_buffer_frames_ before calling GetVmo.
           CalculateRequiredRingBufferSizes();
 
           FX_CHECK(device_info_->clock_domain());
           const auto clock_position_notifications_per_ring =
               *device_info_->clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic ? 0
                                                                                              : 2;
-          GetVmo(static_cast<uint32_t>(min_ring_buffer_frames_),
+          GetVmo(static_cast<uint32_t>(requested_ring_buffer_frames_),
                  clock_position_notifications_per_ring);
         }
 
@@ -1128,15 +1124,18 @@ void Device::StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback) {
       });
 }
 
+// Uses the VMO format and ring buffer properties, to set bytes_per_frame_,
+// requested_ring_buffer_frames_, ring_buffer_consumer_bytes_ and ring_buffer_producer_bytes_.
 void Device::CalculateRequiredRingBufferSizes() {
   ADR_LOG_OBJECT(kLogRingBufferMethods);
 
   FX_CHECK(vmo_format_.channel_count());
   FX_CHECK(vmo_format_.sample_type());
   FX_CHECK(vmo_format_.frames_per_second());
-  FX_CHECK(delay_info_);
-  FX_CHECK(delay_info_->internal_delay());
-  FX_CHECK(min_ring_buffer_bytes_);
+  FX_CHECK(ring_buffer_properties_);
+  FX_CHECK(ring_buffer_properties_->driver_transfer_bytes());
+  FX_CHECK(requested_ring_buffer_bytes_);
+  FX_CHECK(*requested_ring_buffer_bytes_ > 0);
 
   switch (*vmo_format_.sample_type()) {
     case fuchsia_audio::SampleType::kUint8:
@@ -1158,40 +1157,26 @@ void Device::CalculateRequiredRingBufferSizes() {
   }
   bytes_per_frame_ *= *vmo_format_.channel_count();
 
-  //
-  // Calculate the equivalent byte quantity, rounding up. (ns * frames/s * bytes/frame / ns/s)
-  uint32_t frame_rate = *vmo_format_.frames_per_second();
-  uint64_t driver_bytes =
-      (*delay_info_->internal_delay())
-          ? (frame_rate * bytes_per_frame_ * (*delay_info_->internal_delay()) - 1) / ZX_SEC(1) + 1
-          : 0;
-  uint64_t gap_bytes =
-      (frame_rate * bytes_per_frame_ * kRingBufferProducerConsumerGap.get() - 1) / ZX_SEC(1) + 1;
-  uint64_t client_bytes = *min_ring_buffer_bytes_;
+  requested_ring_buffer_frames_ = media::TimelineRate{1, bytes_per_frame_}.Scale(
+      *requested_ring_buffer_bytes_, media::TimelineRate::RoundingMode::Ceiling);
 
-  uint64_t driver_frames = (driver_bytes + bytes_per_frame_ - 1) / bytes_per_frame_;
-  uint64_t gap_frames = (gap_bytes + bytes_per_frame_ - 1) / bytes_per_frame_;
-  uint64_t client_frames = (client_bytes + bytes_per_frame_ - 1) / bytes_per_frame_;
-  min_ring_buffer_frames_ = gap_frames + driver_frames + client_frames;
-
-  // TODO(fxbug.dev/117887): Clarify whether driver, or client, is ultimately responsible for the
-  // TOTAL ring buffer size (including client requirements PLUS driver requirements). This code
-  // assumes that the client's `RingBuffer/GetVmo` parameter `min_frames` refers to the TOTAL
-  // requirement, so the driver need not re-incorporate their requirements (other than perhaps
-  // rounding up to the page, depending on limitations in the hardware DMA controller).
+  // We don't include driver transfer size in our VMO size request (requested_ring_buffer_frames_)
+  // ... but we do communicate it in our description of ring buffer producer/consumer "zones".
+  uint64_t driver_bytes = *ring_buffer_properties_->driver_transfer_bytes() + bytes_per_frame_ - 1;
+  driver_bytes -= (driver_bytes % bytes_per_frame_);
 
   if (*device_info_->device_type() == fuchsia_audio_device::DeviceType::kOutput) {
-    ring_buffer_producer_bytes_ = client_frames * bytes_per_frame_;
-    ring_buffer_consumer_bytes_ = driver_frames * bytes_per_frame_;
+    ring_buffer_consumer_bytes_ = driver_bytes;
+    ring_buffer_producer_bytes_ = requested_ring_buffer_frames_ * bytes_per_frame_;
   } else {
-    ring_buffer_consumer_bytes_ = client_frames * bytes_per_frame_;
-    ring_buffer_producer_bytes_ = driver_frames * bytes_per_frame_;
+    ring_buffer_producer_bytes_ = driver_bytes;
+    ring_buffer_consumer_bytes_ = requested_ring_buffer_frames_ * bytes_per_frame_;
   }
 
   // TODO(fxbug.dev/117826): validate this case; we don't surface this error to the caller.
-  if (min_ring_buffer_frames_ > std::numeric_limits<uint32_t>::max()) {
-    ADR_WARN_OBJECT() << "min_ring_buffer_frames_ cannot exceed uint32_t::max()";
-    min_ring_buffer_frames_ = std::numeric_limits<uint32_t>::max();
+  if (requested_ring_buffer_frames_ > std::numeric_limits<uint32_t>::max()) {
+    ADR_WARN_OBJECT() << "requested_ring_buffer_frames_ cannot exceed uint32_t::max()";
+    requested_ring_buffer_frames_ = std::numeric_limits<uint32_t>::max();
   }
 }
 

@@ -161,6 +161,10 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
     return selected_format_;
   }
 
+  void set_turn_on_delay(std::optional<zx::duration> turn_on_delay) {
+    turn_on_delay_ = turn_on_delay;
+  }
+
  private:
   static inline const std::string_view kClassName = "FakeAudioDriver";
 
@@ -238,14 +242,12 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
   size_t ring_buffer_size_;
   zx::vmo ring_buffer_;
 
-  // Although deprecated, fifo_depth (if set) directly affects internal_delay. In responses to
-  // WatchDelayInfo, we ensure that internal_delay is no less than what fifo_depth implies.
-  // For this reason, explicitly clearing internal_delay also clears fifo_depth.
-  std::optional<uint32_t> fifo_depth_;
-  // An arbitrarily-chosen non-zero delay -- 3 frames @ 48khz.
-  std::optional<zx::duration> internal_delay_{zx::nsec(62500)};
+  std::optional<zx::duration> internal_delay_ = zx::nsec(0);
   std::optional<zx::duration> external_delay_;
+  std::optional<bool> needs_cache_flush_or_invalidate_ = true;
   std::optional<zx::duration> turn_on_delay_;
+  // An arbitrarily-chosen transfer size -- 3 frames. At 48khz, this is 62.5 usec.
+  std::optional<uint32_t> driver_transfer_bytes_ = 12;
 
   std::optional<fuchsia::hardware::audio::PcmFormat> selected_format_;
 

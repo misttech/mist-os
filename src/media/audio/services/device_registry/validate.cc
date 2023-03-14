@@ -455,6 +455,14 @@ zx_status_t ValidateRingBufferProperties(
     FX_LOGS(WARNING) << "Reported RingBufferProperties.external_delay is negative";
     return ZX_ERR_OUT_OF_RANGE;
   }
+  if (!rb_props.driver_transfer_bytes()) {
+    FX_LOGS(WARNING) << "Reported RingBufferProperties.driver_transfer_bytes is missing";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (!rb_props.needs_cache_flush_or_invalidate()) {
+    FX_LOGS(WARNING) << "Reported RingBufferProperties.needs_cache_flush_or_invalidate is missing";
+    return ZX_ERR_INVALID_ARGS;
+  }
   return ZX_OK;
 }
 
@@ -528,7 +536,7 @@ zx_status_t ValidateDelayInfo(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // If we have (redundant) delay values from RingBufferProperties, double-check against those.
+  // If we have a (redundant) delay value from RingBufferProperties, double-check against that.
   if (rb_props) {
     if (rb_props->external_delay() && *rb_props->external_delay() != ext_delay) {
       FX_LOGS(WARNING) << "RingBufferProperties reported 'external_delay' ("

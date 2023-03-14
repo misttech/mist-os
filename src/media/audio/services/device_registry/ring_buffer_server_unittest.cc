@@ -194,7 +194,7 @@ TEST_F(RingBufferServerTest, CreateRingBufferReturnParameters) {
         EXPECT_GT(result->ring_buffer()->buffer()->size(), 2000u);
         EXPECT_THAT(result->ring_buffer()->format(), kDefaultRingBufferOptions.format());
         EXPECT_EQ(result->ring_buffer()->producer_bytes(), 2000u);
-        // consumer_bytes is minimal, based on fifo_depth/internal_delay
+        // consumer_bytes is minimal, based on driver_transfer_bytes
         EXPECT_EQ(result->ring_buffer()->consumer_bytes(), 12u);
         EXPECT_TRUE(result->ring_buffer()->reference_clock()->is_valid());
         EXPECT_EQ(result->ring_buffer()->reference_clock_domain().value_or(
@@ -374,8 +374,10 @@ TEST_F(RingBufferServerTest, StartAndStop) {
 }
 
 // Validate that RingBuffer/WatchDelayInfo notifies of the delay received during initialization.
+// While we are here, validate a non-default value for turn_on_delay.
 TEST_F(RingBufferServerTest, WatchDelayInfo) {
   auto fake_driver = CreateFakeDriverWithDefaults();
+  fake_driver->set_turn_on_delay(zx::msec(42));
   fake_driver->InjectDelayUpdate(zx::nsec(987'654'321), zx::nsec(123'456'789));
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
@@ -397,6 +399,9 @@ TEST_F(RingBufferServerTest, WatchDelayInfo) {
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result->properties());
+        ASSERT_TRUE(result->properties()->turn_on_delay());
+        EXPECT_THAT(result->properties()->turn_on_delay(), Optional(42'000'000));
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -409,8 +414,8 @@ TEST_F(RingBufferServerTest, WatchDelayInfo) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->delay_info());
-        ASSERT_TRUE(result->delay_info());
-        ASSERT_TRUE(result->delay_info());
+        ASSERT_TRUE(result->delay_info()->internal_delay());
+        ASSERT_TRUE(result->delay_info()->external_delay());
         EXPECT_THAT(result->delay_info()->internal_delay(), Optional(987'654'321u));
         EXPECT_THAT(result->delay_info()->external_delay(), Optional(123'456'789u));
       });
@@ -455,8 +460,9 @@ TEST_F(RingBufferServerTest, DynamicDelayUpdate) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->delay_info());
-        ASSERT_FALSE(result->delay_info()->external_delay());
-        EXPECT_THAT(result->delay_info()->internal_delay(), Optional(62500u));
+        ASSERT_TRUE(result->delay_info()->internal_delay());
+        EXPECT_FALSE(result->delay_info()->external_delay());
+        EXPECT_THAT(result->delay_info()->internal_delay(), Optional(0u));
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -467,7 +473,8 @@ TEST_F(RingBufferServerTest, DynamicDelayUpdate) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->delay_info());
-        ASSERT_TRUE(result->delay_info());
+        ASSERT_TRUE(result->delay_info()->internal_delay());
+        ASSERT_TRUE(result->delay_info()->external_delay());
         EXPECT_THAT(result->delay_info()->internal_delay(), Optional(987'654'321u));
         EXPECT_THAT(result->delay_info()->external_delay(), Optional(123'456'789u));
       });

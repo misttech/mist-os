@@ -386,8 +386,9 @@ TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhileAlreadyWatching) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->delay_info());
+        ASSERT_TRUE(result->delay_info()->internal_delay());
         ASSERT_FALSE(result->delay_info()->external_delay());
-        EXPECT_THAT(result->delay_info()->internal_delay(), Optional(62500u));
+        EXPECT_THAT(result->delay_info()->internal_delay(), Optional(0u));
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -417,17 +418,9 @@ TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhileAlreadyWatching) {
   ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
 }
 
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-//   unhealthy before SetActiveChannels. Expect Obs/Ctl/RB to drop & Reg/WatchRemoved.
-
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-//   unhealthy before Start. Expect Obs/Ctl/RB to drop & Reg/WatchRemoved.
-
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-//   unhealthy before Stop. Expect Obs/Ctl/RB to drop & Reg/WatchRemoved.
-
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-//   unhealthy before WatchDelayInfo. Expect Obs/Ctl/RB to drop & Reg/WatchRemoved.
+// TODO(fxbug/dev:117199): When Health can change post-initialization, test when Healthy device
+// becomes Unhealthy right before (1) SetActiveChannels, (2) Start, (3) Stop, (4) WatchDelayInfo.
+// In all four cases, expect Observers/Control/RingBuffer to drop and Registry/WatchDeviceRemoved.
 
 }  // namespace
 }  // namespace media_audio
