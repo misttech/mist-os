@@ -28,6 +28,7 @@ libs = [
   "schema",
   "sdk",
   "selector-maps",
+  "ssh",
   "stream_util",
   "symbol-index",
   "tasks",

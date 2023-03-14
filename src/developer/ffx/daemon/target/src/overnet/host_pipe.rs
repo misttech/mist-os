@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::ssh::build_ssh_command;
 use crate::{target::Target, RETRY_DELAY};
 use anyhow::{anyhow, Context, Result};
 use async_io::Async;
 use async_trait::async_trait;
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
+use ffx_ssh::ssh::build_ssh_command;
 use fuchsia_async::{unblock, Task, Timer};
 use futures::io::{copy_buf, AsyncBufRead, BufReader};
 use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
