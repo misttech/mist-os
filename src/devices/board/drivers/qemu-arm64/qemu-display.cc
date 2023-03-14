@@ -7,24 +7,31 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
 
 #include "qemu-bus.h"
 #include "qemu-virt.h"
-#include "src/devices/board/drivers/qemu-arm64/qemu_bus_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace board_qemu_arm64 {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-static const zx_bind_inst_t sysmem_match[] = {
-    BI_MATCH_IF(EQ, BIND_PROTOCOL, ZX_PROTOCOL_SYSMEM),
+const std::vector<fuchsia_driver_framework::BindRule> kSysmemRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
 };
-static const device_fragment_part_t sysmem_fragment[] = {
-    {std::size(sysmem_match), sysmem_match},
+
+const std::vector<fuchsia_driver_framework::NodeProperty> kSysmemProperties = {
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
 };
-static const device_fragment_t fragments[] = {
-    {"sysmem", std::size(sysmem_fragment), sysmem_fragment},
-};
+
+const std::vector<fuchsia_driver_framework::ParentSpec> kSysmemParents = {
+    fuchsia_driver_framework::ParentSpec{
+        {.bind_rules = kSysmemRules, .properties = kSysmemProperties}}};
 
 zx_status_t QemuArm64::DisplayInit() {
   fpbus::Node display_dev;
@@ -34,18 +41,21 @@ zx_status_t QemuArm64::DisplayInit() {
   display_dev.did() = PDEV_DID_FAKE_DISPLAY;
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DISP');
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, display_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, fragments, std::size(fragments)), {});
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Display(display_dev) request failed: %s",
-           __func__, result.FormatDescription().data());
-    return result.status();
+
+  auto spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "sysmem", .parents = kSysmemParents}};
+  fdf::WireUnownedResult display_result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, display_dev), fidl::ToWire(arena, spec));
+
+  if (!display_result.ok()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Display(display_dev) request failed: %s", __func__,
+           display_result.FormatDescription().data());
+    return display_result.status();
   }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Display(display_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  if (display_result->is_error()) {
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Display(display_dev) failed: %s", __func__,
+           zx_status_get_string(display_result->error_value()));
+    return display_result->error_value();
   }
   return ZX_OK;
 }

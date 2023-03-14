@@ -10,10 +10,12 @@
     program: {
         runner: "driver",
         bind: "meta/bind/fake-display-bind.bindbc",
-        colocate: "true",
+        colocate: "false",
         compat: "driver/fake-display.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.platform.device.Service" },
+    ],
 }

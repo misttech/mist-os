@@ -19,7 +19,10 @@ driver_bind_rules("fake-display-bind") {
   rules = "fake-display.bind"
   header_output = "fake-display-bind.h"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 fuchsia_driver("fake-display-driver") {
