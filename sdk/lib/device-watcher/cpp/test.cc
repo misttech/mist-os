@@ -15,11 +15,13 @@
 
 #include <fbl/ref_ptr.h>
 #include <fbl/unique_fd.h>
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/pseudo_file.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -39,7 +41,7 @@ TEST(DeviceWatcherTest, Smoke) {
   ASSERT_OK(first->AddEntry("file", file));
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints);
+  ASSERT_OK(endpoints.status_value());
   auto& [client, server] = endpoints.value();
 
   fs::ManagedVfs vfs(loop.dispatcher());
@@ -50,7 +52,7 @@ TEST(DeviceWatcherTest, Smoke) {
   fbl::unique_fd dir;
   ASSERT_OK(fdio_fd_create(client.TakeChannel().release(), dir.reset_and_get_address()));
 
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(dir.get(), "second/third/file"));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(dir.get(), "second/third/file").status_value());
 
   libsync::Completion shutdown_complete;
   vfs.Shutdown([&shutdown_complete](zx_status_t status) {
@@ -62,8 +64,51 @@ TEST(DeviceWatcherTest, Smoke) {
 }
 
 TEST(DeviceWatcherTest, OpenInNamespace) {
-  ASSERT_OK(device_watcher::RecursiveWaitForFile("/dev/sys/test"));
-  ASSERT_STATUS(device_watcher::RecursiveWaitForFile("/other-test/file"), ZX_ERR_NOT_FOUND);
+  ASSERT_OK(device_watcher::RecursiveWaitForFile("/dev/sys/test").status_value());
+  ASSERT_STATUS(ZX_ERR_NOT_FOUND,
+                device_watcher::RecursiveWaitForFile("/other-test/file").status_value());
+}
+
+TEST(DeviceWatcherTest, WatchDirectory) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(
+      [](fbl::String* output) { return ZX_OK; }, [](std::string_view input) { return ZX_OK; });
+  constexpr char file1_name[] = "file1";
+  constexpr char file2_name[] = "file2";
+  auto first = fbl::MakeRefCounted<fs::PseudoDir>();
+  ASSERT_OK(first->AddEntry(file1_name, file));
+  ASSERT_OK(first->AddEntry(file2_name, file));
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client, server] = endpoints.value();
+
+  fs::ManagedVfs vfs(loop.dispatcher());
+  ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
+  auto cleanup = fit::defer([&vfs]() {
+    libsync::Completion shutdown_complete;
+    vfs.Shutdown([&shutdown_complete](zx_status_t status) {
+      EXPECT_OK(status);
+      shutdown_complete.Signal();
+    });
+    shutdown_complete.Wait();
+  });
+
+  ASSERT_OK(loop.StartThread());
+
+  std::vector<std::string> file_names;
+  zx::result watch_result = device_watcher::WatchDirectoryForItems(
+      client, [&file_names](std::string_view file) -> zx_status_t {
+        file_names.emplace_back(file);
+        if (file_names.size() == 2) {
+          return ZX_ERR_STOP;
+        }
+        return ZX_OK;
+      });
+  ASSERT_STATUS(ZX_ERR_STOP, watch_result.status_value());
+
+  EXPECT_THAT(file_names,
+              testing::UnorderedElementsAre(std::string(file1_name), std::string(file2_name)));
 }
 
 TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
@@ -82,7 +127,7 @@ TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
   ASSERT_OK(first->AddEntry("file", file));
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints);
+  ASSERT_OK(endpoints.status_value());
   auto& [client, server] = endpoints.value();
 
   fs::ManagedVfs vfs(loop.dispatcher());
@@ -94,7 +139,7 @@ TEST(DeviceWatcherTest, DirWatcherWaitForRemoval) {
   ASSERT_OK(fdio_fd_create(client.TakeChannel().release(), dir.reset_and_get_address()));
   fbl::unique_fd sub_dir(openat(dir.get(), "second/third", O_DIRECTORY | O_RDONLY));
 
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(dir.get(), "second/third/file"));
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(dir.get(), "second/third/file").status_value());
 
   // Verify removal of the root directory file
   std::unique_ptr<device_watcher::DirWatcher> root_watcher;
@@ -128,7 +173,7 @@ TEST(DeviceWatcherTest, DirWatcherVerifyUnowned) {
   ASSERT_OK(first->AddEntry("file", file));
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints);
+  ASSERT_OK(endpoints.status_value());
   auto& [client, server] = endpoints.value();
 
   fs::ManagedVfs vfs(loop.dispatcher());

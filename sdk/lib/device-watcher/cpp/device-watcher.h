@@ -31,6 +31,16 @@ zx::result<zx::channel> RecursiveWaitForFile(int dir_fd, const char* path,
 zx::result<zx::channel> RecursiveWaitForFile(const char* path,
                                              zx::duration timeout = zx::duration::infinite());
 
+using ItemCallback = fit::function<zx_status_t(std::string_view)>;
+// Call the callback for each item in the directory, and wait for new items.
+//
+// This function will not call the callback for the '.' file in a directory.
+//
+// If the callback returns a status other than `ZX_OK`, watching stops and the callback's status is
+// returned to the caller of WatchDirectory.
+zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                    ItemCallback callback);
+
 // DirWatcher can be used to detect when a file has been removed from the filesystem.
 //
 // Example usage:

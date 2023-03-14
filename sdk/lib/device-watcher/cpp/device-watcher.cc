@@ -152,6 +152,36 @@ zx::result<zx::channel> RecursiveWaitForFile(const int dir_fd, std::string_view 
   return RecursiveWaitForFileHelper(dir_fd, target, zx::deadline_after(timeout));
 }
 
+struct ParsedWatchEvent {
+  size_t event_size() { return 2 + name.size(); }
+
+  fuchsia_io::wire::WatchEvent event;
+  std::string_view name;
+};
+
+zx::result<ParsedWatchEvent> ParseEvent(cpp20::span<uint8_t> buffer) {
+  if (buffer.size() < 2) {
+    return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
+  }
+  uint8_t len = buffer[1];
+  if (len + 2 > buffer.size()) {
+    return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
+  }
+
+  std::string_view name;
+  if (len != 0) {
+    name = std::string_view{reinterpret_cast<char*>(&buffer[2]), buffer[1]};
+  }
+  // Messages are of the form:
+  //  uint8_t event
+  //  uint8_t len
+  //  char* name
+  return zx::ok(ParsedWatchEvent{
+      .event = fuchsia_io::wire::WatchEvent(buffer[0]),
+      .name = name,
+  });
+}
+
 }  // namespace
 
 __EXPORT
@@ -193,6 +223,61 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path, zx::duration time
   }
   const auto close_dir = fit::defer([dir_fd]() { close(dir_fd); });
   return RecursiveWaitForFile(dir_fd, rest, timeout);
+}
+
+zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                    ItemCallback callback) {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::DirectoryWatcher>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  auto& [client, server] = endpoints.value();
+
+  auto watch_mask = fuchsia_io::wire::WatchMask::kAdded | fuchsia_io::wire::WatchMask::kExisting;
+  const fidl::WireResult result = fidl::WireCall(dir)->Watch(watch_mask, 0, std::move(server));
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  const fidl::WireResponse response = result.value();
+  if (zx_status_t status = response.s; status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  // Loop until our callback returns an error.
+  for (;;) {
+    zx_signals_t observed;
+    if (zx_status_t status =
+            client.channel().wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), &observed);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    if (!(observed & ZX_CHANNEL_READABLE)) {
+      return zx::error(ZX_ERR_IO);
+    }
+
+    uint8_t buf[fuchsia_io::wire::kMaxBuf];
+    uint32_t actual_len;
+    if (zx_status_t status =
+            client.channel().read(0, buf, nullptr, sizeof(buf), 0, &actual_len, nullptr);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    cpp20::span<uint8_t> buf_span{buf, actual_len};
+    while (buf_span.size() != 0) {
+      zx::result parsed_result = ParseEvent(buf_span);
+      if (parsed_result.is_error()) {
+        return parsed_result.take_error();
+      }
+      ParsedWatchEvent& parsed = parsed_result.value();
+      buf_span = buf_span.subspan(parsed.event_size());
+      if (parsed.name == ".") {
+        continue;
+      }
+      if (zx_status_t status = callback(parsed.name); status != ZX_OK) {
+        return zx::error(status);
+      }
+    }
+  }
 }
 
 }  // namespace device_watcher
