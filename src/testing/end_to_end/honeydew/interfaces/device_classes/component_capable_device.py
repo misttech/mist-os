@@ -7,6 +7,7 @@
 import abc
 
 from honeydew.interfaces.affordances import component
+from honeydew.utils import properties
 
 
 # pylint: disable=too-few-public-methods
@@ -14,7 +15,7 @@ class ComponentCapableDevice(abc.ABC):
     """Abstract base class to be implemented by a device which supports the
     Component affordance."""
 
-    @property
+    @properties.Affordance
     @abc.abstractmethod
     def component(self) -> component.Component:
         """Returns a component affordance object.
