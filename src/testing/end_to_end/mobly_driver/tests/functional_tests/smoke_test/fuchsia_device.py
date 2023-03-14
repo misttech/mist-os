@@ -4,13 +4,6 @@
 # found in the LICENSE file.
 """Simple Fuchsia Mobly controller.
 
-TODO(fxbug.dev/121515): Replace this file with HoneyDew.
-
-Placeholder class for experimentation while HoneyDew is still in development.
-However, this class is still useful for demostrating how custom device
-controllers (Auxillary devices like APs and RPI3) can be written and so can be
-used as a point of reference.
-
 This implements the required APIs to make this module compatible with Mobly.
  - create()
  - destroy()
@@ -31,7 +24,6 @@ def create(configs):
 
 def destroy(unused_devices):
     """Tears down the controller(s)."""
-    pass
 
 
 class FuchsiaDevice():
@@ -39,6 +31,3 @@ class FuchsiaDevice():
 
     def __init__(self, config):
         self._name = config[CONFIG_KEY_NAME]
-
-    def hello(self):
-        print(f'Hi, my name is {self._name}!')

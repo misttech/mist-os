@@ -9,12 +9,11 @@ import("//build/testing/host_test_data.gni")
 if (is_host) {
   # Define a Mobly `fuchsia_device` module.
   python_library("fuchsia_device") {
-    source_root = "."
     sources = [ "fuchsia_device.py" ]
   }
 
-  python_mobly_test("hello_world_test") {
-    main_source = "hello_world_test.py"
+  python_mobly_test("smoke_test") {
+    main_source = "mobly_driver_smoke_test.py"
     sources = [ "fuchsia_device.py" ]
 
     libraries = [ ":fuchsia_device" ]
@@ -37,5 +36,5 @@ if (is_host) {
 # We do not want failures from these tests to break the tree.
 group("fyi") {
   testonly = true
-  deps = [ ":hello_world_test($host_toolchain)" ]
+  deps = [ ":smoke_test($host_toolchain)" ]
 }
