@@ -26,7 +26,7 @@ protocol Registry {
     /// may change dynamically.
     /// * The initial state is indicated by `is_visible`.
     /// * The `Registry` consumer will update state by invoking
-    ///   methods on the provided `request<Listener>`.
+    ///   methods on the provided `server_end:Listener`.
     ///
     /// # Notes
     /// * The implementer may limit the number of simultaneous registrations

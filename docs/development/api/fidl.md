@@ -1474,8 +1474,8 @@ retained by the client is destroyed.
 ### Empty protocols
 
 Sometimes an empty protocol can provide value.  For example, a method that
-creates an object might also receive a `request<FooController>` parameter.  The
-caller provides an implementation of this empty protocol:
+creates an object might also receive a `server_end:FooController` parameter.
+The caller provides an implementation of this empty protocol:
 
 ```fidl
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/api_rubric.test.fidl" region_tag="empty" %}

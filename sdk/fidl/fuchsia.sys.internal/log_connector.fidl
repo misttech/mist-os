@@ -29,7 +29,7 @@ protocol LogConnector {
     /// Removes the `LogConnectionListener` from this realm, returning the request-side if it had not already been taken.
     /// Clients should bind an implementation to the `LogConnectionListener` protocol in order to receive LogSinks.
     ///
-    /// This method returns a `request<LogConnectionListener>` instead of accepting a `LogConnectionListener` directly
+    /// This method returns a `server_end:LogConnectionListener` instead of accepting a `LogConnectionListener` directly
     /// in order to allow appmgr to construct and buffer `LogConnectionListener` with `LogConnection`s.
     TakeLogConnectionListener() -> (resource struct {
         consumer server_end:<LogConnectionListener, optional>;

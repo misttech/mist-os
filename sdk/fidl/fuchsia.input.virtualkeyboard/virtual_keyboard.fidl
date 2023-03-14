@@ -54,7 +54,7 @@ type VisibilityChangeReason = flexible enum {
 @discoverable
 protocol ControllerCreator {
     /// Requests that the `Controller` at the other end of the
-    /// `request<Controller>` channel be associated with the `View`
+    /// `server_end:Controller` channel be associated with the `View`
     /// referenced by `view_ref`.
     ///
     /// When `Controller.RequestShow()` is called, the `Controller`
