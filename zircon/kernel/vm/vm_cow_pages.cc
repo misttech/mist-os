@@ -5772,7 +5772,14 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
     } else if (ktl::holds_alternative<VmCompressor::FailTag>(compression_result)) {
       // Compression failed, but the page back in.
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
+      // TODO(fxbug.dev/60238): Placing in a queue and then moving it is inefficient, but avoids
+      // needing to reason about whether reclamation could be manually attempted on pages that might
+      // otherwise not end up in the reclaimable queues.
       SetNotPinnedLocked(page, offset);
+      // TODO(fxbug.dev/60238): Marking this page as failing reclamation will prevent it from ever
+      // being tried again. As compression might succeed if the contents changes, we should consider
+      // moving the page out of this queue if it is modified.
+      pmm_page_queues()->CompressFailed(page);
       // Page stays owned by the VMO.
       page = nullptr;
     } else {
@@ -5832,7 +5839,8 @@ bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintActio
     return RemovePageForCompressionLocked(page, offset, compressor, guard);
   }
   // No other reclamation strategies, so to avoid this page remaining in a reclamation list we
-  // simulate an access.
+  // simulate an access. Do not want to place it in the ReclaimFailed queue since our failure was
+  // not based on page contents.
   UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
   // Keep a count as having no reclamation strategy is probably a sign of miss-configuration.
   vm_vmo_no_reclamation_strategy.Add(1);

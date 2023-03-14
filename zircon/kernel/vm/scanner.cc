@@ -89,7 +89,7 @@ void scanner_print_stats() {
   for (size_t i = 0; i < PageQueues::kNumReclaim; i++) {
     printf("[SCAN]: Found %lu reclaimable pages in queue %zu\n", queue_counts.reclaim[i], i);
   }
-  printf("[SCAN]: Found %lu reclaimable pages in DontNeed queue\n", queue_counts.reclaim_dont_need);
+  printf("[SCAN]: Found %lu failed reclaim pages\n", queue_counts.failed_reclaim);
   printf("[SCAN]: Found %lu zero forked pages\n", queue_counts.anonymous_zero_fork);
 
   DiscardableVmoTracker::DiscardablePageCounts counts =

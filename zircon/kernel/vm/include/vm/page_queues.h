@@ -134,6 +134,15 @@ class PageQueues {
   void MoveToPagerBackedDirty(vm_page_t* page);
   void MoveToAnonymousZeroFork(vm_page_t* page);
 
+  // Indicates that page has failed a compression attempted, and moves it to a separate queue to
+  // prevent it from being considered part of the reclaim set, which makes it neither active nor
+  // inactive. The specified page must be in the page queues, but if not presently in a reclaim
+  // queue this method will do nothing.
+  // TODO(fxbug.dev/60238): Determine whether/how pages are moved back into the reclaim pool and
+  // either further generalize this to support pager backed, or specialize FailedReclaim to be
+  // explicitly only anonymous.
+  void CompressFailed(vm_page_t* page);
+
   // Changes the backlink information for a page and should only be called by the page owner under
   // its lock (that is the VMO lock). The page must currently be in a valid page queue.
   void ChangeObjectOffset(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
@@ -247,11 +256,13 @@ class PageQueues {
     size_t anonymous = 0;
     size_t wired = 0;
     size_t anonymous_zero_fork = 0;
+    size_t failed_reclaim = 0;
 
     bool operator==(const Counts& other) const {
       return reclaim == other.reclaim && reclaim_dont_need == other.reclaim_dont_need &&
              anonymous == other.anonymous && wired == other.wired &&
-             anonymous_zero_fork == other.anonymous_zero_fork;
+             anonymous_zero_fork == other.anonymous_zero_fork &&
+             failed_reclaim == other.failed_reclaim;
     }
     bool operator!=(const Counts& other) const { return !(*this == other); }
   };
@@ -369,6 +380,7 @@ class PageQueues {
     PageQueueWired,
     PageQueueAnonymousZeroFork,
     PageQueuePagerBackedDirty,
+    PageQueueFailedReclaim,
     PageQueueReclaimDontNeed,
     PageQueueReclaimBase,
     PageQueueReclaimLast = PageQueueReclaimBase + kNumReclaim - 1,

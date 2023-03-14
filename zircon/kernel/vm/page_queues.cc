@@ -402,6 +402,7 @@ void PageQueues::Dump() {
   uint64_t lru_gen;
   size_t counts[kNumReclaim] = {};
   size_t inactive_count;
+  size_t failed_reclaim;
   zx_time_t last_age_time;
   AgeReason last_age_reason;
   ActiveInactiveCounts activeinactive;
@@ -409,6 +410,7 @@ void PageQueues::Dump() {
     Guard<SpinLock, IrqSave> guard{&lock_};
     mru_gen = mru_gen_.load(ktl::memory_order_relaxed);
     lru_gen = lru_gen_.load(ktl::memory_order_relaxed);
+    failed_reclaim = page_queue_counts_[PageQueueFailedReclaim].load(ktl::memory_order_relaxed);
     inactive_count = page_queue_counts_[PageQueueReclaimDontNeed].load(ktl::memory_order_relaxed);
     for (uint32_t i = 0; i < kNumReclaim; i++) {
       counts[i] = page_queue_counts_[PageQueueReclaimBase + i].load(ktl::memory_order_relaxed);
@@ -454,9 +456,10 @@ void PageQueues::Dump() {
          " set %ld.%lds ago due to \"%s\", LRU generation is %" PRIu64 "\n",
          mru_gen, age_time.tv_sec, age_time.tv_nsec, string_from_age_reason(last_age_reason),
          lru_gen);
-  printf("pq: Pager buckets %s evict first: %zu, %s active/inactive totals: %zu/%zu\n", buf,
-         inactive_count, activeinactive.cached ? "cached" : "live", activeinactive.active,
-         activeinactive.inactive);
+  printf(
+      "pq: Pager buckets %s evict first: %zu, %s active/inactive totals: %zu/%zu failed reclaim: %zu\n",
+      buf, inactive_count, activeinactive.cached ? "cached" : "live", activeinactive.active,
+      activeinactive.inactive, failed_reclaim);
 }
 
 // This runs the aging thread. Aging, unlike lru processing, scanning or eviction, requires very
@@ -1029,6 +1032,16 @@ void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
 #endif
 }
 
+void PageQueues::CompressFailed(vm_page_t* page) {
+  DeferPendingSignals dps{*this};
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  // Move the page if its currently in some kind of reclaimable queue.
+  if (queue_is_reclaim(static_cast<PageQueue>(
+          page->object.get_page_queue_ref().load(ktl::memory_order_relaxed)))) {
+    MoveToQueueLocked(page, PageQueueFailedReclaim, dps);
+  }
+}
+
 void PageQueues::ChangeObjectOffset(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
   Guard<SpinLock, IrqSave> guard{&lock_};
   ChangeObjectOffsetLocked(page, object, page_offset);
@@ -1195,6 +1208,8 @@ PageQueues::Counts PageQueues::QueueCounts() const {
   counts.wired = page_queue_counts_[PageQueueWired].load(ktl::memory_order_relaxed);
   counts.anonymous_zero_fork =
       page_queue_counts_[PageQueueAnonymousZeroFork].load(ktl::memory_order_relaxed);
+  counts.failed_reclaim =
+      page_queue_counts_[PageQueueFailedReclaim].load(ktl::memory_order_relaxed);
   return counts;
 }
 
