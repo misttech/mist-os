@@ -39,6 +39,7 @@ pub struct utsname_t {
     pub release: [u8; 65],
     pub version: [u8; 65],
     pub machine: [u8; 65],
+    pub domainname: [u8; 65],
 }
 
 #[cfg(target_arch = "x86_64")]

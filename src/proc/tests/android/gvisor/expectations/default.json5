@@ -1135,11 +1135,6 @@
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
 
-                // uname_test
-                "UnameTest.UnprivilegedSetNames",
-                "UnameTest.SetNames",
-                "UnameTest.UnshareUTS",
-
                 // vfork_test: Unknown why this fails, this is theoretically implemented.
                 "VforkTest.ParentStopsUntilChildExecves",
 

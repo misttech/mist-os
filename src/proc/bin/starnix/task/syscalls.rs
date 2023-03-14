@@ -11,6 +11,7 @@ use zerocopy::AsBytes;
 
 use crate::auth::{Credentials, SecureBits};
 use crate::execution::*;
+use crate::lock::RwLock;
 use crate::logging::{log, log_trace};
 use crate::mm::*;
 use crate::syscalls::*;
@@ -1051,7 +1052,7 @@ pub fn sys_setpriority(
 }
 
 pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> {
-    const IMPLEMENTED_FLAGS: u32 = CLONE_NEWNS;
+    const IMPLEMENTED_FLAGS: u32 = CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {
         not_implemented!(
             current_task,
@@ -1066,6 +1067,16 @@ pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> 
             return error!(EPERM);
         }
         current_task.fs().unshare_namespace();
+    }
+
+    if (flags & CLONE_NEWUTS) != 0 {
+        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+            return error!(EPERM);
+        }
+        // Fork the UTS namespace.
+        let mut task_state = current_task.write();
+        let new_uts_ns = task_state.uts_ns.read().clone();
+        task_state.uts_ns = Arc::new(RwLock::new(new_uts_ns));
     }
 
     Ok(())

@@ -91,6 +91,12 @@ pub struct Kernel {
     /// The thread pool to dispatch blocking calls to.
     pub thread_pool: DynamicThreadPool,
 
+    /// The default UTS namespace for all tasks.
+    ///
+    /// Because each task can have its own UTS namespace, you probably want to use
+    /// the UTS namespace handle of the task, which may/may not point to this one.
+    pub root_uts_ns: UtsNamespaceHandle,
+
     /// A VMO containing a vDSO implementation, if implemented for a given architecture.
     pub vdso: Option<Arc<zx::Vmo>>,
 }
@@ -170,6 +176,7 @@ impl Kernel {
             shared_futexes: Default::default(),
             file_server: FileServer::new(kernel.clone()),
             thread_pool: DynamicThreadPool::new(2),
+            root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: load_vdso_from_file().expect("Couldn't read vDSO from disk"),
         }))
     }

@@ -267,6 +267,7 @@ rustc_binary("starnix_kernel_bin") {
     "task/task.rs",
     "task/thread_group.rs",
     "task/timers.rs",
+    "task/uts_namespace.rs",
     "task/waiter.rs",
     "testing.rs",
     "trace.rs",

@@ -208,6 +208,15 @@ pub struct TaskMutableState {
 
     /// Desired scheduler policy for the task.
     pub scheduler_policy: SchedulerPolicy,
+
+    /// The UTS namespace assigned to this thread.
+    ///
+    /// This field is kept in the mutable state because the UTS namespace of a thread
+    /// can be forked using `clone()` or `unshare()` syscalls.
+    ///
+    /// We use UtsNamespaceHandle because the UTS properties can be modified
+    /// by any other thread that shares this namespace.
+    pub uts_ns: UtsNamespaceHandle,
 }
 
 pub enum ExceptionResult {
@@ -302,6 +311,7 @@ impl Task {
         exit_signal: Option<Signal>,
         vfork_event: Option<zx::Event>,
         priority: u8,
+        uts_ns: UtsNamespaceHandle,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -330,6 +340,7 @@ impl Task {
                 dump_on_exit: false,
                 priority,
                 scheduler_policy: Default::default(),
+                uts_ns,
             }),
         };
         #[cfg(any(test, debug_assertions))]
@@ -428,6 +439,7 @@ impl Task {
             None,
             None,
             DEFAULT_TASK_PRIORITY,
+            kernel.root_uts_ns.clone(),
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -470,6 +482,8 @@ impl Task {
         let clone_thread = flags & (CLONE_THREAD as u64) != 0;
         let clone_vm = flags & (CLONE_VM as u64) != 0;
         let clone_sighand = flags & (CLONE_SIGHAND as u64) != 0;
+
+        let new_uts = flags & (CLONE_NEWUTS as u64) != 0;
 
         if clone_sighand && !clone_vm {
             return error!(EINVAL);
@@ -515,7 +529,7 @@ impl Task {
         let command;
         let creds;
         let priority;
-
+        let uts_ns;
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
             let thread_group_state = self.thread_group.write();
@@ -525,6 +539,19 @@ impl Task {
             command = self.command();
             creds = self.creds();
             priority = state.priority;
+
+            uts_ns = if new_uts {
+                if !self.creds().has_capability(CAP_SYS_ADMIN) {
+                    return error!(EPERM);
+                }
+
+                // Fork the UTS namespace of the existing task.
+                let new_uts_ns = state.uts_ns.read().clone();
+                Arc::new(RwLock::new(new_uts_ns))
+            } else {
+                // Inherit the UTS of the existing task.
+                state.uts_ns.clone()
+            };
 
             if clone_thread {
                 create_zircon_thread(self)?
@@ -568,6 +595,7 @@ impl Task {
             child_exit_signal,
             vfork_event,
             priority,
+            uts_ns,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child

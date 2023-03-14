@@ -12,6 +12,7 @@ mod session;
 mod task;
 mod thread_group;
 mod timers;
+mod uts_namespace;
 mod waiter;
 
 #[cfg(target_arch = "x86_64")]
@@ -29,6 +30,7 @@ pub use session::*;
 pub use task::*;
 pub use thread_group::*;
 pub use timers::*;
+pub use uts_namespace::*;
 pub use waiter::*;
 
 pub mod syscalls;

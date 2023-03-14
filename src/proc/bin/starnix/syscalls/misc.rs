@@ -9,10 +9,9 @@ use crate::syscalls::decls::SyscallDecl;
 use crate::syscalls::*;
 
 pub fn sys_uname(current_task: &CurrentTask, name: UserRef<utsname_t>) -> Result<(), Errno> {
-    fn init_array(fixed: &mut [u8; 65], init: &'static str) {
-        let init_bytes = init.as_bytes();
+    fn init_array(fixed: &mut [u8; 65], init: &[u8]) {
         let len = init.len();
-        fixed[..len].copy_from_slice(init_bytes)
+        fixed[..len].copy_from_slice(init)
     }
 
     let mut result = utsname_t {
@@ -21,14 +20,87 @@ pub fn sys_uname(current_task: &CurrentTask, name: UserRef<utsname_t>) -> Result
         release: [0; 65],
         version: [0; 65],
         machine: [0; 65],
+        domainname: [0; 65],
     };
-    init_array(&mut result.sysname, "Linux");
-    init_array(&mut result.nodename, "local");
-    init_array(&mut result.release, "5.7.17-starnix");
-    init_array(&mut result.version, "starnix");
-    init_array(&mut result.machine, "x86_64");
+
+    // Get the UTS namespace from the perspective of this task.
+    let task_state = current_task.read();
+    let uts_ns = task_state.uts_ns.read();
+
+    init_array(&mut result.sysname, b"Linux");
+    init_array(&mut result.nodename, uts_ns.hostname.as_slice());
+    init_array(&mut result.release, b"5.7.17-starnix");
+    init_array(&mut result.version, b"starnix");
+    init_array(&mut result.machine, b"x86_64");
+    init_array(&mut result.domainname, uts_ns.domainname.as_slice());
     current_task.mm.write_object(name, &result)?;
     Ok(())
+}
+
+pub fn sys_sethostname(
+    current_task: &CurrentTask,
+    hostname: UserCString,
+    len: u64,
+) -> Result<SyscallResult, Errno> {
+    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+        return error!(EPERM);
+    }
+
+    let len = len as usize;
+
+    if len > 65 {
+        return error!(EINVAL);
+    }
+
+    // Read a maximum of 65 characters and mark the null terminator.
+    let mut buffer = [0; 65];
+    let new_hostname = current_task.mm.read_c_string(hostname, &mut buffer)?;
+
+    // Syscall may have specified an even smaller length, so trim to the requested length.
+    let new_hostname = if len < new_hostname.len() {
+        new_hostname[..len].to_owned()
+    } else {
+        new_hostname.to_owned()
+    };
+
+    let task_state = current_task.read();
+    let mut uts_ns = task_state.uts_ns.write();
+    uts_ns.hostname = new_hostname;
+
+    Ok(SUCCESS)
+}
+
+pub fn sys_setdomainname(
+    current_task: &CurrentTask,
+    domainname: UserCString,
+    len: u64,
+) -> Result<SyscallResult, Errno> {
+    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+        return error!(EPERM);
+    }
+
+    let len = len as usize;
+
+    if len > 65 {
+        return error!(EINVAL);
+    }
+
+    // Read a maximum of 65 characters and mark the null terminator.
+    let mut buffer = [0; 65];
+    let new_domainname = current_task.mm.read_c_string(domainname, &mut buffer)?;
+
+    // Syscall may have specified an even smaller length, so trim to the requested length.
+    let new_domainname = if len < new_domainname.len() {
+        new_domainname[..len].to_owned()
+    } else {
+        new_domainname.to_owned()
+    };
+
+    let task_state = current_task.read();
+    let mut uts_ns = task_state.uts_ns.write();
+    uts_ns.domainname = new_domainname;
+
+    Ok(SUCCESS)
 }
 
 pub fn sys_getrandom(
