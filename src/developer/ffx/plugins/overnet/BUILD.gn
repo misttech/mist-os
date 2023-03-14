@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_overnet_plugin") {
   version = "0.1.0"
@@ -11,10 +12,23 @@ ffx_plugin("ffx_overnet_plugin") {
   deps = [
     "//src/connectivity/overnet/lib/hoist",
     "//src/connectivity/overnet/lib/onet_tool",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
   ]
   args_deps = [ "//src/connectivity/overnet/lib/onet_tool" ]
 
   args_sources = [ "src/args.rs" ]
 
   sources = [ "src/lib.rs" ]
+}
+
+ffx_tool("ffx_overnet_plugin_tool") {
+  edition = "2021"
+  output_name = "ffx-overnet"
+  deps = [
+    ":ffx_overnet_plugin",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }

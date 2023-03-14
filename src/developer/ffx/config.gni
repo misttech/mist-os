@@ -31,6 +31,7 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/flutter:ffx_flutter",
   "//src/developer/ffx/plugins/inspect:ffx_inspect",
   "//src/developer/ffx/plugins/log:ffx_log",
+  "//src/developer/ffx/plugins/overnet:ffx_overnet_plugin",
   "//src/developer/ffx/plugins/package:ffx_package",
   "//src/developer/ffx/plugins/platform:ffx_platform",
   "//src/developer/ffx/plugins/power:ffx_power",
