@@ -95,9 +95,7 @@ class Controller : public DeviceType,
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
                                                uint32_t index);
   zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                uint32_t index) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+                                                uint32_t index);
   zx_status_t DisplayControllerImplImportImageForCapture(zx_unowned_handle_t collection_handle,
                                                          uint32_t index,
                                                          uint64_t* out_capture_handle) {
@@ -121,9 +119,7 @@ class Controller : public DeviceType,
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
                                                                   uint32_t collection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
-                                                                   uint64_t collection_id) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+                                                                   uint64_t collection_id);
   zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
                                                               uint32_t* out_stride) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -192,6 +188,8 @@ class Controller : public DeviceType,
     sysmem_ = std::move(sysmem);
     return InitSysmemAllocatorClient();
   }
+
+  zx_status_t InitGttForTesting(const ddk::Pci& pci, fdf::MmioBuffer buffer, uint32_t fb_offset);
 
   // For every frame, in order to use the imported image, it is required to set
   // up the image based on given rotation in GTT and use the handle offset in

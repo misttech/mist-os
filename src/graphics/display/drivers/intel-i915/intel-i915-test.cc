@@ -388,6 +388,111 @@ TEST(IntelI915Display, ImportBufferCollection) {
   loop.Shutdown();
 }
 
+fdf::MmioBuffer MakeMmioBuffer(uint8_t* buffer, size_t size) {
+  return fdf::MmioBuffer({
+      .vaddr = FakeMmioPtr(buffer),
+      .offset = 0,
+      .size = size,
+      .vmo = ZX_HANDLE_INVALID,
+  });
+}
+
+TEST(IntelI915Display, ImportImage) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  loop.StartThread("fidl-loop");
+
+  // Prepare fake sysmem.
+  FakeSysmem fake_sysmem(loop.dispatcher());
+  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+  ASSERT_TRUE(sysmem_endpoints.is_ok());
+  auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
+  fidl::BindServer(loop.dispatcher(), std::move(sysmem_server), &fake_sysmem);
+
+  // Prepare fake PCI.
+  pci::FakePciProtocol fake_pci;
+  ddk::Pci pci = fake_pci.SetUpFidlServer(loop);
+
+  // Initialize display controller and sysmem allocator.
+  Controller display(nullptr);
+  ASSERT_OK(display.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
+
+  // Initialize the GTT to the smallest allowed size (which is 2MB with the |gtt_size| bits of the
+  // graphics control register set to 0x01.
+  constexpr size_t kGraphicsTranslationTableSizeBytes = (1 << 21);
+  ASSERT_OK(pci.WriteConfig16(registers::GmchGfxControl::kAddr,
+                              registers::GmchGfxControl().set_gtt_size(0x01).reg_value()));
+  auto buffer = std::make_unique<uint8_t[]>(kGraphicsTranslationTableSizeBytes);
+  memset(buffer.get(), 0, kGraphicsTranslationTableSizeBytes);
+  fdf::MmioBuffer mmio = MakeMmioBuffer(buffer.get(), kGraphicsTranslationTableSizeBytes);
+  ASSERT_OK(display.InitGttForTesting(pci, std::move(mmio), /*fb_offset=*/0));
+
+  // Import buffer collection.
+  constexpr uint64_t kBufferCollectionId = 1u;
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
+  EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
+      kBufferCollectionId, token_endpoints->client.TakeChannel()));
+
+  const image_t kDefaultImage = {
+      .width = 32,
+      .height = 32,
+      .pixel_format = ZX_PIXEL_FORMAT_ARGB_8888,
+      .type = IMAGE_TYPE_SIMPLE,
+      .handle = 0u,
+  };
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints2(&kDefaultImage,
+                                                                         kBufferCollectionId));
+
+  // Invalid import: bad collection id
+  image_t invalid_image = kDefaultImage;
+  uint64_t kInvalidCollectionId = 100;
+  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kInvalidCollectionId, 0),
+            ZX_ERR_NOT_FOUND);
+
+  // Invalid import: bad index
+  invalid_image = kDefaultImage;
+  uint32_t kInvalidIndex = 100;
+  EXPECT_EQ(
+      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, kInvalidIndex),
+      ZX_ERR_OUT_OF_RANGE);
+
+  // Invalid import: bad type
+  invalid_image = kDefaultImage;
+  invalid_image.type = IMAGE_TYPE_CAPTURE;
+  EXPECT_EQ(
+      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, /*index=*/0),
+      ZX_ERR_INVALID_ARGS);
+
+  // Invalid import: non-sysmem format
+  invalid_image = kDefaultImage;
+  invalid_image.pixel_format = ZX_PIXEL_FORMAT_ARGB_2_10_10_10;
+  EXPECT_EQ(
+      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, /*index=*/0),
+      ZX_ERR_INVALID_ARGS);
+
+  // Invalid import: mismatched format
+  invalid_image = kDefaultImage;
+  invalid_image.pixel_format = ZX_PIXEL_FORMAT_NV12;
+  EXPECT_EQ(
+      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, /*index=*/0),
+      ZX_ERR_INVALID_ARGS);
+
+  // Valid import
+  image_t valid_image = kDefaultImage;
+  EXPECT_EQ(valid_image.handle, 0u);
+  EXPECT_OK(display.DisplayControllerImplImportImage2(&valid_image, kBufferCollectionId, 0));
+  EXPECT_NE(valid_image.handle, 0u);
+
+  display.DisplayControllerImplReleaseImage(&valid_image);
+
+  // Release buffer collection.
+  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBufferCollectionId));
+
+  // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
+  // may still have pending callbacks.
+  loop.Shutdown();
+}
+
 TEST(IntelI915Display, SysmemRequirements) {
   Controller display(nullptr);
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
