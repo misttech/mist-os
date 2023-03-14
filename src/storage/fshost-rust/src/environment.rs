@@ -502,7 +502,7 @@ async fn set_partition_max_size(device: &mut dyn Device, max_byte_size: u64) -> 
     }
 
     let index =
-        device.topological_path().find("/fvm").ok_or(anyhow!("fvm is not in the device path"))?;
+        device.topological_path().rfind("/fvm").ok_or(anyhow!("fvm is not in the device path"))?;
     // The 4 is from the 4 characters in "/fvm"
     let fvm_path = &device.topological_path()[..index + 4];
 
