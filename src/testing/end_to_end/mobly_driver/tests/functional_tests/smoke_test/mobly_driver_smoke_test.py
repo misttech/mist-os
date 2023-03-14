@@ -19,6 +19,7 @@ infra integration points:
 
 from mobly import asserts
 from mobly import base_test
+from mobly import test_runner
 import fuchsia_device
 
 
@@ -36,3 +37,7 @@ class MoblyDriverSmokeTest(base_test.BaseTestClass):
     def test_params_exist(self):
         """Test case to ensure test params are included in the Mobly config"""
         asserts.assert_true(self.user_params, 'Test params are missing.')
+
+
+if __name__ == '__main__':
+    test_runner.main()
