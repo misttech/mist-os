@@ -8,6 +8,8 @@
 
 #include <zxtest/zxtest.h>
 
+namespace amlogic_display {
+
 namespace {
 
 const display_setting_t kDisplaySettingsWithoutClockFactor = {
@@ -39,18 +41,20 @@ static display_setting_t display_types[] = {
     kDisplaySettingsWithoutClockFactor,
 };
 
-}  // namespace
-
 // For now, simply test that timing calculations don't segfault.
 TEST(AmlogicDisplayClock, PanelTiming) {
   for (const auto t : display_types) {
-    amlogic_display::Clock::CalculateLcdTiming(t);
+    Clock::CalculateLcdTiming(t);
   }
 }
 
 TEST(AmlogicDisplayClock, PllTiming_ValidMode) {
   for (const auto t : display_types) {
-    auto pll_r = amlogic_display::Clock::GenerateHPLL(t);
+    auto pll_r = Clock::GenerateHPLL(t);
     EXPECT_OK(pll_r);
   }
 }
+
+}  // namespace
+
+}  // namespace amlogic_display

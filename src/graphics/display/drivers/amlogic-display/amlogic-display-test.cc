@@ -17,6 +17,10 @@
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
 #include "src/lib/fsl/handles/object_info.h"
 
+namespace amlogic_display {
+
+namespace {
+
 namespace sysmem = fuchsia_sysmem;
 
 // TODO(fxbug.dev/121924): Consider creating and using a unified set of sysmem
@@ -302,11 +306,11 @@ class FakeSysmemTest : public zxtest::Test {
   FakeSysmemTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   void SetUp() override {
-    display_ = std::make_unique<amlogic_display::AmlogicDisplay>(/*parent=*/nullptr);
+    display_ = std::make_unique<AmlogicDisplay>(/*parent=*/nullptr);
     display_->SetFormatSupportCheck([](auto) { return true; });
     display_->SetCanvasForTesting(ddk::AmlogicCanvasProtocolClient(&canvas_.get_protocol()));
 
-    auto vout = std::make_unique<amlogic_display::Vout>();
+    auto vout = std::make_unique<Vout>();
     vout->InitDsiForTesting(/*panel_type=*/PANEL_TV070WSM_FT, /*width=*/1024, /*height=*/600);
     display_->SetVoutForTesting(std::move(vout));
 
@@ -338,7 +342,7 @@ class FakeSysmemTest : public zxtest::Test {
  protected:
   async::Loop loop_;
 
-  std::unique_ptr<amlogic_display::AmlogicDisplay> display_;
+  std::unique_ptr<AmlogicDisplay> display_;
   std::unique_ptr<MockAllocator> allocator_;
   FakeCanvasProtocol canvas_;
 };
@@ -550,7 +554,7 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
 }
 
 TEST(AmlogicDisplay, SysmemRequirements) {
-  amlogic_display::AmlogicDisplay display(nullptr);
+  AmlogicDisplay display(nullptr);
   display.SetFormatSupportCheck([](auto) { return true; });
   zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
   ASSERT_OK(buffer_collection_endpoints);
@@ -572,7 +576,7 @@ TEST(AmlogicDisplay, SysmemRequirements) {
 }
 
 TEST(AmlogicDisplay, SysmemRequirements_BgraOnly) {
-  amlogic_display::AmlogicDisplay display(nullptr);
+  AmlogicDisplay display(nullptr);
   display.SetFormatSupportCheck([](zx_pixel_format_t format) {
     return format == ZX_PIXEL_FORMAT_RGB_x888 || format == ZX_PIXEL_FORMAT_ARGB_8888;
   });
@@ -596,34 +600,34 @@ TEST(AmlogicDisplay, SysmemRequirements_BgraOnly) {
 
 TEST(AmlogicDisplay, FloatToFix3_10) {
   inspect::Inspector inspector;
-  EXPECT_EQ(0x0000, amlogic_display::Osd::FloatToFixed3_10(0.0f));
-  EXPECT_EQ(0x0066, amlogic_display::Osd::FloatToFixed3_10(0.1f));
-  EXPECT_EQ(0x1f9a, amlogic_display::Osd::FloatToFixed3_10(-0.1f));
+  EXPECT_EQ(0x0000, Osd::FloatToFixed3_10(0.0f));
+  EXPECT_EQ(0x0066, Osd::FloatToFixed3_10(0.1f));
+  EXPECT_EQ(0x1f9a, Osd::FloatToFixed3_10(-0.1f));
   // Test for maximum positive (<4)
-  EXPECT_EQ(0x0FFF, amlogic_display::Osd::FloatToFixed3_10(4.0f));
-  EXPECT_EQ(0x0FFF, amlogic_display::Osd::FloatToFixed3_10(40.0f));
-  EXPECT_EQ(0x0FFF, amlogic_display::Osd::FloatToFixed3_10(3.9999f));
+  EXPECT_EQ(0x0FFF, Osd::FloatToFixed3_10(4.0f));
+  EXPECT_EQ(0x0FFF, Osd::FloatToFixed3_10(40.0f));
+  EXPECT_EQ(0x0FFF, Osd::FloatToFixed3_10(3.9999f));
   // Test for minimum negative (>= -4)
-  EXPECT_EQ(0x1000, amlogic_display::Osd::FloatToFixed3_10(-4.0f));
-  EXPECT_EQ(0x1000, amlogic_display::Osd::FloatToFixed3_10(-14.0f));
+  EXPECT_EQ(0x1000, Osd::FloatToFixed3_10(-4.0f));
+  EXPECT_EQ(0x1000, Osd::FloatToFixed3_10(-14.0f));
 }
 
 TEST(AmlogicDisplay, FloatToFixed2_10) {
   inspect::Inspector inspector;
-  EXPECT_EQ(0x0000, amlogic_display::Osd::FloatToFixed2_10(0.0f));
-  EXPECT_EQ(0x0066, amlogic_display::Osd::FloatToFixed2_10(0.1f));
-  EXPECT_EQ(0x0f9a, amlogic_display::Osd::FloatToFixed2_10(-0.1f));
+  EXPECT_EQ(0x0000, Osd::FloatToFixed2_10(0.0f));
+  EXPECT_EQ(0x0066, Osd::FloatToFixed2_10(0.1f));
+  EXPECT_EQ(0x0f9a, Osd::FloatToFixed2_10(-0.1f));
   // Test for maximum positive (<2)
-  EXPECT_EQ(0x07FF, amlogic_display::Osd::FloatToFixed2_10(2.0f));
-  EXPECT_EQ(0x07FF, amlogic_display::Osd::FloatToFixed2_10(20.0f));
-  EXPECT_EQ(0x07FF, amlogic_display::Osd::FloatToFixed2_10(1.9999f));
+  EXPECT_EQ(0x07FF, Osd::FloatToFixed2_10(2.0f));
+  EXPECT_EQ(0x07FF, Osd::FloatToFixed2_10(20.0f));
+  EXPECT_EQ(0x07FF, Osd::FloatToFixed2_10(1.9999f));
   // Test for minimum negative (>= -2)
-  EXPECT_EQ(0x0800, amlogic_display::Osd::FloatToFixed2_10(-2.0f));
-  EXPECT_EQ(0x0800, amlogic_display::Osd::FloatToFixed2_10(-14.0f));
+  EXPECT_EQ(0x0800, Osd::FloatToFixed2_10(-2.0f));
+  EXPECT_EQ(0x0800, Osd::FloatToFixed2_10(-14.0f));
 }
 
 TEST(AmlogicDisplay, NoLeakCaptureCanvas) {
-  amlogic_display::AmlogicDisplay display(nullptr);
+  AmlogicDisplay display(nullptr);
   display.SetFormatSupportCheck([](auto) { return true; });
   zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
   ASSERT_OK(buffer_collection_endpoints);
@@ -644,3 +648,7 @@ TEST(AmlogicDisplay, NoLeakCaptureCanvas) {
 
   canvas.CheckThatNoEntriesInUse();
 }
+
+}  // namespace
+
+}  // namespace amlogic_display

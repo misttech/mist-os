@@ -4,12 +4,19 @@
 
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
-#include "zxtest/zxtest.h"
+#include <zxtest/zxtest.h>
 
+namespace amlogic_display {
+
+namespace {
 TEST(Vout, UnsupportedHdmi) {
-  auto vout = std::make_unique<amlogic_display::Vout>();
+  auto vout = std::make_unique<Vout>();
 
   // PowerOff and PowerOn should fail if Hdmi is not initialized.
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, vout->PowerOff().status_value());
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, vout->PowerOn().status_value());
 }
+
+}  // namespace
+
+}  // namespace amlogic_display
