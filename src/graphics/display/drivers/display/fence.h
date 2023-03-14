@@ -15,6 +15,7 @@
 #include <threads.h>
 
 #include <fbl/intrusive_double_list.h>
+#include <fbl/intrusive_single_list.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
@@ -34,7 +35,9 @@ class FenceCallback {
 // Class which wraps an event into a fence. A single Fence can have multiple FenceReference
 // objects, which allows an event to be treated as a semaphore independently of it being
 // imported/released (i.e. can be released while still in use).
-class Fence : public fbl::RefCounted<Fence>, public IdMappable<fbl::RefPtr<Fence>> {
+class Fence : public fbl::RefCounted<Fence>,
+              public IdMappable<fbl::RefPtr<Fence>>,
+              public fbl::SinglyLinkedListable<fbl::RefPtr<Fence>> {
  public:
   Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, uint64_t id, zx::event&& event);
   ~Fence();
