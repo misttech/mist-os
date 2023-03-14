@@ -26,6 +26,8 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   Vout() = default;
   zx_status_t InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t width, uint32_t height);
   zx_status_t InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi);
+  // Sets only the display size, feature bits and panel settings for testing.
+  zx_status_t InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height);
 
   zx_status_t RestartDisplay();
 

@@ -170,18 +170,6 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
   }
 
   buffer_collections_[collection_id] = fidl::WireSyncClient(std::move(collection_client_endpoint));
-
-  // TODO(fxbug.dev/121411): This BufferCollection is currently a placeholder so
-  // we need to set null constraints in order not to block the sysmem Allocator.
-  // Remove this once SetBufferCollectionConstraints() using `collection_id` is
-  // correctly implemented.
-  fidl::OneWayStatus status =
-      buffer_collections_.at(collection_id)->SetConstraints(/*has_constraints=*/false, {});
-  if (!status.ok()) {
-    zxlogf(ERROR, "Failed to set BufferCollection constraints: %s", status.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
   return ZX_OK;
 }
 
@@ -194,6 +182,19 @@ zx_status_t AmlogicDisplay::DisplayControllerImplReleaseBufferCollection(uint64_
   }
   buffer_collections_.erase(collection_id);
   return ZX_OK;
+}
+
+// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
+zx_status_t AmlogicDisplay::DisplayControllerImplImportImage2(image_t* image,
+                                                              uint64_t collection_id,
+                                                              uint32_t index) {
+  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    zxlogf(ERROR, "Cannot import Image on collection %lu: buffer collection doesn't exist",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplImportImage(
+      image, buffer_collections_.at(collection_id).client_end().handle()->get(), index);
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
@@ -554,6 +555,18 @@ zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel
   return ZX_OK;
 }
 
+zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
+    const image_t* config, uint64_t collection_id) {
+  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    zxlogf(ERROR,
+           "Cannot set buffer collection constraints for %lu: buffer collection doesn't exist",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplSetBufferCollectionConstraints(
+      config, buffer_collections_.at(collection_id).client_end().handle()->get());
+}
+
 zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, zx_unowned_handle_t handle) {
   fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{handle};
@@ -664,6 +677,18 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
   capture_intf_ = ddk::DisplayCaptureInterfaceProtocolClient(intf);
   capture_active_id_ = INVALID_ID;
   return ZX_OK;
+}
+
+zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture2(
+    uint64_t collection_id, uint32_t index, uint64_t* out_capture_handle) {
+  if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
+    zxlogf(ERROR, "Cannot import capture image on collection %lu: buffer collection doesn't exist",
+           collection_id);
+    return ZX_ERR_NOT_FOUND;
+  }
+  return DisplayControllerImplImportImageForCapture(
+      buffer_collections_.at(collection_id).client_end().handle()->get(), index,
+      out_capture_handle);
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(

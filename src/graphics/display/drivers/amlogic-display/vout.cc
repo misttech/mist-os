@@ -40,6 +40,31 @@ constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
     .hpd = true,
 };
 
+zx::result<display_setting_t> GetDisplaySettingForPanel(uint32_t panel_type) {
+  switch (panel_type) {
+    case PANEL_TV070WSM_FT:
+    case PANEL_TV070WSM_FT_9365:
+      return zx::ok(kDisplaySettingTV070WSM_FT);
+    case PANEL_P070ACB_FT:
+      return zx::ok(kDisplaySettingP070ACB_FT);
+    case PANEL_KD070D82_FT_9365:
+    case PANEL_KD070D82_FT:
+      return zx::ok(kDisplaySettingKD070D82_FT);
+    case PANEL_TV101WXM_FT_9365:
+    case PANEL_TV101WXM_FT:
+      return zx::ok(kDisplaySettingTV101WXM_FT);
+    case PANEL_G101B158_FT:
+      return zx::ok(kDisplaySettingG101B158_FT);
+    case PANEL_TV080WXM_FT:
+      return zx::ok(kDisplaySettingTV080WXM_FT);
+    case PANEL_TV070WSM_ST7703I:
+      return zx::ok(kDisplaySettingTV070WSM_ST7703I);
+    default:
+      DISP_ERROR("Unsupported panel detected!\n");
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
 }  // namespace
 
 zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t width,
@@ -77,35 +102,29 @@ zx_status_t Vout::InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t wid
   ZX_ASSERT(dsi_.clock);
 
   DISP_INFO("Fixed panel type is %d", dsi_.dsi_host->panel_type());
-  switch (dsi_.dsi_host->panel_type()) {
-    case PANEL_TV070WSM_FT:
-    case PANEL_TV070WSM_FT_9365:
-      dsi_.disp_setting = kDisplaySettingTV070WSM_FT;
-      break;
-    case PANEL_P070ACB_FT:
-      dsi_.disp_setting = kDisplaySettingP070ACB_FT;
-      break;
-    case PANEL_KD070D82_FT_9365:
-    case PANEL_KD070D82_FT:
-      dsi_.disp_setting = kDisplaySettingKD070D82_FT;
-      break;
-    case PANEL_TV101WXM_FT_9365:
-    case PANEL_TV101WXM_FT:
-      dsi_.disp_setting = kDisplaySettingTV101WXM_FT;
-      break;
-    case PANEL_G101B158_FT:
-      dsi_.disp_setting = kDisplaySettingG101B158_FT;
-      break;
-    case PANEL_TV080WXM_FT:
-      dsi_.disp_setting = kDisplaySettingTV080WXM_FT;
-      break;
-    case PANEL_TV070WSM_ST7703I:
-      dsi_.disp_setting = kDisplaySettingTV070WSM_ST7703I;
-      break;
-    default:
-      DISP_ERROR("Unsupported panel detected!\n");
-      return ZX_ERR_NOT_SUPPORTED;
+  zx::result display_setting = GetDisplaySettingForPanel(dsi_.dsi_host->panel_type());
+  if (display_setting.is_error()) {
+    return display_setting.error_value();
   }
+  dsi_.disp_setting = display_setting.value();
+  return ZX_OK;
+}
+
+zx_status_t Vout::InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height) {
+  type_ = VoutType::kDsi;
+
+  supports_afbc_ = kDsiSupportedFeatures.afbc;
+  supports_capture_ = kDsiSupportedFeatures.capture;
+  supports_hpd_ = kDsiSupportedFeatures.hpd;
+
+  dsi_.width = width;
+  dsi_.height = height;
+
+  zx::result display_setting = GetDisplaySettingForPanel(panel_type);
+  if (display_setting.is_error()) {
+    return display_setting.error_value();
+  }
+  dsi_.disp_setting = display_setting.value();
   return ZX_OK;
 }
 
