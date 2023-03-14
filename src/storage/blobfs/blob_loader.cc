@@ -68,10 +68,14 @@ zx::result<std::unique_ptr<BlobLoader>> BlobLoader::Create(
     FX_LOGS(ERROR) << "blobfs: Failed to attach read vmo: " << status.status_string();
     return status.take_error();
   }
+  auto detach = fit::defer([&] { static_cast<void>(read_mapper.Detach(txn_manager)); });
   zx::vmo sandbox_vmo;
   std::unique_ptr<ExternalDecompressorClient> decompressor_client = nullptr;
   if (decompression_connector) {
-    if (auto status = zx::vmo::create(kDecompressionBufferSize, 0, &sandbox_vmo); status != ZX_OK) {
+    if (zx_status_t status = zx::vmo::create(kDecompressionBufferSize, 0, &sandbox_vmo);
+        status != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to create VMO for decompression buffer: "
+                     << zx_status_get_string(status);
       return zx::error(status);
     }
     const char* name = "blobfs-sandbox";
@@ -79,11 +83,12 @@ zx::result<std::unique_ptr<BlobLoader>> BlobLoader::Create(
     zx::result<std::unique_ptr<ExternalDecompressorClient>> client_or =
         ExternalDecompressorClient::Create(decompression_connector, sandbox_vmo, read_mapper.vmo());
     if (!client_or.is_ok()) {
+      FX_LOGS(ERROR) << "Failed to create decompressor client: " << client_or.status_string();
       return client_or.take_error();
-    } else {
-      decompressor_client = std::move(client_or.value());
     }
+    decompressor_client = std::move(client_or).value();
   }
+  detach.cancel();
   return zx::ok(std::unique_ptr<BlobLoader>(new BlobLoader(
       txn_manager, block_iter_provider, node_finder, std::move(metrics), std::move(read_mapper),
       std::move(sandbox_vmo), std::move(decompressor_client))));

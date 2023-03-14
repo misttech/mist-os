@@ -5,9 +5,8 @@
 #include <fuchsia/blobfs/internal/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl/cpp/binding.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/syslog/cpp/log_settings.h>
 #include <lib/trace-provider/provider.h>
 
 #include "src/storage/blobfs/compression/decompressor_sandbox/decompressor_impl.h"
@@ -22,15 +21,10 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   blobfs::DecompressorImpl impl;
-  fidl::Binding<fuchsia::blobfs::internal::DecompressorCreator> binding(&impl);
-  fidl::InterfaceRequestHandler<fuchsia::blobfs::internal::DecompressorCreator> handler =
-      [&](fidl::InterfaceRequest<fuchsia::blobfs::internal::DecompressorCreator> request) {
-        binding.Bind(std::move(request));
-      };
-
+  fidl::BindingSet<fuchsia::blobfs::internal::DecompressorCreator> bindings;
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
   context->outgoing()->AddPublicService<fuchsia::blobfs::internal::DecompressorCreator>(
-      std::move(handler));
+      bindings.GetHandler(&impl));
 
   return loop.Run();
 }

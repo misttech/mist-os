@@ -196,26 +196,31 @@ void SetDeadlineProfile(thrd_t& thread) {
 
 void DecompressorImpl::Create(zx::fifo server_end, zx::vmo compressed_vmo, zx::vmo decompressed_vmo,
                               CreateCallback callback) {
+  FX_LOGS(INFO) << "Creating decompressor.";
   size_t vmo_size;
   zx_status_t status = decompressed_vmo.get_size(&vmo_size);
   if (status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to get `decompressed_vmo` size";
     return callback(status);
   }
 
   fzl::OwnedVmoMapper decompressed_mapper;
   status = decompressed_mapper.Map(std::move(decompressed_vmo), vmo_size);
   if (status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to map `decompressed_vmo`";
     return callback(status);
   }
 
   status = compressed_vmo.get_size(&vmo_size);
   if (status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to get `compressed_vmo` size";
     return callback(status);
   }
 
   fzl::OwnedVmoMapper compressed_mapper;
   status = compressed_mapper.Map(std::move(compressed_vmo), vmo_size, ZX_VM_PERM_READ);
   if (status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to map `compressed_vmo`";
     return callback(status);
   }
 
@@ -224,6 +229,7 @@ void DecompressorImpl::Create(zx::fifo server_end, zx::vmo compressed_vmo, zx::v
   *info = {std::move(server_end), std::move(compressed_mapper), std::move(decompressed_mapper)};
   if (thrd_create_with_name(&handler_thread, WatchFifoWrapper, info.release(),
                             "decompressor-fifo-thread") != thrd_success) {
+    FX_LOGS(ERROR) << "Failed to create decompressor FIFO thread!";
     return callback(ZX_ERR_INTERNAL);
   }
   SetDeadlineProfile(handler_thread);
