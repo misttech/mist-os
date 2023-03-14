@@ -70,6 +70,7 @@ if (is_host) {
     "mixed device types",
     "multiply",
     "multiply affected test",
+    "multiply affected tests with large number of runs",
     "multiply unaffected hermetic tests",
     "no tests",
     "run all tests if no affected tests",

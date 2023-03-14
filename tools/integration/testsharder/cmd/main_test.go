@@ -260,6 +260,31 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
+			name: "multiply affected tests with large number of runs",
+			flags: testsharderFlags{
+				affectedTestsMultiplyThreshold: 3,
+				targetDurationSecs:             int(5 * time.Minute.Seconds()),
+			},
+			testSpecs: []build.TestSpec{
+				fuchsiaTestSpec("affected-test1"),
+				fuchsiaTestSpec("affected-test2"),
+				fuchsiaTestSpec("affected-test3"),
+			},
+			testDurations: []build.TestDuration{
+				{
+					Name: "*",
+					// Test duration is very short relative to the target shard
+					// duration, so the tests should get multiplied many times.
+					MedianDuration: time.Millisecond,
+				},
+			},
+			affectedTests: []string{
+				packageURL("affected-test1"),
+				packageURL("affected-test2"),
+				packageURL("affected-test3"),
+			},
+		},
+		{
 			name: "test list with tags",
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("hermetic-test"),

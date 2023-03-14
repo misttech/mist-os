@@ -1,0 +1,74 @@
+[
+    {
+        "name": "affected:AEMU",
+        "tests": [
+            {
+                "name": "fuchsia-pkg://fuchsia.com/affected-test3#meta/affected-test3.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/affected-test3#meta/affected-test3.cm",
+                "path": "",
+                "label": "//src/something:affected-test3(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1000,
+                "run_algorithm": "STOP_ON_FAILURE",
+                "stop_repeating_after_secs": 298,
+                "affected": true,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "1"
+                    }
+                ]
+            },
+            {
+                "name": "fuchsia-pkg://fuchsia.com/affected-test1#meta/affected-test1.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/affected-test1#meta/affected-test1.cm",
+                "path": "",
+                "label": "//src/something:affected-test1(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1000,
+                "run_algorithm": "STOP_ON_FAILURE",
+                "stop_repeating_after_secs": 149,
+                "affected": true,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "1"
+                    }
+                ]
+            },
+            {
+                "name": "fuchsia-pkg://fuchsia.com/affected-test2#meta/affected-test2.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/affected-test2#meta/affected-test2.cm",
+                "path": "",
+                "label": "//src/something:affected-test2(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1000,
+                "run_algorithm": "STOP_ON_FAILURE",
+                "stop_repeating_after_secs": 100,
+                "affected": true,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "1"
+                    }
+                ]
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "device_type": "AEMU"
+            },
+            "image_overrides": {}
+        },
+        "timeout_secs": 1206,
+        "summary": {
+            "tests": null
+        }
+    }
+]
