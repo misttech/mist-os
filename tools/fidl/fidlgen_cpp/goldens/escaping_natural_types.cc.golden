@@ -11,3 +11,21 @@
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.__reserved)};
 }
+
+const char* ::test_escaping::kBasic = "'\"\\\n\r\t";
+
+const char* ::test_escaping::kNull = "\x00";
+
+const char* ::test_escaping::kMax = "\U0010ffff";
+
+const char* ::test_escaping::kSmileLiteral = "😀";
+
+const char* ::test_escaping::kSmileLower = "😀";
+
+const char* ::test_escaping::kSmileUpper = "😀";
+
+const char* ::test_escaping::kSmileLeadingZero = "😀";
+
+const char* ::test_escaping::kDollar = "$";
+
+const char* ::test_escaping::kDollarBrace = "${";

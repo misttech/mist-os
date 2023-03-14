@@ -22,5 +22,7 @@ fidl/{{ .LibraryDots }}/cpp/natural_types.cc
 {{ range .Tables }}{{ template "Table:NaturalTypesSource" . }}{{ end }}
 {{ range .Unions }}{{ template "Union:NaturalTypesSource" . }}{{ end }}
 
+{{ range .Consts }}{{ template "Const:NaturalTypesSource" . }}{{ end }}
+
 {{ EndOfFile }}
 {{- end }}

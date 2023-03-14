@@ -30,3 +30,10 @@ extern {{ .Decorator }} {{ .Type }} {{ .Name }};
 {{ .Decorator }} {{ .Type }} {{ .Name }} = {{ .Value }};
 {{- end }}
 {{- end }}
+
+{{- define "Const:NaturalTypesSource" }}
+{{- if .Extern }}
+{{ EnsureNamespace "" }}
+{{ .Decorator }} {{ .Type }} {{ . }} = {{ .Value }};
+{{- end }}
+{{- end }}

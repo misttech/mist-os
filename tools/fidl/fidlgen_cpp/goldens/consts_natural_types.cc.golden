@@ -6,3 +6,5 @@
 // fidl_experiment = unknown_interactions
 
 #include <fidl/test.consts/cpp/natural_types.h>
+
+const char* ::test_consts::kUsername = "\"squeenze\"";
