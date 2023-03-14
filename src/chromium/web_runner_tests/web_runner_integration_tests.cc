@@ -99,17 +99,27 @@ class ChromiumAppTest : public gtest::RealLoopFixture,
     auto realm_builder = RealmBuilder::Create();
     realm_builder.AddChild("context_provider",
                            "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cm");
-    // Capabilities that must be given to ContextProvider
+
+    // Capabilities that must be given to ContextProvider.
     realm_builder.AddRoute(Route{
-        .capabilities = {Protocol{"fuchsia.sys.Environment"}, Protocol{"fuchsia.logger.LogSink"}},
+        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+        // successful transition to CFv2. Alphabetize the rest.
+        .capabilities = {Protocol{"fuchsia.sys.Environment"}, Protocol{"fuchsia.logger.LogSink"},
+                         Protocol{"fuchsia.feedback.ComponentDataRegister"},
+                         Protocol{"fuchsia.feedback.CrashReportingProductRegister"},
+                         Directory{
+                             .name = "root-ssl-certificates",
+                             .rights = fuchsia::io::R_STAR_DIR,
+                         }},
         .source = ParentRef(),
         .targets = {ChildRef{"context_provider"}}});
 
-    // Expose all capabilities to the test
+    // Expose the ContextProvider capabilities to the test.
     realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.web.ContextProvider"}},
                                  .source = ChildRef{"context_provider"},
                                  .targets = {ParentRef()}});
-    realm_ = std::make_unique<component_testing::RealmRoot>(realm_builder.Build(dispatcher()));
+
+    realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
     auto incoming_service_clone = context_->svc()->CloneChannel();
     auto web_context_provider = realm_->component().Connect<fuchsia::web::ContextProvider>();
     web_context_provider.set_error_handler([](zx_status_t status) {

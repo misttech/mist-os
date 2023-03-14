@@ -29,32 +29,42 @@
         },
     ],
     use: [
-        // These are all the protocols that must be provided when
-        // creating a WebContext.
         {
+            // These must be provided when creating a `fuchsia.web.Context` that
+            // can render Frames in Scenic. "fuchsia.logger.LogSink" is provided
+            // via include above, and "fuchsia.ui.*" are provided below.
             protocol: [
                 "fuchsia.accessibility.semantics.SemanticsManager",
+
+                // "fuchsia.buildinfo.Provider", is provided below.
+                "fuchsia.device.NameProvider",
                 "fuchsia.fonts.Provider",
-                "fuchsia.logger.LogSink",
+                "fuchsia.hwinfo.Product",
+
+                // "fuchsia.intl.PropertyProvider", is provided below.
+                "fuchsia.kernel.VmexResource",
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.memorypressure.Provider",
-                "fuchsia.sys.Launcher",
+                "fuchsia.process.Launcher",
                 "fuchsia.sysmem.Allocator",
             ],
         },
-
-        // Also needed to create a WebContext but get it directly from the
-        // hermetic netstack component.
         {
-            protocol: "fuchsia.net.interfaces.State",
+            // Required for ContextFeatureFlags::NETWORK.
+            // Get these directly from the hermetic netstack component.
+            protocol: [
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.Lookup",
+
+                // This is also needed to launch a web server.
+                "fuchsia.posix.socket.Provider",
+            ],
             from: "#netstack",
         },
         {
             protocol: [
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input.ImeService",
-                "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",
@@ -68,9 +78,11 @@
             from: "#build_info",
         },
         {
-            // Needed to launch a web server
-            protocol: "fuchsia.posix.socket.Provider",
-            from: "#netstack",
+            protocol: [
+                // Included to suppress "proper `use` declaration "warnings.
+                "fuchsia.tracing.perfetto.ProducerConnector",
+            ],
+            availability: "optional",
         },
     ],
     offer: [
@@ -87,11 +99,28 @@
             to: "#realm_builder",
         },
         {
+            // Optionally used by ContextProvider. Offer them to suppress log messages.
+            protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.feedback.CrashReportingProductRegister",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
             directory: "config-data",
             from: "parent",
             as: "config-data",
             to: "#realm_builder",
             subdir: "web-runner-integration-test",
+        },
+        {
+            // Required for ContextFeatureFlags::NETWORK.
+            directory: "root-ssl-certificates",
+            from: "parent",
+            as: "root-ssl-certificates",
+            to: "#realm_builder",
+            availability: "required",
         },
         {
             protocol: [
