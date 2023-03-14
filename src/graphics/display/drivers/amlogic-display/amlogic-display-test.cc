@@ -36,7 +36,7 @@ class MockBufferCollectionBase
   virtual void VerifyName(const std::string& name) = 0;
 
   void SetConstraints(SetConstraintsRequestView request,
-                      SetConstraintsCompleter::Sync& _completer) override {
+                      SetConstraintsCompleter::Sync& completer) override {
     if (!request->has_constraints) {
       return;
     }
@@ -553,49 +553,64 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
   EXPECT_OK(display_->DisplayControllerImplReleaseBufferCollection(kBufferCollectionId));
 }
 
-TEST(AmlogicDisplay, SysmemRequirements) {
-  AmlogicDisplay display(nullptr);
-  display.SetFormatSupportCheck([](auto) { return true; });
-  zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
-  ASSERT_OK(buffer_collection_endpoints);
+TEST_F(FakeSysmemTest, SysmemRequirements) {
+  MockBufferCollectionBase* collection = nullptr;
+  allocator_->set_mock_buffer_collection_builder([&collection] {
+    const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
+        sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8};
+    auto new_buffer_collection = std::make_unique<MockBufferCollection>(kPixelFormatTypes);
+    collection = new_buffer_collection.get();
+    return new_buffer_collection;
+  });
 
-  MockBufferCollection collection(
-      {sysmem::wire::PixelFormatType::kBgra32, sysmem::wire::PixelFormatType::kR8G8B8A8});
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints);
+  auto& [token_client, token_server] = token_endpoints.value();
+
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+                                                                  token_client.TakeChannel()));
+
+  EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
   image_t image = {};
-  ASSERT_OK(fidl::BindSingleInFlightOnly(
-      loop.dispatcher(), std::move(buffer_collection_endpoints->server), &collection));
+  EXPECT_OK(
+      display_->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
 
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
-      &image, buffer_collection_endpoints->client.handle()->get()));
-
-  loop.RunUntilIdle();
-  EXPECT_TRUE(collection.set_constraints_called());
-  EXPECT_TRUE(collection.set_name_called());
+  EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
+  EXPECT_TRUE(collection->set_name_called());
 }
 
-TEST(AmlogicDisplay, SysmemRequirements_BgraOnly) {
-  AmlogicDisplay display(nullptr);
-  display.SetFormatSupportCheck([](zx_pixel_format_t format) {
+TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
+  MockBufferCollectionBase* collection = nullptr;
+  allocator_->set_mock_buffer_collection_builder([&collection] {
+    const std::vector<sysmem::wire::PixelFormatType> kPixelFormatTypes = {
+        sysmem::wire::PixelFormatType::kBgra32,
+    };
+    auto new_buffer_collection = std::make_unique<MockBufferCollection>(kPixelFormatTypes);
+    collection = new_buffer_collection.get();
+    return new_buffer_collection;
+  });
+  display_->SetFormatSupportCheck([](zx_pixel_format_t format) {
     return format == ZX_PIXEL_FORMAT_RGB_x888 || format == ZX_PIXEL_FORMAT_ARGB_8888;
   });
-  zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
-  ASSERT_OK(buffer_collection_endpoints);
 
-  MockBufferCollection collection({sysmem::wire::PixelFormatType::kBgra32});
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints);
+  auto& [token_client, token_server] = token_endpoints.value();
+
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+                                                                  token_client.TakeChannel()));
+
+  EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
   image_t image = {};
-  ASSERT_OK(fidl::BindSingleInFlightOnly(
-      loop.dispatcher(), std::move(buffer_collection_endpoints->server), &collection));
+  EXPECT_OK(
+      display_->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
 
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(
-      &image, buffer_collection_endpoints->client.handle()->get()));
-
-  loop.RunUntilIdle();
-  EXPECT_TRUE(collection.set_constraints_called());
-  EXPECT_TRUE(collection.set_name_called());
+  EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
+  EXPECT_TRUE(collection->set_name_called());
 }
 
 TEST(AmlogicDisplay, FloatToFix3_10) {
@@ -626,27 +641,24 @@ TEST(AmlogicDisplay, FloatToFixed2_10) {
   EXPECT_EQ(0x0800, Osd::FloatToFixed2_10(-14.0f));
 }
 
-TEST(AmlogicDisplay, NoLeakCaptureCanvas) {
-  AmlogicDisplay display(nullptr);
-  display.SetFormatSupportCheck([](auto) { return true; });
-  zx::result buffer_collection_endpoints = fidl::CreateEndpoints<sysmem::BufferCollection>();
-  ASSERT_OK(buffer_collection_endpoints);
+TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
+  allocator_->set_mock_buffer_collection_builder(
+      [] { return std::make_unique<MockBufferCollectionForCapture>(); });
 
-  MockBufferCollectionForCapture collection;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  ASSERT_OK(token_endpoints);
+  auto& [token_client, token_server] = token_endpoints.value();
 
-  ASSERT_OK(fidl::BindSingleInFlightOnly(
-      loop.dispatcher(), std::move(buffer_collection_endpoints->server), &collection));
-  loop.StartThread("sysmem-thread");
-  FakeCanvasProtocol canvas;
-  display.SetCanvasForTesting(ddk::AmlogicCanvasProtocolClient(&canvas.get_protocol()));
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBufferCollectionId,
+                                                                  token_client.TakeChannel()));
 
   uint64_t capture_handle;
-  EXPECT_OK(display.DisplayControllerImplImportImageForCapture(
-      buffer_collection_endpoints->client.handle()->get(), 0, &capture_handle));
-  EXPECT_OK(display.DisplayControllerImplReleaseCapture(capture_handle));
+  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture2(kBufferCollectionId, /*index=*/0,
+                                                                  &capture_handle));
+  EXPECT_OK(display_->DisplayControllerImplReleaseCapture(capture_handle));
 
-  canvas.CheckThatNoEntriesInUse();
+  canvas_.CheckThatNoEntriesInUse();
 }
 
 }  // namespace

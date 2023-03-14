@@ -193,14 +193,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage2(image_t* image,
            collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplImportImage(
-      image, buffer_collections_.at(collection_id).client_end().handle()->get(), index);
-}
 
-// part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
-zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
-                                                             zx_unowned_handle_t handle,
-                                                             uint32_t index) {
   zx_status_t status = ZX_OK;
   auto import_info = std::make_unique<ImageInfo>();
   if (import_info == nullptr) {
@@ -212,8 +205,9 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
     return status;
   }
 
-  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{zx::unowned_channel(handle)};
-  fidl::WireResult check_result = fidl::WireCall(collection)->CheckBuffersAllocated();
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection =
+      buffer_collections_.at(collection_id);
+  fidl::WireResult check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -228,7 +222,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image,
     return check_response.status;
   }
 
-  fidl::WireResult wait_result = fidl::WireCall(collection)->WaitForBuffersAllocated();
+  fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -563,13 +557,9 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints2
            collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplSetBufferCollectionConstraints(
-      config, buffer_collections_.at(collection_id).client_end().handle()->get());
-}
 
-zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, zx_unowned_handle_t handle) {
-  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{handle};
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection =
+      buffer_collections_.at(collection_id);
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
   const char* buffer_name;
   if (config->type == IMAGE_TYPE_CAPTURE) {
@@ -642,13 +632,12 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   // application priorities.
   constexpr uint32_t kNamePriority = 10;
   fidl::OneWayStatus name_res =
-      fidl::WireCall(collection)
-          ->SetName(kNamePriority, fidl::StringView::FromExternal(buffer_name));
+      collection->SetName(kNamePriority, fidl::StringView::FromExternal(buffer_name));
   if (!name_res.ok()) {
     DISP_ERROR("Failed to set name: %d", name_res.status());
     return name_res.status();
   }
-  fidl::OneWayStatus res = fidl::WireCall(collection)->SetConstraints(true, constraints);
+  fidl::OneWayStatus res = collection->SetConstraints(true, constraints);
   if (!res.ok()) {
     DISP_ERROR("Failed to set constraints: %d", res.status());
     return res.status();
@@ -686,21 +675,15 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture2(
            collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplImportImageForCapture(
-      buffer_collections_.at(collection_id).client_end().handle()->get(), index,
-      out_capture_handle);
-}
 
-zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
-    zx_unowned_handle_t collection_handle, uint32_t index, uint64_t* out_capture_handle) {
-  fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> collection{
-      zx::unowned_channel(collection_handle)};
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection =
+      buffer_collections_.at(collection_id);
   auto import_capture = std::make_unique<ImageInfo>();
   if (import_capture == nullptr) {
     return ZX_ERR_NO_MEMORY;
   }
   fbl::AutoLock lock(&capture_lock_);
-  fidl::WireResult check_result = fidl::WireCall(collection)->CheckBuffersAllocated();
+  fidl::WireResult check_result = collection->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -715,7 +698,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
     return check_response.status;
   }
 
-  fidl::WireResult wait_result = fidl::WireCall(collection)->WaitForBuffersAllocated();
+  fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
