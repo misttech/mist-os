@@ -5,10 +5,7 @@
     program: {
         runner: "starnix",
         apex_hack: [],
-        features: [
-            "magma",
-            "wayland",
-        ],
+        features: [ "magma" ],
         init: [],
         init_user: "root:x:0:0",
         kernel_cmdline: "",

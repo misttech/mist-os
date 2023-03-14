@@ -414,18 +414,6 @@ impl Socket {
         self.ops.read(self, current_task, data, flags)
     }
 
-    /// Reads all the available messages out of this socket, blocking if no messages are immediately
-    /// available.
-    ///
-    /// Returns `Err` if the socket was shutdown or not a UnixSocket.
-    pub fn blocking_read_kernel(&self) -> Result<Vec<Message>, Errno> {
-        if let Some(socket) = self.downcast_socket::<UnixSocket>() {
-            socket.blocking_read_kernel(self)
-        } else {
-            error!(EOPNOTSUPP)
-        }
-    }
-
     pub fn write(
         &self,
         current_task: &CurrentTask,
@@ -434,21 +422,6 @@ impl Socket {
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
         self.ops.write(self, current_task, data, dest_address, ancillary_data)
-    }
-
-    /// Writes the provided message into this socket. If the write succeeds, all the bytes were
-    /// written.
-    ///
-    /// # Parameters
-    /// - `message`: The message to write.
-    ///
-    /// Returns an error if the socket is not connected or not a UnixSocket.
-    pub fn write_kernel(&self, message: Message) -> Result<(), Errno> {
-        if let Some(socket) = self.downcast_socket::<UnixSocket>() {
-            socket.write_kernel(message)
-        } else {
-            error!(EOPNOTSUPP)
-        }
     }
 
     pub fn wait_async(
@@ -501,47 +474,6 @@ impl AcceptQueue {
 mod tests {
     use super::*;
     use crate::testing::*;
-
-    #[::fuchsia::test]
-    fn test_read_write_kernel() {
-        let (kernel, current_task) = create_kernel_and_task();
-        let socket =
-            Socket::new(&kernel, SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
-                .expect("Failed to create socket.");
-        socket
-            .bind(&current_task, SocketAddress::Unix(b"\0".to_vec()))
-            .expect("Failed to bind socket.");
-        socket.listen(10, current_task.as_ucred()).expect("Failed to listen.");
-        assert_eq!(FdEvents::empty(), socket.query_events(&current_task));
-        let connecting_socket =
-            Socket::new(&kernel, SocketDomain::Unix, SocketType::Stream, SocketProtocol::default())
-                .expect("Failed to create socket.");
-        connecting_socket
-            .connect(&current_task, SocketPeer::Handle(socket.clone()))
-            .expect("Failed to connect socket.");
-        assert_eq!(FdEvents::POLLIN, socket.query_events(&current_task));
-        let server_socket = socket.accept().unwrap();
-
-        let message = Message::new(vec![1, 2, 3].into(), None, vec![]);
-        let expected_message = message.clone();
-
-        // Do a blocking read in another thread.
-        let handle = std::thread::spawn(move || {
-            assert_eq!(connecting_socket.blocking_read_kernel(), Ok(vec![expected_message]));
-            assert_eq!(connecting_socket.blocking_read_kernel(), error!(EPIPE));
-        });
-
-        server_socket.write_kernel(message).expect("Failed to write.");
-        server_socket.close();
-
-        // The thread should finish now that messages have been written.
-        handle.join().expect("failed to join thread");
-
-        assert_eq!(
-            FdEvents::POLLHUP | FdEvents::POLLIN | FdEvents::POLLOUT,
-            server_socket.query_events(&current_task)
-        );
-    }
 
     #[::fuchsia::test]
     fn test_dgram_socket() {

@@ -285,13 +285,6 @@ impl MessageQueue {
         self.messages.push_back(message);
     }
 
-    pub fn take_messages(&mut self) -> Vec<Message> {
-        let mut messages = VecDeque::default();
-        std::mem::swap(&mut messages, &mut self.messages);
-        self.length = 0;
-        messages.into()
-    }
-
     pub fn query_events(&self) -> FdEvents {
         let mut events = FdEvents::empty();
         if self.available_capacity() > 0 {

@@ -8,13 +8,10 @@ group("examples") {
       "android",
       "chromiumos",
       "hello_starnix:hello-starnix",
-      "wayland:starnix_wayland",
     ]
   }
 }
 
 group("tests") {
   testonly = true
-
-  deps = [ "wayland:tests" ]
 }

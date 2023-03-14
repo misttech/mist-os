@@ -146,12 +146,6 @@ impl Waiter {
         }
     }
 
-    /// Waits until the waiter is woken up. Do not use if a current_task is available, this will
-    /// result in incorrect signal behavior.
-    pub fn wait_without_current_task_dont_use_if_possible(&self) -> Result<(), Errno> {
-        self.wait_internal(zx::Time::INFINITE)
-    }
-
     /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
     fn wait_internal(&self, deadline: zx::Time) -> Result<(), Errno> {
         match self.0.port.wait(deadline) {

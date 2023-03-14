@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{
-    binder::create_binders, input::InputFile, starnix::StarnixDevice, wayland::serve_wayland,
-};
+use crate::device::{binder::create_binders, input::InputFile, starnix::StarnixDevice};
 use crate::fs::{devtmpfs::dev_tmp_fs, SpecialNode};
 use crate::logging::log_warn;
 use crate::task::CurrentTask;
 use crate::types::*;
 
 /// Parses and runs the features from the provided "program strvec". Some features,
-/// such as Wayland, should be enabled on a per-component basis. We run this when we first
+/// should be enabled on a per-component basis. We run this when we first
 /// make the container. When we start the component, we run the run_component_features
 /// function.
 pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
-            // Wayland is enabled on a per-component basis and so skipped here.
-            "wayland" => {}
             "binder" => {
                 // Creates the various binder drivers (/dev/binder, /dev/hwbinder, /dev/vndbinder).
                 create_binders(current_task)?;
@@ -77,17 +73,6 @@ pub fn run_component_features(
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
-            "wayland" => {
-                // TODO: The paths for the display and memory allocation file currently hard coded
-                // to wayland-0 and wayland-1. In the future this will need to match the environment
-                // variables set for the component.
-                serve_wayland(
-                    current_task,
-                    b"/data/tmp/wayland-0".to_vec(),
-                    b"/data/tmp/wayland-1".to_vec(),
-                    outgoing_dir,
-                )?;
-            }
             "framebuffer" => {
                 current_task.kernel().framebuffer.start_server(outgoing_dir.take().unwrap());
             }

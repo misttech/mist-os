@@ -386,35 +386,6 @@ impl UnixSocket {
         node.set_socket(socket.clone());
         Ok(())
     }
-
-    // These are used for Unix socket for efficiency
-    pub fn blocking_read_kernel(&self, _socket: &Socket) -> Result<Vec<Message>, Errno> {
-        loop {
-            let mut inner = self.lock();
-            let messages = inner.read_kernel()?;
-            if !messages.is_empty() {
-                return Ok(messages);
-            }
-            let waiter = Waiter::new();
-            inner.waiters.wait_async_events(
-                &waiter,
-                FdEvents::POLLIN | FdEvents::POLLHUP,
-                WaitCallback::none(),
-            );
-            drop(inner);
-            waiter.wait_without_current_task_dont_use_if_possible()?;
-        }
-    }
-
-    pub fn write_kernel(&self, message: Message) -> Result<(), Errno> {
-        let peer = {
-            let inner = self.lock();
-            inner.peer().ok_or_else(|| errno!(ENOTCONN))?.clone()
-        };
-        let unix_socket = downcast_socket_to_unix(&peer);
-        let mut peer = unix_socket.lock();
-        peer.write_kernel(message)
-    }
 }
 
 impl SocketOps for UnixSocket {
@@ -891,26 +862,6 @@ impl UnixSocketInner {
         Ok(info)
     }
 
-    /// Reads all the available messages out of this socket.
-    ///
-    /// An empty vector is returned if no data is immediately available.
-    /// An `Err` is returned if the socket was shutdown.
-    pub fn read_kernel(&mut self) -> Result<Vec<Message>, Errno> {
-        let bytes_read = self.messages.len();
-        let messages = self.messages.take_messages();
-
-        // Only signal a broken pipe once the messages have been drained.
-        if messages.is_empty() && self.is_shutdown {
-            return error!(EPIPE);
-        }
-
-        if bytes_read > 0 {
-            self.waiters.notify_events(FdEvents::POLLOUT);
-        }
-
-        Ok(messages)
-    }
-
     /// Writes the the contents of `InputBuffer` into this socket.
     ///
     /// # Parameters
@@ -938,28 +889,6 @@ impl UnixSocketInner {
             self.waiters.notify_events(FdEvents::POLLIN);
         }
         Ok(bytes_written)
-    }
-
-    /// Writes the provided message into this socket. If the write succeeds, all the bytes were
-    /// written.
-    ///
-    /// # Parameters
-    /// - `message`: The message to write.
-    ///
-    /// Returns an error if the socket is not connected.
-    fn write_kernel(&mut self, message: Message) -> Result<(), Errno> {
-        if self.is_shutdown {
-            return error!(EPIPE);
-        }
-
-        let bytes_written = message.data.len();
-        self.messages.write_message(message);
-
-        if bytes_written > 0 {
-            self.waiters.notify_events(FdEvents::POLLIN);
-        }
-
-        Ok(())
     }
 
     fn shutdown_one_end(&mut self) {

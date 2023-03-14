@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Use parking_lot so that we don't need to make the dependency conditional.
+use parking_lot as _;
+
 #[cfg(not(any(test, debug_assertions)))]
 pub type Mutex<T> = parking_lot::Mutex<T>;
 #[cfg(not(any(test, debug_assertions)))]

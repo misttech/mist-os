@@ -10,9 +10,6 @@ import("//src/proc/bin/starnix/starnix.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 declare_args() {
-  # Whether wayland protocol logging should be enabled
-  starnix_wayland_protocol_logging = false
-
   # Restricted mode is currently only supported by Zircon on x64.
   if (target_cpu == "x64") {
     starnix_restricted_mode = true
@@ -94,7 +91,6 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/ui/fuchsia-vulkan",
-    "//src/lib/ui/wayland/server",
     "//src/lib/vulkan",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/proc/lib/kernel_config",
@@ -160,14 +156,9 @@ rustc_binary("starnix_kernel_bin") {
     "device/remote_binder.rs",
     "device/starnix.rs",
     "device/terminal.rs",
-    "device/wayland/bridge_client.rs",
-    "device/wayland/buffer_collection_file.rs",
-    "device/wayland/dma_buf_file.rs",
-    "device/wayland/file_creation.rs",
     "device/wayland/image_file.rs",
     "device/wayland/mod.rs",
     "device/wayland/vulkan.rs",
-    "device/wayland/wayland.rs",
     "dynamic_thread_pool.rs",
     "execution/component_runner.rs",
     "execution/container.rs",
@@ -310,9 +301,6 @@ rustc_binary("starnix_kernel_bin") {
   }
   if (starnix_disable_logging) {
     features = [ "disable_logging" ]
-  }
-  if (starnix_wayland_protocol_logging) {
-    features += [ "wayland_protocol_logging" ]
   }
 }
 

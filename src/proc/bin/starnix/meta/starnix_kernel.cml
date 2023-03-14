@@ -51,7 +51,6 @@
         },
         {
             protocol: [
-                // Wayland bridge protocols.
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",
@@ -87,7 +86,7 @@
             max_count: 100,
         },
 
-        // The features to run in the container (e.g., wayland support).
+        // The features to run in the container.
         features: {
             type: "vector",
             element: {
