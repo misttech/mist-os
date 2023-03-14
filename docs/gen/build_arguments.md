@@ -530,7 +530,7 @@ From //boards/common/arm64-common.gni:29
 
 From //build/board.gni:21
 
-**Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi", "//src/connectivity/wlan/drivers/wlanphy:wlanphy_dfv2", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/media/audio/bundles:virtual_audio_driver"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles/packages/prod:drivers-system", "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi", "//src/connectivity/wlan/drivers/wlanphy:wlanphy", "//src/devices/acpi:drivers", "//src/graphics/drivers/msd-intel-gen", "//src/media/audio/bundles:virtual_audio_driver"]`
 
 From //boards/common/x64-common.gni:58
 
@@ -8264,6 +8264,14 @@ From //out/not-default/args.gn:12
 **Overridden from the default:** `false`
 
 From //build/toolchain/goma.gni:13
+
+### use_llvm_libc_string_functions
+
+**NOTE: Experimental** Use the llvm-libc implementations of string functions.
+
+**Current value (from the default):** `false`
+
+From //zircon/system/ulib/c/libc.gni:13
 
 ### use_lto
 
