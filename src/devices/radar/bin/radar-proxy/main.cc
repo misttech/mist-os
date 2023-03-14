@@ -7,17 +7,17 @@
 #include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include "radar-proxy.h"
+#include "radar-provider-proxy.h"
 #include "src/lib/fsl/io/device_watcher.h"
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  radar::RadarProxy proxy;
+  radar::RadarProviderProxy proxy;
 
   // Calls DeviceAdded() for each existing device during construction.
   auto watcher = fsl::DeviceWatcher::Create(
-      radar::RadarProxy::kRadarDeviceDirectory,
+      radar::RadarProviderProxy::kRadarDeviceDirectory,
       [&](int dir_fd, const std::string& filename) { proxy.DeviceAdded(dir_fd, filename); });
   if (!watcher) {
     return EXIT_FAILURE;

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "radar-proxy.h"
+#include "radar-provider-proxy.h"
 
 #include <dirent.h>
 #include <lib/async/default.h>
@@ -20,13 +20,14 @@ namespace radar {
 
 using fuchsia::hardware::radar::RadarBurstReaderProviderPtr;
 
-RadarProxy::RadarProxy(RadarDeviceConnector* connector)
+RadarProviderProxy::RadarProviderProxy(RadarDeviceConnector* connector)
     : connector_(connector == nullptr ? &default_connector_ : connector) {
   radar_client_.set_error_handler([&](zx_status_t status) { ErrorHandler(status); });
 }
 
-void RadarProxy::Connect(fidl::InterfaceRequest<fuchsia::hardware::radar::RadarBurstReader> server,
-                         ConnectCallback callback) {
+void RadarProviderProxy::Connect(
+    fidl::InterfaceRequest<fuchsia::hardware::radar::RadarBurstReader> server,
+    ConnectCallback callback) {
   if (!radar_client_.is_bound()) {
     fuchsia::hardware::radar::RadarBurstReaderProvider_Connect_Result result;
     result.set_err(fuchsia::hardware::radar::StatusCode::BIND_ERROR);
@@ -42,7 +43,7 @@ void RadarProxy::Connect(fidl::InterfaceRequest<fuchsia::hardware::radar::RadarB
       });
 }
 
-void RadarProxy::DeviceAdded(int dir_fd, const std::string& filename) {
+void RadarProviderProxy::DeviceAdded(int dir_fd, const std::string& filename) {
   if (radar_client_.is_bound()) {
     new_devices_ = true;
     return;
@@ -54,7 +55,7 @@ void RadarProxy::DeviceAdded(int dir_fd, const std::string& filename) {
   }
 }
 
-RadarBurstReaderProviderPtr RadarProxy::DefaultRadarDeviceConnector::ConnectToRadarDevice(
+RadarBurstReaderProviderPtr RadarProviderProxy::DefaultRadarDeviceConnector::ConnectToRadarDevice(
     int dir_fd, const std::string& filename) {
   fdio_cpp::UnownedFdioCaller caller(dir_fd);
   RadarBurstReaderProviderPtr radar_client;
@@ -68,7 +69,8 @@ RadarBurstReaderProviderPtr RadarProxy::DefaultRadarDeviceConnector::ConnectToRa
   return radar_client;
 }
 
-RadarBurstReaderProviderPtr RadarProxy::DefaultRadarDeviceConnector::ConnectToFirstRadarDevice() {
+RadarBurstReaderProviderPtr
+RadarProviderProxy::DefaultRadarDeviceConnector::ConnectToFirstRadarDevice() {
   DIR* const devices_dir = opendir(kRadarDeviceDirectory);
   if (!devices_dir) {
     return {};
@@ -87,7 +89,7 @@ RadarBurstReaderProviderPtr RadarProxy::DefaultRadarDeviceConnector::ConnectToFi
   return {};
 }
 
-void RadarProxy::ErrorHandler(zx_status_t status) {
+void RadarProviderProxy::ErrorHandler(zx_status_t status) {
   FX_PLOGS(ERROR, status) << "Connection to radar device closed, attempting to reconnect";
   // Check for available devices now, just in case one was added before the connection closed. If
   // not, the DeviceWatcher will signal to connect when a new device becomes available.

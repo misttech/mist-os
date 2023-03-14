@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "radar-proxy.h"
-
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding.h>
 
 #include <zxtest/zxtest.h>
 
+#include "radar-provider-proxy.h"
 #include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 
 namespace radar {
@@ -91,7 +90,7 @@ class RadarProxyTest : public zxtest::Test {
  protected:
   // Visible for testing.
   TestRadarDeviceConnector connector_;
-  RadarProxy proxy_;
+  RadarProviderProxy proxy_;
   fuchsia::hardware::radar::RadarBurstReaderProviderSyncPtr service_client_;
 
  private:

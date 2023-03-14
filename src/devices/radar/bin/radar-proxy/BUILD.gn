@@ -23,7 +23,7 @@ executable("radar-proxy-bin") {
   output_name = "radar_proxy"
   sources = [
     "main.cc",
-    "radar-proxy.cc",
+    "radar-provider-proxy.cc",
   ]
   deps = _common_deps
 }
@@ -44,8 +44,8 @@ core_shard("radar-proxy-shard") {
 
 test("radar-proxy-test-bin") {
   sources = [
+    "radar-provider-proxy.cc",
     "radar-proxy-test.cc",
-    "radar-proxy.cc",
   ]
   deps = [
            "//sdk/lib/driver/runtime/testing/runtime",

@@ -25,11 +25,11 @@ class RadarDeviceConnector {
   virtual fuchsia::hardware::radar::RadarBurstReaderProviderPtr ConnectToFirstRadarDevice() = 0;
 };
 
-class RadarProxy : public fuchsia::hardware::radar::RadarBurstReaderProvider {
+class RadarProviderProxy : public fuchsia::hardware::radar::RadarBurstReaderProvider {
  public:
   static constexpr char kRadarDeviceDirectory[] = "/dev/class/radar";
 
-  explicit RadarProxy(RadarDeviceConnector* connector = nullptr);
+  explicit RadarProviderProxy(RadarDeviceConnector* connector = nullptr);
 
   void Connect(fidl::InterfaceRequest<fuchsia::hardware::radar::RadarBurstReader> server,
                ConnectCallback callback) override;
