@@ -16,12 +16,12 @@ FuchsiaTraceParser::FuchsiaTraceParser(std::ostream* out)
 FuchsiaTraceParser::~FuchsiaTraceParser() = default;
 
 bool FuchsiaTraceParser::ParseComplete(std::istream* in) {
-  while (!in->eof()) {
+  while (true) {
     size_t bytes_read =
         in->read(buffer_.data() + buffer_end_, buffer_.size() - buffer_end_).gcount();
     if (bytes_read == 0) {
-      FX_LOGS(ERROR) << "Read returned 0 bytes";
-      return false;
+      // End of file reached.
+      break;
     }
     buffer_end_ += bytes_read;
 
