@@ -215,8 +215,8 @@ zx_status_t KTraceState::Stop() {
   Guard<Mutex> guard(&lock_);
 
   // Start by clearing the group mask and disabling writes.  This will prevent
-  // new writers from starting write operations.  The non-write lock prevent
-  // another thread from starting a another trace session until we have finished
+  // new writers from starting write operations.  The non-write lock prevents
+  // another thread from starting another trace session until we have finished
   // the stop operation.
   ClearMaskDisableWrites();
 

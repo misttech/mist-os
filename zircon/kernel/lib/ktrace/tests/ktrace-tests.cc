@@ -641,7 +641,7 @@ class TestKTraceState : public ::internal::KTraceState {
   }
 
   // Begin a write (Reserve), but disable writes before the PendingCommit is
-  // committed or destroy.  Make sure we don't fail any asserts.  See
+  // committed or destroyed.  Make sure we don't fail any asserts.  See
   // https://fxbug.dev/122043.
   static bool DisableWritesDuringPendingCommitTest() {
     BEGIN_TEST;
