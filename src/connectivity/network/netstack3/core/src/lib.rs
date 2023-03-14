@@ -514,20 +514,21 @@ pub fn add_route<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
     entry: ip::types::AddableEntryEither<DeviceId<NonSyncCtx>>,
 ) -> Result<(), ip::forwarding::AddRouteError> {
-    let (subnet, device, gateway) = entry.into_subnet_device_gateway();
+    let ip::types::DecomposedAddableEntryEither { subnet, device, gateway, metric } =
+        entry.decompose();
     match (device, gateway) {
         (Some(device), None) => map_addr_version!(
             subnet: SubnetEither;
-            crate::ip::forwarding::add_device_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, device),
-            crate::ip::forwarding::add_device_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, device)
+            crate::ip::forwarding::add_device_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, device, metric),
+            crate::ip::forwarding::add_device_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, device, metric)
         )
         .map_err(From::from),
         (None, Some(next_hop)) => {
             let next_hop = next_hop.into();
             map_addr_version!(
                 (subnet: SubnetEither, next_hop: IpAddr);
-                crate::ip::forwarding::add_gateway_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, next_hop),
-                crate::ip::forwarding::add_gateway_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, next_hop),
+                crate::ip::forwarding::add_gateway_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, next_hop, metric),
+                crate::ip::forwarding::add_gateway_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, next_hop, metric),
                 unreachable!()
             )
         }
@@ -563,7 +564,7 @@ mod tests {
     use crate::{
         ip::{
             forwarding::AddRouteError,
-            types::{AddableEntry, AddableEntryEither},
+            types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
         },
         testutil::{FakeCtx, TestIpExt, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
     };
@@ -668,7 +669,8 @@ mod tests {
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
                     None,
-                    I::FAKE_CONFIG.remote_ip.into()
+                    I::FAKE_CONFIG.remote_ip.into(),
+                    AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
             ),
             Err(AddRouteError::GatewayNotNeighbor)
@@ -686,7 +688,8 @@ mod tests {
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(
                     I::FAKE_CONFIG.subnet.into(),
-                    device_id.clone()
+                    device_id.clone(),
+                    AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
             ),
             Ok(())
@@ -698,7 +701,8 @@ mod tests {
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
                     None,
-                    I::FAKE_CONFIG.remote_ip.into()
+                    I::FAKE_CONFIG.remote_ip.into(),
+                    AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
             ),
             Ok(())

@@ -2,21 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::ops::DerefMut as _;
 use std::sync::Once;
 
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_net as fidl_net;
+use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
 use futures::{FutureExt as _, StreamExt as _};
-use net_types::ip::{Ip, Ipv4, Ipv6, Subnet};
+use net_declare::{net_ip_v4, net_subnet_v4, net_subnet_v6};
 use net_types::{
-    ip::{AddrSubnetEither, Ipv4Addr},
+    ip::{AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv6},
     SpecifiedAddr,
 };
 use netstack3_core::{
@@ -24,14 +25,16 @@ use netstack3_core::{
     device::update_ipv6_configuration,
     ip::{
         device::slaac::STABLE_IID_SECRET_KEY_BYTES,
-        types::{AddableEntry, AddableEntryEither},
+        types::{
+            AddableEntry, AddableEntryEither, AddableMetric, RawMetric, DEFAULT_INTERFACE_METRIC,
+        },
     },
     Ctx,
 };
 
 use crate::bindings::{
     devices::Devices,
-    util::{ConversionContext as _, IntoFidl as _, TryFromFidlWithContext as _},
+    util::{ConversionContext as _, IntoFidl as _},
     BindingsNonSyncCtxImpl, RequestStreamExt as _, LOOPBACK_NAME,
 };
 
@@ -629,109 +632,140 @@ async fn test_list_del_routes() {
     let loopback_id = test_stack.get_named_endpoint_id(LOOPBACK_NAME);
     assert_ne!(loopback_id, if_id);
     let device = test_stack.ctx().await.non_sync_ctx.get_core_id(if_id).expect("device exists");
-    let loopback =
-        test_stack.ctx().await.non_sync_ctx.get_core_id(loopback_id).expect("device exists");
-    let route1_subnet_bytes = [192, 168, 0, 0];
-    let route1_subnet_prefix = 24;
+    let sub1 = net_subnet_v4!("192.168.0.0/24");
     let route1: AddableEntryEither<_> = AddableEntry::without_gateway(
-        Subnet::<Ipv4Addr>::new(Ipv4Addr::from(route1_subnet_bytes).into(), route1_subnet_prefix)
-            .unwrap(),
+        sub1,
         device.clone(),
+        AddableMetric::ExplicitMetric(RawMetric(0)),
     )
     .into();
-    let sub10 = Subnet::<Ipv4Addr>::new(Ipv4Addr::from([10, 0, 0, 0]).into(), 24).unwrap();
-    let route2: AddableEntryEither<_> = AddableEntry::without_gateway(sub10, device.clone()).into();
-    let sub10_gateway = SpecifiedAddr::new(Ipv4Addr::from([10, 0, 0, 1])).unwrap().into();
-    let route3 = AddableEntry::with_gateway(sub10, None, sub10_gateway).into();
+    let sub10 = net_subnet_v4!("10.0.0.0/24");
+    let route2: AddableEntryEither<_> = AddableEntry::without_gateway(
+        sub10,
+        device.clone(),
+        AddableMetric::ExplicitMetric(RawMetric(0)),
+    )
+    .into();
+    let sub10_gateway = SpecifiedAddr::new(net_ip_v4!("10.0.0.1")).unwrap().into();
+    let route3 = AddableEntry::with_gateway(
+        sub10,
+        None,
+        sub10_gateway,
+        AddableMetric::ExplicitMetric(RawMetric(0)),
+    )
+    .into();
 
     let () = test_stack
         .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
             // add a couple of routes directly into core:
-            netstack3_core::add_route(sync_ctx, non_sync_ctx, route1.clone()).unwrap();
-            netstack3_core::add_route(sync_ctx, non_sync_ctx, route2.clone()).unwrap();
+            netstack3_core::add_route(sync_ctx, non_sync_ctx, route1).unwrap();
+            netstack3_core::add_route(sync_ctx, non_sync_ctx, route2).unwrap();
             netstack3_core::add_route(sync_ctx, non_sync_ctx, route3).unwrap();
         })
         .await;
 
-    let routes = stack.get_forwarding_table_deprecated().await.expect("Can get forwarding table");
-    let route3_with_device: AddableEntryEither<_> =
-        AddableEntry::with_gateway(sub10, Some(device.clone()), sub10_gateway).into();
-
-    let auto_routes = [
-        // Link local route is added automatically by core.
-        AddableEntry::without_gateway(
-            net_declare::net_subnet_v6!("fe80::/64").into(),
-            device.clone(),
-        )
-        .into(),
-        // Loopback routes are added on netstack creation.
-        AddableEntry::without_gateway(Ipv4::LOOPBACK_SUBNET, loopback.clone()).into(),
-        AddableEntry::without_gateway(Ipv6::LOOPBACK_SUBNET, loopback.clone()).into(),
-        // Multicast routes are added automatically after the device is
-        // installed.
-        AddableEntry::without_gateway(Ipv4::MULTICAST_SUBNET, loopback.clone()).into(),
-        AddableEntry::without_gateway(Ipv6::MULTICAST_SUBNET, loopback.clone()).into(),
-        AddableEntry::without_gateway(Ipv4::MULTICAST_SUBNET, device.clone()).into(),
-        AddableEntry::without_gateway(Ipv6::MULTICAST_SUBNET, device.clone()).into(),
-        // The Limited Broadcast subnet route is added automatically after the
-        // device is installed.
-        AddableEntry::without_gateway(crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET, loopback)
-            .into(),
-        AddableEntry::without_gateway(
-            crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET,
-            device.clone(),
-        )
-        .into(),
-    ];
-    let got = test_stack
-        .with_ctx(|ctx| {
-            routes
-                .into_iter()
-                .map(|e| AddableEntryEither::try_from_fidl_with_ctx(&ctx.non_sync_ctx, e).unwrap())
-                .collect::<HashSet<_>>()
-        })
-        .await;
-    let want = HashSet::from_iter(
-        [route1, route2.clone(), route3_with_device.clone()].into_iter().chain(auto_routes.clone()),
-    );
-    assert_eq!(got, want, "got - want = {:?}", got.symmetric_difference(&want));
-
-    // delete route1:
-    let mut fwd_entry = fidl_net_stack::ForwardingEntry {
-        subnet: fidl_net::Subnet {
-            addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: route1_subnet_bytes }),
-            prefix_len: route1_subnet_prefix,
-        },
-        device_id: 0,
+    let mut route1_fwd_entry = fidl_net_stack::ForwardingEntry {
+        subnet: sub1.into_ext(),
+        device_id: if_id,
         next_hop: None,
         metric: 0,
     };
+
+    let expected_routes = [
+        // Automatically installed routes
+        fidl_net_stack::ForwardingEntry {
+            subnet: crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET.into_ext(),
+            device_id: loopback_id,
+            next_hop: None,
+            metric: crate::bindings::DEFAULT_LOW_PRIORITY_METRIC,
+        },
+        fidl_net_stack::ForwardingEntry {
+            subnet: crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET.into_ext(),
+            device_id: if_id,
+            next_hop: None,
+            metric: crate::bindings::DEFAULT_LOW_PRIORITY_METRIC,
+        },
+        // route1
+        route1_fwd_entry.clone(),
+        // route2
+        fidl_net_stack::ForwardingEntry {
+            subnet: sub10.into_ext(),
+            device_id: if_id,
+            next_hop: None,
+            metric: 0,
+        },
+        // route3
+        fidl_net_stack::ForwardingEntry {
+            subnet: sub10.into_ext(),
+            device_id: if_id,
+            next_hop: Some(Box::new(sub10_gateway.to_ip_addr().into_ext())),
+            metric: 0,
+        },
+        // More automatically installed routes
+        fidl_net_stack::ForwardingEntry {
+            subnet: Ipv4::LOOPBACK_SUBNET.into_ext(),
+            device_id: loopback_id,
+            next_hop: None,
+            metric: DEFAULT_INTERFACE_METRIC.into(),
+        },
+        fidl_net_stack::ForwardingEntry {
+            subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
+            device_id: loopback_id,
+            next_hop: None,
+            metric: DEFAULT_INTERFACE_METRIC.into(),
+        },
+        fidl_net_stack::ForwardingEntry {
+            subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
+            device_id: if_id,
+            next_hop: None,
+            metric: DEFAULT_INTERFACE_METRIC.into(),
+        },
+        fidl_net_stack::ForwardingEntry {
+            subnet: Ipv6::LOOPBACK_SUBNET.into_ext(),
+            device_id: loopback_id,
+            next_hop: None,
+            metric: DEFAULT_INTERFACE_METRIC.into(),
+        },
+        fidl_net_stack::ForwardingEntry {
+            subnet: net_subnet_v6!("fe80::/64").into_ext(),
+            device_id: if_id,
+            next_hop: None,
+            metric: DEFAULT_INTERFACE_METRIC.into(),
+        },
+        fidl_net_stack::ForwardingEntry {
+            subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
+            device_id: loopback_id,
+            next_hop: None,
+            metric: DEFAULT_INTERFACE_METRIC.into(),
+        },
+        fidl_net_stack::ForwardingEntry {
+            subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
+            device_id: if_id,
+            next_hop: None,
+            metric: DEFAULT_INTERFACE_METRIC.into(),
+        },
+    ];
+
+    let routes = stack.get_forwarding_table_deprecated().await.expect("Can get forwarding table");
+    assert_eq!(routes, expected_routes);
+
+    // delete route1:
     let () = stack
-        .del_forwarding_entry(&mut fwd_entry)
+        .del_forwarding_entry(&mut route1_fwd_entry)
         .await
         .squash_result()
         .expect("can delete device forwarding entry");
     // can't delete again:
     assert_eq!(
-        stack.del_forwarding_entry(&mut fwd_entry).await.unwrap().unwrap_err(),
+        stack.del_forwarding_entry(&mut route1_fwd_entry).await.unwrap().unwrap_err(),
         fidl_net_stack::Error::NotFound
     );
 
     // check that route was deleted (should've disappeared from core)
     let routes = stack.get_forwarding_table_deprecated().await.expect("Can get forwarding table");
-    assert_eq!(
-        test_stack
-            .with_ctx(|ctx| {
-                routes
-                    .into_iter()
-                    .map(|e| {
-                        AddableEntryEither::try_from_fidl_with_ctx(&ctx.non_sync_ctx, e).unwrap()
-                    })
-                    .collect::<HashSet<_>>()
-            })
-            .await,
-        HashSet::from_iter([route2, route3_with_device].into_iter().chain(auto_routes))
-    );
+    let expected_routes =
+        expected_routes.into_iter().filter(|route| route != &route1_fwd_entry).collect::<Vec<_>>();
+    assert_eq!(routes, expected_routes);
 }
 
 #[fasync::run_singlethreaded(test)]

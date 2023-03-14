@@ -374,22 +374,28 @@ fn add_initial_routes<NonSyncCtx: NonSyncContext>(
     non_sync_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
-    use netstack3_core::ip::types::AddableEntry;
-    use netstack3_core::ip::types::AddableEntryEither;
+    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric};
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
     for entry in [
-        AddableEntryEither::from(AddableEntry::without_gateway(LINK_LOCAL_SUBNET, device.clone())),
+        AddableEntryEither::from(AddableEntry::without_gateway(
+            LINK_LOCAL_SUBNET,
+            device.clone(),
+            AddableMetric::MetricTracksInterface,
+        )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv4::MULTICAST_SUBNET,
             device.clone(),
+            AddableMetric::MetricTracksInterface,
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv6::MULTICAST_SUBNET,
             device.clone(),
+            AddableMetric::MetricTracksInterface,
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET,
             device.clone(),
+            AddableMetric::ExplicitMetric(RawMetric(crate::bindings::DEFAULT_LOW_PRIORITY_METRIC)),
         )),
     ] {
         netstack3_core::add_route(sync_ctx, non_sync_ctx, entry)?;

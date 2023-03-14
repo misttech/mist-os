@@ -15,7 +15,9 @@ use net_types::{
 use thiserror::Error;
 
 use crate::ip::{
-    self, ExistsError, IpDeviceIdContext, IpLayerContext, IpLayerEvent, IpLayerIpExt,
+    self,
+    types::{AddableMetric, Metric, DEFAULT_INTERFACE_METRIC},
+    ExistsError, IpDeviceIdContext, IpLayerContext, IpLayerEvent, IpLayerIpExt,
     IpLayerNonSyncContext,
 };
 
@@ -30,6 +32,7 @@ pub(crate) fn add_gateway_route<
     ctx: &mut C,
     subnet: Subnet<I::Addr>,
     next_hop: SpecifiedAddr<I::Addr>,
+    metric: AddableMetric,
 ) -> Result<(), AddRouteError> {
     sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
         let device = table.lookup(sync_ctx, None, next_hop).map_or(
@@ -44,8 +47,9 @@ pub(crate) fn add_gateway_route<
                 }
             },
         )?;
+        let metric = observe_metric(metric);
         let entry = table
-            .add_entry(crate::ip::types::Entry { subnet, device, gateway: Some(next_hop) })
+            .add_entry(crate::ip::types::Entry { subnet, device, gateway: Some(next_hop), metric })
             .map_err::<AddRouteError, _>(From::from)?;
         Ok(ctx.on_event(IpLayerEvent::RouteAdded(entry.clone())))
     })
@@ -62,11 +66,26 @@ pub(crate) fn add_device_route<
     ctx: &mut C,
     subnet: Subnet<I::Addr>,
     device: SC::DeviceId,
+    metric: AddableMetric,
 ) -> Result<(), ExistsError> {
     sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        let entry = table.add_entry(crate::ip::types::Entry { subnet, device, gateway: None })?;
+        let metric = observe_metric(metric);
+        let entry =
+            table.add_entry(crate::ip::types::Entry { subnet, device, gateway: None, metric })?;
         Ok(ctx.on_event(IpLayerEvent::RouteAdded(entry.clone())))
     })
+}
+
+// Converts the given [`AddableMetric`] into the corresponding [`Metric`],
+// observing the device's metric, if applicable.
+fn observe_metric(metric: AddableMetric) -> Metric {
+    // TODO(https://fxbug.dev/122489): Lookup the interface's metric.
+    match metric {
+        AddableMetric::ExplicitMetric(value) => Metric::ExplicitMetric(value),
+        AddableMetric::MetricTracksInterface => {
+            Metric::MetricTracksInterface(DEFAULT_INTERFACE_METRIC)
+        }
+    }
 }
 
 // TODO(joshlf):
@@ -109,7 +128,8 @@ impl From<crate::error::ExistsError> for AddRouteError {
 ///
 /// `ForwardingTable` maps destination subnets to the nearest IP hosts (on the
 /// local network) able to route IP packets to those subnets.
-// TODO(ghanan): Use metrics to determine active route?
+// TODO(https://fxbug.dev/122489): Consider Route Metrics when making routing
+// decisions.
 pub struct ForwardingTable<I: Ip, D> {
     /// All the routes available to forward a packet.
     ///
@@ -147,18 +167,20 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         // Insert the new entry after the last route to a more specific and/or
         // local subnet to maintain the invariant that the table is sorted by
         // subnet prefix length and local-ness.
-        let ip::types::Entry { subnet, device: _, gateway: _ } = entry;
+        // TODO(https://fxbug.dev/122489): Consider Route Metrics when sorting.
+        let ip::types::Entry { subnet, device: _, gateway: _, metric: _ } = entry;
         let prefix = subnet.prefix();
-        let index = table.partition_point(|ip::types::Entry { subnet, device: _, gateway }| {
-            let subnet_prefix = subnet.prefix();
-            subnet_prefix > prefix
-                || (subnet_prefix == prefix
-                    && match gateway {
-                        Some(SpecifiedAddr { .. }) => false,
-                        // on-link routes have a higher preference.
-                        None => true,
-                    })
-        });
+        let index =
+            table.partition_point(|ip::types::Entry { subnet, device: _, gateway, metric: _ }| {
+                let subnet_prefix = subnet.prefix();
+                subnet_prefix > prefix
+                    || (subnet_prefix == prefix
+                        && match gateway {
+                            Some(SpecifiedAddr { .. }) => false,
+                            // on-link routes have a higher preference.
+                            None => true,
+                        })
+            });
 
         table.insert(index, entry);
 
@@ -248,7 +270,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         let Self { table } = self;
 
         // Get all potential routes we could take to reach `address`.
-        table.iter().find_map(|ip::types::Entry { subnet, device, gateway }| {
+        table.iter().find_map(|ip::types::Entry { subnet, device, gateway, metric: _ }| {
             (subnet.contains(&address)
                 && local_device.map_or(true, |d| d == device)
                 && sync_ctx.is_device_installed(device))
@@ -284,7 +306,10 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::FakeSyncCtx,
-        ip::testutil::{FakeIpDeviceIdCtx, MultipleDevicesId},
+        ip::{
+            testutil::{FakeIpDeviceIdCtx, MultipleDevicesId},
+            types::{Metric, RawMetric},
+        },
         testutil::FakeEventDispatcherConfig,
     };
 
@@ -373,6 +398,7 @@ mod tests {
         SpecifiedAddr<I::Addr>,
         Subnet<I::Addr>,
         MultipleDevicesId,
+        Metric,
     ) {
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
 
@@ -380,9 +406,10 @@ mod tests {
         let subnet = config.subnet;
         let device = MultipleDevicesId::A;
         let (next_hop, next_hop_subnet) = I::next_hop_addr_sub(1, 1);
+        let metric = Metric::ExplicitMetric(RawMetric(9999));
 
         // Should add the route successfully.
-        let entry = ip::types::Entry { subnet, device: device.clone(), gateway: None };
+        let entry = ip::types::Entry { subnet, device: device.clone(), gateway: None, metric };
         assert_eq!(table.add_entry(entry.clone()), Ok(&entry));
         assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&entry]);
 
@@ -391,11 +418,19 @@ mod tests {
         assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&entry]);
 
         // Add the route but as a next hop route.
-        let entry2 =
-            ip::types::Entry { subnet: next_hop_subnet, device: device.clone(), gateway: None };
+        let entry2 = ip::types::Entry {
+            subnet: next_hop_subnet,
+            device: device.clone(),
+            gateway: None,
+            metric,
+        };
         assert_eq!(table.add_entry(entry2.clone()), Ok(&entry2));
-        let entry3 =
-            ip::types::Entry { subnet: subnet, device: device.clone(), gateway: Some(next_hop) };
+        let entry3 = ip::types::Entry {
+            subnet: subnet,
+            device: device.clone(),
+            gateway: Some(next_hop),
+            metric,
+        };
         assert_eq!(table.add_entry(entry3.clone()), Ok(&entry3));
         assert_eq!(
             table.iter_table().collect::<HashSet<_>>(),
@@ -409,30 +444,41 @@ mod tests {
             HashSet::from([&entry, &entry2, &entry3,])
         );
 
-        (table, config, next_hop, next_hop_subnet, device)
+        (table, config, next_hop, next_hop_subnet, device, metric)
     }
 
     #[ip_test]
     fn test_simple_add_del<I: Ip + TestIpExt>() {
-        let (mut table, config, next_hop, next_hop_subnet, device) = simple_setup::<I>();
+        let (mut table, config, next_hop, next_hop_subnet, device, metric) = simple_setup::<I>();
         assert_eq!(table.iter_table().count(), 3);
 
         // Delete all routes to subnet.
         assert_eq!(
             table.del_subnet_routes(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
             HashSet::from([
-                ip::types::Entry { subnet: config.subnet, device: device.clone(), gateway: None },
                 ip::types::Entry {
                     subnet: config.subnet,
                     device: device.clone(),
-                    gateway: Some(next_hop)
+                    gateway: None,
+                    metric
+                },
+                ip::types::Entry {
+                    subnet: config.subnet,
+                    device: device.clone(),
+                    gateway: Some(next_hop),
+                    metric
                 }
             ])
         );
 
         assert_eq!(
             table.iter_table().collect::<Vec<_>>(),
-            &[&ip::types::Entry { subnet: next_hop_subnet, device: device.clone(), gateway: None }]
+            &[&ip::types::Entry {
+                subnet: next_hop_subnet,
+                device: device.clone(),
+                gateway: None,
+                metric
+            }]
         );
     }
 
@@ -444,10 +490,11 @@ mod tests {
         let subnet = config.subnet;
         let device_a = MultipleDevicesId::A;
         let device_b = MultipleDevicesId::B;
+        let metric = Metric::ExplicitMetric(RawMetric(0));
 
         // Should add the routes successfully.
-        let entry_a = ip::types::Entry { subnet, device: device_a.clone(), gateway: None };
-        let entry_b = ip::types::Entry { subnet, device: device_b.clone(), gateway: None };
+        let entry_a = ip::types::Entry { subnet, device: device_a.clone(), gateway: None, metric };
+        let entry_b = ip::types::Entry { subnet, device: device_b.clone(), gateway: None, metric };
         assert_eq!(table.add_entry(entry_a.clone()), Ok(&entry_a));
         assert_eq!(table.add_entry(entry_b.clone()), Ok(&entry_b));
         assert_eq!(table.iter_table().collect::<Vec<_>>(), &[&entry_a, &entry_b]);
@@ -462,7 +509,7 @@ mod tests {
 
     #[ip_test]
     fn test_simple_lookup<I: Ip + TestIpExt>() {
-        let (mut table, config, next_hop, _next_hop_subnet, device) = simple_setup::<I>();
+        let (mut table, config, next_hop, _next_hop_subnet, device, metric) = simple_setup::<I>();
         let mut sync_ctx = FakeCtx::<I>::default();
 
         // Do lookup for our next hop (should be the device).
@@ -486,11 +533,17 @@ mod tests {
         assert_eq!(
             table.del_subnet_routes(config.subnet).unwrap().into_iter().collect::<HashSet<_>>(),
             HashSet::from([
-                ip::types::Entry { subnet: config.subnet, device: device.clone(), gateway: None },
                 ip::types::Entry {
                     subnet: config.subnet,
                     device: device.clone(),
-                    gateway: Some(next_hop)
+                    gateway: None,
+                    metric
+                },
+                ip::types::Entry {
+                    subnet: config.subnet,
+                    device: device.clone(),
+                    gateway: Some(next_hop),
+                    metric
                 }
             ])
         );
@@ -506,6 +559,7 @@ mod tests {
             subnet: config.subnet,
             device: device.clone(),
             gateway: Some(next_hop),
+            metric: Metric::ExplicitMetric(RawMetric(0)),
         };
         assert_eq!(table.add_entry(gateway_entry.clone()), Ok(&gateway_entry));
         assert_eq!(
@@ -530,6 +584,7 @@ mod tests {
         let (addr1, sub1) = I::next_hop_addr_sub(1, 24);
         let (addr2, _) = I::next_hop_addr_sub(2, 24);
         let (addr3, _) = I::next_hop_addr_sub(3, 24);
+        let metric = Metric::ExplicitMetric(RawMetric(0));
 
         // Add the following routes:
         //  sub1 -> device0
@@ -537,7 +592,8 @@ mod tests {
         // Our expected forwarding table should look like:
         //  sub1 -> device0
 
-        let entry = ip::types::Entry { subnet: sub1, device: device0.clone(), gateway: None };
+        let entry =
+            ip::types::Entry { subnet: sub1, device: device0.clone(), gateway: None, metric };
         assert_eq!(table.add_entry(entry.clone()), Ok(&entry));
         table.print_table();
         assert_eq!(
@@ -553,8 +609,12 @@ mod tests {
         //  default -> addr1 w/ device0
 
         let default_sub = Subnet::new(I::UNSPECIFIED_ADDRESS, 0).unwrap();
-        let default_entry =
-            ip::types::Entry { subnet: default_sub, device: device0.clone(), gateway: Some(addr1) };
+        let default_entry = ip::types::Entry {
+            subnet: default_sub,
+            device: device0.clone(),
+            gateway: Some(addr1),
+            metric,
+        };
 
         assert_eq!(table.add_entry(default_entry.clone()), Ok(&default_entry));
         assert_eq!(
@@ -584,10 +644,12 @@ mod tests {
             assert_eq!(next_hop, addr);
             sub
         };
+        let metric = Metric::ExplicitMetric(RawMetric(0));
         let less_specific_entry = ip::types::Entry {
             subnet: less_specific_sub,
             device: LESS_SPECIFIC_SUB_DEVICE.clone(),
             gateway: None,
+            metric,
         };
         assert_eq!(table.add_entry(less_specific_entry.clone()), Ok(&less_specific_entry));
         assert_eq!(
@@ -610,6 +672,7 @@ mod tests {
             subnet: more_specific_sub,
             device: MORE_SPECIFIC_SUB_DEVICE.clone(),
             gateway: None,
+            metric,
         };
         assert_eq!(table.add_entry(more_specific_entry.clone()), Ok(&more_specific_entry));
         assert_eq!(
@@ -637,10 +700,13 @@ mod tests {
         let mut sync_ctx = FakeCtx::<I>::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
         let (next_hop, sub) = I::next_hop_addr_sub(1, 1);
+        let metric = Metric::ExplicitMetric(RawMetric(0));
 
-        let entry1 = ip::types::Entry { subnet: sub, device: DEVICE1.clone(), gateway: None };
+        let entry1 =
+            ip::types::Entry { subnet: sub, device: DEVICE1.clone(), gateway: None, metric };
         assert_eq!(table.add_entry(entry1.clone()), Ok(&entry1));
-        let entry2 = ip::types::Entry { subnet: sub, device: DEVICE2.clone(), gateway: None };
+        let entry2 =
+            ip::types::Entry { subnet: sub, device: DEVICE2.clone(), gateway: None, metric };
         assert_eq!(table.add_entry(entry2.clone()), Ok(&entry2));
         let lookup = table.lookup(&mut sync_ctx, None, next_hop);
         assert!(
@@ -675,11 +741,13 @@ mod tests {
             assert_eq!(next_hop, addr);
             sub
         };
+        let metric = Metric::ExplicitMetric(RawMetric(0));
 
         let less_specific_entry = ip::types::Entry {
             subnet: less_specific_sub,
             device: LESS_SPECIFIC_SUB_DEVICE.clone(),
             gateway: None,
+            metric,
         };
         assert_eq!(table.add_entry(less_specific_entry.clone()), Ok(&less_specific_entry));
         for (device_removed, expected) in [
@@ -703,6 +771,7 @@ mod tests {
             subnet: more_specific_sub,
             device: MORE_SPECIFIC_SUB_DEVICE.clone(),
             gateway: None,
+            metric,
         };
         assert_eq!(table.add_entry(more_specific_entry.clone()), Ok(&more_specific_entry));
         for (device_removed, expected) in [

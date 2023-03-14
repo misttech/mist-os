@@ -1950,17 +1950,16 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::HashMap, vec::Vec};
+    use alloc::vec::Vec;
 
     use net_declare::net_mac;
-    use net_types::ip::SubnetEither;
     use nonzero_ext::nonzero;
     use test_case::test_case;
 
     use super::*;
     use crate::{
         testutil::{
-            FakeEventDispatcherConfig, FakeSyncCtx, TestIpExt as _, FAKE_CONFIG_V4,
+            FakeEventDispatcherConfig, FakeNonSyncCtx, FakeSyncCtx, TestIpExt as _, FAKE_CONFIG_V4,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx,
@@ -2018,36 +2017,21 @@ mod tests {
         check(&mut sync_ctx, &[ethernet_device, loopback_device][..]);
     }
 
-    fn get_routes<NonSyncCtx: NonSyncContext>(
-        sync_ctx: &SyncCtx<NonSyncCtx>,
-        device: &DeviceId<NonSyncCtx>,
-    ) -> HashMap<SubnetEither, Option<IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>>>
-    {
-        crate::ip::get_all_routes(&sync_ctx)
-            .into_iter()
-            .map(|entry| {
-                let (subnet, route_device, gateway) = entry.into_subnet_device_gateway();
-                assert_eq!(&route_device, device);
-                (subnet, gateway)
-            })
-            .collect::<HashMap<_, _>>()
-    }
-
     #[test]
     fn test_no_default_routes() {
         let Ctx { mut sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
 
-        let loopback_device = crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
-            .expect("error adding loopback device");
+        let _loopback_device: DeviceId<FakeNonSyncCtx> =
+            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
+                .expect("error adding loopback device");
 
-        assert_eq!(get_routes(&sync_ctx, &loopback_device), HashMap::new());
-
-        let ethernet_device = crate::device::add_ethernet_device(
+        assert_eq!(crate::ip::get_all_routes(&sync_ctx), []);
+        let _ethernet_device: DeviceId<FakeNonSyncCtx> = crate::device::add_ethernet_device(
             &mut sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::MIN,
         );
-        assert_eq!(get_routes(&sync_ctx, &ethernet_device), HashMap::new());
+        assert_eq!(crate::ip::get_all_routes(&sync_ctx), []);
     }
 
     #[test]

@@ -34,7 +34,7 @@ use netstack3_core::{
     error::{ExistsError, NetstackError, NotFoundError},
     ip::{
         forwarding::AddRouteError,
-        types::{AddableEntry, AddableEntryEither, EntryEither},
+        types::{AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, RawMetric},
     },
     socket::datagram::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector},
 };
@@ -43,6 +43,10 @@ use crate::bindings::{
     socket::{IntoErrno, IpSockAddrExt, SockAddr},
     BindingsNonSyncCtxImpl,
 };
+
+/// The value used to specify that a `ForwardingEntry.metric` is unset, and the
+/// entry's metric should track the interface's routing metric.
+const UNSET_FORWARDING_ENTRY_METRIC: u32 = 0;
 
 /// A signal used between Core and Bindings, whenever Bindings receive a
 /// notification by the protocol (Core), it should kick the associated task
@@ -969,20 +973,25 @@ impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
         fidl: fidl_net_stack::ForwardingEntry,
     ) -> Result<AddableEntryEither<DeviceId<BindingsNonSyncCtxImpl>>, ForwardingConversionError>
     {
-        let fidl_net_stack::ForwardingEntry { subnet, device_id, next_hop, metric: _ } = fidl;
+        let fidl_net_stack::ForwardingEntry { subnet, device_id, next_hop, metric } = fidl;
         let subnet = subnet.try_into_core()?;
         let device =
             NonZeroU64::new(device_id).map(|d| d.get().try_into_core_with_ctx(ctx)).transpose()?;
         let next_hop: Option<SpecifiedAddr<IpAddr>> =
             next_hop.map(|next_hop| (*next_hop).try_into_core()).transpose()?;
+        let metric = if metric == UNSET_FORWARDING_ENTRY_METRIC {
+            AddableMetric::MetricTracksInterface
+        } else {
+            AddableMetric::ExplicitMetric(RawMetric(metric))
+        };
 
         Ok(match (subnet, device, next_hop.map(Into::into)) {
-            (subnet, Some(device), None) => Self::without_gateway(subnet, device),
+            (subnet, Some(device), None) => Self::without_gateway(subnet, device, metric),
             (SubnetEither::V4(subnet), device, Some(IpAddr::V4(gateway))) => {
-                AddableEntry::with_gateway(subnet, device, gateway).into()
+                AddableEntry::with_gateway(subnet, device, gateway, metric).into()
             }
             (SubnetEither::V6(subnet), device, Some(IpAddr::V6(gateway))) => {
-                AddableEntry::with_gateway(subnet, device, gateway).into()
+                AddableEntry::with_gateway(subnet, device, gateway, metric).into()
             }
             (SubnetEither::V4(_), _, Some(IpAddr::V6(_)))
             | (SubnetEither::V6(_), _, Some(IpAddr::V4(_)))
@@ -1000,17 +1009,30 @@ impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
         self,
         ctx: &C,
     ) -> Result<fidl_net_stack::ForwardingEntry, Never> {
-        let (subnet, device, gateway) = self.into_subnet_device_gateway();
+        let (subnet, device, gateway, metric): (
+            SubnetEither,
+            _,
+            Option<IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>>,
+            _,
+        ) = match self {
+            EntryEither::V4(Entry { subnet, device, gateway, metric }) => {
+                (subnet.into(), device, gateway.map(|gateway| gateway.into()), metric)
+            }
+            EntryEither::V6(Entry { subnet, device, gateway, metric }) => {
+                (subnet.into(), device, gateway.map(|gateway| gateway.into()), metric)
+            }
+        };
+        let RawMetric(metric) = metric.value();
         let device_id = device.try_into_fidl_with_ctx(ctx)?;
         let next_hop = gateway.map(|next_hop| {
             let next_hop: SpecifiedAddr<IpAddr> = next_hop.into();
-            Box::new(next_hop.get().into_fidl())
+            Box::new(next_hop.into_fidl())
         });
         Ok(fidl_net_stack::ForwardingEntry {
             subnet: subnet.into_fidl(),
             device_id,
             next_hop,
-            metric: 0,
+            metric: metric,
         })
     }
 }

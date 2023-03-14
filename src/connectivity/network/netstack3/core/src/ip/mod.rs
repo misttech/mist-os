@@ -3134,7 +3134,7 @@ mod tests {
         ip::{
             device::set_routing_enabled,
             testutil::is_in_ip_multicast,
-            types::{AddableEntry, AddableEntryEither},
+            types::{AddableEntry, AddableEntryEither, AddableMetric, Metric, RawMetric},
         },
         testutil::{
             assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, FakeCtx,
@@ -4922,6 +4922,7 @@ mod tests {
                     .subnet()
                     .into(),
                 device_ids[Device::First.index()].clone(),
+                AddableMetric::ExplicitMetric(RawMetric(0)),
             ),
         )
         .unwrap();
@@ -4954,6 +4955,8 @@ mod tests {
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
         );
+        let addable_metric = AddableMetric::ExplicitMetric(RawMetric(0));
+        let metric = Metric::ExplicitMetric(RawMetric(0));
 
         fn take_ip_layer_events<I: Ip>(
             non_sync_ctx: &mut FakeNonSyncCtx,
@@ -4988,7 +4991,8 @@ mod tests {
                 &mut non_sync_ctx,
                 AddableEntryEither::without_gateway(
                     I::FAKE_CONFIG.subnet.into(),
-                    device_id.clone()
+                    device_id.clone(),
+                    addable_metric,
                 ),
             ),
             Ok(())
@@ -4999,7 +5003,8 @@ mod tests {
             [IpLayerEvent::RouteAdded(types::Entry {
                 subnet: I::FAKE_CONFIG.subnet.into(),
                 device: weak_device_id.clone(),
-                gateway: None
+                gateway: None,
+                metric
             })]
         );
         let gateway_subnet = I::map_ip(
@@ -5011,8 +5016,13 @@ mod tests {
             crate::add_route(
                 &sync_ctx,
                 &mut non_sync_ctx,
-                AddableEntry::with_gateway(gateway_subnet, None, I::FAKE_CONFIG.remote_ip.into(),)
-                    .into()
+                AddableEntry::with_gateway(
+                    gateway_subnet,
+                    None,
+                    I::FAKE_CONFIG.remote_ip.into(),
+                    addable_metric
+                )
+                .into()
             ),
             Ok(())
         );
@@ -5022,6 +5032,7 @@ mod tests {
                 subnet: gateway_subnet,
                 device: weak_device_id.clone(),
                 gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
+                metric
             })]
         );
         assert_eq!(crate::del_route(&sync_ctx, &mut non_sync_ctx, gateway_subnet.into()), Ok(()));
@@ -5031,6 +5042,7 @@ mod tests {
                 subnet: gateway_subnet,
                 device: weak_device_id.clone(),
                 gateway: Some(I::FAKE_CONFIG.remote_ip.into()),
+                metric
             })]
         );
         crate::device::remove_device(&sync_ctx, &mut non_sync_ctx, device_id);
@@ -5039,8 +5051,9 @@ mod tests {
             [IpLayerEvent::RouteRemoved(types::Entry {
                 subnet: I::FAKE_CONFIG.subnet.into(),
                 device: weak_device_id,
-                gateway: None
-            })]
+                gateway: None,
+                metric
+            }),]
         );
     }
 }

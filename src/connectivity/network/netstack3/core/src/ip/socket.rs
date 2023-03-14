@@ -899,6 +899,7 @@ pub(crate) mod testutil {
             device::state::{AddrConfig, AddressState, AssignedAddress as _, IpDeviceState},
             forwarding::ForwardingTable,
             testutil::{FakeDeviceId, FakeIpDeviceIdCtx, FakeStrongIpDeviceId, FakeWeakDeviceId},
+            types::{Metric, RawMetric},
             HopLimits, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
             DEFAULT_HOP_LIMITS,
         },
@@ -1094,8 +1095,12 @@ pub(crate) mod testutil {
             for (device, state, addrs) in devices {
                 for ip in addrs {
                     let subnet = Subnet::new(ip.get(), <I::Addr as IpAddress>::BYTES * 8).unwrap();
-                    let entry =
-                        crate::ip::types::Entry { subnet, device: device.clone(), gateway: None };
+                    let entry = crate::ip::types::Entry {
+                        subnet,
+                        device: device.clone(),
+                        gateway: None,
+                        metric: Metric::ExplicitMetric(RawMetric(0)),
+                    };
                     assert_eq!(
                         crate::ip::forwarding::testutil::add_entry(&mut table, entry.clone()),
                         Ok(&entry)
@@ -1323,7 +1328,7 @@ mod tests {
                 IpDeviceContext as DeviceIpDeviceContext, IpDeviceEvent, IpDeviceIpExt,
                 IpDeviceNonSyncContext,
             },
-            types::AddableEntryEither,
+            types::{AddableEntryEither, AddableMetric, RawMetric},
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
         },
         testutil::*,
@@ -1663,6 +1668,7 @@ mod tests {
                 &mut non_sync_ctx,
                 subnet,
                 device_id.clone(),
+                AddableMetric::ExplicitMetric(RawMetric(0)),
             )
             .expect("install IPv4 device route on a fresh stack without routes"),
             SubnetEither::V6(subnet) => crate::ip::forwarding::add_device_route::<Ipv6, _, _>(
@@ -1670,6 +1676,7 @@ mod tests {
                 &mut non_sync_ctx,
                 subnet,
                 device_id.clone(),
+                AddableMetric::ExplicitMetric(RawMetric(0)),
             )
             .expect("install IPv6 device route on a fresh stack without routes"),
         }
@@ -1925,7 +1932,11 @@ mod tests {
         crate::add_route(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            AddableEntryEither::without_gateway(I::MULTICAST_SUBNET.into(), device_id.clone()),
+            AddableEntryEither::without_gateway(
+                I::MULTICAST_SUBNET.into(),
+                device_id.clone(),
+                AddableMetric::ExplicitMetric(RawMetric(0)),
+            ),
         )
         .expect("add device route");
         let remote_ip = I::multicast_addr(0);
@@ -2039,7 +2050,11 @@ mod tests {
         crate::add_route(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            AddableEntryEither::without_gateway(I::MULTICAST_SUBNET.into(), device_id.clone()),
+            AddableEntryEither::without_gateway(
+                I::MULTICAST_SUBNET.into(),
+                device_id.clone(),
+                AddableMetric::ExplicitMetric(RawMetric(0)),
+            ),
         )
         .unwrap();
 

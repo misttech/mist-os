@@ -95,6 +95,11 @@ const DEFAULT_LOOPBACK_MTU: Mtu = Mtu::new(65536);
 /// Subnet for the IPv4 Limited Broadcast Address.
 const IPV4_LIMITED_BROADCAST_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("255.255.255.255/32");
 
+/// The default "Low Priority" metric to use for default routes.
+///
+/// The value is currently kept in sync with the Netstack2 implementation.
+const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
+
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
 
@@ -437,10 +442,10 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
         let (device, subnet, route_is_present) =
             match event {
                 netstack3_core::ip::IpLayerEvent::RouteAdded(
-                    netstack3_core::ip::types::Entry { device, subnet, gateway: _ },
+                    netstack3_core::ip::types::Entry { device, subnet, gateway: _, metric: _ },
                 ) => (device, subnet, true),
                 netstack3_core::ip::IpLayerEvent::RouteRemoved(
-                    netstack3_core::ip::types::Entry { device, subnet, gateway: _ },
+                    netstack3_core::ip::types::Entry { device, subnet, gateway: _, metric: _ },
                 ) => (device, subnet, false),
             };
         // Interfaces watchers only care about the default route.
@@ -629,28 +634,32 @@ fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
     non_sync_ctx: &mut NonSyncCtx,
     loopback: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
-    use netstack3_core::ip::types::AddableEntry;
-    use netstack3_core::ip::types::AddableEntryEither;
+    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric};
     for entry in [
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv4::LOOPBACK_SUBNET,
             loopback.clone(),
+            AddableMetric::MetricTracksInterface,
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv6::LOOPBACK_SUBNET,
             loopback.clone(),
+            AddableMetric::MetricTracksInterface,
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv4::MULTICAST_SUBNET,
             loopback.clone(),
+            AddableMetric::MetricTracksInterface,
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv6::MULTICAST_SUBNET,
             loopback.clone(),
+            AddableMetric::MetricTracksInterface,
         )),
         AddableEntryEither::from(AddableEntry::without_gateway(
             IPV4_LIMITED_BROADCAST_SUBNET,
             loopback.clone(),
+            AddableMetric::ExplicitMetric(RawMetric(DEFAULT_LOW_PRIORITY_METRIC)),
         )),
     ] {
         netstack3_core::add_route(sync_ctx, non_sync_ctx, entry)?;

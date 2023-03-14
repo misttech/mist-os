@@ -30,7 +30,7 @@ use crate::{
     ip::{
         device::{dad::DadEvent, route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
-        types::{AddableEntryEither, Entry},
+        types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
         IpLayerEvent, SendIpPacketMeta,
     },
     transport::{
@@ -678,7 +678,11 @@ impl FakeEventDispatcherBuilder {
             crate::add_route(
                 sync_ctx,
                 non_sync_ctx,
-                AddableEntryEither::without_gateway(subnet, device.clone()),
+                AddableEntryEither::without_gateway(
+                    subnet,
+                    device.clone(),
+                    AddableMetric::ExplicitMetric(RawMetric(0)),
+                ),
             )
             .expect("add device route");
         }
@@ -898,11 +902,21 @@ impl<I: Ip> From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>
         e: IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>,
     ) -> IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, I> {
         match e {
-            IpLayerEvent::RouteAdded(Entry { subnet, device, gateway }) => {
-                IpLayerEvent::RouteAdded(Entry { subnet, device: device.downgrade(), gateway })
+            IpLayerEvent::RouteAdded(Entry { subnet, device, gateway, metric }) => {
+                IpLayerEvent::RouteAdded(Entry {
+                    subnet,
+                    device: device.downgrade(),
+                    gateway,
+                    metric,
+                })
             }
-            IpLayerEvent::RouteRemoved(Entry { subnet, device, gateway }) => {
-                IpLayerEvent::RouteRemoved(Entry { subnet, device: device.downgrade(), gateway })
+            IpLayerEvent::RouteRemoved(Entry { subnet, device, gateway, metric }) => {
+                IpLayerEvent::RouteRemoved(Entry {
+                    subnet,
+                    device: device.downgrade(),
+                    gateway,
+                    metric,
+                })
             }
         }
     }
