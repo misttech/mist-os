@@ -66,6 +66,20 @@ async fn register(
                 pkg::config::determine_why_repository_server_is_not_running().await
             )
         }
+        Err(err @ RepositoryError::ConflictingRegistration) => {
+            ffx_bail!(
+                "Error while registering repository: {:#}\n\
+                An alias conflict was found between repository registrations.\n\
+                Resolve alias conflict in registration config by finding the conflict with:\n\
+                \n\
+                $ ffx target repository list
+                \n\
+                Then removing the conflicting alias with:\n\
+                \n\
+                $ ffx target repository deregister --repository $CONFLICTING_REPO_NAME",
+                err,
+            )
+        }
         Err(err) => {
             ffx_bail!("Failed to register repository: {}", err)
         }
