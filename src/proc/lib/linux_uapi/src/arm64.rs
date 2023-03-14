@@ -9239,6 +9239,25 @@ pub const EVIOCGBIT_EV_LED: __u32 = 2147632433;
 pub const EVIOCGBIT_EV_FF: __u32 = 2148549941;
 pub const EVIOCGBIT_EV_MSC: __u32 = 2147566884;
 pub const EVIOCGPROP: __u32 = 2147763465;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct remote_binder_command {
+    pub incoming_service: *const crate::arm64_types::c_char,
+    pub wait_callback: ::std::option::Option<unsafe extern "C" fn()>,
+}
+impl Default for remote_binder_command {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub const _REMOTE_BINDER_START: __u32 = 2148553217;
+pub const REMOTE_BINDER_START: __u32 = 2148553217;
+pub const _REMOTE_BINDER_WAIT: __u32 = 20994;
+pub const REMOTE_BINDER_WAIT: __u32 = 20994;
 pub type __uint128_t = u128;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]

@@ -111,4 +111,17 @@ const __u32 EVIOCGBIT_EV_MSC = EVIOCGBIT(EV_MSC, N_BYTES(MSC_MAX));
 const __u32 EVIOCGPROP = EVIOCGPROP(N_BYTES(INPUT_PROP_MAX));
 #undef N_BYTES
 
+// Symbols for remote binder device driver
+
+struct remote_binder_command {
+  const char* incoming_service;
+  void (*wait_callback)();
+};
+
+const __u32 _REMOTE_BINDER_START = _IOR('R', 1, struct remote_binder_command);
+const __u32 REMOTE_BINDER_START = _REMOTE_BINDER_START;
+
+const __u32 _REMOTE_BINDER_WAIT = _IO('R', 2);
+const __u32 REMOTE_BINDER_WAIT = _REMOTE_BINDER_WAIT;
+
 #endif  // SRC_PROC_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_

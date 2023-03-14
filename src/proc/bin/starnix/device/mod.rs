@@ -6,6 +6,7 @@ mod binder;
 mod features;
 mod framebuffer_server;
 mod registry;
+mod remote_binder;
 
 pub use binder::*;
 pub use features::*;

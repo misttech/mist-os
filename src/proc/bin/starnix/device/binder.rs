@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::device::mem::new_null_file;
+use crate::device::remote_binder::RemoteBinderDevice;
 use crate::device::DeviceOps;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::devtmpfs::dev_tmp_fs;
@@ -3621,6 +3622,8 @@ fn make_binder_nodes(current_task: &CurrentTask, dir: &DirEntryHandle) -> Result
         dir.add_node_ops_dev(current_task, name, mode!(IFCHR, 0o600), dev, SpecialNode)?;
         registered_binders.insert(dev, driver);
     }
+    let remote_dev = kernel.device_registry.write().register_dyn_chrdev(RemoteBinderDevice {})?;
+    dir.add_node_ops_dev(current_task, b"remote", mode!(IFCHR, 0o444), remote_dev, SpecialNode)?;
     Ok(())
 }
 
