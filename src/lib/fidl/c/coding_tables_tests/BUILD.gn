@@ -12,7 +12,7 @@ executable("bin") {
   sources = [ "coding_tables_tests.cc" ]
 
   deps = [
-    ":fidl.test.example.codingtables_cpp_wire",
+    ":fidl.test.example.codingtables_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//zircon/system/ulib/fbl",
@@ -24,10 +24,12 @@ executable("bin") {
 fidl("fidl.test.example.codingtablesdeps") {
   visibility = [ ":*" ]
   sources = [ "coding_tables_deps.test.fidl" ]
+  enable_hlcpp = true
 }
 
 fidl("fidl.test.example.codingtables") {
   visibility = [ ":*" ]
   sources = [ "coding_tables.test.fidl" ]
   public_deps = [ ":fidl.test.example.codingtablesdeps" ]
+  enable_hlcpp = true
 }

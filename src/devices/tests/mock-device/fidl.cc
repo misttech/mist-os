@@ -4,10 +4,12 @@
 
 #include "fidl.h"
 
+#include <fuchsia/device/mock/cpp/fidl.h>
 #include <lib/fidl/cpp/message.h>
 #include <lib/fidl/cpp/message_part.h>
 #include <lib/zx/channel.h>
 #include <stdio.h>
+#include <zircon/fidl.h>
 
 #include <utility>
 
@@ -37,9 +39,8 @@ zx_status_t WaitForPerformActions(const zx::channel& c,
   }
 
   const char* err_out = nullptr;
-  status = request.Decode(
-      &fuchsia_device_mock::fuchsia_device_mock_MockDeviceThreadPerformActionsRequestTable,
-      &err_out);
+  status = request.Decode(fuchsia::device::mock::MockDeviceThreadPerformActionsRequest::FidlType,
+                          &err_out);
   if (status != ZX_OK) {
     printf("mock-device-thread: Failed to decode actions: %s\n", err_out);
     return status;

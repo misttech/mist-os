@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fidl.test.example.codingtables/cpp/wire.h>
+#include <fidl/test/example/codingtables/cpp/fidl.h>
 #include <lib/fidl/internal.h>
 
 #include <zxtest/zxtest.h>
 
 TEST(SomeStruct, CodingTable) {
-  const fidl_type& type =
-      fidl_test_example_codingtables::fidl_test_example_codingtables_CodingSomeStructRequestTable;
+  const fidl_type& type = *fidl::test::example::codingtables::CodingSomeStructRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& some_struct_table = type.coded_struct();
   ASSERT_STREQ("fidl.test.example.codingtables/CodingSomeStructRequest", some_struct_table.name);
@@ -56,8 +55,8 @@ TEST(SomeStruct, RequestPayloadCodingTable) {
 }
 
 TEST(StructWithSomeFieldsRemoved, CodingTable) {
-  const fidl_type& type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingStructWithSomeFieldsRemovedFromCodingTablesRequestTable;
+  const fidl_type& type = *fidl::test::example::codingtables::
+                              CodingStructWithSomeFieldsRemovedFromCodingTablesRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& coded_struct = type.coded_struct();
   ASSERT_STREQ(
@@ -95,8 +94,7 @@ TEST(StructWithSomeFieldsRemoved, CodingTable) {
 }
 
 TEST(MyXUnion, CodingTableWhenNullable) {
-  const fidl_type& type =
-      fidl_test_example_codingtables::fidl_test_example_codingtables_CodingMyXUnionRequestTable;
+  const fidl_type& type = *fidl::test::example::codingtables::CodingMyXUnionRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& request_struct = type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -126,8 +124,7 @@ TEST(MyXUnion, CodingTableWhenNullable) {
 }
 
 TEST(MyStrictXUnion, CodingTableWhenNullable) {
-  const fidl_type& type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingMyStrictXUnionRequestTable;
+  const fidl_type& type = *fidl::test::example::codingtables::CodingMyStrictXUnionRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& request_struct = type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -158,8 +155,8 @@ TEST(MyStrictXUnion, CodingTableWhenNullable) {
 }
 
 TEST(MyTable, CodingTable) {
-  const fidl_type& type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingVectorOfMyTableRequestTable;
+  const fidl_type& type =
+      *fidl::test::example::codingtables::CodingVectorOfMyTableRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& request_struct = type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -197,8 +194,8 @@ TEST(MyTable, CodingTable) {
 }
 
 TEST(MyXUnion, CodingTableWhenNonnullable) {
-  const fidl_type& type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingVectorOfMyXUnionRequestTable;
+  const fidl_type& type =
+      *fidl::test::example::codingtables::CodingVectorOfMyXUnionRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& request_struct = type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -222,8 +219,8 @@ TEST(MyXUnion, CodingTableWhenNonnullable) {
 }
 
 TEST(MyStrictXUnion, CodingTableWhenNonnullable) {
-  const fidl_type& type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingVectorOfMyStrictXUnionRequestTable;
+  const fidl_type& type =
+      *fidl::test::example::codingtables::CodingVectorOfMyStrictXUnionRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& request_struct = type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -248,8 +245,7 @@ TEST(MyStrictXUnion, CodingTableWhenNonnullable) {
 }
 
 TEST(MyBits, CodingTable) {
-  const fidl_type& type =
-      fidl_test_example_codingtables::fidl_test_example_codingtables_CodingMyBitsRequestTable;
+  const fidl_type& type = *fidl::test::example::codingtables::CodingMyBitsRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& request_struct = type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -266,8 +262,7 @@ TEST(MyBits, CodingTable) {
 }
 
 TEST(MyEnum, CodingTable) {
-  const fidl_type& type =
-      fidl_test_example_codingtables::fidl_test_example_codingtables_CodingMyEnumRequestTable;
+  const fidl_type& type = *fidl::test::example::codingtables::CodingMyEnumRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& request_struct = type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -287,8 +282,8 @@ TEST(MyEnum, CodingTable) {
 // of collisions that appeared in earlier versions (e.g. number of elements would merge with
 // other content).
 TEST(NumberCollision, CodingTable) {
-  const fidl_type& type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingNumberCollisionRequestTable;
+  const fidl_type& type =
+      *fidl::test::example::codingtables::CodingNumberCollisionRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, type.type_tag());
   const FidlCodedStruct& number_collision_table = type.coded_struct();
   ASSERT_STREQ("fidl.test.example.codingtables/CodingNumberCollisionRequest",
@@ -297,8 +292,8 @@ TEST(NumberCollision, CodingTable) {
 }
 
 TEST(ForeignXUnions, CodingTable) {
-  const fidl_type& req_type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingForeignXUnionsRequestTable;
+  const fidl_type& req_type =
+      *fidl::test::example::codingtables::CodingForeignXUnionsRequest::FidlType;
   ASSERT_EQ(kFidlTypeStruct, req_type.type_tag());
   const FidlCodedStruct& request_struct = req_type.coded_struct();
   ASSERT_EQ(1, request_struct.element_count);
@@ -314,8 +309,8 @@ TEST(ForeignXUnions, CodingTable) {
   ASSERT_EQ(kFidlIsResource_NotResource, tx_table.is_resource);
   ASSERT_EQ(2, tx_table.field_count);
 
-  const fidl_type& resp_type = fidl_test_example_codingtables::
-      fidl_test_example_codingtables_CodingForeignXUnionsResponseTable;
+  const fidl_type& resp_type =
+      *fidl::test::example::codingtables::CodingForeignXUnionsResponse::FidlType;
   ASSERT_EQ(kFidlTypeStruct, resp_type.type_tag());
   const FidlCodedStruct& response_struct = resp_type.coded_struct();
   ASSERT_EQ(1, response_struct.element_count);

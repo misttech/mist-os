@@ -22,7 +22,7 @@ fuchsia_driver("mock-device-driver") {
   ]
   deps = [
     ":fuchsia.device.mock_cpp_wire",
-    ":fuchsia.device.mock_tables",
+    ":fuchsia.device.mock_hlcpp",
     ":mock-device-bind",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/lib/fidl",
@@ -49,4 +49,5 @@ fidl("fuchsia.device.mock") {
   sources = [ "mock-device.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   excluded_checks = [ "event-names-must-start-with-on" ]
+  enable_hlcpp = true
 }
