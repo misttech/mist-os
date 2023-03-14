@@ -333,9 +333,6 @@ pub enum RepositoryError {
 
     #[error("repository server address already in use")]
     ServerAddressAlreadyInUse,
-
-    #[error("repository registration conflict")]
-    ConflictingRegistration,
 }
 
 impl From<fidl::RepositoryError> for RepositoryError {
@@ -366,9 +363,6 @@ impl From<fidl::RepositoryError> for RepositoryError {
             fidl::RepositoryError::InvalidUrl => RepositoryError::InvalidUrl,
             fidl::RepositoryError::ServerAddressAlreadyInUse => {
                 RepositoryError::ServerAddressAlreadyInUse
-            }
-            fidl::RepositoryError::ConflictingRegistration => {
-                RepositoryError::ConflictingRegistration
             }
         }
     }
@@ -402,9 +396,6 @@ impl From<RepositoryError> for fidl::RepositoryError {
             RepositoryError::InvalidUrl => fidl::RepositoryError::InvalidUrl,
             RepositoryError::ServerAddressAlreadyInUse => {
                 fidl::RepositoryError::ServerAddressAlreadyInUse
-            }
-            RepositoryError::ConflictingRegistration => {
-                fidl::RepositoryError::ConflictingRegistration
             }
         }
     }

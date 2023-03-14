@@ -289,6 +289,4 @@ type RepositoryError = strict enum : uint32 {
     INVALID_URL = 13;
     /// The repository server address is already in use.
     SERVER_ADDRESS_ALREADY_IN_USE = 14;
-    /// The repository registration has a conflicting alias.
-    CONFLICTING_REGISTRATION = 15;
 };
