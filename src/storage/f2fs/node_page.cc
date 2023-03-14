@@ -6,10 +6,10 @@
 
 namespace f2fs {
 void NodePage::FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs) {
-  Node &rn = GetRawNode();
-  rn.footer.nid = CpuToLe(nid);
-  rn.footer.ino = CpuToLe(ino);
-  rn.footer.flag = CpuToLe(ofs << static_cast<int>(BitShift::kOffsetBitShift));
+  Node &node = GetRawNode();
+  node.footer.nid = CpuToLe(nid);
+  node.footer.ino = CpuToLe(ino);
+  node.footer.flag = CpuToLe(ofs << static_cast<int>(BitShift::kOffsetBitShift));
 }
 
 void NodePage::CopyNodeFooterFrom(NodePage &src) {

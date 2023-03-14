@@ -38,14 +38,13 @@ zx_status_t F2fs::RecoverDentry(NodePage &ipage, VnodeF2fs &vnode) {
 }
 
 zx_status_t F2fs::RecoverInode(VnodeF2fs &vnode, NodePage &node_page) {
-  struct Node *raw_node = node_page.GetAddress<Node>();
-  struct Inode *raw_inode = &(raw_node->i);
+  Inode &inode = node_page.GetAddress<Node>()->i;
 
-  vnode.SetMode(LeToCpu(raw_inode->i_mode));
-  vnode.SetATime(LeToCpu(raw_inode->i_atime), LeToCpu(raw_inode->i_atime_nsec));
-  vnode.SetCTime(LeToCpu(raw_inode->i_ctime), LeToCpu(raw_inode->i_ctime_nsec));
-  vnode.SetMTime(LeToCpu(raw_inode->i_mtime), LeToCpu(raw_inode->i_mtime_nsec));
-  vnode.InitFileCache(LeToCpu(raw_inode->i_size));
+  vnode.SetMode(LeToCpu(inode.i_mode));
+  vnode.SetATime(LeToCpu(inode.i_atime), LeToCpu(inode.i_atime_nsec));
+  vnode.SetCTime(LeToCpu(inode.i_ctime), LeToCpu(inode.i_ctime_nsec));
+  vnode.SetMTime(LeToCpu(inode.i_mtime), LeToCpu(inode.i_mtime_nsec));
+  vnode.InitFileCache(LeToCpu(inode.i_size));
 
   return RecoverDentry(node_page, vnode);
 }

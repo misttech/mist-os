@@ -320,14 +320,14 @@ void FileTester::ReadFromFile(File *file, void *data, size_t len, size_t off) {
 void MapTester::CheckNodeLevel(F2fs *fs, VnodeF2fs *vn, uint32_t level) {
   LockedPage ipage;
   ASSERT_EQ(fs->GetNodeManager().GetNodePage(vn->Ino(), &ipage), ZX_OK);
-  Inode *inode = &(ipage->GetAddress<Node>()->i);
+  Inode &inode = ipage->GetAddress<Node>()->i;
 
   uint32_t i;
   for (i = 0; i < level; ++i)
-    ASSERT_NE(inode->i_nid[i], 0U);
+    ASSERT_NE(inode.i_nid[i], 0U);
 
   for (; i < kNidsPerInode; ++i)
-    ASSERT_EQ(inode->i_nid[i], 0U);
+    ASSERT_EQ(inode.i_nid[i], 0U);
 }
 
 void MapTester::CheckNidsFree(F2fs *fs, std::unordered_set<nid_t> &nids) {

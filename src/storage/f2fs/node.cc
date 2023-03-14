@@ -1182,7 +1182,6 @@ zx::result<> NodeManager::AllocNid(nid_t &out) {
 }
 
 zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
-  Node *src, *dst;
   nid_t ino = page.InoOfNode();
   NodeInfo old_node_info, new_node_info;
   LockedPage ipage;
@@ -1196,19 +1195,16 @@ zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
 
   GetNodeInfo(ino, old_node_info);
 
-  ipage->SetUptodate();
   ipage.Zero();
   ipage.GetPage<NodePage>().FillNodeFooter(ino, ino, 0);
+  ipage->Write(page.GetAddress(), 0, offsetof(Inode, i_ext));
+  ipage->SetUptodate();
 
-  src = page.GetAddress<Node>();
-  dst = ipage->GetAddress<Node>();
-
-  std::memcpy(dst, src,
-              reinterpret_cast<uint64_t>(&src->i.i_ext) - reinterpret_cast<uint64_t>(&src->i));
-  dst->i.i_size = 0;
-  dst->i.i_blocks = 1;
-  dst->i.i_links = 1;
-  dst->i.i_xattr_nid = 0;
+  Inode &inode = ipage->GetAddress<Node>()->i;
+  inode.i_size = 0;
+  inode.i_blocks = 1;
+  inode.i_links = 1;
+  inode.i_xattr_nid = 0;
 
   new_node_info = old_node_info;
   new_node_info.ino = ino;
@@ -1231,8 +1227,7 @@ zx_status_t NodeManager::RestoreNodeSummary(uint32_t segno, SummaryBlock &sum) {
       return ret;
     }
 
-    Node *rn = page->GetAddress<Node>();
-    sum_entry->nid = rn->footer.nid;
+    sum_entry->nid = page->GetAddress<Node>()->footer.nid;
     sum_entry->version = 0;
     sum_entry->ofs_in_node = 0;
   }

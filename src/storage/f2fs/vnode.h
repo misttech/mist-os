@@ -396,10 +396,6 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetPages(page_offsets);
   }
 
-  std::vector<bool> GetReadaheadPagesInfo(pgoff_t index, uint64_t max_scan) {
-    return file_cache_->GetReadaheadPagesInfo(index, max_scan);
-  }
-
   pgoff_t Writeback(WritebackOperation &operation) { return file_cache_->Writeback(operation); }
 
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax) {
@@ -444,6 +440,8 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t Truncate(size_t len) override __TA_EXCLUDES(mutex_) { return ZX_ERR_NOT_SUPPORTED; }
   DirtyPageList &GetDirtyPageList() const { return file_cache_->GetDirtyPageList(); }
   VmoManager &GetVmoManager() const { return vmo_manager(); }
+
+  block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
 
  protected:
   void RecycleNode() override;

@@ -299,13 +299,13 @@ void Dir::InitDentInode(VnodeF2fs *vnode, NodePage &ipage) {
   ipage.WaitOnWriteback();
 
   // copy name info. to this inode page
-  Node *rn = ipage.GetAddress<Node>();
+  Inode &inode = ipage.GetAddress<Node>()->i;
   std::string_view name = vnode->GetNameView();
   // double check |name|
   ZX_DEBUG_ASSERT(IsValidNameLength(name));
   auto size = safemath::checked_cast<uint32_t>(name.size());
-  rn->i.i_namelen = CpuToLe(size);
-  name.copy(reinterpret_cast<char *>(&rn->i.i_name[0]), size);
+  inode.i_namelen = CpuToLe(size);
+  name.copy(reinterpret_cast<char *>(&inode.i_name[0]), size);
 
   LockedPage lock_page(fbl::RefPtr<Page>(&ipage), false);
   lock_page.SetDirty();

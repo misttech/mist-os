@@ -12,9 +12,8 @@ namespace f2fs {
 //    update block addresses in the node page
 void VnodeF2fs::SetDataBlkaddr(NodePage &node_page, uint32_t ofs_in_node, block_t new_addr) {
   node_page.WaitOnWriteback();
-  Node *rn = node_page.GetAddress<Node>();
   // Get physical address of data block
-  uint32_t *addr_array = BlkaddrInNode(*rn);
+  uint32_t *addr_array = BlkaddrInNode(*node_page.GetAddress<Node>());
 
   if (new_addr == kNewAddr) {
     ZX_DEBUG_ASSERT(addr_array[ofs_in_node] == kNullAddr);

@@ -9,10 +9,9 @@
 namespace f2fs {
 
 uint8_t *Dir::InlineDentryBitmap(Page *page) {
-  Node *rn = page->GetAddress<Node>();
-  Inode &ri = rn->i;
+  Inode &inode = page->GetAddress<Node>()->i;
   return reinterpret_cast<uint8_t *>(
-      &ri.i_addr[GetExtraISize() / sizeof(uint32_t) + kInlineStartOffset]);
+      &inode.i_addr[GetExtraISize() / sizeof(uint32_t) + kInlineStartOffset]);
 }
 
 uint64_t Dir::InlineDentryBitmapSize() const {
@@ -483,28 +482,27 @@ zx_status_t File::RecoverInlineData(NodePage &page) {
   //    x       x  -> recover data blocks
   // ([prev.] is checkpointed data. And [next] is data written and fsynced after checkpoint.)
 
-  Inode *raw_inode = nullptr;
   if (IsInode(page)) {
-    raw_inode = &page.GetAddress<Node>()->i;
-  }
+    Inode &inode = page.GetAddress<Node>()->i;
 
-  // [next] have inline data.
-  if (raw_inode && (raw_inode->i_inline & kInlineData)) {
-    // Process inline.
-    LockedPage ipage;
-    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK) {
-      return err;
+    // [next] have inline data.
+    if (inode.i_inline & kInlineData) {
+      // Process inline.
+      LockedPage ipage;
+      if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK) {
+        return err;
+      }
+      FsBlock block;
+      ipage->WaitOnWriteback();
+      page.Read(block.get(), InlineDataOffset(), MaxInlineData());
+      ipage->Write(block.get(), InlineDataOffset(), MaxInlineData());
+
+      SetFlag(InodeInfoFlag::kInlineData);
+      SetFlag(InodeInfoFlag::kDataExist);
+
+      ipage.SetDirty();
+      return ZX_OK;
     }
-    FsBlock block;
-    ipage->WaitOnWriteback();
-    page.Read(block.get(), InlineDataOffset(), MaxInlineData());
-    ipage->Write(block.get(), InlineDataOffset(), MaxInlineData());
-
-    SetFlag(InodeInfoFlag::kInlineData);
-    SetFlag(InodeInfoFlag::kDataExist);
-
-    ipage.SetDirty();
-    return ZX_OK;
   }
 
   // [prev.] has inline data but [next] has no inline data.

@@ -55,7 +55,7 @@ constexpr pgoff_t kInvalidPageOffset = std::numeric_limits<pgoff_t>::max();
 constexpr block_t kInvalidNodeOffset = std::numeric_limits<block_t>::max();
 
 // For readahead
-constexpr pgoff_t kDefaultReadaheadSize = 32;
+constexpr block_t kDefaultReadaheadSize = 32;
 
 // CountType for monitoring
 //
@@ -495,10 +495,7 @@ class SuperblockInfo {
 
 inline bool RawIsInode(Node &node) { return node.footer.nid == node.footer.ino; }
 
-inline bool IsInode(Page &page) {
-  Node *p = page.GetAddress<Node>();
-  return RawIsInode(*p);
-}
+inline bool IsInode(Page &page) { return RawIsInode(*page.GetAddress<Node>()); }
 
 inline uint32_t *BlkaddrInNode(Node &node) {
   if (RawIsInode(node)) {
@@ -511,10 +508,8 @@ inline uint32_t *BlkaddrInNode(Node &node) {
 }
 
 inline block_t DatablockAddr(NodePage *node_page, uint64_t offset) {
-  Node *raw_node;
-  uint32_t *addr_array;
-  raw_node = node_page->GetAddress<Node>();
-  addr_array = BlkaddrInNode(*raw_node);
+  Node &raw_node = *node_page->GetAddress<Node>();
+  uint32_t *addr_array = BlkaddrInNode(raw_node);
   return LeToCpu(addr_array[offset]);
 }
 

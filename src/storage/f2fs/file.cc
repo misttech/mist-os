@@ -494,7 +494,7 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
 }
 
 void File::VmoRead(uint64_t offset, uint64_t length) {
-  ZX_DEBUG_ASSERT(kBlockSize == PAGE_SIZE);
+  ZX_DEBUG_ASSERT(kBlockSize == zx_system_get_page_size());
   ZX_DEBUG_ASSERT(offset % kBlockSize == 0);
   ZX_DEBUG_ASSERT(length);
   ZX_DEBUG_ASSERT(length % kBlockSize == 0);

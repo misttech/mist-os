@@ -335,7 +335,10 @@ void VmoManager::AllowEviction(fs::PagedVfs &vfs, const size_t start, const size
     return;
   }
   fs::SharedLock lock(mutex_);
-  ZX_ASSERT(vmo_.op_range(ZX_VMO_OP_DONT_NEED, 0, GetContentSizeUnsafe(true), nullptr, 0) == ZX_OK);
+  size_t actual_end = std::min(end, GetContentSizeUnsafe(true));
+  if (start < actual_end) {
+    ZX_ASSERT(vmo_.op_range(ZX_VMO_OP_DONT_NEED, start, actual_end - start, nullptr, 0) == ZX_OK);
+  }
 }
 
 zx_status_t VmoManager::Read(void *data, uint64_t offset, size_t len) {

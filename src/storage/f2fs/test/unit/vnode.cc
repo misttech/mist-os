@@ -37,9 +37,9 @@ void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T 
   {
     LockedPage node_page;
     ASSERT_EQ(fs.GetNodeManager().GetNodePage(nid, &node_page), ZX_OK);
-    Node *rn = node_page->GetAddress<Node>();
+    Node *node = node_page->GetAddress<Node>();
 
-    fault_injection(rn);
+    fault_injection(node);
 
     node_page.SetDirty();
   }
@@ -205,11 +205,11 @@ TEST_F(VnodeTest, VgetExceptionCase) {
   ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), nid, &test_vnode), ZX_ERR_NOT_FOUND);
 
   // 2. Check Create() namelen exception
-  auto namelen_fault_inject = [](Node *rn) { rn->i.i_namelen = 0; };
+  auto namelen_fault_inject = [](Node *node) { node->i.i_namelen = 0; };
   VgetFaultInjetionAndTest(*fs_, *root_dir_, "namelen_dir", namelen_fault_inject, ZX_ERR_NOT_FOUND);
 
   // 3. Check Vget() GetNlink() exception
-  auto nlink_fault_inject = [](Node *rn) { rn->i.i_links = 0; };
+  auto nlink_fault_inject = [](Node *node) { node->i.i_links = 0; };
   VgetFaultInjetionAndTest(*fs_, *root_dir_, "nlink_dir", nlink_fault_inject, ZX_ERR_NOT_FOUND);
 
   test_vnode = nullptr;

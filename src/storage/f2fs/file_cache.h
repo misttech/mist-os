@@ -378,9 +378,8 @@ class FileCache {
   void Downgrade(Page *raw_page) __TA_EXCLUDES(tree_lock_);
   bool IsOrphan() const { return is_orphan_.test(std::memory_order_relaxed); }
   bool SetOrphan() { return is_orphan_.test_and_set(std::memory_order_relaxed); }
-  // Check if |max_scan| pages keep active before |index|. If so, it returns a bitmap indicating
-  // which block needs to be read from |index|.
-  std::vector<bool> GetReadaheadPagesInfo(pgoff_t index, size_t max_scan) __TA_EXCLUDES(tree_lock_);
+  // It returns a bitmap indicating which of blocks requires read I/O.
+  std::vector<bool> GetDirtyPagesInfo(pgoff_t index, size_t max_scan) __TA_EXCLUDES(tree_lock_);
   F2fs *fs() const;
   VmoManager &GetVmoManager() { return *vmo_manager_; }
   DirtyPageList &GetDirtyPageList() { return dirty_page_list_; }

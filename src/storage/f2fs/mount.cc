@@ -22,7 +22,7 @@ const MountOpt default_option[] = {
     {"noacl", 1, false},
     {"disable_ext_identify", 0, true},
     {"inline_xattr", 0, false},
-    {"inline_data", 1, true},
+    {"inline_data", 0, true},
     {"inline_dentry", 1, true},
     {"mode", static_cast<uint32_t>(ModeType::kModeAdaptive), true},
     {"readonly", 0, true},

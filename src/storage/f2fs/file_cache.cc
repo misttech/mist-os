@@ -590,15 +590,14 @@ void FileCache::Reset() {
   vmo_manager_->Reset();
 }
 
-std::vector<bool> FileCache::GetReadaheadPagesInfo(pgoff_t index, size_t max_scan) {
+std::vector<bool> FileCache::GetDirtyPagesInfo(pgoff_t index, size_t max_scan) {
   std::vector<bool> read_blocks;
-  size_t num_read_blocks = kDefaultReadaheadSize;
-  read_blocks.reserve(num_read_blocks);
+  read_blocks.reserve(max_scan);
 
   // Set bits in |read_blocks| which requires read IOs.
-  std::lock_guard tree_lock(tree_lock_);
+  fs::SharedLock tree_lock(tree_lock_);
   auto current = page_tree_.find(index);
-  for (size_t i = 0; i < num_read_blocks; ++i) {
+  for (size_t i = 0; i < max_scan; ++i) {
     read_blocks.push_back(true);
     if (current != page_tree_.end() && current->GetKey() == index + i) {
       if (current->IsDirty() || current->IsWriteback()) {

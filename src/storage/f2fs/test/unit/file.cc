@@ -447,13 +447,13 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
   test_file_vn = nullptr;
 }
 
-TEST_F(FileTest, DISABLED_Readahead) {
+TEST_F(FileTest, Readahead) {
   fbl::RefPtr<fs::Vnode> test_file;
   ASSERT_EQ(root_dir_->Create("test", S_IFREG, &test_file), ZX_OK);
 
   fbl::RefPtr<File> test_file_vn = fbl::RefPtr<File>::Downcast(std::move(test_file));
 
-  constexpr size_t kNumPage = 256;
+  constexpr size_t kNumPage = kAddrsPerBlock * 3;
   constexpr size_t kDataSize = kPageSize * kNumPage;
   std::vector<char> w_buf(kDataSize, 0);
 
@@ -463,13 +463,8 @@ TEST_F(FileTest, DISABLED_Readahead) {
   auto cleanup_file_cache = [&](fbl::RefPtr<File> &test_file_vn) {
     WritebackOperation op = {.bSync = true};
     test_file_vn->Writeback(op);
-    ASSERT_EQ(test_file_vn->Close(), ZX_OK);
-    // WriteCheckpoint clears VnodeCache
-    fs_->WriteCheckpoint(false, false);
-    test_file_vn = nullptr;
-
-    FileTester::Lookup(root_dir_.get(), "test", &test_file);
-    test_file_vn = fbl::RefPtr<File>::Downcast(std::move(test_file));
+    WritebackOperation op1 = {.bReleasePages = true};
+    test_file_vn->Writeback(op1);
   };
 
   cleanup_file_cache(test_file_vn);
@@ -481,56 +476,15 @@ TEST_F(FileTest, DISABLED_Readahead) {
     ASSERT_EQ(test_file_vn->FindPage(0, &page), ZX_ERR_NOT_FOUND);
   }
 
-  // Read at offset 1
-  {
-    char *buf[kPageSize];
-    size_t out_actual;
-    test_file_vn->Read(buf, kPageSize - 1, 1, &out_actual);
-  }
+  block_t block_offset = 0;
+  ASSERT_EQ(test_file_vn->GetReadBlockSize(block_offset, 1, kNumPage), kDefaultReadaheadSize);
 
-  {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(test_file_vn->FindPage(kDefaultReadaheadSize, &page), ZX_ERR_NOT_FOUND);
-    ASSERT_EQ(test_file_vn->FindPage(1, &page), ZX_ERR_NOT_FOUND);
-    page = nullptr;
-    ASSERT_EQ(test_file_vn->FindPage(0, &page), ZX_OK);
-  }
+  block_offset += kDefaultReadaheadSize;
+  ASSERT_EQ(test_file_vn->GetReadBlockSize(block_offset, kDefaultReadaheadSize * 2, kNumPage),
+            kDefaultReadaheadSize * 2);
 
-  cleanup_file_cache(test_file_vn);
-
-  // Read at offset 0
-  {
-    char *buf[kPageSize];
-    size_t out_actual;
-    test_file_vn->Read(buf, kPageSize, 0, &out_actual);
-  }
-
-  {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(test_file_vn->FindPage(kDefaultReadaheadSize, &page), ZX_ERR_NOT_FOUND);
-    ASSERT_EQ(test_file_vn->FindPage(kDefaultReadaheadSize - 1, &page), ZX_OK);
-    page = nullptr;
-    ASSERT_EQ(test_file_vn->FindPage(1, &page), ZX_OK);
-    page = nullptr;
-    ASSERT_EQ(test_file_vn->FindPage(0, &page), ZX_OK);
-  }
-
-  // Sequential Read at offset kDefaultReadaheadSize * kPageSize
-  {
-    char *buf[kPageSize];
-    size_t out_actual;
-    test_file_vn->Read(buf, kPageSize, kDefaultReadaheadSize * kPageSize, &out_actual);
-  }
-
-  {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(test_file_vn->FindPage(2 * kDefaultReadaheadSize, &page), ZX_ERR_NOT_FOUND);
-    ASSERT_EQ(test_file_vn->FindPage(2 * kDefaultReadaheadSize - 1, &page), ZX_OK);
-    page = nullptr;
-    ASSERT_EQ(test_file_vn->FindPage(kDefaultReadaheadSize + 1, &page), ZX_OK);
-    page = nullptr;
-    ASSERT_EQ(test_file_vn->FindPage(kDefaultReadaheadSize, &page), ZX_OK);
-  }
+  block_offset = kNumPage - kDefaultReadaheadSize / 2;
+  ASSERT_EQ(test_file_vn->GetReadBlockSize(block_offset, 1, kNumPage), kDefaultReadaheadSize / 2);
 
   ASSERT_EQ(test_file_vn->Close(), ZX_OK);
   test_file_vn = nullptr;

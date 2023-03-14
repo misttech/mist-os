@@ -142,24 +142,33 @@ void VnodeF2fs::VmoRead(uint64_t offset, uint64_t length) {
   }
 }
 
+block_t VnodeF2fs::GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block) {
+  block_t size = req_size;
+  size = std::max(kDefaultReadaheadSize, size);
+  if (start_block + size > end_block) {
+    size = end_block - start_block;
+  }
+  return size;
+}
+
 zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t offset,
                                                    const size_t length) {
-  size_t vmo_size = 0;
-  // do readahead if |scan_blocks| of active pages are alive before |index| in order.
-  size_t scan_blocks = 4UL;
   std::vector<bool> block_bitmap;
-  size_t block_offset = offset / kBlockSize;
+  size_t vmo_size = fbl::round_up(length, kBlockSize);
   size_t file_size = GetSize();
+  block_t num_read_blocks = safemath::checked_cast<block_t>(vmo_size / kBlockSize);
+  block_t start_block = safemath::checked_cast<block_t>(offset / kBlockSize);
 
-  if (TestFlag(InodeInfoFlag::kInlineData) || TestFlag(InodeInfoFlag::kNoAlloc) ||
-      offset >= file_size) {
-    // Just supply pages without read I/Os for appended or inline area.
-    vmo_size = fbl::round_up(length, kBlockSize);
-  } else {
-    block_bitmap = GetReadaheadPagesInfo(block_offset, scan_blocks);
-    ZX_DEBUG_ASSERT(block_bitmap.size() >= length / kBlockSize);
-    vmo_size =
-        std::min(fbl::round_up(file_size, kBlockSize) - offset, block_bitmap.size() * kBlockSize);
+  // Just supply pages for appended or inline area without read I/Os.
+  if (!TestFlag(InodeInfoFlag::kInlineData) && !TestFlag(InodeInfoFlag::kNoAlloc) &&
+      offset < file_size) {
+    block_t end_block =
+        safemath::checked_cast<block_t>(fbl::round_up(file_size, kBlockSize) / kBlockSize);
+    num_read_blocks = GetReadBlockSize(start_block, num_read_blocks, end_block);
+    // Get the information about which of blocks are subject to writeback.
+    block_bitmap = file_cache_->GetDirtyPagesInfo(start_block, num_read_blocks);
+    ZX_ASSERT(num_read_blocks == block_bitmap.size());
+    vmo_size = num_read_blocks * kBlockSize;
   }
 
   // Create vmo to feed paged vmo.
@@ -172,26 +181,25 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
     return zx::error(ret);
   }
 
-  // It tries read IOs only for valid block addrs unless regarding pages are subject to writeback.
+  // Read blocks only for valid block addrs unless regarding pages are subject to writeback.
   if (block_bitmap.size()) {
-    size_t block_length = vmo_size / kBlockSize;
     auto addrs =
-        fs()->GetNodeManager().GetDataBlockAddresses(*this, block_offset, block_length, true);
+        fs()->GetNodeManager().GetDataBlockAddresses(*this, start_block, num_read_blocks, true);
     if (addrs.is_error()) {
       return addrs.take_error();
     }
-    auto i = 0;
-    auto read_blocks = 0;
+    int i = 0;
+    block_t actual_read_blocks = 0;
     for (auto &addr : *addrs) {
       if (!block_bitmap[i++]) {
         // no read IOs for dirty and writeback pages.
         addr = kNullAddr;
       } else if (addr != kNewAddr && addr != kNullAddr) {
         // the number of blocks to be read.
-        ++read_blocks;
+        ++actual_read_blocks;
       }
     }
-    if (read_blocks) {
+    if (actual_read_blocks) {
       if (auto status = fs()->MakeReadOperations(vmo, *addrs, PageType::kData); status.is_error()) {
         return status.take_error();
       }
@@ -503,70 +511,65 @@ zx_status_t VnodeF2fs::Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
 }
 
 void VnodeF2fs::UpdateInode(LockedPage &inode_page) {
-  Node *rn;
-  Inode *ri;
-
   inode_page->WaitOnWriteback();
+  Inode &inode = inode_page->GetAddress<Node>()->i;
 
-  rn = inode_page->GetAddress<Node>();
-  ri = &(rn->i);
-
-  ri->i_mode = CpuToLe(GetMode());
-  ri->i_advise = GetAdvise();
-  ri->i_uid = CpuToLe(GetUid());
-  ri->i_gid = CpuToLe(GetGid());
-  ri->i_links = CpuToLe(GetNlink());
-  ri->i_size = CpuToLe(GetSize());
+  inode.i_mode = CpuToLe(GetMode());
+  inode.i_advise = GetAdvise();
+  inode.i_uid = CpuToLe(GetUid());
+  inode.i_gid = CpuToLe(GetGid());
+  inode.i_links = CpuToLe(GetNlink());
+  inode.i_size = CpuToLe(GetSize());
   // For on-disk i_blocks, we keep counting inode block for backward compatibility.
-  ri->i_blocks = CpuToLe(safemath::CheckAdd<uint64_t>(GetBlocks(), 1).ValueOrDie());
-  SetRawExtent(ri->i_ext);
+  inode.i_blocks = CpuToLe(safemath::CheckAdd<uint64_t>(GetBlocks(), 1).ValueOrDie());
+  SetRawExtent(inode.i_ext);
 
-  ri->i_atime = CpuToLe(static_cast<uint64_t>(GetATime().tv_sec));
-  ri->i_ctime = CpuToLe(static_cast<uint64_t>(GetCTime().tv_sec));
-  ri->i_mtime = CpuToLe(static_cast<uint64_t>(GetMTime().tv_sec));
-  ri->i_atime_nsec = CpuToLe(static_cast<uint32_t>(GetATime().tv_nsec));
-  ri->i_ctime_nsec = CpuToLe(static_cast<uint32_t>(GetCTime().tv_nsec));
-  ri->i_mtime_nsec = CpuToLe(static_cast<uint32_t>(GetMTime().tv_nsec));
-  ri->i_current_depth = CpuToLe(static_cast<uint32_t>(GetCurDirDepth()));
-  ri->i_xattr_nid = CpuToLe(GetXattrNid());
-  ri->i_flags = CpuToLe(GetInodeFlags());
-  ri->i_pino = CpuToLe(GetParentNid());
-  ri->i_generation = CpuToLe(GetGeneration());
-  ri->i_dir_level = GetDirLevel();
+  inode.i_atime = CpuToLe(static_cast<uint64_t>(GetATime().tv_sec));
+  inode.i_ctime = CpuToLe(static_cast<uint64_t>(GetCTime().tv_sec));
+  inode.i_mtime = CpuToLe(static_cast<uint64_t>(GetMTime().tv_sec));
+  inode.i_atime_nsec = CpuToLe(static_cast<uint32_t>(GetATime().tv_nsec));
+  inode.i_ctime_nsec = CpuToLe(static_cast<uint32_t>(GetCTime().tv_nsec));
+  inode.i_mtime_nsec = CpuToLe(static_cast<uint32_t>(GetMTime().tv_nsec));
+  inode.i_current_depth = CpuToLe(static_cast<uint32_t>(GetCurDirDepth()));
+  inode.i_xattr_nid = CpuToLe(GetXattrNid());
+  inode.i_flags = CpuToLe(GetInodeFlags());
+  inode.i_pino = CpuToLe(GetParentNid());
+  inode.i_generation = CpuToLe(GetGeneration());
+  inode.i_dir_level = GetDirLevel();
 
   std::string_view name = GetNameView();
   // double check |name|
   ZX_DEBUG_ASSERT(IsValidNameLength(name));
   auto size = safemath::checked_cast<uint32_t>(name.size());
-  ri->i_namelen = CpuToLe(size);
-  name.copy(reinterpret_cast<char *>(&ri->i_name[0]), size);
+  inode.i_namelen = CpuToLe(size);
+  name.copy(reinterpret_cast<char *>(&inode.i_name[0]), size);
 
   if (TestFlag(InodeInfoFlag::kInlineData)) {
-    ri->i_inline |= kInlineData;
+    inode.i_inline |= kInlineData;
   } else {
-    ri->i_inline &= ~kInlineData;
+    inode.i_inline &= ~kInlineData;
   }
   if (TestFlag(InodeInfoFlag::kInlineDentry)) {
-    ri->i_inline |= kInlineDentry;
+    inode.i_inline |= kInlineDentry;
   } else {
-    ri->i_inline &= ~kInlineDentry;
+    inode.i_inline &= ~kInlineDentry;
   }
   if (GetExtraISize()) {
-    ri->i_inline |= kExtraAttr;
-    ri->i_extra_isize = GetExtraISize();
+    inode.i_inline |= kExtraAttr;
+    inode.i_extra_isize = GetExtraISize();
     if (TestFlag(InodeInfoFlag::kInlineXattr)) {
-      ri->i_inline_xattr_size = GetInlineXattrAddrs();
+      inode.i_inline_xattr_size = GetInlineXattrAddrs();
     }
   }
   if (TestFlag(InodeInfoFlag::kDataExist)) {
-    ri->i_inline |= kDataExist;
+    inode.i_inline |= kDataExist;
   } else {
-    ri->i_inline &= ~kDataExist;
+    inode.i_inline &= ~kDataExist;
   }
   if (TestFlag(InodeInfoFlag::kInlineXattr)) {
-    ri->i_inline |= kInlineXattr;
+    inode.i_inline |= kInlineXattr;
   } else {
-    ri->i_inline &= ~kInlineXattr;
+    inode.i_inline &= ~kInlineXattr;
   }
 
   inode_page.SetDirty();
@@ -617,10 +620,10 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
 
 int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node, uint32_t count) {
   int nr_free = 0;
-  Node *raw_node = node_page.GetAddress<Node>();
+  Node &node = *node_page.GetAddress<Node>();
 
   for (; count > 0; --count, ++ofs_in_node) {
-    uint32_t *addr = BlkaddrInNode(*raw_node) + ofs_in_node;
+    uint32_t *addr = BlkaddrInNode(node) + ofs_in_node;
     block_t blkaddr = LeToCpu(*addr);
     if (blkaddr == kNullAddr)
       continue;
