@@ -18,9 +18,7 @@ not expecting, causing `rust-analyzer` to not work correctly.
 
 ### Currently supported version {#supported-rust-analyzer-version}
 
-Currently, use [version v0.3.1418 of `rust-analyzer`][rust-analyzer-release]. More recent versions have a [known issue](https://github.com/rust-lang/rust-analyzer/issues/14276) where they hang on the "Fetching" stage.
-
-[rust-analyzer-release]: https://github.com/rust-lang/rust-analyzer/releases/tag/2023-02-27
+Currently, use [the **latest version** of `rust-analyzer`][rust-analyzer-latest].
 
 ## Visual Studio Code {#visual-studio-code}
 
@@ -171,6 +169,7 @@ See instructions on [the Intellij Rust site](https://intellij-rust.github.io/).
 Finally, follow [these steps][cargo-toml-gen] to generate a `Cargo.toml` file for use by Intellij.
 Note that cargo-based workflows are more likely to break than rust-analyzer based ones.
 
+[rust-analyzer-latest]: https://github.com/rust-analyzer/rust-analyzer/releases
 [vscode-extension-guide]: /docs/reference/tools/editors/vscode/extensions.md#rust-analyzer
 [vscode-download]: https://code.visualstudio.com/Download
 [vscode-update]:  https://vscode-docs.readthedocs.io/en/stable/supporting/howtoupdate/
