@@ -20,12 +20,12 @@ mod repo_publish;
 pub use crate::{
     args::{
         PackageArchiveCreateCommand, PackageArchiveExtractCommand, PackageBuildCommand,
-        RepoCreateCommand, RepoPublishCommand,
+        RepoCreateCommand, RepoMergeCommand, RepoPublishCommand,
     },
     package_archive::{cmd_package_archive_create, cmd_package_archive_extract},
     package_build::cmd_package_build,
     repo_create::cmd_repo_create,
-    repo_publish::{cmd_repo_publish, repo_merge},
+    repo_publish::{cmd_repo_merge, cmd_repo_publish},
 };
 
 pub(crate) const PACKAGE_MANIFEST_NAME: &str = "package_manifest.json";

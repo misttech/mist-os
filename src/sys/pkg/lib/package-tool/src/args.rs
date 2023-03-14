@@ -193,6 +193,31 @@ pub struct RepoPublishCommand {
     pub repo_path: Utf8PathBuf,
 }
 
+/// Merge repositories.
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "merge")]
+pub struct RepoMergeCommand {
+    /// path to the source repository directory
+    #[argh(positional)]
+    pub src_repo_path: Utf8PathBuf,
+
+    /// path to the initial trusted root metadata (Default is to use 1.root.json from the source repository)
+    #[argh(option)]
+    pub src_trusted_root_path: Option<Utf8PathBuf>,
+
+    /// path to the destination repository directory
+    #[argh(positional)]
+    pub dest_repo_path: Utf8PathBuf,
+
+    /// path to the keys used to sign and trust metadata (Default is to use repository `keys/` directory)
+    #[argh(option)]
+    pub dest_trusted_keys: Option<Utf8PathBuf>,
+
+    /// path to the initial trusted root metadata (Default is to use 1.root.json from the destination repository)
+    #[argh(option)]
+    pub dest_trusted_root_path: Option<Utf8PathBuf>,
+}
+
 fn parse_copy_mode(value: &str) -> Result<CopyMode, String> {
     match value {
         "copy" => Ok(CopyMode::Copy),

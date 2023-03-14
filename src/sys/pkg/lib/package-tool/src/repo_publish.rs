@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::args::RepoPublishCommand,
+    crate::args::{RepoMergeCommand, RepoPublishCommand},
     anyhow::{format_err, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     fidl_fuchsia_developer_ffx::ListFields,
@@ -83,6 +83,25 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub async fn cmd_repo_merge(cmd: RepoMergeCommand) -> Result<()> {
+    let src_trusted_root_path = cmd
+        .src_trusted_root_path
+        .unwrap_or(cmd.src_repo_path.join("repository").join("1.root.json"));
+    let dest_trusted_root_path = cmd
+        .dest_trusted_root_path
+        .unwrap_or(cmd.dest_repo_path.join("repository").join("1.root.json"));
+    let dest_trusted_keys = cmd.dest_trusted_keys.unwrap_or(cmd.dest_repo_path.join("keys"));
+
+    repo_merge(
+        cmd.src_repo_path,
+        src_trusted_root_path,
+        cmd.dest_repo_path,
+        dest_trusted_keys,
+        dest_trusted_root_path,
+    )
+    .await
 }
 
 async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
@@ -1040,7 +1059,6 @@ mod tests {
 
         // Prepare src repo
         let src_repo_path = dir.join("fuchsia");
-        let src_trusted_root = src_repo_path.join("repository").join("1.root.json");
         create_dir_all(&src_repo_path).unwrap();
         test_utils::make_pm_repository(&src_repo_path).await;
         std::os::unix::fs::symlink(
@@ -1102,17 +1120,15 @@ mod tests {
         );
         assert!(trusted_targets.targets().get("packageb/0").is_none());
 
-        assert_matches!(
-            repo_merge(
-                src_repo_path,
-                src_trusted_root,
-                dest_repo_path,
-                repo_keys_path,
-                dest_trusted_root
-            )
-            .await,
-            Ok(())
-        );
+        let merge_cmd = RepoMergeCommand {
+            src_repo_path,
+            src_trusted_root_path: None,
+            dest_repo_path,
+            dest_trusted_root_path: None,
+            dest_trusted_keys: None,
+        };
+
+        assert_matches!(cmd_repo_merge(merge_cmd).await, Ok(()));
 
         // Validate merkle of package A is updated, and we can see package B.
         repo_client.update().await.unwrap();

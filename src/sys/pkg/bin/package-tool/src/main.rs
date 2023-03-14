@@ -11,8 +11,9 @@ use {
     argh::FromArgs,
     package_tool::{
         cmd_package_archive_create, cmd_package_archive_extract, cmd_package_build,
-        cmd_repo_create, cmd_repo_publish, PackageArchiveCreateCommand,
-        PackageArchiveExtractCommand, PackageBuildCommand, RepoCreateCommand, RepoPublishCommand,
+        cmd_repo_create, cmd_repo_merge, cmd_repo_publish, PackageArchiveCreateCommand,
+        PackageArchiveExtractCommand, PackageBuildCommand, RepoCreateCommand, RepoMergeCommand,
+        RepoPublishCommand,
     },
 };
 
@@ -73,6 +74,7 @@ struct RepoCommand {
 enum RepoSubCommands {
     Create(RepoCreateCommand),
     Publish(RepoPublishCommand),
+    Merge(RepoMergeCommand),
 }
 
 #[fuchsia::main]
@@ -89,6 +91,7 @@ async fn main() -> Result<()> {
         SubCommands::Repository(cmd) => match cmd.subcommands {
             RepoSubCommands::Create(cmd) => cmd_repo_create(cmd).await,
             RepoSubCommands::Publish(cmd) => cmd_repo_publish(cmd).await,
+            RepoSubCommands::Merge(cmd) => cmd_repo_merge(cmd).await,
         },
     }
 }
