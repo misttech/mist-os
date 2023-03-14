@@ -272,7 +272,9 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
   arch_set_current_thread(newthread);
 
   // set the GS:in_restricted_mode pointer to the state of the new thread
-  arch_set_restricted_flag(newthread->restricted_state().in_restricted());
+  const bool in_restricted =
+      newthread->restricted_state() != nullptr && newthread->restricted_state()->in_restricted();
+  arch_set_restricted_flag(in_restricted);
 
   x86_64_context_switch(&oldthread->arch().sp, newthread->arch().sp
 #if __has_feature(safe_stack)

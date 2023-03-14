@@ -14,6 +14,7 @@
 #include <lib/fxt/thread_ref.h>
 #include <lib/relaxed_atomic.h>
 #include <lib/zircon-internal/thread_annotations.h>
+#include <lib/zx/result.h>
 #include <platform.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
@@ -1257,7 +1258,20 @@ struct Thread {
       return Thread::Current::Get()->memory_allocation_state_;
     }
 
-    static RestrictedState& restricted_state() { return Thread::Current::Get()->restricted_state_; }
+    static zx_status_t AllocateRestrictedState() {
+      Thread* t = Thread::Current::Get();
+      DEBUG_ASSERT(t->restricted_state_ == nullptr);
+      fbl::AllocChecker ac;
+      t->restricted_state_ = ktl::make_unique<RestrictedState>(&ac);
+      if (!ac.check()) {
+        return ZX_ERR_NO_MEMORY;
+      }
+      return ZX_OK;
+    }
+
+    static RestrictedState* restricted_state() {
+      return Thread::Current::Get()->restricted_state();
+    }
 
     // Generate a backtrace for the calling thread.
     //
@@ -1466,8 +1480,7 @@ struct Thread {
   const lockdep::ThreadLockState& lock_state() const { return lock_state_; }
 #endif
 
-  RestrictedState& restricted_state() { return restricted_state_; }
-  const RestrictedState& restricted_state() const { return restricted_state_; }
+  RestrictedState* restricted_state() { return restricted_state_.get(); }
 
   arch_thread& arch() { return arch_; }
   const arch_thread& arch() const { return arch_; }
@@ -1592,7 +1605,8 @@ struct Thread {
   TaskState task_state_;
   PreemptionState preemption_state_;
   MemoryAllocationState memory_allocation_state_;
-  RestrictedState restricted_state_;
+  // Must only be accessed by "this" thread. May be null.
+  ktl::unique_ptr<RestrictedState> restricted_state_;
   // This is part of ensuring that all stack ownership of loaned pages can be boosted in priority
   // via priority inheritance if a higher priority thread is trying to reclaim the loaned pages.
   StackOwnedLoanedPagesInterval* stack_owned_loaned_pages_interval_ = nullptr;

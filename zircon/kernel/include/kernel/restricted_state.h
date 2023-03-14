@@ -66,7 +66,7 @@ class ArchRestrictedStateImpl {
 // expensive register state.
 class RestrictedState {
  public:
-  RestrictedState() = default;
+  RestrictedState();
   ~RestrictedState() = default;
   DISALLOW_COPY_ASSIGN_AND_MOVE(RestrictedState);
 
