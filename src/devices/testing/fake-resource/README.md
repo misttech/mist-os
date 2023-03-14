@@ -7,7 +7,11 @@ for the following system calls:
 - **zx_vmo_create_physical**()
 - **zx_ioports_request**()
 - **zx_ioports_release**()
+- **zx_smc_call**()
 
-The library exposes methods for creating and destroying fake BTI "handles" that
-are compatible with the fake BTI syscalls.  It is not safe to use any other
-handle operations on the fake BTI and PMT handles.
+`<lib/fake-resource/resource.h>` provides the falling functions to configure syscall behavior:
+
+- **fake_root_resource_create**()
+- **fake_smc_set_handler**()
+- **fake_smc_set_results**()
+- **fake_smc_unset**()
