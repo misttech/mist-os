@@ -49,8 +49,15 @@ rustc_cdylib("lib") {
 
 python_c_extension("fuchsia_controller_py") {
   sources = [
+    "abi/fidl_channel.cc",
+    "abi/fidl_channel.h",
+    "abi/fidl_handle.cc",
+    "abi/fidl_handle.h",
     "abi/fuchsia_controller.h",
     "abi/fuchsia_controller_py.cc",
+    "abi/macros.h",
+    "abi/mod.cc",
+    "abi/mod.h",
   ]
 
   deps = [

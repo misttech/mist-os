@@ -6,10 +6,10 @@ import os
 import asyncio
 
 
-async def read_handle(fd, handle):
+async def channel_read(fd, channel):
     while True:
         try:
-            return handle.read()
+            return channel.read()
         except RuntimeError:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, lambda: os.read(fd, 4))
@@ -19,14 +19,14 @@ async def async_main():
     os.putenv('FFX_BIN', 'host_x64/ffx')
     ctx = Context({})
     fd = open_handle_notifier()
-    hdl = ctx.open_daemon_protocol('fuchsia.developer.ffx.Echo')
+    ch = ctx.open_daemon_protocol('fuchsia.developer.ffx.Echo')
     # For now this is just a raw encoded FIDL message.
     out = bytearray(
         b'\x01\x00\x00\x00\x02\x00\x00\x01%z\xcet\x90g/\x00\x06\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xfffoobar\x00\x00'
     )
-    hdl.write((out, []))
+    ch.write((out, []))
     print(f'Was able to write: {out}')
-    (b, _) = await read_handle(fd, hdl)
+    (b, _) = await channel_read(fd, ch)
     print(f'Read: {b}')
     assert out == b
 
