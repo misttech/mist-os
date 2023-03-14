@@ -169,4 +169,60 @@ test_platforms = [
   {
     device_type = "GCE"
   },
+
+  # Testbeds with auxiliary devices for E2E tests
+  {
+    access_points = "1"
+    device_type = "Astro"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    device_type = "Astro"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    attenuators = "1"
+    device_type = "Astro"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    device_type = "Sherlock"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    device_type = "Sherlock"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    attenuators = "1"
+    device_type = "Sherlock"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    device_type = "Nelson"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    device_type = "Nelson"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
+  {
+    access_points = "1"
+    attenuators = "1"
+    device_type = "Nelson"
+    iperf_servers = "1"
+    pool = "fuchsia.tests.connectivity"
+  },
 ]
