@@ -13,6 +13,9 @@
 
 namespace paver {
 
+constexpr std::string_view kBlobfsPartitionLabel = "blobfs";
+constexpr std::string_view kDataPartitionLabel = "data";
+
 // Options for locating an FVM within a partition.
 enum class BindOption {
   // Bind to the FVM, if it exists already.

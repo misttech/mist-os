@@ -38,7 +38,6 @@
 #include "src/lib/storage/fs_management/cpp/fvm.h"
 #include "src/lib/uuid/uuid.h"
 #include "src/security/lib/zxcrypt/client.h"
-#include "src/storage/fshost/constants.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/fvm_sparse.h"
 
@@ -640,9 +639,9 @@ zx::result<> AllocateEmptyPartitions(const fbl::unique_fd& devfs_root,
                                      const fbl::unique_fd& fvm_fd) {
   FvmPartition fvm_partitions[] = {
       FvmPartition::Make(std::array<uint8_t, fvm::kGuidSize>(GUID_BLOB_VALUE),
-                         fshost::kBlobfsPartitionLabel),
+                         paver::kBlobfsPartitionLabel),
       FvmPartition::Make(std::array<uint8_t, fvm::kGuidSize>(GUID_DATA_VALUE),
-                         fshost::kDataPartitionLabel)};
+                         paver::kDataPartitionLabel)};
   fbl::Array<PartitionInfo> partitions(new PartitionInfo[2]{{
                                                                 .pd = &fvm_partitions[0].descriptor,
                                                                 .active = true,

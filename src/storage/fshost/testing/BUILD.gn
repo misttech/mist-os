@@ -2,34 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-import("//build/dist/component_manifest_resources.gni")
-import("//build/test.gni")
 import("//src/storage/fshost/fshost.gni")
-import("//tools/cmc/build/cmc.gni")
-
-source_set("integration_test_fixture") {
-  testonly = true
-  sources = [
-    "fshost_integration_test.cc",
-    "fshost_integration_test.h",
-    "mock-block-device.h",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp_wire",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_wire",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_hlcpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
-    "//sdk/lib/fdio",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/storage/fshost:headers",
-  ]
-  deps = [
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/inspect/service/cpp:cpp",
-  ]
-}
 
 fshost_component_and_config("test-fshost") {
   testonly = true

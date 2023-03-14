@@ -379,10 +379,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/storage/fshost:fshost-registry",
-
-    #------------------
-    #------------------
     "//src/storage/testing/driver_test_realm:bin",
 
     #------------------

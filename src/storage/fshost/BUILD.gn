@@ -4,13 +4,7 @@
 
 import("//build/components.gni")
 import("//build/dist/component_manifest_resources.gni")
-import("//build/test.gni")
 import("//src/storage/fshost/fshost.gni")
-import("//tools/cmc/build/cmc.gni")
-
-source_set("headers") {
-  sources = [ "constants.h" ]
-}
 
 source_set("admin-client") {
   sources = [
@@ -23,191 +17,6 @@ source_set("admin-client") {
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zx",
   ]
-}
-
-source_set("launcher") {
-  visibility = [ ":*" ]
-  sources = [ "fdio.cc" ]
-  deps = [
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
-    "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-source_set("fshost-registry") {
-  sources = [
-    "admin-server.cc",
-    "fs-manager.cc",
-    "fshost-boot-args.cc",
-    "lifecycle.cc",
-  ]
-  public_deps = [
-    ":config",
-    ":headers",
-    ":inspect",
-    ":launcher",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp_wire",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/vfs/cpp",
-    "//src/lib/loader_service",
-    "//src/lib/storage/fs_management",
-    "//src/lib/storage/vfs/cpp",
-    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
-    "//src/storage/fxfs:fuchsia.fxfs_cpp_wire",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/zx",
-  ]
-  deps = [
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp_natural_ostream",
-    "//sdk/lib/fdio",
-    "//src/lib/files",
-    "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-    "//zircon/system/ulib/fzl",
-    "//zircon/third_party/ulib/safemath",
-  ]
-}
-
-source_set("inspect") {
-  sources = [
-    "inspect-manager.cc",
-    "inspect-manager.h",
-  ]
-  public_deps = [
-    "//sdk/lib/fdio",
-    "//sdk/lib/sys/inspect/cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/lib/fsl",
-    "//src/lib/storage/fs_management",
-    "//src/lib/storage/vfs/cpp",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
-source_set("block-watcher") {
-  configs += [ "//build/config:all_source" ]
-  sources = [
-    "block-device-manager.cc",
-    "block-device.cc",
-    "block-watcher.cc",
-    "encrypted-volume.cc",
-    "filesystem-mounter.cc",
-    "fxfs.cc",
-    "nand-device.cc",
-    "storage-wiper.cc",
-    "utils.cc",
-    "watcher.cc",
-  ]
-  public_deps = [
-    ":config",
-    ":fshost-registry",
-    ":launcher",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
-    "//sdk/lib/fit",
-    "//sdk/lib/fit-promise",
-    "//src/lib/storage/vfs/cpp",
-    "//src/storage/blobfs",
-    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
-    "//src/storage/fxfs:fuchsia.fxfs_cpp_wire",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/zx",
-  ]
-  deps = [
-    ":headers",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl",
-    "//sdk/lib/fit",
-    "//src/devices/block/drivers/block-verity:verified-volume-client",
-    "//src/lib/digest",
-    "//src/lib/files",
-    "//src/lib/loader_service",
-    "//src/lib/storage/fs_management",
-    "//src/lib/storage/key-bag/c",
-    "//src/lib/storage/ramdevice_client/cpp",
-    "//src/lib/storage/vfs/cpp",
-    "//src/lib/uuid:uuid",
-    "//src/security/lib/fcrypto",
-    "//src/security/lib/kms-stateless",
-    "//src/security/lib/zxcrypt:zxcrypt-client",
-    "//src/storage/f2fs",
-    "//src/storage/gpt",
-    "//src/storage/minfs",
-    "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_cpp_wire",
-    "//zircon/system/ulib/explicit-memory",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-engine",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-source_set("config") {
-  sources = [ "config.cc" ]
-  public_deps = [
-    ":fshost_config",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
-executable("fshost") {
-  if (is_fuchsia) {
-    configs += [ "//build/config:all_source" ]
-  }
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
-  sources = [ "main.cc" ]
-  deps = [
-    ":block-watcher",
-    ":config",
-    ":fshost-registry",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/lib/device-watcher/cpp",
-    "//src/lib/storage/fs_management",
-    "//src/lib/storage/ramdevice_client/cpp",
-    "//third_party/zstd",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-  ]
-}
-
-# Include this target from a product config if you want to allow authoring
-# factory partition contents in mutable mode and prevent opening block-verity
-# volumes in verified read mode.
-generated_resource("allow-authoring-factory") {
-  outputs = [ "config/allow-authoring-factory" ]
-  contents = "yes"
-
-  # We should never allow authoring factory from a production, user-facing build.
-  deps = [ "//build/validate:non_production_tag" ]
 }
 
 # This is only used for generating the structured configuration library, as the
@@ -223,10 +32,6 @@ fuchsia_component_manifest("fshost_manifest_for_config_lib") {
   manifest = get_target_outputs(":fshost_for_config_lib.cml")
   manifest = manifest[0]
   deps = [ ":fshost_for_config_lib.cml" ]
-}
-
-fuchsia_structured_config_cpp_elf_lib("fshost_config") {
-  cm_label = ":fshost_manifest_for_config_lib"
 }
 
 fuchsia_structured_config_rust_lib("fshost_config_rust") {
