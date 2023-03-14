@@ -58,6 +58,10 @@ impl PidTable {
         entry.task = None;
     }
 
+    pub fn get_thread_group(&self, pid: pid_t) -> Option<Arc<ThreadGroup>> {
+        self.get_entry(pid).and_then(|entry| entry.group.as_ref()).and_then(|group| group.upgrade())
+    }
+
     pub fn get_thread_groups(&self) -> Vec<Arc<ThreadGroup>> {
         self.table
             .iter()

@@ -826,7 +826,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     }
 
     /// Returns a task in the current thread group.
-    fn get_task(&self) -> Result<Arc<Task>, Errno> {
+    pub fn get_task(&self) -> Result<Arc<Task>, Errno> {
         self.tasks
             .get(&self.leader())
             .map(|t| {

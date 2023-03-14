@@ -4,7 +4,6 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::auth::Credentials;
 use crate::device::mem::new_null_file;
 use crate::device::DeviceOps;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
@@ -37,7 +36,11 @@ use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{TryFutureExt, TryStreamExt};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{
+    btree_map::{BTreeMap, Entry},
+    VecDeque,
+};
+use std::ffi::CString;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes};
@@ -66,9 +69,6 @@ pub struct BinderDriver {
     /// value is removed from the map.
     procs: RwLock<BTreeMap<u64, Arc<BinderProcess>>>,
 
-    /// The currently connected remote clients.
-    remote_tasks: RwLock<BTreeMap<u64, Arc<RemoteBinderTask>>>,
-
     /// The identifier to use for the next created `BinderProcess`.
     next_identifier: AtomicU64,
 }
@@ -81,7 +81,7 @@ impl DeviceOps for Arc<BinderDriver> {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let binder_proc = self.create_process(current_task.get_pid());
+        let binder_proc = self.create_local_process(current_task.get_pid());
         Ok(Box::new(BinderConnection { identifier: binder_proc.identifier, driver: self.clone() }))
     }
 }
@@ -150,14 +150,7 @@ impl FileOps for BinderConnection {
         user_addr: UserAddress,
     ) -> Result<SyscallResult, Errno> {
         let proc = self.proc(current_task)?;
-        let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
-        self.driver.ioctl(
-            &CurrentBinderTask { task: current_task },
-            &proc,
-            &binder_thread,
-            request,
-            user_addr,
-        )
+        self.driver.ioctl(current_task, &proc, request, user_addr)
     }
 
     fn get_vmo(
@@ -267,34 +260,6 @@ struct CommandQueueWithWaitQueue {
     waiters: WaitQueue,
 }
 
-#[derive(Debug)]
-struct BinderProcess {
-    /// A global identifier at the driver level for this binder process.
-    identifier: u64,
-
-    /// The identifier of the process associated with this binder process.
-    pid: pid_t,
-
-    // The mutable state of `BinderProcess` is protected by 3 locks. For ordering purpose, locks
-    // must be taken in the order they are defined in this class, even across `BinderProcess`
-    // instances.
-    // Moreover, any `BinderThread` lock must be ordered after any `state` lock from a
-    // `BinderProcess`.
-    /// The [`SharedMemory`] region mapped in both the driver and the binder process. Allows for
-    /// transactions to copy data once from the sender process into the receiver process.
-    shared_memory: Mutex<Option<SharedMemory>>,
-    /// The main mutable state of the `BinderProcess`.
-    state: Mutex<BinderProcessState>,
-    /// A queue for commands that could not be scheduled on any existing binder threads. Binder
-    /// threads that exhaust their own queue will read from this one.
-    ///
-    /// When there are no commands in a thread's and the process' command queue, a binder thread can
-    /// register with this [`WaitQueue`] to be notified when commands are available.
-    command_queue: Mutex<CommandQueueWithWaitQueue>,
-}
-
-type BinderProcessGuard<'a> = Guard<'a, BinderProcess, MutexGuard<'a, BinderProcessState>>;
-
 /// An active binder transaction.
 #[derive(Debug)]
 struct ActiveTransaction {
@@ -343,7 +308,7 @@ struct TransientTransactionState<'a> {
     /// The part of the transient state that will live for the lifetime of the transaction.
     state: TransactionState,
     /// The task to which the transient file descriptors belong.
-    task: &'a dyn BinderTask,
+    accessor: &'a dyn ResourceAccessor,
     /// The file descriptors to close in case of an error.
     transient_fds: Vec<FdNumber>,
 }
@@ -352,19 +317,19 @@ impl<'a> std::fmt::Debug for TransientTransactionState<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransientTransactionState")
             .field("state", &self.state)
-            .field("task", &self.task)
+            .field("accessor", &self.accessor)
             .field("transient_fds", &self.transient_fds)
             .finish()
     }
 }
 
 impl<'a> TransientTransactionState<'a> {
-    /// Creates a new [`TransientTransactionState`], whose resources will belong to `task` and
+    /// Creates a new [`TransientTransactionState`], whose resources will belong to `accessor` and
     /// `target_proc` for FDs and binder handles respectively.
-    fn new(task: &'a dyn BinderTask, target_proc: &Arc<BinderProcess>) -> Self {
+    fn new(accessor: &'a dyn ResourceAccessor, target_proc: &Arc<BinderProcess>) -> Self {
         TransientTransactionState {
             state: TransactionState { proc: Arc::downgrade(target_proc), handles: Vec::new() },
-            task,
+            accessor,
             transient_fds: Vec::new(),
         }
     }
@@ -386,7 +351,7 @@ impl<'a> TransientTransactionState<'a> {
 impl<'a> Drop for TransientTransactionState<'a> {
     fn drop(&mut self) {
         for fd in &self.transient_fds {
-            let _: Result<(), Errno> = self.task.close_fd(*fd);
+            let _: Result<(), Errno> = self.accessor.close_fd(*fd);
         }
     }
 }
@@ -416,12 +381,49 @@ enum RequestType {
     RequestResponse,
 }
 
+#[derive(Debug)]
+struct BinderProcess {
+    /// A global identifier at the driver level for this binder process.
+    identifier: u64,
+
+    /// The identifier of the process associated with this binder process.
+    pid: pid_t,
+
+    /// Resource accessor to access remote resource in case of a remote binder process. None in
+    /// case of a local process.
+    remote_resource_accessor: Option<RemoteResourceAccessor>,
+
+    // The mutable state of `BinderProcess` is protected by 3 locks. For ordering purpose, locks
+    // must be taken in the order they are defined in this class, even across `BinderProcess`
+    // instances.
+    // Moreover, any `BinderThread` lock must be ordered after any `state` lock from a
+    // `BinderProcess`.
+    /// The [`SharedMemory`] region mapped in both the driver and the binder process. Allows for
+    /// transactions to copy data once from the sender process into the receiver process.
+    shared_memory: Mutex<Option<SharedMemory>>,
+    /// The main mutable state of the `BinderProcess`.
+    state: Mutex<BinderProcessState>,
+    /// A queue for commands that could not be scheduled on any existing binder threads. Binder
+    /// threads that exhaust their own queue will read from this one.
+    ///
+    /// When there are no commands in a thread's and the process' command queue, a binder thread can
+    /// register with this [`WaitQueue`] to be notified when commands are available.
+    command_queue: Mutex<CommandQueueWithWaitQueue>,
+}
+
+type BinderProcessGuard<'a> = Guard<'a, BinderProcess, MutexGuard<'a, BinderProcessState>>;
+
 impl BinderProcess {
     #[allow(clippy::let_and_return)]
-    fn new(identifier: u64, pid: pid_t) -> Arc<Self> {
+    fn new(
+        identifier: u64,
+        pid: pid_t,
+        remote_resource_accessor: Option<RemoteResourceAccessor>,
+    ) -> Arc<Self> {
         let result = Arc::new(Self {
             identifier,
             pid,
+            remote_resource_accessor,
             shared_memory: Default::default(),
             state: Default::default(),
             command_queue: Default::default(),
@@ -437,6 +439,15 @@ impl BinderProcess {
 
     fn lock<'a>(self: &'a Arc<Self>) -> BinderProcessGuard<'a> {
         Guard::new(self, self.state.lock())
+    }
+
+    /// Return the `ResourceAccessor` to use to access the resources of this process.
+    fn get_resource_accessor<'a>(&'a self, task: &'a Task) -> &'a dyn ResourceAccessor {
+        if let Some(resource_accessor) = &self.remote_resource_accessor {
+            resource_accessor
+        } else {
+            task
+        }
     }
 
     /// A binder thread is done reading a buffer allocated to a transaction. The binder
@@ -479,7 +490,7 @@ impl BinderProcess {
     /// binder object.
     fn handle_refcount_operation(
         self: &Arc<Self>,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         command: binder_driver_command_protocol,
         handle: Handle,
     ) -> Result<(), Errno> {
@@ -508,7 +519,7 @@ impl BinderProcess {
     /// Subscribe a process to the death of the owner of `handle`.
     fn handle_request_death_notification(
         self: &Arc<Self>,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         binder_thread: &Arc<BinderThread>,
         handle: Handle,
         cookie: binder_uintptr_t,
@@ -546,7 +557,7 @@ impl BinderProcess {
     /// Remove a previously subscribed death notification.
     fn handle_clear_death_notification(
         self: &Arc<Self>,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         handle: Handle,
         cookie: binder_uintptr_t,
     ) -> Result<(), Errno> {
@@ -643,7 +654,7 @@ impl<'a> BinderProcessGuard<'a> {
     /// `BinderProcess`.
     fn handle_refcount_operation(
         &mut self,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         command: binder_driver_command_protocol,
         handle: Handle,
     ) -> Result<Vec<RefCountAction>, Errno> {
@@ -1587,7 +1598,7 @@ impl Command {
     /// Serializes and writes the command into userspace memory at `buffer`.
     fn write_to_memory(
         &self,
-        current_task: &dyn RunningBinderTask,
+        resource_accessor: &dyn ResourceAccessor,
         buffer: &UserBuffer,
     ) -> Result<usize, Errno> {
         match self {
@@ -1605,7 +1616,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<AcquireRefData>() {
                     return error!(ENOMEM);
                 }
-                current_task.write_object(
+                resource_accessor.write_object(
                     UserRef::new(buffer.address),
                     &AcquireRefData {
                         command: self.driver_return_code(),
@@ -1624,7 +1635,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<ErrorData>() {
                     return error!(ENOMEM);
                 }
-                current_task.write_object(
+                resource_accessor.write_object(
                     UserRef::new(buffer.address),
                     &ErrorData { command: self.driver_return_code(), error_val: *error_val },
                 )
@@ -1642,7 +1653,7 @@ impl Command {
                     if buffer.length < std::mem::size_of::<TransactionData>() {
                         return error!(ENOMEM);
                     }
-                    current_task.write_object(
+                    resource_accessor.write_object(
                         UserRef::new(buffer.address),
                         &TransactionData {
                             command: self.driver_return_code(),
@@ -1661,7 +1672,7 @@ impl Command {
                     if buffer.length < std::mem::size_of::<TransactionData>() {
                         return error!(ENOMEM);
                     }
-                    current_task.write_object(
+                    resource_accessor.write_object(
                         UserRef::new(buffer.address),
                         &TransactionData {
                             command: self.driver_return_code(),
@@ -1678,7 +1689,8 @@ impl Command {
                 if buffer.length < std::mem::size_of::<binder_driver_return_protocol>() {
                     return error!(ENOMEM);
                 }
-                current_task.write_object(UserRef::new(buffer.address), &self.driver_return_code())
+                resource_accessor
+                    .write_object(UserRef::new(buffer.address), &self.driver_return_code())
             }
             Self::DeadBinder(cookie) | Self::ClearDeathNotificationDone(cookie) => {
                 #[repr(C, packed)]
@@ -1690,7 +1702,7 @@ impl Command {
                 if buffer.length < std::mem::size_of::<DeadBinderData>() {
                     return error!(ENOMEM);
                 }
-                current_task.write_object(
+                resource_accessor.write_object(
                     UserRef::new(buffer.address),
                     &DeadBinderData { command: self.driver_return_code(), cookie: *cookie },
                 )
@@ -2078,90 +2090,27 @@ impl std::fmt::Display for Handle {
     }
 }
 
-/// Abstraction over a thread that has a connection to the binder driver.
-trait BinderTask: std::fmt::Debug + MemoryAccessor {
-    fn creds(&self) -> Credentials;
-    fn get_current_selinux_context(&self) -> FsString;
-
+/// Abstraction for accessing resources of a given process, whether it is a current process or a
+/// remote one.
+trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
+    // File related methods.
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno>;
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno>;
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno>;
-}
 
-impl MemoryAccessorExt for dyn BinderTask + '_ {}
-
-/// Abstraction over the thread that is currently accessing the driver.
-trait RunningBinderTask: BinderTask {
-    fn kernel(&self) -> &Kernel;
-    fn wait_on_waiter(&self, waiter: &Waiter) -> Result<(), Errno>;
-    // This is needed because Rust doesn't support upcasting traits.
+    // Convenience method to allow passing a MemoryAccessor as a parameter.
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor;
 }
 
-impl MemoryAccessorExt for dyn RunningBinderTask + '_ {}
+impl MemoryAccessorExt for dyn ResourceAccessor + '_ {}
 
-/// Implementation of BinderTask and RunningBinderTask for a local task, represented by a
-/// `CurrentTask`.
-struct CurrentBinderTask<'a> {
-    task: &'a CurrentTask,
-}
-
-impl<'a> MemoryAccessor for CurrentBinderTask<'a> {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.task.mm.read_memory(addr, bytes)
-    }
-    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
-        self.task.mm.read_memory_partial(addr, bytes)
-    }
-    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.task.mm.write_memory(addr, bytes)
-    }
-}
-
-impl<'a> BinderTask for CurrentBinderTask<'a> {
-    fn creds(&self) -> Credentials {
-        self.task.creds()
-    }
-    fn get_current_selinux_context(&self) -> FsString {
-        self.task.thread_group.read().selinux.current_context.clone()
-    }
-    fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-        self.task.files.close(fd)
-    }
-    fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        self.task.files.get_with_flags(fd)
-    }
-    fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        self.task.files.add_with_flags(file, flags)
-    }
-}
-
-impl<'a> RunningBinderTask for CurrentBinderTask<'a> {
-    fn kernel(&self) -> &Kernel {
-        self.task.kernel()
-    }
-
-    fn wait_on_waiter(&self, waiter: &Waiter) -> Result<(), Errno> {
-        waiter.wait(self.task)
-    }
-    fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
-        self
-    }
-}
-
-impl std::fmt::Debug for CurrentBinderTask<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.task.fmt(f)
-    }
-}
-
-/// Implementation of `BinderTask` and `CurrentBinderTask` for a remote client.
-struct RemoteBinderTask {
-    process_accessor: fbinder::ProcessAccessorSynchronousProxy,
+/// Implementation of `ResourceAccessor` for a remote client.
+struct RemoteResourceAccessor {
     kernel: Arc<Kernel>,
+    process_accessor: fbinder::ProcessAccessorSynchronousProxy,
 }
 
-impl RemoteBinderTask {
+impl RemoteResourceAccessor {
     fn map_fidl_posix_errno(e: fposix::Errno) -> Errno {
         errno_from_code!(e.into_primitive() as i16)
     }
@@ -2178,13 +2127,13 @@ impl RemoteBinderTask {
     }
 }
 
-impl std::fmt::Debug for RemoteBinderTask {
+impl std::fmt::Debug for RemoteResourceAccessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RemoteBinderTask").finish()
+        f.debug_struct("RemoteResourceAccessor").finish()
     }
 }
 
-impl MemoryAccessor for RemoteBinderTask {
+impl MemoryAccessor for RemoteResourceAccessor {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         let result = self
             .process_accessor
@@ -2213,17 +2162,7 @@ impl MemoryAccessor for RemoteBinderTask {
     }
 }
 
-impl BinderTask for RemoteBinderTask {
-    fn creds(&self) -> Credentials {
-        // TODO(qsr): uid/gid should be set in the configuration
-        Credentials::root()
-    }
-
-    fn get_current_selinux_context(&self) -> FsString {
-        // TODO(fxb/108648): Compute the correct security context.
-        b"user:role:type:level".to_vec()
-    }
-
+impl ResourceAccessor for RemoteResourceAccessor {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
         self.run_file_request(fbinder::FileRequest {
             close_requests: Some(vec![fd.raw()]),
@@ -2256,7 +2195,7 @@ impl BinderTask for RemoteBinderTask {
 
     fn add_file_with_flags(&self, file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(self.kernel())?;
+        let handle = file.to_handle(&self.kernel)?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..fbinder::FileRequest::EMPTY
@@ -2270,53 +2209,67 @@ impl BinderTask for RemoteBinderTask {
         }
         error!(ENOENT)
     }
-}
 
-impl RunningBinderTask for RemoteBinderTask {
-    fn kernel(&self) -> &Kernel {
-        &self.kernel
-    }
-    fn wait_on_waiter(&self, waiter: &Waiter) -> Result<(), Errno> {
-        waiter.wait_without_current_task_dont_use_if_possible()
-    }
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
         self
     }
 }
 
-/// Implementation of BinderTask for a local task.
-#[derive(Debug)]
-struct LocalBinderTask {
-    task: Arc<Task>,
-}
-
-impl MemoryAccessor for LocalBinderTask {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.task.mm.read_memory(addr, bytes)
-    }
-    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
-        self.task.mm.read_memory_partial(addr, bytes)
-    }
-    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.task.mm.write_memory(addr, bytes)
-    }
-}
-
-impl BinderTask for LocalBinderTask {
-    fn creds(&self) -> Credentials {
-        self.task.creds()
-    }
-    fn get_current_selinux_context(&self) -> FsString {
-        self.task.thread_group.read().selinux.current_context.clone()
-    }
+/// Implementation of `ResourceAccessor` for a local client represented as a `CurrentTask`.
+impl ResourceAccessor for CurrentTask {
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-        self.task.files.close(fd)
+        self.files.close(fd)
     }
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        self.task.files.get_with_flags(fd)
+        self.files.get_with_flags(fd)
     }
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        self.task.files.add_with_flags(file, flags)
+        self.files.add_with_flags(file, flags)
+    }
+
+    fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
+        self
+    }
+}
+
+impl MemoryAccessor for CurrentTask {
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.mm.read_memory(addr, bytes)
+    }
+    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
+        self.mm.read_memory_partial(addr, bytes)
+    }
+    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.write_memory(addr, bytes)
+    }
+}
+
+/// Implementation of `ResourceAccessor` for a local client represented as a `Task`.
+impl ResourceAccessor for Task {
+    fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
+        self.files.close(fd)
+    }
+    fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+        self.files.get_with_flags(fd)
+    }
+    fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
+        self.files.add_with_flags(file, flags)
+    }
+
+    fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
+        self
+    }
+}
+
+impl MemoryAccessor for Task {
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.mm.read_memory(addr, bytes)
+    }
+    fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno> {
+        self.mm.read_memory_partial(addr, bytes)
+    }
+    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.write_memory(addr, bytes)
     }
 }
 
@@ -2328,7 +2281,6 @@ impl BinderDriver {
         {
             let _l1 = driver.context_manager_and_queue.lock();
             let _l2 = driver.procs.read();
-            let _l3 = driver.remote_tasks.read();
         }
         driver
     }
@@ -2341,10 +2293,28 @@ impl BinderDriver {
         self.procs.read().get(&identifier).map(Arc::clone).ok_or_else(|| errno!(ENOENT))
     }
 
+    /// Creates and register the binder process state to represent a local process with `pid`.
+    fn create_local_process(&self, pid: pid_t) -> Arc<BinderProcess> {
+        self.create_process(pid, None)
+    }
+
+    /// Creates and register the binder process state to represent a remote process with `pid`.
+    fn create_remote_process(
+        &self,
+        pid: pid_t,
+        resouce_accessor: RemoteResourceAccessor,
+    ) -> Arc<BinderProcess> {
+        self.create_process(pid, Some(resouce_accessor))
+    }
+
     /// Creates and register the binder process state to represent a process with `pid`.
-    fn create_process(&self, pid: pid_t) -> Arc<BinderProcess> {
+    fn create_process(
+        &self,
+        pid: pid_t,
+        resource_accessor: Option<RemoteResourceAccessor>,
+    ) -> Arc<BinderProcess> {
         let identifier = self.get_next_identifier();
-        let binder_process = BinderProcess::new(identifier, pid);
+        let binder_process = BinderProcess::new(identifier, pid, resource_accessor);
         assert!(
             self.procs.write().insert(identifier, binder_process.clone()).is_none(),
             "process with same pid created"
@@ -2356,7 +2326,7 @@ impl BinderDriver {
     /// thread.
     #[cfg(test)]
     fn create_process_and_thread(&self, pid: pid_t) -> (Arc<BinderProcess>, Arc<BinderThread>) {
-        let binder_process = self.create_process(pid);
+        let binder_process = self.create_local_process(pid);
         let binder_thread = binder_process.lock().find_or_register_thread(pid);
         (binder_process, binder_thread)
     }
@@ -2372,22 +2342,24 @@ impl BinderDriver {
 
         fasync::Task::local(
             async move {
+                let base_task = Task::create_init_child_process(
+                    &kernel,
+                    &CString::new("external_binder".to_string()).unwrap(),
+                )?;
                 let process_accessor =
                     fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
-                let pid = kernel.pids.write().allocate_pid();
-                let binder_process = driver.create_process(pid);
+                let binder_process = driver.create_remote_process(
+                    base_task.id,
+                    RemoteResourceAccessor { kernel: kernel.clone(), process_accessor },
+                );
                 let identifier = binder_process.identifier;
-                let remote_binder_task =
-                    Arc::new(RemoteBinderTask { process_accessor, kernel: kernel.clone() });
-                driver.remote_tasks.write().insert(identifier, remote_binder_task.clone());
                 scopeguard::defer! {
                     driver.procs.write().remove(&identifier);
-                    driver.remote_tasks.write().remove(&identifier);
                 }
                 let mut stream = fbinder::BinderRequestStream::from_channel(
                     fasync::Channel::from_channel(server_end.into_channel())?,
                 );
-                let mut tid_to_pid: BTreeMap<u64, pid_t> = Default::default();
+                let mut tid_to_task: BTreeMap<u64, Arc<CurrentTask>> = Default::default();
                 while let Some(event) = stream.try_next().await? {
                     match event {
                         fbinder::BinderRequest::SetVmo { vmo, mapped_address, control_handle } => {
@@ -2396,21 +2368,33 @@ impl BinderDriver {
                             }
                         }
                         fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
-                            let tid = *tid_to_pid
-                                .entry(tid)
-                                .or_insert_with(|| kernel.pids.write().allocate_pid());
-                            let binder_thread = binder_process.lock().find_or_register_thread(tid);
+                            // Get the task associated with the thread. If none already exist, a
+                            // new thread of `base_task` is created.
+                            let current_task = match tid_to_task.entry(tid) {
+                                Entry::Occupied(e) => e.get().clone(),
+                                Entry::Vacant(e) => e
+                                    .insert(Arc::new(base_task.clone_task(
+                                        (CLONE_THREAD
+                                            | CLONE_VM
+                                            | CLONE_SIGHAND
+                                            | CLONE_FS
+                                            | CLONE_FILES)
+                                            as u64,
+                                        None,
+                                        Default::default(),
+                                        Default::default(),
+                                    )?))
+                                    .clone(),
+                            };
 
-                            let cloned_driver = driver.clone();
-                            let cloned_remote_binder_task = remote_binder_task.clone();
-                            let cloned_binder_process = binder_process.clone();
+                            let driver = driver.clone();
+                            let binder_process = binder_process.clone();
 
                             kernel.thread_pool.dispatch(move || {
-                                let mut result = cloned_driver
+                                let mut result = driver
                                     .ioctl(
-                                        &*cloned_remote_binder_task,
-                                        &cloned_binder_process,
-                                        &binder_thread,
+                                        &current_task,
+                                        &binder_process,
                                         request,
                                         parameter.into(),
                                     )
@@ -2434,7 +2418,7 @@ impl BinderDriver {
 
     fn get_context_manager(
         &self,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
     ) -> Result<(Arc<BinderObject>, Arc<BinderProcess>), Errno> {
         let context_manager = loop {
             let mut state = self.context_manager_and_queue.lock();
@@ -2444,7 +2428,7 @@ impl BinderDriver {
             let waiter = Waiter::new();
             state.wait_queue.wait_async(&waiter);
             std::mem::drop(state);
-            current_task.wait_on_waiter(&waiter)?;
+            waiter.wait(current_task)?;
         };
         let proc = context_manager.owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
         Ok((context_manager, proc))
@@ -2452,12 +2436,12 @@ impl BinderDriver {
 
     fn ioctl(
         &self,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         binder_proc: &Arc<BinderProcess>,
-        binder_thread: &Arc<BinderThread>,
         request: u32,
         user_arg: UserAddress,
     ) -> Result<SyscallResult, Errno> {
+        let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
         match request {
             uapi::BINDER_VERSION => {
                 // A thread is requesting the version of this binder driver.
@@ -2467,7 +2451,9 @@ impl BinderDriver {
                 }
                 let response =
                     binder_version { protocol_version: BINDER_CURRENT_PROTOCOL_VERSION as i32 };
-                current_task.write_object(UserRef::new(user_arg), &response)?;
+                binder_proc
+                    .get_resource_accessor(current_task)
+                    .write_object(UserRef::new(user_arg), &response)?;
                 Ok(SUCCESS)
             }
             uapi::BINDER_SET_CONTEXT_MGR | uapi::BINDER_SET_CONTEXT_MGR_EXT => {
@@ -2479,7 +2465,8 @@ impl BinderDriver {
 
                 let flags = if request == uapi::BINDER_SET_CONTEXT_MGR_EXT {
                     let user_ref = UserRef::<flat_binder_object>::new(user_arg);
-                    let flat_binder_object = current_task.read_object(user_ref)?;
+                    let flat_binder_object =
+                        binder_proc.get_resource_accessor(current_task).read_object(user_ref)?;
                     flat_binder_object.flags
                 } else {
                     0
@@ -2498,8 +2485,9 @@ impl BinderDriver {
                     return error!(EINVAL);
                 }
 
+                let resource_accessor = binder_proc.get_resource_accessor(current_task);
                 let user_ref = UserRef::<binder_write_read>::new(user_arg);
-                let mut input = current_task.read_object(user_ref)?;
+                let mut input = resource_accessor.read_object(user_ref)?;
 
                 // We will be writing this back to userspace, don't trust what the client gave us.
                 input.write_consumed = 0;
@@ -2508,7 +2496,7 @@ impl BinderDriver {
                 if input.write_size > 0 {
                     // The calling thread wants to write some data to the binder driver.
                     let mut cursor = UserMemoryCursor::new(
-                        current_task.as_memory_accessor(),
+                        resource_accessor.as_memory_accessor(),
                         UserAddress::from(input.write_buffer),
                         input.write_size,
                     );
@@ -2519,7 +2507,7 @@ impl BinderDriver {
                         self.handle_thread_write(
                             current_task,
                             binder_proc,
-                            binder_thread,
+                            &binder_thread,
                             &mut cursor,
                         )?;
                     }
@@ -2536,7 +2524,7 @@ impl BinderDriver {
                     let read_result = match self.handle_thread_read(
                         current_task,
                         binder_proc,
-                        binder_thread,
+                        &binder_thread,
                         &read_buffer,
                     ) {
                         // If the wait was interrupted and some command has been consumed, return a
@@ -2548,7 +2536,7 @@ impl BinderDriver {
                 }
 
                 // Write back to the calling thread how much data was read/written.
-                current_task.write_object(user_ref, &input)?;
+                resource_accessor.write_object(user_ref, &input)?;
                 Ok(SUCCESS)
             }
             uapi::BINDER_SET_MAX_THREADS => {
@@ -2557,7 +2545,8 @@ impl BinderDriver {
                 }
 
                 let user_ref = UserRef::<u32>::new(user_arg);
-                binder_proc.lock().max_thread_count = current_task.read_object(user_ref)? as usize;
+                binder_proc.lock().max_thread_count =
+                    binder_proc.get_resource_accessor(current_task).read_object(user_ref)? as usize;
                 Ok(SUCCESS)
             }
             uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
@@ -2594,7 +2583,7 @@ impl BinderDriver {
     /// This method will never block.
     fn handle_thread_write(
         &self,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         binder_proc: &Arc<BinderProcess>,
         binder_thread: &Arc<BinderThread>,
         cursor: &mut UserMemoryCursor<'_>,
@@ -2697,26 +2686,23 @@ impl BinderDriver {
         Ok(())
     }
 
-    fn get_binder_task(
-        &self,
-        kernel: &Kernel,
-        binder_process: &Arc<BinderProcess>,
-    ) -> Result<Box<Arc<dyn BinderTask>>, Errno> {
-        if let Some(task) = self.remote_tasks.read().get(&binder_process.identifier) {
-            return Ok(Box::new(task.clone()));
+    /// Returns a task with the given pid.
+    fn get_target_task(&self, kernel: &Arc<Kernel>, pid: pid_t) -> Result<Arc<Task>, Errno> {
+        let pids = kernel.pids.read();
+        if let Some(task) = pids.get_task(pid) {
+            Ok(task)
+        } else if let Some(thread_group) = pids.get_thread_group(pid) {
+            std::mem::drop(pids);
+            thread_group.read().get_task()
+        } else {
+            error!(EINVAL)
         }
-        Ok(Box::new(Arc::new(LocalBinderTask {
-            task: kernel.pids.read().get_task(binder_process.pid).ok_or_else(|| {
-                log_error!("binder: task {:?} does not exist (anymore)", binder_process.pid);
-                errno!(EINVAL)
-            })?,
-        })))
     }
 
     /// A binder thread is starting a transaction on a remote binder object.
     fn handle_transaction(
         &self,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         binder_proc: &Arc<BinderProcess>,
         binder_thread: &Arc<BinderThread>,
         data: binder_transaction_data_sg,
@@ -2734,12 +2720,13 @@ impl BinderDriver {
             }
         };
 
-        let target_task = self.get_binder_task(current_task.kernel(), &target_proc)?;
+        let target_task = self.get_target_task(current_task.kernel(), target_proc.pid)?;
         let security_context: Option<FsString> = if object.flags
             & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
             == uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
         {
-            let mut security_context = target_task.get_current_selinux_context();
+            let mut security_context =
+                target_task.thread_group.read().selinux.current_context.clone();
             security_context.push(b'\0');
             Some(security_context)
         } else {
@@ -2748,10 +2735,10 @@ impl BinderDriver {
 
         // Copy the transaction data to the target process.
         let (buffers, transaction_state) = self.copy_transaction_buffers(
-            current_task,
+            binder_proc.get_resource_accessor(current_task),
             binder_proc,
             binder_thread,
-            target_task.as_ref().as_ref(),
+            target_proc.get_resource_accessor(&target_task),
             &target_proc,
             &data,
             security_context.as_deref(),
@@ -2849,7 +2836,7 @@ impl BinderDriver {
     /// A binder thread is sending a reply to a transaction.
     fn handle_reply(
         &self,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         binder_proc: &Arc<BinderProcess>,
         binder_thread: &Arc<BinderThread>,
         data: binder_transaction_data_sg,
@@ -2857,14 +2844,14 @@ impl BinderDriver {
         // Find the process and thread that initiated the transaction. This reply is for them.
         let (target_proc, target_thread) = binder_thread.write().pop_transaction_caller()?;
 
-        let target_task = self.get_binder_task(current_task.kernel(), &target_proc)?;
+        let target_task = self.get_target_task(current_task.kernel(), target_proc.pid)?;
 
         // Copy the transaction data to the target process.
         let (buffers, transaction_state) = self.copy_transaction_buffers(
-            current_task,
+            binder_proc.get_resource_accessor(current_task),
             binder_proc,
             binder_thread,
-            target_task.as_ref().as_ref(),
+            target_proc.get_resource_accessor(&target_task),
             &target_proc,
             &data,
             None,
@@ -2901,17 +2888,18 @@ impl BinderDriver {
     /// Dequeues a command from the thread's command queue, or blocks until commands are available.
     fn handle_thread_read(
         &self,
-        current_task: &dyn RunningBinderTask,
+        current_task: &CurrentTask,
         binder_proc: &Arc<BinderProcess>,
         binder_thread: &Arc<BinderThread>,
         read_buffer: &UserBuffer,
     ) -> Result<usize, Errno> {
+        let resource_accessor = binder_proc.get_resource_accessor(current_task);
         loop {
             {
                 let mut binder_proc_state = binder_proc.lock();
                 if binder_proc_state.should_request_thread(binder_thread) {
                     let bytes_written =
-                        Command::SpawnLooper.write_to_memory(current_task, read_buffer)?;
+                        Command::SpawnLooper.write_to_memory(resource_accessor, read_buffer)?;
                     binder_proc_state.did_request_thread();
                     return Ok(bytes_written);
                 }
@@ -2934,7 +2922,7 @@ impl BinderDriver {
 
             if let Some(command) = command_queue.pop_front() {
                 // Attempt to write the command to the thread's buffer.
-                let bytes_written = command.write_to_memory(current_task, read_buffer)?;
+                let bytes_written = command.write_to_memory(resource_accessor, read_buffer)?;
                 match command {
                     Command::Transaction { sender, .. } => {
                         // The transaction is synchronous and we're expected to give a reply, so
@@ -2980,7 +2968,7 @@ impl BinderDriver {
                 binder_thread.write().waiter = WaiterRef::empty();
                 binder_proc.command_queue.lock().waiters.cancel_wait(wait_key);
             }
-            current_task.wait_on_waiter(&waiter)?;
+            waiter.wait(current_task)?;
         }
     }
 
@@ -2991,10 +2979,10 @@ impl BinderDriver {
     /// If `security_context` is present, it musts be null terminated.
     fn copy_transaction_buffers<'a>(
         &self,
-        source_task: &dyn RunningBinderTask,
+        source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &Arc<BinderProcess>,
         source_thread: &Arc<BinderThread>,
-        target_task: &'a dyn BinderTask,
+        target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &Arc<BinderProcess>,
         data: &binder_transaction_data_sg,
         security_context: Option<&[u8]>,
@@ -3025,11 +3013,11 @@ impl BinderDriver {
         let userspace_addrs = unsafe { data.transaction_data.data.ptr };
 
         // Copy the data straight into the target's buffer.
-        source_task.read_memory(
+        source_resource_accessor.read_memory(
             UserAddress::from(userspace_addrs.buffer),
             allocations.data_buffer.as_mut_bytes(),
         )?;
-        source_task.read_objects(
+        source_resource_accessor.read_objects(
             UserRef::new(UserAddress::from(userspace_addrs.offsets)),
             allocations.offsets_buffer.as_mut_bytes(),
         )?;
@@ -3037,10 +3025,10 @@ impl BinderDriver {
         // Translate any handles/fds from the source process' handle table to the target process'
         // handle table.
         let transient_transaction_state = self.translate_handles(
-            source_task,
+            source_resource_accessor,
             source_proc,
             source_thread,
-            target_task,
+            target_resource_accessor,
             target_proc,
             allocations.offsets_buffer.as_bytes(),
             allocations.data_buffer.as_mut_bytes(),
@@ -3063,16 +3051,17 @@ impl BinderDriver {
     /// `BC_FREE_BUFFER` command.
     fn translate_handles<'a>(
         &self,
-        source_task: &dyn RunningBinderTask,
+        source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &Arc<BinderProcess>,
         source_thread: &Arc<BinderThread>,
-        target_task: &'a dyn BinderTask,
+        target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &Arc<BinderProcess>,
         offsets: &[binder_uintptr_t],
         transaction_data: &mut [u8],
         sg_buffer: &mut SharedBuffer<'_, u8>,
     ) -> Result<TransientTransactionState<'a>, TransactionError> {
-        let mut transaction_state = TransientTransactionState::new(target_task, target_proc);
+        let mut transaction_state =
+            TransientTransactionState::new(target_resource_accessor, target_proc);
 
         let mut sg_remaining_buffer = sg_buffer.user_buffer();
         let mut sg_buffer_offset = 0;
@@ -3141,8 +3130,8 @@ impl BinderDriver {
                     SerializedBinderObject::Handle { handle, flags, cookie: 0 }
                 }
                 SerializedBinderObject::File { fd, flags, cookie } => {
-                    let (file, fd_flags) = source_task.get_file_with_flags(fd)?;
-                    let new_fd = target_task.add_file_with_flags(file, fd_flags)?;
+                    let (file, fd_flags) = source_resource_accessor.get_file_with_flags(fd)?;
+                    let new_fd = target_resource_accessor.add_file_with_flags(file, fd_flags)?;
 
                     // Close this FD if the transaction fails.
                     transaction_state.push_fd(new_fd);
@@ -3154,7 +3143,7 @@ impl BinderDriver {
                     if length > sg_remaining_buffer.length {
                         return error!(EINVAL)?;
                     }
-                    source_task.read_memory(
+                    source_resource_accessor.read_memory(
                         buffer,
                         &mut sg_buffer.as_mut_bytes()[sg_buffer_offset..sg_buffer_offset + length],
                     )?;
@@ -3241,9 +3230,9 @@ impl BinderDriver {
 
                     // Dup each file descriptor and re-write the value of the new FD.
                     for fd in fd_array {
-                        let (file, flags) =
-                            source_task.get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
-                        let new_fd = target_task.add_file_with_flags(file, flags)?;
+                        let (file, flags) = source_resource_accessor
+                            .get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
+                        let new_fd = target_resource_accessor.add_file_with_flags(file, flags)?;
 
                         // Close this FD if the transaction fails.
                         transaction_state.push_fd(new_fd);
@@ -3657,8 +3646,10 @@ mod tests {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_endpoints, create_proxy};
+    use fidl::endpoints::{create_endpoints, create_proxy, RequestStream, ServerEnd};
+    use fuchsia_async as fasync;
     use fuchsia_async::LocalExecutor;
+    use futures::TryStreamExt;
     use memoffset::offset_of;
 
     const BASE_ADDR: UserAddress = UserAddress::from(0x0000000000000100);
@@ -3682,7 +3673,7 @@ mod tests {
             let driver = BinderDriver::new();
             let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.id);
             let receiver_task = create_task(&kernel, "receiver_task");
-            let receiver_proc = driver.create_process(receiver_task.id);
+            let receiver_proc = driver.create_local_process(receiver_task.id);
 
             mmap_shared_memory(&driver, &sender_task, &sender_proc);
             mmap_shared_memory(&driver, &receiver_task, &receiver_proc);
@@ -3782,12 +3773,11 @@ mod tests {
     fn handle_0_succeeds_when_context_manager_is_set() {
         let driver = BinderDriver::new();
         let (_kernel, current_task) = create_kernel_and_task();
-        let context_manager_proc = driver.create_process(1);
+        let context_manager_proc = driver.create_local_process(1);
         let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc, 0);
         driver.context_manager_and_queue.lock().context_manager = Some(context_manager.clone());
-        let (object, owner) = driver
-            .get_context_manager(&CurrentBinderTask { task: &current_task })
-            .expect("failed to find handle 0");
+        let (object, owner) =
+            driver.get_context_manager(&current_task).expect("failed to find handle 0");
         assert!(Arc::ptr_eq(&context_manager_proc, &owner));
         assert!(Arc::ptr_eq(&context_manager, &object));
     }
@@ -3795,15 +3785,15 @@ mod tests {
     #[fuchsia::test]
     fn fail_to_retrieve_non_existing_handle() {
         let driver = BinderDriver::new();
-        let binder_proc = driver.create_process(1);
+        let binder_proc = driver.create_local_process(1);
         assert!(binder_proc.lock().handles.get(3).is_none());
     }
 
     #[fuchsia::test]
     fn handle_is_not_dropped_after_transaction_finishes_if_it_already_existed() {
         let driver = BinderDriver::new();
-        let proc_1 = driver.create_process(1);
-        let proc_2 = driver.create_process(2);
+        let proc_1 = driver.create_local_process(1);
+        let proc_2 = driver.create_local_process(2);
 
         let transaction_ref = BinderObject::new(
             &proc_1,
@@ -3839,8 +3829,8 @@ mod tests {
     #[fuchsia::test]
     fn handle_is_dropped_after_transaction_finishes() {
         let driver = BinderDriver::new();
-        let proc_1 = driver.create_process(1);
-        let proc_2 = driver.create_process(2);
+        let proc_1 = driver.create_local_process(1);
+        let proc_2 = driver.create_local_process(2);
 
         let transaction_ref = BinderObject::new(
             &proc_1,
@@ -3873,8 +3863,8 @@ mod tests {
     #[fuchsia::test]
     fn handle_is_dropped_after_last_weak_ref_released() {
         let driver = BinderDriver::new();
-        let proc_1 = driver.create_process(1);
-        let proc_2 = driver.create_process(2);
+        let proc_1 = driver.create_local_process(1);
+        let proc_2 = driver.create_local_process(2);
 
         let transaction_ref = BinderObject::new(
             &proc_1,
@@ -4233,7 +4223,7 @@ mod tests {
     #[fuchsia::test]
     fn binder_object_enqueues_release_command_when_dropped() {
         let driver = BinderDriver::new();
-        let proc = driver.create_process(1);
+        let proc = driver.create_local_process(1);
 
         const LOCAL_BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
@@ -4256,7 +4246,7 @@ mod tests {
     #[fuchsia::test]
     fn handle_table_refs() {
         let driver = BinderDriver::new();
-        let proc = driver.create_process(1);
+        let proc = driver.create_local_process(1);
 
         let object = BinderObject::new(
             &proc,
@@ -4617,15 +4607,14 @@ mod tests {
         };
 
         // Copy the data from process 1 to process 2
-        let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
         const kSecContext: &[u8] = b"hello\0";
         let (buffers, _transaction_state) = test
             .driver
             .copy_transaction_buffers(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &target_binder_task,
+                &test.receiver_task,
                 &test.receiver_proc,
                 &transaction,
                 Some(kSecContext),
@@ -4685,14 +4674,13 @@ mod tests {
 
         const EXPECTED_HANDLE: Handle = Handle::from_raw(1);
 
-        let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
         let transaction_state = test
             .driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &target_binder_task,
+                &test.receiver_task,
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
@@ -4771,10 +4759,10 @@ mod tests {
 
         test.driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
@@ -4797,7 +4785,7 @@ mod tests {
     #[fuchsia::test]
     fn transaction_translate_binder_handle_passed_between_non_owning_processes() {
         let test = TranslateHandlesTestFixture::new();
-        let owner_proc = test.driver.create_process(3);
+        let owner_proc = test.driver.create_local_process(3);
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -4838,14 +4826,13 @@ mod tests {
             __bindgen_anon_1.handle: SENDING_HANDLE.into(),
         }));
 
-        let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
         let transaction_state = test
             .driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &target_binder_task,
+                &test.receiver_task,
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
@@ -4882,7 +4869,7 @@ mod tests {
     #[test]
     fn transaction_translate_binder_handles_with_same_address() {
         let test = TranslateHandlesTestFixture::new();
-        let other_proc = test.driver.create_process(3);
+        let other_proc = test.driver.create_local_process(3);
         let mut receiver_shared_memory = test.lock_receiver_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -4934,14 +4921,13 @@ mod tests {
             __bindgen_anon_1.handle: SENDING_HANDLE_OTHER.into(),
         }));
 
-        let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
         let transaction_state = test
             .driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &target_binder_task,
+                &test.receiver_task,
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
@@ -5076,10 +5062,10 @@ mod tests {
         let (buffers, _) = test
             .driver
             .copy_transaction_buffers(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &input,
                 None,
@@ -5179,10 +5165,10 @@ mod tests {
         // Perform the translation and copying.
         test.driver
             .copy_transaction_buffers(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &input,
                 None,
@@ -5257,10 +5243,10 @@ mod tests {
         // Perform the translation and copying.
         test.driver
             .copy_transaction_buffers(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &input,
                 None,
@@ -5378,14 +5364,13 @@ mod tests {
         };
 
         // Perform the translation and copying.
-        let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
         let (buffers, transient_transaction_state) = test
             .driver
             .copy_transaction_buffers(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &target_binder_task,
+                &test.receiver_task,
                 &test.receiver_proc,
                 &input,
                 None,
@@ -5456,10 +5441,10 @@ mod tests {
         let transaction_ref_error = test
             .driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &[0 as binder_uintptr_t],
                 &mut transaction_data,
@@ -5488,10 +5473,10 @@ mod tests {
         let transaction_ref_error = test
             .driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &[0 as binder_uintptr_t],
                 &mut transaction_data,
@@ -5530,10 +5515,10 @@ mod tests {
 
         test.driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &LocalBinderTask { task: test.receiver_task.task_arc_clone() },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &[
                     0 as binder_uintptr_t,
@@ -5578,7 +5563,7 @@ mod tests {
         let driver = BinderDriver::new();
 
         let (owner_proc, owner_thread) = driver.create_process_and_thread(1);
-        let client_proc = driver.create_process(2);
+        let client_proc = driver.create_local_process(2);
 
         // Register an object with the owner.
         let object = owner_proc.lock().find_or_register_object(
@@ -5659,7 +5644,7 @@ mod tests {
         // Register a death notification handler.
         client_proc
             .handle_request_death_notification(
-                &CurrentBinderTask { task: &current_task },
+                &current_task,
                 &client_thread,
                 handle,
                 DEATH_NOTIFICATION_COOKIE,
@@ -5715,7 +5700,7 @@ mod tests {
         // Register a death notification handler.
         client_proc
             .handle_request_death_notification(
-                &CurrentBinderTask { task: &current_task },
+                &current_task,
                 &client_thread,
                 handle,
                 DEATH_NOTIFICATION_COOKIE,
@@ -5757,7 +5742,7 @@ mod tests {
         // Register a death notification handler.
         client_proc
             .handle_request_death_notification(
-                &CurrentBinderTask { task: &current_task },
+                &current_task,
                 &client_thread,
                 handle,
                 death_notification_cookie,
@@ -5766,11 +5751,7 @@ mod tests {
 
         // Now clear the death notification handler.
         client_proc
-            .handle_clear_death_notification(
-                &CurrentBinderTask { task: &current_task },
-                handle,
-                death_notification_cookie,
-            )
+            .handle_clear_death_notification(&current_task, handle, death_notification_cookie)
             .expect("clear death notification");
 
         // Check that the client received an acknowlgement
@@ -5827,14 +5808,13 @@ mod tests {
         });
         let offsets = [0];
 
-        let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
         let transient_transaction_state = test
             .driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &target_binder_task,
+                &test.receiver_task,
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
@@ -5902,14 +5882,13 @@ mod tests {
         });
         let offsets = [0];
 
-        let target_binder_task = LocalBinderTask { task: test.receiver_task.task_arc_clone() };
         let transaction_state = test
             .driver
             .translate_handles(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
-                &target_binder_task,
+                &test.receiver_task,
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
@@ -5977,12 +5956,7 @@ mod tests {
 
         // Submit the transaction.
         driver
-            .handle_transaction(
-                &CurrentBinderTask { task: &sender_task },
-                &sender_proc,
-                &sender_thread,
-                transaction,
-            )
+            .handle_transaction(&sender_task, &sender_proc, &sender_thread, transaction)
             .expect("failed to handle the transaction");
 
         // The thread is ineligible to take the command (not sleeping) so check the process queue.
@@ -6010,12 +5984,7 @@ mod tests {
             buffers_size: 0,
         };
         driver
-            .handle_transaction(
-                &CurrentBinderTask { task: &sender_task },
-                &sender_proc,
-                &sender_thread,
-                transaction,
-            )
+            .handle_transaction(&sender_task, &sender_proc, &sender_thread, transaction)
             .expect("transaction queued");
 
         // There should now be an entry in the queue.
@@ -6104,20 +6073,10 @@ mod tests {
 
         // Submit the transaction twice so that the queue is populated.
         driver
-            .handle_transaction(
-                &CurrentBinderTask { task: &sender_task },
-                &sender_proc,
-                &sender_thread,
-                transaction,
-            )
+            .handle_transaction(&sender_task, &sender_proc, &sender_thread, transaction)
             .expect("failed to handle the transaction");
         driver
-            .handle_transaction(
-                &CurrentBinderTask { task: &sender_task },
-                &sender_proc,
-                &sender_thread,
-                transaction,
-            )
+            .handle_transaction(&sender_task, &sender_proc, &sender_thread, transaction)
             .expect("failed to handle the transaction");
 
         // The thread is ineligible to take the command (not sleeping) so check (and dequeue)
@@ -6149,12 +6108,7 @@ mod tests {
             buffers_size: 0,
         };
         driver
-            .handle_transaction(
-                &CurrentBinderTask { task: &sender_task },
-                &sender_proc,
-                &sender_thread,
-                transaction,
-            )
+            .handle_transaction(&sender_task, &sender_proc, &sender_thread, transaction)
             .expect("sync transaction queued");
 
         assert_eq!(
@@ -6196,7 +6150,7 @@ mod tests {
         // Submit the transaction.
         test.driver
             .handle_transaction(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
                 transaction,
@@ -6255,7 +6209,7 @@ mod tests {
         // Submit the transaction.
         test.driver
             .handle_transaction(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
                 transaction,
@@ -6315,7 +6269,7 @@ mod tests {
         // Submit the transaction.
         test.driver
             .handle_transaction(
-                &CurrentBinderTask { task: &test.sender_task },
+                &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
                 transaction,
@@ -6335,7 +6289,7 @@ mod tests {
         let read_buffer_addr = map_memory(&test.receiver_task, UserAddress::default(), *PAGE_SIZE);
         test.driver
             .handle_thread_read(
-                &CurrentBinderTask { task: &test.receiver_task },
+                &test.receiver_task,
                 &test.receiver_proc,
                 &receiver_thread,
                 &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
@@ -6465,7 +6419,7 @@ mod tests {
 
             // Set the context manager, as external ioctl will wait for it to be set before
             // executing.
-            let context_manager_proc = driver.create_process(1);
+            let context_manager_proc = driver.create_local_process(1);
             let context_manager =
                 BinderObject::new_context_manager_marker(&context_manager_proc, 0);
             driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
@@ -6512,7 +6466,8 @@ mod tests {
         );
 
         let (kernel, _task) = create_kernel_and_task();
-        let remote_binder_task = RemoteBinderTask { process_accessor, kernel: kernel.clone() };
+        let remote_binder_task =
+            RemoteResourceAccessor { process_accessor, kernel: kernel.clone() };
         let mut vector = Vec::with_capacity(vector_size);
         for i in 0..vector_size {
             vector.push((i & 255) as u8);
