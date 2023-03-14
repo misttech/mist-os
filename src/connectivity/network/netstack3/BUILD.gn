@@ -7,7 +7,6 @@ import("//build/rust/rustc_binary.gni")
 
 common_deps = [
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
-  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
   "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",

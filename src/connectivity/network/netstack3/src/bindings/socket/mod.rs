@@ -138,11 +138,6 @@ pub(crate) async fn serve(
         .await
 }
 
-trait CanClone: Send + 'static {}
-
-impl CanClone for fidl_fuchsia_io::NodeMarker {}
-impl CanClone for fidl_fuchsia_unknown::CloneableMarker {}
-
 /// A trait generalizing the data structures passed as arguments to POSIX socket
 /// calls.
 ///
