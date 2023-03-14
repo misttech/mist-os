@@ -60,30 +60,6 @@
     ],
     use: [
         {
-            protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#bionic",
-            path: "/bionic/fuchsia.starnix.galaxy.Controller",
-            dependency: "weak",
-        },
-        {
-            protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#stardroid",
-            path: "/stardroid/fuchsia.starnix.galaxy.Controller",
-            dependency: "weak",
-        },
-        {
-            protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#chromiumos",
-            path: "/chromiumos/fuchsia.starnix.galaxy.Controller",
-            dependency: "weak",
-        },
-        {
-            protocol: "fuchsia.starnix.galaxy.Controller",
-            from: "#empty_container",
-            path: "/empty_container/fuchsia.starnix.galaxy.Controller",
-            dependency: "weak",
-        },
-        {
             protocol: "fuchsia.starnix.container.Controller",
             from: "#bionic",
             path: "/bionic/fuchsia.starnix.container.Controller",

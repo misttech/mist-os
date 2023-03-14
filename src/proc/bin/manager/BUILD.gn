@@ -28,7 +28,6 @@ rustc_binary("starnix_manager_bin") {
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.starnix.developer:fuchsia.starnix.developer_rust",
-    "//sdk/fidl/fuchsia.starnix.galaxy:fuchsia.starnix.galaxy_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

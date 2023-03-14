@@ -9,9 +9,8 @@ use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
-use fidl_fuchsia_starnix_container as _;
+use fidl_fuchsia_starnix_container as fstarcontainer;
 use fidl_fuchsia_starnix_developer as fstardev;
-use fidl_fuchsia_starnix_galaxy as fstargalaxy;
 use fuchsia_async as fasync;
 use fuchsia_component::client::{self as fclient, connect_to_protocol};
 use fuchsia_runtime::{HandleInfo, HandleType};
@@ -143,7 +142,8 @@ async fn start_shell(
 /// Returns an error if the FIDL connection to the galaxy failed.
 fn connect_to_vsock(port: u32, bridge_socket: fidl::Socket, galaxy: &str) -> Result<(), Error> {
     let service_prefix = "/".to_string() + galaxy;
-    let galaxy = fclient::connect_to_protocol_at::<fstargalaxy::ControllerMarker>(&service_prefix)?;
+    let galaxy =
+        fclient::connect_to_protocol_at::<fstarcontainer::ControllerMarker>(&service_prefix)?;
 
     galaxy.vsock_connect(port, bridge_socket).context("Failed to call vsock connect on galaxy")
 }
