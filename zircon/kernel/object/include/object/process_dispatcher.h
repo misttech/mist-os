@@ -64,8 +64,8 @@ class ProcessDispatcher final
                             KernelHandle<VmAddressRegionDispatcher>* root_vmar_handle,
                             zx_rights_t* root_vmar_rights);
 
-  // Creates a new process dispatcher for a process that will share its `shared_state_` with other
-  // processes.
+  // Creates a new process dispatcher for a process that will share its `shareable_state_` with
+  // other processes.
   //
   // The shared state will be instantiated from `shared_proc`.
   //
@@ -129,10 +129,10 @@ class ProcessDispatcher final
   zx_status_t Initialize(SharedAspaceType type);
 
   // Accessors.
-  HandleTable& handle_table() { return shared_state_->handle_table(); }
-  const HandleTable& handle_table() const { return shared_state_->handle_table(); }
+  HandleTable& handle_table() { return shareable_state_->handle_table(); }
+  const HandleTable& handle_table() const { return shareable_state_->handle_table(); }
 
-  FutexContext& futex_context() { return shared_state_->futex_context(); }
+  FutexContext& futex_context() { return shareable_state_->futex_context(); }
 
   // Returns a pointer to the process's VmAspace containing |va| if such an aspace exists, otherwise
   // it returns the normal aspace of the process.
@@ -143,26 +143,26 @@ class ProcessDispatcher final
   // data with this process.
   uintptr_t hw_trace_context_id() const {
     // TODO(fxbug.dev/104750): Figure out how to make HW tracing work in restricted mode.
-    return shared_state_->aspace()->arch_aspace().pt_phys();
+    return shareable_state_->aspace()->arch_aspace().pt_phys();
   }
 #endif
 
   uintptr_t arch_table_phys() const {
     // TODO(fxbug.dev/104750): Figure out how to make tracing works in restricted mode.
-    return shared_state_->aspace()->arch_aspace().arch_table_phys();
+    return shareable_state_->aspace()->arch_aspace().arch_table_phys();
   }
 
-  uintptr_t vdso_base_address() { return shared_state_->aspace()->vdso_base_address(); }
+  uintptr_t vdso_base_address() { return shareable_state_->aspace()->vdso_base_address(); }
 
   void EnumerateAspaceChildren(VmEnumerator* ve) {
-    shared_state_->aspace()->EnumerateChildren(ve);
+    shareable_state_->aspace()->EnumerateChildren(ve);
     if (restricted_aspace_) {
       restricted_aspace_->EnumerateChildren(ve);
     }
   }
 
   void DumpAspace(bool verbose) {
-    shared_state_->aspace()->Dump(true);
+    shareable_state_->aspace()->Dump(true);
     if (restricted_aspace_) {
       restricted_aspace_->Dump(true);
     }
@@ -284,10 +284,10 @@ class ProcessDispatcher final
   // address space of the process. This is what threads would use when executing in normal mode.
   // Then the restricted aspace would only ever be used by threads currently executing in restricted
   // mode.
-  fbl::RefPtr<VmAspace> normal_aspace() { return shared_state_->aspace(); }
+  fbl::RefPtr<VmAspace> normal_aspace() { return shareable_state_->aspace(); }
 
   // This is used by the restricted mode code where it's important to avoid refcount manipulation.
-  VmAspace* normal_aspace_ptr() { return shared_state_->aspace_ptr(); }
+  VmAspace* normal_aspace_ptr() { return shareable_state_->aspace_ptr(); }
 
   // Returns the "restricted" address space for a process, or nullptr if it does not have a
   // restricted address space.
@@ -309,8 +309,8 @@ class ProcessDispatcher final
   friend void KillProcess(zx_koid_t id);
   friend void DumpProcessMemoryUsage(const char* prefix, size_t min_pages);
 
-  ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shared_state, fbl::RefPtr<JobDispatcher> job,
-                    ktl::string_view name, uint32_t flags,
+  ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shareable_state,
+                    fbl::RefPtr<JobDispatcher> job, ktl::string_view name, uint32_t flags,
                     fbl::RefPtr<AttributionObject> attribution_object);
 
   ProcessDispatcher(const ProcessDispatcher&) = delete;
@@ -337,7 +337,7 @@ class ProcessDispatcher final
   // Kill all threads
   void KillAllThreadsLocked() TA_REQ(get_lock());
 
-  const fbl::RefPtr<ShareableProcessState> shared_state_;
+  const fbl::RefPtr<ShareableProcessState> shareable_state_;
 
   // the enclosing job
   const fbl::RefPtr<JobDispatcher> job_;

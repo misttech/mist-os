@@ -141,7 +141,7 @@ zx_status_t ProcessDispatcher::CreateShared(
   }
 
   fbl::RefPtr<ShareableProcessState> shareable_state;
-  shareable_state = shared_proc->shared_state_;
+  shareable_state = shared_proc->shareable_state_;
   // Increment the share count on the shared state before passing it to the ProcessDispatcher
   // constructor. If the increment fails, the shared state has already been destroyed.
   if (!shareable_state->IncrementShareCount()) {
@@ -185,11 +185,11 @@ zx_status_t ProcessDispatcher::CreateShared(
   return ZX_OK;
 }
 
-ProcessDispatcher::ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shared_state,
+ProcessDispatcher::ProcessDispatcher(fbl::RefPtr<ShareableProcessState> shareable_state,
                                      fbl::RefPtr<JobDispatcher> job, ktl::string_view name,
                                      uint32_t flags,
                                      fbl::RefPtr<AttributionObject> attribution_object)
-    : shared_state_(ktl::move(shared_state)),
+    : shareable_state_(ktl::move(shareable_state)),
       job_(ktl::move(job)),
       attribution_obj_(ktl::move(attribution_object)),
       policy_(job_->GetPolicy()),
@@ -258,7 +258,7 @@ zx_status_t ProcessDispatcher::Initialize() {
   char aspace_name[ZX_MAX_NAME_LEN];
   snprintf(aspace_name, sizeof(aspace_name), "proc:%" PRIu64, get_koid());
 
-  if (!shared_state_->Initialize(USER_ASPACE_BASE, USER_ASPACE_SIZE, aspace_name)) {
+  if (!shareable_state_->Initialize(USER_ASPACE_BASE, USER_ASPACE_SIZE, aspace_name)) {
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -279,7 +279,7 @@ zx_status_t ProcessDispatcher::Initialize(SharedAspaceType type) {
     static constexpr vaddr_t top_of_private = USER_ASPACE_BASE + PAGE_ALIGN(USER_ASPACE_SIZE / 2);
     static constexpr vaddr_t size_of_shared = USER_ASPACE_BASE + USER_ASPACE_SIZE - top_of_private;
     DEBUG_ASSERT(IS_PAGE_ALIGNED(top_of_private));
-    if (!shared_state_->Initialize(top_of_private, size_of_shared, aspace_name)) {
+    if (!shareable_state_->Initialize(top_of_private, size_of_shared, aspace_name)) {
       return ZX_ERR_NO_MEMORY;
     }
   }
@@ -544,9 +544,9 @@ void ProcessDispatcher::FinishDeadTransition() {
   exceptionate_.Shutdown();
   debug_exceptionate_.Shutdown();
 
-  // clean up shared state, including the handle table
-  LTRACEF_LEVEL(2, "removing shared state reference from proc %p\n", this);
-  shared_state_->DecrementShareCount();
+  // clean up shareable state, including the handle table
+  LTRACEF_LEVEL(2, "removing shareable state reference from proc %p\n", this);
+  shareable_state_->DecrementShareCount();
 
   // Tear down the restricted address space. It may not exist if Initialize() failed or if this
   // process was not created with one.
@@ -638,7 +638,7 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
     return ZX_ERR_BAD_STATE;
   }
   VmAspace::vm_usage_t usage;
-  zx_status_t s = shared_state_->aspace()->GetMemoryUsage(&usage);
+  zx_status_t s = shareable_state_->aspace()->GetMemoryUsage(&usage);
   if (s != ZX_OK) {
     return s;
   }
@@ -686,7 +686,7 @@ zx_status_t ProcessDispatcher::GetAspaceMaps(user_out_ptr<zx_info_maps_t> maps, 
   // be noticed and result in a ZX_ERR_BAD_STATE being returned from GetVmAspaceMaps.
   size_t actual = 0;
   size_t available = 0;
-  zx_status_t status = GetVmAspaceMaps(shared_state_->aspace(), maps, max, &actual, &available);
+  zx_status_t status = GetVmAspaceMaps(shareable_state_->aspace(), maps, max, &actual, &available);
   DEBUG_ASSERT(max >= actual);
   if (status != ZX_OK) {
     return status;
@@ -725,7 +725,7 @@ zx_status_t ProcessDispatcher::GetVmos(VmoInfoWriter& vmos, size_t max, size_t* 
   size_t available2 = 0;
   DEBUG_ASSERT(max >= actual);
   vmos.AddOffset(actual);
-  s = GetVmAspaceVmos(shared_state_->aspace(), vmos, max - actual, &actual2, &available2);
+  s = GetVmAspaceVmos(shareable_state_->aspace(), vmos, max - actual, &actual2, &available2);
   if (s != ZX_OK) {
     return s;
   }
@@ -816,7 +816,7 @@ VmObject::AttributionCounts ProcessDispatcher::PageCount() const {
     return page_counts;
   }
 
-  auto root_vmar = shared_state_->aspace()->RootVmar();
+  auto root_vmar = shareable_state_->aspace()->RootVmar();
   if (root_vmar) {
     page_counts += root_vmar->AllocatedPages();
   }
@@ -964,7 +964,7 @@ fbl::RefPtr<VmAspace> ProcessDispatcher::aspace_at(vaddr_t va) {
   if (!restricted_aspace_) {
     // If there is no restricted aspace associated with the process, shortcut and return the normal
     // aspace. This ensures a valid VmAspace pointer is returned.
-    return shared_state_->aspace();
+    return shareable_state_->aspace();
   }
 
   const vaddr_t begin = restricted_aspace_->base();
@@ -974,5 +974,5 @@ fbl::RefPtr<VmAspace> ProcessDispatcher::aspace_at(vaddr_t va) {
     return restricted_aspace_;
   }
 
-  return shared_state_->aspace();
+  return shareable_state_->aspace();
 }
