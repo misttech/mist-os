@@ -127,10 +127,6 @@ const Driver* DriverLoader::LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_in
   return LoadDriverUrl(url, use_universe_resolver);
 }
 
-bool DriverLoader::MatchesUrlDriverIndex(const std::string& driver_url, std::string_view url) {
-  return cpp20::ends_with(std::string_view(driver_url), url);
-}
-
 void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
                                         AddToIndexCallback callback) {
   auto result = driver_index_.sync()->AddCompositeNodeSpec(spec);
@@ -161,7 +157,7 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
     return std::vector<MatchedDriver>();
   }
 
-  bool autobind = config.url.empty();
+  bool autobind = config.driver_url_suffix.empty();
 
   fidl::Arena allocator;
   size_t size = props.size() + str_props.size() + 2;
@@ -176,7 +172,8 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
   // If we are looking for a specific driver, we add a property to the device with the
   // name of the driver we are looking for. Drivers can then bind to this.
   if (!autobind) {
-    fidl_props[index++] = fdf::MakeProperty(allocator, "fuchsia.compat.LIBNAME", config.url);
+    fidl_props[index++] =
+        fdf::MakeProperty(allocator, "fuchsia.compat.LIBNAME", config.driver_url_suffix);
   }
 
   for (size_t i = 0; i < props.size(); i++) {
@@ -292,9 +289,10 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
       continue;
     }
 
-    if (config.url.empty() || MatchesUrlDriverIndex(driver_url, config.url)) {
+    if (config.driver_url_suffix.empty() ||
+        cpp20::ends_with(std::string_view(driver_url), config.driver_url_suffix)) {
       if (fidl_driver_info.is_fallback()) {
-        if (include_fallback_drivers_ || !config.url.empty()) {
+        if (include_fallback_drivers_ || !config.driver_url_suffix.empty()) {
           matched_fallback_drivers.push_back(matched_driver_info);
         }
       } else {

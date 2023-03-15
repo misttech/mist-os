@@ -236,7 +236,7 @@ TEST_F(DriverLoaderTest, TestUrl) {
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
-  config.url = name2;
+  config.driver_url_suffix = name2;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
@@ -265,7 +265,7 @@ TEST_F(DriverLoaderTest, TestRelativeUrl) {
 
   {
     DriverLoader::MatchDeviceConfig config;
-    config.url = "driver1.cm";
+    config.driver_url_suffix = "driver1.cm";
     fidl::VectorView<fdf::wire::NodeProperty> props{};
     auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
@@ -275,7 +275,7 @@ TEST_F(DriverLoaderTest, TestRelativeUrl) {
 
   {
     DriverLoader::MatchDeviceConfig config;
-    config.url = "driver2.cm";
+    config.driver_url_suffix = "driver2.cm";
     fidl::VectorView<fdf::wire::NodeProperty> props{};
     auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
@@ -301,7 +301,7 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeUrl) {
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
-  config.url = long_name;
+  config.driver_url_suffix = long_name;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
@@ -537,7 +537,7 @@ TEST_F(DriverLoaderTest, TestEphemeralDriver) {
 
   // We should find driver1 from the universe resolver.
   DriverLoader::MatchDeviceConfig config;
-  config.url = name1;
+  config.driver_url_suffix = name1;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
@@ -556,7 +556,7 @@ TEST_F(DriverLoaderTest, TestV2Driver) {
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
-  config.url = name;
+  config.driver_url_suffix = name;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 

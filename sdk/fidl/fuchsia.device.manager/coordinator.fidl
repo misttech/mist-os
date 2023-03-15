@@ -331,12 +331,13 @@ protocol Coordinator {
     }) error zx.status;
 
     /// Attempt to bind a driver against this device.
-    /// + request `driver_path` the driver to bind to this device.
+    /// + request `driver_url_suffix` only driver's that match this URL suffix will try to bind to
+    ///           the device (e.g: "fvm.cm").
     ///           If this is null, the API will autobind.
     /// * error `ZX_ERR_ALREADY_BOUND` if the device is already bound.
     /// * error `ZX_ERR_NOT_FOUND` no drivers were found.
     BindDevice(struct {
-        driver_path string:<DEVICE_PATH_MAX, optional>;
+        driver_url_suffix string:<DEVICE_PATH_MAX, optional>;
     }) -> () error zx.status;
 
     /// Returns the topological path of this device.

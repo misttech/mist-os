@@ -923,7 +923,8 @@ void Device::ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
 
 void Device::BindDevice(BindDeviceRequestView request, BindDeviceCompleter::Sync& completer) {
   auto dev = fbl::RefPtr(this);
-  std::string_view driver_path(request->driver_path.data(), request->driver_path.size());
+  std::string_view driver_url_suffix(request->driver_url_suffix.data(),
+                                     request->driver_url_suffix.size());
 
   if (dev->coordinator->suspend_resume_manager().InSuspend()) {
     LOGF(ERROR, "'bind-device' is forbidden in suspend");
@@ -932,11 +933,12 @@ void Device::BindDevice(BindDeviceRequestView request, BindDeviceCompleter::Sync
   }
 
   VLOGF(1, "'bind-device' device %p '%s'", dev.get(), dev->name().data());
-  zx_status_t status = dev->coordinator->bind_driver_manager().BindDriverToDevice(dev, driver_path);
+  zx_status_t status =
+      dev->coordinator->bind_driver_manager().BindDriverToDevice(dev, driver_url_suffix);
 
   // Notify observers that this device is available again
   // Needed for non-auto-binding drivers like GPT against block, etc
-  if (driver_path.empty()) {
+  if (driver_url_suffix.empty()) {
     devfs.advertise_modified();
   }
   completer.Reply(zx::make_result(status));

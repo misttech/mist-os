@@ -45,7 +45,8 @@ class DriverLoader {
   void WaitForBaseDrivers(fit::callback<void()> callback);
 
   struct MatchDeviceConfig {
-    std::string_view url;
+    // If this is non-empty, then only drivers who match this url suffix will be matched.
+    std::string_view driver_url_suffix;
     // This config should only be true after the base drivers are loaded.
     // We will need to go through all the devices and bind just base drivers
     // and fallback drivers.
@@ -75,8 +76,6 @@ class DriverLoader {
   std::vector<const Driver*> GetAllDriverIndexDrivers();
 
  private:
-  bool MatchesUrlDriverIndex(const std::string& driver_url, std::string_view url);
-
   // Drivers we cached from the DriverIndex.
   fbl::DoublyLinkedList<std::unique_ptr<Driver>> driver_index_drivers_;
 

@@ -132,17 +132,19 @@ protocol Controller {
         server zx.handle:CHANNEL;
     });
 
-    /// Attempt to bind the requested driver to this device. This should be the name of the
-    /// component manifest for the driver e.g. "fvm.cm". A full path can be specified but this is
-    /// deprecated.
+    /// Attempt to bind a driver to this device.
+    /// + request `driver` This represents the suffix of a driver URL (e.g: "fvm.cm").
+    ///            If this is non-empty, then the only drivers that will try to bind
+    ///            are ones that match this url suffix.
     Bind(struct {
         driver string:MAX_DRIVER_PATH_LEN;
     }) -> () error zx.status;
 
-    /// This api will unbind all the children of this device and bind the
-    /// requested driver. If the driver is empty, it will autobind.
-    /// The Rebind will not return until the bind completes. The name is the same as for the Bind
-    /// call.
+    /// Unbind all the children of this device, and then attempt to bind a driver to the device.
+    /// This will not return until the bind completes.
+    /// + request `driver` This represents the suffix of a driver URL (e.g: "fvm.cm").
+    ///            If this is non-empty, then the only drivers that will try to bind
+    ///            are ones that match this url suffix.
     Rebind(struct {
         driver string:MAX_DRIVER_PATH_LEN;
     }) -> () error zx.status;

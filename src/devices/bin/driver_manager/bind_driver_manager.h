@@ -33,7 +33,8 @@ class BindDriverManager {
   // Try binding a specific driver to the device. Returns ZX_ERR_ALREADY_BOUND if there
   // is a driver bound to the device and the device is not allowed to be bound multiple times.
   // Returns ZX_ERR_NOT_FOUND if `GetMatchingDrivers` doesn't return any drivers.
-  zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, std::string_view driver_url);
+  zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev,
+                                 std::string_view driver_url_suffix);
 
   // Binds all the devices to the drivers.
   void BindAllDevices(const DriverLoader::MatchDeviceConfig& config);
@@ -54,7 +55,7 @@ class BindDriverManager {
   // If |driver_url| is not empty then the device will only be checked against the driver
   // with that specific name.
   zx::result<std::vector<MatchedDriver>> GetMatchingDrivers(const fbl::RefPtr<Device>& dev,
-                                                            std::string_view driver_url);
+                                                            std::string_view driver_url_suffix);
 
   // Find and return matching drivers for |dev|.
   zx::result<std::vector<MatchedDriver>> MatchDevice(
