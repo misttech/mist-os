@@ -4,19 +4,21 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <zircon/assert.h>
+
+#include <__verbose_abort>
 
 #include <phys/frame-pointer.h>
 #include <phys/main.h>
 #include <phys/stack.h>
 #include <phys/symbolize.h>
 
-// This is what ZX_ASSERT calls.
-PHYS_SINGLETHREAD void __zx_panic(const char* format, ...) {
+namespace {
+
+[[noreturn]] PHYS_SINGLETHREAD void vpanic(const char* format, va_list args) {
   // Print the message.
-  va_list args;
-  va_start(args, format);
   vprintf(format, args);
   va_end(args);
 
@@ -42,4 +44,20 @@ PHYS_SINGLETHREAD void __zx_panic(const char* format, ...) {
 
   // Now crash.
   ArchPanicReset();
+}
+
+}  // namespace
+
+// This is what ZX_ASSERT calls.
+PHYS_SINGLETHREAD void __zx_panic(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  vpanic(format, args);
+}
+
+// This is what libc++ headers call.
+[[noreturn]] PHYS_SINGLETHREAD void std::__libcpp_verbose_abort(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  vpanic(format, args);
 }
