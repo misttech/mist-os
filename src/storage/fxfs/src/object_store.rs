@@ -1763,6 +1763,54 @@ impl ObjectStore {
         // mutations_cipher_offset is updated by flush.
         Ok(())
     }
+
+    /// Returns a list of project ids currently tracked with project limits in ascending order,
+    /// beginning after `last_id` and providing up to `max_entries`. If `max_entries` would be
+    /// exceeded then it also returns the final id in the list, for use in the following call to
+    /// resume the listing.
+    pub async fn list_projects(
+        &self,
+        last_id: u64,
+        max_entries: usize,
+    ) -> Result<(Vec<u64>, Option<u64>), Error> {
+        let root_dir_id = self.root_directory_object_id();
+        let layer_set = self.tree().layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter =
+            merger.seek(Bound::Included(&ObjectKey::project_limit(root_dir_id, last_id))).await?;
+        let mut entries = Vec::new();
+        let mut more_entries = false;
+        loop {
+            {
+                let Some(ItemRef { key: ObjectKey{ object_id, data: key_data }, value,..}) =
+                    iter.get() else { break };
+                // We've moved outside the target object id.
+                if *object_id != root_dir_id {
+                    break;
+                }
+                match key_data {
+                    ObjectKeyData::ProjectLimit { project_id } => {
+                        // Bypass deleted entries.
+                        if project_id > &last_id && *value != ObjectValue::None {
+                            if entries.len() == max_entries {
+                                more_entries = true;
+                                break;
+                            }
+                            entries.push(*project_id);
+                        }
+                    }
+                    // We've moved outside the list of ProjectLimits.
+                    _ => {
+                        break;
+                    }
+                }
+            }
+            iter.advance().await?;
+        }
+        let token = if more_entries { Some(*entries.last().unwrap()) } else { None };
+        // Skip deleted entries
+        Ok((entries, token))
+    }
 }
 
 #[async_trait]

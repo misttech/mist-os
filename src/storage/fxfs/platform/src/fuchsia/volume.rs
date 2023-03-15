@@ -15,7 +15,9 @@ use {
     },
     anyhow::{bail, ensure, Error},
     async_trait::async_trait,
-    fidl_fuchsia_fxfs::{ProjectIdRequest, ProjectIdRequestStream},
+    fidl_fuchsia_fxfs::{
+        BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
+    },
     fidl_fuchsia_io as fio,
     fs_inspect::{FsInspectVolume, VolumeData},
     fuchsia_async as fasync,
@@ -36,6 +38,7 @@ use {
         },
     },
     std::{
+        boxed::Box,
         convert::TryInto,
         marker::Unpin,
         sync::{Arc, Mutex, Weak},
@@ -440,16 +443,28 @@ impl FxVolumeAndRoot {
                 )?,
                 ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
                     &mut self.get_project_for_node(node_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, "Failed to apply node.");
+                        error!(?error, store_id, node_id, "Failed to get node.");
                         map_to_raw_status(error)
                     }),
                 )?,
                 ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
                     &mut self.clear_project_for_node(node_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, "Failed to apply node.");
+                        error!(?error, store_id, node_id, "Failed to clear for node.");
                         map_to_raw_status(error)
                     }),
                 )?,
+                ProjectIdRequest::List { responder, token } => {
+                    responder.send(&mut self.list_projects(&token).await.map_err(|error| {
+                        error!(?error, store_id, ?token, "Failed to list projects.");
+                        map_to_raw_status(error)
+                    }))?
+                }
+                ProjectIdRequest::Info { responder, project_id } => {
+                    responder.send(&mut self.project_info(project_id).await.map_err(|error| {
+                        error!(?error, store_id, project_id, "Failed to get project info.");
+                        map_to_raw_status(error)
+                    }))?
+                }
             }
         }
         Ok(())
@@ -649,6 +664,64 @@ impl FxVolumeAndRoot {
     pub(super) fn into_volume(self) -> Arc<FxVolume> {
         self.volume
     }
+
+    // Maximum entries to fit based on 64KiB message size minus 16 bytes of header, 16 bytes
+    // of vector header, 16 bytes for the optional token header, and 8 bytes of token value.
+    // https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/max-out-pagination
+    const MAX_PROJECT_ENTRIES: usize = 8184;
+
+    // Calls out to the inner volume to list available projects, removing and re-adding the fidl
+    // wrapper types for the pagination token.
+    async fn list_projects(
+        &self,
+        last_token: &Option<Box<ProjectIterToken>>,
+    ) -> Result<(Vec<u64>, Option<Box<ProjectIterToken>>), Error> {
+        let (entries, token) = self
+            .volume
+            .store()
+            .list_projects(
+                match last_token {
+                    None => 0,
+                    Some(v) => v.value,
+                },
+                Self::MAX_PROJECT_ENTRIES,
+            )
+            .await?;
+        Ok((entries, token.map(|value| Box::new(ProjectIterToken { value }))))
+    }
+
+    async fn project_info(&self, project_id: u64) -> Result<(BytesAndNodes, BytesAndNodes), Error> {
+        let store = self.volume.store();
+        let root_id = self.root.directory().object_id();
+        // If there is no limit, we should fail with NotFound.
+        let limit = match store
+            .tree()
+            .find(&ObjectKey::project_limit(root_id, project_id))
+            .await?
+            .ok_or(FxfsError::NotFound)?
+            .value
+        {
+            ObjectValue::None => Err(FxfsError::NotFound),
+            ObjectValue::BytesAndNodes { bytes, nodes } => Ok(BytesAndNodes {
+                bytes: bytes.try_into().map_err(|_| FxfsError::Inconsistent)?,
+                nodes: nodes.try_into().map_err(|_| FxfsError::Inconsistent)?,
+            }),
+            _ => Err(FxfsError::Inconsistent),
+        }?;
+        // If limit *was* found but usage is not, that should be interpreted as 0 usage.
+        let usage = match store.tree().find(&ObjectKey::project_usage(root_id, project_id)).await? {
+            None => Ok(BytesAndNodes { bytes: 0, nodes: 0 }),
+            Some(object) => match object.value {
+                ObjectValue::None => Ok(BytesAndNodes { bytes: 0, nodes: 0 }),
+                ObjectValue::BytesAndNodes { bytes, nodes } => Ok(BytesAndNodes {
+                    bytes: bytes.try_into().map_err(|_| FxfsError::Inconsistent)?,
+                    nodes: nodes.try_into().map_err(|_| FxfsError::Inconsistent)?,
+                }),
+                _ => Err(FxfsError::Inconsistent),
+            },
+        }?;
+        Ok((limit, usage))
+    }
 }
 
 // The correct number here is arguably u64::MAX - 1 (because node 0 is reserved). There's a bug
@@ -695,18 +768,16 @@ mod tests {
                 close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
                 open_file_checked, write_at, TestFixture,
             },
-            volume::{FlushTaskConfig, FxVolume, FxVolumeAndRoot},
+            volume::{FlushTaskConfig, FxVolumeAndRoot},
             volumes_directory::VolumesDirectory,
         },
-        anyhow::Error,
         fidl::endpoints::ServerEnd,
-        fidl_fuchsia_fxfs::{ProjectIdMarker, VolumeMarker},
+        fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker, VolumeMarker},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_fs::file,
         fuchsia_zircon::Status,
         fxfs::{
-            errors::FxfsError,
             filesystem::{Filesystem, FxFilesystem},
             fsck::{fsck, fsck_volume},
             object_handle::{ObjectHandle, ObjectHandleExt},
@@ -714,7 +785,7 @@ mod tests {
                 directory::ObjectDescriptor,
                 transaction::{Options, TransactionHandler},
                 volume::root_volume,
-                HandleOptions, ObjectKey, ObjectStore, ObjectValue,
+                HandleOptions, ObjectStore,
             },
         },
         fxfs_insecure_crypto::InsecureCrypt,
@@ -1241,47 +1312,6 @@ mod tests {
         device.ensure_unique();
     }
 
-    /// Return the project limit for a give `project_id` as a (bytes, nodes) tuple.
-    async fn get_project_limit(
-        volume: &Arc<FxVolume>,
-        project_id: u64,
-    ) -> Result<(u64, u64), Error> {
-        let store = volume.store();
-        let root_object_id = store.root_directory_object_id();
-        let item = store
-            .tree()
-            .find(&ObjectKey::project_limit(root_object_id, project_id))
-            .await?
-            .ok_or(FxfsError::NotFound)?;
-        match item.value {
-            ObjectValue::BytesAndNodes { bytes, nodes } => Ok((
-                bytes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-                nodes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-            )),
-            ObjectValue::None => Err(FxfsError::NotFound.into()),
-            _ => Err(FxfsError::Inconsistent.into()),
-        }
-    }
-
-    async fn get_project_usage(
-        volume: &Arc<FxVolume>,
-        project_id: u64,
-    ) -> Result<(u64, u64), Error> {
-        let store = volume.store();
-        let root_id = store.root_directory_object_id();
-        let usage_key = ObjectKey::project_usage(root_id, project_id);
-        if let ObjectValue::BytesAndNodes { bytes, nodes } =
-            store.tree().find(&usage_key).await?.ok_or(FxfsError::NotFound)?.value
-        {
-            Ok((
-                bytes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-                nodes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-            ))
-        } else {
-            Err(FxfsError::Inconsistent.into())
-        }
-    }
-
     #[fasync::run_singlethreaded(test)]
     async fn test_project_limit_persistence() {
         const BYTES_LIMIT_1: u64 = 123456;
@@ -1343,10 +1373,8 @@ mod tests {
                 .unwrap()
                 .expect("To set limits");
             {
-                // Should just be one open volume.
-                let (bytes, nodes) = get_project_limit(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching limits");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").0;
                 assert_eq!(bytes, BYTES_LIMIT_1);
                 assert_eq!(nodes, NODES_LIMIT_1);
             }
@@ -1403,10 +1431,8 @@ mod tests {
                 .unwrap()
                 .expect("To set limits");
             {
-                // Should just be one open volume.
-                let (bytes, nodes) = get_project_limit(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching limits");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").0;
                 assert_eq!(bytes, BYTES_LIMIT_2);
                 assert_eq!(nodes, NODES_LIMIT_2);
             }
@@ -1448,14 +1474,6 @@ mod tests {
                 volume_server_end.into_channel().into(),
             );
 
-            {
-                let (bytes, nodes) = get_project_limit(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching limits");
-                assert_eq!(bytes, BYTES_LIMIT_2);
-                assert_eq!(nodes, NODES_LIMIT_2);
-            }
-
             let project_proxy = {
                 let (volume_dir_proxy, dir_server_end) =
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
@@ -1468,6 +1486,13 @@ mod tests {
                 connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
                     .expect("Unable to connect to project id service")
             };
+
+            {
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").0;
+                assert_eq!(bytes, BYTES_LIMIT_2);
+                assert_eq!(nodes, NODES_LIMIT_2);
+            }
 
             // Should be unable to clear the project limit, due to being in use.
             project_proxy.clear(PROJECT_ID).await.unwrap().expect("To clear limits");
@@ -1483,12 +1508,8 @@ mod tests {
             );
 
             assert_eq!(
-                get_project_limit(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect_err("Expect missing limits")
-                    .downcast::<FxfsError>()
-                    .unwrap(),
-                FxfsError::NotFound
+                project_proxy.info(PROJECT_ID).await.unwrap().expect_err("Expect missing limits"),
+                Status::NOT_FOUND.into_raw()
             );
 
             std::mem::drop(volume_proxy);
@@ -1513,13 +1534,18 @@ mod tests {
             .mount_volume(VOLUME_NAME, None)
             .await
             .expect("mount unencrypted volume failed");
+        let (volume_dir_proxy, dir_server_end) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                .expect("Create dir proxy to succeed");
+        volumes_directory
+            .serve_volume(&volume_and_root, dir_server_end)
+            .await
+            .expect("serve_volume failed");
+        let project_proxy = connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
+            .expect("Unable to connect to project id service");
         assert_eq!(
-            get_project_limit(volume_and_root.volume(), PROJECT_ID)
-                .await
-                .expect_err("Expect missing limits")
-                .downcast::<FxfsError>()
-                .unwrap(),
-            FxfsError::NotFound
+            project_proxy.info(PROJECT_ID).await.unwrap().expect_err("Expect missing limits"),
+            Status::NOT_FOUND.into_raw()
         );
         volumes_directory.terminate().await;
         std::mem::drop(volumes_directory);
@@ -1580,10 +1606,8 @@ mod tests {
                 .unwrap()
                 .expect("To set limits");
             {
-                // Should just be one open volume.
-                let (bytes, nodes) = get_project_limit(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching limits");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").0;
                 assert_eq!(bytes, BYTES_LIMIT);
                 assert_eq!(nodes, NODES_LIMIT);
             }
@@ -1623,9 +1647,10 @@ mod tests {
             file_proxy.sync().await.expect("FIDL call failed").expect("Sync failed.");
 
             {
-                get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect_err("Usage should be missing due to being zero.");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
+                assert_eq!(bytes, 0);
+                assert_eq!(nodes, 0);
             }
 
             let node_id = file_proxy.get_attr().await.unwrap().1.id;
@@ -1637,9 +1662,8 @@ mod tests {
                 .expect("Setting project on node");
 
             bytes_usage = {
-                let (bytes, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching usage");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
                 assert!(bytes > 0);
                 assert_eq!(nodes, 1);
                 bytes
@@ -1657,9 +1681,8 @@ mod tests {
             );
             file_proxy.sync().await.expect("FIDL call failed").expect("Sync failed.");
             bytes_usage = {
-                let (bytes, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching usage");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
                 assert!(bytes > bytes_usage);
                 assert_eq!(nodes, 1);
                 bytes
@@ -1699,13 +1722,6 @@ mod tests {
                 volume_server_end.into_channel().into(),
             );
 
-            {
-                let (bytes, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching limits");
-                assert_eq!(bytes, bytes_usage);
-                assert_eq!(nodes, 1);
-            }
             let (root_proxy, project_proxy) = {
                 let (volume_dir_proxy, dir_server_end) =
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
@@ -1733,6 +1749,13 @@ mod tests {
                 (root_proxy, project_proxy)
             };
 
+            {
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
+                assert_eq!(bytes, bytes_usage);
+                assert_eq!(nodes, 1);
+            }
+
             assert_eq!(
                 project_proxy
                     .get_for_node(first_object_id)
@@ -1749,9 +1772,10 @@ mod tests {
             filesystem.graveyard().flush().await;
 
             {
-                get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect_err("Usage should be missing due to being zero.");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
+                assert_eq!(bytes, 0);
+                assert_eq!(nodes, 0);
             }
 
             let file_proxy = open_file_checked(
@@ -1771,9 +1795,8 @@ mod tests {
                 .expect("Applying project");
 
             bytes_usage = {
-                let (bytes, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching limits");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
                 // Empty file should have less space than the non-empty file from above.
                 assert!(bytes < bytes_usage);
                 assert_eq!(nodes, 1);
@@ -1791,9 +1814,8 @@ mod tests {
             );
             file_proxy.sync().await.expect("FIDL call failed").expect("Sync failed.");
             bytes_usage = {
-                let (bytes, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching usage");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
                 assert!(bytes > bytes_usage);
                 assert_eq!(nodes, 1);
                 bytes
@@ -1802,9 +1824,8 @@ mod tests {
             // Trim to zero. Bytes should decrease.
             file_proxy.resize(0).await.expect("FIDL call failed").expect("Resize file");
             {
-                let (bytes, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect("Fetching usage");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
                 assert!(bytes < bytes_usage);
                 assert_eq!(nodes, 1);
             };
@@ -1816,9 +1837,10 @@ mod tests {
                 .expect("FIDL call failed")
                 .expect("Clear failed.");
             {
-                get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                    .await
-                    .expect_err("Usage should be missing due to being zero.");
+                let BytesAndNodes { bytes, nodes } =
+                    project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
+                assert_eq!(bytes, 0);
+                assert_eq!(nodes, 0);
             };
 
             std::mem::drop(volume_proxy);
@@ -1964,9 +1986,8 @@ mod tests {
                 );
             }
 
-            let (_, nodes) = get_project_usage(volume_and_root.volume(), PROJECT_ID)
-                .await
-                .expect("Fetching usage");
+            let BytesAndNodes { nodes, .. } =
+                project_proxy.info(PROJECT_ID).await.unwrap().expect("Fetching project info").1;
             assert_eq!(nodes, 3);
             std::mem::drop(volume_proxy);
             volumes_directory.terminate().await;
@@ -1981,6 +2002,108 @@ mod tests {
         fsck_volume(filesystem.as_ref(), volume_store_id, Some(Arc::new(InsecureCrypt::new())))
             .await
             .expect("Fsck volume");
+        filesystem.close().await.expect("close filesystem failed");
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_project_listing() {
+        const VOLUME_NAME: &str = "A";
+        let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let volume_store_id;
+        {
+            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
+            .await
+            .unwrap();
+            let volume_and_root = volumes_directory
+                .create_volume(VOLUME_NAME, None)
+                .await
+                .expect("create unencrypted volume failed");
+            volume_store_id = volume_and_root.volume().store().store_object_id();
+            let (volume_proxy, volume_server_end) =
+                fidl::endpoints::create_proxy::<VolumeMarker>().expect("Create proxy to succeed");
+            volumes_directory.directory_node().clone().open(
+                ExecutionScope::new(),
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                Path::validate_and_split(VOLUME_NAME).unwrap(),
+                volume_server_end.into_channel().into(),
+            );
+            let (volume_dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create dir proxy to succeed");
+            volumes_directory
+                .serve_volume(&volume_and_root, dir_server_end)
+                .await
+                .expect("serve_volume failed");
+            let project_proxy =
+                connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
+                    .expect("Unable to connect to project id service");
+            // This is just to ensure that the small numbers below can be used for this test.
+            assert!(FxVolumeAndRoot::MAX_PROJECT_ENTRIES >= 3);
+            // Create a bunch of proxies. 3 more than the limit to ensure pagination.
+            let num_entries = u64::try_from(FxVolumeAndRoot::MAX_PROJECT_ENTRIES + 3).unwrap();
+            for project_id in 1..=num_entries {
+                project_proxy.set_limit(project_id, 1, 1).await.unwrap().expect("To set limits");
+            }
+            // If this `unwrap()` fails, it is likely the MAX_PROJECT_ENTRIES is too large for fidl.
+            let (mut entries, mut next_token) =
+                project_proxy.list(None).await.unwrap().expect("To get project listing");
+            assert_eq!(entries.len(), FxVolumeAndRoot::MAX_PROJECT_ENTRIES);
+            assert!(next_token.is_some());
+            assert!(entries.contains(&1));
+            assert!(entries.contains(&3));
+            assert!(!entries.contains(&num_entries));
+            // Page two should have a small set at the end.
+            (entries, next_token) = project_proxy
+                .list(next_token.as_deref_mut())
+                .await
+                .unwrap()
+                .expect("To get project listing");
+            assert_eq!(entries.len(), 3);
+            assert!(next_token.is_none());
+            assert!(entries.contains(&num_entries));
+            assert!(!entries.contains(&1));
+            assert!(!entries.contains(&3));
+            // Delete a couple and list all again.
+            project_proxy.clear(1).await.unwrap().expect("Clear project");
+            project_proxy.clear(3).await.unwrap().expect("Clear project");
+            (entries, next_token) =
+                project_proxy.list(None).await.unwrap().expect("To get project listing");
+            assert_eq!(entries.len(), FxVolumeAndRoot::MAX_PROJECT_ENTRIES);
+            assert!(next_token.is_some());
+            assert!(!entries.contains(&num_entries));
+            assert!(!entries.contains(&1));
+            assert!(!entries.contains(&3));
+            (entries, next_token) = project_proxy
+                .list(next_token.as_deref_mut())
+                .await
+                .unwrap()
+                .expect("To get project listing");
+            assert_eq!(entries.len(), 1);
+            assert!(next_token.is_none());
+            assert!(entries.contains(&num_entries));
+            // Delete one more to hit the edge case.
+            project_proxy.clear(2).await.unwrap().expect("Clear project");
+            (entries, next_token) =
+                project_proxy.list(None).await.unwrap().expect("To get project listing");
+            assert_eq!(entries.len(), FxVolumeAndRoot::MAX_PROJECT_ENTRIES);
+            assert!(next_token.is_none());
+            assert!(entries.contains(&num_entries));
+            std::mem::drop(volume_proxy);
+            volumes_directory.terminate().await;
+            std::mem::drop(volumes_directory);
+            filesystem.close().await.expect("close filesystem failed");
+            device = filesystem.take_device().await;
+        }
+        device.ensure_unique();
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
+        fsck(filesystem.clone()).await.expect("Fsck");
+        fsck_volume(filesystem.as_ref(), volume_store_id, None).await.expect("Fsck volume");
         filesystem.close().await.expect("close filesystem failed");
     }
 

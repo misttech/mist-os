@@ -107,6 +107,19 @@ closed protocol Volume {
     }) -> () error zx.status;
 };
 
+/// A token used for paging through tracked projects. One may be returned by the `ProjectId.List`
+/// call so it can be passed into the succeeding call to continue the listing from where it left
+/// off.
+type ProjectIterToken = struct {
+    value uint64;
+};
+
+/// Storage for a pair of related byte and node values.
+type BytesAndNodes = struct {
+    bytes uint64;
+    nodes uint64;
+};
+
 @discoverable
 closed protocol ProjectId {
     /// Set the limit in bytes and node count for an XFS project id. Setting limits lower than
@@ -149,6 +162,26 @@ closed protocol ProjectId {
     strict ClearForNode(struct {
         node_id uint64;
     }) -> () error zx.status;
+
+    /// Fetches project id numbers currently tracked with a limit from lowest to highest. If `token`
+    /// is null, start at the beginning, if `token` is populated with a previously provided
+    /// `next_token` the iteration continues where it left off. If there are more projects to be
+    /// listed then `next_token` will be populated, otherwise it will be null.
+    strict List(struct {
+        token box<ProjectIterToken>;
+    }) -> (struct {
+        entries vector<uint64>:MAX;
+        next_token box<ProjectIterToken>;
+    }) error zx.status;
+
+    /// Looks up the limit and usage for a tracked `project_id`. If the `project_id` does not have
+    /// a limit set, it will return ZX_ERR_NOT_FOUND.
+    strict Info(struct {
+        project_id uint64;
+    }) -> (struct {
+        limit BytesAndNodes;
+        usage BytesAndNodes;
+    }) error zx.status;
 };
 
 /// fuchsia.fxfs.Volumes is only used for creating volumes.  Other operations (e.g. enumeration and
