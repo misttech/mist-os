@@ -44,7 +44,8 @@ class pcf8563 : public DeviceType {
     if (zx::result result = Read(); result.is_error()) {
       completer.Close(result.status_value());
     } else {
-      completer.Reply(result.value());
+      // TODO(fxbug.dev/123155): Reply with error if RTC time is known to be invalid.
+      completer.ReplySuccess(result.value());
     }
   }
 

@@ -187,7 +187,10 @@ void RtcDevice::WriteTime(FidlRtc::wire::Time time) {
   WriteRegRaw(kRegB, ReadRegRaw(kRegB) & ~kRegBUpdateCycleInhibitBit);
 }
 
-void RtcDevice::Get(GetCompleter::Sync& completer) { completer.Reply(ReadTime()); }
+void RtcDevice::Get(GetCompleter::Sync& completer) {
+  // TODO(fxbug.dev/123155): Reply with error if RTC time is known to be invalid.
+  completer.ReplySuccess(ReadTime());
+}
 
 void RtcDevice::Set(SetRequestView request, SetCompleter::Sync& completer) {
   WriteTime(request->rtc);

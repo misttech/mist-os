@@ -15,12 +15,15 @@ type Time = struct {
 };
 
 protocol Device {
-    /// Get the current RTC time
+    /// Get the current RTC time.
+    /// If the driver detects that it does not have a valid time to report, then it will return an
+    /// `ZX_ERR_INTERNAL` error.
     Get() -> (struct {
         rtc Time;
-    });
+    }) error zx.status;
 
-    /// Set the RTC time
+    /// Set the RTC time.
+    /// If the RTC time is not valid, the driver will return an `ZX_ERR_OUT_OF_RANGE` error.
     Set(struct {
         rtc Time;
     }) -> (struct {

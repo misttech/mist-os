@@ -91,7 +91,8 @@ AmlRtc::AmlRtc(zx_device_t* parent, fdf::MmioBuffer mmio)
 
 void AmlRtc::Get(GetCompleter::Sync& completer) {
   FidlRtc::wire::Time rtc = SecondsToRtc(MmioRead32(&regs_->real_time));
-  completer.Reply(rtc);
+  // TODO(fxbug.dev/123155): Reply with error if RTC time is known to be invalid.
+  completer.ReplySuccess(rtc);
 }
 
 void AmlRtc::Set(SetRequestView request, SetCompleter::Sync& completer) {

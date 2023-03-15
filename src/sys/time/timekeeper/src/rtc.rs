@@ -124,7 +124,8 @@ impl Rtc for RtcImpl {
             .get()
             .map_err(|err| anyhow!("FIDL error: {}", err))
             .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on get")))
-            .await
+            .await?
+            .map_err(|err| anyhow!("Driver error: {}", err))
             .and_then(fidl_time_to_zx_time)
     }
 
@@ -238,8 +239,8 @@ mod test {
         let rtc_impl = RtcImpl { proxy };
         let _responder = fasync::Task::spawn(async move {
             if let Some(Ok(frtc::DeviceRequest::Get { responder })) = stream.next().await {
-                let mut fidl_time = TEST_FIDL_TIME;
-                responder.send(&mut fidl_time).expect("Failed response");
+                let fidl_time = TEST_FIDL_TIME;
+                responder.send(&mut Ok(fidl_time)).expect("Failed response");
             }
         });
         assert_eq!(rtc_impl.get().await.unwrap(), TEST_ZX_TIME);
@@ -252,8 +253,8 @@ mod test {
         let rtc_impl = RtcImpl { proxy };
         let _responder = fasync::Task::spawn(async move {
             if let Some(Ok(frtc::DeviceRequest::Get { responder })) = stream.next().await {
-                let mut fidl_time = INVALID_FIDL_TIME_1;
-                responder.send(&mut fidl_time).expect("Failed response");
+                let fidl_time = INVALID_FIDL_TIME_1;
+                responder.send(&mut Ok(fidl_time)).expect("Failed response");
             }
         });
         assert_eq!(rtc_impl.get().await.is_err(), true);
