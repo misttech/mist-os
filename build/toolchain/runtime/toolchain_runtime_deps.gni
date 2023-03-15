@@ -200,74 +200,12 @@ foreach(entry, _clang_runtime) {
     },
   ]
 }
-
-_clang_runtime = []
-_clang_runtime = _new_clang_runtime
-
-# The runtime.json for clang is currently broken:
-#
-# 1) There are two entries with the same content, which triggers an
-#    assert() below.
-#
-# 2) There is no entry for ldflags = [ "-static-libstdc++" ], which
-#    triggers another assert.
-#
-# Try to detect it here, then fix it.
-#
-_riscv64_target = [
-  "riscv64-unknown-fuchsia",
-  "riscv64-fuchsia",
-]
-_count_empty_riscv64_entries = 0
-_new_clang_runtime = []
-foreach(entry, _clang_runtime) {
-  if (entry.cflags == [] && entry.ldflags == [] && entry.runtime == [] &&
-      entry.target == _riscv64_target) {
-    _count_empty_riscv64_entries += 1
-    if (_count_empty_riscv64_entries == 2) {
-      entry.ldflags = [ "-static-libstdc++" ]
-    }
-  }
-  _new_clang_runtime += [ entry ]
-}
-
 _clang_runtime = []
 _clang_runtime = _new_clang_runtime
 
 _rustc_lib_dir = "$rustc_prefix/lib"
 _rustc_runtime_file = "$_rustc_lib_dir/runtime.json"
 _rustc_runtime = read_file(_rustc_runtime_file, "json")
-
-# Similarly the rustc runtime.json file doesn't have entries for riscv64
-# for now, so add empty entries here if needed.
-
-# IMPORTANT NOTE: For riscv64, the rustc compiler uses a prefix of riscv64gc-
-# which the `rust_target` variable set in build/rust/config.gni uses properly.
-#
-# However, the toolchain_runtime_deps() template below uses `current_target_tuple`
-# which is always the Clang-compatible value "riscv64-unknown-fuchsia", so this
-# is what should appear in the runtime.json file for this compiler.
-_rustc_runtime_has_riscv64 = false
-foreach(entry, _rustc_runtime) {
-  if (entry.target == _riscv64_target) {
-    _rustc_runtime_has_riscv64 = true
-  }
-}
-
-if (!_rustc_runtime_has_riscv64) {
-  _rustc_runtime += [
-    {
-      runtime = []
-      rustflags = []
-      target = _riscv64_target
-    },
-    {
-      runtime = []
-      rustflags = [ "-Cprefer-dynamic" ]
-      target = _riscv64_target
-    },
-  ]
-}
 
 # ## Toolchain specifications
 #
@@ -395,9 +333,9 @@ template("toolchain_runtime_deps") {
         if (config_flags == match_flags &&
             config.target + [ current_target_tuple ] -
             [ current_target_tuple ] != config.target) {
-          assert(match == false,
-                 "${toolchain_spec.runtime_file} has multiple matches for" +
-                     " --target=${current_target_tuple} + $invoker")
+          assert(
+              match == false,
+              "${toolchain_spec.runtime_file} has multiple matches for" + " --target=${current_target_tuple}: matched $match_flags in both $match and $config;" + " from toolchain_runtime_deps($target_name) $invoker")
           match = config
         }
       }
