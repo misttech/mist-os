@@ -289,7 +289,7 @@ pub struct StartupHandles {
 pub fn parse_numbered_handles(
     current_task: &CurrentTask,
     numbered_handles: Option<Vec<fprocess::HandleInfo>>,
-    files: &FdTable,
+    files: &Arc<FdTable>,
 ) -> Result<StartupHandles, Error> {
     let mut shell_controller = None;
     if let Some(numbered_handles) = numbered_handles {
