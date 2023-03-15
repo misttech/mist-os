@@ -407,10 +407,10 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fasync::TestExecutor;
-    use fidl::encoding::TopLevel;
     use fidl::endpoints::{create_proxy, ServerEnd};
-    use fidl::{fidl_empty_struct, fidl_struct, Vmo};
+    use fidl::Vmo;
     use fidl_fuchsia_io::DirectoryMarker;
+    use fidl_test_storage::{TestStruct, WrongStruct};
     use fuchsia_async as fasync;
     use std::task::Poll;
     use test_case::test_case;
@@ -423,11 +423,6 @@ mod tests {
     const VALUE0: i32 = 3;
     const VALUE1: i32 = 33;
     const VALUE2: i32 = 128;
-
-    #[derive(PartialEq, Clone, Copy, Debug, Default)]
-    struct TestStruct {
-        value: i32,
-    }
 
     impl FidlStorageConvertible for TestStruct {
         type Storable = Self;
@@ -444,25 +439,6 @@ mod tests {
         fn from_storable(storable: Self::Storable) -> Self {
             storable
         }
-    }
-
-    impl TopLevel for TestStruct {}
-    impl Persistable for TestStruct {}
-    fidl_struct! {
-        name: TestStruct,
-        members: [
-            value {
-                ty: i32,
-                offset_v1: 0,
-                offset_v2: 0,
-            },
-        ],
-        padding_v1: [],
-        padding_v2: [],
-        size_v1: 8,
-        size_v2: 8,
-        align_v1: 8,
-        align_v2: 8,
     }
 
     fn serve_vfs_dir(
@@ -753,9 +729,6 @@ mod tests {
         assert_eq!(data, value_to_write2);
     }
 
-    #[derive(Copy, Clone, PartialEq, Default, Debug)]
-    struct WrongStruct;
-
     impl FidlStorageConvertible for WrongStruct {
         type Storable = Self;
         const KEY: &'static str = "WRONG_STRUCT";
@@ -772,9 +745,6 @@ mod tests {
             storable
         }
     }
-    impl TopLevel for WrongStruct {}
-    impl Persistable for WrongStruct {}
-    fidl_empty_struct! { WrongStruct }
 
     // Test that attempting to write two kinds of structs to a storage instance that only supports
     // one results in a failure.

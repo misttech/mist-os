@@ -13,6 +13,11 @@ group("storage") {
   ]
 }
 
+fidl("test.storage") {
+  testonly = true
+  sources = [ "storage.test.fidl" ]
+}
+
 rustc_library("settings_storage") {
   name = "settings_storage"
   with_unit_tests = true
@@ -43,6 +48,7 @@ rustc_library("settings_storage") {
   ]
 
   test_deps = [
+    ":test.storage_rust",
     "//src/lib/fuchsia",
     "//src/lib/storage/vfs/rust:vfs",
     "//third_party/rust_crates:assert_matches",
