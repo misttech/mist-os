@@ -4,8 +4,6 @@
 
 #![allow(non_upper_case_globals)]
 
-use fuchsia_inspect as inspect;
-use lazy_static::lazy_static;
 use paste::paste;
 
 use crate::task::*;
@@ -407,14 +405,15 @@ macro_rules! for_each_syscall {
 /// A system call declaration.
 ///
 /// Describes the name of the syscall and its number.
+#[derive(Copy, Clone)]
 pub struct SyscallDecl {
-    pub name: &'static str,
     pub number: u64,
+    pub name: &'static str,
 }
 
 impl std::fmt::Debug for SyscallDecl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.name, self.number,)
+        write!(f, "{}:{}", self.name, self.number)
     }
 }
 
@@ -423,7 +422,7 @@ impl std::fmt::Debug for SyscallDecl {
 /// Contains the declaration of the invoked system call, as well as which arguments it was invoked
 /// with.
 pub struct Syscall {
-    pub decl: &'static SyscallDecl,
+    pub decl: SyscallDecl,
     pub arg0: u64,
     pub arg1: u64,
     pub arg2: u64,
@@ -435,7 +434,7 @@ pub struct Syscall {
 impl Syscall {
     /// Populates the syscall parameters from the x64 registers.
     #[cfg(target_arch = "x86_64")]
-    pub fn new(syscall_decl: &'static SyscallDecl, current_task: &CurrentTask) -> Syscall {
+    pub fn new(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
         Syscall {
             decl: syscall_decl,
             arg0: current_task.registers.rdi,
@@ -449,7 +448,7 @@ impl Syscall {
 
     /// Populates the syscall parameters from the ARM64 registers.
     #[cfg(target_arch = "aarch64")]
-    pub fn new(syscall_decl: &'static SyscallDecl, current_task: &CurrentTask) -> Syscall {
+    pub fn new(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
         Syscall {
             decl: syscall_decl,
             arg0: current_task.registers.r[0],
@@ -472,50 +471,6 @@ impl std::fmt::Debug for Syscall {
     }
 }
 
-/// A macro for declaring a const SyscallDecl for a given syscall.
-///
-/// The constant will be called DECL_<SYSCALL>.
-macro_rules! syscall_decl {
-    {$($name:ident,)*} => {
-        paste! {
-            $(pub const [<DECL_ $name:upper>]: SyscallDecl = SyscallDecl { name: stringify!($name), number: [<__NR_ $name>] as u64};)*
-        }
-    }
-}
-
-// Produce each syscall declaration.
-for_each_syscall! {syscall_decl}
-
-/// A macro for declaring a SyscallDecl stats property.
-macro_rules! syscall_stats_property {
-    ($($name:ident,)*) => {
-        paste!{
-            $(
-                lazy_static!{
-                static ref [<SYSCALL_ $name:upper _STATS>]: inspect::UintProperty =
-                    SYSCALL_STATS_NODE.create_uint(stringify!($name), 0);
-                }
-            )*
-        }
-    }
-}
-
-lazy_static! {
-    static ref SYSCALL_STATS_NODE: inspect::Node =
-        inspect::component::inspector().root().create_child("syscall_stats");
-    static ref SYSCALL_UNKNOWN_STATS: inspect::UintProperty =
-        SYSCALL_STATS_NODE.create_uint("<unknown>", 0);
-}
-
-// Produce each syscall stats property.
-for_each_syscall! {syscall_stats_property}
-
-/// A declaration for an unknown syscall.
-///
-/// Useful so that functions that return a SyscallDecl have a sentinel
-/// to return when they cannot find an appropriate syscall.
-pub const DECL_UNKNOWN: SyscallDecl = SyscallDecl { name: "<unknown>", number: 0xFFFF };
-
 /// A macro for the body of SyscallDecl::from_number.
 ///
 /// Evaluates to the &'static SyscallDecl for the given number or to
@@ -524,20 +479,8 @@ macro_rules! syscall_match {
     {$number:ident; $($name:ident,)*} => {
         paste! {
             match $number as u32 {
-                $([<__NR_ $name>] => &[<DECL_ $name:upper>],)*
-                _ => &DECL_UNKNOWN,
-            }
-        }
-    }
-}
-
-#[cfg(feature = "syscall_stats")]
-macro_rules! syscall_match_stats {
-    {$number:ident; $($name:ident,)*} => {
-        paste! {
-            match $number as u32 {
-                $([<__NR_ $name>] => &[<SYSCALL_ $name:upper _STATS>],)*
-                _ => &SYSCALL_UNKNOWN_STATS,
+                $([<__NR_ $name>] => stringify!($name),)*
+                _ => "<unknown>",
             }
         }
     }
@@ -547,12 +490,51 @@ impl SyscallDecl {
     /// The SyscallDecl for the given syscall number.
     ///
     /// Returns &DECL_UNKNOWN if the given syscall number is not known.
-    pub fn from_number(number: u64) -> &'static SyscallDecl {
-        for_each_syscall! { syscall_match, number }
+    pub fn from_number(number: u64) -> SyscallDecl {
+        let name = for_each_syscall! { syscall_match, number };
+        Self { number, name }
+    }
+}
+
+#[cfg(feature = "syscall_stats")]
+mod syscall_stats {
+    use fuchsia_inspect as inspect;
+    use once_cell::sync::Lazy;
+
+    /// A macro for declaring a SyscallDecl stats property.
+    macro_rules! syscall_stats_property {
+        ($($name:ident,)*) => {
+            paste!{
+                $(
+                    static [<SYSCALL_ $name:upper _STATS>]: Lazy<inspect::UintProperty> =
+                    Lazy::new(|| SYSCALL_STATS_NODE.create_uint(stringify!($name), 0));
+                )*
+            }
+        }
     }
 
-    #[cfg(feature = "syscall_stats")]
-    pub fn stats_property(number: u64) -> &'static inspect::UintProperty {
-        for_each_syscall! { syscall_match_stats, number }
+    static SYSCALL_STATS_NODE: Lazy<inspect::Node> =
+        Lazy::new(|| inspect::component::inspector().root().create_child("syscall_stats"));
+    static SYSCALL_UNKNOWN_STATS: Lazy<inspect::UintProperty> =
+        Lazy::new(|| SYSCALL_STATS_NODE.create_uint("<unknown>", 0));
+
+    // Produce each syscall stats property.
+    for_each_syscall! {syscall_stats_property}
+
+    macro_rules! syscall_match_stats {
+        {$number:ident; $($name:ident,)*} => {
+            paste! {
+                match $number as u32 {
+                    $([<__NR_ $name>] => &[<SYSCALL_ $name:upper _STATS>],)*
+                    _ => &SYSCALL_UNKNOWN_STATS,
+                }
+            }
+        }
+    }
+
+    impl SyscallDecl {
+        pub fn stats_property(number: u64) -> &'static inspect::UintProperty {
+            for_each_syscall! { syscall_match_stats, number }
+        }
     }
 }

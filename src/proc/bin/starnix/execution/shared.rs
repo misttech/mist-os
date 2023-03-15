@@ -61,7 +61,7 @@ pub struct TaskInfo {
 /// Returns an `ErrorContext` if the system call returned an error.
 pub fn execute_syscall(
     current_task: &mut CurrentTask,
-    syscall_decl: &'static SyscallDecl,
+    syscall_decl: SyscallDecl,
 ) -> Option<ErrorContext> {
     #[cfg(feature = "syscall_stats")]
     SyscallDecl::stats_property(syscall_decl.number).add(1);

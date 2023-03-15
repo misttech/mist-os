@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::convert::TryInto;
 use std::ffi::{CStr, CString};
 use std::sync::Arc;
@@ -21,9 +21,7 @@ use crate::task::*;
 use crate::types::{range_ext::RangeExt, *};
 use crate::vmex_resource::VMEX_RESOURCE;
 
-lazy_static! {
-    pub static ref PAGE_SIZE: u64 = zx::system_get_page_size() as u64;
-}
+pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);
 
 bitflags! {
     pub struct MappingOptions: u32 {

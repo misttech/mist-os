@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::Arc;
 
@@ -10,9 +10,9 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::mm::{MemoryAccessor, ProcMapsFile, ProcStatFile, ProcStatusFile};
+use crate::selinux::selinux_proc_attrs;
 use crate::task::{CurrentTask, Task, ThreadGroup};
 use crate::types::*;
-use crate::selinux::selinux_proc_attrs;
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>` directory for `task`.
 pub fn pid_directory(fs: &FileSystemHandle, task: &Arc<Task>) -> Arc<FsNode> {
@@ -159,9 +159,8 @@ impl FsNodeOps for NsDirectory {
         }
         if let Some(id) = elements.next() {
             // The name starts with {namespace}:, check that it matches {namespace}:[id]
-            lazy_static! {
-                static ref NS_IDENTIFIER_RE: Regex = Regex::new("^\\[[0-9]+\\]$").unwrap();
-            }
+            static NS_IDENTIFIER_RE: Lazy<Regex> =
+                Lazy::new(|| Regex::new("^\\[[0-9]+\\]$").unwrap());
             if NS_IDENTIFIER_RE.is_match(id) {
                 // TODO(qsr): For now, returns an empty file. In the future, this should create a
                 // reference to to correct namespace, and ensures it keeps it alive.

@@ -5,14 +5,12 @@
 use fidl_fuchsia_kernel as fkernel;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
-lazy_static! {
-    pub static ref VMEX_RESOURCE: zx::Resource = {
-        let (client_end, server_end) = zx::Channel::create();
-        connect_channel_to_protocol::<fkernel::VmexResourceMarker>(server_end)
-            .expect("couldn't connect to fuchsia.kernel.VmexResource");
-        let service = fkernel::VmexResourceSynchronousProxy::new(client_end);
-        service.get(zx::Time::INFINITE).expect("couldn't talk to fuchsia.kernel.VmexResource")
-    };
-}
+pub static VMEX_RESOURCE: Lazy<zx::Resource> = Lazy::new(|| {
+    let (client_end, server_end) = zx::Channel::create();
+    connect_channel_to_protocol::<fkernel::VmexResourceMarker>(server_end)
+        .expect("couldn't connect to fuchsia.kernel.VmexResource");
+    let service = fkernel::VmexResourceSynchronousProxy::new(client_end);
+    service.get(zx::Time::INFINITE).expect("couldn't talk to fuchsia.kernel.VmexResource")
+});
