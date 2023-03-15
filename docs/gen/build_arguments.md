@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -3651,6 +3651,14 @@ LINT.IfChange
 
 From //build/images/fvm.gni:32
 
+### fxfs_blob
+
+Use Fxfs's blob implementation
+
+**Current value (from the default):** `false`
+
+From //src/storage/fshost/generated_fshost_config.gni:50
+
 ### gcc_tool_dir
 
 Directory where the GCC toolchain binaries ("gcc", "nm", etc.) are found.
@@ -3722,7 +3730,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7969,7 +7977,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
