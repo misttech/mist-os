@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::test::*;
-use anyhow::*;
-use ffx_core::ffx_plugin;
+use anyhow::Result;
 use ffx_selftest_args::SelftestCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use std::time::Duration;
 
 mod component;
@@ -16,7 +16,23 @@ mod experiment;
 mod target;
 mod test;
 
-#[ffx_plugin()]
+#[derive(FfxTool)]
+pub struct SelfTestTool {
+    #[command]
+    cmd: SelftestCommand,
+}
+
+fho::embedded_plugin!(SelfTestTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for SelfTestTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        selftest(self.cmd).await.map_err(Into::into)
+    }
+}
+
 pub async fn selftest(cmd: SelftestCommand) -> Result<()> {
     let default_tests = tests![
         test_isolated,
