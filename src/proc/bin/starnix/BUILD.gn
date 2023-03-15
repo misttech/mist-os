@@ -123,6 +123,13 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:zerocopy",
   ]
 
+  if (current_cpu == "x64") {
+    deps += [
+      ":vdso-data($target_linux_toolchain)",
+      "//third_party/rust_crates:memoffset",
+    ]
+  }
+
   if (is_debug) {
     deps += [ "//third_party/rust_crates:tracing-mutex" ]
   }
