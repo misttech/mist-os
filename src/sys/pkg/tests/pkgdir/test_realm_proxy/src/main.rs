@@ -1,33 +1,27 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Context, Error},
+    anyhow::{Error, Result},
     blobfs_ramdisk::BlobfsRamdisk,
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fidl_test_fidl_pkg::{Backing, HarnessRequest, HarnessRequestStream},
-    fuchsia_async::Task,
+    fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream},
     fuchsia_component::server::ServiceFs,
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
-    futures::prelude::*,
-    std::convert::TryInto,
+    fuchsia_zircon as zx,
+    futures::{StreamExt, TryFutureExt},
+    realm_proxy::service::handle_request_stream,
     tracing::{error, info},
 };
 
-#[fuchsia::main(logging_tags = ["pkg-harness"])]
-async fn main() -> Result<(), Error> {
-    main_inner().await.map_err(|err| {
-        // Use anyhow to print the error chain.
-        let err = anyhow!(err);
-        error!("error running pkg-harness: {:#}", err);
-        err
-    })
+enum IncomingService {
+    RealmProxy(RealmProxy_RequestStream),
 }
 
-async fn main_inner() -> Result<(), Error> {
-    info!("starting pkg-harness");
+#[fuchsia::main(logging = true)]
+async fn main() -> Result<(), Error> {
+    info!("starting");
 
     // Spin up a blobfs and install the test package.
     let test_package = make_test_package().await;
@@ -39,59 +33,28 @@ async fn main_inner() -> Result<(), Error> {
     system_image_package.write_to_blobfs_dir(&blobfs_root_dir);
 
     let blobfs_client = blobfs.client();
+    let (client, server) = fidl::endpoints::create_proxy()?;
 
-    let (pkgdir_backed_package, dir_request) = fidl::endpoints::create_proxy().unwrap();
     package_directory::serve(
         vfs::execution_scope::ExecutionScope::new(),
         blobfs_client,
         *test_package.meta_far_merkle_root(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        dir_request,
+        server,
     )
-    .await
-    .expect("serving test_package with pkgdir");
+    .await?;
 
-    // Set up serving FIDL to expose the test package.
-    enum IncomingService {
-        Harness(HarnessRequestStream),
-    }
-    let mut fs = ServiceFs::new();
-    fs.take_and_serve_directory_handle().context("while serving directory handle")?;
-    fs.dir("svc").add_fidl_service(IncomingService::Harness);
-    let () = fs
-        .for_each_concurrent(None, move |svc| {
-            match svc {
-                IncomingService::Harness(stream) => Task::spawn(
-                    serve_harness(stream, Clone::clone(&pkgdir_backed_package))
-                        .map(|res| res.context("while serving test.fidl.pkg.Harness")),
-                ),
-            }
-            .unwrap_or_else(|e| {
-                error!("error handling fidl connection: {:#}", anyhow!(e));
-            })
-        })
-        .await;
+    let mut fs = ServiceFs::new_local();
+    fs.dir("svc").add_fidl_service(IncomingService::RealmProxy);
+    fs.take_and_serve_directory_handle()?;
 
-    Ok(())
-}
+    fs.for_each_concurrent(None, move |IncomingService::RealmProxy(stream)| {
+        let realm_proxy = PkgdirTestRealmProxy::new(Clone::clone(&client));
+        handle_request_stream(realm_proxy, stream)
+            .unwrap_or_else(|e| error!("handling realm_proxy request stream{:?}", e))
+    })
+    .await;
 
-/// Serve test.fidl.pkg.Harness.
-async fn serve_harness(
-    mut stream: HarnessRequestStream,
-    pkgdir_backed_package: fio::DirectoryProxy,
-) -> Result<(), Error> {
-    while let Some(event) = stream.try_next().await.context("while pulling next event")? {
-        let HarnessRequest::ConnectPackage { backing, dir, responder } = event;
-        let pkg = match backing {
-            Backing::Pkgdir => &pkgdir_backed_package,
-        };
-
-        let () = pkg
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(dir.into_channel()))
-            .expect("clone to succeed");
-
-        responder.send(&mut Ok(())).context("while sending success response")?;
-    }
     Ok(())
 }
 
@@ -177,4 +140,34 @@ fn repeat_by_n(seed: char, n: usize) -> String {
 
 fn make_file_contents(size: usize) -> impl Iterator<Item = u8> {
     b"ABCD".iter().copied().cycle().take(size)
+}
+
+// A [RealmProxy] implementation that returns clones of the pacakge directory
+// for testing. It only responds to requests to connect to fuchsia.io.Directory.
+// Any other protocol connection is rejected with [OperationError::Unsupported].
+pub struct PkgdirTestRealmProxy {
+    directory: fio::DirectoryProxy,
+}
+
+impl PkgdirTestRealmProxy {
+    pub fn new(directory: fio::DirectoryProxy) -> Self {
+        Self { directory }
+    }
+}
+
+impl realm_proxy::service::RealmProxy for PkgdirTestRealmProxy {
+    fn connect_to_named_protocol(
+        &mut self,
+        protocol: &str,
+        server_end: zx::Channel,
+    ) -> Result<(), OperationError> {
+        if protocol != "fuchsia.io.Directory" {
+            error!("this puppet only serves the fuchsia.io.Directory protocol");
+            return Err(OperationError::Unsupported);
+        }
+        self.directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into()).map_err(|e| {
+            error!("{:?}", e);
+            OperationError::Failed
+        })
+    }
 }

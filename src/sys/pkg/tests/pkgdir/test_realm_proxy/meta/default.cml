@@ -1,21 +1,15 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
     include: [
         "//src/sys/test_runners/tmp_storage.shard.cml",
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
+        "//src/testing/realm_proxy/service/meta/service.shard.cml",
     ],
     program: {
         runner: "elf",
-        binary: "bin/pkg_harness",
+        binary: "bin/test_realm_proxy",
     },
-    capabilities: [
-        {
-            protocol: [ "test.fidl.pkg.Harness" ],
-        },
-    ],
     use: [
         {
             protocol: [ "fuchsia.process.Launcher" ],
@@ -26,12 +20,6 @@
             from: "parent",
             rights: [ "r*" ],
             path: "/dev",
-        },
-    ],
-    expose: [
-        {
-            protocol: [ "test.fidl.pkg.Harness" ],
-            from: "self",
         },
     ],
 }

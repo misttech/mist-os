@@ -10,9 +10,9 @@ rustc_test("driver") {
   edition = "2021"
 
   deps = [
-    "pkg-harness:test.fidl.pkg_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -33,10 +33,16 @@ rustc_test("driver") {
   ]
 }
 
-fuchsia_component("pkgdir-integration-test") {
+fuchsia_component("test_suite_component") {
   testonly = true
+  component_name = "default"
   manifest = "meta/pkgdir-integration-test.cml"
   deps = [ ":driver" ]
+}
+
+fuchsia_package("test_suite") {
+  testonly = true
+  deps = [ ":test_suite_component" ]
 }
 
 fuchsia_component("test-root") {
@@ -52,9 +58,9 @@ fuchsia_test_package("pkgdir-integration-tests") {
     }
   }
   test_components = [ ":test-root" ]
-  deps = [
-    ":pkgdir-integration-test",
-    "pkg-harness",
+  subpackages = [
+    "test_realm_proxy",
+    ":test_suite",
   ]
 }
 

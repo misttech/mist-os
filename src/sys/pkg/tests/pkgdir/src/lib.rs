@@ -6,9 +6,8 @@
 #![allow(clippy::let_unit_value)]
 
 use {
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-    fidl_test_fidl_pkg::{Backing, HarnessMarker},
+    fidl::endpoints::create_proxy, fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
+    fidl_fuchsia_testing_harness::RealmProxy_Marker,
     fuchsia_component::client::connect_to_protocol,
 };
 
@@ -23,22 +22,22 @@ fn repeat_by_n(seed: char, n: usize) -> String {
 async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {
     // Bind to parent to ensure driver test realm is started
     let _ = connect_to_protocol::<fcomponent::BinderMarker>().unwrap();
-    let proxy = connect_to_protocol::<HarnessMarker>().unwrap();
-    let connect = |backing| {
-        let proxy = Clone::clone(&proxy);
+    let realm_proxy = connect_to_protocol::<RealmProxy_Marker>().expect("connect to realm_proxy");
+    let connect = || {
+        let realm_proxy = Clone::clone(&realm_proxy);
         async move {
-            let (dir, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            let () = proxy.connect_package(backing, server).await.unwrap().unwrap();
-            PackageSource { dir, _backing: backing }
+            let (client, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
+            let _ = realm_proxy
+                .connect_to_named_protocol("fuchsia.io.Directory", server.into_channel())
+                .await
+                .expect("connect to fuchsia.io.Directory");
+            PackageSource { dir: client }
         }
     };
-    // To test a new implementation, add the corresponding field from the test.fidl.pkg/Backing enum
-    // here.
-    IntoIterator::into_iter([connect(Backing::Pkgdir).await])
+    IntoIterator::into_iter([connect().await])
 }
 
 struct PackageSource {
-    _backing: Backing,
     dir: fio::DirectoryProxy,
 }
 

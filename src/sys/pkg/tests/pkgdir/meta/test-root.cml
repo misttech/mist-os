@@ -5,53 +5,53 @@
     include: [ "//src/storage/testing/driver_test_realm/meta/client.shard.cml" ],
     children: [
         {
-            name: "pkg_harness",
-            url: "fuchsia-pkg://fuchsia.com/pkgdir-integration-tests#meta/pkg-harness.cm",
+            name: "test_realm_proxy",
+            url: "test_realm_proxy#meta/default.cm",
         },
         {
-            name: "pkgdir_integration_test",
-            url: "fuchsia-pkg://fuchsia.com/pkgdir-integration-tests#meta/pkgdir-integration-test.cm",
+            name: "test_suite",
+            url: "test_suite#meta/default.cm",
         },
     ],
     offer: [
         {
             directory: "dev-topological",
             from: "#storage_driver_test_realm",
-            to: [ "#pkg_harness" ],
+            to: [ "#test_realm_proxy" ],
         },
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
-                "#pkg_harness",
-                "#pkgdir_integration_test",
+                "#test_realm_proxy",
+                "#test_suite",
             ],
         },
         {
-            protocol: "fuchsia.process.Launcher",
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
-            to: [ "#pkg_harness" ],
+            to: [ "#test_realm_proxy" ],
         },
         {
             storage: "tmp",
             from: "parent",
-            to: [ "#pkg_harness" ],
+            to: [ "#test_realm_proxy" ],
         },
         {
-            protocol: [ "test.fidl.pkg.Harness" ],
-            from: "#pkg_harness",
-            to: [ "#pkgdir_integration_test" ],
+            protocol: [ "fuchsia.testing.harness.RealmProxy" ],
+            from: "#test_realm_proxy",
+            to: "#test_suite",
         },
         {
             protocol: "fuchsia.component.Binder",
             from: "framework",
-            to: "#pkgdir_integration_test",
+            to: "#test_suite",
         },
     ],
     expose: [
         {
             protocol: "fuchsia.test.Suite",
-            from: "#pkgdir_integration_test",
+            from: "#test_suite",
         },
     ],
 }

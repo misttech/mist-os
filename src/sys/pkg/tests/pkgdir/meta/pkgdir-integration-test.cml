@@ -14,7 +14,7 @@
         {
             protocol: [
                 "fuchsia.component.Binder",
-                "test.fidl.pkg.Harness",
+                "fuchsia.testing.harness.RealmProxy",
             ],
             from: "parent",
         },
