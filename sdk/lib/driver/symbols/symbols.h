@@ -20,16 +20,13 @@ struct EncodedDriverStartArgs {
   fidl_opaque_wire_format_metadata wire_format_metadata;
 };
 
-struct PrepareStopContext;
-
-typedef void(PrepareStopCompleteCallback)(PrepareStopContext* context, zx_status_t status);
-
-struct PrepareStopContext {
-  // The value that was stored when the driver was started.
-  void* driver;
-  // The callback to trigger when done preparing for stop to be invoked.
-  PrepareStopCompleteCallback* complete;
-};
+// The callback to trigger when done preparing for stop to be invoked.
+// Once this is called, the framework will shutdown all driver dispatchers
+// belonging to the driver, and then call the stop hook in the DriverLifecycle.
+//
+// |cookie| is the opaque pointer that the |prepare_stop| caller passed as the |complete_cookie|.
+// |status| is the status of the |prepare_stop| async operation.
+typedef void(PrepareStopCompleteCallback)(void* cookie, zx_status_t status);
 
 struct DriverLifecycle {
   // This is the version of `DriverLifecycle` and all structures used by it.
@@ -56,7 +53,12 @@ struct DriverLifecycle {
     // Pointer to a function that is triggered before the stop hook is invoked. This method allows
     // the driver to asynchronously do work that may not otherwise be done synchronously during the
     // stop hook.
-    void (*prepare_stop)(PrepareStopContext* context);
+    // |driver| is the value that was stored when the driver was started.
+    // |complete| is the callback that must be called to complete the |prepare_stop| operation.
+    // |complete_cookie| is an opaque pointer provided by the caller (the Driver Framework), and
+    // must be provided without modification into the |complete| callback function.
+    void (*prepare_stop)(void* driver, PrepareStopCompleteCallback* complete,
+                         void* complete_cookie);
   } v2;
 };
 

@@ -8,19 +8,20 @@
 namespace fdf {
 
 PrepareStopCompleter::PrepareStopCompleter(PrepareStopCompleter&& other) noexcept
-    : context_(other.context_) {
-  other.context_ = nullptr;
+    : complete_(other.complete_), cookie_(other.cookie_) {
+  other.complete_ = nullptr;
+  other.cookie_ = nullptr;
 }
 
 PrepareStopCompleter::~PrepareStopCompleter() {
-  if (context_) {
+  if (complete_) {
     ZX_ASSERT_MSG(called_, "PrepareStopCompleter was not called before going out of scope.");
   }
 }
 
 void PrepareStopCompleter::operator()(zx::result<> result) {
   ZX_ASSERT_MSG(!called_, "Cannot call PrepareStopCompleter more than once.");
-  context_->complete(context_, result.status_value());
+  complete_(cookie_, result.status_value());
   called_ = true;
 }
 

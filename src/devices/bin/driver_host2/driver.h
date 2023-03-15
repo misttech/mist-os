@@ -31,6 +31,10 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
 
   void Stop(StopCompleter::Sync& completer) override;
 
+  // Called by the driver to signal completion of the |prepare_stop| operation.
+  // |status| is the status of the prepare_stop operation sent from the driver.
+  void PrepareStopCompleted(zx_status_t status);
+
   // Starts the driver.
   zx::result<> Start(fuchsia_driver_framework::DriverStartArgs start_args,
                      fdf::Dispatcher dispatcher);

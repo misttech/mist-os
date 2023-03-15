@@ -419,15 +419,12 @@ class DriverTest : public testing::Test {
 
   void UnbindAndFreeDriver(std::unique_ptr<compat::Driver> driver) {
     libsync::Completion completion;
-    PrepareStopContext stop_context{
-        .driver = &completion,
-        .complete =
-            [](PrepareStopContext* context, zx_status_t status) {
-              reinterpret_cast<libsync::Completion*>(context->driver)->Signal();
-            },
-    };
 
-    fdf::PrepareStopCompleter completer(&stop_context);
+    fdf::PrepareStopCompleter completer(
+        [](void* cookie, zx_status_t status) {
+          static_cast<libsync::Completion*>(cookie)->Signal();
+        },
+        &completion);
     driver->PrepareStop(std::move(completer));
 
     // Keep running the test loop while we're waiting for a signal on the dispatcher thread.

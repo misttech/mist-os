@@ -14,24 +14,13 @@ zx::result<> PrepareStopSync(OpaqueDriverPtr driver, const DriverLifecycle& driv
                              fdf::TestSynchronizedDispatcher& driver_dispatcher) {
   libsync::Completion prepare_stop_completion;
 
-  struct StopContext : public PrepareStopContext {
-    explicit StopContext(libsync::Completion* completion)
-        : PrepareStopContext(), completion(completion) {}
-    libsync::Completion* completion;
-  };
-
-  std::unique_ptr<StopContext> stop_context =
-      std::make_unique<StopContext>(&prepare_stop_completion);
-
-  stop_context->driver = driver;
-  stop_context->complete = [](PrepareStopContext* context, zx_status_t status) {
-    // Put the context in a unique_ptr so that it gets destroyed when we are finished here.
-    std::unique_ptr<StopContext> stop_context(static_cast<StopContext*>(context));
-    stop_context->completion->Signal();
-  };
-
   zx::result result = fdf::RunOnDispatcherSync(driver_dispatcher.dispatcher(), [&]() {
-    driver_lifecycle_symbol.v2.prepare_stop(stop_context.release());
+    driver_lifecycle_symbol.v2.prepare_stop(
+        driver,
+        [](void* cookie, zx_status_t status) {
+          static_cast<libsync::Completion*>(cookie)->Signal();
+        },
+        &prepare_stop_completion);
   });
 
   if (result.is_error()) {

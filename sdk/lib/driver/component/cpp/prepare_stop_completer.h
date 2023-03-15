@@ -14,7 +14,8 @@ namespace fdf {
 // The completer must be called before this class is destroyed. This is a move-only type.
 class PrepareStopCompleter {
  public:
-  explicit PrepareStopCompleter(PrepareStopContext* context) : context_(context) {}
+  explicit PrepareStopCompleter(PrepareStopCompleteCallback* complete, void* cookie)
+      : complete_(complete), cookie_(cookie) {}
 
   PrepareStopCompleter(PrepareStopCompleter&& other) noexcept;
 
@@ -27,7 +28,8 @@ class PrepareStopCompleter {
   void operator()(zx::result<> result);
 
  private:
-  PrepareStopContext* context_;
+  PrepareStopCompleteCallback* complete_;
+  void* cookie_;
   bool called_ = false;
 };
 

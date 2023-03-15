@@ -142,34 +142,39 @@ void Driver::Stop(StopCompleter::Sync& completer) {
       dispatcher = initial_dispatcher_.async_dispatcher();
     }
     zx_status_t status = async::PostTask(dispatcher, [this]() {
-      struct Context : public PrepareStopContext {
-        Context(Driver* driver) : PrepareStopContext(), driver_actual(driver) {}
-        Driver* const driver_actual;
-      };
-      auto context = std::make_unique<Context>(this);
+      void* opaque_driver;
       {
         fbl::AutoLock al(&lock_);
         ZX_ASSERT(opaque_.has_value());
-        context->driver = *opaque_;
+        opaque_driver = opaque_.value();
       }
-      context->complete = [](PrepareStopContext* ctx, zx_status_t status) {
-        auto* context = static_cast<Context*>(ctx);
-        if (status != ZX_OK) {
-          LOGF(ERROR, "prepare_stop failed with status: %s", zx_status_get_string(status));
-        }
-        {
-          fbl::AutoLock al(&context->driver_actual->lock_);
-          context->driver_actual->binding_->Unbind();
-        }
-        delete context;
-      };
-      lifecycle_->v2.prepare_stop(context.release());
+      lifecycle_->v2.prepare_stop(
+          opaque_driver,
+          [](void* cookie, zx_status_t status) {
+            static_cast<Driver*>(cookie)->PrepareStopCompleted(status);
+          },
+          this);
     });
     // It shouldn't be possible for this to fail as the dispatcher shouldn't be shutdown by anyone
     // other than the driver host.
     ZX_ASSERT(status == ZX_OK);
   } else {
     fbl::AutoLock al(&lock_);
+    binding_->Unbind();
+  }
+}
+
+void Driver::PrepareStopCompleted(zx_status_t status) {
+  if (status != ZX_OK) {
+    LOGF(ERROR, "prepare_stop failed with status: %s", zx_status_get_string(status));
+  }
+  {
+    fbl::AutoLock al(&lock_);
+    if (!binding_.has_value()) {
+      LOGF(ERROR, "Driver::binding_ does not exist.");
+      return;
+    }
+
     binding_->Unbind();
   }
 }

@@ -80,10 +80,10 @@ class Lifecycle {
     return ZX_OK;
   }
 
-  static void PrepareStop(PrepareStopContext* context) {
-    DriverBase* casted_driver = static_cast<DriverBase*>(context->driver);
-    PrepareStopCompleter completer(context);
-    casted_driver->PrepareStop(std::move(completer));
+  static void PrepareStop(void* driver, PrepareStopCompleteCallback* complete,
+                          void* complete_cookie) {
+    PrepareStopCompleter completer(complete, complete_cookie);
+    static_cast<DriverBase*>(driver)->PrepareStop(std::move(completer));
   }
 
   static zx_status_t Stop(void* driver) {
