@@ -48,7 +48,7 @@ class ReporterTest : public gtest::TestLoopFixture {
       return inspect::Hierarchy();
     }
 
-    auto ret = inspect::ReadFromVmo(std::move(duplicate));
+    auto ret = inspect::ReadFromVmo(duplicate);
     EXPECT_TRUE(ret.is_ok());
     if (ret.is_ok()) {
       return ret.take_value();
@@ -77,14 +77,13 @@ TEST_F(ReporterTest, InitialState) {
   auto hierarchy = GetHierarchy();
 
   // Expect metrics with default values in the root node.
-  EXPECT_THAT(
-      hierarchy,
-      NodeMatches(AllOf(NameMatches("root"),
-                        PropertyList(IsSupersetOf(
-                            {UintIs("count of failures to open device", 0),
-                             UintIs("count of failures to obtain device fdio service channel", 0),
-                             UintIs("count of failures to obtain device stream channel", 0),
-                             UintIs("count of failures to start a device", 0)})))));
+  EXPECT_THAT(hierarchy,
+              NodeMatches(AllOf(NameMatches("root"),
+                                PropertyList(IsSupersetOf({
+                                    UintIs("count of failures to connect to device", 0),
+                                    UintIs("count of failures to obtain device stream channel", 0),
+                                    UintIs("count of failures to start a device", 0),
+                                })))));
 
   // Expect empty child nodes for devices and client ports.
   EXPECT_THAT(
@@ -127,25 +126,20 @@ TEST_F(ReporterTest, InitialState) {
 
 // Tests methods that update metrics in the root node.
 TEST_F(ReporterTest, RootMetrics) {
-  under_test_.FailedToOpenDevice("", false, 0);
-  under_test_.FailedToObtainFdioServiceChannel("", false, 0);
-  under_test_.FailedToObtainFdioServiceChannel("", false, 0);
+  under_test_.FailedToConnectToDevice("", false, 0);
   under_test_.FailedToObtainStreamChannel("", false, 0);
   under_test_.FailedToObtainStreamChannel("", false, 0);
-  under_test_.FailedToObtainStreamChannel("", false, 0);
-  under_test_.FailedToStartDevice("");
   under_test_.FailedToStartDevice("");
   under_test_.FailedToStartDevice("");
   under_test_.FailedToStartDevice("");
 
-  EXPECT_THAT(
-      GetHierarchy(),
-      NodeMatches(AllOf(NameMatches("root"),
-                        PropertyList(IsSupersetOf(
-                            {UintIs("count of failures to open device", 1u),
-                             UintIs("count of failures to obtain device fdio service channel", 2u),
-                             UintIs("count of failures to obtain device stream channel", 3u),
-                             UintIs("count of failures to start a device", 4u)})))));
+  EXPECT_THAT(GetHierarchy(),
+              NodeMatches(AllOf(NameMatches("root"),
+                                PropertyList(IsSupersetOf({
+                                    UintIs("count of failures to connect to device", 1),
+                                    UintIs("count of failures to obtain device stream channel", 2u),
+                                    UintIs("count of failures to start a device", 3u),
+                                })))));
 }
 
 // Tests methods that add and remove devices.

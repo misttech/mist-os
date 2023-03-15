@@ -7,7 +7,8 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <lib/fdio/fdio.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/cpp/caller.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 
@@ -87,32 +88,15 @@ void DeviceDetector::StreamConfigFromDevFs(int dir_fd, std::string_view name,
                                            fuchsia_audio_device::DeviceType device_type) {
   FX_CHECK(handler_);
 
-  // TODO(fxbug.dev/35145): Remove blocking 'openat' from main thread. Maybe we want fdio_open_at,
-  // but with a DeviceWatcher that uses fuchsia::io::Directory handles, not file descriptors.
-  fbl::unique_fd dev_node(openat(dir_fd, name.data(), O_RDONLY));
-  if (!dev_node.is_valid()) {
-    FX_LOGS(ERROR) << "DeviceDetector failed to open device node at '" << name << "'. ("
-                   << strerror(errno) << ": " << errno << ")";
+  fdio_cpp::UnownedFdioCaller caller(dir_fd);
+  zx::result client_end =
+      component::ConnectAt<fuchsia_hardware_audio::StreamConfigConnector>(caller.directory(), name);
+  if (client_end.is_error()) {
+    FX_PLOGS(ERROR, client_end.error_value())
+        << "DeviceDetector failed to connect to device node at '" << name << "'";
     return;
   }
-
-  zx_status_t res;
-  zx::channel dev_channel;
-  res = fdio_get_service_handle(dev_node.release(), dev_channel.reset_and_get_address());
-  if (res != ZX_OK) {
-    FX_PLOGS(ERROR, res) << "Failed to obtain FDIO service channel to audio " << device_type << " '"
-                         << name << "'";
-    return;
-  }
-
-  auto config_connector = fidl::Client<fuchsia_hardware_audio::StreamConfigConnector>(
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfigConnector>(std::move(dev_channel)),
-      dispatcher_);
-  if (!config_connector.is_valid()) {
-    FX_LOGS(ERROR)
-        << "DeviceDetector failed to open StreamConfigConnector from FDIO service channel";
-    return;
-  }
+  fidl::Client config_connector(std::move(client_end.value()), dispatcher_);
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
   if (!endpoints.is_ok()) {

@@ -1020,9 +1020,8 @@ void Reporter::InitInspect() {
   impl_->inspector = std::make_unique<sys::ComponentInspector>(&impl_->component_context);
   inspect::Node& root_node = impl_->inspector->root();
 
-  impl_->failed_to_open_device_count = root_node.CreateUint("count of failures to open device", 0);
-  impl_->failed_to_obtain_fdio_service_channel_count =
-      root_node.CreateUint("count of failures to obtain device fdio service channel", 0);
+  impl_->failed_to_connect_to_device_count =
+      root_node.CreateUint("count of failures to connect to device", 0);
   impl_->failed_to_obtain_stream_channel_count =
       root_node.CreateUint("count of failures to obtain device stream channel", 0);
   impl_->failed_to_start_device_count =
@@ -1086,21 +1085,12 @@ Reporter::CreateVolumeControl() {
                                     : static_cast<VolumeControl*>(new VolumeControlNop()));
 }
 
-void Reporter::FailedToOpenDevice(const std::string& name, bool is_input, int err) {
+void Reporter::FailedToConnectToDevice(const std::string& name, bool is_input, zx_status_t status) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!impl_) {
     return;
   }
-  impl_->failed_to_open_device_count.Add(1);
-}
-
-void Reporter::FailedToObtainFdioServiceChannel(const std::string& name, bool is_input,
-                                                zx_status_t status) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (!impl_) {
-    return;
-  }
-  impl_->failed_to_obtain_fdio_service_channel_count.Add(1);
+  impl_->failed_to_connect_to_device_count.Add(1);
 }
 
 void Reporter::FailedToObtainStreamChannel(const std::string& name, bool is_input,

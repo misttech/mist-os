@@ -6,7 +6,8 @@
 
 #include <fcntl.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
-#include <lib/fdio/fdio.h>
+#include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
@@ -81,35 +82,17 @@ class PlugDetectorImpl : public PlugDetector {
       return;
     }
 
-    // Open the device node.
-    //
-    // TODO(fxbug.dev/35145): Remove blocking 'openat' from the main thread. fdio_open_at is
-    // probably what we want, but we'll need a version of DeviceWatcher that operates on
-    // fuchsia::io::Directory handles instead of file descriptors.
-    fbl::unique_fd dev_node(openat(dir_fd, name.c_str(), O_RDONLY));
-    if (!dev_node.is_valid()) {
-      Reporter::Singleton().FailedToOpenDevice(name, is_input, errno);
-      FX_LOGS(ERROR) << "PlugDetectorImpl failed to open device node at '" << name << "'. ("
-                     << strerror(errno) << ": " << errno << ")";
-      return;
-    }
-
-    // Obtain the FDIO device channel, wrap it in a sync proxy, use that to get the stream channel.
-    zx_status_t res;
-    zx::channel dev_channel;
-    res = fdio_get_service_handle(dev_node.release(), dev_channel.reset_and_get_address());
-    if (res != ZX_OK) {
-      Reporter::Singleton().FailedToObtainFdioServiceChannel(name, is_input, res);
-      FX_PLOGS(ERROR, res) << "Failed to obtain FDIO service channel to audio "
-                           << (is_input ? "input" : "output") << " '" << name << "'";
+    fdio_cpp::UnownedFdioCaller caller(dir_fd);
+    fuchsia::hardware::audio::StreamConfigConnectorPtr device;
+    if (zx_status_t status = fdio_service_connect_at(caller.borrow_channel(), name.c_str(),
+                                                     device.NewRequest().TakeChannel().release());
+        status != ZX_OK) {
+      Reporter::Singleton().FailedToConnectToDevice(name, is_input, status);
+      FX_PLOGS(ERROR, status) << "Failed to connect to audio " << (is_input ? "input" : "output")
+                              << " device '" << name << "'";
 
       return;
     }
-
-    // Obtain the stream channel
-    auto device = fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfigConnector>(
-                      std::move(dev_channel))
-                      .Bind();
     device.set_error_handler([name, is_input](zx_status_t res) {
       Reporter::Singleton().FailedToObtainStreamChannel(name, is_input, res);
       FX_PLOGS(ERROR, res) << "Failed to open channel to audio " << (is_input ? "input" : "output")

@@ -114,8 +114,10 @@ source_set("device_registry_lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
     "//src/media/audio/services/common",
+    "//zircon/system/ulib/fdio-caller",
   ]
 
   deps = [

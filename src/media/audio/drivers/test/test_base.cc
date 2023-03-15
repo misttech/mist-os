@@ -9,7 +9,8 @@
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
-#include <lib/fdio/fdio.h>
+#include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -109,26 +110,13 @@ void TestBase::ConnectToBluetoothDevice() {
 
 // Given this device_entry, open the device and set the FIDL config_channel
 void TestBase::ConnectToDevice(const DeviceEntry& device_entry) {
-  // Open the device node.
-  fbl::unique_fd dev_node(openat(device_entry.dir_fd, device_entry.filename.c_str(), O_RDONLY));
-  if (!dev_node.is_valid()) {
-    FAIL() << "AudioDriver::TestBase failed to open device node at \"" << device_entry.filename
-           << "\". (" << strerror(errno) << " : " << errno << ")";
-  }
+  fdio_cpp::UnownedFdioCaller caller(device_entry.dir_fd);
+  fuchsia::hardware::audio::StreamConfigConnectorPtr device;
+  ASSERT_EQ(fdio_service_connect_at(caller.borrow_channel(), device_entry.filename.c_str(),
+                                    device.NewRequest().TakeChannel().release()),
+            ZX_OK)
+      << "AudioDriver::TestBase failed to open device node at '" << device_entry.filename << "'";
 
-  // Obtain the FDIO device channel, wrap it in a sync proxy, use that to get the stream channel.
-  zx::channel dev_channel;
-  zx_status_t status =
-      fdio_get_service_handle(dev_node.release(), dev_channel.reset_and_get_address());
-  if (status != ZX_OK) {
-    FAIL() << status << "Err " << status << ", failed to obtain FDIO service channel to audio "
-           << ((device_type() == DeviceType::Input) ? "input" : "output");
-  }
-
-  // Obtain the stream channel
-  auto device =
-      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfigConnector>(std::move(dev_channel))
-          .Bind();
   device.set_error_handler([this](zx_status_t status) {
     FAIL() << status << "Err " << status << ", failed to open channel to audio "
            << (device_type() == DeviceType::Input ? "input" : "output");

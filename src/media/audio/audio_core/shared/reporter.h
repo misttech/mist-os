@@ -239,8 +239,7 @@ class Reporter {
                                const AudioAdmin::CapturerPolicies& capturer_policies);
 
   // Device creation failures.
-  void FailedToOpenDevice(const std::string& name, bool is_input, int err);
-  void FailedToObtainFdioServiceChannel(const std::string& name, bool is_input, zx_status_t status);
+  void FailedToConnectToDevice(const std::string& name, bool is_input, zx_status_t status);
   void FailedToObtainStreamChannel(const std::string& name, bool is_input, zx_status_t status);
   void FailedToStartDevice(const std::string& name);
 
@@ -290,8 +289,7 @@ class Reporter {
     std::unique_ptr<sys::ComponentInspector> inspector;
     std::unique_ptr<media::audio::MetricsImpl> metrics_impl;
 
-    inspect::UintProperty failed_to_open_device_count;
-    inspect::UintProperty failed_to_obtain_fdio_service_channel_count;
+    inspect::UintProperty failed_to_connect_to_device_count;
     inspect::UintProperty failed_to_obtain_stream_channel_count;
     inspect::UintProperty failed_to_start_device_count;
     inspect::LinearIntHistogram mixer_clock_skew_discontinuities;
