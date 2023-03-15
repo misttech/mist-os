@@ -4,8 +4,6 @@
 
 use std::collections::BTreeSet;
 
-use std::sync::{Arc, Weak};
-
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::task::{CurrentTask, WaitQueue, Waiter};
@@ -222,7 +220,7 @@ impl RecordLockType {
 
 #[derive(Debug, Clone)]
 struct RecordLock {
-    pub fd_table: Weak<FdTable>,
+    pub fd_table_id: FdTableId,
     pub range: RecordRange,
     pub lock_type: RecordLockType,
     pub process_id: pid_t,
@@ -230,7 +228,7 @@ struct RecordLock {
 
 impl RecordLock {
     fn id(&self) -> FdTableId {
-        FdTableId::new(self.fd_table.as_ptr())
+        self.fd_table_id
     }
 
     fn as_tuple(&self) -> (FdTableId, &RecordRange, RecordLockType) {
@@ -268,7 +266,7 @@ impl RecordLocksState {
     /// `fd_table`.
     fn get_conflicting_lock(
         &self,
-        fd_table: &Arc<FdTable>,
+        fd_table: &FdTable,
         lock_type: RecordLockType,
         range: &RecordRange,
     ) -> Option<uapi::flock> {
@@ -296,7 +294,7 @@ impl RecordLocksState {
     fn apply_lock(
         &mut self,
         process_id: pid_t,
-        fd_table: &Arc<FdTable>,
+        fd_table: &FdTable,
         lock_type: RecordLockType,
         range: RecordRange,
     ) -> Result<(), Errno> {
@@ -309,8 +307,7 @@ impl RecordLocksState {
                 return error!(EAGAIN);
             }
         }
-        let mut new_lock =
-            RecordLock { fd_table: Arc::downgrade(fd_table), range, lock_type, process_id };
+        let mut new_lock = RecordLock { fd_table_id: fd_table.id(), range, lock_type, process_id };
         for lock in table_locks_in_range {
             self.locks.remove(&lock);
             if lock.lock_type == lock_type {
@@ -330,7 +327,7 @@ impl RecordLocksState {
         Ok(())
     }
 
-    fn unlock(&mut self, fd_table: &Arc<FdTable>, range: RecordRange) -> Result<(), Errno> {
+    fn unlock(&mut self, fd_table: &FdTable, range: RecordRange) -> Result<(), Errno> {
         let intersection_locks: Vec<_> = self
             .locks
             .iter()

@@ -4,10 +4,11 @@
 
 use bitflags::bitflags;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::fs::*;
-use crate::lock::RwLock;
+use crate::lock::{Mutex, RwLock};
 use crate::types::*;
 
 bitflags! {
@@ -20,7 +21,7 @@ bitflags! {
 pub struct FdTableId(usize);
 
 impl FdTableId {
-    pub fn new(id: *const FdTable) -> Self {
+    pub fn new(id: *const HashMap<FdNumber, FdTableEntry>) -> Self {
         Self(id as usize)
     }
 }
@@ -52,7 +53,10 @@ impl FdTableEntry {
 
 #[derive(Debug, Default)]
 pub struct FdTable {
-    table: RwLock<HashMap<FdNumber, FdTableEntry>>,
+    // TODO(fxb/122600) The external mutex is only used to be able to drop the file descriptor
+    // while keeping the table itself. It will be unneeded once the live state of a task is deleted
+    // as soon as the task dies, instead of relying on Drop.
+    table: Mutex<Arc<RwLock<HashMap<FdNumber, FdTableEntry>>>>,
 }
 
 pub enum TargetFdNumber {
@@ -67,23 +71,24 @@ pub enum TargetFdNumber {
 }
 
 impl FdTable {
-    pub fn new() -> Arc<FdTable> {
+    pub fn new() -> FdTable {
         Default::default()
     }
 
     pub fn id(&self) -> FdTableId {
-        FdTableId::new(self as *const Self)
+        FdTableId::new(self.table.lock().read().deref() as *const HashMap<FdNumber, FdTableEntry>)
     }
 
-    pub fn fork(&self) -> Arc<FdTable> {
-        let result = Arc::new(FdTable { table: RwLock::new(self.table.read().clone()) });
-        result.table.write().values_mut().for_each(|entry| entry.fd_table_id = result.id());
+    pub fn fork(&self) -> FdTable {
+        let result =
+            FdTable { table: Mutex::new(Arc::new(RwLock::new(self.table.lock().read().clone()))) };
+        let id = result.id();
+        result.table.lock().write().values_mut().for_each(|entry| entry.fd_table_id = id);
         result
     }
 
     pub fn exec(&self) {
-        let mut table = self.table.write();
-        table.retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
+        self.table.lock().write().retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
     }
 
     pub fn insert(&self, fd: FdNumber, file: FileHandle) {
@@ -91,8 +96,8 @@ impl FdTable {
     }
 
     pub fn insert_with_flags(&self, fd: FdNumber, file: FileHandle, flags: FdFlags) {
-        let mut table = self.table.write();
-        table.insert(fd, FdTableEntry::new(file, self.id(), flags));
+        let id = self.id();
+        self.table.lock().write().insert(fd, FdTableEntry::new(file, id, flags));
     }
 
     #[cfg(test)]
@@ -101,9 +106,11 @@ impl FdTable {
     }
 
     pub fn add_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        let mut table = self.table.write();
+        let id = self.id();
+        let state = self.table.lock();
+        let mut table = state.write();
         let fd = self.get_lowest_available_fd(&table, FdNumber::from_raw(0));
-        table.insert(fd, FdTableEntry::new(file, self.id(), flags));
+        table.insert(fd, FdTableEntry::new(file, id, flags));
         Ok(fd)
     }
 
@@ -119,7 +126,9 @@ impl FdTable {
         // the close() function on the FileOps calls back into the FdTable.
         let _removed_file;
         let result = {
-            let mut table = self.table.write();
+            let id = self.id();
+            let state = self.table.lock();
+            let mut table = state.write();
             let file =
                 table.get(&oldfd).map(|entry| entry.file.clone()).ok_or_else(|| errno!(EBADF))?;
 
@@ -133,7 +142,7 @@ impl FdTable {
                     self.get_lowest_available_fd(&table, FdNumber::from_raw(0))
                 }
             };
-            table.insert(fd, FdTableEntry::new(file, self.id(), flags));
+            table.insert(fd, FdTableEntry::new(file, id, flags));
             Ok(fd)
         };
         result
@@ -144,8 +153,12 @@ impl FdTable {
     }
 
     pub fn get_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        let table = self.table.read();
-        table.get(&fd).map(|entry| (entry.file.clone(), entry.flags)).ok_or_else(|| errno!(EBADF))
+        self.table
+            .lock()
+            .read()
+            .get(&fd)
+            .map(|entry| (entry.file.clone(), entry.flags))
+            .ok_or_else(|| errno!(EBADF))
     }
 
     pub fn get_unless_opath(&self, fd: FdNumber) -> Result<FileHandle, Errno> {
@@ -159,11 +172,17 @@ impl FdTable {
     pub fn close(&self, fd: FdNumber) -> Result<(), Errno> {
         // Drop the file object only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
-        let removed = {
-            let mut table = self.table.write();
-            table.remove(&fd)
-        };
+        let removed = { self.table.lock().write().remove(&fd) };
         removed.ok_or_else(|| errno!(EBADF)).map(|_| {})
+    }
+
+    /// Drop the fd table, closing any files opened exclusively by this table.
+    // TODO(fxb/122600) This will be unneeded once the live state of a task is deleted as soon as
+    // the task dies, instead of relying on Drop.
+    pub fn drop_local(&self) {
+        // Replace the file table with an empty one. Extract it first so that the drop happens
+        // without the lock in case a file call back to the table when it is closed.
+        let _ = std::mem::take(self.table.lock().deref_mut());
     }
 
     pub fn get_fd_flags(&self, fd: FdNumber) -> Result<FdFlags, Errno> {
@@ -171,8 +190,9 @@ impl FdTable {
     }
 
     pub fn set_fd_flags(&self, fd: FdNumber, flags: FdFlags) -> Result<(), Errno> {
-        let mut table = self.table.write();
-        table
+        self.table
+            .lock()
+            .write()
             .get_mut(&fd)
             .map(|entry| {
                 entry.flags = flags;
@@ -194,7 +214,13 @@ impl FdTable {
 
     /// Returns a vector of all current file descriptors in the table.
     pub fn get_all_fds(&self) -> Vec<FdNumber> {
-        self.table.read().keys().cloned().collect()
+        self.table.lock().read().keys().cloned().collect()
+    }
+}
+
+impl Clone for FdTable {
+    fn clone(&self) -> Self {
+        FdTable { table: Mutex::new(self.table.lock().clone()) }
     }
 }
 
