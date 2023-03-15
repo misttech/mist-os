@@ -1,2 +1,8 @@
 # Driver Framework Team for refactoring.
 include /src/devices/OWNERS
+
+# Telephony driver owners
+jiamingw@google.com
+rquattle@google.com
+ghanan@google.com
+vaas@google.com
