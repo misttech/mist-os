@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use errors::ffx_bail;
+use ffx_config::global_env_context;
 use fuchsia_async::TimeoutExt;
 use serde_json::Value;
 use std::{
@@ -20,12 +21,10 @@ pub mod asserts;
 /// Create a new ffx isolate. This method relies on the environment provided by
 /// the ffx binary and should only be called within ffx.
 pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
-    // This method is always called from within ffx.
-    let ffx_path = std::env::current_exe().expect("could not determine own path");
-    let ffx_path = std::fs::canonicalize(ffx_path).expect("could not canonicalize own path");
     let ssh_key = ffx_config::get::<String, _>("ssh.priv").await?.into();
+    let context = global_env_context().context("No global context")?;
 
-    ffx_isolate::Isolate::new(name, ffx_path, ssh_key).await
+    ffx_isolate::Isolate::new_with_sdk(name, ssh_key, &context).await
 }
 
 /// Get the target nodename we're expected to interact with in this test, or

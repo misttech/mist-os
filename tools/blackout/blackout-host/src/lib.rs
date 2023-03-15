@@ -23,6 +23,7 @@ use {
 };
 
 pub mod steps;
+use ffx_config::global_env_context;
 pub use steps::RebootType;
 use steps::{LoadStep, RebootStep, SetupStep, TestStep, VerifyStep};
 
@@ -373,12 +374,11 @@ impl TestEnv {
     /// If either creating the isolated ffx instance or the target discovery fails, this function
     /// will panic.
     pub async fn new(package: &'static str, component: &'static str, opts: CommonOpts) -> TestEnv {
-        let ffx_path = std::env::current_exe().expect("could not determine own path");
-        let ffx_path = std::fs::canonicalize(ffx_path).expect("could not canonicalize own path");
         let ssh_key =
             ffx_config::get::<String, _>("ssh.priv").await.expect("could not get ssh key").into();
+        let context = global_env_context().expect("No global context");
         let isolate = Arc::new(
-            ffx_isolate::Isolate::new("blackout-ffx", ffx_path, ssh_key)
+            ffx_isolate::Isolate::new_with_sdk("blackout-ffx", ssh_key, &context)
                 .await
                 .expect("failed to make new isolated ffx"),
         );

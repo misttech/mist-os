@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use sdk_metadata::{ElementType, FfxTool, HostTool, Manifest, Part};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
@@ -41,6 +41,13 @@ pub struct FfxToolFiles {
 pub enum SdkRoot {
     Modular { manifest: PathBuf, module: String },
     Full(PathBuf),
+}
+
+/// A serde-serializable representation of ffx' sdk configuration.
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+pub struct FfxSdkConfig {
+    pub root: Option<PathBuf>,
+    pub module: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +103,15 @@ impl SdkRoot {
                 // Otherwise assume this is a build manifest, but with no module.
                 Sdk::from_build_dir(&manifest, None)
             }
+        }
+    }
+
+    pub fn to_config(&self) -> FfxSdkConfig {
+        match self.clone() {
+            Self::Modular { manifest, module } => {
+                FfxSdkConfig { root: Some(manifest), module: Some(module) }
+            }
+            Self::Full(manifest) => FfxSdkConfig { root: Some(manifest), module: None },
         }
     }
 }

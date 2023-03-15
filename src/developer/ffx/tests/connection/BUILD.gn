@@ -34,17 +34,13 @@ if (is_host) {
       "//third_party/rust_crates:tracing",
     ]
 
-    non_rust_deps = [ ":ffx_bin" ]
+    non_rust_deps = [
+      "//src/developer/ffx:test_data",
+      "//src/developer/ffx/plugins/component:ffx_component_tool_test_data",
+      "//src/developer/ffx/plugins/target:ffx_target_tool_test_data",
+    ]
 
     test_environments = [ nuc_env ]
-  }
-
-  out_dir = "${root_out_dir}/src/developer/ffx/tests/connection"
-
-  host_test_data("ffx_bin") {
-    deps = [ "//src/developer/ffx:host" ]
-    sources = [ "${host_tools_dir}/ffx" ]
-    outputs = [ "${out_dir}/{{source_file_part}}" ]
   }
 }
 

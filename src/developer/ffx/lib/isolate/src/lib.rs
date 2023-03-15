@@ -2,17 +2,65 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
+use anyhow::{anyhow, Context as _, Result};
+use ffx_config::{EnvironmentContext, SdkRoot};
 use fuchsia_async;
+use sdk::FfxSdkConfig;
 use serde::Serialize;
 use std::{
     borrow::Cow,
     collections::HashMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Child, ExitStatus, Stdio},
     time::SystemTime,
 };
 use tempfile::TempDir;
+
+/// Where to search for ffx and subtools, based on either being part of an
+/// ffx command (like `ffx self-test`) or being part of the build (using the
+/// build root to find things in either the host tool or test data targets.
+#[derive(Debug, Clone)]
+pub enum SearchContext {
+    Runtime { ffx_path: PathBuf, sdk_root: Option<SdkRoot> },
+    Build { build_root: PathBuf },
+}
+
+fn env_search_paths(search: &SearchContext) -> Vec<Cow<'_, Path>> {
+    use SearchContext::*;
+    match search {
+        Runtime { ffx_path, .. } => {
+            if let Some(parent) = ffx_path.parent() {
+                return vec![Cow::from(parent)];
+            }
+        }
+        Build { build_root } => {
+            // The build passes these search paths in so that when this is run from
+            // a unit test we can find the path that ffx subtools exist at from
+            // the build root.
+            return vec![
+                Cow::Owned(build_root.join(std::env!("SUBTOOL_SEARCH_TEST_DATA"))),
+                Cow::Owned(build_root.join(std::env!("SUBTOOL_SEARCH_HOST_TOOLS"))),
+            ];
+        }
+    }
+    vec![]
+}
+
+fn find_ffx(search: &SearchContext, search_paths: &[Cow<'_, Path>]) -> Result<PathBuf> {
+    use SearchContext::*;
+    match search {
+        Runtime { ffx_path, .. } => return Ok(ffx_path.to_owned()),
+        Build { build_root } => {
+            for path in search_paths {
+                let path = build_root.join(path).join("ffx");
+                if path.exists() {
+                    return Ok(path);
+                }
+            }
+        }
+    }
+    Err(anyhow!("ffx not found in search paths for isolation"))
+}
 
 #[derive(Debug)]
 pub struct CommandOutput {
@@ -28,14 +76,29 @@ pub struct Isolate {
 }
 
 impl Isolate {
-    /// new creates a new isolated environment for ffx to run in, including a
+    /// Creates a new isolated environment for ffx to run in, including a
     /// user level configuration that isolates the ascendd socket into a temporary
     /// directory. If $FUCHSIA_TEST_OUTDIR is set, then it is used as the log
     /// directory. The isolated environment is torn down when the Isolate is
     /// dropped, which will attempt to terminate any running daemon and then
     /// remove all isolate files.
-    pub async fn new(name: &str, ffx_path: PathBuf, ssh_key: PathBuf) -> Result<Isolate> {
+    ///
+    /// Most of the time you'll want to use the appropriate convenience wrapper,
+    /// [`Isolate::new_with_sdk`] or [`Isolate::new_in_test`].
+    pub async fn new_with_search(
+        name: &str,
+        search: SearchContext,
+        ssh_key: PathBuf,
+    ) -> Result<Isolate> {
         let tmpdir = tempfile::Builder::new().prefix(name).tempdir()?;
+        let search_paths = env_search_paths(&search);
+
+        let ffx_path = find_ffx(&search, &search_paths)?;
+
+        let sdk_config = match &search {
+            SearchContext::Runtime { sdk_root: Some(sdk_root), .. } => Some(sdk_root.to_config()),
+            _ => None,
+        };
 
         let log_dir = if let Ok(d) = std::env::var("FUCHSIA_TEST_OUTDIR") {
             PathBuf::from(d)
@@ -62,13 +125,16 @@ impl Isolate {
             target_addr = Option::Some(Cow::Owned(addr.to_string() + &":0".to_string()));
             mdns_discovery = false;
         }
+        let user_config = UserConfig::for_test(
+            log_dir.to_string_lossy(),
+            target_addr,
+            mdns_discovery,
+            search_paths,
+            sdk_config,
+        );
         std::fs::write(
             tmpdir.path().join(".ffx_user_config.json"),
-            serde_json::to_string(&UserConfig::for_test(
-                log_dir.to_string_lossy(),
-                target_addr,
-                mdns_discovery,
-            ))?,
+            serde_json::to_string(&user_config)?,
         )?;
 
         std::fs::write(
@@ -119,6 +185,37 @@ impl Isolate {
         Ok(Isolate { tmpdir, env_ctx })
     }
 
+    /// Simple wrapper around [`Isolate::new_with_search`] for situations where all you
+    /// have is the path to ffx. You should prefer to use [`Isolate::new_with_sdk`] or
+    /// [`Isolate::new_in_test`] if you can.
+    pub async fn new(name: &str, ffx_path: PathBuf, ssh_key: PathBuf) -> Result<Self> {
+        let search = SearchContext::Runtime { ffx_path, sdk_root: None };
+        Self::new_with_search(name, search, ssh_key).await
+    }
+
+    /// Use this when building an isolation environment from within an ffx subtool
+    /// or other situation where there's an sdk involved.
+    pub async fn new_with_sdk(
+        name: &str,
+        ssh_key: PathBuf,
+        context: &EnvironmentContext,
+    ) -> Result<Self> {
+        let ffx_path = context.rerun_bin().await?;
+        let ffx_path =
+            std::fs::canonicalize(ffx_path).context("could not canonicalize own path")?;
+
+        let sdk_root = context.get_sdk_root().await.ok();
+
+        Self::new_with_search(name, SearchContext::Runtime { ffx_path, sdk_root }, ssh_key).await
+    }
+
+    /// Use this when building an isolation environment from within a unit test
+    /// in the fuchsia tree. This will make the isolated ffx look for subtools
+    /// in the appropriate places in the build tree.
+    pub async fn new_in_test(name: &str, build_root: PathBuf, ssh_key: PathBuf) -> Result<Self> {
+        Self::new_with_search(name, SearchContext::Build { build_root }, ssh_key).await
+    }
+
     pub fn ascendd_path(&self) -> PathBuf {
         self.tmpdir.path().join("daemon.sock")
     }
@@ -148,43 +245,57 @@ impl Isolate {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct UserConfig<'a> {
     log: UserConfigLog<'a>,
     test: UserConfigTest,
     targets: UserConfigTargets<'a>,
     discovery: UserConfigDiscovery,
+    ffx: UserConfigFfx<'a>,
+    sdk: Option<FfxSdkConfig>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct UserConfigLog<'a> {
     enabled: bool,
     dir: Cow<'a, str>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
+struct UserConfigFfx<'a> {
+    #[serde(rename = "subtool-search-paths")]
+    subtool_search_paths: Vec<Cow<'a, Path>>,
+}
+
+#[derive(Serialize, Debug)]
 struct UserConfigTest {
     #[serde(rename(serialize = "is-isolated"))]
     is_isolated: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct UserConfigTargets<'a> {
     manual: HashMap<Cow<'a, str>, Option<SystemTime>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct UserConfigDiscovery {
     mdns: UserConfigMdns,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct UserConfigMdns {
     enabled: bool,
 }
 
 impl<'a> UserConfig<'a> {
-    fn for_test(dir: Cow<'a, str>, target: Option<Cow<'a, str>>, discovery: bool) -> Self {
+    fn for_test(
+        dir: Cow<'a, str>,
+        target: Option<Cow<'a, str>>,
+        discovery: bool,
+        subtool_search_paths: Vec<Cow<'a, Path>>,
+        sdk: Option<FfxSdkConfig>,
+    ) -> Self {
         let mut manual_targets = HashMap::new();
         if !target.is_none() {
             manual_targets.insert(target.unwrap(), None);
@@ -194,11 +305,13 @@ impl<'a> UserConfig<'a> {
             test: UserConfigTest { is_isolated: true },
             targets: UserConfigTargets { manual: manual_targets },
             discovery: UserConfigDiscovery { mdns: UserConfigMdns { enabled: discovery } },
+            ffx: UserConfigFfx { subtool_search_paths },
+            sdk,
         }
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct FfxEnvConfig<'a> {
     user: Cow<'a, str>,
     build: Option<&'static str>,

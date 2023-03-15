@@ -146,17 +146,13 @@ where
     Fut: futures::future::Future<Output = ()>,
 {
     let hoist = Hoist::new().expect("creating hoist");
-    let ffx_path = std::env::current_exe()
-        .expect("get path")
-        .canonicalize()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("src/developer/ffx/tests/connection/ffx");
 
     let ssh_path = std::env::var("FUCHSIA_SSH_KEY").unwrap().into();
-    let isolate =
-        ffx_isolate::Isolate::new(case_name, ffx_path, ssh_path).await.expect("create isolate");
+    let build_root =
+        std::env::current_exe().unwrap().canonicalize().unwrap().parent().unwrap().to_owned();
+    let isolate = ffx_isolate::Isolate::new_in_test(case_name, build_root, ssh_path)
+        .await
+        .expect("create isolate");
 
     // Ensure that the address is formatted properly, and include port is if it available.
     // Without this formatting, the connection does not work when using a remote workflow.
