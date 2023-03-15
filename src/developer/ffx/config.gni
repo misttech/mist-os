@@ -23,6 +23,7 @@ declare_args() {
 # `_tool_host_tool` appended)
 dual_mode_plugins = [
   "//src/connectivity/network/testing/network-test-realm/ffx:ffx_net_test_realm",
+  "//src/developer/ffx/plugins/agis:ffx_agis",
   "//src/developer/ffx/plugins/assembly:ffx_assembly",
   "//src/developer/ffx/plugins/audio:ffx_audio",
   "//src/developer/ffx/plugins/component:ffx_component",

@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use errors::ffx_error;
 use ffx_agis_args::{AgisCommand, ListenOp, Operation, RegisterOp};
 use ffx_config::keys::TARGET_DEFAULT_KEY;
-use ffx_core::ffx_plugin;
+use fho::{daemon_protocol, selector, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{ListenerProxy, TargetQuery};
 use fidl_fuchsia_gpu_agis::{ComponentRegistryProxy, ObserverProxy};
 use serde::Serialize;
@@ -56,12 +56,32 @@ impl Vtc {
     }
 }
 
-#[ffx_plugin(
-    ComponentRegistryProxy = "core/agis:expose:fuchsia.gpu.agis.ComponentRegistry",
-    ObserverProxy = "core/agis:expose:fuchsia.gpu.agis.Observer",
-    ListenerProxy = "daemon::protocol"
-)]
-pub async fn agis(
+#[derive(FfxTool)]
+pub struct AgisTool {
+    #[with(selector("core/agis:expose:fuchsia.gpu.agis.ComponentRegistry"))]
+    component_registry: ComponentRegistryProxy,
+    #[with(selector("core/agis:expose:fuchsia.gpu.agis.Observer"))]
+    observer: ObserverProxy,
+    #[with(daemon_protocol())]
+    listener: ListenerProxy,
+    #[command]
+    cmd: AgisCommand,
+}
+
+fho::embedded_plugin!(AgisTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for AgisTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        agis(self.component_registry, self.observer, self.listener, self.cmd)
+            .await
+            .map_err(Into::into)
+    }
+}
+
+async fn agis(
     component_registry: ComponentRegistryProxy,
     observer: ObserverProxy,
     listener: ListenerProxy,
@@ -185,7 +205,7 @@ mod test {
                 }
             };
         };
-        setup_fake_component_registry(callback)
+        fho::testing::fake_proxy(callback)
     }
 
     fn fake_observer() -> ObserverProxy {
@@ -204,7 +224,7 @@ mod test {
                 }
             };
         };
-        return setup_fake_observer(callback);
+        fho::testing::fake_proxy(callback)
     }
 
     fn fake_listener() -> ListenerProxy {
@@ -218,7 +238,7 @@ mod test {
                 }
             };
         };
-        return setup_fake_listener(callback);
+        fho::testing::fake_proxy(callback)
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
