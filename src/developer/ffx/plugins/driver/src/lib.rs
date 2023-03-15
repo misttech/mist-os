@@ -1,21 +1,21 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-use {
-    anyhow::{Context, Result},
-    component_debug::capability,
-    ffx_core::ffx_plugin,
-    ffx_driver_args::DriverCommand,
-    ffx_writer::Writer,
-    fidl::endpoints::ProtocolMarker,
-    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_device_manager as fdm,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_playground as fdp,
-    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fidl_fuchsia_test_manager as ftm,
-    fuchsia_zircon_status::Status,
-    selectors::{self, VerboseError},
-};
+use anyhow::{Context, Result};
+use component_debug::capability;
+use ffx_driver_args::DriverCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_developer_remotecontrol as rc;
+use fidl_fuchsia_device_manager as fdm;
+use fidl_fuchsia_driver_development as fdd;
+use fidl_fuchsia_driver_playground as fdp;
+use fidl_fuchsia_driver_registrar as fdr;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_sys2 as fsys;
+use fidl_fuchsia_test_manager as ftm;
+use fuchsia_zircon_status::Status;
+use selectors::{self, VerboseError};
 
 struct DriverConnector {
     remote_control: Option<rc::RemoteControlProxy>,
@@ -188,11 +188,26 @@ impl driver_connector::DriverConnector for DriverConnector {
     }
 }
 
-#[ffx_plugin()]
-pub async fn driver(
-    remote_control: Option<rc::RemoteControlProxy>,
-    mut writer: Writer,
+#[derive(FfxTool)]
+pub struct DriverTool {
+    remote_control: fho::Result<rc::RemoteControlProxy>,
+    #[command]
     cmd: DriverCommand,
-) -> Result<()> {
-    driver_tools::driver(cmd.into(), DriverConnector::new(remote_control), &mut writer).await
+}
+
+fho::embedded_plugin!(DriverTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for DriverTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        driver_tools::driver(
+            self.cmd.into(),
+            DriverConnector::new(self.remote_control.ok()),
+            &mut writer,
+        )
+        .await
+        .map_err(Into::into)
+    }
 }

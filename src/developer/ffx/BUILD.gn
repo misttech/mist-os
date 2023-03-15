@@ -54,7 +54,6 @@ if (is_host) {
       "//src/developer/ffx/plugins/coverage:ffx_coverage",
       "//src/developer/ffx/plugins/cts:ffx_cts",
       "//src/developer/ffx/plugins/doctor:ffx_doctor",
-      "//src/developer/ffx/plugins/driver:ffx_driver",
       "//src/developer/ffx/plugins/fuzz:ffx_fuzz",
       "//src/developer/ffx/plugins/input:ffx_input",
       "//src/developer/ffx/plugins/process_explorer:ffx_process_explorer",

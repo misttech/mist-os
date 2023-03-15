@@ -27,6 +27,7 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/audio:ffx_audio",
   "//src/developer/ffx/plugins/component:ffx_component",
   "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
+  "//src/developer/ffx/plugins/driver:ffx_driver",
   "//src/developer/ffx/plugins/efi:ffx_efi",
   "//src/developer/ffx/plugins/emulator:ffx_emulator",
   "//src/developer/ffx/plugins/flutter:ffx_flutter",
