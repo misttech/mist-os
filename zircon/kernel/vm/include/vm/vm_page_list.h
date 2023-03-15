@@ -565,6 +565,16 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
     return true;
   }
 
+  // Returns true if there are no interval sentinels owned by this node.
+  bool HasNoIntervalSentinel() const {
+    for (const auto& p : pages_) {
+      if (p.IsInterval()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
  private:
   template <typename PTR_TYPE, typename S, typename F>
   static zx_status_t ForEveryPageInRange(S self, F func, uint64_t start_offset, uint64_t end_offset,

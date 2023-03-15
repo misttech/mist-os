@@ -651,8 +651,16 @@ void VmPageList::MergeFrom(
   // nodes to moved directly between the lists, without having to worry about allocations.
   DEBUG_ASSERT((other.list_skew_ + offset) % kNodeSize == list_skew_);
 
+  // We should not be starting or ending partway inside an interval, either for the source or the
+  // target. Note that entire intervals that fall completely inside the range will be checked for
+  // later while we're doing the migration.
+  DEBUG_ASSERT(!other.IsOffsetInInterval(offset));
+  DEBUG_ASSERT(!other.IsOffsetInInterval(end_offset - 1));
+  DEBUG_ASSERT(!IsOffsetInInterval(end_offset - offset - 1));
+
   auto release_fn_wrapper = [&release_fn](VmPageOrMarker* page_or_marker, uint64_t offset) {
     if (!page_or_marker->IsEmpty()) {
+      DEBUG_ASSERT(!page_or_marker->IsInterval());
       release_fn(ktl::move(*page_or_marker), offset);
     }
     return ZX_ERR_NEXT;
@@ -671,6 +679,7 @@ void VmPageList::MergeFrom(
 
   auto other_iter = other.list_.lower_bound(node_shift);
   while (other_iter.IsValid()) {
+    DEBUG_ASSERT(other_iter->HasNoIntervalSentinel());
     uint64_t other_offset = other_iter->GetKey();
     // Any such nodes should have already been freed.
     DEBUG_ASSERT(other_offset < (end_offset + other.list_skew_));
@@ -681,6 +690,7 @@ void VmPageList::MergeFrom(
 
     auto target = list_.find(other_offset - node_shift);
     if (target.IsValid()) {
+      DEBUG_ASSERT(target->HasNoIntervalSentinel());
       // If there's already a node at the desired location, then merge the two nodes.
       for (unsigned i = 0; i < VmPageListNode::kPageFanOut; i++) {
         uint64_t src_offset = other_offset - other.list_skew_ + i * PAGE_SIZE;
@@ -726,9 +736,11 @@ void VmPageList::MergeOnto(VmPageList& other,
 
   auto iter = list_.begin();
   while (iter.IsValid()) {
+    DEBUG_ASSERT(iter->HasNoIntervalSentinel());
     auto node = list_.erase(iter++);
     auto target = other.list_.find(node->GetKey());
     if (target.IsValid()) {
+      DEBUG_ASSERT(target->HasNoIntervalSentinel());
       // If there's already a node at the desired location, then merge the two nodes.
       for (unsigned i = 0; i < VmPageListNode::kPageFanOut; i++) {
         VmPageOrMarker page = ktl::move(node->Lookup(i));
@@ -755,18 +767,25 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
   // Taking pages from children isn't supported, so list_skew_ should be 0.
   DEBUG_ASSERT(list_skew_ == 0);
 
+  // We should not be starting or ending partway inside an interval. Entire intervals that fall
+  // completely inside the range will be checked for later while we're taking the pages below.
+  DEBUG_ASSERT(!IsOffsetInInterval(offset));
+  DEBUG_ASSERT(!IsOffsetInInterval(end - 1));
+
   // If we can't take the whole node at the start of the range,
   // the shove the pages into the splice list head_ node.
   while (offset_to_node_index(offset, 0) != 0 && offset < end) {
     res.head_.Lookup(offset_to_node_index(offset, 0)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
+  DEBUG_ASSERT(res.head_.HasNoIntervalSentinel());
 
   // As long as the current and end node offsets are different, we
   // can just move the whole node into the splice list.
   while (offset_to_node_offset(offset, 0) != offset_to_node_offset(end, 0)) {
     ktl::unique_ptr<VmPageListNode> node = list_.erase(offset_to_node_offset(offset, 0));
     if (node) {
+      DEBUG_ASSERT(node->HasNoIntervalSentinel());
       res.middle_.insert(ktl::move(node));
     }
     offset += (PAGE_SIZE * VmPageListNode::kPageFanOut);
@@ -777,6 +796,7 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
     res.tail_.Lookup(offset_to_node_index(offset, 0)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
+  DEBUG_ASSERT(res.tail_.HasNoIntervalSentinel());
 
   return res;
 }
@@ -873,6 +893,7 @@ VmPageOrMarker VmPageSpliceList::Pop() {
       res = ktl::move(tail_.Lookup(cur_node_idx));
     }
   }
+  DEBUG_ASSERT(!res.IsInterval());
 
   pos_ += PAGE_SIZE;
   return res;
