@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>

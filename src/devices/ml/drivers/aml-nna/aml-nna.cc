@@ -114,18 +114,13 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     zxlogf(ERROR, "Could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  ddk::RegistersProtocolClient reset(parent, "register-reset");
-  if (!reset.is_valid()) {
-    zxlogf(ERROR, "Could not get reset_register fragment");
-    return ZX_ERR_NO_RESOURCES;
+
+  auto reset_register_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(parent,
+                                                                                  "register-reset");
+  if (reset_register_client.is_error()) {
+    return reset_register_client.status_value();
   }
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Could not create channel %d\n", endpoints.status_value());
-    return endpoints.status_value();
-  }
-  auto& [client_end, server_end] = endpoints.value();
-  reset.Connect(server_end.TakeChannel());
 
   std::optional<fdf::MmioBuffer> hiu_mmio;
   status = pdev.MapMmio(kHiu, &hiu_mmio);
@@ -180,9 +175,10 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
 
   fbl::AllocChecker ac;
 
-  auto device = std::unique_ptr<AmlNnaDevice>(new (&ac) AmlNnaDevice(
-      parent, std::move(*hiu_mmio), std::move(*power_mmio), std::move(*memory_pd_mmio),
-      std::move(client_end), std::move(pdev), nna_block, std::move(smc_monitor)));
+  auto device = std::unique_ptr<AmlNnaDevice>(
+      new (&ac) AmlNnaDevice(parent, std::move(*hiu_mmio), std::move(*power_mmio),
+                             std::move(*memory_pd_mmio), std::move(reset_register_client.value()),
+                             std::move(pdev), nna_block, std::move(smc_monitor)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

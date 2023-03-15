@@ -4,7 +4,6 @@
 
 #include "aml-nna.h"
 
-#include <fuchsia/hardware/registers/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/mmio/mmio.h>
 
@@ -23,9 +22,9 @@ constexpr size_t kMemoryPDRegSize = 0x1000 / sizeof(uint32_t);
 
 namespace aml_nna {
 
-class MockRegisters {
+class MockRegistersInternal {
  public:
-  MockRegisters()
+  MockRegistersInternal()
       : hiu_regs_(std::make_unique<ddk_mock::MockMmioReg[]>(kHiuRegSize)),
         power_regs_(std::make_unique<ddk_mock::MockMmioReg[]>(kPowerRegSize)),
         memory_pd_regs_(std::make_unique<ddk_mock::MockMmioReg[]>(kMemoryPDRegSize)),
@@ -36,7 +35,7 @@ class MockRegisters {
         memory_pd_mock_(ddk_mock::MockMmioRegRegion(memory_pd_regs_.get(), sizeof(uint32_t),
                                                     kMemoryPDRegSize)) {
     loop_.StartThread();
-    reset_mock_ = std::make_unique<mock_registers::MockRegistersDevice>(loop_.dispatcher());
+    reset_mock_ = std::make_unique<mock_registers::MockRegisters>(loop_.dispatcher());
   }
 
   // The caller should set the mock expectations before calling this.
@@ -44,7 +43,7 @@ class MockRegisters {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
     ASSERT_OK(endpoints);
     auto& [client_end, server_end] = endpoints.value();
-    reset_mock_->RegistersConnect(server_end.TakeChannel());
+    reset_mock_->Init(std::move(server_end));
 
     ddk::PDev pdev;
     zx::resource smc_monitor;
@@ -63,7 +62,7 @@ class MockRegisters {
     loop_.Shutdown();
   }
 
-  mock_registers::MockRegisters* reset() { return reset_mock_->fidl_service(); }
+  mock_registers::MockRegisters* reset() { return reset_mock_.get(); }
 
   std::unique_ptr<ddk_mock::MockMmioReg[]> hiu_regs_;
   std::unique_ptr<ddk_mock::MockMmioReg[]> power_regs_;
@@ -75,11 +74,11 @@ class MockRegisters {
 
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  std::unique_ptr<mock_registers::MockRegistersDevice> reset_mock_;
+  std::unique_ptr<mock_registers::MockRegisters> reset_mock_;
 };
 
 TEST(AmlNnaTest, InitT931) {
-  MockRegisters mock_regs;
+  MockRegistersInternal mock_regs;
 
   mock_regs.power_regs_[0x3a].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFCFFFF);
   mock_regs.power_regs_[0x3b].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFCFFFF);
@@ -97,7 +96,7 @@ TEST(AmlNnaTest, InitT931) {
 }
 
 TEST(AmlNnaTest, InitS905d3) {
-  MockRegisters mock_regs;
+  MockRegistersInternal mock_regs;
 
   mock_regs.power_regs_[0x3a].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);
   mock_regs.power_regs_[0x3b].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);
