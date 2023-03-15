@@ -31,15 +31,20 @@ rustc_test("bin") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/process_builder",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/sys/bedrock/cap",
     "//src/sys/bedrock/exec",
     "//src/sys/bedrock/processargs",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:tracing",
   ]
 
   sources = [
+    "src/echo_oneshot.rs",
+    "src/echo_oneshot_channel.rs",
     "src/elf.rs",
     "src/lib.rs",
   ]
