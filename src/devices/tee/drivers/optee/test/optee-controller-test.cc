@@ -13,6 +13,7 @@
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-object/object.h>
 #include <lib/fake-resource/resource.h>
+#include <lib/fdf/env.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/sync/completion.h>
@@ -28,6 +29,7 @@
 
 #include "../optee-smc.h"
 #include "../tee-smc.h"
+#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 struct SharedMemoryInfo {
@@ -39,7 +41,7 @@ struct SharedMemoryInfo {
 // physical addresses within it.
 static SharedMemoryInfo gSharedMemory = {};
 
-constexpr uuid_t kOpteeOsUuid = {
+constexpr fuchsia_tee::wire::Uuid kOpteeOsUuid = {
     0x486178E0, 0xE7F8, 0x11E3, {0xBC, 0x5E, 0x00, 0x02, 0xA5, 0xD5, 0xC5, 0x1B}};
 
 using SmcCb = std::function<void(const zx_smc_parameters_t*, zx_smc_result_t*)>;
@@ -194,9 +196,58 @@ class FakeRpmbService {
   component::OutgoingDirectory outgoing_;
 };
 
+class FakeTeeService : public fidl::WireServer<fuchsia_hardware_tee::DeviceConnector> {
+ public:
+  explicit FakeTeeService(OpteeController* optee)
+      : dispatcher_(fdf::Dispatcher::GetCurrent()),
+        outgoing_(dispatcher_->async_dispatcher()),
+        optee_(optee) {}
+
+  fidl::ClientEnd<fuchsia_io::Directory> Connect() {
+    auto device_handler = [this](fidl::ServerEnd<fuchsia_hardware_tee::DeviceConnector> request) {
+      fidl::BindServer(dispatcher_->async_dispatcher(), std::move(request), this);
+      client_connected_.Signal();
+    };
+    fuchsia_hardware_tee::Service::InstanceHandler handler(
+        {.device_connector = std::move(device_handler)});
+
+    auto service_result = outgoing_.AddService<fuchsia_hardware_tee::Service>(std::move(handler));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    return std::move(endpoints->client);
+  }
+
+  void ConnectToApplication(ConnectToApplicationRequestView request,
+                            ConnectToApplicationCompleter::Sync& completer) override {
+    optee_->ConnectToApplication(std::move(request), completer);
+  }
+
+  void ConnectToDeviceInfo(ConnectToDeviceInfoRequestView request,
+                           ConnectToDeviceInfoCompleter::Sync& completer) override {}
+
+  void WaitForClientConnected() { client_connected_.Wait(); }
+
+ private:
+  fdf::UnownedDispatcher dispatcher_;
+  component::OutgoingDirectory outgoing_;
+  OpteeController* optee_;
+
+  libsync::Completion client_connected_;
+};
+
 class FakeDdkOptee : public zxtest::Test {
  public:
-  FakeDdkOptee() : clients_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+  FakeDdkOptee() : clients_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+
+  void SetUp() override {
+    fdf_env_reset();
+    ASSERT_OK(fdf_env_start());
+
+    ASSERT_EQ(ZX_OK, driver_dispatcher_.StartAsDefault({}, "driver-test-loop").status_value());
     ASSERT_OK(clients_loop_.StartThread());
     ASSERT_OK(clients_loop_.StartThread());
     ASSERT_OK(clients_loop_.StartThread());
@@ -206,8 +257,28 @@ class FakeDdkOptee : public zxtest::Test {
 
     ASSERT_OK(OpteeController::Create(nullptr, parent_.get()));
     optee_ = parent_->GetLatestChild()->GetDeviceContext<OpteeController>();
+
+    tee_service_ = FakeTeeService(optee_);
+    parent_->AddFidlService(fuchsia_hardware_tee::Service::Name, tee_service_->Connect(), "tee");
+
+    zx::result client_end =
+        optee_->DdkConnectFragmentFidlProtocol<fuchsia_hardware_tee::Service::DeviceConnector>(
+            "tee");
+    ASSERT_OK(client_end.status_value());
+    tee_proto_client_.Bind(std::move(client_end.value()));
+
+    tee_service_->WaitForClientConnected();
+
+    call_with_args_count = 0;
   }
-  void SetUp() override { call_with_args_count = 0; }
+
+  void TearDown() override {
+    device_async_remove(parent_->GetLatestChild());
+    EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(parent_.get()));
+
+    zx::result result = driver_dispatcher_.Stop();
+    EXPECT_EQ(ZX_OK, result.status_value());
+  }
 
  protected:
   FakePDev pdev_;
@@ -218,6 +289,9 @@ class FakeDdkOptee : public zxtest::Test {
   OpteeController* optee_ = nullptr;
 
   async::Loop clients_loop_;
+  fdf::TestSynchronizedDispatcher driver_dispatcher_;
+  std::optional<FakeTeeService> tee_service_;
+  fidl::WireSyncClient<fuchsia_hardware_tee::DeviceConnector> tee_proto_client_;
 };
 
 TEST_F(FakeDdkOptee, PmtUnpinned) {
@@ -234,7 +308,7 @@ TEST_F(FakeDdkOptee, PmtUnpinned) {
 TEST_F(FakeDdkOptee, RpmbTest) { EXPECT_EQ(optee_->RpmbConnectServer().status_value(), ZX_OK); }
 
 TEST_F(FakeDdkOptee, MultiThreadTest) {
-  zx::channel tee_app_client[2];
+  fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[2];
   sync_completion_t completion1;
   sync_completion_t completion2;
   sync_completion_t smc_completion;
@@ -242,20 +316,19 @@ TEST_F(FakeDdkOptee, MultiThreadTest) {
   zx_status_t status;
 
   for (auto& i : tee_app_client) {
-    zx::channel tee_app_server;
-    ASSERT_OK(zx::channel::create(0, &i, &tee_app_server));
-    zx::channel provider_server;
-    zx::channel provider_client;
-    ASSERT_OK(zx::channel::create(0, &provider_client, &provider_server));
+    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
+    ASSERT_OK(tee_endpoints.status_value());
 
-    optee_->TeeConnectToApplication(&kOpteeOsUuid, std::move(tee_app_server),
-                                    std::move(provider_client));
+    i = std::move(tee_endpoints->client);
+
+    auto result = tee_proto_client_->ConnectToApplication(
+        kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
+        std::move(tee_endpoints->server));
+    ASSERT_OK(result.status());
   }
 
-  auto client_end1 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[0]));
-  fidl::WireSharedClient fidl_client1(std::move(client_end1), clients_loop_.dispatcher());
-  auto client_end2 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[1]));
-  fidl::WireSharedClient fidl_client2(std::move(client_end2), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client1(std::move(tee_app_client[0]), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client2(std::move(tee_app_client[1]), clients_loop_.dispatcher());
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
@@ -304,27 +377,26 @@ TEST_F(FakeDdkOptee, MultiThreadTest) {
 }
 
 TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
-  zx::channel tee_app_client[2];
+  fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[2];
   sync_completion_t completion1;
   sync_completion_t completion2;
   sync_completion_t smc_completion;
   zx_status_t status;
 
   for (auto& i : tee_app_client) {
-    zx::channel tee_app_server;
-    ASSERT_OK(zx::channel::create(0, &i, &tee_app_server));
-    zx::channel provider_server;
-    zx::channel provider_client;
-    ASSERT_OK(zx::channel::create(0, &provider_client, &provider_server));
+    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
+    ASSERT_OK(tee_endpoints.status_value());
 
-    optee_->TeeConnectToApplication(&kOpteeOsUuid, std::move(tee_app_server),
-                                    std::move(provider_client));
+    i = std::move(tee_endpoints->client);
+
+    auto result = tee_proto_client_->ConnectToApplication(
+        kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
+        std::move(tee_endpoints->server));
+    ASSERT_OK(result.status());
   }
 
-  auto client_end1 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[0]));
-  fidl::WireSharedClient fidl_client1(std::move(client_end1), clients_loop_.dispatcher());
-  auto client_end2 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[1]));
-  fidl::WireSharedClient fidl_client2(std::move(client_end2), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client1(std::move(tee_app_client[0]), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client2(std::move(tee_app_client[1]), clients_loop_.dispatcher());
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
@@ -377,7 +449,7 @@ TEST_F(FakeDdkOptee, TheadLimitCorrectOrder) {
 }
 
 TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
-  zx::channel tee_app_client[3];
+  fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[3];
   sync_completion_t completion1;
   sync_completion_t completion2;
   sync_completion_t completion3;
@@ -385,22 +457,20 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
   sync_completion_t smc_sleep_completion;
 
   for (auto& i : tee_app_client) {
-    zx::channel tee_app_server;
-    ASSERT_OK(zx::channel::create(0, &i, &tee_app_server));
-    zx::channel provider_server;
-    zx::channel provider_client;
-    ASSERT_OK(zx::channel::create(0, &provider_client, &provider_server));
+    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
+    ASSERT_OK(tee_endpoints.status_value());
 
-    optee_->TeeConnectToApplication(&kOpteeOsUuid, std::move(tee_app_server),
-                                    std::move(provider_client));
+    i = std::move(tee_endpoints->client);
+
+    auto result = tee_proto_client_->ConnectToApplication(
+        kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
+        std::move(tee_endpoints->server));
+    ASSERT_OK(result.status());
   }
 
-  auto client_end1 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[0]));
-  fidl::WireSharedClient fidl_client1(std::move(client_end1), clients_loop_.dispatcher());
-  auto client_end2 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[1]));
-  fidl::WireSharedClient fidl_client2(std::move(client_end2), clients_loop_.dispatcher());
-  auto client_end3 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[2]));
-  fidl::WireSharedClient fidl_client3(std::move(client_end3), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client1(std::move(tee_app_client[0]), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client2(std::move(tee_app_client[1]), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client3(std::move(tee_app_client[2]), clients_loop_.dispatcher());
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {
@@ -479,7 +549,7 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrder) {
 }
 
 TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
-  zx::channel tee_app_client[3];
+  fidl::ClientEnd<fuchsia_tee::Application> tee_app_client[3];
   sync_completion_t completion1;
   sync_completion_t completion2;
   sync_completion_t completion3;
@@ -488,22 +558,20 @@ TEST_F(FakeDdkOptee, TheadLimitWrongOrderCascade) {
   sync_completion_t smc_sleep_completion2;
 
   for (auto& i : tee_app_client) {
-    zx::channel tee_app_server;
-    ASSERT_OK(zx::channel::create(0, &i, &tee_app_server));
-    zx::channel provider_server;
-    zx::channel provider_client;
-    ASSERT_OK(zx::channel::create(0, &provider_client, &provider_server));
+    auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
+    ASSERT_OK(tee_endpoints.status_value());
 
-    optee_->TeeConnectToApplication(&kOpteeOsUuid, std::move(tee_app_server),
-                                    std::move(provider_client));
+    i = std::move(tee_endpoints->client);
+
+    auto result = tee_proto_client_->ConnectToApplication(
+        kOpteeOsUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
+        std::move(tee_endpoints->server));
+    ASSERT_OK(result.status());
   }
 
-  auto client_end1 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[0]));
-  fidl::WireSharedClient fidl_client1(std::move(client_end1), clients_loop_.dispatcher());
-  auto client_end2 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[1]));
-  fidl::WireSharedClient fidl_client2(std::move(client_end2), clients_loop_.dispatcher());
-  auto client_end3 = fidl::ClientEnd<fuchsia_tee::Application>(std::move(tee_app_client[2]));
-  fidl::WireSharedClient fidl_client3(std::move(client_end3), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client1(std::move(tee_app_client[0]), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client2(std::move(tee_app_client[1]), clients_loop_.dispatcher());
+  fidl::WireSharedClient fidl_client3(std::move(tee_app_client[2]), clients_loop_.dispatcher());
 
   {
     SetSmcCallWithArgHandler([&](const zx_smc_parameters_t* params, zx_smc_result_t* out) {

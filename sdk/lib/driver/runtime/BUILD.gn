@@ -69,6 +69,7 @@ sdk_source_set("driver_runtime_env") {
     "//src/devices/bin/driver_host/*",
     "//src/devices/bin/driver_host2/*",
     "//src/devices/bin/driver_runtime/*",
+    "//src/devices/tee/drivers/optee:optee-controller-test-bin",
     "//src/devices/testing/driver-runtime-main/*",
   ]
   public_deps = [

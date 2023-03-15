@@ -25,3 +25,7 @@ protocol DeviceConnector {
         application_request server_end:tee.Application;
     });
 };
+
+service Service {
+    device_connector client_end:DeviceConnector;
+};

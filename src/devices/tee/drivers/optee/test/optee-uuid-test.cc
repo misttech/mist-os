@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
-#include <fuchsia/hardware/tee/c/banjo.h>
 
 #include <zxtest/zxtest.h>
 
@@ -20,22 +19,6 @@ TEST(UuidTest, LlcppCtor) {
       .clock_seq_and_node = {0x01, 0x02, 0x03, 0x04, 0x05, 0x6, 0x07, 0x08}};
 
   Uuid uuid(llcpp_uuid);
-
-  EXPECT_EQ(uuid.time_low(), 0x01234567);
-  EXPECT_EQ(uuid.time_mid(), 0x89AB);
-  EXPECT_EQ(uuid.time_hi_and_version(), 0xCDEF);
-  for (size_t i = 0; i < 8; i++) {
-    EXPECT_EQ(uuid.clock_seq_and_node()[i], i + 1);
-  }
-}
-
-TEST(UuidTest, BanjoCtor) {
-  uuid_t banjo_uuid{.time_low = 0x01234567,
-                    .time_mid = 0x89AB,
-                    .time_hi_and_version = 0xCDEF,
-                    .clock_seq_and_node = {0x01, 0x02, 0x03, 0x04, 0x05, 0x6, 0x07, 0x08}};
-
-  Uuid uuid(banjo_uuid);
 
   EXPECT_EQ(uuid.time_low(), 0x01234567);
   EXPECT_EQ(uuid.time_mid(), 0x89AB);

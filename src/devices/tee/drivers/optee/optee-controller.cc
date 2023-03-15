@@ -520,7 +520,35 @@ zx_status_t OpteeController::Bind() {
     return status;
   }
 
-  status = DdkAdd(kDeviceName.data(), DEVICE_ADD_ALLOW_MULTI_COMPOSITE);
+  async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  fuchsia_hardware_tee::Service::InstanceHandler handler({
+      .device_connector = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_.AddService<fuchsia_hardware_tee::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    return result.status_value();
+  }
+
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve outgoing directory");
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_tee::Service::Name,
+  };
+
+  status = DdkAdd(ddk::DeviceAddArgs(kDeviceName.data())
+                      .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
     LOG(ERROR, "failed to add device");
     return status;

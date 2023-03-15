@@ -11,7 +11,9 @@
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/hardware/tee/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -197,6 +199,9 @@ class OpteeController : public OpteeControllerBase,
   zx::bti bti_;
   zx::pmt pmt_;
   std::unique_ptr<SharedMemoryManager> shared_memory_manager_;
+
+  component::OutgoingDirectory outgoing_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
+  fidl::ServerBindingGroup<fuchsia_hardware_tee::DeviceConnector> bindings_;
 };
 
 }  // namespace optee

@@ -4,6 +4,7 @@
 
 #include "device.h"
 
+#include <fidl/fuchsia.tee/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async/default.h>
@@ -54,11 +55,13 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
     return status;
   }
 
-  status = ddk::TeeProtocolClient::CreateFromDevice(parent(), "tee", &tee_proto_client_);
-  if (status != ZX_OK) {
-    LOG(ERROR, "ddk::TeeProtocolClient::CreateFromDevice() failed - status: %d", status);
-    return status;
+  zx::result client_end =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_tee::Service::DeviceConnector>("tee");
+  if (client_end.is_error()) {
+    LOG(ERROR, "Unable to connect to fidl protocol - status: %d", client_end.status_value());
+    return client_end.status_value();
   }
+  tee_proto_client_.Bind(std::move(client_end.value()));
 
   // See note on the constraints of |bti_| in the header.
   constexpr uint32_t kBtiIndex = 0;
@@ -173,30 +176,30 @@ fpromise::result<zx_paddr_t, zx_status_t> AmlogicSecureMemDevice::GetSecureMemor
 
 zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
   ZX_DEBUG_ASSERT(tee_proto_client_.is_valid());
-  zx::channel tee_device_client;
-  zx::channel tee_device_server;
-  zx_status_t status = zx::channel::create(0, &tee_device_client, &tee_device_server);
-  if (status != ZX_OK) {
-    LOG(ERROR, "optee: failed to create fuchsia.tee.Application channels - status: %d", status);
-    return status;
+
+  auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
+  if (!tee_endpoints.is_ok()) {
+    return tee_endpoints.status_value();
   }
-  constexpr zx_handle_t kNoServiceProvider = ZX_HANDLE_INVALID;
-  const uuid_t kSecmemUuid = {
+
+  const fuchsia_tee::wire::Uuid kSecmemUuid = {
       0x2c1a33c0, 0x44cc, 0x11e5, {0xbc, 0x3b, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
-  status = tee_proto_client_.ConnectToApplication(&kSecmemUuid, std::move(tee_device_server),
-                                                  zx::channel(kNoServiceProvider));
-  if (status != ZX_OK) {
-    LOG(ERROR, "optee: tee_client_.ConnectToApplication() failed - status: %d", status);
-    return status;
+
+  auto result = tee_proto_client_->ConnectToApplication(
+      kSecmemUuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
+      std::move(tee_endpoints->server));
+  if (!result.ok()) {
+    LOG(ERROR, "optee: tee_client_.ConnectToApplication() failed - status: %d", result.status());
+    return result.status();
   }
-  sysmem_secure_mem_server_.emplace(fdf_dispatcher_, std::move(tee_device_client));
+  sysmem_secure_mem_server_.emplace(fdf_dispatcher_, tee_endpoints->client.TakeChannel());
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_sysmem::SecureMem>();
   if (endpoints.is_error()) {
     LOG(ERROR, "failed to create sysmem tee channels - status: %d", endpoints.status_value());
     return endpoints.status_value();
   }
   auto& [sysmem_secure_mem_client, sysmem_secure_mem_server] = endpoints.value();
-  status = sysmem_secure_mem_server_->BindAsync(
+  zx_status_t status = sysmem_secure_mem_server_->BindAsync(
       std::move(sysmem_secure_mem_server), &sysmem_secure_mem_server_thread_,
       [this](bool is_success) {
         ZX_DEBUG_ASSERT(thrd_current() == sysmem_secure_mem_server_thread_);

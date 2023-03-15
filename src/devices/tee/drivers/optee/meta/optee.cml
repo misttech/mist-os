@@ -14,8 +14,17 @@
         compat: "driver/optee.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
+    capabilities: [
+        { service: "fuchsia.hardware.tee.Service" },
+    ],
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.rpmb.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.tee.Service",
+            from: "self",
+        },
     ],
 }

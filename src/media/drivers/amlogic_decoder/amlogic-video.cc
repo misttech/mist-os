@@ -265,28 +265,26 @@ zx_status_t AmlogicVideo::AllocateStreamBuffer(StreamBuffer* buffer, uint32_t si
   return ZX_OK;
 }
 
-zx_status_t AmlogicVideo::ConnectToTrustedApp(const uuid_t* application_uuid,
+zx_status_t AmlogicVideo::ConnectToTrustedApp(const fuchsia_tee::wire::Uuid& application_uuid,
                                               fuchsia::tee::ApplicationSyncPtr* tee) {
   TRACE_DURATION("media", "AmlogicVideo::ConnectToTrustedApp");
-  ZX_DEBUG_ASSERT(application_uuid);
   ZX_DEBUG_ASSERT(tee);
 
-  zx::channel tee_client;
-  zx::channel tee_server;
-  zx_status_t status = zx::channel::create(/*flags=*/0, &tee_client, &tee_server);
-  if (status != ZX_OK) {
-    LOG(ERROR, "zx::channel::create() failed - status: %d", status);
-    return status;
+  auto tee_endpoints = fidl::CreateEndpoints<fuchsia_tee::Application>();
+  if (!tee_endpoints.is_ok()) {
+    LOG(ERROR, "fidl::CreateEndpoints failed - status: %d", tee_endpoints.status_value());
+    return tee_endpoints.status_value();
   }
 
-  status = tee_.ConnectToApplication(application_uuid, std::move(tee_server),
-                                     /*service_provider=*/zx::channel());
-  if (status != ZX_OK) {
-    LOG(ERROR, "tee_connect() failed - status: %d", status);
-    return status;
+  auto result = tee_proto_client_->ConnectToApplication(
+      application_uuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>(),
+      std::move(tee_endpoints->server));
+  if (!result.ok()) {
+    LOG(ERROR, "amlogic-video: tee_client_.ConnectToApplication() failed - status: %d",
+        result.status());
+    return result.status();
   }
-
-  tee->Bind(std::move(tee_client));
+  tee->Bind(tee_endpoints->client.TakeChannel());
   return ZX_OK;
 }
 
@@ -297,9 +295,9 @@ zx_status_t AmlogicVideo::EnsureSecmemSessionIsConnected() {
   }
 
   fuchsia::tee::ApplicationSyncPtr tee_connection;
-  const uuid_t kSecmemUuid = {
+  const fuchsia_tee::wire::Uuid kSecmemUuid = {
       0x2c1a33c0, 0x44cc, 0x11e5, {0xbc, 0x3b, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}};
-  zx_status_t status = ConnectToTrustedApp(&kSecmemUuid, &tee_connection);
+  zx_status_t status = ConnectToTrustedApp(kSecmemUuid, &tee_connection);
   if (status != ZX_OK) {
     LOG(ERROR, "ConnectToTrustedApp() failed - status: %d", status);
     return status;
@@ -849,10 +847,20 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   // If tee is available as a fragment, we require that we can get ZX_PROTOCOL_TEE.  It'd be nice
   // if there were a less fragile way to detect this.  Passing in driver metadata for this doesn't
   // seem worthwhile so far.  There's no tee on vim2.
-  tee_ = ddk::TeeProtocolClient(parent_, "tee");
-  is_tee_available_ = tee_.is_valid();
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_tee::DeviceConnector>();
+  if (endpoints.is_error()) {
+    LOG(ERROR, "fidl::CreateEndpoints failed - status: %d", endpoints.status_value());
+    return endpoints.status_value();
+  }
+  zx_status_t status =
+      device_connect_fragment_fidl_protocol2(parent, "tee", fuchsia_hardware_tee::Service::Name,
+                                             fuchsia_hardware_tee::Service::DeviceConnector::Name,
+                                             endpoints->server.TakeChannel().release());
+  is_tee_available_ = (status == ZX_OK);
 
   if (is_tee_available_) {
+    tee_proto_client_.Bind(std::move(endpoints->client));
     // TODO(fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware TA
     LOG(INFO, "Got ZX_PROTOCOL_TEE");
   } else {
@@ -861,7 +869,7 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   }
 
   pdev_device_info_t info;
-  zx_status_t status = pdev_.GetDeviceInfo(&info);
+  status = pdev_.GetDeviceInfo(&info);
   if (status != ZX_OK) {
     DECODE_ERROR("pdev_.GetDeviceInfo failed");
     return status;
@@ -1012,9 +1020,9 @@ zx_status_t AmlogicVideo::PreloadFirmwareViaTee() {
   constexpr uint32_t kRetryCount = 10;
   for (uint32_t i = 0; i < kRetryCount; i++) {
     fuchsia::tee::ApplicationSyncPtr tee_connection;
-    const uuid_t kVideoFirmwareUuid = {
+    const fuchsia_tee::wire::Uuid kVideoFirmwareUuid = {
         0x526fc4fc, 0x7ee6, 0x4a12, {0x96, 0xe3, 0x83, 0xda, 0x95, 0x65, 0xbc, 0xe8}};
-    status = ConnectToTrustedApp(&kVideoFirmwareUuid, &tee_connection);
+    status = ConnectToTrustedApp(kVideoFirmwareUuid, &tee_connection);
     if (status != ZX_OK) {
       LOG(ERROR, "ConnectToTrustedApp() failed - status: %d", status);
       continue;

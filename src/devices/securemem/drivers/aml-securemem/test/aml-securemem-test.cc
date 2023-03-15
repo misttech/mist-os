@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.tee/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
@@ -60,23 +61,18 @@ class FakeSysmem : public ddk::SysmemProtocol<FakeSysmem> {
 
 // We cover the code involved in supporting non-VDEC secure memory and VDEC secure memory in
 // sysmem-test, so this fake doesn't really need to do much yet.
-class FakeTee : public ddk::TeeProtocol<FakeTee> {
+class FakeTee : public fidl::WireServer<fuchsia_hardware_tee::DeviceConnector> {
  public:
-  FakeTee() : proto_({&tee_protocol_ops_, this}) {}
-
-  const tee_protocol_t* proto() const { return &proto_; }
-
-  zx_status_t TeeConnectToApplication(const uuid_t* application_uuid, zx::channel tee_app_request,
-                                      zx::channel service_provider) {
+  void ConnectToApplication(ConnectToApplicationRequestView request,
+                            ConnectToApplicationCompleter::Sync& completer) override {
     // Currently, do nothing
     //
     // We don't rely on the tee_app_request channel sticking around for these tests.  See
     // sysmem-test for a test that exercises the tee_app_request channel.
-    return ZX_OK;
   }
 
- private:
-  tee_protocol_t proto_;
+  void ConnectToDeviceInfo(ConnectToDeviceInfoRequestView request,
+                           ConnectToDeviceInfoCompleter::Sync& completer) override {}
 };
 
 struct IncomingNamespace {
@@ -86,7 +82,9 @@ struct IncomingNamespace {
 
 class AmlogicSecureMemTest : public zxtest::Test {
  protected:
-  AmlogicSecureMemTest() {
+  AmlogicSecureMemTest()
+      : tee_server_loop_(fdf::Dispatcher::GetCurrent()),
+        outgoing_(component::OutgoingDirectory(tee_server_loop_->async_dispatcher())) {
     fake_pdev::FakePDevFidl::Config config;
     config.use_fake_bti = true;
 
@@ -103,9 +101,21 @@ class AmlogicSecureMemTest : public zxtest::Test {
     ASSERT_NO_FATAL_FAILURE();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                           std::move(outgoing_endpoints->client), "pdev");
-
     root_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_.proto()->ops, sysmem_.proto()->ctx, "sysmem");
-    root_->AddProtocol(ZX_PROTOCOL_TEE, tee_.proto()->ops, tee_.proto()->ctx, "tee");
+
+    auto device_handler = [this](fidl::ServerEnd<fuchsia_hardware_tee::DeviceConnector> request) {
+      fidl::BindServer(tee_server_loop_->async_dispatcher(), std::move(request), &tee_);
+    };
+    fuchsia_hardware_tee::Service::InstanceHandler handler(
+        {.device_connector = std::move(device_handler)});
+
+    auto service_result = outgoing_.AddService<fuchsia_hardware_tee::Service>(std::move(handler));
+    ZX_ASSERT(service_result.is_ok());
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+    root_->AddFidlService(fuchsia_hardware_tee::Service::Name, std::move(endpoints->client), "tee");
 
     // We initialize this in a dispatcher thread so that fdf_dispatcher_get_current_dispatcher
     // works. This dispatcher isn't actually used in the test.
@@ -155,6 +165,7 @@ class AmlogicSecureMemTest : public zxtest::Test {
   amlogic_secure_mem::AmlogicSecureMemDevice* dev() { return dev_; }
 
  private:
+  fdf::Unowned<fdf::Dispatcher> tee_server_loop_;
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
@@ -164,6 +175,7 @@ class AmlogicSecureMemTest : public zxtest::Test {
   amlogic_secure_mem::AmlogicSecureMemDevice* dev_;
   fdf::Dispatcher dispatcher_;
 
+  component::OutgoingDirectory outgoing_;
   libsync::Completion shutdown_completion_;
 };
 

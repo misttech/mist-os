@@ -5,10 +5,10 @@
 #ifndef SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_AMLOGIC_VIDEO_H_
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_AMLOGIC_VIDEO_H_
 
+#include <fidl/fuchsia.hardware.tee/cpp/wire.h>
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <fuchsia/hardware/tee/cpp/banjo.h>
 #include <fuchsia/tee/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -203,7 +203,8 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   friend class test::TestVP9;
   friend class test::TestFrameProvider;
 
-  zx_status_t ConnectToTrustedApp(const uuid_t* uuid, fuchsia::tee::ApplicationSyncPtr* tee);
+  zx_status_t ConnectToTrustedApp(const fuchsia_tee::wire::Uuid& uuid,
+                                  fuchsia::tee::ApplicationSyncPtr* tee);
 
   zx_status_t EnsureSecmemSessionIsConnected();
 
@@ -229,7 +230,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   ddk::ClockProtocolClient clocks_[static_cast<int>(ClockType::kMax)];
 
   // Unlike sysmem and canvas, tee is optional (no tee on vim2).
-  ddk::TeeProtocolClient tee_;
+  fidl::WireSyncClient<fuchsia_hardware_tee::DeviceConnector> tee_proto_client_;
   bool is_tee_available_ = false;
   std::optional<SecmemSession> secmem_session_;
 

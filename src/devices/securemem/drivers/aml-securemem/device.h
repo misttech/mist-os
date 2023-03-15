@@ -6,11 +6,11 @@
 #define SRC_DEVICES_SECUREMEM_DRIVERS_AML_SECUREMEM_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.securemem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.tee/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <fuchsia/hardware/tee/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/zx/bti.h>
@@ -59,7 +59,7 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   fdf_dispatcher_t* fdf_dispatcher_ = nullptr;
   ddk::PDevFidl pdev_proto_client_;
   ddk::SysmemProtocolClient sysmem_proto_client_;
-  ddk::TeeProtocolClient tee_proto_client_;
+  fidl::WireSyncClient<fuchsia_hardware_tee::DeviceConnector> tee_proto_client_;
 
   // Note: |bti_| must be backed by a dummy IOMMU so that the physical address will be stable every
   // time a secure memory VMO is passed to be pinned.
