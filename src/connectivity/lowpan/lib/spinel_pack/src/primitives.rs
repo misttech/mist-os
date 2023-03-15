@@ -261,7 +261,7 @@ impl TryPackAs<str> for String {
     }
 }
 
-impl TryPackAs<str> for [u8] {
+impl TryPackAs<str> for &[u8] {
     fn pack_as_len(&self) -> io::Result<usize> {
         Ok(self.len() + 1)
     }
@@ -273,41 +273,38 @@ impl TryPackAs<str> for [u8] {
     }
 }
 
-impl TryPackAs<str> for &[u8] {
-    fn pack_as_len(&self) -> io::Result<usize> {
-        TryPackAs::<str>::pack_as_len(*self)
-    }
-
-    fn try_pack_as<T: std::io::Write + ?Sized>(&self, buffer: &mut T) -> io::Result<usize> {
-        TryPackAs::<str>::try_pack_as(*self, buffer)
-    }
-}
-
 impl TryPackAs<str> for Vec<u8> {
     fn pack_as_len(&self) -> io::Result<usize> {
-        TryPackAs::<str>::pack_as_len(self.as_slice())
+        TryPackAs::<str>::pack_as_len(&self.as_slice())
     }
 
     fn try_pack_as<T: std::io::Write + ?Sized>(&self, buffer: &mut T) -> io::Result<usize> {
-        TryPackAs::<str>::try_pack_as(self.as_slice(), buffer)
+        TryPackAs::<str>::try_pack_as(&self.as_slice(), buffer)
     }
 }
 
-impl TryPack for [u8] {
+impl<T: TryPack> TryPack for Vec<T>
+where
+    for<'a> &'a [T]: TryPack,
+{
     fn pack_len(&self) -> io::Result<usize> {
-        TryPackAs::<[u8]>::pack_as_len(self)
+        self.as_slice().pack_len()
     }
 
     fn try_pack<B: std::io::Write + ?Sized>(&self, buffer: &mut B) -> io::Result<usize> {
-        TryPackAs::<[u8]>::try_pack_as(self, buffer)
+        self.as_slice().try_pack(buffer)
+    }
+
+    fn array_pack_len(&self) -> io::Result<usize> {
+        self.as_slice().array_pack_len()
     }
 
     fn try_array_pack<B: std::io::Write + ?Sized>(&self, buffer: &mut B) -> io::Result<usize> {
-        TryPackAs::<SpinelDataWlen>::try_pack_as(self, buffer)
+        self.as_slice().try_array_pack(buffer)
     }
 }
 
-impl<T: TryPack> TryPack for Vec<T> {
+impl<T: TryPack> TryPack for &[T] {
     fn pack_len(&self) -> io::Result<usize> {
         let mut len: usize = 0;
         for iter in self.iter() {
@@ -378,78 +375,6 @@ impl<T: TryPack> TryPack for HashSet<T> {
         TryPackAs::<u16>::try_pack_as(&pack_len, buffer)?;
 
         self.try_pack(buffer).map(|len| len + 2)
-    }
-}
-
-impl TryPackAs<SpinelDataWlen> for [u8] {
-    fn pack_as_len(&self) -> std::io::Result<usize> {
-        Ok(self.len() + 2)
-    }
-
-    fn try_pack_as<T: std::io::Write + ?Sized>(&self, buffer: &mut T) -> std::io::Result<usize> {
-        let bytes = self;
-        let len = bytes.len() + 2;
-
-        if len > std::u16::MAX as usize {
-            Err(io::ErrorKind::InvalidInput.into())
-        } else {
-            buffer.write_u16::<LittleEndian>((len - 2) as u16)?;
-            buffer.write_all(bytes)?;
-            Ok(len)
-        }
-    }
-}
-
-impl TryPackAs<SpinelDataWlen> for &[u8] {
-    fn pack_as_len(&self) -> std::io::Result<usize> {
-        Ok(self.len() + 2)
-    }
-
-    fn try_pack_as<T: std::io::Write + ?Sized>(&self, buffer: &mut T) -> std::io::Result<usize> {
-        let bytes = *self;
-        let len = bytes.len() + 2;
-
-        if len > std::u16::MAX as usize {
-            Err(io::ErrorKind::InvalidInput.into())
-        } else {
-            buffer.write_u16::<LittleEndian>((len - 2) as u16)?;
-            buffer.write_all(bytes)?;
-            Ok(len)
-        }
-    }
-}
-
-impl TryPackAs<[u8]> for [u8] {
-    fn pack_as_len(&self) -> std::io::Result<usize> {
-        Ok(self.len())
-    }
-
-    fn try_pack_as<T: std::io::Write + ?Sized>(&self, buffer: &mut T) -> std::io::Result<usize> {
-        let bytes = self;
-        let len = bytes.len();
-
-        if len > std::u16::MAX as usize {
-            Err(io::ErrorKind::InvalidInput.into())
-        } else {
-            buffer.write_all(bytes).map(|_| len)
-        }
-    }
-}
-
-impl<'a> TryPackAs<[u8]> for &'a [u8] {
-    fn pack_as_len(&self) -> std::io::Result<usize> {
-        Ok(self.len())
-    }
-
-    fn try_pack_as<T: std::io::Write + ?Sized>(&self, buffer: &mut T) -> std::io::Result<usize> {
-        let bytes = *self;
-        let len = bytes.len();
-
-        if len > std::u16::MAX as usize {
-            Err(io::ErrorKind::InvalidInput.into())
-        } else {
-            buffer.write_all(bytes).map(|_| len)
-        }
     }
 }
 
@@ -755,6 +680,19 @@ where
 
 impl<T> TryPackAs<[u8]> for Vec<T>
 where
+    for<'a> &'a [T]: TryPackAs<[u8]>,
+{
+    fn pack_as_len(&self) -> io::Result<usize> {
+        TryPackAs::<[u8]>::pack_as_len(&self.as_slice())
+    }
+
+    fn try_pack_as<B: std::io::Write + ?Sized>(&self, buffer: &mut B) -> io::Result<usize> {
+        TryPackAs::<[u8]>::try_pack_as(&self.as_slice(), buffer)
+    }
+}
+
+impl<T> TryPackAs<[u8]> for &[T]
+where
     Self: TryPack,
 {
     fn pack_as_len(&self) -> io::Result<usize> {
@@ -767,6 +705,19 @@ where
 }
 
 impl<T> TryPackAs<SpinelDataWlen> for Vec<T>
+where
+    for<'a> &'a [T]: TryPackAs<SpinelDataWlen>,
+{
+    fn pack_as_len(&self) -> io::Result<usize> {
+        TryPackAs::<SpinelDataWlen>::pack_as_len(&self.as_slice())
+    }
+
+    fn try_pack_as<B: std::io::Write + ?Sized>(&self, buffer: &mut B) -> io::Result<usize> {
+        TryPackAs::<SpinelDataWlen>::try_pack_as(&self.as_slice(), buffer)
+    }
+}
+
+impl<T> TryPackAs<SpinelDataWlen> for &[T]
 where
     Self: TryPackAs<[u8]>,
 {

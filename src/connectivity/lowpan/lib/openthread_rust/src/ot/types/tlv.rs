@@ -266,7 +266,7 @@ pub trait TlvIteratorExt {
     fn meshcop_tlvs(&self) -> MeshcopTlvIterator<'_>;
 }
 
-impl TlvIteratorExt for [u8] {
+impl TlvIteratorExt for &[u8] {
     fn meshcop_tlvs(&self) -> MeshcopTlvIterator<'_> {
         MeshcopTlvIterator(self)
     }
@@ -279,6 +279,7 @@ mod test {
     #[test]
     fn test_tlv_deserialize_serialize() {
         let data = hex::decode("0e080000000000010000000300000b35060004001fffc00208029c6f4dbae059cb0708fd0087d0e40b384405105f7ddf9e9e9670d81331ad06754660320308626c61686e6574320102f09f04105d95f609e1e842c47a69ddd77e23e23d0c0402a0fff8").unwrap();
+        let data = data.as_slice();
 
         let tlvs =
             data.meshcop_tlvs().collect::<Result<Vec<_>, _>>().expect("Failed to parse TLVs");

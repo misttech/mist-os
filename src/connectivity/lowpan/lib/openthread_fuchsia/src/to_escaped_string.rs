@@ -8,7 +8,7 @@ pub trait ToEscapedString {
     fn to_escaped_string(&self) -> String;
 }
 
-impl ToEscapedString for [u8] {
+impl ToEscapedString for &[u8] {
     fn to_escaped_string(&self) -> String {
         self.iter()
             .copied()
