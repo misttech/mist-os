@@ -26,6 +26,9 @@
 // should issues a matching |DecrementShareCount| before the |ShareableProcessState| is destroyed.
 class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
  public:
+  ShareableProcessState(const ShareableProcessState&) = delete;
+  ShareableProcessState& operator=(const ShareableProcessState&) = delete;
+
   ShareableProcessState() = default;
   ~ShareableProcessState() {
     DEBUG_ASSERT(!aspace_ || aspace_->is_destroyed());
@@ -38,7 +41,7 @@ class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
   // Returns whether or not the share count was incremented successfully. Can fail if the process
   // state has been destroyed.
   bool IncrementShareCount() {
-    uint32_t prev = process_count_.load(ktl::memory_order_relaxed);
+    uint64_t prev = process_count_.load(ktl::memory_order_relaxed);
     do {
       if (prev == 0) {
         return false;
@@ -52,7 +55,7 @@ class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
   void DecrementShareCount() {
     DEBUG_ASSERT(process_count_ > 0);
 
-    const uint32_t prev = process_count_.fetch_sub(1, ktl::memory_order_relaxed);
+    const uint64_t prev = process_count_.fetch_sub(1, ktl::memory_order_relaxed);
 
     if (prev > 1) {
       return;
@@ -71,10 +74,12 @@ class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
   // that has been destroyed.
   bool Initialize(vaddr_t aspace_base, vaddr_t aspace_size, const char* aspace_name) {
     DEBUG_ASSERT(!aspace_);
-    DEBUG_ASSERT(process_count_.load(ktl::memory_order_relaxed) > 0);
+    DEBUG_ASSERT(process_count_.load(ktl::memory_order_relaxed) == 1);
     aspace_ = VmAspace::Create(aspace_base, aspace_size, VmAspace::Type::User, aspace_name);
     return aspace_ != nullptr;
   }
+
+  uint64_t share_count() const { return process_count_.load(ktl::memory_order_relaxed); }
 
   HandleTable& handle_table() { return handle_table_; }
   const HandleTable& handle_table() const { return handle_table_; }
@@ -89,15 +94,14 @@ class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
   const VmAspace* aspace_ptr() const { return aspace_.get(); }
 
  private:
-  mutable DECLARE_MUTEX(ShareableProcessState) lock_;
 
+  // The layout of the fields below is intended to eliminating padding.
+  //
   // The number of processes currently sharing this state.
-  ktl::atomic<uint32_t> process_count_ = 1;
-
   HandleTable handle_table_;
-  FutexContext futex_context_;
-
+  ktl::atomic<uint64_t> process_count_ = 1;
   fbl::RefPtr<VmAspace> aspace_;
+  FutexContext futex_context_;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_SHAREABLE_PROCESS_STATE_H_
