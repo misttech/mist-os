@@ -5,6 +5,7 @@
     program: {
         apex_hack: [],
         features: [
+            "framebuffer",
             "magma",
             "custom_artifacts",
             "test_data",
