@@ -2561,28 +2561,14 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
     p = page_or_mark->Page();
   } else {
     // We need to get a real page as our initial content. At this point we are either starting from
-    // the zero page, or something supplied from a page source. The page source only fills in if we
-    // have a true absence of content.
+    // the zero page, or something supplied from a page source.
     //
-    // We treat a page source that always supplies zeroes (does not preserve page content) as an
-    // absence of content (given the lack of a page), but we can only use the zero page if we're not
-    // writing, since we can't (or in case of not providing specific physical pages, shouldn't) let
-    // an arbitrary physical page get added below - we need to only add the specific physical pages
-    // supplied by the source.
-    //
-    // In the case of a (hypothetical) page source that's both always providing zeroes and not
-    // supplying specific physical pages, we intentionally ask the page source to supply the pages
-    // here since otherwise there's no point in having such a page source.  We have no such page
-    // sources currently.
-    //
-    // Contiguous VMOs don't use markers and always have a page source, so the first two conditions
-    // won't be true for a contiguous VMO.
+    // A page source that always supplies zeroes (does not preserve page content) could, in the case
+    // of a read, return the zero page, however in practice this is not a useful optimization and
+    // adds extra complexity.
     AssertHeld(page_owner->lock_ref());
-    if ((page_or_mark && page_or_mark->IsMarker()) || !page_owner->page_source_ ||
-        (!writing && !page_owner->is_source_preserving_page_content())) {
-      // We case use the zero page, since we have a marker, or no page source, or we're not adding
-      // a page to the VmCowPages (due to !writing) and the page source always provides zeroes so
-      // reading zeroes is consistent with what the page source would provide.
+    if ((page_or_mark && page_or_mark->IsMarker()) || !page_owner->page_source_) {
+      // We can use the zero page, since we have a marker, or no page source.
       p = vm_get_zero_page();
     } else {
       // We will attempt to get the page from the page source.

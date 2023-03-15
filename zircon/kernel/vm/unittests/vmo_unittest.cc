@@ -2203,18 +2203,9 @@ static bool vmo_attribution_ops_contiguous_test() {
     buf.reserve(2 * PAGE_SIZE, &ac);
     ASSERT_TRUE(ac.check());
 
-    // Read the first two pages.
+    // Read the first two pages. Reading will still cause pages to get committed, and should
+    // increment the generation count.
     status = vmo->Read(buf.data(), 0, 2 * PAGE_SIZE);
-    ASSERT_EQ(ZX_OK, status);
-    // Since these are zero pages being read, this won't commit any pages in
-    // the vmo and should not increment the generation count, and shouldn't increase the number of
-    // pages.
-    EXPECT_EQ(true,
-              verify_object_page_attribution(vmo.get(), expected_gen_count, expected_page_count));
-
-    // Write the first two pages. This will commit 2 pages and should increment the generation
-    // count.
-    status = vmo->Write(buf.data(), 0, 2 * PAGE_SIZE);
     ASSERT_EQ(ZX_OK, status);
     if (!is_ppb_enabled) {
       // expected_gen_count and expected_page_count don't change because the pages are already
@@ -2226,8 +2217,6 @@ static bool vmo_attribution_ops_contiguous_test() {
       expected_page_count.uncompressed += 2;
       DEBUG_ASSERT(expected_page_count.uncompressed == 2);
     }
-    EXPECT_EQ(true,
-              verify_object_page_attribution(vmo.get(), expected_gen_count, expected_page_count));
 
     // Write the last two pages. This will commit 2 pages and should increment the generation
     // count.
