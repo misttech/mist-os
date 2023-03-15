@@ -449,7 +449,7 @@ fn impl_valid_fidl_table(
             fn from(src: #name) -> #fidl_table_path {
                 Self {
                     #field_intos
-                    ..fidl_table_validation::Decodable::new_empty()
+                    ..#fidl_table_path::EMPTY
                 }
             }
         }
