@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/i2c-channel.h>
@@ -100,18 +99,15 @@ zx_status_t InitGpioExpanders(zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx_status_t ResetAs370Emmc(const ddk::RegistersProtocolClient& reset) {
-  zx::channel reset_server;
-  fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_client;
-  zx_status_t status = zx::channel::create(0, &reset_server, &reset_client.channel());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create reset register channel: %d", status);
-    return status;
+zx_status_t ResetAs370Emmc(zx_device_t* parent) {
+  auto reset_register_client = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_registers::Service::Device>(parent, "reset");
+  if (reset_register_client.is_error()) {
+    return reset_register_client.status_value();
   }
 
-  reset.Connect(std::move(reset_server));
   const fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_fidl_client(
-      std::move(reset_client));
+      std::move(reset_register_client.value()));
 
   // Ideally this would be done in SdhciHwReset() as part of the SDMMC init process, however that
   // seems to make the device hang. Resetting here is effectively the same since SdhciHwReset() is
@@ -197,12 +193,7 @@ zx_status_t As370Sdhci::Create(void* ctx, zx_device_t* parent) {
       reset_mmio->SetBit<uint32_t>(kSdioPhyRstNBit, kPerifStickyResetNAddress);
     }
   } else if (device_info.did == PDEV_DID_AS370_SDHCI1) {
-    ddk::RegistersProtocolClient reset(parent, "reset");
-    if (!reset.is_valid()) {
-      zxlogf(ERROR, "Could not get registers protocol");
-      return ZX_ERR_NO_RESOURCES;
-    }
-    if ((status = ResetAs370Emmc(reset)) != ZX_OK) {
+    if ((status = ResetAs370Emmc(parent)) != ZX_OK) {
       return status;
     }
   }
