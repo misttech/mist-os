@@ -20,11 +20,6 @@ zx::result<std::string> GetResourcePath(std::string_view url);
 // fuchsia-boot:// and relative package URLs.
 zx::result<std::string> GetBasePathFromUrl(const std::string& url);
 
-// Get the path in the namespace to a file within a package.
-// E.g: fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so
-//      will return the full path to the my-driver.so file.
-zx::result<std::string> GetPathFromUrl(const std::string& url);
-
 // Returns true if url starts with 'fuchsia-boot://'
 bool IsFuchsiaBootScheme(std::string_view url);
 

@@ -15,7 +15,7 @@ namespace {
 using devmgr_integration_test::IsolatedDevmgr;
 
 TEST(MetadataTest, RunTests) {
-  const char kDriver[] = "/boot/meta/ddk-metadata-test-driver.cm";
+  const char kDriver[] = "ddk-metadata-test-driver.cm";
   auto args = IsolatedDevmgr::DefaultArgs();
 
   args.root_device_driver = "/boot/meta/test-parent-sys.cm";

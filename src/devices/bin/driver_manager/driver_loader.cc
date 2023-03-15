@@ -129,23 +129,7 @@ const Driver* DriverLoader::LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_in
 
 bool DriverLoader::MatchesLibnameDriverIndex(const std::string& driver_url,
                                              std::string_view libname) {
-  if (libname.compare(driver_url) == 0) {
-    return true;
-  }
-
-  auto result = GetPathFromUrl(driver_url);
-  if (result.is_error()) {
-    return false;
-  }
-  auto driver_path = result.value();
-
-  // If `libname` is a relative path then check if `driver_path` ends with
-  // `libname`.
-  if (!libname.empty() && libname[0] != '/' && libname.length() <= driver_path.length()) {
-    return !driver_path.compare(driver_path.length() - libname.length(), libname.length(), libname);
-  }
-
-  return driver_path == libname;
+  return cpp20::ends_with(std::string_view(driver_url), libname);
 }
 
 void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,

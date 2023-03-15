@@ -32,18 +32,6 @@ zx::result<fidl::WireSyncClient<fuchsia_io::Directory>> GetCurrentPackageDirecto
 
 }  // namespace
 
-TEST(ManifestParserTest, FuchsiaUrlToPath) {
-  auto result = GetPathFromUrl("fuchsia-pkg://fuchsia.com/my-package#driver/my-driver.so");
-  ASSERT_EQ(result.status_value(), ZX_OK);
-  ASSERT_EQ(result.value(), "/pkgfs/packages/my-package/0/driver/my-driver.so");
-}
-
-TEST(ManifestParserTest, BootUrlToPath) {
-  auto result = GetPathFromUrl("fuchsia-boot:///#driver/my-driver.so");
-  ASSERT_EQ(result.status_value(), ZX_OK);
-  ASSERT_EQ(result.value(), "/boot/driver/my-driver.so");
-}
-
 TEST(ManifestParserTest, BootUrlToBasePath) {
   auto result = GetBasePathFromUrl("fuchsia-boot:///#driver/my-driver.so");
   ASSERT_EQ(result.status_value(), ZX_OK);

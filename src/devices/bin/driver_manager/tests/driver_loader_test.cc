@@ -308,35 +308,6 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeLibname) {
   ASSERT_EQ(drivers.size(), 0);
 }
 
-TEST_F(DriverLoaderTest, TestLibnameConvertToPath) {
-  std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#meta/#driver1.cm";
-  std::string name2 = "fuchsia-boot:///#meta/driver2.cm";
-
-  driver_index_server.fake_drivers.emplace_back(name1, fdi::wire::DriverPackageType::kBase);
-  driver_index_server.fake_drivers.emplace_back(name2, fdi::wire::DriverPackageType::kBoot);
-
-  auto driver1 = std::make_unique<Driver>();
-  driver1->libname = name1;
-  resolver.map[name1] = std::move(driver1);
-
-  auto driver2 = std::make_unique<Driver>();
-  driver2->libname = name2;
-  resolver.map[name2] = std::move(driver2);
-
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
-                             nullptr);
-  loop.StartThread("fidl-thread");
-
-  // We can also match libname by the path that the URL turns into.
-  DriverLoader::MatchDeviceConfig config;
-  config.libname = "/boot/meta/driver2.cm";
-  fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
-
-  ASSERT_EQ(drivers.size(), 1);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->libname, name2);
-}
-
 TEST_F(DriverLoaderTest, TestOnlyReturnBaseAndFallback) {
   std::string name1 = "fuchsia-pkg://fuchsia.com/my-package#meta/#driver1.cm";
   std::string name2 = "fuchsia-boot:///#meta/driver2.cm";

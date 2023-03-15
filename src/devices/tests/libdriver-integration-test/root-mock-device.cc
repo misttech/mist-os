@@ -21,7 +21,7 @@
 
 #include "lib/stdcompat/string_view.h"
 
-constexpr char kMockDeviceLib[] = "/boot/meta/mock-device.cm";
+constexpr char kMockDeviceLib[] = "mock-device.cm";
 
 namespace libdriver_integration_test {
 
