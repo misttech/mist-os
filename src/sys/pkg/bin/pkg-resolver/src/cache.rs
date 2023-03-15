@@ -1004,8 +1004,17 @@ pub enum FetchError {
     )]
     BlobBodyTimeout { uri: String },
 
-    #[error("Blob fetch of {uri}: http request expected 206, got {code}")]
-    ExpectedHttpStatus206 { code: hyper::StatusCode, uri: String },
+    #[error(
+        "Blob fetch of {uri}: http request for range {first_byte_pos}-{last_byte_pos} expected 206, got {code}, \
+        headers {response_headers:?}"
+    )]
+    ExpectedHttpStatus206 {
+        code: hyper::StatusCode,
+        uri: String,
+        first_byte_pos: u64,
+        last_byte_pos: u64,
+        response_headers: http::header::HeaderMap,
+    },
 
     #[error("Blob fetch of {uri}: http request expected Content-Range header")]
     MissingContentRangeHeader { uri: String },

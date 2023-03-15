@@ -124,6 +124,9 @@ pub(super) async fn resuming_get<'a>(
                                 Err(FetchError::ExpectedHttpStatus206 {
                                     code: response.status(),
                                     uri: uri.to_string(),
+                                    first_byte_pos,
+                                    last_byte_pos,
+                                    response_headers: response.headers().clone(),
                                 });
                         }
 
