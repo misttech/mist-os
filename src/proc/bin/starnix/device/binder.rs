@@ -2688,15 +2688,19 @@ impl BinderDriver {
     }
 
     /// Returns a task with the given pid.
-    fn get_target_task(&self, kernel: &Arc<Kernel>, pid: pid_t) -> Result<Arc<Task>, Errno> {
+    fn get_target_task(
+        &self,
+        kernel: &Arc<Kernel>,
+        pid: pid_t,
+    ) -> Result<Arc<Task>, TransactionError> {
         let pids = kernel.pids.read();
         if let Some(task) = pids.get_task(pid) {
             Ok(task)
         } else if let Some(thread_group) = pids.get_thread_group(pid) {
             std::mem::drop(pids);
-            thread_group.read().get_task()
+            thread_group.read().get_task().map_err(|_| TransactionError::Dead)
         } else {
-            error!(EINVAL)
+            Err(TransactionError::Dead)
         }
     }
 
