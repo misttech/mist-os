@@ -218,9 +218,8 @@ impl From<fidl::IpAddress> for IpAddress {
     }
 }
 
-impl Into<fidl::IpAddress> for IpAddress {
-    fn into(self) -> fidl::IpAddress {
-        let IpAddress(ip_address) = self;
+impl From<IpAddress> for fidl::IpAddress {
+    fn from(IpAddress(ip_address): IpAddress) -> Self {
         match ip_address {
             std::net::IpAddr::V4(v4addr) => {
                 fidl::IpAddress::Ipv4(fidl::Ipv4Address { addr: v4addr.octets() })
@@ -257,9 +256,9 @@ macro_rules! generate_address_type {
             }
         }
 
-        impl Into<fidl::$new_type> for $new_type {
-            fn into(self) -> fidl::$new_type {
-                let Self(addr) = self;
+        impl From<$new_type> for fidl::$new_type {
+            fn from(addr: $new_type) -> fidl::$new_type {
+                let $new_type(addr) = addr;
                 fidl::$new_type { addr: addr.octets() }
             }
         }
@@ -343,9 +342,9 @@ impl From<fidl::Subnet> for Subnet {
     }
 }
 
-impl Into<fidl::Subnet> for Subnet {
-    fn into(self) -> fidl::Subnet {
-        let Self { addr, prefix_len } = self;
+impl From<Subnet> for fidl::Subnet {
+    fn from(subnet: Subnet) -> fidl::Subnet {
+        let Subnet { addr, prefix_len } = subnet;
         let addr = addr.into();
         fidl::Subnet { addr, prefix_len }
     }
@@ -479,9 +478,9 @@ impl From<fidl::SocketAddress> for SocketAddress {
     }
 }
 
-impl Into<fidl::SocketAddress> for SocketAddress {
-    fn into(self) -> fidl::SocketAddress {
-        match self.0 {
+impl From<SocketAddress> for fidl::SocketAddress {
+    fn from(SocketAddress(addr): SocketAddress) -> Self {
+        match addr {
             std::net::SocketAddr::V4(socket_addr) => {
                 fidl::SocketAddress::Ipv4(fidl::Ipv4SocketAddress {
                     address: fidl::Ipv4Address { addr: socket_addr.ip().octets() },
