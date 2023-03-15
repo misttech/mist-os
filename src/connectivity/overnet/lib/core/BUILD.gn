@@ -82,6 +82,7 @@ rustc_test("core_test") {
   edition = "2021"
 
   deps = CORE_DEPS + [
+           ":test.coding_rust",
            "//src/lib/fuchsia",
            "//third_party/rust_crates:parking_lot",
          ]
@@ -91,6 +92,11 @@ rustc_test("core_test") {
     args = [ "--test-threads=1" ]
   }
   sources = CORE_SOURCES
+}
+
+fidl("test.coding") {
+  testonly = true
+  sources = [ "coding.test.fidl" ]
 }
 
 if (is_host) {

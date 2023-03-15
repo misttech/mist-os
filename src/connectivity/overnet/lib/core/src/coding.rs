@@ -57,44 +57,7 @@ pub fn encode_fidl_with_context(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl::fidl_struct;
-
-    #[derive(Debug, PartialEq)]
-    struct Foo {
-        byte: u8,
-    }
-
-    impl fidl::encoding::TopLevel for Foo {}
-    impl fidl::encoding::Persistable for Foo {}
-
-    fidl_struct! {
-        name: Foo,
-        members: [
-            byte {
-                ty: u8,
-                offset_v1: 0,
-                offset_v2: 0,
-            },
-        ],
-        padding_v1: [
-            {
-                ty: u64,
-                offset: 0,
-                mask: 0xffffffffffffff00,
-            },
-        ],
-        padding_v2: [
-            {
-                ty: u64,
-                offset: 0,
-                mask: 0xffffffffffffff00,
-            },
-        ],
-        size_v1: 8,
-        size_v2: 8,
-        align_v1: 8,
-        align_v2: 8,
-    }
+    use fidl_test_coding::Foo;
 
     #[fuchsia::test]
     fn encode_decode_without_persistent_header() {
