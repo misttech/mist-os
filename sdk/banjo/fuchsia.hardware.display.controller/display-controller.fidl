@@ -66,15 +66,11 @@ type CursorInfo = struct {
     format ZxPixelFormat;
 };
 
-// TODO(fxbug.dev/120971): Change this back to `strict resource union` after finishing the
-// transition from `i2c_bus_id` to `i2c`.
-type Panel = resource struct {
-    /// The bus_id to use to read this display's edid from the device's i2c protocol.
-    i2c_bus_id uint32;
+type Panel = strict resource union {
     // The i2c bus to use to read this display's edid.
-    i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
+    1: i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
     /// The display's parameters if an edid is not present.
-    params DisplayParams;
+    2: params DisplayParams;
 };
 
 /// A structure containing information a connected display.
