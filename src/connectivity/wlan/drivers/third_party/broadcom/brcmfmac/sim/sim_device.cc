@@ -101,7 +101,7 @@ zx_status_t SimDevice::DeviceInit() {
 }
 
 zx_status_t SimDevice::DeviceAdd(device_add_args_t* args, zx_device_t** out_device) {
-  return fake_dev_mgr_->DeviceAdd(phy_device_, args, out_device);
+  return fake_dev_mgr_->DeviceAdd(parent(), args, out_device);
 }
 
 void SimDevice::DeviceAsyncRemove(zx_device_t* dev) { fake_dev_mgr_->DeviceAsyncRemove(dev); }
