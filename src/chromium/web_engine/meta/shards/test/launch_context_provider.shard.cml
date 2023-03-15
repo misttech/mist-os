@@ -1,0 +1,21 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Include this shard when a test will launch it's own instance of
+// `context_provider.cm`. It is not required to use a `fuchsia.web.Context`
+// (aka `web_instance`).
+//
+{
+    offer: [
+        // Required to fulfill Context requests with
+        //`ContextFeatureFlags::NETWORK`.
+        {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            as: "root-ssl-certificates",
+            to: "#realm_builder",
+            availability: "required",
+        },
+    ],
+}

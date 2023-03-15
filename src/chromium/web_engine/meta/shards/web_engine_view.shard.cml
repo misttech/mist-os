@@ -1,17 +1,29 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// Include this shard when `fuchsia.web.Frame.CreateView*()` may be called.
+//
 {
     use: [
         {
             protocol: [
                 "fuchsia.accessibility.semantics.SemanticsManager",
-                "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",
             ],
+        },
+        {
+            // TODO(fxbug.dev/123550): Remove these as not all views require them.
+            protocol: [
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
+                "fuchsia.ui.input3.Keyboard",
+            ],
+
+            // These should be optional, but that conflicts with
+            // ///src/ui/tests/integration_input_tests/virtual-keyboard/web-virtual-keyboard-client/meta/web-virtual-keyboard-client.cml.
+            // availability: "optional",
         },
     ],
 }

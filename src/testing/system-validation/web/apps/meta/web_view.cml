@@ -20,16 +20,6 @@
             protocol: [ "fuchsia.ui.app.ViewProvider" ],
         },
     ],
-    use: [
-        {
-            protocol: [
-                // Extra capabilities used by web_engine but not specified in a shard cml.
-                "fuchsia.media.ProfileProvider",
-                "fuchsia.tracing.perfetto.ProducerConnector",
-                "fuchsia.tracing.provider.Registry",
-            ],
-        },
-    ],
     expose: [
         {
             protocol: [ "fuchsia.ui.app.ViewProvider" ],

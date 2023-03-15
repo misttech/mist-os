@@ -1,20 +1,44 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+// This shard contains the minimum set of capabilities required to create a
+// `fuchsia.web.Context`(aka `web_instance`).
+// Include this shard when `fuchsia.web.ContextProvider` may be used.
+// Capabilities only required by ContextProvider are not included.
+//
 {
     use: [
         {
             protocol: [
+                // Required protocols.
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",
                 "fuchsia.fonts.Provider",
+                "fuchsia.hwinfo.Product",
                 "fuchsia.intl.PropertyProvider",
+
+                // Assuming all clients want JavaScript support (default).
+                "fuchsia.kernel.VmexResource",
+
+                // More required protocols.
                 "fuchsia.logger.LogSink",
+                "fuchsia.media.ProfileProvider",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.process.Launcher",
                 "fuchsia.sysmem.Allocator",
+
+                // TODO(fxbug.dev/123550): Determine whether this should be in
+                // this shard.
                 "fuchsia.web.ContextProvider",
             ],
+        },
+        {
+            protocol: [
+                // Included to suppress "proper `use` declaration "warnings.
+                "fuchsia.tracing.perfetto.ProducerConnector",
+            ],
+            availability: "optional",
         },
     ],
 }
