@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/virtio/backends/fake.h>
@@ -186,92 +187,100 @@ class FakeGpuBackend : public virtio::FakeBackend {
   FakeGpuBackend() : FakeBackend({{0, 1024}}) {}
 };
 
-class VirtioGpuTest : public zxtest::Test {
+class VirtioGpuTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
-  VirtioGpuTest()
-      : loop_(&kAsyncLoopConfigAttachToCurrentThread), fake_sysmem_(loop_.dispatcher()) {}
+  VirtioGpuTest() = default;
   void SetUp() override {
+    fake_sysmem_ = std::make_unique<FakeSysmem>(dispatcher());
+
     zx::bti bti;
     fake_bti_create(bti.reset_and_get_address());
     device_ = std::make_unique<virtio::GpuDevice>(nullptr, std::move(bti),
                                                   std::make_unique<FakeGpuBackend>());
 
-    // TODO(fxbug.dev/121411): Remove once SetBufferCollectionConstraints()
-    // doesn't use borrowed client channel anymore.
-    zx::result server_channel = fidl::CreateEndpoints(&client_channel_);
-    ASSERT_OK(server_channel);
-    ASSERT_OK(fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(server_channel.value()),
-                                           &collection_));
-
     zx::result sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
     ASSERT_OK(sysmem_endpoints);
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
-    fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(sysmem_server), &fake_sysmem_);
-
-    loop_.StartThread();
+    fidl::BindSingleInFlightOnly(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
     ASSERT_OK(device_->SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
+
+    RunLoopUntilIdle();
   }
+
   void TearDown() override {
     // Ensure the loop processes all queued FIDL messages.
-    loop_.Quit();
-    loop_.JoinThreads();
-    loop_.ResetQuit();
-    loop_.RunUntilIdle();
+    loop().Shutdown();
+  }
+
+  void ImportBufferCollection(uint64_t buffer_collection_id) {
+    zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+    ASSERT_TRUE(token_endpoints.is_ok());
+    EXPECT_OK(device_->DisplayControllerImplImportBufferCollection(
+        buffer_collection_id, token_endpoints->client.TakeChannel()));
   }
 
  protected:
+  std::unique_ptr<FakeSysmem> fake_sysmem_;
   std::unique_ptr<virtio::GpuDevice> device_;
-
-  async::Loop loop_;
-
-  // TODO(fxbug.dev/121411): Remove once SetBufferCollectionConstraints()
-  // doesn't use borrowed client channel anymore.
-  StubBufferCollection collection_;
-  fidl::ClientEnd<fuchsia_sysmem::BufferCollection> client_channel_;
-
-  FakeSysmem fake_sysmem_;
 };
 
-template <typename Lambda>
-bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) {
-  ZX_ASSERT(max_intervals >= 0);
-
-  for (int sleeps_left = max_intervals; sleeps_left > 0; --sleeps_left) {
-    if (predicate())
-      return true;
-    zx::nanosleep(zx::deadline_after(poll_interval));
-  }
-
-  return predicate();
-}
-
 TEST_F(VirtioGpuTest, ImportVmo) {
-  image_t image = {};
-  image.pixel_format = ZX_PIXEL_FORMAT_RGB_x888;
-  image.width = 4;
-  image.height = 4;
-
-  zx::vmo vmo;
-  size_t offset;
-  uint32_t pixel_size;
-  uint32_t row_bytes;
-  EXPECT_OK(
-      device_->GetVmoAndStride(&image, client_channel_, 0, &vmo, &offset, &pixel_size, &row_bytes));
-  EXPECT_EQ(4, pixel_size);
-  EXPECT_EQ(16, row_bytes);
-}
-
-TEST_F(VirtioGpuTest, SetConstraints) {
-  image_t image = {};
-  image.pixel_format = ZX_PIXEL_FORMAT_RGB_x888;
-  image.width = 4;
-  image.height = 4;
   display_controller_impl_protocol_t proto;
   EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
                                     reinterpret_cast<void*>(&proto)));
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &image,
-                                                         client_channel_.channel().get()));
+
+  // Import buffer collection.
+  constexpr uint64_t kBufferCollectionId = 1u;
+  ImportBufferCollection(kBufferCollectionId);
+
+  // Set buffer collection constraints.
+  const image_t kDefaultImage = {
+      .width = 4,
+      .height = 4,
+      .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
+      .type = IMAGE_TYPE_SIMPLE,
+      .handle = 0,
+  };
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints2(device_.get(), &kDefaultImage,
+                                                          kBufferCollectionId));
+  RunLoopUntilIdle();
+
+  PerformBlockingWork([&] {
+    zx::result buffer_info_result =
+        device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0, &kDefaultImage);
+    ASSERT_OK(buffer_info_result);
+
+    const auto& buffer_info = buffer_info_result.value();
+    EXPECT_EQ(4, buffer_info.bytes_per_pixel);
+    EXPECT_EQ(16, buffer_info.bytes_per_row);
+  });
+}
+
+TEST_F(VirtioGpuTest, SetConstraints) {
+  display_controller_impl_protocol_t proto;
+  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
+                                    reinterpret_cast<void*>(&proto)));
+
+  // Import buffer collection.
+  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
+  ASSERT_TRUE(token_endpoints.is_ok());
+  constexpr uint64_t kBufferCollectionId = 1u;
+  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBufferCollectionId,
+                                                token_endpoints->client.handle()->get()));
+  RunLoopUntilIdle();
+
+  // Set buffer collection constraints.
+  const image_t kDefaultImage = {
+      .width = 4,
+      .height = 4,
+      .pixel_format = ZX_PIXEL_FORMAT_RGB_x888,
+      .type = IMAGE_TYPE_SIMPLE,
+      .handle = 0,
+  };
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints2(device_.get(), &kDefaultImage,
+                                                          kBufferCollectionId));
+  RunLoopUntilIdle();
 }
 
 void ExpectHandlesArePaired(zx_handle_t lhs, zx_handle_t rhs) {
@@ -293,12 +302,9 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
 }
 
 TEST_F(VirtioGpuTest, ImportBufferCollection) {
-  EXPECT_TRUE(PollUntil([&]() { return fake_sysmem_.GetLatestMockAllocator() != nullptr; },
-                        zx::msec(5), 1000));
-
   // This allocator is expected to be alive as long as the `device_` is
   // available, so it should outlive the test body.
-  const MockAllocator* allocator = fake_sysmem_.GetLatestMockAllocator();
+  const MockAllocator* allocator = fake_sysmem_->GetLatestMockAllocator();
 
   zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
@@ -319,9 +325,8 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
                                                 token2_endpoints->client.handle()->get()),
             ZX_ERR_ALREADY_EXISTS);
 
-  EXPECT_TRUE(
-      PollUntil([&]() { return !allocator->GetActiveBufferCollectionTokenClients().empty(); },
-                zx::msec(5), 1000));
+  RunLoopUntilIdle();
+  EXPECT_TRUE(!allocator->GetActiveBufferCollectionTokenClients().empty());
 
   // Verify that the current buffer collection token is used.
   {
@@ -341,9 +346,8 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
             ZX_ERR_NOT_FOUND);
   EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kValidBufferCollectionId));
 
-  EXPECT_TRUE(
-      PollUntil([&]() { return allocator->GetActiveBufferCollectionTokenClients().empty(); },
-                zx::msec(5), 1000));
+  RunLoopUntilIdle();
+  EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());
 
   // Verify that the current buffer collection token is released.
   {
@@ -359,12 +363,9 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
 }
 
 TEST_F(VirtioGpuTest, ImportImage) {
-  EXPECT_TRUE(PollUntil([&]() { return fake_sysmem_.GetLatestMockAllocator() != nullptr; },
-                        zx::msec(5), 1000));
-
   // This allocator is expected to be alive as long as the `device_` is
   // available, so it should outlive the test body.
-  const MockAllocator* allocator = fake_sysmem_.GetLatestMockAllocator();
+  const MockAllocator* allocator = fake_sysmem_->GetLatestMockAllocator();
 
   zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
@@ -377,9 +378,9 @@ TEST_F(VirtioGpuTest, ImportImage) {
   constexpr uint64_t kBufferCollectionId = 1u;
   EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBufferCollectionId,
                                                 token1_endpoints->client.handle()->get()));
-  EXPECT_TRUE(
-      PollUntil([&]() { return !allocator->GetActiveBufferCollectionTokenClients().empty(); },
-                zx::msec(5), 1000));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(!allocator->GetActiveBufferCollectionTokenClients().empty());
 
   // Set buffer collection constraints.
   const image_t kDefaultImage = {
@@ -391,20 +392,25 @@ TEST_F(VirtioGpuTest, ImportImage) {
   };
   EXPECT_OK(proto.ops->set_buffer_collection_constraints2(device_.get(), &kDefaultImage,
                                                           kBufferCollectionId));
+  RunLoopUntilIdle();
 
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
   uint64_t kInvalidCollectionId = 100;
-  EXPECT_EQ(
-      proto.ops->import_image2(device_.get(), &invalid_image, kInvalidCollectionId, /*index=*/0),
-      ZX_ERR_NOT_FOUND);
+  PerformBlockingWork([&] {
+    EXPECT_EQ(
+        proto.ops->import_image2(device_.get(), &invalid_image, kInvalidCollectionId, /*index=*/0),
+        ZX_ERR_NOT_FOUND);
+  });
 
   // Invalid import: bad index
   invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
-  EXPECT_EQ(
-      proto.ops->import_image2(device_.get(), &invalid_image, kBufferCollectionId, kInvalidIndex),
-      ZX_ERR_OUT_OF_RANGE);
+  PerformBlockingWork([&] {
+    EXPECT_EQ(
+        proto.ops->import_image2(device_.get(), &invalid_image, kBufferCollectionId, kInvalidIndex),
+        ZX_ERR_OUT_OF_RANGE);
+  });
 
   // TODO(fxbug.dev/122727): Implement fake ring-buffer based tests so that we
   // can test the valid import case.
@@ -412,9 +418,8 @@ TEST_F(VirtioGpuTest, ImportImage) {
   // Release buffer collection.
   EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBufferCollectionId));
 
-  EXPECT_TRUE(
-      PollUntil([&]() { return allocator->GetActiveBufferCollectionTokenClients().empty(); },
-                zx::msec(5), 1000));
+  RunLoopUntilIdle();
+  EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());
 }
 
 }  // namespace

@@ -48,10 +48,14 @@ class GpuDevice : public Device,
 
   const char* tag() const override { return "virtio-gpu"; }
 
-  zx_status_t GetVmoAndStride(image_t* image,
-                              fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> client_end,
-                              uint32_t index, zx::vmo* vmo_out, size_t* offset_out,
-                              uint32_t* pixel_size_out, uint32_t* row_bytes_out) const;
+  struct BufferInfo {
+    zx::vmo vmo = {};
+    size_t offset = 0;
+    uint32_t bytes_per_pixel = 0;
+    uint32_t bytes_per_row = 0;
+  };
+  zx::result<BufferInfo> GetAllocatedBufferInfoForImage(uint64_t collection_id, uint32_t index,
+                                                        const image_t* image) const;
 
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
@@ -66,7 +70,9 @@ class GpuDevice : public Device,
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
 
   zx_status_t DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
-                                               uint32_t index);
+                                               uint32_t index) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
                                                 uint32_t index);
@@ -98,7 +104,9 @@ class GpuDevice : public Device,
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel sysmem_handle);
 
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
-                                                                  zx_unowned_handle_t collection);
+                                                                  zx_unowned_handle_t collection) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
                                                                    uint64_t collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);

@@ -72,6 +72,7 @@ test("virtio-gpu-test") {
   deps = [
     ":gpu_lib",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",
+    "//sdk/lib/async-loop-testing/cpp",
     "//src/devices/bus/lib/virtio",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",

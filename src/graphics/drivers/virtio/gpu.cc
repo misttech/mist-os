@@ -89,50 +89,50 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
   display_controller_interface_on_displays_changed(intf, &args, 1, nullptr, 0, nullptr, 0, nullptr);
 }
 
-zx_status_t GpuDevice::GetVmoAndStride(
-    image_t* image, fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection> client_end,
-    uint32_t index, zx::vmo* vmo_out, size_t* offset_out, uint32_t* pixel_size_out,
-    uint32_t* row_bytes_out) const {
-  fidl::WireResult check_result = fidl::WireCall(client_end)->CheckBuffersAllocated();
+zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
+    uint64_t collection_id, uint32_t index, const image_t* image) const {
+  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& client =
+      buffer_collections_.at(collection_id);
+  fidl::WireResult check_result = client->CheckBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
     zxlogf(ERROR, "%s: failed to CheckBuffersAllocated %d", tag(), check_result.status());
-    return check_result.status();
+    return zx::error(check_result.status());
   }
   const auto& check_response = check_result.value();
   if (check_response.status == ZX_ERR_UNAVAILABLE) {
-    return ZX_ERR_SHOULD_WAIT;
+    return zx::error(ZX_ERR_SHOULD_WAIT);
   }
   if (check_response.status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to CheckBuffersAllocated call %d", tag(), check_response.status);
-    return check_response.status;
+    return zx::error(check_response.status);
   }
 
-  auto wait_result = fidl::WireCall(client_end)->WaitForBuffersAllocated();
+  auto wait_result = client->WaitForBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
     zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated %d", tag(), wait_result.status());
-    return wait_result.status();
+    return zx::error(wait_result.status());
   }
   auto& wait_response = wait_result.value();
   if (wait_response.status != ZX_OK) {
     zxlogf(ERROR, "%s: failed to WaitForBuffersAllocated call %d", tag(), wait_response.status);
-    return wait_response.status;
+    return zx::error(wait_response.status);
   }
   fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
       wait_response.buffer_collection_info;
 
   if (!collection_info.settings.has_image_format_constraints) {
     zxlogf(ERROR, "%s: bad image format constraints", tag());
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   if (index >= collection_info.buffer_count) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
   ZX_DEBUG_ASSERT(collection_info.settings.image_format_constraints.pixel_format.type ==
@@ -147,14 +147,15 @@ zx_status_t GpuDevice::GetVmoAndStride(
   uint32_t minimum_row_bytes;
   if (!ImageFormatMinimumRowBytes(format_constraints, image->width, &minimum_row_bytes)) {
     zxlogf(ERROR, "%s: Invalid image width %d for collection", tag(), image->width);
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  *offset_out = collection_info.buffers[index].vmo_usable_start;
-  *pixel_size_out = ImageFormatStrideBytesPerWidthPixel(format_constraints.pixel_format);
-  *row_bytes_out = minimum_row_bytes;
-  *vmo_out = std::move(collection_info.buffers[index].vmo);
-  return ZX_OK;
+  return zx::ok(BufferInfo{
+      .vmo = std::move(collection_info.buffers[index].vmo),
+      .offset = collection_info.buffers[index].vmo_usable_start,
+      .bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(format_constraints.pixel_format),
+      .bytes_per_row = minimum_row_bytes,
+  });
 }
 
 zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(uint64_t collection_id,
@@ -203,22 +204,15 @@ zx_status_t GpuDevice::DisplayControllerImplImportImage2(image_t* image, uint64_
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplImportImage(image, it->second.client_end().borrow().handle()->get(),
-                                          index);
-}
 
-zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image, zx_unowned_handle_t handle,
-                                                        uint32_t index) {
-  zx::vmo vmo;
-  size_t offset;
-  uint32_t pixel_size;
-  uint32_t row_bytes;
-  zx_status_t status =
-      GetVmoAndStride(image, fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>{handle},
-                      index, &vmo, &offset, &pixel_size, &row_bytes);
-  if (status != ZX_OK)
-    return status;
-  return Import(std::move(vmo), image, offset, pixel_size, row_bytes);
+  zx::result<BufferInfo> buffer_info_result =
+      GetAllocatedBufferInfoForImage(collection_id, index, image);
+  if (!buffer_info_result.is_ok()) {
+    return buffer_info_result.error_value();
+  }
+  BufferInfo& buffer_info = buffer_info_result.value();
+  return Import(std::move(buffer_info.vmo), image, buffer_info.offset, buffer_info.bytes_per_pixel,
+                buffer_info.bytes_per_row);
 }
 
 zx_status_t GpuDevice::Import(zx::vmo vmo, image_t* image, size_t offset, uint32_t pixel_size,
@@ -335,12 +329,7 @@ zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints2(
            collection_id);
     return ZX_ERR_NOT_FOUND;
   }
-  return DisplayControllerImplSetBufferCollectionConstraints(
-      config, it->second.client_end().borrow().handle()->get());
-}
 
-zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, zx_unowned_handle_t collection) {
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.display = fuchsia_sysmem::wire::kDisplayUsageLayer;
   constraints.has_buffer_memory_constraints = true;
@@ -377,10 +366,7 @@ zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(
   image_constraints.display_width_divisor = 1;
   image_constraints.display_height_divisor = 1;
 
-  zx_status_t status = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollection>{
-                                          zx::unowned_channel{collection}})
-                           ->SetConstraints(true, constraints)
-                           .status();
+  zx_status_t status = it->second->SetConstraints(true, constraints).status();
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "virtio::GpuDevice: Failed to set constraints");
