@@ -56,7 +56,7 @@ static_library("arch") {
     "lbr.cc",
   ]
 
-  if (is_kernel) {
+  if (is_fuchsia || is_kernel) {
     deps = [ zircon_cpu ]
   }
 }

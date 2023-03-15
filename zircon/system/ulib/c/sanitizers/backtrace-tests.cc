@@ -218,73 +218,79 @@ class Collector {
   size_t baseline_ = 0, count_ = 0;
 };
 
-TEST(SanitizerFastBacktraceTests, BacktraceByFramePointer) {
+// These aren't just called SanitizerFastBacktraceTests because though they do
+// test the implementation underlying __sanitizer_fast_backtrace, they also
+// substantially just test libc's own invariants about how it sets up the
+// stacks and CFI annotations to be consistently backtrace-able from the entry
+// points both of various kinds of created threads, and of the initial thread.
+
+TEST(LibcBacktraceTests, BacktraceByFramePointer) {
   Collector bt(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(bt.Collect());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, BacktraceByShadowCallStack) {
+TEST(LibcBacktraceTests, BacktraceByShadowCallStack) {
   Collector bt(kByShadowCallStack);
   ASSERT_NO_FATAL_FAILURE(bt.Collect());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, BacktraceByUnwind) {
+TEST(LibcBacktraceTests, BacktraceByUnwind) {
   Collector bt(kByUnwind);
   ASSERT_NO_FATAL_FAILURE(bt.Collect());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, C11ThreadBacktraceByFramePointer) {
+TEST(LibcBacktraceTests, C11ThreadBacktraceByFramePointer) {
   Collector bt(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(bt.CollectC11Thread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, C11ThreadBacktraceByShadowCallStack) {
+TEST(LibcBacktraceTests, C11ThreadBacktraceByShadowCallStack) {
   Collector bt(kByShadowCallStack);
   ASSERT_NO_FATAL_FAILURE(bt.CollectC11Thread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, C11ThreadBacktraceByUnwind) {
+TEST(LibcBacktraceTests, C11ThreadBacktraceByUnwind) {
   Collector bt(kByUnwind);
   ASSERT_NO_FATAL_FAILURE(bt.CollectC11Thread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, PThreadBacktraceByFramePointer) {
+TEST(LibcBacktraceTests, PThreadBacktraceByFramePointer) {
   Collector bt(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(bt.CollectPThread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, PThreadBacktraceByShadowCallStack) {
+TEST(LibcBacktraceTests, PThreadBacktraceByShadowCallStack) {
   Collector bt(kByShadowCallStack);
   ASSERT_NO_FATAL_FAILURE(bt.CollectPThread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, PThreadBacktraceByUnwind) {
+TEST(LibcBacktraceTests, PThreadBacktraceByUnwind) {
   Collector bt(kByUnwind);
   ASSERT_NO_FATAL_FAILURE(bt.CollectPThread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, CppThreadBacktraceByFramePointer) {
+TEST(LibcBacktraceTests, CppThreadBacktraceByFramePointer) {
   Collector bt(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(bt.CollectCppThread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, CppThreadBacktraceByShadowCallStack) {
+TEST(LibcBacktraceTests, CppThreadBacktraceByShadowCallStack) {
   Collector bt(kByShadowCallStack);
   ASSERT_NO_FATAL_FAILURE(bt.CollectCppThread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
 }
 
-TEST(SanitizerFastBacktraceTests, CppThreadBacktraceByUnwind) {
+TEST(LibcBacktraceTests, CppThreadBacktraceByUnwind) {
   Collector bt(kByUnwind);
   ASSERT_NO_FATAL_FAILURE(bt.CollectCppThread());
   ASSERT_NO_FATAL_FAILURE(bt.Check());
@@ -373,7 +379,7 @@ void ExpectMatch(Collector& fp_collector, Collector& scs_collector, Collector& u
   }
 }
 
-TEST(SanitizerFastBacktraceTests, BacktraceMethodsMatch) {
+TEST(LibcBacktraceTests, BacktraceMethodsMatch) {
   Collector fp(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(fp.Collect());
 
@@ -389,7 +395,7 @@ TEST(SanitizerFastBacktraceTests, BacktraceMethodsMatch) {
   ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw, 1, kIncompleteFramePointers));
 }
 
-TEST(SanitizerFastBacktraceTests, C11ThreadBacktraceMethodsMatch) {
+TEST(LibcBacktraceTests, C11ThreadBacktraceMethodsMatch) {
   Collector fp(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(fp.CollectC11Thread());
 
@@ -402,7 +408,7 @@ TEST(SanitizerFastBacktraceTests, C11ThreadBacktraceMethodsMatch) {
   ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw));
 }
 
-TEST(SanitizerFastBacktraceTests, PThreadBacktraceMethodsMatch) {
+TEST(LibcBacktraceTests, PThreadBacktraceMethodsMatch) {
   Collector fp(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(fp.CollectPThread());
 
@@ -415,7 +421,7 @@ TEST(SanitizerFastBacktraceTests, PThreadBacktraceMethodsMatch) {
   ASSERT_NO_FATAL_FAILURE(ExpectMatch(fp, scs, unw));
 }
 
-TEST(SanitizerFastBacktraceTests, CppThreadBacktraceMethodsMatch) {
+TEST(LibcBacktraceTests, CppThreadBacktraceMethodsMatch) {
   Collector fp(kByFramePointer);
   ASSERT_NO_FATAL_FAILURE(fp.CollectCppThread());
 
