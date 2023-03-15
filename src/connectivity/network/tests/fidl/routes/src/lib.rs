@@ -20,7 +20,7 @@ use futures::{FutureExt, StreamExt};
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
 use net_types::{
     self,
-    ip::{GenericOverIp, Ip, IpInvariant, Ipv4Addr, Ipv6Addr},
+    ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
 };
 use netstack_testing_common::{
     interfaces,
@@ -333,6 +333,77 @@ fn assert_eq_unordered<T: Debug + Eq + Hash + PartialEq>(a: Vec<T>, b: Vec<T>) {
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
 const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
 
+// The initial IPv4 routes that are installed on the loopback interface.
+fn initial_loopback_routes_v4(
+    loopback_id: u64,
+) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv4>> {
+    [
+        new_installed_route(
+            net_subnet_v4!("127.0.0.0/8"),
+            loopback_id,
+            DEFAULT_INTERFACE_METRIC,
+            true,
+        ),
+        new_installed_route(
+            net_subnet_v4!("255.255.255.255/32"),
+            loopback_id,
+            DEFAULT_LOW_PRIORITY_METRIC,
+            false,
+        ),
+    ]
+    .into_iter()
+}
+
+// The initial IPv6 routes that are installed on the loopback interface.
+fn initial_loopback_routes_v6(
+    loopback_id: u64,
+) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv6>> {
+    [new_installed_route(net_subnet_v6!("::1/128"), loopback_id, DEFAULT_INTERFACE_METRIC, true)]
+        .into_iter()
+}
+
+// The initial IPv4 routes that are installed on an ethernet interface.
+fn initial_ethernet_routes_v4(
+    ethernet_id: u64,
+) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv4>> {
+    [
+        new_installed_route(
+            net_subnet_v4!("255.255.255.255/32"),
+            ethernet_id,
+            DEFAULT_LOW_PRIORITY_METRIC,
+            false,
+        ),
+        new_installed_route(
+            net_subnet_v4!("224.0.0.0/4"),
+            ethernet_id,
+            DEFAULT_INTERFACE_METRIC,
+            true,
+        ),
+    ]
+    .into_iter()
+}
+
+// The initial IPv6 routes that are installed on the ethernet interface.
+fn initial_ethernet_routes_v6(
+    ethernet_id: u64,
+) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv6>> {
+    [
+        new_installed_route(
+            net_subnet_v6!("fe80::/64"),
+            ethernet_id,
+            DEFAULT_INTERFACE_METRIC,
+            true,
+        ),
+        new_installed_route(
+            net_subnet_v6!("ff00::/8"),
+            ethernet_id,
+            DEFAULT_INTERFACE_METRIC,
+            true,
+        ),
+    ]
+    .into_iter()
+}
+
 // Verifies the startup behavior of the watcher protocols; including the
 // expected preinstalled routes.
 #[netstack_test]
@@ -342,42 +413,41 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
-    // The routes we expected to be installed in the netstack by default.
     let loopback_id = realm
         .loopback_properties()
         .await
         .expect("failed to get loopback properties")
         .expect("loopback properties unexpectedly None")
         .id;
+
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+    let interface_id = interface.id();
+    // TODO(https://fxbug.dev/123440) Netstack2 only installs certain routes
+    // after the interface is enabled.
+    interface.set_link_up(true).await.expect("bring device up");
+    assert!(interface.control().enable().await.expect("send enable").expect("enable interface"));
+
+    // The routes we expected to be installed in the netstack by default.
     #[derive(GenericOverIp)]
     struct RoutesHolder<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
         Vec<fnet_routes_ext::InstalledRoute<I>>,
     );
     let RoutesHolder(expected_routes) = I::map_ip(
-        IpInvariant(loopback_id),
-        |IpInvariant(loopback_id)| {
-            RoutesHolder(vec![
-                new_installed_route(
-                    net_subnet_v4!("127.0.0.0/8"),
-                    loopback_id,
-                    DEFAULT_INTERFACE_METRIC,
-                    true,
-                ),
-                new_installed_route(
-                    net_subnet_v4!("255.255.255.255/32"),
-                    loopback_id,
-                    DEFAULT_LOW_PRIORITY_METRIC,
-                    false,
-                ),
-            ])
+        IpInvariant((loopback_id, interface_id)),
+        |IpInvariant((loopback_id, interface_id))| {
+            RoutesHolder(
+                initial_loopback_routes_v4(loopback_id)
+                    .chain(initial_ethernet_routes_v4(interface_id))
+                    .collect::<Vec<_>>(),
+            )
         },
-        |IpInvariant(loopback_id)| {
-            RoutesHolder(vec![new_installed_route(
-                net_subnet_v6!("::1/128"),
-                loopback_id,
-                DEFAULT_INTERFACE_METRIC,
-                true,
-            )])
+        |IpInvariant((loopback_id, interface_id))| {
+            RoutesHolder(
+                initial_loopback_routes_v6(loopback_id)
+                    .chain(initial_ethernet_routes_v6(interface_id))
+                    .collect::<Vec<_>>(),
+            )
         },
     );
 

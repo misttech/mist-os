@@ -68,6 +68,22 @@ func ipv6LinkLocalOnLinkRoute(nicID tcpip.NICID) tcpip.Route {
 	return onLinkV6Route(nicID, header.IPv6LinkLocalPrefix.Subnet())
 }
 
+// The IPv4 Multicast Subnet (224.0.0.0/4), as defined in RFC 1112 section 4.
+func ipv4MulticastSubnet() tcpip.AddressWithPrefix {
+	return tcpip.AddressWithPrefix{
+		Address:   util.Parse("224.0.0.0"),
+		PrefixLen: 4,
+	}
+}
+
+// The IPv6 Multicast Subnet (ff00::/8), as defined in RFC 4291 section 2.7.
+func ipv6MulticastSubnet() tcpip.AddressWithPrefix {
+	return tcpip.AddressWithPrefix{
+		Address:   util.Parse("ff00::"),
+		PrefixLen: 8,
+	}
+}
+
 type stats struct {
 	tcpip.Stats
 	SocketCount      tcpip.StatCounter
@@ -1295,6 +1311,33 @@ func (ns *Netstack) addEndpoint(
 	}
 
 	ns.onInterfaceAddLocked(ifs, name)
+
+	if ifs.endpoint.Capabilities()&stack.CapabilityLoopback == 0 {
+		// Add initial routes to the IPv4 and IPv6 Multicast subnets. Note that
+		// these aren't strictly required to route multicast traffic bound to a
+		// particular interface (since gVisor has special-case logic in the
+		// forwarding pipeline to handle such traffic), but they are needed to
+		// forward multicast traffic when the interface is unspecified.
+		// They are also installed in Netstack3, so adding them here improves
+		// consistency between the two stacks.
+		ifs.ns.routeTable.AddRoute(
+			tcpip.Route{Destination: ipv4MulticastSubnet().Subnet(), NIC: ifs.nicid},
+			routes.MediumPreference,
+			ifs.metric,
+			true,  /* metricTracksInterface */
+			false, /* dynamic */
+			true,  /* enabled */
+		)
+		ifs.ns.routeTable.AddRoute(
+			tcpip.Route{Destination: ipv6MulticastSubnet().Subnet(), NIC: ifs.nicid},
+			routes.MediumPreference,
+			ifs.metric,
+			true,  /* metricTracksInterface */
+			false, /* dynamic */
+			true,  /* enabled */
+		)
+		ifs.ns.routeTable.UpdateStack(ifs.ns.stack, ifs.ns.resetDestinationCache)
+	}
 
 	return ifs, nil
 }

@@ -1269,6 +1269,30 @@ func TestDHCPAcquired(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The multicast subnet routes that are implicitly installed on all devices.
+	ipv4MulticastSubnetRoute := routes.ExtendedRoute{
+		Route: tcpip.Route{
+			Destination: ipv4MulticastSubnet().Subnet(),
+			NIC:         ifState.nicid,
+		},
+		Prf:                   routes.MediumPreference,
+		MetricTracksInterface: true,
+		Metric:                defaultInterfaceMetric,
+		Dynamic:               false,
+		Enabled:               true,
+	}
+	ipv6MulticastSubnetRoute := routes.ExtendedRoute{
+		Route: tcpip.Route{
+			Destination: ipv6MulticastSubnet().Subnet(),
+			NIC:         ifState.nicid,
+		},
+		Prf:                   routes.MediumPreference,
+		MetricTracksInterface: true,
+		Metric:                defaultInterfaceMetric,
+		Dynamic:               false,
+		Enabled:               true,
+	}
+
 	tests := []struct {
 		name               string
 		oldAddr, newAddr   tcpip.AddressWithPrefix
@@ -1302,7 +1326,7 @@ func TestDHCPAcquired(t *testing.T) {
 				{
 					Route: tcpip.Route{
 						Destination: destination1,
-						NIC:         1,
+						NIC:         ifState.nicid,
 					},
 					Prf:                   routes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
@@ -1310,11 +1334,13 @@ func TestDHCPAcquired(t *testing.T) {
 					Dynamic:               true,
 					Enabled:               false,
 				},
+				ipv4MulticastSubnetRoute,
+				ipv6MulticastSubnetRoute,
 				{
 					Route: tcpip.Route{
 						Destination: destination2,
 						Gateway:     util.Parse("192.168.42.18"),
-						NIC:         1,
+						NIC:         ifState.nicid,
 					},
 					Prf:                   routes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
@@ -1326,7 +1352,7 @@ func TestDHCPAcquired(t *testing.T) {
 					Route: tcpip.Route{
 						Destination: destination2,
 						Gateway:     util.Parse("192.168.42.19"),
-						NIC:         1,
+						NIC:         ifState.nicid,
 					},
 					Prf:                   routes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
@@ -1348,7 +1374,7 @@ func TestDHCPAcquired(t *testing.T) {
 				{
 					Route: tcpip.Route{
 						Destination: destination1,
-						NIC:         1,
+						NIC:         ifState.nicid,
 					},
 					Prf:                   routes.MediumPreference,
 					Metric:                defaultInterfaceMetric,
@@ -1356,6 +1382,8 @@ func TestDHCPAcquired(t *testing.T) {
 					Dynamic:               true,
 					Enabled:               false,
 				},
+				ipv4MulticastSubnetRoute,
+				ipv6MulticastSubnetRoute,
 			},
 		},
 	}

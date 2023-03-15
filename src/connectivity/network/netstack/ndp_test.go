@@ -137,11 +137,17 @@ func TestNDPIPv6OffLinkRoutePreferences(t *testing.T) {
 		{Destination: broadcastSubnet, NIC: ifs1.nicid},
 		{Destination: broadcastSubnet, NIC: ifs2.nicid},
 
+		{Destination: ipv4MulticastSubnet().Subnet(), NIC: ifs1.nicid},
+		{Destination: ipv4MulticastSubnet().Subnet(), NIC: ifs2.nicid},
+
 		ipv6LinkLocalOnLinkRoute(ifs1.nicid),
 		ipv6LinkLocalOnLinkRoute(ifs2.nicid),
 
 		r1,
 		r2,
+
+		{Destination: ipv6MulticastSubnet().Subnet(), NIC: ifs1.nicid},
+		{Destination: ipv6MulticastSubnet().Subnet(), NIC: ifs2.nicid},
 	}
 
 	ndpDisp.OnOffLinkRouteUpdated(r2.NIC, r2.Destination, r2.Gateway, header.LowRoutePreference)
@@ -151,8 +157,8 @@ func TestNDPIPv6OffLinkRoutePreferences(t *testing.T) {
 		t.Errorf("route table mismatch (-want +got):\n%s", diff)
 	}
 
-	// Flip the preferences for the routes.
-	expectedRouteTable[4], expectedRouteTable[5] = expectedRouteTable[5], expectedRouteTable[4]
+	// Flip the preferences of r1 and r2.
+	expectedRouteTable[6], expectedRouteTable[7] = expectedRouteTable[7], expectedRouteTable[6]
 	ndpDisp.OnOffLinkRouteUpdated(r2.NIC, r2.Destination, r2.Gateway, header.HighRoutePreference)
 	ndpDisp.OnOffLinkRouteUpdated(r1.NIC, r1.Destination, r1.Gateway, header.LowRoutePreference)
 	waitForEmptyQueue(ndpDisp)
