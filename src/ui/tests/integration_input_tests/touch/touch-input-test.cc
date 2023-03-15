@@ -13,6 +13,7 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
+#include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
@@ -112,6 +113,7 @@ using GfxEvent = fuchsia::ui::gfx::Event;
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
 using component_testing::ConfigValue;
+using component_testing::Directory;
 using component_testing::DirectoryContents;
 using component_testing::LocalComponentHandles;
 using component_testing::LocalComponentImpl;
@@ -801,12 +803,34 @@ class WebEngineTestIp : public TouchInputBase<> {
   // Routes needed to setup Chromium client.
   static std::vector<Route> GetWebEngineRoutes(ChildRef target) {
     return {
+        {
+            .capabilities =
+                {
+                    Protocol{fuchsia::logger::LogSink::Name_},
+                },
+            .source = ParentRef(),
+            .targets =
+                {
+                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
+                    ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
+                    ChildRef{kMockCobalt},
+                    // Not including kNetstack here, since it emits spurious
+                    // FATAL errors.
+                },
+        },
+        {.capabilities = {Protocol{fuchsia::process::Launcher::Name_}},
+         .source = ParentRef(),
+         .targets = {target}},
         {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
          .source = ChildRef{kMockResponseListener},
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
          .source = ChildRef{kFontsProvider},
          .targets = {target}},
+        {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
+                          Directory{.name = "config-data", .as = "config-data", .subdir = "fonts"}},
+         .source = ParentRef(),
+         .targets = {target, ChildRef{kFontsProvider}}},
         {.capabilities = {Protocol{fuchsia::ui::input::ImeService::Name_}},
          .source = ChildRef{kTextManager},
          .targets = {target}},
@@ -827,8 +851,9 @@ class WebEngineTestIp : public TouchInputBase<> {
         {.capabilities = {Protocol{fuchsia::web::ContextProvider::Name_}},
          .source = ChildRef{kWebContextProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::sys::Environment::Name_},
-                          Protocol{fuchsia::logger::LogSink::Name_}},
+        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+        // successful transition to CFv2.
+        {.capabilities = {Protocol{fuchsia::sys::Environment::Name_}},
          .source = ParentRef(),
          .targets = {target, ChildRef{kWebContextProvider}}},
         {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_}},
@@ -855,6 +880,12 @@ class WebEngineTestIp : public TouchInputBase<> {
         {.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
          .source = ChildRef{kIntl},
          .targets = {target}},
+        {.capabilities = {Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }},
+         .source = ParentRef(),
+         .targets = {ChildRef{kWebContextProvider}}},
     };
   }
 

@@ -57,6 +57,7 @@ executable("text-input-test-bin") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_hlcpp",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_hlcpp",
     "//sdk/fidl/fuchsia.sys:fuchsia.sys_hlcpp",

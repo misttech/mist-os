@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/chromium/web_engine/meta/shards/test/launch_context_provider.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "sys/testing/system-test.shard.cml",
@@ -18,8 +19,11 @@
             protocol: [
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
-                "fuchsia.posix.socket.Provider",
+                "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
+
+                // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+                // successful transition to CFv2.
                 "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.tracing.provider.Registry",
@@ -28,6 +32,14 @@
             ],
             from: "parent",
             to: "#realm_builder",
+        },
+        {
+            // Required for `fonts_provider` to provide fonts.
+            directory: "config-data",
+            from: "parent",
+            as: "config-data",
+            to: "#realm_builder",
+            availability: "required",
         },
     ],
     facets: {

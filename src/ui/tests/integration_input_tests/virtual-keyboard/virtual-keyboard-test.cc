@@ -14,6 +14,7 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
+#include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
@@ -113,10 +114,14 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
     config.ui_to_client_services = protocols_required;
     config.passthrough_capabilities = {
-        {
-            Protocol{fuchsia::sys::Environment::Name_},
-        },
-    };
+        {Protocol{fuchsia::process::Launcher::Name_},
+         // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" from all of
+         // these after successful transition to CFv2.
+         Protocol{fuchsia::sys::Environment::Name_},
+         Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }}};
     configs.push_back(std::move(config));
   }
 
@@ -128,10 +133,11 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
     config.ui_to_client_services = protocols_required;
     config.passthrough_capabilities = {
-        {
-            Protocol{fuchsia::sys::Environment::Name_},
-        },
-    };
+        {Protocol{fuchsia::process::Launcher::Name_}, Protocol{fuchsia::sys::Environment::Name_},
+         Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }}};
     configs.push_back(std::move(config));
   }
 
@@ -146,12 +152,13 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Flatland::Name_);
     config.ui_to_client_services.push_back(fuchsia::ui::composition::Allocator::Name_);
     config.passthrough_capabilities = {
-        {
-            Protocol{fuchsia::sys::Environment::Name_},
-        },
-    };
-    configs.push_back(std::move(config));
+        {Protocol{fuchsia::process::Launcher::Name_}, Protocol{fuchsia::sys::Environment::Name_},
+         Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }}};
   }
+
   return configs;
 }
 
@@ -417,6 +424,21 @@ class WebEngineTest : public VirtualKeyboardBase {
   // Routes needed to setup Chromium client.
   static std::vector<Route> GetWebEngineRoutes(ChildRef target) {
     return {
+        {
+            .capabilities =
+                {
+                    Protocol{fuchsia::logger::LogSink::Name_},
+                },
+            .source = ParentRef(),
+            .targets =
+                {
+                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
+                    ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
+                    ChildRef{kMockCobalt},
+                    // Not including kNetstack here, since it emits spurious
+                    // FATAL errors.
+                },
+        },
         {.capabilities = {Protocol{test::virtualkeyboard::InputPositionListener::Name_}},
          .source = ChildRef{kResponseListener},
          .targets = {target}},
@@ -424,13 +446,13 @@ class WebEngineTest : public VirtualKeyboardBase {
          .source = ChildRef{kFontsProvider},
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
-                          Protocol{fuchsia::logger::LogSink::Name_},
                           Directory{.name = "config-data",
                                     .rights = fuchsia::io::R_STAR_DIR,
                                     .path = "/config/data"}},
          .source = ParentRef(),
          .targets = {ChildRef{kFontsProvider}}},
-        {.capabilities = {Protocol{fuchsia::ui::input3::Keyboard::Name_},
+        {.capabilities = {Protocol{fuchsia::process::Launcher::Name_},
+                          Protocol{fuchsia::ui::input3::Keyboard::Name_},
                           Protocol{fuchsia::ui::input::ImeService::Name_}},
          .source = ParentRef(),
          .targets = {target}},
@@ -467,22 +489,29 @@ class WebEngineTest : public VirtualKeyboardBase {
         {.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
          .source = ParentRef(),
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
-                          Protocol{fuchsia::ui::composition::Allocator::Name_}},
+        {.capabilities = {Protocol{fuchsia::ui::composition::Allocator::Name_},
+                          Protocol{fuchsia::ui::composition::Flatland::Name_}},
          .source = ParentRef(),
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target, ChildRef{kWebContextProvider}}},
+        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+        // successful transition to CFv2.
         {
             .capabilities =
                 {
-                    Protocol{fuchsia::logger::LogSink::Name_},
                     Protocol{fuchsia::sys::Environment::Name_},
                 },
             .source = ParentRef(),
             .targets = {ChildRef{kWebContextProvider}},
         },
+        {.capabilities = {Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }},
+         .source = ParentRef(),
+         .targets = {ChildRef{kWebContextProvider}}},
     };
   }
 

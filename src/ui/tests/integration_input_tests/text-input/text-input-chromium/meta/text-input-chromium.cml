@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/chromium/web_engine/meta/shards/test/launch_context_provider.shard.cml",
         "//src/chromium/web_engine/meta/shards/web_engine_base.shard.cml",
+        "//src/chromium/web_engine/meta/shards/web_engine_feature_keyboard.shard.cml",
         "//src/chromium/web_engine/meta/shards/web_engine_feature_network.shard.cml",
+        "//src/chromium/web_engine/meta/shards/web_engine_feature_vulkan.shard.cml",
         "//src/chromium/web_engine/meta/shards/web_engine_view.shard.cml",
         "sys/component/realm_builder.shard.cml",
-        "syslog/client.shard.cml",
     ],
     program: {
         runner: "elf",
@@ -21,24 +23,8 @@
     use: [
         {
             protocol: [
-                "fuchsia.accessibility.semantics.SemanticsManager",
-                "fuchsia.buildinfo.Provider",
-                "fuchsia.fonts.Provider",
-                "fuchsia.input.virtualkeyboard.ControllerCreator",
-                "fuchsia.intl.PropertyProvider",
-                "fuchsia.logger.LogSink",
-                "fuchsia.memorypressure.Provider",
-                "fuchsia.net.interfaces.State",
-                "fuchsia.posix.socket.Provider",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.ui.composition.Allocator",
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input.ImeService",
-                "fuchsia.ui.input3.Keyboard",
-                "fuchsia.ui.scenic.Scenic",
+                // Used by the test.
                 "fuchsia.ui.test.input.KeyboardInputListener",
-                "fuchsia.vulkan.loader.Loader",
-                "fuchsia.web.ContextProvider",
             ],
         },
     ],

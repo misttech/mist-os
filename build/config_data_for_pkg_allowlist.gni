@@ -87,6 +87,7 @@ config_data_for_pkg_allowlist = [
   "system-update-committer",
   "tee_manager",
   "text-input-test",
+  "touch-input-test",
   "triage-detect",
   "tz_version_parrot",
   "tzdata-test",

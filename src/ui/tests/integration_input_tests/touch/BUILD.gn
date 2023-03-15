@@ -5,6 +5,15 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/flutter/config.gni")
+import("//src/fonts/build/fonts.gni")
+
+font_collection("single-font-collection") {
+  testonly = true
+  product_config_path =
+      "//src/ui/testing/data/single-font-collection.fontcfg.json5"
+  local_asset_names = [ "Roboto-Regular.ttf" ]
+  font_service_pkg = "touch-input-test"
+}
 
 executable("touch-input-test-bin") {
   testonly = true
@@ -23,6 +32,7 @@ executable("touch-input-test-bin") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_hlcpp",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
@@ -65,6 +75,7 @@ fuchsia_test_component("touch-input-test-component") {
 fuchsia_test_package("touch-input-test") {
   test_components = [ ":touch-input-test-component" ]
   deps = [
+    ":single-font-collection",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",

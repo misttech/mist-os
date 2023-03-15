@@ -17,6 +17,7 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
+#include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
 #include <fuchsia/sys/cpp/fidl.h>
@@ -387,16 +388,18 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
     config.use_input = true;
     config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
     config.passthrough_capabilities = {
-        {
-            // Uncomment the configuration below if you want to run chrome remote
-            // devtools. See README.md for details.
-            // Protocol{fuchsia::posix::socket::Provider::Name_},
-            // Protocol{fuchsia::net::interfaces::State::Name_},
-            Protocol{fuchsia::kernel::Stats::Name_},
-            Protocol{fuchsia::sys::Environment::Name_},
-            Protocol{fuchsia::feedback::ComponentDataRegister::Name_},
-            Protocol{fuchsia::feedback::CrashReportingProductRegister::Name_},
-        },
+        {// Uncomment the configuration below if you want to run chrome remote
+         // devtools. See README.md for details.
+         // Protocol{fuchsia::posix::socket::Provider::Name_},
+         // Protocol{fuchsia::net::interfaces::State::Name_},
+         Protocol{fuchsia::kernel::Stats::Name_}, Protocol{fuchsia::process::Launcher::Name_},
+         Protocol{fuchsia::feedback::ComponentDataRegister::Name_},
+         Protocol{fuchsia::feedback::CrashReportingProductRegister::Name_},
+         Protocol{fuchsia::sys::Environment::Name_},
+         Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }},
     };
     config.ui_to_client_services = {
         fuchsia::accessibility::semantics::SemanticsManager::Name_,
@@ -633,6 +636,7 @@ class ChromiumInputTest : public ChromiumInputBase {
         },
         {.capabilities =
              {
+                 Protocol{fuchsia::process::Launcher::Name_},
                  Protocol{fuchsia::ui::composition::Allocator::Name_},
                  Protocol{fuchsia::ui::composition::Flatland::Name_},
                  Protocol{fuchsia::vulkan::loader::Loader::Name_},
@@ -673,6 +677,8 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Protocol{fuchsia::accessibility::semantics::SemanticsManager::Name_}},
          .source = ParentRef(),
          .targets = {target}},
+        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+        // successful transition to CFv2.
         {.capabilities = {Protocol{fuchsia::sys::Environment::Name_}},
          .source = ParentRef(),
          .targets = {target, ChildRef{kWebContextProvider}}},
@@ -703,6 +709,12 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target, ChildRef{kWebContextProvider}}},
+        {.capabilities = {Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }},
+         .source = ParentRef(),
+         .targets = {ChildRef{kWebContextProvider}}},
     };
   }
 
