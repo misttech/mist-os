@@ -613,6 +613,49 @@ impl FileOps for MagmaFile {
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_PERFORM_BUFFER_OP => {
+                let (control, mut response): (
+                    virtio_magma_connection_perform_buffer_op_ctrl_t,
+                    virtio_magma_connection_perform_buffer_op_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                response.result_return = unsafe {
+                    magma_connection_perform_buffer_op(
+                        control.connection as magma_connection_t,
+                        control.buffer,
+                        control.options,
+                        control.start_offset,
+                        control.length,
+                    ) as u64
+                };
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_PERFORM_BUFFER_OP as u32;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_INFO => {
+                let (control, mut response): (
+                    virtio_magma_buffer_get_info_ctrl_t,
+                    virtio_magma_buffer_get_info_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                let mut buffer_info = magma_buffer_info_t { committed_byte_count: 0, size: 0 };
+
+                let status = unsafe { magma_buffer_get_info(control.buffer, &mut buffer_info) };
+
+                if status == MAGMA_STATUS_OK {
+                    current_task.mm.write_object(
+                        UserRef::<magma_buffer_info_t>::new(UserAddress::from(control.info_out)),
+                        &buffer_info,
+                    )?;
+                }
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_INFO as u32;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
             t => {
                 log_warn!(current_task, "Got unknown request: {:?}", t);
                 error!(ENOSYS)

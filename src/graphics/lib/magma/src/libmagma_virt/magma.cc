@@ -184,7 +184,26 @@ magma_status_t magma_connection_execute_immediate_commands(
 }
 
 magma_status_t magma_buffer_get_info(magma_buffer_t buffer, magma_buffer_info_t* info_out) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
+  auto buffer_wrapped = virtmagma_buffer_t::Get(buffer);
+
+  virtio_magma_buffer_get_info_ctrl_t request{
+      .hdr = {.type = VIRTIO_MAGMA_CMD_BUFFER_GET_INFO},
+      .buffer = reinterpret_cast<uint64_t>(buffer_wrapped->Object()),
+      .info_out = reinterpret_cast<uintptr_t>(info_out),
+  };
+  virtio_magma_buffer_get_info_resp_t response{};
+
+  auto connection_wrapped = virtmagma_connection_t::Get(buffer_wrapped->Parent());
+
+  if (!virtmagma_send_command(connection_wrapped->Parent().fd(), &request, sizeof(request),
+                              &response, sizeof(response))) {
+    assert(false);
+    return DRET(MAGMA_STATUS_INTERNAL_ERROR);
+  }
+  if (response.hdr.type != VIRTIO_MAGMA_RESP_BUFFER_GET_INFO)
+    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Wrong response header: %u", response.hdr.type);
+
+  return static_cast<magma_status_t>(response.result_return);
 }
 
 magma_status_t magma_initialize_tracing(magma_handle_t channel) {

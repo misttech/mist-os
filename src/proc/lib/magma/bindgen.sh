@@ -17,7 +17,7 @@ readonly RAW_LINES="// Copyright 2021 The Fuchsia Authors. All rights reserved.
 use zerocopy::{AsBytes, FromBytes};
 
 // TODO: BEGIN remove these hardcoded values when bindgen is fixed
-pub const MAGMA_STATUS_OK: u32 = 0;
+pub const MAGMA_STATUS_OK: i32 = 0;
 pub const MAGMA_STATUS_INVALID_ARGS: i32 = -2;
 pub const MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: u32 = 1;
 pub const MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE: u32 = 2;

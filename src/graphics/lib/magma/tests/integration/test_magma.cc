@@ -384,10 +384,6 @@ class TestConnection {
   }
 
   void BufferMapDuplicates(int count) {
-    if (is_virtmagma())
-      // TODO(fxbug.dev/13278); only images can be exported
-      GTEST_SKIP();
-
     ASSERT_TRUE(connection_);
 
     bool is_intel_or_vsi = false;
@@ -1405,9 +1401,6 @@ TEST_F(Magma, BufferImportExport) {
   TestConnection test1;
   TestConnection test2;
 
-  if (test1.is_virtmagma())
-    GTEST_SKIP();  // TODO(fxbug.dev/13278)
-
   uint32_t handle;
   uint64_t exported_id;
   test1.BufferExport(&handle, &exported_id);
@@ -1483,11 +1476,7 @@ TEST_F(Magma, EnablePerformanceCounters) { TestConnection().EnablePerformanceCou
 
 TEST_F(Magma, DisabledPerformanceCounters) { TestConnection().DisabledPerformanceCounters(); }
 
-TEST_F(Magma, CommitBuffer) {
-#if !defined(__Fuchsia__)
-  // magma_buffer_get_info is only implemented on Fuchsia.
-  GTEST_SKIP();
-#endif
+TEST_F(Magma, BufferCommit) {
   TestConnection connection;
   magma_buffer_t buffer;
   uint64_t size_out;
@@ -1495,10 +1484,12 @@ TEST_F(Magma, CommitBuffer) {
   uint64_t buffer_id;
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection.connection(), buffer_size,
                                                             &size_out, &buffer, &buffer_id));
-  magma_buffer_info_t info;
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
-  EXPECT_EQ(info.size, buffer_size);
-  EXPECT_EQ(0u, info.committed_byte_count);
+  {
+    magma_buffer_info_t info;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
+    EXPECT_EQ(info.size, buffer_size);
+    EXPECT_EQ(0u, info.committed_byte_count);
+  }
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
             magma_connection_perform_buffer_op(connection.connection(), buffer,
@@ -1509,8 +1500,11 @@ TEST_F(Magma, CommitBuffer) {
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_perform_buffer_op(connection.connection(), buffer,
                                                                 MAGMA_BUFFER_RANGE_OP_COMMIT,
                                                                 page_size(), page_size()));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
-  EXPECT_EQ(page_size(), info.committed_byte_count);
+  {
+    magma_buffer_info_t info;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
+    EXPECT_EQ(page_size(), info.committed_byte_count);
+  }
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
             magma_connection_perform_buffer_op(connection.connection(), buffer,
@@ -1522,14 +1516,20 @@ TEST_F(Magma, CommitBuffer) {
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_perform_buffer_op(connection.connection(), buffer,
                                                                 MAGMA_BUFFER_RANGE_OP_DECOMMIT,
                                                                 2 * page_size(), page_size()));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
-  EXPECT_EQ(page_size(), info.committed_byte_count);
+  {
+    magma_buffer_info_t info;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
+    EXPECT_EQ(page_size(), info.committed_byte_count);
+  }
 
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_perform_buffer_op(connection.connection(), buffer,
                                                                 MAGMA_BUFFER_RANGE_OP_DECOMMIT,
                                                                 page_size(), page_size()));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
-  EXPECT_EQ(0u, info.committed_byte_count);
+  {
+    magma_buffer_info_t info;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
+    EXPECT_EQ(0u, info.committed_byte_count);
+  }
 
   magma_connection_release_buffer(connection.connection(), buffer);
 }

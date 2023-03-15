@@ -335,7 +335,7 @@ pub fn export_buffer(
             &mut buffer_handle_out as *mut magma_handle_t,
         )
     };
-    if status as u32 == MAGMA_STATUS_OK {
+    if status == MAGMA_STATUS_OK {
         let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) };
 
         let mut image_info_opt: Option<ImageInfo> = None;
@@ -405,7 +405,7 @@ pub fn get_buffer_handle(
         )
     };
 
-    if status != MAGMA_STATUS_OK as i32 {
+    if status != MAGMA_STATUS_OK {
         response.result_return = status as u64;
     } else {
         let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) };

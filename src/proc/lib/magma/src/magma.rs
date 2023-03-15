@@ -7,7 +7,7 @@
 use zerocopy::{AsBytes, FromBytes};
 
 // TODO: BEGIN remove these hardcoded values when bindgen is fixed
-pub const MAGMA_STATUS_OK: u32 = 0;
+pub const MAGMA_STATUS_OK: i32 = 0;
 pub const MAGMA_STATUS_INVALID_ARGS: i32 = -2;
 pub const MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE: u32 = 1;
 pub const MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE: u32 = 2;
@@ -236,6 +236,12 @@ pub struct virtmagma_create_image_wrapper {
 pub struct virtmagma_get_image_info_wrapper {
     pub image_info_out: __u64,
     pub image_info_size: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct virtmagma_buffer_get_info_wrapper {
+    pub buffer_info_out: __u64,
+    pub buffer_info_size: __u64,
 }
 pub type __u_char = ::std::os::raw::c_uchar;
 pub type __u_short = ::std::os::raw::c_ushort;
@@ -1419,13 +1425,13 @@ pub type virtio_magma_buffer_set_name_resp_t = virtio_magma_buffer_set_name_resp
 pub struct virtio_magma_buffer_get_info_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
+    pub info_out: u64,
 }
 pub type virtio_magma_buffer_get_info_ctrl_t = virtio_magma_buffer_get_info_ctrl;
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct virtio_magma_buffer_get_info_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
-    pub info_out: u64,
     pub result_return: u64,
 }
 pub type virtio_magma_buffer_get_info_resp_t = virtio_magma_buffer_get_info_resp;

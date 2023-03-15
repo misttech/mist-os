@@ -67,6 +67,8 @@ def wire_width(type):
         width = 4
     if type.find('magma_image_info_t') != -1:
         width = 0  # Unknown
+    if type.find('magma_buffer_info_t') != -1:
+        width = 0  # Unknown
     return width
 
 
