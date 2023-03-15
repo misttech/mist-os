@@ -76,6 +76,9 @@ closed protocol CryptManagement {
 type MountOptions = resource struct {
     /// An optional connection to a crypt client (for encrypted volumes).
     crypt client_end:<Crypt, optional>;
+
+    /// If true, mount as a blob filesystem.
+    as_blob bool;
 };
 
 type CheckOptions = resource struct {

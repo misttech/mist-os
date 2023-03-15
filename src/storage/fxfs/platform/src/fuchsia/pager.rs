@@ -56,35 +56,35 @@ struct PortThread {
     port: Arc<zx::Port>,
 }
 
-pub struct Pager<T: PagerBackedVmo> {
+pub struct Pager {
     pager: zx::Pager,
-    inner: Arc<Mutex<Inner<T>>>,
+    inner: Arc<Mutex<Inner>>,
     port_thread: PortThread,
 }
 
-struct Inner<T: PagerBackedVmo> {
-    files: HashMap<u64, FileHolder<T>>,
+struct Inner {
+    files: HashMap<u64, FileHolder>,
 }
 
 // FileHolder is used to retain either a strong or a weak reference to a file.  If there are any
 // child VMOs that have been shared, then we will have a strong reference which is required to keep
 // the file alive.  When we detect that there are no more children, we can downgrade to a weak
 // reference which will allow the file to be cleaned up if there are no other uses.
-enum FileHolder<T: PagerBackedVmo> {
-    Strong(Arc<T>),
-    Weak(Weak<T>),
+enum FileHolder {
+    Strong(Arc<dyn PagerBackedVmo>),
+    Weak(Weak<dyn PagerBackedVmo>),
 }
 
-impl<T: PagerBackedVmo> FileHolder<T> {
-    fn as_ptr(&self) -> *const T {
+impl FileHolder {
+    fn as_ptr(&self) -> *const () {
         match self {
-            FileHolder::Strong(file) => Arc::as_ptr(file),
-            FileHolder::Weak(file) => Weak::as_ptr(file),
+            FileHolder::Strong(file) => Arc::as_ptr(file) as *const (),
+            FileHolder::Weak(file) => Weak::as_ptr(file) as *const (),
         }
     }
 }
 
-fn watch_for_zero_children<T: PagerBackedVmo>(port: &zx::Port, file: &T) -> Result<(), zx::Status> {
+fn watch_for_zero_children(port: &zx::Port, file: &dyn PagerBackedVmo) -> Result<(), zx::Status> {
     file.vmo().as_handle_ref().wait_async_handle(
         port,
         file.pager_key(),
@@ -93,14 +93,14 @@ fn watch_for_zero_children<T: PagerBackedVmo>(port: &zx::Port, file: &T) -> Resu
     )
 }
 
-impl<T: PagerBackedVmo> From<Arc<T>> for FileHolder<T> {
-    fn from(file: Arc<T>) -> FileHolder<T> {
+impl From<Arc<dyn PagerBackedVmo>> for FileHolder {
+    fn from(file: Arc<dyn PagerBackedVmo>) -> FileHolder {
         FileHolder::Strong(file)
     }
 }
 
-impl<T: PagerBackedVmo> From<Weak<T>> for FileHolder<T> {
-    fn from(file: Weak<T>) -> FileHolder<T> {
+impl From<Weak<dyn PagerBackedVmo>> for FileHolder {
+    fn from(file: Weak<dyn PagerBackedVmo>) -> FileHolder {
         FileHolder::Weak(file)
     }
 }
@@ -176,10 +176,7 @@ impl PagerExecutor {
 }
 
 impl PortThread {
-    fn start<T: PagerBackedVmo>(
-        executor: Arc<PagerExecutor>,
-        inner: Arc<Mutex<Inner<T>>>,
-    ) -> Result<Self, Error> {
+    fn start(executor: Arc<PagerExecutor>, inner: Arc<Mutex<Inner>>) -> Result<Self, Error> {
         let port = Arc::new(zx::Port::create());
         let port_clone = port.clone();
 
@@ -196,10 +193,10 @@ impl PortThread {
         &self.port
     }
 
-    fn thread_lifecycle<T: PagerBackedVmo>(
+    fn thread_lifecycle(
         executor: Arc<PagerExecutor>,
         port: Arc<zx::Port>,
-        inner: Arc<Mutex<Inner<T>>>,
+        inner: Arc<Mutex<Inner>>,
         terminate_event: Arc<DropEvent>,
     ) {
         debug!("Pager port thread started successfully");
@@ -237,11 +234,11 @@ impl PortThread {
         }
     }
 
-    fn receive_pager_packet<T: PagerBackedVmo>(
+    fn receive_pager_packet(
         key: u64,
         contents: PagerPacket,
         executor_handle: &fasync::EHandle,
-        inner: Arc<Mutex<Inner<T>>>,
+        inner: Arc<Mutex<Inner>>,
         terminate_event: &Arc<DropEvent>,
     ) {
         let command = contents.command();
@@ -279,10 +276,10 @@ impl PortThread {
         .detach();
     }
 
-    fn receive_signal_packet<T: PagerBackedVmo>(
+    fn receive_signal_packet(
         key: u64,
         signals: SignalPacket,
-        inner: Arc<Mutex<Inner<T>>>,
+        inner: Arc<Mutex<Inner>>,
         port: Arc<zx::Port>,
     ) {
         assert!(signals.observed().contains(zx::Signals::VMO_ZERO_CHILDREN));
@@ -336,7 +333,7 @@ impl Drop for PortThread {
 }
 
 /// Pager handles page requests. It is a per-volume object.
-impl<T: PagerBackedVmo> Pager<T> {
+impl Pager {
     pub fn new(executor: Arc<PagerExecutor>) -> Result<Self, Error> {
         let pager = zx::Pager::create(zx::PagerOptions::empty())?;
         let inner = Arc::new(Mutex::new(Inner { files: HashMap::default() }));
@@ -357,17 +354,21 @@ impl<T: PagerBackedVmo> Pager<T> {
     }
 
     /// Registers a file with the pager.
-    pub fn register_file(&self, file: &Arc<T>) -> u64 {
+    pub fn register_file(&self, file: &Arc<impl PagerBackedVmo>) -> u64 {
         let pager_key = file.pager_key();
-        self.inner.lock().unwrap().files.insert(pager_key, FileHolder::Weak(Arc::downgrade(file)));
+        self.inner
+            .lock()
+            .unwrap()
+            .files
+            .insert(pager_key, FileHolder::Weak(Arc::downgrade(file) as Weak<dyn PagerBackedVmo>));
         pager_key
     }
 
     /// Unregisters a file with the pager.
-    pub fn unregister_file(&self, file: &T) {
+    pub fn unregister_file(&self, file: &dyn PagerBackedVmo) {
         let mut inner = self.inner.lock().unwrap();
         if let Entry::Occupied(o) = inner.files.entry(file.pager_key()) {
-            if std::ptr::eq(file, o.get().as_ptr()) {
+            if std::ptr::eq(file as *const _ as *const (), o.get().as_ptr()) {
                 if let FileHolder::Strong(_) = o.remove() {
                     file.on_zero_children();
                 }
@@ -378,7 +379,7 @@ impl<T: PagerBackedVmo> Pager<T> {
     /// Starts watching for the `VMO_ZERO_CHILDREN` signal on `file`'s vmo. Returns false if the
     /// signal is already being watched for. When the pager receives the `VMO_ZERO_CHILDREN` signal
     /// [`PagerBacked::on_zero_children`] will be called.
-    pub fn watch_for_zero_children(&self, file: &T) -> Result<bool, Error> {
+    pub fn watch_for_zero_children(&self, file: &dyn PagerBackedVmo) -> Result<bool, Error> {
         let mut inner = self.inner.lock().unwrap();
         let file = inner.files.get_mut(&file.pager_key()).unwrap();
 
@@ -547,11 +548,11 @@ pub trait PagerBackedVmo: Sync + Send + 'static {
 
     /// Called by the pager when a `ZX_PAGER_VMO_READ` packet is received for the VMO. The
     /// implementation should respond by calling `Pager::supply_pages` or `Pager::report_failure`.
-    async fn page_in(self: &Arc<Self>, range: Range<u64>);
+    async fn page_in(self: Arc<Self>, range: Range<u64>);
 
     /// Called by the pager when a `ZX_PAGER_VMO_DIRTY` packet is received for the VMO. The
     /// implementation should respond by calling `Pager::dirty_pages` or `Pager::report_failure`.
-    async fn mark_dirty(self: &Arc<Self>, range: Range<u64>);
+    async fn mark_dirty(self: Arc<Self>, range: Range<u64>);
 
     /// Called by the pager to indicate there are no more VMO children.
     fn on_zero_children(&self);
@@ -599,6 +600,79 @@ impl PagerVmoStats {
     }
 }
 
+// Transfer buffers are to be used with supply_pages. supply_pages only works with pages that are
+// unmapped, but we need the pages to be mapped so that we can decrypt and potentially verify
+// checksums.  To keep things simple, the buffers are fixed size at 1 MiB which should cover most
+// requests.
+pub const TRANSFER_BUFFER_MAX_SIZE: u64 = 1_048_576;
+
+// The number of transfer buffers we support.
+const TRANSFER_BUFFER_COUNT: u64 = 8;
+
+pub struct TransferBuffers {
+    vmo: zx::Vmo,
+    free_list: Mutex<Vec<u64>>,
+    event: event_listener::Event,
+}
+
+impl TransferBuffers {
+    pub fn new() -> Self {
+        const VMO_SIZE: u64 = TRANSFER_BUFFER_COUNT * TRANSFER_BUFFER_MAX_SIZE;
+        Self {
+            vmo: zx::Vmo::create(VMO_SIZE).unwrap(),
+            free_list: Mutex::new(
+                (0..VMO_SIZE).step_by(TRANSFER_BUFFER_MAX_SIZE as usize).collect(),
+            ),
+            event: event_listener::Event::new(),
+        }
+    }
+
+    pub async fn get(&self) -> TransferBuffer<'_> {
+        loop {
+            let listener = self.event.listen();
+            if let Some(offset) = self.free_list.lock().unwrap().pop() {
+                return TransferBuffer { buffers: self, offset };
+            }
+            listener.await;
+        }
+    }
+}
+
+pub struct TransferBuffer<'a> {
+    buffers: &'a TransferBuffers,
+
+    // The offset this buffer starts at in the VMO.
+    offset: u64,
+}
+
+impl TransferBuffer<'_> {
+    pub fn vmo(&self) -> &zx::Vmo {
+        &self.buffers.vmo
+    }
+
+    pub fn offset(&self) -> u64 {
+        self.offset
+    }
+
+    // Allocating pages in the kernel is time-consuming, so it can help to commit pages first,
+    // whilst other work is occurring in the background, and then copy later which is relatively
+    // fast.
+    pub fn commit(&self, size: u64) {
+        let _ignore_error = self.buffers.vmo.op_range(
+            zx::VmoOp::COMMIT,
+            self.offset,
+            std::cmp::min(size, TRANSFER_BUFFER_MAX_SIZE),
+        );
+    }
+}
+
+impl Drop for TransferBuffer<'_> {
+    fn drop(&mut self) {
+        self.buffers.free_list.lock().unwrap().push(self.offset);
+        self.buffers.event.notify(1);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -611,11 +685,11 @@ mod tests {
     struct MockFile {
         vmo: zx::Vmo,
         pager_key: u64,
-        pager: Arc<Pager<Self>>,
+        pager: Arc<Pager>,
     }
 
     impl MockFile {
-        fn new(pager: Arc<Pager<Self>>, pager_key: u64) -> Self {
+        fn new(pager: Arc<Pager>, pager_key: u64) -> Self {
             let vmo = pager.create_vmo(pager_key, zx::system_get_page_size().into()).unwrap();
             Self { pager, vmo, pager_key }
         }
@@ -631,12 +705,12 @@ mod tests {
             &self.vmo
         }
 
-        async fn page_in(self: &Arc<Self>, range: Range<u64>) {
+        async fn page_in(self: Arc<Self>, range: Range<u64>) {
             let aux_vmo = zx::Vmo::create(range.end - range.start).unwrap();
             self.pager.supply_pages(&self.vmo, range, &aux_vmo, 0);
         }
 
-        async fn mark_dirty(self: &Arc<Self>, range: Range<u64>) {
+        async fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
             self.pager.dirty_pages(&self.vmo, range);
         }
 
@@ -647,7 +721,7 @@ mod tests {
     async fn test_do_not_unregister_a_file_that_has_been_replaced() {
         const PAGER_KEY: u64 = 1234;
         let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::<MockFile>::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new(pager_executor).unwrap());
 
         let file1 = Arc::new(MockFile::new(pager.clone(), PAGER_KEY));
         assert_eq!(pager.register_file(&file1), PAGER_KEY);
@@ -672,7 +746,7 @@ mod tests {
         struct ExecutorValidatingFile {
             vmo: zx::Vmo,
             pager_key: u64,
-            pager: Arc<Pager<Self>>,
+            pager: Arc<Pager>,
             expected_ehandle: fasync::EHandle,
             was_page_in_checked: AtomicBool,
             was_mark_dirty_checked: AtomicBool,
@@ -688,7 +762,7 @@ mod tests {
                 &self.vmo
             }
 
-            async fn page_in(self: &Arc<Self>, range: Range<u64>) {
+            async fn page_in(self: Arc<Self>, range: Range<u64>) {
                 assert_eq!(fasync::EHandle::local().port(), self.expected_ehandle.port());
                 self.was_page_in_checked.store(true, Ordering::Relaxed);
 
@@ -696,7 +770,7 @@ mod tests {
                 self.pager.supply_pages(&self.vmo, range, &aux_vmo, 0);
             }
 
-            async fn mark_dirty(self: &Arc<Self>, range: Range<u64>) {
+            async fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
                 assert_eq!(fasync::EHandle::local().port(), self.expected_ehandle.port());
                 self.was_mark_dirty_checked.store(true, Ordering::Relaxed);
 
@@ -709,7 +783,7 @@ mod tests {
         const PAGER_KEY: u64 = 1234;
         let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
         let expected_ehandle = pager_executor.executor_handle().clone();
-        let pager = Arc::new(Pager::<ExecutorValidatingFile>::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new(pager_executor).unwrap());
         let file = Arc::new(ExecutorValidatingFile {
             vmo: pager.create_vmo(PAGER_KEY, zx::system_get_page_size().into()).unwrap(),
             pager_key: PAGER_KEY,
@@ -734,7 +808,7 @@ mod tests {
     }
 
     impl OnZeroChildrenFile {
-        fn new(pager: &Pager<Self>, pager_key: u64, sender: mpsc::UnboundedSender<()>) -> Self {
+        fn new(pager: &Pager, pager_key: u64, sender: mpsc::UnboundedSender<()>) -> Self {
             let vmo = pager.create_vmo(pager_key, zx::system_get_page_size().into()).unwrap();
             Self { vmo, pager_key, sender: Mutex::new(sender) }
         }
@@ -750,11 +824,11 @@ mod tests {
             &self.vmo
         }
 
-        async fn page_in(self: &Arc<Self>, _range: Range<u64>) {
+        async fn page_in(self: Arc<Self>, _range: Range<u64>) {
             unreachable!();
         }
 
-        async fn mark_dirty(self: &Arc<Self>, _range: Range<u64>) {
+        async fn mark_dirty(self: Arc<Self>, _range: Range<u64>) {
             unreachable!();
         }
 
@@ -767,7 +841,7 @@ mod tests {
     async fn test_watch_for_zero_children() {
         let (sender, mut receiver) = mpsc::unbounded();
         let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::<OnZeroChildrenFile>::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new(pager_executor).unwrap());
         let file = Arc::new(OnZeroChildrenFile::new(&pager, 1234, sender));
         assert_eq!(pager.register_file(&file), file.pager_key());
         {
@@ -792,7 +866,7 @@ mod tests {
     async fn test_multiple_watch_for_zero_children_calls() {
         let (sender, mut receiver) = mpsc::unbounded();
         let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::<OnZeroChildrenFile>::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new(pager_executor).unwrap());
         let file = Arc::new(OnZeroChildrenFile::new(&pager, 1234, sender));
         assert_eq!(pager.register_file(&file), file.pager_key());
         {
@@ -824,7 +898,7 @@ mod tests {
         struct StatusCodeFile {
             vmo: zx::Vmo,
             pager_key: u64,
-            pager: Arc<Pager<Self>>,
+            pager: Arc<Pager>,
             status_code: Mutex<zx::Status>,
         }
 
@@ -838,11 +912,11 @@ mod tests {
                 &self.vmo
             }
 
-            async fn page_in(self: &Arc<Self>, range: Range<u64>) {
+            async fn page_in(self: Arc<Self>, range: Range<u64>) {
                 self.pager.report_failure(&self.vmo, range, *self.status_code.lock().unwrap())
             }
 
-            async fn mark_dirty(self: &Arc<Self>, _range: Range<u64>) {
+            async fn mark_dirty(self: Arc<Self>, _range: Range<u64>) {
                 unreachable!();
             }
 
@@ -853,7 +927,7 @@ mod tests {
 
         const PAGER_KEY: u64 = 1234;
         let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::<StatusCodeFile>::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new(pager_executor).unwrap());
         let file = Arc::new(StatusCodeFile {
             vmo: pager.create_vmo(PAGER_KEY, zx::system_get_page_size().into()).unwrap(),
             pager_key: PAGER_KEY,
@@ -888,7 +962,7 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_query_vmo_stats() {
         let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::<MockFile>::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new(pager_executor).unwrap());
         let file = Arc::new(MockFile::new(pager.clone(), 1234));
         assert_eq!(pager.register_file(&file), file.pager_key());
 
@@ -916,7 +990,7 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_query_dirty_ranges() {
         let pager_executor = Arc::new(PagerExecutor::start().await.unwrap());
-        let pager = Arc::new(Pager::<MockFile>::new(pager_executor).unwrap());
+        let pager = Arc::new(Pager::new(pager_executor).unwrap());
         let file = Arc::new(MockFile::new(pager.clone(), 1234));
         assert_eq!(pager.register_file(&file), file.pager_key());
 

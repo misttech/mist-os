@@ -40,7 +40,7 @@ pub enum WatcherCreateError {
     ChannelConversion(#[source] zx::Status),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Eq, PartialEq)]
 #[allow(missing_docs)]
 pub enum WatcherStreamError {
     #[error("read from watch channel failed with status: {0}")]
@@ -65,7 +65,7 @@ assoc_values!(WatchEvent, [
 
 /// A message containing a `WatchEvent` and the filename (relative to the directory being watched)
 /// that triggered the event.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct WatchMessage {
     /// The event that occurred.
     pub event: WatchEvent,

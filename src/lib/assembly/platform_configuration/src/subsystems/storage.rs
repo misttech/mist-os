@@ -48,6 +48,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("allow_legacy_data_partition_names", false)?
                 .field("use_disk_based_minfs_migration", false)?
                 .field("nand", false)?
+                .field("fxfs_blob", false)?
                 // LINT.ThenChange(//src/storage/fshost/generated_fshost_config.gni)
                 // LINT.IfChange
                 .field("fvm_slice_size", 8388608)?;

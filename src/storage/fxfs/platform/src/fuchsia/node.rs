@@ -106,6 +106,15 @@ pub enum GetResult<'a> {
     Node(Arc<dyn FxNode>),
 }
 
+impl<'a> GetResult<'a> {
+    pub fn placeholder(self) -> Option<PlaceholderOwner<'a>> {
+        match self {
+            GetResult::Placeholder(placeholder) => Some(placeholder),
+            _ => None,
+        }
+    }
+}
+
 struct NodeCacheInner {
     map: BTreeMap<u64, Weak<dyn FxNode>>,
     next_waker_sequence: u64,
@@ -341,7 +350,7 @@ mod tests {
             time::Duration,
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry::DirectoryEntry, path::Path},
+        vfs::path::Path,
     };
 
     struct FakeNode(u64, Arc<NodeCache>);
@@ -506,7 +515,7 @@ mod tests {
             FxFilesystem::new_empty(DeviceHolder::new(FakeDevice::new(16384, 512))).await.unwrap();
         let root_volume = root_volume(fs.clone()).await.unwrap();
         let volume = root_volume.new_volume("vol", None).await.unwrap();
-        let volume = FxVolumeAndRoot::new(Weak::new(), volume, 0).await.unwrap();
+        let volume = FxVolumeAndRoot::new::<FxDirectory>(Weak::new(), volume, 0).await.unwrap();
         let (root, server_end) =
             create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
         volume.root().clone().open(

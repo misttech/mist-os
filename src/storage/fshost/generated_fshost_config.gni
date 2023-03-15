@@ -45,6 +45,9 @@ declare_args() {
   # available.
   # If set, devices not already using this scheme will be forcibly migrated, losing data.
   use_native_fxfs_crypto = true
+
+  # Use Fxfs's blob implementation
+  fxfs_blob = false
 }
 
 # Generates a structured config value file for fshost.
@@ -91,6 +94,7 @@ template("generated_fshost_config") {
       factory = false
       fvm = true
       fvm_ramdisk = false
+      fxfs_blob = false
       gpt = true
       gpt_all = false
       mbr = false

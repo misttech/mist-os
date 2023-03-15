@@ -4,7 +4,6 @@
 
 use {
     crate::fuchsia::{
-        file::FxFile,
         pager::Pager,
         pager::{PagerVmoStatsOptions, VmoDirtyRange},
         vmo_data_buffer::VmoDataBuffer,
@@ -230,7 +229,7 @@ impl PagedObjectHandle {
         self.buffer.vmo()
     }
 
-    pub fn pager(&self) -> &Pager<FxFile> {
+    pub fn pager(&self) -> &Pager {
         self.owner().pager()
     }
 
@@ -414,7 +413,7 @@ impl PagedObjectHandle {
                     ObjectKey::attribute(
                         self.handle.object_id(),
                         self.handle.attribute_id(),
-                        AttributeKey::Size,
+                        AttributeKey::Attribute,
                     ),
                     ObjectValue::attribute(content_size),
                 ),
@@ -810,7 +809,7 @@ impl FlushBatch {
         how_many(self.dirty_byte_count, zx::system_get_page_size())
     }
 
-    fn writeback_begin(&self, vmo: &zx::Vmo, pager: &Pager<FxFile>) {
+    fn writeback_begin(&self, vmo: &zx::Vmo, pager: &Pager) {
         for range in &self.ranges {
             let options = if range.is_zero_range {
                 zx::PagerWritebackBeginOptions::DIRTY_RANGE_IS_ZERO
@@ -821,7 +820,7 @@ impl FlushBatch {
         }
     }
 
-    fn writeback_end(&self, vmo: &zx::Vmo, pager: &Pager<FxFile>) {
+    fn writeback_end(&self, vmo: &zx::Vmo, pager: &Pager) {
         for range in &self.ranges {
             pager.writeback_end(vmo, range.range.clone());
         }
@@ -860,7 +859,7 @@ impl FlushBatch {
                 dirty_ranges.push(range);
             }
             handle
-                .multi_write(transaction, &dirty_ranges, buffer.as_mut())
+                .multi_write(transaction, 0, &dirty_ranges, buffer.as_mut())
                 .await
                 .context("multi_write failed")?;
         }

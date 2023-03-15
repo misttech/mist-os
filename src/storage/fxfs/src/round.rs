@@ -7,13 +7,21 @@
 ///
 /// (Note that unstable rust is currently adding the same function
 /// `{integer}::checked_next_multiple_of()` behind the "int_roundings" feature.)
-pub fn round_up<T: Into<u64>>(offset: u64, block_size: T) -> Option<u64> {
+pub fn round_up<T: Into<U>, U: Copy + num_traits::PrimInt>(offset: U, block_size: T) -> Option<U> {
     let block_size = block_size.into();
-    Some(round_down(offset.checked_add(block_size - 1)?, block_size))
+    #[allow(clippy::eq_op)]
+    let one = block_size / block_size;
+    Some(round_down(offset.checked_add(&(block_size - one))?, block_size))
 }
 
 /// Round `offset` down to the previous multiple of `block_size`.
-pub fn round_down<T: Into<u64>>(offset: u64, block_size: T) -> u64 {
+pub fn round_down<
+    T: Into<U>,
+    U: Copy + std::ops::Rem<U, Output = U> + std::ops::Sub<U, Output = U>,
+>(
+    offset: U,
+    block_size: T,
+) -> U {
     let block_size = block_size.into();
     offset - offset % block_size
 }

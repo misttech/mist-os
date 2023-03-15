@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::fuchsia::{file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot},
+    crate::fuchsia::{
+        directory::FxDirectory, file::FxFile, pager::PagerBackedVmo, volume::FxVolumeAndRoot,
+    },
     anyhow::Context,
     anyhow::Error,
     fidl::endpoints::{create_proxy, ServerEnd},
@@ -17,7 +19,7 @@ use {
     fxfs_insecure_crypto::InsecureCrypt,
     std::sync::{Arc, Weak},
     storage_device::{fake_device::FakeDevice, DeviceHolder},
-    vfs::{directory::entry::DirectoryEntry, path::Path},
+    vfs::path::Path,
 };
 
 struct State {
@@ -50,7 +52,7 @@ impl TestFixture {
         let (filesystem, volume) = if format {
             let filesystem = FxFilesystem::new_empty(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let vol = FxVolumeAndRoot::new(
+            let vol = FxVolumeAndRoot::new::<FxDirectory>(
                 Weak::new(),
                 root_volume
                     .new_volume(
@@ -67,7 +69,7 @@ impl TestFixture {
         } else {
             let filesystem = FxFilesystem::open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
-            let vol = FxVolumeAndRoot::new(
+            let vol = FxVolumeAndRoot::new::<FxDirectory>(
                 Weak::new(),
                 root_volume
                     .volume(

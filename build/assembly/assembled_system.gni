@@ -540,6 +540,8 @@ template("assembled_system") {
         if (embed_fvm_in_zbi) {
           fvm_ramdisk = true
         }
+
+        fxfs_blob = fxfs_blob
       }
     }
   }

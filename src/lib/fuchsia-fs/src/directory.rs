@@ -515,9 +515,10 @@ pub fn readdir_recursive(
     )
 }
 
-/// Returns a sorted Vec of directory entries contained directly in the given directory proxy. The
-/// returned entries will not include "." or nodes from any subdirectories.
-pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, EnumerateError> {
+async fn readdir_inner(
+    dir: &fio::DirectoryProxy,
+    include_dot: bool,
+) -> Result<Vec<DirEntry>, EnumerateError> {
     let status = dir.rewind().await.map_err(|e| EnumerateError::Fidl("rewind", e))?;
     zx_status::Status::ok(status).map_err(EnumerateError::Rewind)?;
 
@@ -536,7 +537,7 @@ pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, Enumera
 
         for entry in parse_dir_entries(&buf) {
             let entry = entry.map_err(EnumerateError::DecodeDirent)?;
-            if entry.name != "." {
+            if include_dot || entry.name != "." {
                 entries.push(entry);
             }
         }
@@ -545,6 +546,18 @@ pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, Enumera
     entries.sort_unstable();
 
     Ok(entries)
+}
+
+/// Returns a sorted Vec of directory entries contained directly in the given directory proxy.
+/// (Like `readdir`, but includes the dot path as well.)
+pub async fn readdir_inclusive(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, EnumerateError> {
+    readdir_inner(dir, /*include_dot=*/ true).await
+}
+
+/// Returns a sorted Vec of directory entries contained directly in the given directory proxy. The
+/// returned entries will not include "." or nodes from any subdirectories.
+pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, EnumerateError> {
+    readdir_inner(dir, /*include_dot=*/ false).await
 }
 
 /// Returns a sorted Vec of directory entries contained directly in the given directory proxy. The

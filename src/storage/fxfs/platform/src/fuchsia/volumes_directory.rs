@@ -4,9 +4,11 @@
 
 use {
     crate::fuchsia::{
+        blob::BlobDirectory,
         component::map_to_raw_status,
+        directory::FxDirectory,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-        volume::{FlushTaskConfig, FxVolumeAndRoot},
+        volume::{FlushTaskConfig, FxVolume, FxVolumeAndRoot, RootDir},
         RemoteCrypt,
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -31,7 +33,7 @@ use {
             directory::ObjectDescriptor,
             transaction::{LockKey, Options},
             volume::RootVolume,
-            ObjectStore,
+            Directory, ObjectStore,
         },
     },
     fxfs_crypto::Crypt,
@@ -131,7 +133,7 @@ impl VolumesDirectory {
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<FxVolumeAndRoot, Error> {
         let volume = self
-            .mount_store(
+            .mount_store::<FxDirectory>(
                 name,
                 self.root_volume.new_volume(name, crypt).await?,
                 FlushTaskConfig::default(),
@@ -160,11 +162,11 @@ impl VolumesDirectory {
             !self.mounted_volumes.lock().await.contains_key(&store.store_object_id()),
             FxfsError::AlreadyBound
         );
-        self.mount_store(name, store, FlushTaskConfig::default()).await
+        self.mount_store::<FxDirectory>(name, store, FlushTaskConfig::default()).await
     }
 
     // Mounts the given store.  A lock *must* be held on the volume directory.
-    async fn mount_store(
+    async fn mount_store<T: From<Directory<FxVolume>> + RootDir>(
         self: &Arc<Self>,
         name: &str,
         store: Arc<ObjectStore>,
@@ -173,7 +175,7 @@ impl VolumesDirectory {
         store.track_statistics(&metrics::object_stores(), name);
         let store_id = store.store_object_id();
         let unique_id = zx::Event::create();
-        let volume = FxVolumeAndRoot::new(
+        let volume = FxVolumeAndRoot::new::<T>(
             Arc::downgrade(self),
             store,
             unique_id.get_koid().unwrap().raw_koid(),
@@ -246,10 +248,11 @@ impl VolumesDirectory {
         self: &Arc<Self>,
         volume: &FxVolumeAndRoot,
         outgoing_dir_server_end: ServerEnd<fio::DirectoryMarker>,
+        executable: bool,
     ) -> Result<(), Error> {
         let outgoing_dir = vfs::directory::immutable::simple();
 
-        outgoing_dir.add_entry("root", volume.root().clone())?;
+        outgoing_dir.add_entry("root", volume.root().clone().as_directory_entry())?;
         let svc_dir = vfs::directory::immutable::simple();
         outgoing_dir.add_entry("svc", svc_dir.clone())?;
 
@@ -280,9 +283,13 @@ impl VolumesDirectory {
         // filesystem to the volume we are exporting.  The reality is that it only matters for
         // GetToken and mutable methods which are not supported by the immutable version of Simple.
         let scope = volume.volume().scope().clone();
+        let mut flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+        if executable {
+            flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+        }
         outgoing_dir.open(
             scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            flags,
             Path::dot(),
             outgoing_dir_server_end.into_channel().into(),
         );
@@ -332,7 +339,7 @@ impl VolumesDirectory {
     ) -> Result<(), Error> {
         let crypt = crypt
             .map(|crypt| Arc::new(RemoteCrypt::new(crypt.into_proxy().unwrap())) as Arc<dyn Crypt>);
-        self.serve_volume(&self.create_volume(&name, crypt).await?, outgoing_directory).await
+        self.serve_volume(&self.create_volume(&name, crypt).await?, outgoing_directory, false).await
     }
 
     async fn handle_volume_requests(
@@ -490,15 +497,22 @@ impl VolumesDirectory {
             None
         };
 
-        let volume = self
-            .mount_store(
-                name,
-                self.root_volume.volume_from_id(store_id, crypt).await?,
-                FlushTaskConfig::default(),
+        let store_to_mount = self.root_volume.volume_from_id(store_id, crypt).await?;
+        let (volume, executable) = if options.as_blob {
+            (
+                self.mount_store::<BlobDirectory>(name, store_to_mount, FlushTaskConfig::default())
+                    .await?,
+                true,
             )
-            .await?;
+        } else {
+            (
+                self.mount_store::<FxDirectory>(name, store_to_mount, FlushTaskConfig::default())
+                    .await?,
+                false,
+            )
+        };
 
-        self.serve_volume(&volume, outgoing_directory).await
+        self.serve_volume(&volume, outgoing_directory, executable).await
     }
 
     async fn handle_admin_requests(
@@ -1019,7 +1033,10 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
 
-        volumes_directory.serve_volume(&vol, dir_server_end).await.expect("serve_volume failed");
+        volumes_directory
+            .serve_volume(&vol, dir_server_end, false)
+            .await
+            .expect("serve_volume failed");
 
         let admin_proxy = connect_to_protocol_at_dir_svc::<AdminMarker>(&dir_proxy)
             .expect("Unable to connect to admin service");
@@ -1129,7 +1146,7 @@ mod tests {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .expect("Create dir proxy to succeed");
             volumes_directory
-                .serve_volume(&volume, dir_server_end)
+                .serve_volume(&volume, dir_server_end, false)
                 .await
                 .expect("serve_volume failed");
 
