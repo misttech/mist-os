@@ -19,8 +19,6 @@
 #include "src/proc/tests/chromiumos/syscalls/proc_test.h"
 #include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
-constexpr size_t MMAP_FILE_SIZE = 64;
-constexpr intptr_t LIMIT_4GB = 0x80000000;
 constexpr size_t PAGE_SIZE = 0x1000;
 
 #ifndef MAP_FIXED_NOREPLACE
@@ -28,6 +26,11 @@ constexpr size_t PAGE_SIZE = 0x1000;
 #endif
 
 namespace {
+
+#if __x86_64__
+
+constexpr size_t MMAP_FILE_SIZE = 64;
+constexpr intptr_t LIMIT_4GB = 0x80000000;
 
 TEST(MmapTest, Map32Test) {
   char* tmp = getenv("TEST_TMPDIR");
@@ -54,6 +57,7 @@ TEST(MmapTest, Map32Test) {
 
   unlink(path.c_str());
 }
+#endif
 
 TEST(MmapTest, MprotectMultipleMappings) {
   char* page1 = (char*)mmap(nullptr, PAGE_SIZE * 2, PROT_READ | PROT_WRITE,
