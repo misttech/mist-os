@@ -31,6 +31,7 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/assembly:ffx_assembly",
   "//src/developer/ffx/plugins/audio:ffx_audio",
   "//src/developer/ffx/plugins/component:ffx_component",
+  "//src/developer/ffx/plugins/coverage:ffx_coverage",
   "//src/developer/ffx/plugins/debug:ffx_debug_plugin",
   "//src/developer/ffx/plugins/driver:ffx_driver",
   "//src/developer/ffx/plugins/efi:ffx_efi",

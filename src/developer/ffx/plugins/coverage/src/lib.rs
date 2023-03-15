@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use ffx_core::ffx_plugin;
 use ffx_coverage_args::CoverageCommand;
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use glob::glob;
 use std::{
     fs::File,
@@ -25,7 +25,24 @@ struct ExportParams<'a> {
     extra_args: Vec<&'a str>,
 }
 
-#[ffx_plugin("coverage")]
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("coverage"))]
+pub struct CoverageTool {
+    #[command]
+    cmd: CoverageCommand,
+}
+
+fho::embedded_plugin!(CoverageTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for CoverageTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        coverage(self.cmd).await.map_err(Into::into)
+    }
+}
+
 pub async fn coverage(cmd: CoverageCommand) -> Result<()> {
     let clang_bin_dir = cmd.clang_dir.join("bin");
     let llvm_profdata_bin = clang_bin_dir.join("llvm-profdata");

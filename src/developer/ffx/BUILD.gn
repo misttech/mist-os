@@ -50,7 +50,6 @@ if (is_host) {
     # section for this.
     plugin_deps += [
       "//src/connectivity/network/net-cli/ffx:ffx_net",
-      "//src/developer/ffx/plugins/coverage:ffx_coverage",
       "//src/developer/ffx/plugins/cts:ffx_cts",
       "//src/developer/ffx/plugins/doctor:ffx_doctor",
       "//src/developer/ffx/plugins/fuzz:ffx_fuzz",

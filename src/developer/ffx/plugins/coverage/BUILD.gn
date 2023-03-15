@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_coverage") {
   version = "0.0.1"
@@ -14,8 +15,10 @@ ffx_plugin("ffx_coverage") {
 
   deps = [
     "//src/developer/ffx/core:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/symbol-index",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:glob",
   ]
   test_deps = [
@@ -24,4 +27,15 @@ ffx_plugin("ffx_coverage") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:tempfile",
   ]
+}
+
+ffx_tool("ffx_coverage_tool") {
+  edition = "2021"
+  output_name = "ffx-coverage"
+  deps = [
+    ":ffx_coverage",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }
