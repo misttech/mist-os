@@ -13,6 +13,8 @@ use crate::error::{FatfsError, FatfsNumericError};
 use crate::fs::{FatType, FormatVolumeOptions, FsStatusFlags};
 use crate::table::RESERVED_FAT_ENTRIES;
 
+use std::collections::HashMap;
+
 const BITS_PER_BYTE: u32 = 8;
 const KB: u64 = 1024;
 const MB: u64 = KB * 1024;
@@ -456,12 +458,7 @@ pub(crate) fn estimate_fat_type(total_bytes: u64) -> FatType {
     }
 }
 
-fn determine_bytes_per_cluster(
-    total_bytes: u64,
-    bytes_per_sector: u16,
-    fat_type: Option<FatType>,
-) -> u32 {
-    let fat_type = fat_type.unwrap_or_else(|| estimate_fat_type(total_bytes));
+fn determine_bytes_per_cluster(total_bytes: u64, bytes_per_sector: u16, fat_type: FatType) -> u32 {
     let bytes_per_cluster = match fat_type {
         FatType::Fat12 => (total_bytes.next_power_of_two() / MB * 512) as u32,
         FatType::Fat16 => {
@@ -607,13 +604,28 @@ fn determine_root_dir_sectors(
 }
 
 fn determine_fs_geometry(
+    fat_type: Option<FatType>,
     total_sectors: u32,
     bytes_per_sector: u16,
-    sectors_per_cluster: u8,
+    bytes_per_cluster: Option<u32>,
     root_dir_entries: u16,
     fats: u8,
-) -> io::Result<(FatType, u16, u32)> {
-    for &fat_type in &[FatType::Fat32, FatType::Fat16, FatType::Fat12] {
+) -> io::Result<(FatType, u16, u32, u8)> {
+    let mut failures = HashMap::new();
+    let fat_types = match fat_type {
+        Some(t) => vec![t],
+        None => vec![FatType::Fat32, FatType::Fat16, FatType::Fat12],
+    };
+    for fat_type in fat_types {
+        let bytes_per_cluster = bytes_per_cluster.unwrap_or_else(|| {
+            let total_bytes = u64::from(total_sectors) * u64::from(bytes_per_sector);
+            determine_bytes_per_cluster(total_bytes, bytes_per_sector, fat_type)
+        });
+        let sectors_per_cluster = {
+            let sectors_per_cluster = bytes_per_cluster / u32::from(bytes_per_sector);
+            assert!(sectors_per_cluster <= u32::from(u8::MAX));
+            sectors_per_cluster as u8
+        };
         let root_dir_sectors =
             determine_root_dir_sectors(root_dir_entries, bytes_per_sector, fat_type);
         let result = try_fs_geometry(
@@ -624,10 +636,26 @@ fn determine_fs_geometry(
             root_dir_sectors,
             fats,
         );
-        if result.is_ok() {
-            let (reserved_sectors, sectors_per_fat) = result.unwrap(); // SAFE: used is_ok() before
-            return Ok((fat_type, reserved_sectors, sectors_per_fat));
-        }
+        match result {
+            Ok((reserved_sectors, sectors_per_fat)) => {
+                return Ok((fat_type, reserved_sectors, sectors_per_fat, sectors_per_cluster));
+            }
+            Err(e) => failures.insert(fat_type, e),
+        };
+    }
+    eprintln!("Failed to identify any valid geometry.  Errors:");
+    for (fat_type, err) in failures {
+        eprintln!(
+            "type: {:?} err: {:?} total_sectors: {}, bytes_per_sector: {} bytes_per_cluster: {:?}\
+            root_dir_entries: {} fats: {}",
+            fat_type,
+            err,
+            total_sectors,
+            bytes_per_sector,
+            bytes_per_cluster,
+            root_dir_entries,
+            fats
+        );
     }
 
     return Err(Error::new(ErrorKind::Other, FatfsError::BadDiskSize));
@@ -638,21 +666,13 @@ fn format_bpb(
     total_sectors: u32,
     bytes_per_sector: u16,
 ) -> io::Result<(BiosParameterBlock, FatType)> {
-    let bytes_per_cluster = options.bytes_per_cluster.unwrap_or_else(|| {
-        let total_bytes = u64::from(total_sectors) * u64::from(bytes_per_sector);
-        determine_bytes_per_cluster(total_bytes, bytes_per_sector, options.fat_type)
-    });
-
-    let sectors_per_cluster = bytes_per_cluster / u32::from(bytes_per_sector);
-    assert!(sectors_per_cluster <= u32::from(u8::MAX));
-    let sectors_per_cluster = sectors_per_cluster as u8;
-
     let fats = options.fats.unwrap_or(2u8);
     let root_dir_entries = options.max_root_dir_entries.unwrap_or(512);
-    let (fat_type, reserved_sectors, sectors_per_fat) = determine_fs_geometry(
+    let (fat_type, reserved_sectors, sectors_per_fat, sectors_per_cluster) = determine_fs_geometry(
+        options.fat_type,
         total_sectors,
         bytes_per_sector,
-        sectors_per_cluster,
+        options.bytes_per_cluster,
         root_dir_entries,
         fats,
     )?;
@@ -787,9 +807,9 @@ mod tests {
 
     #[test]
     fn test_determine_bytes_per_cluster_fat12() {
-        assert_eq!(determine_bytes_per_cluster(1 * MB + 0, 512, Some(FatType::Fat12)), 512);
-        assert_eq!(determine_bytes_per_cluster(1 * MB + 1, 512, Some(FatType::Fat12)), 1024);
-        assert_eq!(determine_bytes_per_cluster(1 * MB, 4096, Some(FatType::Fat12)), 4096);
+        assert_eq!(determine_bytes_per_cluster(1 * MB + 0, 512, FatType::Fat12), 512);
+        assert_eq!(determine_bytes_per_cluster(1 * MB + 1, 512, FatType::Fat12), 1024);
+        assert_eq!(determine_bytes_per_cluster(1 * MB, 4096, FatType::Fat12), 4096);
     }
 
     #[test]
@@ -990,6 +1010,18 @@ mod tests {
         test_determine_sectors_per_fat_for_multiple_sizes(512, FatType::Fat32, 32, 2, 0);
         test_determine_sectors_per_fat_for_multiple_sizes(512, FatType::Fat32, 32, 1, 0);
         test_determine_sectors_per_fat_for_multiple_sizes(4096, FatType::Fat32, 32, 2, 0);
+    }
+
+    #[test]
+    fn test_determine_fs_geometry() {
+        init();
+
+        // Regression test for a specific case.
+        assert!(determine_fs_geometry(
+            None, /*total_sectors=*/ 8227, /*bytes_per_sector=*/ 512, None,
+            /*root_dir_entries=*/ 512, /*fats=*/ 2
+        )
+        .is_ok());
     }
 
     #[test]

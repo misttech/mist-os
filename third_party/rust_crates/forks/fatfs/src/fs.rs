@@ -32,7 +32,7 @@ use crate::transaction::TransactionManager;
 /// A type of FAT filesystem.
 ///
 /// `FatType` values are based on the size of File Allocation Table entry.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum FatType {
     /// 12 bits per FAT entry
     Fat12,

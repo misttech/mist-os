@@ -39,10 +39,7 @@ fn format(volume: &File, size: u64) -> Result<()> {
 
     // Note: there is no way to specify OEM label, which was set to "Fuchsia" before and now it is
     // "MSWIN4.1".
-    let options = fatfs::FormatVolumeOptions::new()
-        .bytes_per_sector(512)
-        .fat_type(fatfs::FatType::Fat32)
-        .volume_label(label);
+    let options = fatfs::FormatVolumeOptions::new().bytes_per_sector(512).volume_label(label);
 
     fatfs::format_volume(volume, options)?;
     Ok(())
@@ -274,5 +271,81 @@ mod test {
         assert_eq!(output_size % 63 * 512, 0);
 
         Ok(())
+    }
+
+    async fn create_image_with_payload(size: u64) -> Result<(fatfs::FatType, u64)> {
+        let tmpdir = tempdir()?;
+        let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
+
+        let output = tmppath("test_output");
+        let bootloader = tmppath("test_bootloader");
+        {
+            let file = File::create(&bootloader)?;
+            file.set_len(size)?;
+        }
+
+        command(EfiCommand {
+            subcommand: EfiSubCommand::Create(CreateCommand {
+                output: output.clone(),
+                cmdline: None,
+                bootdata: None,
+                efi_bootloader: Some(bootloader),
+                zircon: None,
+                zedboot: None,
+            }),
+        })
+        .await?;
+
+        let output_size = metadata(&output)?.len();
+
+        let volume = File::open(&output)?;
+        let fs = fatfs::FileSystem::new(volume, fatfs::FsOptions::new())?;
+        let fat_type = fs.fat_type();
+
+        Ok((fat_type, output_size))
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_create_16mib() {
+        let (fat_type, size) = create_image_with_payload(16 * 1024 * 1024).await.unwrap();
+        assert_eq!(fat_type, fatfs::FatType::Fat16);
+        assert!(size >= 16 * 1024 * 1024);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_create_20mib() {
+        let (fat_type, size) = create_image_with_payload(20 * 1024 * 1024).await.unwrap();
+        assert_eq!(fat_type, fatfs::FatType::Fat16);
+        assert!(size >= 20 * 1024 * 1024);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_create_24mib() {
+        let (fat_type, size) = create_image_with_payload(24 * 1024 * 1024).await.unwrap();
+        assert_eq!(fat_type, fatfs::FatType::Fat16);
+        assert!(size >= 24 * 1024 * 1024);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_create_28mib() {
+        let (fat_type, size) = create_image_with_payload(28 * 1024 * 1024).await.unwrap();
+        assert_eq!(fat_type, fatfs::FatType::Fat16);
+        assert!(size >= 28 * 1024 * 1024);
+    }
+
+    // Empirically this is roughly where images switch over to FAT32.  By the spec, FAT32 images
+    // must have at least 65525 clusters, which at 512 bytes per cluster is 33,548,800 bytes.
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_create_30mib() {
+        let (fat_type, size) = create_image_with_payload(30 * 1024 * 1024).await.unwrap();
+        assert_eq!(fat_type, fatfs::FatType::Fat32);
+        assert!(size >= 30 * 1024 * 1024);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_create_32mib() {
+        let (fat_type, size) = create_image_with_payload(32 * 1024 * 1024).await.unwrap();
+        assert_eq!(fat_type, fatfs::FatType::Fat32);
+        assert!(size >= 32 * 1024 * 1024);
     }
 }
