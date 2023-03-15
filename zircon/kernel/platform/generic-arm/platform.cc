@@ -53,6 +53,8 @@
 #include <object/resource_dispatcher.h>
 #include <phys/handoff.h>
 #include <platform/crashlog.h>
+#include <platform/debug.h>
+#include <platform/legacy_debug.h>
 #include <vm/bootreserve.h>
 #include <vm/kstack.h>
 #include <vm/physmap.h>
@@ -444,21 +446,21 @@ zx_status_t platform_mp_prep_cpu_unplug(cpu_num_t cpu_id) {
 
 zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug(cpu_id); }
 
-void platform_dputs_thread(const char* str, size_t len) {
+void legacy_platform_dputs_thread(const char* str, size_t len) {
   if (uart_disabled) {
     return;
   }
   uart_puts(str, len, true);
 }
 
-void platform_dputs_irq(const char* str, size_t len) {
+void legacy_platform_dputs_irq(const char* str, size_t len) {
   if (uart_disabled) {
     return;
   }
   uart_puts(str, len, false);
 }
 
-int platform_dgetc(char* c, bool wait) {
+int legacy_platform_dgetc(char* c, bool wait) {
   if (uart_disabled) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -474,14 +476,14 @@ int platform_dgetc(char* c, bool wait) {
   return ret;
 }
 
-void platform_pputc(char c) {
+void legacy_platform_pputc(char c) {
   if (uart_disabled) {
     return;
   }
   uart_pputc(c);
 }
 
-int platform_pgetc(char* c) {
+int legacy_platform_pgetc(char* c) {
   if (uart_disabled) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -565,8 +567,6 @@ NO_ASAN void platform_mexec(mexec_asm_func mexec_assembly, memmov_ops_t* ops,
   mexec_assembly((uintptr_t)new_bootimage_addr, 0, 0, arm64_get_boot_el(), ops,
                  (void*)kernel_dst_phys);
 }
-
-bool platform_serial_enabled(void) { return !uart_disabled && uart_present(); }
 
 bool platform_early_console_enabled() { return false; }
 

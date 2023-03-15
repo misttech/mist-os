@@ -12,6 +12,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/cbuf.h>
 #include <lib/debuglog.h>
+#include <lib/uart/all.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <reg.h>
@@ -23,6 +24,8 @@
 #include <trace.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
+
+#include <cstdint>
 
 #include <arch/x86.h>
 #include <arch/x86/apic.h>
@@ -37,6 +40,7 @@
 #include <phys/handoff.h>
 #include <platform/console.h>
 #include <platform/debug.h>
+#include <platform/legacy_debug.h>
 #include <platform/pc.h>
 #include <vm/physmap.h>
 #include <vm/vm_aspace.h>
@@ -228,9 +232,11 @@ static void init_uart() {
   }
 }
 
-bool platform_serial_enabled() { return gDebugPort.type != DebugPort::Type::kNull; }
-
 void X86UartInitEarly(const uart::all::Driver& serial) {
+  if (gBootOptions->experimental_serial_migration) {
+    return;
+  }
+
   // Updates gDebugPort with the provided UART metadata, given by a variant of
   // libuart driver types, each with methods to indicate the ZBI item type and
   // payload.
@@ -273,6 +279,10 @@ void X86UartInitEarly(const uart::all::Driver& serial) {
 }
 
 void X86UartInitLate() {
+  if (gBootOptions->experimental_serial_migration) {
+    return;
+  }
+
   // At this stage, we have threads, interrupts, the heap, and virtual memory
   // available to us, which wasn't available at earlier stages.
   //
@@ -398,13 +408,13 @@ static void platform_dputs(const char* str, size_t len, bool block) {
   }
 }
 
-void platform_dputs_thread(const char* str, size_t len) {
+void legacy_platform_dputs_thread(const char* str, size_t len) {
   if (platform_serial_enabled()) {
     platform_dputs(str, len, true);
   }
 }
 
-void platform_dputs_irq(const char* str, size_t len) {
+void legacy_platform_dputs_irq(const char* str, size_t len) {
   if (platform_serial_enabled()) {
     platform_dputs(str, len, false);
   }
@@ -429,7 +439,7 @@ static void debug_uart_putc_poll(char c) {
   uart_write(0, c);
 }
 
-int platform_dgetc(char* c, bool wait) {
+int legacy_platform_dgetc(char* c, bool wait) {
   if (!platform_serial_enabled()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -446,7 +456,7 @@ int platform_dgetc(char* c, bool wait) {
 }
 
 // panic time polling IO for the panic shell
-void platform_pputc(char c) {
+void legacy_platform_pputc(char c) {
   if (platform_serial_enabled()) {
     if (c == '\n')
       debug_uart_putc_poll('\r');
@@ -454,7 +464,7 @@ void platform_pputc(char c) {
   }
 }
 
-int platform_pgetc(char* c) {
+int legacy_platform_pgetc(char* c) {
   if (platform_serial_enabled()) {
     return debug_uart_getc_poll(c);
   }

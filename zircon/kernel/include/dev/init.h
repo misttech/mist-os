@@ -26,6 +26,10 @@ struct ArchPhysHandoff;
 void DriverHandoffEarly(const PhysHandoff& handoff);
 void DriverHandoffLate(const PhysHandoff& handoff);
 
+// Uart initialization routines.
+void UartDriverHandoffEarly(const uart::all::Driver& serial);
+void UartDriverHandoffLate(const uart::all::Driver& serial);
+
 // Platform-specific subroutines of the above functions, respectively.
 //
 // Defined in //zircon/kernel/platform/*/dev-init.cc.

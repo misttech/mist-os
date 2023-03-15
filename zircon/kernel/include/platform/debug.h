@@ -13,8 +13,6 @@
 #include <sys/types.h>
 #include <zircon/compiler.h>
 
-__BEGIN_CDECLS
-
 void platform_dputs_thread(const char* str, size_t len);
 void platform_dputs_irq(const char* str, size_t len);
 
@@ -30,7 +28,5 @@ static inline void platform_dputc(char c) { platform_dputs_thread(&c, 1); }
 int platform_pgetc(char* c);
 
 void platform_pputc(char c);
-
-__END_CDECLS
 
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_DEBUG_H_

@@ -26,8 +26,15 @@ zx_library("pc") {
     "power.cc",
     "smbios.cc",
     "timer.cc",
+    "uart.cc",
   ]
+
   deps = [
+    # uart.cc includes <platform/uart.h>
+    "//zircon/kernel/platform:headers",
+  ]
+
+  deps += [
     ":tests",
     "//src/lib/zbitl",
     "//zircon/kernel/arch/x86:headers",

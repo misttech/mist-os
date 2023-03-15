@@ -132,8 +132,8 @@ $3 ~ /^R_AARCH64_ADR_/ || $3 ~ /^R_AARCH64_.*ABS_L/ {
     next
 }
 {
-    # awk handles large integers poorly, so factor out the high 40 bits.
-    this_prefix = substr($1, 1, 10)
+    # awk handles large integers poorly, so factor out the high 36 bits.
+    this_prefix = substr($1, 1, 9)
     raw_offset = substr($1, 10)
     if (address_prefix == "") {
         address_prefix = this_prefix;

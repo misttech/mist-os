@@ -10,8 +10,15 @@ source_set("generic-arm") {
     "dev-init.cc",
     "efi.cc",
     "platform.cc",
+    "uart.cc",
   ]
+
   deps = [
+    # uart.cc includes <platform/uart.h>
+    "//zircon/kernel/platform:headers",
+  ]
+
+  deps += [
     "//zircon/kernel/dev/hdcp/amlogic_s912",
     "//zircon/kernel/dev/hw_rng",
     "//zircon/kernel/dev/hw_rng/amlogic_rng",

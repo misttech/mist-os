@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/boot-options/boot-options.h>
 #include <lib/uart/all.h>
 #include <lib/uart/null.h>
 #include <zircon/boot/driver-config.h>
@@ -66,9 +67,15 @@ void UartInitLate(uint32_t extra) {
 }  // namespace
 
 void PlatformUartDriverHandoffEarly(const uart::all::Driver& serial) {
+  if (gBootOptions->experimental_serial_migration) {
+    return;
+  }
   ktl::visit([](const auto& uart) { UartInitEarly(uart.extra(), uart.config()); }, serial);
 }
 
 void PlatformUartDriverHandoffLate(const uart::all::Driver& serial) {
+  if (gBootOptions->experimental_serial_migration) {
+    return;
+  }
   ktl::visit([](const auto& uart) { UartInitLate(uart.extra()); }, serial);
 }

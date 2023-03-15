@@ -5,9 +5,11 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/zircon/zircon_cpu.gni")
+import("//build/zircon/zx_library.gni")
 
-source_set("platform") {
+zx_library("platform") {
   sources = [
+    "debug.cc",
     "efi.cc",
     "efi_bootbyte.cc",
     "efi_crashlog.cc",
@@ -20,8 +22,10 @@ source_set("platform") {
   ]
   deps = [
     "//src/lib/zbitl",
+    "//zircon/kernel/dev/interrupt",
     "//zircon/kernel/dev/pdev/hw_watchdog",
     "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/cbuf",
     "//zircon/kernel/lib/code-patching:headers",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",
