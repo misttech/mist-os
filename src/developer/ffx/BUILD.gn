@@ -60,7 +60,6 @@ if (is_host) {
       "//src/developer/ffx/plugins/input:ffx_input",
       "//src/developer/ffx/plugins/process_explorer:ffx_process_explorer",
       "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
-      "//src/developer/ffx/plugins/sdk:ffx_sdk",
       "//src/developer/ffx/plugins/self-test:ffx_selftest",
       "//src/developer/ffx/plugins/test:ffx_test",
       "//src/developer/ffx/plugins/trace:ffx_trace",

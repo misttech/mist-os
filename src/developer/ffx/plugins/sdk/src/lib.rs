@@ -4,26 +4,41 @@
 
 use anyhow::{Context, Result};
 use ffx_config::{query, ConfigLevel};
-use ffx_core::ffx_plugin;
 use ffx_sdk_args::{SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use sdk::{Sdk, SdkVersion};
-use std::io::{stdout, Write};
+use std::io::Write;
 
-#[ffx_plugin()]
-pub async fn exec_sdk(command: SdkCommand) -> Result<()> {
-    let writer = Box::new(stdout());
-    let sdk = ffx_config::global_env_context()
-        .context("loading global environment context")?
-        .get_sdk()
-        .await;
+#[derive(FfxTool)]
+pub struct SdkTool {
+    sdk: fho::Result<Sdk>,
+    #[command]
+    cmd: SdkCommand,
+}
 
-    match &command.sub {
-        SubCommand::Version(_) => exec_version(sdk?, writer).await,
-        SubCommand::Set(cmd) => exec_set(cmd).await,
+fho::embedded_plugin!(SdkTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for SdkTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        exec_sdk(self.cmd, self.sdk, writer).await
     }
 }
 
-async fn exec_version<W: Write + Sync>(sdk: Sdk, mut writer: W) -> Result<()> {
+pub async fn exec_sdk(
+    command: SdkCommand,
+    sdk: fho::Result<Sdk>,
+    writer: SimpleWriter,
+) -> fho::Result<()> {
+    match &command.sub {
+        SubCommand::Version(_) => exec_version(sdk?, writer).await.map_err(Into::into),
+        SubCommand::Set(cmd) => exec_set(cmd).await.map_err(Into::into),
+    }
+}
+
+async fn exec_version<W: Write>(sdk: Sdk, mut writer: W) -> Result<()> {
     match sdk.get_version() {
         SdkVersion::Version(v) => writeln!(writer, "{}", v)?,
         SdkVersion::InTree => writeln!(writer, "<in tree>")?,
