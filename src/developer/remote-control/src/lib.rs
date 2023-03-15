@@ -19,17 +19,27 @@ use {
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
     selector_maps::{MappingError, SelectorMappingList},
     selectors::{StringSelector, TreeSelector},
-    std::{cell::RefCell, net::SocketAddr, rc::Rc},
+    std::{borrow::Borrow, cell::RefCell, net::SocketAddr, rc::Rc, rc::Weak},
     tracing::*,
 };
 
 mod host_identifier;
 
 pub struct RemoteControlService {
-    ids: RefCell<Vec<u64>>,
+    ids: RefCell<Vec<Weak<RefCell<Vec<u64>>>>>,
     id_allocator: fn() -> Result<HostIdentifier>,
     connector: Box<dyn Fn(fidl::Socket)>,
     maps: SelectorMappingList,
+}
+
+struct Client {
+    // Maintain reference-counts to this client's ids.
+    // The ids may be shared (e.g. when Overnet maintains two
+    // connections to the target -- legacy + CSO), so we can't
+    // just maintain a list of RCS's ids and remove when one
+    // disappars.  Instead, when these are freed due to the client
+    // being dropped, the RCS Weak references will become invalid.
+    allocated_ids: Rc<RefCell<Vec<u64>>>,
 }
 
 impl RemoteControlService {
@@ -86,7 +96,17 @@ impl RemoteControlService {
         };
     }
 
-    async fn handle(self: &Rc<Self>, request: rcs::RemoteControlRequest) -> Result<()> {
+    // Some of the ID-lists may be gone because old clients have shut down.
+    // They will have a strong_count of 0.  Drop 'em.
+    fn remove_old_ids(self: &Rc<Self>) {
+        self.ids.borrow_mut().retain(|wirc| wirc.strong_count() > 0);
+    }
+
+    async fn handle(
+        self: &Rc<Self>,
+        client: &Client,
+        request: rcs::RemoteControlRequest,
+    ) -> Result<()> {
         match request {
             rcs::RemoteControlRequest::EchoString { value, responder } => {
                 info!("Received echo string {}", value);
@@ -94,13 +114,13 @@ impl RemoteControlService {
                 Ok(())
             }
             rcs::RemoteControlRequest::AddId { id, responder } => {
-                self.ids.borrow_mut().push(id);
+                client.allocated_ids.borrow_mut().push(id);
                 responder.send()?;
                 Ok(())
             }
             rcs::RemoteControlRequest::AddOvernetLink { id, socket, responder } => {
                 (self.connector)(socket);
-                self.ids.borrow_mut().push(id);
+                client.allocated_ids.borrow_mut().push(id);
                 responder.send()?;
                 Ok(())
             }
@@ -237,19 +257,23 @@ impl RemoteControlService {
     }
 
     pub async fn serve_stream(self: Rc<Self>, stream: rcs::RemoteControlRequestStream) {
+        // When the stream ends, the client (and its ids) will drop
+        let allocated_ids = Rc::new(RefCell::new(vec![]));
+        self.ids.borrow_mut().push(Rc::downgrade(&allocated_ids));
+        let client = Client { allocated_ids };
         stream
             .for_each_concurrent(None, |request| async {
                 match request {
                     Ok(request) => {
                         let _ = self
-                            .handle(request)
+                            .handle(&client, request)
                             .await
                             .map_err(|e| warn!("stream request handling error: {:?}", e));
                     }
                     Err(e) => warn!("stream error: {:?}", e),
                 }
             })
-            .await
+            .await;
     }
 
     async fn listen_reversed_port(
@@ -361,8 +385,25 @@ impl RemoteControlService {
             }
         };
 
-        // TODO(raggi): limit size to stay under message size limit.
-        let ids = self.ids.borrow().clone();
+        // We need to clean up the ids at some point. Let's do
+        // it when those IDs are asked for.
+        self.remove_old_ids();
+        // Now the only vecs should be ones which are still held with a strong
+        // Rc reference. Extract those.
+        let ids: Vec<u64> = self
+            .ids
+            .borrow()
+            .iter()
+            .flat_map(|w| -> Vec<u64> {
+                // This is all sadmac's fault. Grr. (Because he suggested, correctly, that
+                // we use a Rc<Vec<_>> instead of Vec<Rc<_>>)
+                <Rc<RefCell<Vec<u64>>> as Borrow<RefCell<Vec<u64>>>>::borrow(
+                    &w.upgrade().expect("Didn't we just clear out refs with expired values??"),
+                )
+                .borrow()
+                .clone()
+            })
+            .collect();
         let mut target_identity = identifier.identify().await.map(move |mut i| {
             i.ids = Some(ids);
             i
