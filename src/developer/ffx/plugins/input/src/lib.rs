@@ -2,14 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Result},
-    ffx_core::ffx_plugin,
-    ffx_input_args::ComponentInputCommand,
-    fidl_fuchsia_ui_input_config::FeaturesProxy,
-};
+use anyhow::{format_err, Context, Result};
+use ffx_input_args::ComponentInputCommand;
+use fho::{selector, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_ui_input_config::FeaturesProxy;
 
-#[ffx_plugin(FeaturesProxy = "core/ui/scene_manager:expose:fuchsia.ui.input.config.Features")]
+#[derive(FfxTool)]
+pub struct InputTool {
+    #[with(selector("core/ui/scene_manager:expose:fuchsia.ui.input.config.Features"))]
+    features_proxy: FeaturesProxy,
+    #[command]
+    cmd: ComponentInputCommand,
+}
+
+fho::embedded_plugin!(InputTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for InputTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        feature(self.features_proxy, self.cmd).await.map_err(Into::into)
+    }
+}
+
 pub async fn feature(features_proxy: FeaturesProxy, cmd: ComponentInputCommand) -> Result<()> {
     match (cmd.enable, cmd.disable) {
         (None, None) => Err(format_err!("Need --enable or --disable")),
