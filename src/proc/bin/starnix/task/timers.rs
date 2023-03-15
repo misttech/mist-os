@@ -14,6 +14,8 @@ use crate::types::*;
 #[derive(Debug, Default)]
 pub struct TimerTable {}
 
+pub type TimerId = usize;
+
 impl TimerTable {
     pub fn new() -> Arc<TimerTable> {
         Default::default()
@@ -23,19 +25,21 @@ impl TimerTable {
         &self,
         _clockid: uapi::__kernel_clockid_t,
         _event: &sigevent,
-    ) -> Result<usize, Errno> {
+    ) -> Result<TimerId, Errno> {
+        // TODO(fxbug.dev/123084): Really implement.
+        Ok(1)
+    }
+
+    pub fn delete(&self, _id: TimerId) -> Result<(), Errno> {
+        // TODO(fxbug.dev/123084): Really implement.
+        Ok(())
+    }
+
+    pub fn get_time(&self, _id: TimerId) -> Result<itimerspec, Errno> {
         error!(ENOSYS)
     }
 
-    pub fn delete(&self, _id: usize) -> Result<(), Errno> {
-        error!(ENOSYS)
-    }
-
-    pub fn get_time(&self, _id: usize) -> Result<itimerspec, Errno> {
-        error!(ENOSYS)
-    }
-
-    pub fn get_overrun(&self, _id: usize) -> Result<i32, Errno> {
+    pub fn get_overrun(&self, _id: TimerId) -> Result<i32, Errno> {
         error!(ENOSYS)
     }
 }

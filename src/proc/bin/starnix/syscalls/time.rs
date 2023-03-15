@@ -103,10 +103,9 @@ pub fn sys_clock_nanosleep(
     clock_nanosleep_with_deadline(current_task, which_clock, flags, deadline, user_remaining)
 }
 
-#[allow(clippy::only_used_in_recursion)]
 fn clock_nanosleep_with_deadline(
     current_task: &mut CurrentTask,
-    which_clock: u32,
+    _which_clock: u32,
     flags: u32,
     deadline: zx::Time,
     user_remaining: UserRef<timespec>,
@@ -126,7 +125,7 @@ fn clock_nanosleep_with_deadline(
             current_task.set_syscall_restart_func(move |current_task| {
                 clock_nanosleep_with_deadline(
                     current_task,
-                    which_clock,
+                    _which_clock,
                     flags,
                     deadline,
                     user_remaining,
@@ -239,6 +238,86 @@ fn get_dynamic_clock(current_task: &CurrentTask, which_clock: i32) -> Result<i64
     } else {
         get_process_cpu_time(current_task, pid)
     }
+}
+
+pub fn sys_timer_create(
+    current_task: &CurrentTask,
+    clockid: uapi::__kernel_clockid_t,
+    event: UserRef<sigevent>,
+    timerid: UserRef<uapi::__kernel_timer_t>,
+) -> Result<(), Errno> {
+    not_implemented!(current_task, "timer_create");
+    let timers = &current_task.thread_group.read().timers;
+    let user_event = current_task.mm.read_object(event)?;
+    let id = timers.create(clockid, &user_event)? as uapi::__kernel_timer_t;
+    current_task.mm.write_object(timerid, &id)?;
+    Ok(())
+}
+
+pub fn sys_timer_delete(
+    current_task: &CurrentTask,
+    id: uapi::__kernel_timer_t,
+) -> Result<(), Errno> {
+    not_implemented!(current_task, "timer_delete");
+    let timers = &current_task.thread_group.read().timers;
+    timers.delete(id as usize)
+}
+
+pub fn sys_timer_gettime(
+    current_task: &CurrentTask,
+    id: uapi::__kernel_timer_t,
+    curr_value: UserRef<itimerspec>,
+) -> Result<(), Errno> {
+    let timers = &current_task.thread_group.read().timers;
+    current_task.mm.write_object(curr_value, &timers.get_time(id as usize)?)?;
+    Ok(())
+}
+
+pub fn sys_timer_getoverrun(
+    current_task: &CurrentTask,
+    id: uapi::__kernel_timer_t,
+) -> Result<i32, Errno> {
+    let timers = &current_task.thread_group.read().timers;
+    timers.get_overrun(id as usize)
+}
+
+pub fn sys_timer_settime(
+    current_task: &CurrentTask,
+    _id: uapi::__kernel_timer_t,
+    _flags: i32,
+    _new_value: UserRef<itimerspec>,
+    _old_value: UserRef<itimerspec>,
+) -> Result<(), Errno> {
+    not_implemented!(current_task, "timer_settime");
+    Ok(())
+}
+
+pub fn sys_getitimer(
+    current_task: &CurrentTask,
+    which: u32,
+    user_curr_value: UserRef<itimerval>,
+) -> Result<(), Errno> {
+    let itimers = current_task.thread_group.read().itimers;
+    let timer = itimers.get(which as usize).ok_or_else(|| errno!(EINVAL))?;
+    current_task.mm.write_object(user_curr_value, timer)?;
+    Ok(())
+}
+
+pub fn sys_setitimer(
+    current_task: &CurrentTask,
+    which: u32,
+    user_new_value: UserRef<itimerval>,
+    user_old_value: UserRef<itimerval>,
+) -> Result<(), Errno> {
+    let new_value = current_task.mm.read_object(user_new_value)?;
+
+    let old_value = current_task.thread_group.set_itimer(which, new_value)?;
+
+    if !user_old_value.is_null() {
+        current_task.mm.write_object(user_old_value, &old_value)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

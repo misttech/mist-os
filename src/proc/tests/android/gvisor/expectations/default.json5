@@ -189,8 +189,6 @@
                 "FcntlLockTest.GetLockRespectsPIDNamespace",
 
                 // flock_test
-                "FlockTest.TestSharedLockFailExclusiveHolderBlocking",
-                "FlockTest.TestExclusiveLockFailExclusiveHolderBlocking",
                 "FlockTestNoFixture.FlockSymlink",
 
                 // fork_test
@@ -1115,16 +1113,15 @@
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_BOOTTIME",
 
                 // timers_test
-                "IntervalTimerTest.MultipleTimers",
                 "IntervalTimerTest.SingleShotSilent",
                 "IntervalTimerTest.PeriodicGroupDirectedSignal",
+                "IntervalTimerTest.PeriodicThreadDirectedSignal",
                 "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
                 "TimerTest.ProcessKilledOnCPUHardLimit",
                 "IntervalTimerTest.OtherThreadGroup",
                 "IntervalTimerTest.PeriodicSilent",
                 "IntervalTimerTest.IsInitiallyStopped",
                 "IntervalTimerTest.RealTimeSignalsAreNotDuplicated",
-                "IntervalTimerTest.PeriodicThreadDirectedSignal",
                 "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
 
@@ -1232,6 +1229,8 @@
                 "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
                 "AllInetTests/SimpleTcpSocketTest.CloseNonConnectedLingerOption/*",
                 "SeccompTest.RetKillOnlyKillsOneThread",
+                "FlockTest.TestSharedLockFailExclusiveHolderBlocking",
+                "FlockTest.TestExclusiveLockFailExclusiveHolderBlocking",
 
                 // TODO(fxbug.dev/105339): Re-enable once flake is resolved.
                 "Waiters/WaitSpecificChildTest.MultipleForkOutOfOrder/*",
