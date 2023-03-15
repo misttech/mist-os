@@ -61,19 +61,13 @@ config("internal.config") {
 
 config("testonly.config") {
   visibility = [ "./*" ]
-  defines = [
-    # TODO(fxbug.dev/122001): Remove LLVM_LIBC_TEST_USE_FUCHSIA after roll.
-    "LIBC_COPT_TEST_USE_FUCHSIA=1",
-    "LLVM_LIBC_TEST_USE_FUCHSIA=1",
-  ]
+  defines = [ "LIBC_COPT_TEST_USE_FUCHSIA=1" ]
 }
 
 config("llvm-libc-export.config") {
   visibility = [ "./*" ]
   defines = [
-    # TODO(fxbug.dev/122001): Remove LLVM_LIBC_PUBLIC_PACKAGING after roll.
     "LIBC_COPT_PUBLIC_PACKAGING=1",
-    "LLVM_LIBC_PUBLIC_PACKAGING=1",
     "LLVM_LIBC_FUNCTION_ATTR=[[gnu::visibility(\"default\")]]",
     "LIBC_INLINE=inline",
   ]
