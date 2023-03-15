@@ -18,19 +18,8 @@ bool BootStack::IsOnStack(uintptr_t sp) const {
 
 #if __has_feature(shadow_call_stack)
 
-bool BootShadowCallStack::IsOnStack(uintptr_t sp) const {
-  const uintptr_t base = reinterpret_cast<uintptr_t>(shadow_call_stack);
-  return base <= sp && sp - base <= sizeof(shadow_call_stack);
-}
-
-ShadowCallStackBacktrace BootShadowCallStack::BackTrace(uintptr_t scsp) const {
-  if (scsp % sizeof(uintptr_t) == 0 && IsOnStack(scsp)) {
-    const cpp20::span whole_stack(shadow_call_stack);
-    const uintptr_t base = reinterpret_cast<uintptr_t>(shadow_call_stack);
-    const size_t frames = (scsp - base) / sizeof(uintptr_t);
-    return ShadowCallStackBacktrace(whole_stack.subspan(0, frames));
-  }
-  return {};
+arch::ShadowCallStackBacktrace BootShadowCallStack::BackTrace(uintptr_t scsp) const {
+  return arch::ShadowCallStackBacktrace(shadow_call_stack, scsp);
 }
 
 #endif  // __has_feature(shadow_call_stack)

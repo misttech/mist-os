@@ -23,7 +23,6 @@ if (toolchain_environment == "kernel.phys" ||
       "exception.cc",
       "reset.cc",
       "setup.cc",
-      "shadow-call-stack.S",
       "start.S",
     ]
     public_deps = [ "//zircon/kernel/phys:main" ]

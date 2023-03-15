@@ -38,7 +38,6 @@ if (toolchain_environment == "kernel.phys" ||
       "psci.cc",
       "reset.cc",
       "setup.cc",
-      "shadow-call-stack.S",
       "start.S",
     ]
     include_dirs = [ "//zircon/.." ]

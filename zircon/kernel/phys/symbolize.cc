@@ -16,7 +16,6 @@
 #include <ktl/algorithm.h>
 #include <ktl/string_view.h>
 #include <phys/elf-image.h>
-#include <phys/frame-pointer.h>
 #include <phys/main.h>
 #include <phys/stack.h>
 #include <pretty/hexdump.h>
@@ -106,8 +105,9 @@ void Symbolize::DumpFile(ktl::string_view announce, size_t size_bytes, ktl::stri
   Printf(" %zu bytes\n", size_bytes);
 }
 
-void Symbolize::PrintBacktraces(const FramePointer& frame_pointers,
-                                const ShadowCallStackBacktrace& shadow_call_stack, unsigned int n) {
+void Symbolize::PrintBacktraces(const Symbolize::FramePointerBacktrace& frame_pointers,
+                                const arch::ShadowCallStackBacktrace& shadow_call_stack,
+                                unsigned int n) {
   Context();
   if (frame_pointers.empty()) {
     Printf("%s: Frame pointer backtrace is empty!\n", name_);
@@ -156,8 +156,8 @@ bool Symbolize::IsOnStack(uintptr_t sp) const {
                      [sp](auto&& stack) { return stack.boot_stack.IsOnStack(sp); });
 }
 
-ShadowCallStackBacktrace Symbolize::GetShadowCallStackBacktrace(uintptr_t scsp) const {
-  ShadowCallStackBacktrace backtrace;
+arch::ShadowCallStackBacktrace Symbolize::GetShadowCallStackBacktrace(uintptr_t scsp) const {
+  arch::ShadowCallStackBacktrace backtrace;
   for (const auto& stack : shadow_call_stacks_) {
     backtrace = stack.boot_stack.BackTrace(scsp);
     if (!backtrace.empty()) {
@@ -260,17 +260,10 @@ void Symbolize::PrintException(uint64_t vector, const char* vector_name,
   BackTraceFrame(0, exc.pc(), true);
 
   // Collect each kind of backtrace if possible.
-  FramePointer fp_backtrace;
-  ShadowCallStackBacktrace scs_backtrace;
+  FramePointerBacktrace fp_backtrace;
+  arch::ShadowCallStackBacktrace scs_backtrace;
 
-  const uint64_t fp = exc.fp();
-  if (fp % sizeof(uintptr_t) == 0 &&
-      ktl::any_of(stacks_.begin(), stacks_.end(), [fp](const auto& stack) {
-        return stack.boot_stack.IsOnStack(fp) &&
-               stack.boot_stack.IsOnStack(fp + sizeof(FramePointer));
-      })) {
-    fp_backtrace = *reinterpret_cast<FramePointer*>(fp);
-  }
+  fp_backtrace = FramePointerBacktrace::BackTrace(exc.fp());
 
   uint64_t scsp = exc.shadow_call_sp();
   scs_backtrace = boot_shadow_call_stack.BackTrace(scsp);

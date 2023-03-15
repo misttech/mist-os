@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_SYMBOLIZE_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_SYMBOLIZE_H_
 
+#include <lib/arch/backtrace.h>
 #include <lib/elfldltl/note.h>
 #include <lib/elfldltl/preallocated-vector.h>
 #include <lib/symbolizer-markup/writer.h>
@@ -23,8 +24,6 @@
 #include <phys/stack.h>
 
 class ElfImage;
-class FramePointer;
-class ShadowCallStackBacktrace;
 struct PhysExceptionState;
 class Symbolize;
 
@@ -38,6 +37,13 @@ class Symbolize {
     BootStackType& boot_stack;
     std::string_view name;
   };
+
+  struct IsOnStackFunction {
+    bool operator()(const void* ptr) const {
+      return gSymbolize && gSymbolize->IsOnStack(reinterpret_cast<uintptr_t>(ptr));
+    }
+  };
+  using FramePointerBacktrace = arch::FramePointerBacktrace<IsOnStackFunction>;
 
   using ModuleList = elfldltl::PreallocatedVector<const ElfImage*>;
 
@@ -65,8 +71,13 @@ class Symbolize {
 
   bool IsOnStack(uintptr_t sp) const;
 
-  ShadowCallStackBacktrace GetShadowCallStackBacktrace(
-      uintptr_t scsp = GetShadowCallStackPointer()) const;
+  arch::ShadowCallStackBacktrace GetShadowCallStackBacktrace(
+      uintptr_t scsp = arch::GetShadowCallStackPointer()) const;
+
+  FramePointerBacktrace GetFramePointerBacktrace(
+      const arch::CallFrame* fp = static_cast<arch::CallFrame*>(__builtin_frame_address(0))) const {
+    return FramePointerBacktrace::BackTrace(fp);
+  }
 
   // Return the ELF build ID note for the main executable.
   elfldltl::ElfNote BuildId() const;
@@ -97,8 +108,8 @@ class Symbolize {
   }
 
   // Print both flavors of backtrace together.
-  PHYS_SINGLETHREAD void PrintBacktraces(const FramePointer& frame_pointers,
-                                         const ShadowCallStackBacktrace& shadow_call_stack,
+  PHYS_SINGLETHREAD void PrintBacktraces(const FramePointerBacktrace& frame_pointers,
+                                         const arch::ShadowCallStackBacktrace& shadow_call_stack,
                                          unsigned int n = 0);
 
   // Print the trigger markup element for a dumpfile.

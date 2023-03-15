@@ -10,7 +10,6 @@
 
 #include <__verbose_abort>
 
-#include <phys/frame-pointer.h>
 #include <phys/main.h>
 #include <phys/stack.h>
 #include <phys/symbolize.h>
@@ -35,7 +34,7 @@ namespace {
 
   // Now print the backtrace and stack dump.
   if (gSymbolize) {
-    gSymbolize->PrintBacktraces(FramePointer::BackTrace(),
+    gSymbolize->PrintBacktraces(gSymbolize->GetFramePointerBacktrace(),
                                 gSymbolize->GetShadowCallStackBacktrace());
 
     uintptr_t sp = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));

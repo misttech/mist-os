@@ -138,13 +138,9 @@ if (toolchain_environment == "kernel.phys" ||
   }
 
   static_library("symbolize") {
-    public = [
-      "include/phys/frame-pointer.h",
-      "include/phys/symbolize.h",
-    ]
+    public = [ "include/phys/symbolize.h" ]
 
     sources = [
-      "frame-pointer.cc",
       "main-symbolize.cc",
       "panic.cc",
       "stack.cc",
@@ -156,6 +152,7 @@ if (toolchain_environment == "kernel.phys" ||
       ":elf-image",
       "//src/lib/elfldltl",
       "//src/lib/symbolizer-markup",
+      "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",

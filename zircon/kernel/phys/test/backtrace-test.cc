@@ -4,11 +4,13 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <inttypes.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <zircon/assert.h>
 #include <zircon/boot/image.h>
 
-#include <phys/frame-pointer.h>
+#include <ktl/iterator.h>
 #include <phys/stack.h>
 #include <phys/symbolize.h>
 
@@ -18,32 +20,26 @@ namespace {
 
 // BackTrace() omits its immediate caller, so Collect* itself won't appear.
 
-[[gnu::noinline]] auto CollectFp() { return FramePointer::BackTrace(); }
+[[gnu::noinline]] auto CollectFp() { return Symbolize::FramePointerBacktrace::BackTrace(); }
 
 [[gnu::noinline]] auto CollectScs() { return boot_shadow_call_stack.BackTrace(); }
 
-[[gnu::noinline]] PHYS_SINGLETHREAD int Find() {
-  constexpr auto bt_depth = [](auto&& bt) {
-    int depth = 0;
-    for ([[maybe_unused]] auto pc : bt) {
-      ++depth;
-    }
-    return depth;
-  };
+[[gnu::noinline]] PHYS_SINGLETHREAD ptrdiff_t Find() {
+  constexpr auto bt_depth = [](auto&& bt) { return ktl::distance(bt.begin(), bt.end()); };
 
   printf("Collecting backtraces...\n");
   gSymbolize->Context();
 
   const auto fp_bt = CollectFp();
-  const int fp_depth = bt_depth(fp_bt);
+  const ptrdiff_t fp_depth = bt_depth(fp_bt);
 
-  printf("Printing frame pointer backtrace, %d frames:\n", fp_depth);
+  printf("Printing frame pointer backtrace, %td frames:\n", fp_depth);
   gSymbolize->BackTrace(fp_bt);
 
   const auto scs_bt = CollectScs();
-  const int scs_depth = bt_depth(scs_bt);
+  const ptrdiff_t scs_depth = bt_depth(scs_bt);
   if (BootShadowCallStack::kEnabled) {
-    printf("Printing shadow call stack backtrace, %d frames:\n", scs_depth);
+    printf("Printing shadow call stack backtrace, %td frames:\n", scs_depth);
     gSymbolize->BackTrace(scs_bt);
 
     ZX_ASSERT(fp_depth == scs_depth);
@@ -60,9 +56,9 @@ namespace {
       // The first PC is the collection call site above, which differs between
       // the two collections.  The rest should match.
       if (first) {
-        ZX_ASSERT(*scs != *fp);
+        ZX_ASSERT_MSG(*scs != *fp, "SCS %#" PRIxPTR " vs FP %#" PRIxPTR, *scs, *fp);
       } else {
-        ZX_ASSERT(*scs == *fp);
+        ZX_ASSERT_MSG(*scs == *fp, "SCS %#" PRIxPTR " vs FP %#" PRIxPTR, *scs, *fp);
       }
     }
   } else {
@@ -73,11 +69,11 @@ namespace {
   return fp_depth - 1;
 }
 
-[[gnu::noinline]] PHYS_SINGLETHREAD int Outer() { return Find() - 1; }
+[[gnu::noinline]] PHYS_SINGLETHREAD ptrdiff_t Outer() { return Find() - 1; }
 
-[[gnu::noinline]] PHYS_SINGLETHREAD int Otter() { return Outer() - 1; }
+[[gnu::noinline]] PHYS_SINGLETHREAD ptrdiff_t Otter() { return Outer() - 1; }
 
-[[gnu::noinline]] PHYS_SINGLETHREAD int Foo() { return Otter() - 1; }
+[[gnu::noinline]] PHYS_SINGLETHREAD ptrdiff_t Foo() { return Otter() - 1; }
 
 }  // namespace
 

@@ -19,31 +19,9 @@
 #endif  // __has_feature(shadow_call_stack)
 
 #ifndef __ASSEMBLER__
-#include <lib/stdcompat/span.h>
-#include <stdint.h>
+#include <lib/arch/backtrace.h>
 
 #include <ktl/iterator.h>
-
-// The shadow call stack grows up, so iterating over frames from innermost to
-// outermost has to go last to first.
-class ShadowCallStackBacktrace {
- public:
-  ShadowCallStackBacktrace() = default;
-  ShadowCallStackBacktrace(const ShadowCallStackBacktrace&) = default;
-
-  explicit ShadowCallStackBacktrace(cpp20::span<const uintptr_t> stack) : stack_(stack) {}
-
-  ShadowCallStackBacktrace& operator=(const ShadowCallStackBacktrace&) = default;
-
-  bool empty() const { return stack_.empty(); }
-
-  auto begin() const { return stack_.rbegin(); }
-
-  auto end() const { return stack_.rend(); }
-
- private:
-  cpp20::span<const uintptr_t> stack_;
-};
 
 struct BootStack {
   // Returns true iff SP falls on this stack.
@@ -64,7 +42,7 @@ struct NoStack {
 
   constexpr uintptr_t InitialSp() const { return 0; }
 
-  ShadowCallStackBacktrace BackTrace(uintptr_t scsp = 0) const { return {}; }
+  arch::ShadowCallStackBacktrace BackTrace(uintptr_t scsp = 0) const { return {}; }
 };
 
 #if __has_feature(safe_stack)
@@ -74,16 +52,15 @@ using BootUnsafeStack = NoStack;
 #endif  // __has_feature(safe_stack)
 
 #if __has_feature(shadow_call_stack)
-extern "C" uintptr_t GetShadowCallStackPointer();
-
 struct BootShadowCallStack {
   static constexpr bool kEnabled = true;
 
-  bool IsOnStack(uintptr_t scsp) const;
-
   uintptr_t StartScsp() const { return reinterpret_cast<uintptr_t>(ktl::end(shadow_call_stack)); }
 
-  ShadowCallStackBacktrace BackTrace(uintptr_t scsp = GetShadowCallStackPointer()) const;
+  // The caller evaluates the default argument to supply its own backtrace.
+  // That way the immediate caller itself is not included in the backtrace.
+  arch::ShadowCallStackBacktrace BackTrace(
+      uintptr_t scsp = arch::GetShadowCallStackPointer()) const;
 
   uintptr_t shadow_call_stack[BOOT_SHADOW_CALL_STACK_SIZE / sizeof(uintptr_t)];
 };
@@ -91,8 +68,6 @@ static_assert(alignof(BootShadowCallStack) == 8);
 static_assert(BOOT_SHADOW_CALL_STACK_SIZE % sizeof(uintptr_t) == 0);
 
 #else
-
-constexpr uintptr_t GetShadowCallStackPointer() { return 0; }
 
 using BootShadowCallStack = NoStack;
 
