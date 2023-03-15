@@ -62,7 +62,7 @@ impl std::ops::Deref for ConfigWrapper {
 
 /// Returns the configuration object for the container being run by this `starnix_kernel`.
 fn get_config() -> ConfigWrapper {
-    if let Ok(config_bytes) = std::fs::read("/galaxy_config/config") {
+    if let Ok(config_bytes) = std::fs::read("/container_config/config") {
         let program_dict: fdata::Dictionary = fidl::encoding::unpersist(&config_bytes)
             .expect("Failed to unpersist the program dictionary.");
 
@@ -79,7 +79,7 @@ fn get_config() -> ConfigWrapper {
         let pkg_dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
             .map(zx::Channel::from_handle);
         let outgoing_dir =
-            fruntime::take_startup_handle(kernel_config::GALAXY_OUTGOING_DIR_HANDLE_INFO)
+            fruntime::take_startup_handle(kernel_config::CONTAINER_OUTGOING_DIR_HANDLE_INFO)
                 .map(zx::Channel::from_handle);
 
         ConfigWrapper {
@@ -308,11 +308,8 @@ fn create_fs_context(
         create_remotefs_filesystem(kernel, pkg_dir_proxy, rights, "data")?,
         BTreeMap::from([(b"pkg".to_vec(), TmpFs::new_fs(kernel))]),
     );
-    let mut mappings = vec![
-        (b"container".to_vec(), container_fs.clone()),
-        (b"galaxy".to_vec(), container_fs),
-        (b"data".to_vec(), TmpFs::new_fs(kernel)),
-    ];
+    let mut mappings =
+        vec![(b"container".to_vec(), container_fs), (b"data".to_vec(), TmpFs::new_fs(kernel))];
     if config.features.contains(&"custom_artifacts".to_string()) {
         mappings.push((b"custom_artifacts".to_vec(), TmpFs::new_fs(kernel)));
     }

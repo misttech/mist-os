@@ -33,10 +33,10 @@
             path: "/dev/class/gpu",
         },
         {
-            directory: "galaxy_config",
+            directory: "container_config",
             from: "parent",
             rights: [ "r*" ],
-            path: "/galaxy_config",
+            path: "/container_config",
             availability: "optional",
         },
         {

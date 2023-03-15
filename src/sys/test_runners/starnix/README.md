@@ -13,7 +13,7 @@ The Starnix test runner runs test binaries that are compiled for Linux. Each
 such Linux binary expects to run in a particular environment (e.g., a particular
 system image). Starnix calls such an environment a "container."
 
-All galaxies share the same `starnix_kernel.cml`, but they differ in their
+All containers share the same `starnix_kernel.cml`, but they differ in their
 configuration. A container is simply a package that contains the Starnix kernel
 component along with a system image and configuration values for its
 `starnix_kernel.cml`.
@@ -23,7 +23,7 @@ configuration via the `program` block in the test's `.cml`.  The Starnix test
 runner then instantiates the bundled Starnix kernel for each test, and uses
 that runner to actually run the test binary.
 
-This means that the same test runner can be used for all Starnix galaxies, and
+This means that the same test runner can be used for all Starnix containers, and
 each test component runs hermetically.
 
 To create a new Starnix test component, first add the following include to the

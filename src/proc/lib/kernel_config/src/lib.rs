@@ -16,11 +16,11 @@ use vfs::directory::helper::DirectlyMutable;
 /// The handle type that is used to pass configuration handles to the starnix_kernel.
 pub const HANDLE_TYPE: fruntime::HandleType = fruntime::HandleType::User0;
 
-/// The handle info that is used to pass the /pkg directory of a galaxy component.
+/// The handle info that is used to pass the /pkg directory of a container component.
 pub const PKG_HANDLE_INFO: fruntime::HandleInfo = fruntime::HandleInfo::new(HANDLE_TYPE, 0);
 
-/// The handle info that is used to pass the outgoing directory for a galaxy.
-pub const GALAXY_OUTGOING_DIR_HANDLE_INFO: fruntime::HandleInfo =
+/// The handle info that is used to pass the outgoing directory for a container.
+pub const CONTAINER_OUTGOING_DIR_HANDLE_INFO: fruntime::HandleInfo =
     fruntime::HandleInfo::new(HANDLE_TYPE, 1);
 
 #[derive(Debug)]
@@ -35,9 +35,9 @@ pub fn generate_kernel_config(
     mut component_start_info: frunner::ComponentStartInfo,
 ) -> Result<KernelStartInfo, Error> {
     // The name of the directory as seen by the starnix_kernel.
-    const CONFIG_DIRECTORY: &str = "galaxy_config";
+    const CONFIG_DIRECTORY: &str = "container_config";
 
-    // Grab the /pkg directory of the galaxy component, and pass it to the starnix_kernel as handle
+    // Grab the /pkg directory of the container component, and pass it to the starnix_kernel as handle
     // `User1`.
     let mut ns = component_start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
     let pkg = ns
@@ -52,13 +52,13 @@ pub fn generate_kernel_config(
         id: PKG_HANDLE_INFO.as_raw(),
     };
 
-    // Pass the outgoing directory of the galaxy to the starnix_kernel. The kernel uses this to
-    // serve, for example, a component runner on behalf of the galaxy.
+    // Pass the outgoing directory of the container to the starnix_kernel. The kernel uses this to
+    // serve, for example, a component runner on behalf of the container.
     let outgoing_dir =
         component_start_info.outgoing_dir.take().expect("Missing outgoing directory.");
     let outgoing_dir_handle_info = fprocess::HandleInfo {
         handle: outgoing_dir.into_handle(),
-        id: GALAXY_OUTGOING_DIR_HANDLE_INFO.as_raw(),
+        id: CONTAINER_OUTGOING_DIR_HANDLE_INFO.as_raw(),
     };
     let numbered_handles = vec![pkg_handle_info, outgoing_dir_handle_info];
 
@@ -102,9 +102,9 @@ fn generate_kernel_name(name: &str) -> String {
     name.to_owned() + "_" + &random_id
 }
 
-/// Creates a new subdirectory in `kernels_dir`, named after the galaxy being created.
+/// Creates a new subdirectory in `kernels_dir`, named after the container being created.
 ///
-/// This directory is populated with a file containing the galaxy's `program` block.
+/// This directory is populated with a file containing the container's `program` block.
 ///
 /// Returns the name of the newly created directory.
 fn generate_kernel_config_directory(
@@ -114,10 +114,12 @@ fn generate_kernel_config_directory(
     // The name of the file that the starnix_kernel's configuration is written to.
     const CONFIG_FILE: &str = "config";
 
-    let mut program_block =
-        component_start_info.program.take().ok_or(anyhow!("Missing program block in galaxy."))?;
+    let mut program_block = component_start_info
+        .program
+        .take()
+        .ok_or(anyhow!("Missing program block in container."))?;
 
-    // Add the galaxy configuration file to the directory that is provided to the starnix_kernel.
+    // Add the container configuration file to the directory that is provided to the starnix_kernel.
     let kernel_config_file =
         vfs::file::vmo::read_only(fidl::encoding::persist(&mut program_block)?);
 
@@ -127,13 +129,13 @@ fn generate_kernel_config_directory(
     // This particular starnix_kernel's configuration directory is stored in the `kernels_dir`. We
     // then offer a subdirectory of said directory to the starnix_kernel.
     let kernel_name = {
-        let galaxy_url =
+        let container_url =
             component_start_info.resolved_url.clone().ok_or(anyhow!("Missing resolved URL"))?;
-        let galaxy_name = galaxy_url
+        let container_name = container_url
             .split('/')
             .last()
             .expect("Could not find last path component in resolved URL");
-        generate_kernel_name(galaxy_name)
+        generate_kernel_name(container_name)
     };
 
     kernels_dir.add_entry(kernel_name.clone(), kernel_config_dir)?;

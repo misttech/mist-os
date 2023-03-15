@@ -13,14 +13,14 @@
 #include "src/proc/tests/chromiumos/syscalls/test_helper.h"
 
 // Some tests run in environments where /proc is not mounted by default, such as the chromiumos
-// galaxy. This harness mounts the proc filesystem to /proc if needed.
+// container. This harness mounts the proc filesystem to /proc if needed.
 
 class ProcTest : public ::testing::Test {
  public:
   static constexpr char kProc[] = "/proc";
 
   void SetUp() override {
-    // TODO Ideally the test galaxy should just have /proc mounted by default
+    // TODO Ideally the test container should just have /proc mounted by default
     // but first the mount point needs to exist in the image
     // (prebuilt/starnix/chromiumos-image-amd64/system.img).
     if (access(kProc, F_OK) != 0) {

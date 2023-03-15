@@ -90,8 +90,8 @@ pub async fn serve_starnix_manager(
             fstardev::ManagerRequest::StartShell { params, controller, .. } => {
                 start_shell(params, controller).await?;
             }
-            fstardev::ManagerRequest::VsockConnect { galaxy, port, bridge_socket, .. } => {
-                connect_to_vsock(port, bridge_socket, &galaxy).unwrap_or_else(|e| {
+            fstardev::ManagerRequest::VsockConnect { container, port, bridge_socket, .. } => {
+                connect_to_vsock(port, bridge_socket, &container).unwrap_or_else(|e| {
                     tracing::error!("failed to connect to vsock {:?}", e);
                 });
             }
@@ -137,15 +137,17 @@ async fn start_shell(
     create_child_component(url, args).await
 }
 
-/// Connects `bridge_socket` to the vsocket at `port` in the specified galaxy.
+/// Connects `bridge_socket` to the vsocket at `port` in the specified container.
 ///
-/// Returns an error if the FIDL connection to the galaxy failed.
-fn connect_to_vsock(port: u32, bridge_socket: fidl::Socket, galaxy: &str) -> Result<(), Error> {
-    let service_prefix = "/".to_string() + galaxy;
-    let galaxy =
+/// Returns an error if the FIDL connection to the container failed.
+fn connect_to_vsock(port: u32, bridge_socket: fidl::Socket, container: &str) -> Result<(), Error> {
+    let service_prefix = "/".to_string() + container;
+    let container =
         fclient::connect_to_protocol_at::<fstarcontainer::ControllerMarker>(&service_prefix)?;
 
-    galaxy.vsock_connect(port, bridge_socket).context("Failed to call vsock connect on galaxy")
+    container
+        .vsock_connect(port, bridge_socket)
+        .context("Failed to call vsock connect on container")
 }
 
 /// Creates a `HandleInfo` from the provided socket and file descriptor.
@@ -203,10 +205,10 @@ pub async fn create_child_component(
 /// Creates a new instance of `starnix_kernel`.
 ///
 /// This is done by creating a new child in the `kernels` collection. A directory is offered to the
-/// `starnix_kernel`, at `/galaxy_config`. The directory contains the `program` block of the galaxy,
-/// and the galaxy's `/pkg` directory.
+/// `starnix_kernel`, at `/container_config`. The directory contains the `program` block of the
+/// container, and the container's `/pkg` directory.
 ///
-/// The component controller for the galaxy is also passed to the `starnix_kernel`, via the `User0`
+/// The component controller for the container is also passed to the `starnix_kernel`, via the `User0`
 /// handle. The `controller` is closed when the `starnix_kernel` finishes executing (e.g., when
 /// the init task completes).
 async fn create_new_kernel(
@@ -223,7 +225,7 @@ async fn create_new_kernel(
         generate_kernel_config(kernels_dir, KERNEL_DIRECTORY, component_start_info)?;
 
     // Create a new instance of starnix_kernel in the kernel collection. Offer the directory that
-    // contains all the configuration information for the galaxy that it is running.
+    // contains all the configuration information for the container that it is running.
     let realm =
         connect_to_protocol::<fcomponent::RealmMarker>().expect("Failed to connect to realm.");
     realm

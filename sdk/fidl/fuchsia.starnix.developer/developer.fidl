@@ -8,25 +8,25 @@ using zx;
 
 /// A protocol used to instantiate and interact with components run by Starnix.
 ///
-/// Several `Manager` methods allow clients to choose a "galaxy." A galaxy is a Starnix kernel
+/// Several `Manager` methods allow clients to choose a "container." A container is a Starnix kernel
 /// instance configured with a particular system image, init task, etc.
 ///
-/// For example, the `bionic` galaxy runs components in a bionic (Android libc) based
+/// For example, the `bionic` container runs components in a bionic (Android libc) based
 /// environment.
 ///
-/// Some methods allow clients to specify the name of a galaxy explicitly, while others rely on the
-/// `runner` field of a provided component's `.cml`.
+/// Some methods allow clients to specify the name of a container explicitly, while others rely on
+/// the `runner` field of a provided component's `.cml`.
 @discoverable
 protocol Manager {
-    /// Connects `bridge_socket` to a vsocket at `port` in the specified galaxy.
+    /// Connects `bridge_socket` to a vsocket at `port` in the specified container.
     VsockConnect(resource struct {
-        /// The galaxy to connect the socket to.
-        galaxy string:MAX;
+        /// The container to connect the socket to.
+        container string:MAX;
 
         /// The port to which the socket should be connected.
         port uint32;
 
-        /// The socket handle that will be used by the galaxy.
+        /// The socket handle that will be used by the container.
         bridge_socket zx.handle:SOCKET;
     });
 
@@ -41,10 +41,10 @@ protocol Manager {
 
     /// Starts a shell component.
     ///
-    /// The shell component to launch is optionally specified by `params.url`. The galaxy in which
+    /// The shell component to launch is optionally specified by `params.url`. The container in which
     /// the shell will run is determined by the `.cml` file of the shell component (i.e., by which
     /// runner it uses). For example, a shell component with its `runner` set to `bionic` will
-    /// run in the `bionic` galaxy.
+    /// run in the `bionic` container.
     ///
     /// If no shell component is specified, the `Manager` will choose a default shell component to
     /// launch and connect to.
