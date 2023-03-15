@@ -221,7 +221,10 @@ def copy_file_if_changed(src_path, dst_path):
 
     # Use lexists to make sure broken symlinks are removed as well.
     if os.path.lexists(dst_path):
-        os.remove(dst_path)
+        if os.path.isdir(dst_path):
+            shutil.rmtree(dst_path)
+        else:
+            os.remove(dst_path)
 
     # See https://fxbug.dev/121003 for context.
     # If the file is writable, try to hard-link it directly. Otherwise,
@@ -238,10 +241,27 @@ def copy_file_if_changed(src_path, dst_path):
             if e.errno != errno.EXDEV:
                 raise
 
+    def make_writable(p):
+        file_mode = os.stat(p).st_mode
+        is_readonly = file_mode & stat.S_IWUSR == 0
+        if is_readonly:
+            os.chmod(p, file_mode | stat.S_IWUSR)
+
+    def copy_writable(src, dst):
+        shutil.copy2(src, dst)
+        make_writable(dst)
+
     if do_copy:
-        shutil.copy2(src_path, dst_path)
-        if is_src_readonly:
-            os.chmod(dst_path, file_mode | stat.S_IWUSR)
+        if os.path.isdir(src_path):
+            shutil.copytree(src_path, dst_path, copy_function=copy_writable)
+            # Make directories writable so their contents can be removed and
+            # repopulated in incremental builds.
+            make_writable(dst_path)
+            for (root, dirs, _) in os.walk(dst_path):
+                for d in dirs:
+                    make_writable(os.path.join(root, d))
+        else:
+            copy_writable(src_path, dst_path)
 
 
 _HEXADECIMAL_SET = set("0123456789ABCDEFabcdef")
@@ -502,6 +522,13 @@ def main():
         '--fuchsia-dir',
         help='Path to Fuchsia source directory, auto-detected.')
     parser.add_argument('--depfile', help='Ninja depfile output path.')
+    parser.add_argument(
+        "--allow-directory-in-outputs",
+        action="store_true",
+        default=False,
+        help=
+        'Allow directory outputs in `--bazel-outputs`, NOTE timestamps on directories do NOT accurately reflect content freshness, which can lead to incremental build incorrectness.'
+    )
     parser.add_argument('extra_bazel_args', nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
@@ -574,9 +601,19 @@ For more details, see the comments in //build/bazel/legacy_ninja_build_outputs.g
             file=sys.stderr)
         return 1
 
-    for bazel_out, ninja_out in zip(args.bazel_outputs, args.ninja_outputs):
-        src_path = os.path.join(args.workspace_dir, bazel_out)
-        dst_path = ninja_out
+    src_paths = [
+        os.path.join(args.workspace_dir, bazel_out)
+        for bazel_out in args.bazel_outputs
+    ]
+    if not args.allow_directory_in_outputs:
+        dirs = [p for p in src_paths if os.path.isdir(p)]
+        if dirs:
+            print(
+                '\nDirectories are not allowed in --bazel-outputs when --allow-directory-in-outputs is not specified, got directories:\n\n%s\n'
+                % '\n'.join(dirs))
+            return 1
+
+    for src_path, dst_path in zip(src_paths, args.ninja_outputs):
         copy_file_if_changed(src_path, dst_path)
 
     if args.depfile:

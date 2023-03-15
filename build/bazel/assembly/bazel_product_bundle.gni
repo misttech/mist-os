@@ -83,34 +83,21 @@ template("bazel_product_bundle") {
                     "//")
     _bazel_product_bundle_out_dir += "/" + _product_bundle_name + "_out"
 
+    # Directory outputs are OK because `product_bundle.json` correctly
+    # represents the freshness of all outputs.
+    allow_directory_in_outputs = true
     bazel_outputs = [
       "bazel-bin/${_bazel_product_bundle_out_dir}/product_bundle.json",
-      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/blob.blk",
-      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fuchsia.zbi",
-      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.blk",
-      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.blob.sparse.blk",
-      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.sparse.blk",
+      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a",
+      "bazel-bin/${_bazel_product_bundle_out_dir}/repository",
       "bazel-bin/" + get_path_info(_bazel_product_bundle_out_dir, "dir") +
           "/pave.sh",
-
-      # TODO(https://fxbug.dev/123576): Figure out how to handle conditional
-      # outputs (e.g. vbmeta).
-      # "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fuchsia.vbmeta",
-      # "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.fastboot.blk",
     ]
     ninja_outputs = [
       "product_bundle/product_bundle.json",
-      "product_bundle/system_a/blob.blk",
-      "product_bundle/system_a/fuchsia.zbi",
-      "product_bundle/system_a/fvm.blk",
-      "product_bundle/system_a/fvm.blob.sparse.blk",
-      "product_bundle/system_a/fvm.sparse.blk",
+      "product_bundle/system_a",
+      "product_bundle/repository",
       "pave.sh",
-
-      # TODO(https://fxbug.dev/123576): Figure out how to handle conditional
-      # outputs (e.g. vbmeta).
-      # "product_bundle/system_a/fuchsia.vbmeta",
-      # "product_bundle/system_a/fvm.fastboot.blk",
     ]
 
     # Populate metadata when Bazel image is not used will pollute GN assembly.
@@ -120,7 +107,8 @@ template("bazel_product_bundle") {
       _system_a_root =
           rebase_path(target_gen_dir, root_out_dir) + "/product_bundle/system_a"
 
-      # TODO(https://fxbug.dev/123120): Add more metadata when they are needed.
+      # TODO(https://fxbug.dev/123576): Figure out how to handle conditional
+      # outputs (e.g. vbmeta).
       metadata = {
         images = [
           {
