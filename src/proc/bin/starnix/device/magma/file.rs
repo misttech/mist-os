@@ -594,6 +594,25 @@ impl FileOps for MagmaFile {
                 response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_QUERY as u32;
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_UNMAP_BUFFER => {
+                let (control, mut response): (
+                    virtio_magma_connection_unmap_buffer_ctrl_t,
+                    virtio_magma_connection_unmap_buffer_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                unsafe {
+                    magma_connection_unmap_buffer(
+                        control.connection as magma_connection_t,
+                        control.hw_va,
+                        control.buffer,
+                    )
+                };
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_UNMAP_BUFFER as u32;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
             t => {
                 log_warn!(current_task, "Got unknown request: {:?}", t);
                 error!(ENOSYS)
