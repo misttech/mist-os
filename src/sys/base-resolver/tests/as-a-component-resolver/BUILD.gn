@@ -65,9 +65,10 @@ fuchsia_component("fake-dependencies") {
   testonly = true
   manifest = "meta/fake-dependencies.cml"
   deps = [
-    ":driver_test_realm",
     ":fake_dependencies_bin",
     "//src/storage/bin/blobfs",
+    "//src/storage/blobfs:decompressor-sandbox",
+    "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
@@ -90,14 +91,6 @@ fuchsia_component("package-directory-exposer") {
   testonly = true
   manifest = "meta/package-directory-exposer.cml"
   deps = [ ":package_directory_exposer_bin" ]
-}
-
-group("driver_test_realm") {
-  testonly = true
-  deps = [
-    "//sdk/lib/driver_test_realm/platform",
-    "//src/storage/testing:storage_drivers",
-  ]
 }
 
 rustc_binary("mock_component_bin") {

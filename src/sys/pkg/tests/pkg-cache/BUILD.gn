@@ -69,8 +69,9 @@ fuchsia_component("pkg-cache-integration-test") {
   manifest = "meta/pkg-cache-integration-test.cml"
   deps = [
     ":driver",
-    "//sdk/lib/driver_test_realm/platform",
     "//src/storage/bin/blobfs",
+    "//src/storage/blobfs:decompressor-sandbox",
+    "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pm:pm_bin",
   ]
 }
@@ -89,7 +90,6 @@ fuchsia_test_package("pkg-cache-integration-tests") {
   test_components = [ ":test-root" ]
   deps = [
     ":pkg-cache-integration-test",
-    "//src/storage/testing:storage_drivers",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
     "//src/sys/pkg/bin/system-update-committer:component",
   ]

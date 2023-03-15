@@ -456,10 +456,10 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
   deps = [
     ":ca.cert-resource",
     ":empty-repo",
-
-    # For ramdisk devices, needed to back blobfs (which in turn backs pkg-cache)
     ":pkg-resolver-component",
     "//src/connectivity/network/dns:component",
+
+    # For ramdisk devices, needed to back blobfs (which in turn backs pkg-cache)
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
     "//src/sys/pkg/bin/pkg-local-mirror",
@@ -467,6 +467,7 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
     # Isolated, low-deps netstack
     "//src/connectivity/network/netstack:component",
     "//src/storage/bin/blobfs",
+    "//src/storage/blobfs:decompressor-sandbox",
     "//src/sys/pkg/bin/pm:pm_bin",
     "//src/sys/pkg/bin/system-update-committer:component",
   ]

@@ -46,7 +46,8 @@ fuchsia_unittest_package("blobfs-lib-tests") {
   deps = [
     ":blobfs_test",
     "//src/storage/bin/blobfs",
-    "//src/storage/testing/driver_test_realm",
+    "//src/storage/blobfs:decompressor-sandbox",
+    "//src/storage/testing:storage_driver_test_realm",
   ]
   test_specs = {
     log_settings = {

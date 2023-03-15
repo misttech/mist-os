@@ -93,7 +93,11 @@ impl BlobfsRamdiskBuilder {
             scoped_task::job_default(),
             SpawnOptions::CLONE_ALL,
             &CString::new("/pkg/bin/blobfs").unwrap(),
-            &[&CString::new("blobfs").unwrap(), &CString::new("mount").unwrap()],
+            &[
+                &CString::new("blobfs").unwrap(),
+                &CString::new("mount").unwrap(),
+                &CString::new("--sandbox_decompression").unwrap(),
+            ],
             None,
             &mut [
                 SpawnAction::add_handle(block_device_handle_id, block_handle.into()),

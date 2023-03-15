@@ -12,6 +12,10 @@
             name: "test_suite",
             url: "test_suite#meta/default.cm",
         },
+        {
+            name: "decompressor-sandbox",
+            url: "#meta/decompressor-sandbox.cm",
+        },
     ],
     offer: [
         {
@@ -23,6 +27,7 @@
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
+                "#decompressor-sandbox",
                 "#test_realm_proxy",
                 "#test_suite",
             ],
@@ -46,6 +51,11 @@
             protocol: "fuchsia.component.Binder",
             from: "framework",
             to: "#test_suite",
+        },
+        {
+            protocol: "fuchsia.blobfs.internal.DecompressorCreator",
+            from: "#decompressor-sandbox",
+            to: "#test_realm_proxy",
         },
     ],
     expose: [

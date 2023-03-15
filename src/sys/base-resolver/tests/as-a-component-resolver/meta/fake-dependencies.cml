@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/storage/blobfs/meta/decompressor_sandbox.shard.cml",
+        "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
-        "driver_test_realm/meta/client.shard.cml",
-        "driver_test_realm/platform/meta/client.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -33,13 +33,6 @@
             from: "parent",
             rights: [ "r*" ],
             path: "/the-subpackage",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#platform_driver_test_realm",
         },
     ],
     expose: [

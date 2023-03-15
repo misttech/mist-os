@@ -54,6 +54,7 @@ fuchsia_test_package("isolated-ota-integration-tests") {
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component",
     "//src/storage/bin/blobfs",
+    "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
     "//src/sys/pkg/bin/fake-system-update-committer",
     "//src/sys/pkg/bin/pkg-cache:ignore-system-image-component-and-config",

@@ -12,7 +12,10 @@
     },
     use: [
         {
-            protocol: [ "fuchsia.process.Launcher" ],
+            protocol: [
+                "fuchsia.blobfs.internal.DecompressorCreator",
+                "fuchsia.process.Launcher",
+            ],
             from: "parent",
         },
         {

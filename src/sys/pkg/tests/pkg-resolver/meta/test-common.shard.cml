@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/storage/blobfs/meta/decompressor_sandbox.shard.cml",
         "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
@@ -13,11 +14,11 @@
     children: [
         {
             name: "netstack",
-            url: "fuchsia-pkg://fuchsia.com/pkg-resolver-integration-tests#meta/netstack.cm",
+            url: "#meta/netstack.cm",
         },
         {
             name: "dns_resolver",
-            url: "fuchsia-pkg://fuchsia.com/pkg-resolver-integration-tests#meta/dns_resolver.cm",
+            url: "#meta/dns_resolver.cm",
         },
     ],
     use: [

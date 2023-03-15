@@ -45,17 +45,10 @@ fuchsia_component("test-component") {
   manifest = "meta/test_driver.cml"
   deps = [
     ":blobfs-ramdisk_test",
-    ":driver_test_realm",
     "//src/storage/bin/blobfs",
+    "//src/storage/blobfs:decompressor-sandbox",
+    "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/tools/blobfs-corrupt",
-  ]
-}
-
-group("driver_test_realm") {
-  testonly = true
-  deps = [
-    "//sdk/lib/driver_test_realm/platform",
-    "//src/storage/testing:storage_drivers",
   ]
 }
 
