@@ -58,7 +58,10 @@ func TestOOMSignal(t *testing.T) {
 		"fshost shutdown complete"})
 
 	// Ensure the OOM thread reboots the target.
-	i.WaitForLogMessage("memory-pressure: rebooting due to OOM. received user-mode acknowledgement.")
+	// TODO(fxbug.dev/118767): Driver host crashes might prevent userspace from cleanly
+	// shutting down. Ideally we would like to wait for the log:
+	// "memory-pressure: rebooting due to OOM. received user-mode acknowledgement."
+	i.WaitForLogMessage("memory-pressure: rebooting due to OOM")
 
 	// Ensure that the reboot has stowed a correct crashlog.
 	i.WaitForLogMessage("memory-pressure: stowing crashlog")
