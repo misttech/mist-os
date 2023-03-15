@@ -35,6 +35,7 @@ using namespace std::literals;
 
 using ::testing::_;
 using ::testing::DoAll;
+using ::testing::ElementsAreArray;
 using ::testing::IsEmpty;
 using ::testing::Return;
 using ::testing::SetArgReferee;
@@ -1249,7 +1250,7 @@ TEST_F(FastbootEfiVarTest, EfiGetVarInfo_Error) {
 TEST_F(FastbootEfiVarTest, EfiGetVarInfo_Ok) {
   EXPECT_CALL(mock_efi_variables, EfiQueryVariableInfo())
       .WillOnce(Return(fit::success(EfiVariables::EfiVariableInfo{0, 1, 2})));
-  constexpr auto expected_output =
+  constexpr std::string_view expected_output =
       "\n  Max Storage Size: 0\n  Remaining Variable Storage Size: 1\n  Max Variable Size: 2\n";
 
   transport.AddInPacket(std::string("oem efi-getvarinfo"));
@@ -1352,8 +1353,8 @@ TEST_F(FastbootEfiVarTest, EfiGetVarValue_NameWithGuid) {
   std::copy(VariableValues()[2].begin(), VariableValues()[2].end(), kVal.begin());
   const auto expected_output =
       "00010203-0405-0607-0809-0a0b0c0d0e0f var_2:\n"
-      "0x00000000: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f |................\n"
-      "0x00000010: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f |................\n";
+      "00010203 04050607 08090a0b 0c0d0e0f |................\n"
+      "10111213 14151617 18191a1b 1c1d1e1f |................\n";
 
   EXPECT_CALL(mock_efi_variables, EfiGetVariable(VariableIds()[2]))
       .WillOnce(Return(fit::success(std::move(kVal))));
@@ -1375,8 +1376,8 @@ TEST_F(FastbootEfiVarTest, EfiGetVarValue_NameWithoutGuid) {
   std::copy(VariableValues()[2].begin(), VariableValues()[2].end(), kVal.begin());
   const auto expected_output =
       "00010203-0405-0607-0809-0a0b0c0d0e0f var_2:\n"
-      "0x00000000: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f |................\n"
-      "0x00000010: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f |................\n";
+      "00010203 04050607 08090a0b 0c0d0e0f |................\n"
+      "10111213 14151617 18191a1b 1c1d1e1f |................\n";
 
   EXPECT_CALL(mock_efi_variables, EfiGetVariable(VariableIds()[2]))
       .WillOnce(Return(fit::success(std::move(kVal))));
@@ -1441,12 +1442,12 @@ TEST_F(FastbootEfiVarTest, EfiDumpVars_Multiple) {
   }
   const auto expected_output =
       "00000000-0000-0000-0000-000000000000 var_0:\n"
-      "0x00000000: 00                                              |.\n"
+      "00                                  |.\n"
       "00000001-0001-0001-0100-000000000000 var_1:\n"
-      "0x00000000: 01 02                                           |..\n"
+      "0102                                |..\n"
       "00010203-0405-0607-0809-0a0b0c0d0e0f var_2:\n"
-      "0x00000000: 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f |................\n"
-      "0x00000010: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f |................\n"
+      "00010203 04050607 08090a0b 0c0d0e0f |................\n"
+      "10111213 14151617 18191a1b 1c1d1e1f |................\n"
       "\n";
 
   EXPECT_CALL(mock_efi_variables, EfiGetNextVariableName(_))
@@ -1501,6 +1502,35 @@ TEST_F(FastbootEfiVarTest, EfiDumpVars_Error) {
   ASSERT_EQ(transport.GetOutPackets().size(), 1ULL);
   fastboot::Packets expected_packets = {"FAILEfiVariableName iteration failed"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
+}
+
+class FastbootPrint : public ::testing::Test {
+ public:
+  fastboot::TestTransport transport;
+  MockZirconBootOps mock_zb_ops;
+  MockEfiVariables mock_efi_variables;
+  Fastboot fastboot =
+      Fastboot(download_buffer, mock_zb_ops.GetZirconBootOps(), &mock_efi_variables);
+};
+
+TEST_F(FastbootPrint, EfiGetInfoPrint2kInfo) {
+  EXPECT_CALL(mock_efi_variables, EfiQueryVariableInfo())
+      .WillOnce(Return(fit::success(EfiVariables::EfiVariableInfo{0, 1, 2})));
+  constexpr std::string_view expected_output[] = {
+      "INFO",
+      "INFO  Max Storage Size: 0",
+      "INFO  Remaining Variable Storage Size: 1",
+      "INFO  Max Variable Size: 2",
+      "OKAY",
+  };
+
+  transport.AddInPacket(std::string("oem efi-getvarinfo"));
+
+  zx::result ret = fastboot.ProcessPacket(&transport);
+  ASSERT_TRUE(ret.is_ok());
+
+  ASSERT_EQ(transport.GetOutPackets().size(), 5ULL);
+  EXPECT_THAT(transport.GetOutPackets(), ElementsAreArray(expected_output));
 }
 
 }  // namespace

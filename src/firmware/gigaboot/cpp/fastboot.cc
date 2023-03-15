@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <xefi.h>
 
+#include <algorithm>
 #include <string>
 
 #include <efi/types.h>
@@ -333,8 +334,29 @@ zx::result<> Fastboot::GptInit(std::string_view cmd, fastboot::Transport *transp
   return SendResponse(ResponseType::kOkay, "", transport);
 }
 
+fbl::Vector<char> StringPrintf(const char *fmt, va_list va) {
+  fbl::Vector<char> buf{'\0'};
+  va_list va2;
+  va_copy(va2, va);
+  const size_t len = vsnprintf(buf.data(), 0, fmt, va);
+  buf.resize(len + 1);
+  vsnprintf(buf.data(), buf.size(), fmt, va2);
+  va_end(va2);
+  buf.pop_back();
+  return buf;
+}
+
+void Fastboot::InfoSend(fastboot::Transport *transport, const char *fmt, va_list va) {
+  fbl::Vector<char> s = StringPrintf(fmt, va);
+  if (Fastboot::SendResponse(Fastboot::ResponseType::kInfo, s.data(), transport).is_error()) {
+    printf("Failed to send Info response.\n");
+  }
+}
+
 zx::result<> Fastboot::EfiGetVarInfo(std::string_view cmd, fastboot::Transport *transport) {
   auto info = efi_variables_->EfiQueryVariableInfo();
+  auto transport_scope = RegisterTransport(transport);
+
   if (info.is_error()) {
     return SendResponse(ResponseType::kFail, "QueryVariableInfo() failed", transport);
   }
@@ -353,6 +375,8 @@ zx::result<> Fastboot::EfiGetVarInfo(std::string_view cmd, fastboot::Transport *
 }
 
 zx::result<> Fastboot::EfiGetVarNames(std::string_view cmd, fastboot::Transport *transport) {
+  auto transport_scope = RegisterTransport(transport);
+
   for (auto v_id : *efi_variables_) {
     if (!v_id.IsValid()) {
       return SendResponse(ResponseType::kFail, "EfiVariableName iteration failed", transport);
@@ -379,6 +403,62 @@ void hexdump_printer_printf(void *printf_arg, const char *fmt, ...) {
   va_end(args);
 }
 
+// Hex dump function with shortened output line length. Mostly taken from:
+// http://cs/fuchsia/zircon/system/ulib/pretty/hexdump.cc
+// void hexdump8_very_ex(const void* ptr, size_t len, uint64_t disp_addr, hexdump_printf_func_t*
+// printf_func, void* printf_arg);
+//
+// It differs from original in:
+//  - offset column removed
+//  - spaces between quartets of bytes are removed
+//
+// Output format looks like:
+// ```
+//  01010102 00000100 00000000 00000001 |................
+//  00                                  |.
+// ```
+//
+// Short hexdump version is required to make it readable when send via kInfo channel.
+// In order to make it easier to use with kInfo channel this function calls `printf_func` only to
+// print full line.
+void hexdump8_short(const void *ptr, size_t len, hexdump_printf_func_t *printf_func,
+                    void *printf_arg) {
+  const uint8_t *address = reinterpret_cast<const uint8_t *>(ptr);
+  char line_buffer[fastboot::kMaxCommandPacketSize + 1];
+
+  for (size_t count = 0; count < len; count += 16) {
+    cpp20::span<char> remaining(line_buffer);
+    size_t used = 0;
+
+    size_t i;
+    for (i = 0; i < std::min(len - count, size_t{16}); i++) {
+      used = snprintf(remaining.data(), remaining.size(), "%02hhx%s", *(address + i),
+                      (i % 4 == 3) ? " " : "");
+      remaining = remaining.subspan(used);
+    }
+
+    for (; i < 16; i++) {
+      used = snprintf(remaining.data(), remaining.size(), "%s", (i % 4 == 3) ? "   " : "  ");
+      remaining = remaining.subspan(used);
+    }
+
+    used = snprintf(remaining.data(), remaining.size(), "|");
+    remaining = remaining.subspan(used);
+
+    for (i = 0; i < std::min(len - count, size_t{16}); i++) {
+      char c = address[i];
+      used = snprintf(remaining.data(), remaining.size(), "%c", isprint(c) ? c : '.');
+      remaining = remaining.subspan(used);
+    }
+
+    used = snprintf(remaining.data(), remaining.size(), "\n");
+    remaining = remaining.subspan(used);
+
+    printf_func(printf_arg, line_buffer);
+    address += 16;
+  }
+}
+
 // This function expects `cmd` in following format:
 // oem efi-getvar <var_name> [<guid>]
 //
@@ -386,6 +466,8 @@ void hexdump_printer_printf(void *printf_arg, const char *fmt, ...) {
 //  oem efi-getvar BootOrder
 //  oem efi-getvar BootOrder 8be4df61-93ca-11d2-aa0d-00e098032b8c
 zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *transport) {
+  auto transport_scope = RegisterTransport(transport);
+
   CommandArgs args;
   ExtractCommandArgs(cmd, " ", args);
 
@@ -446,8 +528,8 @@ zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *tran
   if (res_get_var.is_error()) {
     return SendResponse(ResponseType::kFail, "GetVariable() failed", transport);
   }
-  hexdump8_very_ex(res_get_var.value().data(), res_get_var.value().size(), 0,
-                   hexdump_printer_printf, this);
+  hexdump8_short(res_get_var.value().data(), res_get_var.value().size(), hexdump_printer_printf,
+                 this);
 
   return SendResponse(ResponseType::kOkay, "", transport);
 }
@@ -461,6 +543,7 @@ int Fastboot::printer_(const char *fmt, ...) {
 }
 
 zx::result<> Fastboot::EfiDumpVars(std::string_view cmd, fastboot::Transport *transport) {
+  auto transport_scope = RegisterTransport(transport);
   for (const auto &v_id : *efi_variables_) {
     if (!v_id.IsValid())
       return SendResponse(ResponseType::kFail, "EfiVariableName iteration failed", transport);
@@ -480,7 +563,7 @@ zx::result<> Fastboot::EfiDumpVars(std::string_view cmd, fastboot::Transport *tr
     }
 
     auto &val = res.value();
-    hexdump8_very_ex(val.data(), val.size(), 0, hexdump_printer_printf, this);
+    hexdump8_short(val.data(), val.size(), hexdump_printer_printf, this);
   }
   printer_("\n");
 

@@ -9,7 +9,9 @@
 #include <lib/fastboot/fastboot_base.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon_boot/zircon_boot.h>
+#include <stdarg.h>
 
+#include <functional>
 #include <memory>
 #include <string_view>
 
@@ -31,8 +33,8 @@ class Fastboot : public fastboot::FastbootBase {
   }
   bool IsContinue() { return continue_; }
 
-  // 'printf' signature for output testing.
-  using VPrintFunction = int (*)(const char *fmt, va_list ap);
+  // 'vprintf' signature for output testing.
+  using VPrintFunction = std::function<int(const char *fmt, va_list ap)>;
   void SetVPrintFunction(VPrintFunction vprint_function) { vprinter_ = vprint_function; }
 
  private:
@@ -86,8 +88,42 @@ class Fastboot : public fastboot::FastbootBase {
   // OEM commands
   zx::result<> GptInit(std::string_view cmd, fastboot::Transport *transport);
 
-  // Print function for testing
-  VPrintFunction vprinter_ = vprintf;
+  class TransportScope {
+    Fastboot &owner;
+
+    TransportScope() = delete;
+    TransportScope(const TransportScope &) = delete;
+    TransportScope &operator=(const TransportScope &) = delete;
+
+   public:
+    explicit TransportScope(Fastboot &owner_in) : owner(owner_in) {}
+    ~TransportScope() { owner.UnRegisterTransport(); }
+  };
+  void UnRegisterTransport() { print_transport_ = nullptr; }
+
+  // Set current transport to use for sending text via kInfo from `vprinter()`
+  // Returns `TransportScope` object that calls `UnRegisterTransport()` on dustruction to stop using
+  // `transport` when it is out of scope.
+  TransportScope RegisterTransport(fastboot::Transport *transport) {
+    print_transport_ = transport;
+    return TransportScope(*this);
+  }
+
+  // If set, this transport is used to send text from `vprinter_()` via kInfo channel.
+  fastboot::Transport *print_transport_ = nullptr;
+
+  void InfoSend(fastboot::Transport *transport, const char *fmt, va_list va);
+
+  // Print function for testing and sending text via kInfo channel
+  VPrintFunction vprinter_ = [this](const char *fmt, va_list ap) {
+    if (print_transport_) {
+      va_list ap2;
+      va_copy(ap2, ap);
+      InfoSend(print_transport_, fmt, ap2);
+      va_end(ap2);
+    }
+    return vprintf(fmt, ap);
+  };
   int printer_(const char *fmt, ...);
   friend void hexdump_printer_printf(void *printf_arg, const char *fmt, ...);
 
