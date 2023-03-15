@@ -28,7 +28,19 @@ flash_manifest_version = 3
 
 # These are the common assembly-related labels.
 labels = {
-  if (use_bringup_assembly) {
+  if (use_bazel_images_only) {
+    assert(
+        bazel_assembly_targets == [ bazel_assembly_targets[0] ],
+        "bazel_assembly_targets should define exactly one element when use_bazel_images_only=true")
+
+    # For now only Fuchsia images built by Bazel are useful.
+    assembly_name = "fuchsia"
+    images = bazel_assembly_targets[0]
+
+    # images_prime target is used to provide extra metadata, for Bazel assembly
+    # we consolidate metadata on the same product bundle GN wrapper.
+    images_prime = bazel_assembly_targets[0]
+  } else if (use_bringup_assembly) {
     images = "//build/images/bringup"
     assembly_name = "bringup"
   } else {
@@ -49,19 +61,20 @@ supports_fastboot_fvm = fvm_partition != "" && !use_bringup_assembly
 
 # These are the common assembly-related files.
 files = {
-  images_outdir = get_label_info(labels.images, "target_out_dir")
-  assembly_outdir = images_outdir + "/${labels.assembly_name}"
+  if (use_bazel_images_only) {
+    images_outdir =
+        get_label_info(labels.images, "target_gen_dir") + "/product_bundle"
+    assembly_outdir = images_outdir + "/system_a"
+  } else {
+    images_outdir = get_label_info(labels.images, "target_out_dir")
+    assembly_outdir = images_outdir + "/${labels.assembly_name}"
+  }
+
   zedboot_assembly_outdir =
       get_label_info(labels.zedboot_images, "target_out_dir") + "/zedboot"
 
   if (!use_bringup_assembly) {
     blobfs = "${assembly_outdir}/blob.blk"
-
-    flash_manifest = "${images_outdir}/flash_manifest/flash.json"
-
-    if (use_gigaboot) {
-      esp = "${root_out_dir}/fuchsia.esp.blk"
-    }
 
     fvm = "${assembly_outdir}/fvm.blk"
     fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"
@@ -85,6 +98,16 @@ files = {
     cache_package_manifests = "$root_build_dir/cache_package_manifests.list"
     universe_package_manifests =
         "$root_build_dir/universe_package_manifests.list"
+
+    # TODO(https://fxbug.dev/123120): Audit and add the following paths when
+    # only Bazel assembly is enabled.
+    if (!use_bazel_images_only) {
+      flash_manifest = "${images_outdir}/flash_manifest/flash.json"
+
+      if (use_gigaboot) {
+        esp = "${root_out_dir}/fuchsia.esp.blk"
+      }
+    }
   }
 
   _image_suffix = "zbi"
@@ -97,8 +120,8 @@ files = {
   vbmeta = "${assembly_outdir}/${labels.assembly_name}.vbmeta"
 
   # Final output image and vbmeta (the files at the above paths are copied here)
-  final_zbi = "$root_out_dir/" + rebase_path(zbi, assembly_outdir)
-  final_vbmeta = "$root_out_dir/" + rebase_path(vbmeta, assembly_outdir)
+  final_zbi = "${root_out_dir}/" + rebase_path(zbi, assembly_outdir)
+  final_vbmeta = "${root_out_dir}/" + rebase_path(vbmeta, assembly_outdir)
 
   # Recovery output image and vbmeta
   if (recovery_is_zedboot) {
@@ -120,12 +143,12 @@ files = {
     recovery_vbmeta = "${root_out_dir}/recovery.vbmeta"
   }
   final_recovery_zbi =
-      "$root_out_dir/" + rebase_path(recovery_zbi, _recovery_outdir)
+      "${root_out_dir}/" + rebase_path(recovery_zbi, _recovery_outdir)
   final_recovery_vbmeta =
-      "$root_out_dir/" + rebase_path(recovery_vbmeta, _recovery_outdir)
+      "${root_out_dir}/" + rebase_path(recovery_vbmeta, _recovery_outdir)
 
-  installer_zbi = "$root_out_dir/obj/build/images/recovery/recovery-installer/recovery-installer.${_image_suffix}"
-  installer_vbmeta = "$root_out_dir/obj/build/images/recovery/recovery-installer/recovery-installer.vbmeta"
+  installer_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.${_image_suffix}"
+  installer_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-installer/recovery-installer.vbmeta"
 
   qemu_kernel = _qemu_kernel_file
 }

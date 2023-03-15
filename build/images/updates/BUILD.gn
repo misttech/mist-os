@@ -97,20 +97,31 @@ if (use_bringup_assembly) {
   #####
   # These are lists of the packages in the above groups
 
-  package_list_from_assembly("base_packages.list") {
-    testonly = true
-    system_label = labels.images
-    package_set = "base"
-    contents = "name"
-    outputs = [ files.base_package_names ]
-  }
+  if (use_bazel_images_only) {
+    # TODO(https://fxbug.dev/123120): Figure out how to provide the following
+    # information when only Bazel assembly is used.
+    write_file(files.base_package_names, "")
+    write_file(files.cache_package_names, "")
+    group("base_packages.list") {
+    }
+    group("cache_packages.list") {
+    }
+  } else {
+    package_list_from_assembly("base_packages.list") {
+      testonly = true
+      system_label = labels.images
+      package_set = "base"
+      contents = "name"
+      outputs = [ files.base_package_names ]
+    }
 
-  package_list_from_assembly("cache_packages.list") {
-    testonly = true
-    system_label = labels.images
-    package_set = "cache"
-    contents = "name"
-    outputs = [ files.cache_package_names ]
+    package_list_from_assembly("cache_packages.list") {
+      testonly = true
+      system_label = labels.images
+      package_set = "cache"
+      contents = "name"
+      outputs = [ files.cache_package_names ]
+    }
   }
 
   generate_package_metadata("universe_packages.list") {
@@ -171,20 +182,33 @@ if (use_bringup_assembly) {
     ]
   }
 
-  package_list_from_assembly("base_package_manifests.list") {
-    testonly = true
-    system_label = labels.images
-    package_set = "base"
-    contents = "manifest"
-    outputs = [ files.base_package_manifests ]
-  }
+  if (use_bazel_images_only) {
+    # TODO(https://fxbug.dev/123120): Figure out how to provide the following
+    # information when only Bazel assembly is used.
+    generated_file("base_package_manifests.list") {
+      outputs = [ files.base_package_manifests ]
+      contents = ""
+    }
+    generated_file("cache_package_manifests.list") {
+      outputs = [ files.cache_package_manifests ]
+      contents = ""
+    }
+  } else {
+    package_list_from_assembly("base_package_manifests.list") {
+      testonly = true
+      system_label = labels.images
+      package_set = "base"
+      contents = "manifest"
+      outputs = [ files.base_package_manifests ]
+    }
 
-  package_list_from_assembly("cache_package_manifests.list") {
-    testonly = true
-    system_label = labels.images
-    package_set = "cache"
-    contents = "manifest"
-    outputs = [ files.cache_package_manifests ]
+    package_list_from_assembly("cache_package_manifests.list") {
+      testonly = true
+      system_label = labels.images
+      package_set = "cache"
+      contents = "manifest"
+      outputs = [ files.cache_package_manifests ]
+    }
   }
 
   action("universe_package_manifests.list") {
@@ -197,18 +221,21 @@ if (use_bringup_assembly) {
       ":cache_package_manifests.list",
       ":package_manifests_from_metadata.list",
     ]
+
+    inputs = [
+      files.base_package_manifests,
+      files.cache_package_manifests,
+      files.manifests_from_metadata,
+    ]
+
     args = [
       "--depfile",
       rebase_path(depfile, root_build_dir),
       "-o",
       rebase_path(outputs[0], root_build_dir),
     ]
-    sources = []
-    foreach(_dep, deps) {
-      _dep_outputs = []  # tell gn its ok to rewrite each iteration
-      _dep_outputs = get_target_outputs(_dep)
-      args += [ rebase_path(_dep_outputs[0], root_build_dir) ]
-      sources += [ _dep_outputs[0] ]
+    foreach(input, inputs) {
+      args += [ rebase_path(input, root_build_dir) ]
     }
   }
 
@@ -216,11 +243,17 @@ if (use_bringup_assembly) {
     testonly = true
     script = "//build/cat.sh"
     outputs = [ all_package_manifests_list ]
-    deps = [
-      ":base_package_manifests.list",
-      ":cache_package_manifests.list",
-      ":universe_package_manifests.list",
-    ]
+    deps = [ ":universe_package_manifests.list" ]
+
+    # TODO(https://fxbug.dev/123120): Figure out how to provide the following
+    # information when only Bazel assembly is used.
+    if (!use_bazel_images_only) {
+      deps += [
+        ":base_package_manifests.list",
+        ":cache_package_manifests.list",
+      ]
+    }
+
     args = rebase_path(outputs, root_build_dir)
     sources = []
     foreach(_dep, deps) {

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_action.gni")
+import("//build/images/args.gni")
 import("//bundles/assembly/platform_aibs.gni")
 
 # A GN wrapper for a Bazel product bundle target. From GN's perspective, the
@@ -38,6 +39,7 @@ import("//bundles/assembly/platform_aibs.gni")
 #    Default: false
 #
 #  deps
+#  metadata
 #  testonly
 #  visibility
 #
@@ -83,13 +85,102 @@ template("bazel_product_bundle") {
 
     bazel_outputs = [
       "bazel-bin/${_bazel_product_bundle_out_dir}/product_bundle.json",
+      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/blob.blk",
+      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fuchsia.zbi",
+      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.blk",
+      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.blob.sparse.blk",
+      "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.sparse.blk",
       "bazel-bin/" + get_path_info(_bazel_product_bundle_out_dir, "dir") +
           "/pave.sh",
+
+      # TODO(https://fxbug.dev/123576): Figure out how to handle conditional
+      # outputs (e.g. vbmeta).
+      # "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fuchsia.vbmeta",
+      # "bazel-bin/${_bazel_product_bundle_out_dir}/system_a/fvm.fastboot.blk",
     ]
     ninja_outputs = [
-      "${_product_bundle_name}/product_bundle.json",
+      "product_bundle/product_bundle.json",
+      "product_bundle/system_a/blob.blk",
+      "product_bundle/system_a/fuchsia.zbi",
+      "product_bundle/system_a/fvm.blk",
+      "product_bundle/system_a/fvm.blob.sparse.blk",
+      "product_bundle/system_a/fvm.sparse.blk",
       "pave.sh",
+
+      # TODO(https://fxbug.dev/123576): Figure out how to handle conditional
+      # outputs (e.g. vbmeta).
+      # "product_bundle/system_a/fuchsia.vbmeta",
+      # "product_bundle/system_a/fvm.fastboot.blk",
     ]
+
+    # Populate metadata when Bazel image is not used will pollute GN assembly.
+    if (use_bazel_images_only) {
+      _label_dir = get_label_info(":${target_name}", "dir")
+      _full_label = "${_label_dir}:${target_name}($current_toolchain)"
+      _system_a_root =
+          rebase_path(target_gen_dir, root_out_dir) + "/product_bundle/system_a"
+
+      # TODO(https://fxbug.dev/123120): Add more metadata when they are needed.
+      metadata = {
+        images = [
+          {
+            name = "zircon-a"
+            type = "zbi"
+            cpu = current_cpu
+            label = _full_label
+            path = "${_system_a_root}/fuchsia.zbi"
+
+            archive = true
+            bootserver_pave = []
+            if (!sign_zbi) {
+              bootserver_pave += [ "--zircona" ]
+              fastboot_flash = []
+              if (zircon_a_partition != "") {
+                fastboot_flash += [ zircon_a_partition ]
+              }
+              if (zircon_b_partition != "") {
+                fastboot_flash += [ zircon_b_partition ]
+              }
+            }
+          },
+          {
+            name = "blob"
+            type = "blk"
+            cpu = current_cpu
+            label = _full_label
+            path = "${_system_a_root}/blob.blk"
+          },
+          {
+            name = "storage-full"
+            cpu = current_cpu
+            type = "blk"
+            label = _full_label
+            path = "${_system_a_root}/fvm.blk"
+            archive = add_qemu_to_build_archives
+          },
+          {
+            name = "storage-sparse"
+            cpu = current_cpu
+            type = "blk"
+            label = _full_label
+            path = "${_system_a_root}/fvm.sparse.blk"
+            archive = true
+            bootserver_pave = [ "--fvm" ]
+          },
+          {
+            name = "fvm.blob.sparse"
+            cpu = current_cpu
+            type = "blk"
+            label = _full_label
+            path = "${_system_a_root}/fvm.blob.sparse.blk"
+
+            # Hack: Infra expects bootserver_pave to be present
+            # in the GN graph for this image to be built.
+            bootserver_pave = []
+          },
+        ]
+      }
+    }
   }
 
   # A convenience group for easy `fx build` invocation.

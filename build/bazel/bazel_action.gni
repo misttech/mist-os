@@ -80,6 +80,7 @@ declare_args() {
 #     Type: list of string.
 #
 #   deps:
+#   metadata:
 #   no_output_dir_leaks:
 #   testonly:
 #   visibility:
@@ -150,6 +151,7 @@ template("bazel_action") {
                              "no_output_dir_leaks",
                              "testonly",
                              "visibility",
+                             "metadata",
                            ])
 
     script = "//build/bazel/scripts/bazel_action.py"
