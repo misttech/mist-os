@@ -680,7 +680,7 @@ mod tests {
         fuchsia_merkle::Hash,
         pretty_assertions::assert_eq,
         serde_json::json,
-        std::{path::PathBuf, str::FromStr},
+        std::path::PathBuf,
         tempfile::{NamedTempFile, TempDir},
     };
 
@@ -710,9 +710,7 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: "../p1".into(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }],
             subpackages: vec![],
@@ -749,9 +747,7 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: "../p1".into(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }],
             subpackages: vec![],
@@ -773,7 +769,7 @@ mod tests {
                         {
                             "source_path": "../p1",
                             "path": "data/p1",
-                            "merkle": "0000000000000000000000000000000000000000000000000000000000000000",
+                            "merkle": zeros_hash_str(),
                             "size": 1
                         },
                     ],
@@ -797,12 +793,13 @@ mod tests {
                     {
                         "source_path": "../p1",
                         "path": "data/p1",
-                        "merkle": "0000000000000000000000000000000000000000000000000000000000000000",
+                        "merkle": zeros_hash_str(),
                         "size": 1
                     },
                 ]
             }
-        )).expect("valid json");
+        ))
+        .expect("valid json");
 
         assert_eq!(
             manifest,
@@ -814,9 +811,7 @@ mod tests {
                 blobs: vec![BlobInfo {
                     source_path: "../p1".into(),
                     path: "data/p1".into(),
-                    merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                        .parse()
-                        .unwrap(),
+                    merkle: zeros_hash(),
                     size: 1
                 }],
                 subpackages: vec![],
@@ -836,13 +831,14 @@ mod tests {
                     {
                         "source_path": "../p1",
                         "path": "data/p1",
-                        "merkle": "0000000000000000000000000000000000000000000000000000000000000000",
+                        "merkle": zeros_hash_str(),
                         "size": 1
                     },
                 ],
                 "blob_sources_relative": "file"
             }
-        )).expect("valid json");
+        ))
+        .expect("valid json");
 
         assert_eq!(
             manifest,
@@ -854,9 +850,7 @@ mod tests {
                 blobs: vec![BlobInfo {
                     source_path: "../p1".into(),
                     path: "data/p1".into(),
-                    merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                        .parse()
-                        .unwrap(),
+                    merkle: zeros_hash(),
                     size: 1
                 }],
                 subpackages: vec![],
@@ -871,8 +865,7 @@ mod tests {
         let mut package_builder = Package::builder("package-name".parse().unwrap());
         package_builder.add_entry(
             String::from("bin/my_prog"),
-            Hash::from_str("0000000000000000000000000000000000000000000000000000000000000000")
-                .unwrap(),
+            zeros_hash(),
             PathBuf::from("src/bin/my_prog"),
             1,
         );
@@ -1125,9 +1118,7 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: expected_blob_source_path.clone(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }],
             subpackages: vec![SubpackageInfo {
@@ -1182,9 +1173,7 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: "../data_source/p1".into(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }],
             subpackages: vec![SubpackageInfo {
@@ -1239,9 +1228,7 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: "../data_source/p1".into(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }],
             subpackages: vec![SubpackageInfo {
@@ -1264,9 +1251,7 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: "../data_source/p2".into(),
                 path: "data/p2".into(),
-                merkle: "1111111111111111111111111111111111111111111111111111111111111111"
-                    .parse()
-                    .unwrap(),
+                merkle: ones_hash(),
                 size: 1,
             }],
             subpackages: vec![],
@@ -1315,16 +1300,12 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: "../data_source/p1".into(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }, BlobInfo {
                 source_path: "../data_source/p2".into(),
                 path: "meta/".into(),
-                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
-                    .parse()
-                    .unwrap(),
+                merkle: Hash::from([2; fuchsia_hash::HASH_SIZE]),
                 size: 1,
             }],
             subpackages: vec![SubpackageInfo {
@@ -1402,9 +1383,7 @@ mod tests {
             BlobInfo {
                 source_path: expected_meta_far_source_path,
                 path: "meta/".into(),
-                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
-                    .parse()
-                    .unwrap(),
+                merkle: Hash::from([2; fuchsia_hash::HASH_SIZE]),
                 size: 1,
             }
         );
@@ -1412,13 +1391,11 @@ mod tests {
         // Does not contain top level meta.far
         assert_eq!(contents.len(), 4);
         assert_eq!(
-            contents.get("0000000000000000000000000000000000000000000000000000000000000000"),
+            contents.get(zeros_hash_str()),
             Some(&BlobInfo {
                 source_path: data_dir.join("p1").to_string(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             })
         );
@@ -1484,16 +1461,12 @@ mod tests {
             blobs: vec![BlobInfo {
                 source_path: "../data_source/p1".into(),
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }, BlobInfo {
                 source_path: "../data_source/p2".into(),
                 path: "meta/".into(),
-                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
-                    .parse()
-                    .unwrap(),
+                merkle:  Hash::from([2; fuchsia_hash::HASH_SIZE]),
                 size: 1,
             }],
             subpackages: vec![SubpackageInfo {
@@ -1553,9 +1526,7 @@ mod tests {
             BlobInfo {
                 source_path: expected_meta_far_source_path,
                 path: "meta/".into(),
-                merkle: "2222222222222222222222222222222222222222222222222222222222222222"
-                    .parse()
-                    .unwrap(),
+                merkle: Hash::from([2; fuchsia_hash::HASH_SIZE]),
                 size: 1,
             }
         );
@@ -1567,9 +1538,7 @@ mod tests {
             Some(&BlobInfo {
                 source_path: expected_blob_source_path_1,
                 path: "data/p1".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             })
         );
@@ -1766,9 +1735,7 @@ mod host_tests {
             blobs: vec![BlobInfo {
                 source_path: blob_source_path,
                 path: "data/p2".into(),
-                merkle: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .parse()
-                    .unwrap(),
+                merkle: zeros_hash(),
                 size: 1,
             }],
             subpackages: vec![SubpackageInfo {
