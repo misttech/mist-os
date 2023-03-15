@@ -33,6 +33,10 @@ sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
 #   hermetic_inputs_file (optional)
 #       Implicit inputs to the ffx plugin.
 #
+#   needs_sdk (optional, default true)
+#       Whether the (host-tools module of the) sdk is needed to run this action
+#       or not.
+#
 #   sources (optional)
 #       Files the plugin takes as input. The step will be re-run whenever any
 #       of these change. If inputs is empty, the step will run only when the
@@ -104,6 +108,8 @@ template("ffx_action") {
       !defined(invoker.depfile) &&
       (!defined(invoker.hermetic_deps) || invoker.hermetic_deps)
 
+  _needs_sdk = !defined(invoker.needs_sdk) || invoker.needs_sdk
+
   if (_use_hermetic_inputs_file) {
     # Generate a list of hermetic inputs based on the files in the SDK manifest.
     # Also, merge in any additional inputs if necessary.
@@ -116,20 +122,27 @@ template("ffx_action") {
                                "visibility",
                              ])
 
-      deps = [ sdk_host_tools_label ]
+      deps = []
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
 
       script = "//src/developer/ffx/build/hermetic_inputs_for_ffx.py"
-      inputs = [ sdk_host_tools_manifest ]
+      inputs = []
       outputs = [ hermetic_inputs_path ]
       args = [
-        "--sdk-manifest",
-        rebase_path(sdk_host_tools_manifest, root_build_dir),
         "--output",
         rebase_path(hermetic_inputs_path, root_build_dir),
       ]
+
+      if (_needs_sdk) {
+        deps += [ sdk_host_tools_label ]
+        inputs += [ sdk_host_tools_manifest ]
+        args += [
+          "--sdk-manifest",
+          rebase_path(sdk_host_tools_manifest, root_build_dir),
+        ]
+      }
 
       if (defined(invoker.hermetic_inputs_file)) {
         inputs += [ invoker.hermetic_inputs_file ]
@@ -171,12 +184,24 @@ template("ffx_action") {
                            ])
 
     # Use a builddir-specific environment, not the user's own environment.
-    _ffx_config = [
-      "ffx.analytics.disabled=true",
-      "sdk.root=" + rebase_path(root_build_dir, root_build_dir),
-      "sdk.type=in-tree",
-      "sdk.module=host_tools.modular",
-    ]
+    _ffx_config = [ "ffx.analytics.disabled=true" ]
+
+    deps = [ ffx_env_for_build_label ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+
+    inputs += [ ffx_env_config ]
+
+    if (_needs_sdk) {
+      deps += [ sdk_host_tools_label ]
+      inputs += [ sdk_host_tools_manifest ]
+      _ffx_config += [
+        "sdk.root=" + rebase_path(root_build_dir, root_build_dir),
+        "sdk.type=in-tree",
+        "sdk.module=host_tools.modular",
+      ]
+    }
 
     # Pass the ffx config at runtime. ffx checks that it has read and write access to the
     # config files which causes hermetic actions error if using a global ffx config file.
@@ -186,19 +211,6 @@ template("ffx_action") {
              "--config",
              string_join(",", _ffx_config),
            ] + invoker.args
-
-    deps = [
-      ffx_env_for_build_label,
-      sdk_host_tools_label,
-    ]
-    if (defined(invoker.deps)) {
-      deps += invoker.deps
-    }
-
-    inputs += [
-      ffx_env_config,
-      sdk_host_tools_manifest,
-    ]
 
     if (_use_hermetic_inputs_file) {
       hermetic_inputs_target = ":${hermetic_inputs_label}"

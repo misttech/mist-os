@@ -92,6 +92,7 @@ template("ffx_tool") {
   ffx_action(target_metadata) {
     ffx_tool = ":$target_versioned"
     ffx_tool_output_name = output_versioned
+    needs_sdk = false
     inputs = []
     outputs = [ "$root_out_dir/$output_metadata" ]
     args = [
