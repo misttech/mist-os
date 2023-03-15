@@ -56,13 +56,13 @@ std::string StateToString(Device::State state) {
 
 }  // namespace
 
-Device::Device(Coordinator* coord, fbl::String name, fbl::String libname,
-               fbl::RefPtr<Device> parent, uint32_t protocol_id, zx::vmo inspect,
+Device::Device(Coordinator* coord, fbl::String name, fbl::String url, fbl::RefPtr<Device> parent,
+               uint32_t protocol_id, zx::vmo inspect,
                fidl::ClientEnd<fuchsia_device_manager::DeviceController> device_controller,
                fidl::ClientEnd<fio::Directory> outgoing_dir)
     : coordinator(coord),
       name_(std::move(name)),
-      libname_(std::move(libname)),
+      url_(std::move(url)),
       parent_(std::move(parent)),
       protocol_id_(protocol_id),
       publish_task_([this] {
@@ -208,7 +208,7 @@ zx_status_t Device::Create(
   } else {
     // We should've already verified that this is null by this point.
     ZX_ASSERT_MSG(real_parent->proxy_ == nullptr, "Trying to add a second proxy to device %s",
-                  real_parent->libname().c_str());
+                  real_parent->url().c_str());
     real_parent->proxy_ = dev;
   }
 
@@ -290,7 +290,7 @@ zx_status_t Device::CreateProxy(
     fidl::ClientEnd<fuchsia_device_manager::DeviceController> controller) {
   ZX_ASSERT(proxy_ == nullptr);
 
-  fbl::String driver_path = libname_;
+  fbl::String driver_path = url_;
   // non-immortal devices, use foo.proxy.cm for
   // their proxy devices instead of foo.so
   if (!(this->flags & DEV_CTX_IMMORTAL)) {
@@ -355,7 +355,7 @@ void Device::set_state(Device::State state) {
 }
 
 void Device::InitializeInspectValues() {
-  inspect().set_driver(libname().c_str());
+  inspect().set_driver(url().c_str());
   inspect().set_protocol_id(protocol_id_);
   inspect().set_flags(flags);
   inspect().set_properties(props());
@@ -1035,7 +1035,7 @@ void Device::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
 }
 
 bool Device::DriverLivesInSystemStorage() const {
-  return StringHasPrefix("/system/", libname()) || StringHasPrefix("fuchsia-pkg://", libname());
+  return StringHasPrefix("/system/", url()) || StringHasPrefix("fuchsia-pkg://", url());
 }
 
 bool Device::IsAlreadyBound() const {
@@ -1045,7 +1045,7 @@ bool Device::IsAlreadyBound() const {
 void Device::set_bound_driver(const Driver* driver) {
   ZX_ASSERT_MSG(bound_driver_ == nullptr,
                 "Device  '%s' already has driver %s bound to it, cannot bind %s, flags: 0x%x",
-                name().c_str(), bound_driver_->libname.c_str(), driver->libname.c_str(), flags);
+                name().c_str(), bound_driver_->url.c_str(), driver->url.c_str(), flags);
   if (!(flags & DEV_CTX_ALLOW_MULTI_COMPOSITE)) {
     flags |= DEV_CTX_BOUND;
     bound_driver_ = driver;

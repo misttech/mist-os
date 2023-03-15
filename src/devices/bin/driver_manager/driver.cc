@@ -155,9 +155,9 @@ bool is_driver_eager_fallback(fidl::WireSyncClient<fuchsia_boot::Arguments>* boo
 }
 
 void found_driver(zircon_driver_note_payload_t* note,
-                  fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                  std::string_view libname, zx::vmo& driver_vmo,
-                  const std::vector<std::string>& service_uses, DriverLoadCallback& func) {
+                  fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args, std::string_view url,
+                  zx::vmo& driver_vmo, const std::vector<std::string>& service_uses,
+                  DriverLoadCallback& func) {
   // ensure strings are terminated
   note->name[sizeof(note->name) - 1] = 0;
   note->vendor[sizeof(note->vendor) - 1] = 0;
@@ -173,7 +173,7 @@ void found_driver(zircon_driver_note_payload_t* note,
   }
 
   drv->flags = note->flags;
-  drv->libname = libname;
+  drv->url = url;
   drv->name = note->name;
   drv->service_uses = service_uses;
   if (note->version[0] == '*') {
@@ -188,7 +188,7 @@ void found_driver(zircon_driver_note_payload_t* note,
 
   drv->dso_vmo = std::move(driver_vmo);
 
-  VLOGF(2, "Found driver: %s", libname.data());
+  VLOGF(2, "Found driver: %s", url.data());
   VLOGF(2, "        name: %s", note->name);
   VLOGF(2, "      vendor: %s", note->vendor);
   VLOGF(2, "     version: %s", note->version);
@@ -218,19 +218,19 @@ zx::result<zx::vmo> SetVmoName(zx::vmo vmo, const std::string& path) {
 }  // namespace
 
 zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                        std::string_view libname_view, zx::vmo driver_vmo,
+                        std::string_view url_view, zx::vmo driver_vmo,
                         const std::vector<std::string>& service_uses, DriverLoadCallback func) {
-  std::string libname(libname_view);
+  std::string url(url_view);
   zx::unowned_vmo dso = driver_vmo.borrow();
 
   zx_status_t status = ReadDriverInfo(std::move(dso), [&](zircon_driver_note_payload_t* note) {
-    found_driver(note, boot_args, libname, driver_vmo, service_uses, func);
+    found_driver(note, boot_args, url, driver_vmo, service_uses, func);
   });
 
   if (status == ZX_ERR_NOT_FOUND) {
-    LOGF(INFO, "Missing info from driver '%s'", libname.c_str());
+    LOGF(INFO, "Missing info from driver '%s'", url.c_str());
   } else if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to read info from driver '%s': %s", libname.c_str(),
+    LOGF(ERROR, "Failed to read info from driver '%s': %s", url.c_str(),
          zx_status_get_string(status));
   }
   return status;

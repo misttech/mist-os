@@ -45,7 +45,7 @@ class DriverLoader {
   void WaitForBaseDrivers(fit::callback<void()> callback);
 
   struct MatchDeviceConfig {
-    std::string_view libname;
+    std::string_view url;
     // This config should only be true after the base drivers are loaded.
     // We will need to go through all the devices and bind just base drivers
     // and fallback drivers.
@@ -66,7 +66,7 @@ class DriverLoader {
       std::string_view name, fidl::VectorView<fdf::wire::NodeProperty> props,
       const MatchDeviceConfig& config);
 
-  const Driver* LibnameToDriver(std::string_view libname) const;
+  const Driver* UrlToDriver(std::string_view url) const;
 
   const Driver* LoadDriverUrl(const std::string& manifest_url, bool use_universe_resolver = false);
   const Driver* LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_info);
@@ -75,7 +75,7 @@ class DriverLoader {
   std::vector<const Driver*> GetAllDriverIndexDrivers();
 
  private:
-  bool MatchesLibnameDriverIndex(const std::string& driver_url, std::string_view libname);
+  bool MatchesUrlDriverIndex(const std::string& driver_url, std::string_view url);
 
   // Drivers we cached from the DriverIndex.
   fbl::DoublyLinkedList<std::unique_ptr<Driver>> driver_index_drivers_;

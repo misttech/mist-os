@@ -128,8 +128,8 @@ class DeviceInspect {
 
   void set_properties(const fbl::Array<const zx_device_prop_t>& props);
 
-  void set_driver(const std::string& libname) {
-    device_node_.CreateString("driver", libname, &static_values_);
+  void set_driver(const std::string& url) {
+    device_node_.CreateString("driver", url, &static_values_);
   }
 
  private:

@@ -75,7 +75,7 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
     device_info.topological_path(fidl::StringView(allocator, path.value()));
 
     device_info.bound_driver_libname(
-        fidl::StringView(allocator, {device->libname().data(), device->libname().size()}));
+        fidl::StringView(allocator, {device->url().data(), device->url().size()}));
 
     fidl::VectorView<fdm::wire::DeviceProperty> props(allocator, device->props().size());
     for (size_t i = 0; i < device->props().size(); i++) {

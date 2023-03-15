@@ -72,14 +72,14 @@ zx_status_t BindDriverManager::BindDevice(const fbl::RefPtr<Device>& dev) {
 }
 
 zx_status_t BindDriverManager::BindDriverToDevice(const fbl::RefPtr<Device>& dev,
-                                                  std::string_view driver_libname) {
+                                                  std::string_view driver_url) {
   // It shouldn't be possible to get a bind request for a proxy device.
   if (dev->flags & DEV_CTX_PROXY) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
   // TODO: disallow if we're in the middle of enumeration, etc
-  zx::result result = GetMatchingDrivers(dev, driver_libname);
+  zx::result result = GetMatchingDrivers(dev, driver_url);
   if (!result.is_ok()) {
     return result.error_value();
   }
@@ -99,7 +99,7 @@ zx_status_t BindDriverManager::BindDriverToDevice(const fbl::RefPtr<Device>& dev
 }
 
 zx::result<std::vector<MatchedDriver>> BindDriverManager::GetMatchingDrivers(
-    const fbl::RefPtr<Device>& dev, std::string_view driver_libname) {
+    const fbl::RefPtr<Device>& dev, std::string_view driver_url) {
   // It shouldn't be possible to get a bind request for a proxy device.
   if (dev->flags & DEV_CTX_PROXY) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -111,7 +111,7 @@ zx::result<std::vector<MatchedDriver>> BindDriverManager::GetMatchingDrivers(
 
   // Check for drivers in the Driver-index.
   DriverLoader::MatchDeviceConfig config;
-  config.libname = driver_libname;
+  config.url = driver_url;
   return zx::ok(coordinator_->driver_loader().MatchDeviceDriverIndex(dev, config));
 }
 

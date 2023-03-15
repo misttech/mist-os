@@ -32,7 +32,7 @@ FirmwareLoader::FirmwareLoader(Coordinator* coordinator, async_dispatcher_t* fir
       firmware_dispatcher_(firmware_dispatcher),
       path_prefix_(path_prefix) {}
 
-void FirmwareLoader::LoadFirmware(const fbl::RefPtr<Device>& dev, const char* driver_libname,
+void FirmwareLoader::LoadFirmware(const fbl::RefPtr<Device>& dev, const char* driver_url,
                                   const char* path,
                                   fit::callback<void(zx::result<LoadFirmwareResult>)> cb) {
   const std::string fwdirs[] = {
@@ -47,13 +47,13 @@ void FirmwareLoader::LoadFirmware(const fbl::RefPtr<Device>& dev, const char* dr
   }
 
   // This is done ahead of time as it is not thread-safe.
-  const Driver* driver = coordinator_->driver_loader().LibnameToDriver(driver_libname);
+  const Driver* driver = coordinator_->driver_loader().UrlToDriver(driver_url);
   fbl::unique_fd package_dir;
   if (driver != nullptr && driver->package_dir.is_valid()) {
     package_dir = driver->package_dir.duplicate();
   }
 
-  bool is_system = strncmp(driver_libname, kSystemPrefix, std::size(kSystemPrefix) - 1) == 0;
+  bool is_system = strncmp(driver_url, kSystemPrefix, std::size(kSystemPrefix) - 1) == 0;
 
   // This must occur in a separate thread as fdio operations may block when accessing /system or
   // /pkg, possibly deadlocking the system. See http://fxbug.dev/87127 for more context.

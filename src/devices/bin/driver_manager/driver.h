@@ -31,7 +31,7 @@ struct Driver : public fbl::DoublyLinkedListable<std::unique_ptr<Driver>> {
   uint32_t flags = 0;
   zx::vmo dso_vmo;
 
-  fbl::String libname;
+  fbl::String url;
 
   // If this is valid, it's the root directory of the Driver's package.
   fbl::unique_fd package_dir;
@@ -60,7 +60,7 @@ struct MatchedDriverInfo {
 
   const char* name() const {
     if (is_v1()) {
-      return v1()->libname.c_str();
+      return v1()->url.c_str();
     }
     return v2().url.c_str();
   }
@@ -74,7 +74,7 @@ using MatchedDriver =
 using DriverLoadCallback = fit::function<void(Driver* driver, const char* version)>;
 
 zx_status_t load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args,
-                        std::string_view libname, zx::vmo driver_vmo,
+                        std::string_view url, zx::vmo driver_vmo,
                         const std::vector<std::string>& service_uses, DriverLoadCallback func);
 zx::result<zx::vmo> load_manifest_vmo(
     const fidl::WireSyncClient<fuchsia_io::Directory>& package_dir, std::string_view resource_path);

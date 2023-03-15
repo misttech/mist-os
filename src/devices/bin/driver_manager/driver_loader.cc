@@ -44,9 +44,9 @@ bool ShouldUseUniversalResolver(fdi::wire::DriverPackageType package_type) {
 
 }  // namespace
 
-const Driver* DriverLoader::LibnameToDriver(std::string_view libname) const {
+const Driver* DriverLoader::UrlToDriver(std::string_view url) const {
   for (const auto& drv : driver_index_drivers_) {
-    if (libname.compare(drv.libname) == 0) {
+    if (url.compare(drv.url) == 0) {
       return &drv;
     }
   }
@@ -84,7 +84,7 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
 const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
                                           bool use_universe_resolver) {
   // Check if we've already loaded this driver. If we have then return it.
-  auto driver = LibnameToDriver(manifest_url);
+  auto driver = UrlToDriver(manifest_url);
   if (driver != nullptr) {
     return driver;
   }
@@ -127,9 +127,8 @@ const Driver* DriverLoader::LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_in
   return LoadDriverUrl(url, use_universe_resolver);
 }
 
-bool DriverLoader::MatchesLibnameDriverIndex(const std::string& driver_url,
-                                             std::string_view libname) {
-  return cpp20::ends_with(std::string_view(driver_url), libname);
+bool DriverLoader::MatchesUrlDriverIndex(const std::string& driver_url, std::string_view url) {
+  return cpp20::ends_with(std::string_view(driver_url), url);
 }
 
 void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
@@ -162,7 +161,7 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
     return std::vector<MatchedDriver>();
   }
 
-  bool autobind = config.libname.empty();
+  bool autobind = config.url.empty();
 
   fidl::Arena allocator;
   size_t size = props.size() + str_props.size() + 2;
@@ -177,7 +176,7 @@ const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(
   // If we are looking for a specific driver, we add a property to the device with the
   // name of the driver we are looking for. Drivers can then bind to this.
   if (!autobind) {
-    fidl_props[index++] = fdf::MakeProperty(allocator, "fuchsia.compat.LIBNAME", config.libname);
+    fidl_props[index++] = fdf::MakeProperty(allocator, "fuchsia.compat.LIBNAME", config.url);
   }
 
   for (size_t i = 0; i < props.size(); i++) {
@@ -293,9 +292,9 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
       continue;
     }
 
-    if (config.libname.empty() || MatchesLibnameDriverIndex(driver_url, config.libname)) {
+    if (config.url.empty() || MatchesUrlDriverIndex(driver_url, config.url)) {
       if (fidl_driver_info.is_fallback()) {
-        if (include_fallback_drivers_ || !config.libname.empty()) {
+        if (include_fallback_drivers_ || !config.url.empty()) {
           matched_fallback_drivers.push_back(matched_driver_info);
         }
       } else {
@@ -351,11 +350,11 @@ std::vector<const Driver*> DriverLoader::GetAllDriverIndexDrivers() {
       break;
     }
     for (auto driver : next_result.value().drivers) {
-      if (!driver.has_libname()) {
+      if (!driver.has_url()) {
         continue;
       }
 
-      std::string url(driver.libname().data(), driver.libname().size());
+      std::string url(driver.url().data(), driver.url().size());
       bool use_universe_resolver = false;
       if (driver.has_package_type()) {
         use_universe_resolver = ShouldUseUniversalResolver(driver.package_type());

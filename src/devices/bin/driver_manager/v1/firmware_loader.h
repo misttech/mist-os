@@ -21,7 +21,7 @@ class FirmwareLoader {
   FirmwareLoader(Coordinator* coordinator, async_dispatcher_t* firmware_dispatcher,
                  std::string path_prefix);
 
-  void LoadFirmware(const fbl::RefPtr<Device>& dev, const char* driver_libname, const char* path,
+  void LoadFirmware(const fbl::RefPtr<Device>& dev, const char* driver_url, const char* path,
                     fit::callback<void(zx::result<LoadFirmwareResult>)> cb);
 
  private:

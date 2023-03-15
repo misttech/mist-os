@@ -120,10 +120,10 @@ zx::result<zx::vmo> DriverToVmo(const Driver& driver) {
   return zx::ok(std::move(vmo));
 }
 
-zx::result<zx::vmo> LibnameToVmo(DriverLoader& driver_loader, const fbl::String& libname) {
-  const Driver* driver = driver_loader.LibnameToDriver(libname);
+zx::result<zx::vmo> UrlToVmo(DriverLoader& driver_loader, const fbl::String& url) {
+  const Driver* driver = driver_loader.UrlToDriver(url);
   if (!driver) {
-    LOGF(ERROR, "Cannot find driver '%s'", libname.data());
+    LOGF(ERROR, "Cannot find driver '%s'", url.data());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -167,7 +167,7 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
                               fidl::ServerEnd<fuchsia_device_manager::DeviceController> controller,
                               zx::channel rpc_proxy) {
   // If we don't have a driver name, then create a stub instead.
-  if (dev->libname().size() == 0) {
+  if (dev->url().size() == 0) {
     return CreateStubDevice(dev, std::move(controller), dh);
   }
 
@@ -177,15 +177,15 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
   }
 
   fidl::Arena arena;
-  zx::result vmo_result = LibnameToVmo(dev->coordinator->driver_loader(), dev->libname());
+  zx::result vmo_result = UrlToVmo(dev->coordinator->driver_loader(), dev->url());
   if (vmo_result.is_error()) {
-    LOGF(ERROR, "Failed to get VMO for libname '%s' %s", dev->libname().c_str(),
+    LOGF(ERROR, "Failed to get VMO for url '%s' %s", dev->url().c_str(),
          vmo_result.status_string());
     return vmo_result.error_value();
   }
   zx::vmo vmo = std::move(vmo_result.value());
 
-  auto driver_path = fidl::StringView::FromExternal(dev->libname().data(), dev->libname().size());
+  auto driver_path = fidl::StringView::FromExternal(dev->url().data(), dev->url().size());
 
   fdm::wire::ProxyDevice proxy{driver_path, std::move(vmo), std::move(rpc_proxy)};
   auto type = fdm::wire::DeviceType::WithProxy(arena, std::move(proxy));
@@ -251,7 +251,7 @@ zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, const Driver& dri
 
   dev->set_bound_driver(&driver);
   dev->device_controller()
-      ->BindDriver(fidl::StringView::FromExternal(driver.libname.c_str()), std::move(*vmo))
+      ->BindDriver(fidl::StringView::FromExternal(driver.url.c_str()), std::move(*vmo))
       .ThenExactlyOnce([dev](fidl::WireUnownedResult<fdm::DeviceController::BindDriver>& result) {
         if (result.is_peer_closed()) {
           // TODO(fxbug.dev/56208): If we're closed from the driver host we only log a warning,
@@ -643,8 +643,8 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
   const Driver& driver = *matched_driver.v1();
 
   if (!driver_host_is_asan() && driver.flags & ZIRCON_DRIVER_NOTE_FLAG_ASAN) {
-    LOGF(ERROR, "%s (%s) requires ASAN, but we are not in an ASAN environment",
-         driver.libname.data(), driver.name.data());
+    LOGF(ERROR, "%s (%s) requires ASAN, but we are not in an ASAN environment", driver.url.data(),
+         driver.name.data());
     return ZX_ERR_BAD_STATE;
   }
 
@@ -657,7 +657,7 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
   //   (2) The driver being bound is the fragment driver, which is always colocated.
   //   (3) The driver specified `colocate = true` in its component manifest, AND the parent device
   //       did not enforce isolation with the MUST_ISOLATE flag.
-  if (dev->is_composite() || std::string_view{driver.libname.c_str()} == fdf::kFragmentDriverUrl ||
+  if (dev->is_composite() || std::string_view{driver.url.c_str()} == fdf::kFragmentDriverUrl ||
       (matched_driver.colocate && !(dev->flags & DEV_CTX_MUST_ISOLATE))) {
     VLOGF(1, "Binding driver to %s in same driver host as parent", dev->name().data());
     // non-busdev is pretty simple
@@ -937,7 +937,7 @@ void Coordinator::RestartDriverHosts(RestartDriverHostsRequestView request,
   uint32_t count = 0;
   for (auto& dev : device_manager_->devices()) {
     // Call remove on the device's driver host if it contains the driver.
-    if (dev.libname().compare(driver_path) == 0) {
+    if (dev.url().compare(driver_path) == 0) {
       LOGF(INFO, "Device %s found in restart driver hosts.", dev.name().data());
       LOGF(INFO, "Shutting down host: %ld.", dev.host()->koid());
 
