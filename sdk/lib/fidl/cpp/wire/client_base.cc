@@ -6,7 +6,6 @@
 #include <lib/fidl/trace.h>
 #include <lib/fidl/txn_header.h>
 #include <lib/fit/function.h>
-#include <stdio.h>
 
 namespace fidl {
 namespace internal {
@@ -35,7 +34,7 @@ void ClientBase::Bind(AnyTransport&& transport, async_dispatcher_t* dispatcher,
   auto binding = AsyncClientBinding::Create(
       dispatcher, std::make_shared<fidl::internal::AnyTransport>(std::move(transport)),
       shared_from_this(), error_handler, std::move(teardown_observer), threading_policy);
-  binding_ = binding;
+  binding_ = WeakBindingRef<AsyncClientBinding>{binding, binding->shared_unbind_info()};
   client_object_lifetime_ = std::move(client_object_lifetime);
   dispatcher_ = dispatcher;
   event_dispatcher_ = std::move(event_dispatcher);
@@ -90,34 +89,37 @@ void ClientBase::ReleaseResponseContexts(fidl::UnbindInfo info) {
 
 void ClientBase::SendTwoWay(fidl::OutgoingMessage& message, ResponseContext* context,
                             fidl::WriteOptions write_options) {
-  if (auto transport = GetTransport()) {
-    PrepareAsyncTxn(context);
-    message.set_txid(context->Txid());
-    message.Write(*transport, std::move(write_options));
-    if (!message.ok()) {
-      ForgetAsyncTxn(context);
-      TryAsyncDeliverError(message.error(), context);
-      HandleSendError(message.error());
-    }
-    return;
-  }
-  // TODO(fxbug.dev/87788): propagate the error that caused the binding to teardown.
-  TryAsyncDeliverError(fidl::Status::Unbound(), context);
+  auto matchers = MatchVariant{
+      [&](const std::shared_ptr<AnyTransport>& transport) {
+        PrepareAsyncTxn(context);
+        message.set_txid(context->Txid());
+        message.Write(*transport, std::move(write_options));
+        if (!message.ok()) {
+          ForgetAsyncTxn(context);
+          TryAsyncDeliverError(message.error(), context);
+          HandleSendError(message.error());
+        }
+      },
+      [&](fidl::UnbindInfo info) { TryAsyncDeliverError(ErrorFromUnbindInfo(info), context); },
+  };
+  std::visit(matchers, GetTransportOrError());
 }
 
-fidl::OneWayStatus ClientBase::SendOneWay(::fidl::OutgoingMessage& message,
+fidl::OneWayStatus ClientBase::SendOneWay(fidl::OutgoingMessage& message,
                                           fidl::WriteOptions write_options) {
-  if (auto transport = GetTransport()) {
-    message.set_txid(0);
-    message.Write(*transport, std::move(write_options));
-    if (!message.ok()) {
-      HandleSendError(message.error());
-      return fidl::OneWayStatus{message.error()};
-    }
-    return fidl::OneWayStatus{fidl::Status::Ok()};
-  }
-  // TODO(fxbug.dev/87788): propagate the error that caused the binding to teardown.
-  return fidl::OneWayStatus{fidl::Status::Unbound()};
+  auto matchers = MatchVariant{
+      [&](const std::shared_ptr<AnyTransport>& transport) {
+        message.set_txid(0);
+        message.Write(*transport, std::move(write_options));
+        if (!message.ok()) {
+          HandleSendError(message.error());
+          return fidl::OneWayStatus{message.error()};
+        }
+        return fidl::OneWayStatus{fidl::Status::Ok()};
+      },
+      [](fidl::UnbindInfo info) { return OneWayErrorFromUnbindInfo(info); },
+  };
+  return std::visit(matchers, GetTransportOrError());
 }
 
 void ClientBase::HandleSendError(fidl::Status error) {
@@ -131,6 +133,21 @@ void ClientBase::TryAsyncDeliverError(::fidl::Status error, ResponseContext* con
   if (status != ZX_OK) {
     context->OnError(error);
   }
+}
+
+ClientBase::TransportOrError ClientBase::GetTransportOrError() {
+  auto matchers = MatchVariant{
+      [](const std::shared_ptr<AsyncClientBinding>& binding) -> TransportOrError {
+        return binding->GetTransport();
+      },
+      [](fidl::UnbindInfo info) -> TransportOrError { return info; },
+      [](WeakClientBindingRef::Invalid) -> TransportOrError {
+        // Should not reach here if we check for a valid client before
+        // making calls.
+        __builtin_abort();
+      },
+  };
+  return std::visit(matchers, binding_.lock_or_error());
 }
 
 std::optional<UnbindInfo> ClientBase::Dispatch(fidl::IncomingHeaderAndMessage& msg,

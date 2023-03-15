@@ -225,12 +225,12 @@ TEST_F(LoaderTest, NoBackingLoader) {
   client->LoadObject("mylib.so").Then([](auto& result) {
     ASSERT_EQ(ZX_OK, result.status());
     auto* response = result.Unwrap();
-    EXPECT_EQ(ZX_ERR_CANCELED, response->rv);
+    EXPECT_EQ(ZX_ERR_PEER_CLOSED, response->rv);
   });
   client->Config("").Then([](auto& result) {
     ASSERT_EQ(ZX_OK, result.status());
     auto* response = result.Unwrap();
-    EXPECT_EQ(ZX_ERR_CANCELED, response->rv);
+    EXPECT_EQ(ZX_ERR_PEER_CLOSED, response->rv);
   });
 
   ASSERT_TRUE(RunLoopUntilIdle());

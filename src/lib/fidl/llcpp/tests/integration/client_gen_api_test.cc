@@ -587,14 +587,8 @@ TEST(GenAPITestCase, SyncNotifyErrorIfDispatcherShutdown) {
     ClientType client(std::move(local), loop.dispatcher());
 
     libsync::Completion error;
-    // Note that the reason is |kUnbind| because shutting down the loop will
-    // synchronously teardown the client. Once the internal bindings object is
-    // destroyed, the client would forget what was the original reason for
-    // teardown (kDispatcherError).
-    //
-    // We may want to improve the post-teardown error fidelity by remembering
-    // the reason on the client object.
-    ExpectErrorResponseContext context(error.get(), ZX_ERR_CANCELED, fidl::Reason::kUnbind);
+    ExpectErrorResponseContext context(error.get(), ZX_ERR_CANCELED,
+                                       fidl::Reason::kDispatcherError);
 
     loop.Shutdown();
     EXPECT_FALSE(error.signaled());
@@ -771,8 +765,8 @@ TEST(AllClients, SendErrorLeadsToBindingTeardown) {
     bool called = false;
     client->Echo("foo").ThenExactlyOnce([&called](fidl::WireUnownedResult<Values::Echo>& result) {
       called = true;
-      EXPECT_EQ(fidl::Reason::kUnbind, result.reason());
-      EXPECT_STATUS(ZX_ERR_CANCELED, result.status());
+      EXPECT_EQ(fidl::Reason::kTransportError, result.reason());
+      EXPECT_STATUS(ZX_ERR_ACCESS_DENIED, result.status());
     });
     loop.RunUntilIdle();
     EXPECT_TRUE(called);
@@ -798,6 +792,13 @@ TEST(AllClients, DrainAllMessageInPeerClosedSendError) {
 
       bool received() const { return received_; }
 
+      fidl::UnbindInfo unbind_info() const {
+        ZX_ASSERT(unbind_info_.has_value());
+        return unbind_info_.value();
+      }
+
+      void on_fidl_error(fidl::UnbindInfo info) final { unbind_info_.emplace(info); }
+
       void OnValueEvent(fidl::WireEvent<Values::OnValueEvent>* event) override {
         ASSERT_EQ(strlen(data), event->s.size());
         EXPECT_EQ(0, strncmp(event->s.data(), data, strlen(data)));
@@ -806,8 +807,13 @@ TEST(AllClients, DrainAllMessageInPeerClosedSendError) {
 
      private:
       bool received_ = false;
+      std::optional<fidl::UnbindInfo> unbind_info_;
     } event_handler;
 
+    zx_info_handle_basic_t info;
+    zx::unowned_channel local_channel = zx::unowned_channel{local.channel().get()};
+    ASSERT_OK(local_channel->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+    const zx_koid_t local_koid = info.koid;
     async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
     ClientType client(std::move(local), loop.dispatcher(), &event_handler);
 
@@ -828,9 +834,24 @@ TEST(AllClients, DrainAllMessageInPeerClosedSendError) {
     EXPECT_TRUE(event_handler.received());
 
     // The client binding should still be torn down.
+    EXPECT_TRUE(event_handler.unbind_info().is_peer_closed());
+
+    // Check that the client channel is closed.
+    // From https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts?hl=en#kernel_object_ids,
+    // KOIDs are never reused, so |zx_object_get_info| should either return |ZX_ERR_BAD_HANDLE|,
+    // or a different KOID in case the handle was reused.
+    zx_status_t status =
+        local_channel->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+    if (status == ZX_OK) {
+      ASSERT_NE(local_koid, info.koid);
+    } else {
+      ASSERT_STATUS(status, ZX_ERR_BAD_HANDLE);
+    }
+
+    // Making an outgoing call yields the earlier error.
     client->Echo("foo").ThenExactlyOnce([&](fidl::WireUnownedResult<Values::Echo>& result) {
-      EXPECT_EQ(fidl::Reason::kUnbind, result.reason());
-      EXPECT_STATUS(ZX_ERR_CANCELED, result.status());
+      EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, result.reason());
+      EXPECT_STATUS(ZX_ERR_PEER_CLOSED, result.status());
     });
     ASSERT_OK(loop.RunUntilIdle());
   };

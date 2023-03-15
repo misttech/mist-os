@@ -391,6 +391,23 @@ class WeakBindingRef {
   std::shared_ptr<LockedUnbindInfo> info_;
 };
 
+// |MatchVariant| builds an overloaded callable that ergonomically visits an
+// |std::variant|:
+//
+//     std::variant<int, std::string> v;
+//     auto matchers = MatchVariant {
+//         [](int i) { ... },
+//         [](std::string s) { ... },
+//     };
+//     std::visit(matchers, v);
+//
+template <typename... Callables>
+struct MatchVariant : Callables... {
+  using Callables::operator()...;
+};
+template <typename... Callables>
+MatchVariant(Callables...) -> MatchVariant<Callables...>;
+
 //
 // Server binding specifics
 //

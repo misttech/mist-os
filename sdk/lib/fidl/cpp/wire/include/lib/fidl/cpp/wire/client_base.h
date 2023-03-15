@@ -392,13 +392,17 @@ class ClientBase final : public std::enable_shared_from_this<ClientBase> {
     return nullptr;
   }
 
+  using WeakClientBindingRef = WeakBindingRef<AsyncClientBinding>;
+
+  using TransportOrError = std::variant<std::shared_ptr<AnyTransport>, fidl::UnbindInfo>;
+
+  TransportOrError GetTransportOrError();
+
   // Allow unit tests to peek into the internals of this class.
   friend class ::fidl_testing::ClientBaseChecker;
 
   // Weak reference to the internal binding state.
-  // TODO(fxbug.dev/87788): remember the error that caused the binding to teardown.
-  // We can store a tombstone instead of an expired weak pointer.
-  std::weak_ptr<AsyncClientBinding> binding_;
+  WeakClientBindingRef binding_;
 
   std::weak_ptr<ClientControlBlock> client_object_lifetime_;
 

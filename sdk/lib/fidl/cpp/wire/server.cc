@@ -76,27 +76,24 @@ void Dispatch(void* impl, ::fidl::IncomingHeaderAndMessage& msg,
 }
 
 ::fidl::OneWayStatus WeakEventSenderInner::SendEvent(::fidl::OutgoingMessage& message) const {
-  return std::visit(
-      [&](auto&& binding_or_info) -> fidl::OneWayStatus {
-        using T = std::decay_t<decltype(binding_or_info)>;
-        if constexpr (std::is_same_v<T, std::shared_ptr<AsyncServerBinding>>) {
-          message.set_txid(0);
-          message.Write(binding_or_info->transport());
-          if (!message.ok()) {
-            HandleSendError(message.error());
-            return fidl::OneWayStatus{message.error()};
-          }
-          return fidl::OneWayStatus{fidl::OneWayStatus::Ok()};
-        } else if constexpr (std::is_same_v<T, fidl::UnbindInfo>) {
-          return OneWayErrorFromUnbindInfo(binding_or_info);
-        } else {
-          static_assert(std::is_same_v<T, WeakServerBindingRef::Invalid>);
-          // NOTE TO USER: if you see a crash at this line, it could mean
-          // the code sent an event on a moved-from server binding reference.
-          __builtin_abort();
+  auto matchers = MatchVariant{
+      [&](const std::shared_ptr<AsyncServerBinding>& binding) {
+        message.set_txid(0);
+        message.Write(binding->transport());
+        if (!message.ok()) {
+          HandleSendError(message.error());
+          return fidl::OneWayStatus{message.error()};
         }
+        return fidl::OneWayStatus{fidl::OneWayStatus::Ok()};
       },
-      binding_.lock_or_error());
+      [](fidl::UnbindInfo info) { return OneWayErrorFromUnbindInfo(info); },
+      [](WeakServerBindingRef::Invalid) -> fidl::OneWayStatus {
+        // NOTE TO USER: if you see a crash at this line, it could mean
+        // the code sent an event on a moved-from server binding reference.
+        __builtin_abort();
+      },
+  };
+  return std::visit(matchers, binding_.lock_or_error());
 }
 
 void WeakEventSenderInner::HandleSendError(fidl::Status error) const {

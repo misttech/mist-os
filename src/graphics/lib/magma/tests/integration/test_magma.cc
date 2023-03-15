@@ -1191,11 +1191,6 @@ class TestConnection {
               magma_connection_enable_performance_counters(connection_, &counter, 1));
     EXPECT_EQ(MAGMA_STATUS_ACCESS_DENIED, magma_connection_get_error(connection_));
 
-    magma_perf_count_pool_t pool;
-    magma_handle_t handle;
-    EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST,
-              magma_connection_create_performance_counter_buffer_pool(connection_, &pool, &handle));
-
     magma_connection_release_buffer(connection_, buffer);
     magma_connection_release_semaphore(connection_, semaphore);
 #endif
