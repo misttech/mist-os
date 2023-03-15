@@ -295,8 +295,8 @@ func Main() {
 	noOpaqueIID := false
 	flags.BoolVar(&noOpaqueIID, "no-opaque-iids", false, "disable opaque IIDs")
 
-	fastUDP := true
-	flags.BoolVar(&fastUDP, "fast-udp", true, "enable Fast UDP")
+	fastUDP := false
+	flags.BoolVar(&fastUDP, "fast-udp", false, "enable Fast UDP")
 
 	configFile := flags.String("config-data", "/config/data/default.json", "config file to use")
 
