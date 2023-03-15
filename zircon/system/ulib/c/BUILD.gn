@@ -41,7 +41,7 @@ group("components") {
 
 group("unittests") {
   testonly = true
-  deps = []
+  deps = [ "errno" ]
   foreach(subdir,
           libc_components + [
                 "sanitizers",
