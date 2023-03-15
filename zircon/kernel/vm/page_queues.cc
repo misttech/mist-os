@@ -962,6 +962,19 @@ void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page
 #endif
 }
 
+void PageQueues::SetHighPriority(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
+  DeferPendingSignals dps{*this};
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  DEBUG_ASSERT(object);
+  SetQueueBacklinkLocked(page, object, page_offset, PageQueueHighPriority, dps);
+}
+
+void PageQueues::MoveToHighPriority(vm_page_t* page) {
+  DeferPendingSignals dps{*this};
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  MoveToQueueLocked(page, PageQueueHighPriority, dps);
+}
+
 void PageQueues::MoveToAnonymous(vm_page_t* page) {
   DeferPendingSignals dps{*this};
   Guard<SpinLock, IrqSave> guard{&lock_};
@@ -1210,6 +1223,7 @@ PageQueues::Counts PageQueues::QueueCounts() const {
       page_queue_counts_[PageQueueAnonymousZeroFork].load(ktl::memory_order_relaxed);
   counts.failed_reclaim =
       page_queue_counts_[PageQueueFailedReclaim].load(ktl::memory_order_relaxed);
+  counts.high_priority = page_queue_counts_[PageQueueHighPriority].load(ktl::memory_order_relaxed);
   return counts;
 }
 
@@ -1275,6 +1289,10 @@ bool PageQueues::DebugPageIsAnonymous(const vm_page_t* page) const {
 
 bool PageQueues::DebugPageIsWired(const vm_page_t* page) const {
   return page->object.get_page_queue_ref().load(ktl::memory_order_relaxed) == PageQueueWired;
+}
+
+bool PageQueues::DebugPageIsHighPriority(const vm_page_t* page) const {
+  return page->object.get_page_queue_ref().load(ktl::memory_order_relaxed) == PageQueueHighPriority;
 }
 
 bool PageQueues::DebugPageIsAnonymousZeroFork(const vm_page_t* page) const {

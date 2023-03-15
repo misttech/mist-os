@@ -4028,21 +4028,29 @@ static bool vmo_high_priority_reclaim_test() {
     vmo->ChangeHighPriorityCountLocked(delta);
   };
 
+  // Our page should be in a pager backed page queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBacked(page));
+
   // Indicate our VMO is high priority.
   change_priority(1);
 
-  // Our page should now be in a pager backed page queue.
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBacked(page));
+  // Our page should now be in a high priority page queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsHighPriority(page));
+  EXPECT_GT(pmm_page_queues()->QueueCounts().high_priority, 0u);
 
   // Attempting to reclaim should fail.
   EXPECT_FALSE(vmo->DebugGetCowPages()->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Ignore,
                                                     nullptr));
 
   // Page should still be in the queue.
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBacked(page));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsHighPriority(page));
 
   // Switch to a regular anonymous VMO.
   change_priority(-1);
+
+  // Page should be back in the regular pager backed page queue.
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBacked(page));
+
   vmo.reset();
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo);
   ASSERT_EQ(ZX_OK, status);

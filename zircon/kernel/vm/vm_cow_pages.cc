@@ -3619,24 +3619,37 @@ void VmCowPages::MoveToPinnedLocked(vm_page_t* page, uint64_t offset) {
 }
 
 void VmCowPages::MoveToNotPinnedLocked(vm_page_t* page, uint64_t offset) {
+  PageQueues* pq = pmm_page_queues();
   if (is_source_preserving_page_content()) {
     DEBUG_ASSERT(is_page_dirty_tracked(page));
     // We can only move Clean pages to the pager backed queues as they track age information for
     // eviction; only Clean pages can be evicted. Pages in AwaitingClean and Dirty are protected
     // from eviction in the Dirty queue.
     if (is_page_clean(page)) {
-      pmm_page_queues()->MoveToPagerBacked(page);
+      if (high_priority_count_ != 0) {
+        // If this VMO is high priority then do not place in the pager backed queue as that is
+        // reclaimable, place in the high priority queue instead.
+        pq->MoveToHighPriority(page);
+      } else {
+        pq->MoveToPagerBacked(page);
+      }
     } else {
       DEBUG_ASSERT(!page->is_loaned());
-      pmm_page_queues()->MoveToPagerBackedDirty(page);
+      pq->MoveToPagerBackedDirty(page);
     }
   } else {
     // Place pages from contiguous VMOs in the wired queue, as they are notionally pinned until the
     // owner explicitly releases them.
     if (can_decommit_zero_pages_locked()) {
-      pmm_page_queues()->MoveToAnonymous(page);
+      if (high_priority_count_ != 0 && !pq->ReclaimIsOnlyPagerBacked()) {
+        // If anonymous pages are reclaimable, and this VMO is high priority, then places our pages
+        // in the high priority queue instead of the anonymous one to avoid reclamation.
+        pq->MoveToHighPriority(page);
+      } else {
+        pq->MoveToAnonymous(page);
+      }
     } else {
-      pmm_page_queues()->MoveToWired(page);
+      pq->MoveToWired(page);
     }
   }
 }
@@ -3646,24 +3659,37 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
   DEBUG_ASSERT(reinterpret_cast<VmCowPages*>(page->object.get_object()) == nullptr);
   IncrementResidentPagesLocked();
 #endif
+  PageQueues* pq = pmm_page_queues();
   if (is_source_preserving_page_content()) {
     DEBUG_ASSERT(is_page_dirty_tracked(page));
     // We can only move Clean pages to the pager backed queues as they track age information for
     // eviction; only Clean pages can be evicted. Pages in AwaitingClean and Dirty are protected
     // from eviction in the Dirty queue.
     if (is_page_clean(page)) {
-      pmm_page_queues()->SetPagerBacked(page, this, offset);
+      if (high_priority_count_ != 0) {
+        // If this VMO is high priority then do not place in the pager backed queue as that is
+        // reclaimable, place in the high priority queue instead.
+        pq->SetHighPriority(page, this, offset);
+      } else {
+        pq->SetPagerBacked(page, this, offset);
+      }
     } else {
       DEBUG_ASSERT(!page->is_loaned());
-      pmm_page_queues()->SetPagerBackedDirty(page, this, offset);
+      pq->SetPagerBackedDirty(page, this, offset);
     }
   } else {
     // Place pages from contiguous VMOs in the wired queue, as they are notionally pinned until the
     // owner explicitly releases them.
     if (can_decommit_zero_pages_locked()) {
-      pmm_page_queues()->SetAnonymous(page, this, offset);
+      if (high_priority_count_ != 0 && !pq->ReclaimIsOnlyPagerBacked()) {
+        // If anonymous pages are reclaimable, and this VMO is high priority, then places our pages
+        // in the high priority queue instead of the anonymous one to avoid reclamation.
+        pq->SetHighPriority(page, this, offset);
+      } else {
+        pq->SetAnonymous(page, this, offset);
+      }
     } else {
-      pmm_page_queues()->SetWired(page, this, offset);
+      pq->SetWired(page, this, offset);
     }
   }
 }
@@ -3810,13 +3836,28 @@ int64_t VmCowPages::ChangeSingleHighPriorityCountLocked(int64_t delta) {
   DEBUG_ASSERT(high_priority_count_ >= 0);
   const bool is_zero = high_priority_count_ == 0;
   // Any change to or from zero means we need to add or remove a count from our parent (if we have
-  // one).
+  // one) and potentially move pages in the page queues.
   if (is_zero && !was_zero) {
     delta = -1;
   } else if (was_zero && !is_zero) {
     delta = 1;
   } else {
     delta = 0;
+  }
+  if (delta != 0) {
+    // If we moved to or from zero then update every page into the correct page queue for tracking.
+    // MoveToNotPinnedLocked will check the high_priority_count_, which has already been updated, so
+    // can just call that on every page.
+    page_list_.ForEveryPage([this](const VmPageOrMarker* page_or_marker, uint64_t offset) {
+      if (page_or_marker->IsPage()) {
+        vm_page_t* page = page_or_marker->Page();
+        if (page->object.pin_count == 0) {
+          AssertHeld(lock_ref());
+          MoveToNotPinnedLocked(page, offset);
+        }
+      }
+      return ZX_ERR_NEXT;
+    });
   }
   vm_vmo_high_priority.Add(delta);
   return delta;

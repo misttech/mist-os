@@ -123,6 +123,7 @@ class PageQueues {
   void SetPagerBacked(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetPagerBackedDirty(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
   void SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
+  void SetHighPriority(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
 
   // All Move operations change the queue that a page is considered to be in, but do not change the
   // object or offset backlink information. The page must currently be in a valid page queue.
@@ -133,6 +134,7 @@ class PageQueues {
   void MoveToPagerBackedDontNeed(vm_page_t* page);
   void MoveToPagerBackedDirty(vm_page_t* page);
   void MoveToAnonymousZeroFork(vm_page_t* page);
+  void MoveToHighPriority(vm_page_t* page);
 
   // Indicates that page has failed a compression attempted, and moves it to a separate queue to
   // prevent it from being considered part of the reclaim set, which makes it neither active nor
@@ -257,12 +259,13 @@ class PageQueues {
     size_t wired = 0;
     size_t anonymous_zero_fork = 0;
     size_t failed_reclaim = 0;
+    size_t high_priority = 0;
 
     bool operator==(const Counts& other) const {
       return reclaim == other.reclaim && reclaim_dont_need == other.reclaim_dont_need &&
              anonymous == other.anonymous && wired == other.wired &&
              anonymous_zero_fork == other.anonymous_zero_fork &&
-             failed_reclaim == other.failed_reclaim;
+             failed_reclaim == other.failed_reclaim && high_priority == other.high_priority;
     }
     bool operator!=(const Counts& other) const { return !(*this == other); }
   };
@@ -318,6 +321,7 @@ class PageQueues {
   bool DebugPageIsAnonymousZeroFork(const vm_page_t* page) const;
   bool DebugPageIsAnyAnonymous(const vm_page_t* page) const;
   bool DebugPageIsWired(const vm_page_t* page) const;
+  bool DebugPageIsHighPriority(const vm_page_t* page) const;
 
   // These methods are public so that the scanner can call. Once the scanner is an object that can
   // be friended, and not a collection of anonymous functions, these can be made private.
@@ -378,6 +382,7 @@ class PageQueues {
     PageQueueNone = 0,
     PageQueueAnonymous,
     PageQueueWired,
+    PageQueueHighPriority,
     PageQueueAnonymousZeroFork,
     PageQueuePagerBackedDirty,
     PageQueueFailedReclaim,
