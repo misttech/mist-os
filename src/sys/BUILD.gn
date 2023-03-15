@@ -18,6 +18,7 @@ group("tests") {
     ":legacy_tests",
     "activity:tests",
     "base-resolver:tests",
+    "bedrock:tests",
     "cache_manager:tests",
     "component_manager:tests",
     "core:tests",
