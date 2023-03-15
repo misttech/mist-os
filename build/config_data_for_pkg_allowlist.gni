@@ -65,6 +65,7 @@ config_data_for_pkg_allowlist = [
   "mem",
   "memory_monitor",
   "metrics-logger",
+  "mouse-input-test",
   "netcfg",
   "netstack",
   "night_mode_integration_test_pkg",

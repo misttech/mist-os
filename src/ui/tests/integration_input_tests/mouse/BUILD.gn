@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/flutter/config.gni")
+import("//src/fonts/build/fonts.gni")
 
 group("tests") {
   testonly = true
@@ -23,6 +24,14 @@ group("tests") {
   ]
 }
 
+font_collection("single-font-collection") {
+  testonly = true
+  product_config_path =
+      "//src/ui/testing/data/single-font-collection.fontcfg.json5"
+  local_asset_names = [ "Roboto-Regular.ttf" ]
+  font_service_pkg = "mouse-input-test"
+}
+
 executable("mouse-input-test-bin") {
   testonly = true
   sources = [ "mouse-input-test.cc" ]
@@ -37,6 +46,7 @@ executable("mouse-input-test-bin") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_hlcpp",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_hlcpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
@@ -70,17 +80,26 @@ fuchsia_component("mouse-input-test-component") {
 fuchsia_test_package("mouse-input-test") {
   test_components = [ ":mouse-input-test-component" ]
   deps = [
+    # Needed by font_provider.
+    ":single-font-collection",
+
+    # The test realms.
     "mouse-input-chromium:mouse-input-chromium-component",
     "mouse-input-flutter:realm",
 
-    # TODO(fxbug.dev/119212): These should be provided by the Product
+    # TODO(fxbug.dev/119212): This should be provided by the Product
     # configurations on which these tests run rather than as deps.
     "//src/chromium:uses_web_engine",
+
+    # Used by some tests.
+    "//src/lib/ui/input-synthesis:input-synthesis-component",
+
+    # Launched in the test realm for hermeticity.
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",
-    "//src/lib/ui/input-synthesis:input-synthesis-component",
+    "//src/fonts:font_provider_cm",
 
     # Include some default config (it doesn't matter which, since we're going to override it).
     "//src/ui/testing/test_ui_stack:flatland_scene_manager_config",

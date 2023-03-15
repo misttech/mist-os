@@ -13,6 +13,7 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
+#include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/session/scene/cpp/fidl.h>
 #include <fuchsia/sys/cpp/fidl.h>
@@ -53,6 +54,7 @@ namespace {
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
 using component_testing::ConfigValue;
+using component_testing::Directory;
 using component_testing::LocalComponentHandles;
 using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
@@ -276,6 +278,9 @@ class MouseInputBase : public ui_testing::PortableUITest {
   // Use a DPR other than 1.0, so that logical and physical coordinate spaces
   // are different.
   float device_pixel_ratio() override { return 2.f; }
+
+  static constexpr auto kFontsProvider = "fonts_provider";
+  static constexpr auto kFontsProviderUrl = "#meta/fonts.cm";
 
  private:
   uint32_t display_width_ = 0;
@@ -618,6 +623,7 @@ class ChromiumInputTest : public MouseInputBase {
     return {
         std::make_pair(kMouseInputChromium, kMouseInputChromiumUrl),
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
+        std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
         std::make_pair(kNetstack, kNetstackUrl),
         std::make_pair(kMockCobalt, kMockCobaltUrl),
@@ -648,15 +654,37 @@ class ChromiumInputTest : public MouseInputBase {
          .targets = {target}},
         {.capabilities =
              {
+                 Protocol{fuchsia::process::Launcher::Name_},
                  Protocol{fuchsia::sys::Environment::Name_},
-                 Protocol{fuchsia::logger::LogSink::Name_},
                  Protocol{fuchsia::vulkan::loader::Loader::Name_},
              },
          .source = ParentRef(),
          .targets = {target}},
+        {
+            .capabilities =
+                {
+                    Protocol{fuchsia::logger::LogSink::Name_},
+                },
+            .source = ParentRef(),
+            .targets =
+                {
+                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
+                    ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider},
+                    ChildRef{kMockCobalt},
+                    // Not including kNetstack here, since it emits spurious
+                    // FATAL errors.
+                },
+        },
         {.capabilities = {Protocol{fuchsia::ui::test::input::MouseInputListener::Name_}},
          .source = ChildRef{kMouseInputListener},
          .targets = {target}},
+        {.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
+         .source = ChildRef{kFontsProvider},
+         .targets = {target}},
+        {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
+                          Directory{.name = "config-data", .as = "config-data", .subdir = "fonts"}},
+         .source = ParentRef(),
+         .targets = {target, ChildRef{kFontsProvider}}},
         {.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
          .source = ChildRef{kMemoryPressureProvider},
          .targets = {target}},
@@ -666,8 +694,9 @@ class ChromiumInputTest : public MouseInputBase {
         {.capabilities = {Protocol{fuchsia::web::ContextProvider::Name_}},
          .source = ChildRef{kWebContextProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::sys::Environment::Name_},
-                          Protocol{fuchsia::logger::LogSink::Name_}},
+        // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+        // successful transition to CFv2.
+        {.capabilities = {Protocol{fuchsia::sys::Environment::Name_}},
          .source = ParentRef(),
          .targets = {target, ChildRef{kWebContextProvider}}},
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
@@ -694,6 +723,12 @@ class ChromiumInputTest : public MouseInputBase {
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target, ChildRef{kWebContextProvider}}},
+        {.capabilities = {Directory{
+             .name = "root-ssl-certificates",
+             .type = fuchsia::component::decl::DependencyType::STRONG,
+         }},
+         .source = ParentRef(),
+         .targets = {ChildRef{kWebContextProvider}}},
     };
   }
 
