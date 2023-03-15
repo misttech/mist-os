@@ -220,8 +220,7 @@ pub struct NetScanResultNet {
     pub net_type: u32,
     pub flags: u8,
     pub network_name: Vec<u8>,
-    // TODO(https://fxbug.dev/105014): can this be [u8; 8]?
-    pub xpanid: Vec<u8>,
+    pub xpanid: [u8; 8],
     pub steering_data: Vec<u8>,
 }
 

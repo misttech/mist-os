@@ -438,9 +438,7 @@ impl FakeSpinelDevice {
                                         net_type: 2,
                                         flags: 0,
                                         network_name: b"net_chan_11".to_vec(),
-                                        xpanid: vec![
-                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-                                        ],
+                                        xpanid: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
                                         steering_data: vec![],
                                     }
                                 },
@@ -472,9 +470,7 @@ impl FakeSpinelDevice {
                                         net_type: 2,
                                         flags: 0,
                                         network_name: b"net_chan_12".to_vec(),
-                                        xpanid: vec![
-                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
-                                        ],
+                                        xpanid: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
                                         steering_data: vec![],
                                     }
                                 },
@@ -506,9 +502,7 @@ impl FakeSpinelDevice {
                                         net_type: 2,
                                         flags: 0,
                                         network_name: b"net_chan_13".to_vec(),
-                                        xpanid: vec![
-                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02
-                                        ],
+                                        xpanid: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02],
                                         steering_data: vec![],
                                     }
                                 },

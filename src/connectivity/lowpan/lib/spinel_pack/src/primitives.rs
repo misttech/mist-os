@@ -603,6 +603,25 @@ where
     impl_try_array_owned_unpack_sized!(Self);
 }
 
+impl<'a, T, const N: usize> TryUnpack<'a> for [T; N]
+where
+    T: TryUnpack<'a>,
+{
+    type Unpacked = [T::Unpacked; N];
+    fn try_unpack(iter: &mut std::slice::Iter<'a, u8>) -> anyhow::Result<Self::Unpacked> {
+        let mut ret: Vec<T::Unpacked> = Vec::with_capacity(iter.size_hint().0);
+
+        while iter.len() != 0 {
+            ret.push(T::try_array_unpack(iter)?);
+        }
+
+        ret.try_into().map_err(|vec: Vec<_>| {
+            anyhow::anyhow!("incorrect number of elements {} vs {}", vec.len(), N)
+        })
+    }
+    impl_try_array_unpack_sized!(Self, 'a);
+}
+
 impl<'a, T> TryUnpack<'a> for Vec<T>
 where
     T: TryUnpack<'a>,
@@ -656,12 +675,34 @@ where
     impl_try_array_unpack_sized!(Self, 'a);
 }
 
-impl<'a, T> TryUnpackAs<'a, [u8]> for Vec<T>
+impl<'a, T, const N: usize> TryUnpackAs<'a, [u8]> for [T; N]
 where
-    Self: TryUnpack<'a, Unpacked = Vec<T>>,
+    Self: TryUnpack<'a, Unpacked = Self>,
 {
     fn try_unpack_as(iter: &mut std::slice::Iter<'a, u8>) -> anyhow::Result<Self> {
         Self::try_unpack(iter)
+    }
+}
+
+impl<'a, T> TryUnpackAs<'a, [u8]> for Vec<T>
+where
+    Self: TryUnpack<'a, Unpacked = Self>,
+{
+    fn try_unpack_as(iter: &mut std::slice::Iter<'a, u8>) -> anyhow::Result<Self> {
+        Self::try_unpack(iter)
+    }
+}
+
+impl<'a, T, const N: usize> TryUnpackAs<'a, SpinelDataWlen> for [T; N]
+where
+    Self: TryUnpackAs<'a, [u8]>,
+{
+    fn try_unpack_as(iter: &mut std::slice::Iter<'a, u8>) -> anyhow::Result<Self> {
+        // Get a reference to the buffer.
+        let buffer: &'a [u8] = TryUnpackAs::<SpinelDataWlen>::try_unpack_as(iter)?;
+
+        // Unpack using that buffer.
+        TryUnpackAs::<[u8]>::try_unpack_as(&mut buffer.iter())
     }
 }
 
@@ -701,6 +742,19 @@ where
 
     fn try_pack_as<B: std::io::Write + ?Sized>(&self, buffer: &mut B) -> io::Result<usize> {
         self.try_pack(buffer)
+    }
+}
+
+impl<T, const N: usize> TryPackAs<SpinelDataWlen> for [T; N]
+where
+    for<'a> &'a [T]: TryPackAs<SpinelDataWlen>,
+{
+    fn pack_as_len(&self) -> io::Result<usize> {
+        TryPackAs::<SpinelDataWlen>::pack_as_len(&self.as_slice())
+    }
+
+    fn try_pack_as<B: std::io::Write + ?Sized>(&self, buffer: &mut B) -> io::Result<usize> {
+        TryPackAs::<SpinelDataWlen>::try_pack_as(&self.as_slice(), buffer)
     }
 }
 
