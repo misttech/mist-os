@@ -11,7 +11,9 @@ use {
         object_store::{
             allocator::{AllocatorItem, Reservation},
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
-            object_record::{ObjectItem, ObjectItemV5, ObjectKey, ObjectKeyData, ObjectValue},
+            object_record::{
+                ObjectItem, ObjectItemV5, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
+            },
         },
         serialized_types::{migrate_nodefault, Migrate, Versioned},
     },
@@ -651,7 +653,7 @@ impl<'a> Transaction<'a> {
                         }
                     }
                 },
-                ObjectKeyData::ProjectLimit { project_id } => {
+                ObjectKeyData::Project { project_id, property: ProjectProperty::Limit } => {
                     if !self.txn_locks.contains(&LockKey::ProjectId {
                         store_object_id: *store_object_id,
                         project_id: *project_id,
@@ -667,7 +669,7 @@ impl<'a> Transaction<'a> {
                         )
                     }
                 }
-                ObjectKeyData::ProjectUsage { .. } => match op {
+                ObjectKeyData::Project { property: ProjectProperty::Usage, .. } => match op {
                     Operation::Insert | Operation::ReplaceOrInsert => {
                         panic!(
                             "Project usage is all handled by merging deltas, no inserts or \

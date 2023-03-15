@@ -4,7 +4,7 @@
 
 use {
     super::extent_record::{ExtentKey, ExtentValue},
-    super::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
+    super::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty},
     crate::lsm_tree::{
         merge::{
             ItemOp::{Discard, Keep, Replace},
@@ -212,11 +212,19 @@ pub fn merge(
         (
             ObjectKey {
                 object_id: _,
-                data: ObjectKeyData::ProjectUsage { project_id: left_project_id },
+                data:
+                    ObjectKeyData::Project {
+                        project_id: left_project_id,
+                        property: ProjectProperty::Usage,
+                    },
             },
             ObjectKey {
                 object_id: _,
-                data: ObjectKeyData::ProjectUsage { project_id: right_project_id },
+                data:
+                    ObjectKeyData::Project {
+                        project_id: right_project_id,
+                        property: ProjectProperty::Usage,
+                    },
             },
             ObjectValue::BytesAndNodes { bytes: left_bytes, nodes: left_nodes },
             ObjectValue::BytesAndNodes { bytes: right_bytes, nodes: right_nodes },

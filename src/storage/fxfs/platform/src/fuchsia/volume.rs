@@ -541,11 +541,6 @@ impl FxVolumeAndRoot {
                 Options::default(),
             )
             .await?;
-        store
-            .tree()
-            .find(&ObjectKey::project_limit(root_id, project_id))
-            .await?
-            .ok_or(FxfsError::NotFound)?;
 
         let object_key = ObjectKey::object(node_id);
         let (kind, mut attributes) =
@@ -691,36 +686,19 @@ impl FxVolumeAndRoot {
     }
 
     async fn project_info(&self, project_id: u64) -> Result<(BytesAndNodes, BytesAndNodes), Error> {
-        let store = self.volume.store();
-        let root_id = self.root.directory().object_id();
-        // If there is no limit, we should fail with NotFound.
-        let limit = match store
-            .tree()
-            .find(&ObjectKey::project_limit(root_id, project_id))
-            .await?
-            .ok_or(FxfsError::NotFound)?
-            .value
-        {
-            ObjectValue::None => Err(FxfsError::NotFound),
-            ObjectValue::BytesAndNodes { bytes, nodes } => Ok(BytesAndNodes {
-                bytes: bytes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-                nodes: nodes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-            }),
-            _ => Err(FxfsError::Inconsistent),
-        }?;
-        // If limit *was* found but usage is not, that should be interpreted as 0 usage.
-        let usage = match store.tree().find(&ObjectKey::project_usage(root_id, project_id)).await? {
-            None => Ok(BytesAndNodes { bytes: 0, nodes: 0 }),
-            Some(object) => match object.value {
-                ObjectValue::None => Ok(BytesAndNodes { bytes: 0, nodes: 0 }),
-                ObjectValue::BytesAndNodes { bytes, nodes } => Ok(BytesAndNodes {
-                    bytes: bytes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-                    nodes: nodes.try_into().map_err(|_| FxfsError::Inconsistent)?,
-                }),
-                _ => Err(FxfsError::Inconsistent),
-            },
-        }?;
-        Ok((limit, usage))
+        let (limit, usage) = self.volume.store().project_info(project_id).await?;
+        // At least one of them needs to be around to return anything.
+        ensure!(limit.is_some() || usage.is_some(), FxfsError::NotFound);
+        Ok((
+            limit.map_or_else(
+                || BytesAndNodes { bytes: u64::MAX, nodes: u64::MAX },
+                |v| BytesAndNodes { bytes: v.0, nodes: v.1 },
+            ),
+            usage.map_or_else(
+                || BytesAndNodes { bytes: 0, nodes: 0 },
+                |v| BytesAndNodes { bytes: v.0, nodes: v.1 },
+            ),
+        ))
     }
 }
 
@@ -2008,6 +1986,8 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_project_listing() {
         const VOLUME_NAME: &str = "A";
+        const FILE_NAME: &str = "B";
+        const NON_ZERO_PROJECT_ID: u64 = 3;
         let mut device = DeviceHolder::new(FakeDevice::new(8192, 512));
         let volume_store_id;
         {
@@ -2043,12 +2023,53 @@ mod tests {
                 connect_to_protocol_at_dir_svc::<ProjectIdMarker>(&volume_dir_proxy)
                     .expect("Unable to connect to project id service");
             // This is just to ensure that the small numbers below can be used for this test.
-            assert!(FxVolumeAndRoot::MAX_PROJECT_ENTRIES >= 3);
+            assert!(FxVolumeAndRoot::MAX_PROJECT_ENTRIES >= 4);
             // Create a bunch of proxies. 3 more than the limit to ensure pagination.
             let num_entries = u64::try_from(FxVolumeAndRoot::MAX_PROJECT_ENTRIES + 3).unwrap();
             for project_id in 1..=num_entries {
                 project_proxy.set_limit(project_id, 1, 1).await.unwrap().expect("To set limits");
             }
+
+            // Add one usage entry to be interspersed with the limit entries. Verifies that the
+            // iterator will progress passed it with no effect.
+            let file_proxy = {
+                let (root_proxy, root_server_end) =
+                    fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                        .expect("Create dir proxy to succeed");
+                volume_dir_proxy
+                    .open(
+                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                        fio::ModeType::empty(),
+                        "root",
+                        ServerEnd::new(root_server_end.into_channel()),
+                    )
+                    .expect("Failed to open volume root");
+
+                open_file_checked(
+                    &root_proxy,
+                    fio::OpenFlags::CREATE
+                        | fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE,
+                    FILE_NAME,
+                )
+                .await
+            };
+            let node_id = file_proxy.get_attr().await.unwrap().1.id;
+            project_proxy
+                .set_for_node(node_id, NON_ZERO_PROJECT_ID)
+                .await
+                .unwrap()
+                .expect("Setting project on node");
+            {
+                let BytesAndNodes { nodes, .. } = project_proxy
+                    .info(NON_ZERO_PROJECT_ID)
+                    .await
+                    .unwrap()
+                    .expect("Fetching project info")
+                    .1;
+                assert_eq!(nodes, 1);
+            }
+
             // If this `unwrap()` fails, it is likely the MAX_PROJECT_ENTRIES is too large for fidl.
             let (mut entries, mut next_token) =
                 project_proxy.list(None).await.unwrap().expect("To get project listing");
@@ -2068,7 +2089,7 @@ mod tests {
             assert!(entries.contains(&num_entries));
             assert!(!entries.contains(&1));
             assert!(!entries.contains(&3));
-            // Delete a couple and list all again.
+            // Delete a couple and list all again, but one has usage still.
             project_proxy.clear(1).await.unwrap().expect("Clear project");
             project_proxy.clear(3).await.unwrap().expect("Clear project");
             (entries, next_token) =
@@ -2077,17 +2098,18 @@ mod tests {
             assert!(next_token.is_some());
             assert!(!entries.contains(&num_entries));
             assert!(!entries.contains(&1));
-            assert!(!entries.contains(&3));
+            assert!(entries.contains(&3));
             (entries, next_token) = project_proxy
                 .list(next_token.as_deref_mut())
                 .await
                 .unwrap()
                 .expect("To get project listing");
-            assert_eq!(entries.len(), 1);
+            assert_eq!(entries.len(), 2);
             assert!(next_token.is_none());
             assert!(entries.contains(&num_entries));
-            // Delete one more to hit the edge case.
+            // Delete two more to hit the edge case.
             project_proxy.clear(2).await.unwrap().expect("Clear project");
+            project_proxy.clear(4).await.unwrap().expect("Clear project");
             (entries, next_token) =
                 project_proxy.list(None).await.unwrap().expect("To get project listing");
             assert_eq!(entries.len(), FxVolumeAndRoot::MAX_PROJECT_ENTRIES);

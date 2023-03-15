@@ -30,6 +30,16 @@ pub enum ObjectDescriptor {
     Symlink,
 }
 
+/// For specifying what property of the project is being addressed.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeHash)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub enum ProjectProperty {
+    /// The configured limit for the project.
+    Limit,
+    /// The currently tracked usage for the project.
+    Usage,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeHash)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum ObjectKeyData {
@@ -45,12 +55,10 @@ pub enum ObjectKeyData {
     Child { name: String },
     /// A graveyard entry.
     GraveyardEntry { object_id: u64 },
-    /// Project ID limit info, where the id is the associated id number. This should only be
-    /// attached to the volume's root node.
-    ProjectLimit { project_id: u64 },
-    /// Project ID usage info, where the is the associated id number. This should only be attached
-    /// to the volume's root node.
-    ProjectUsage { project_id: u64 },
+    /// Project ID info. This should only be attached to the volume's root node. Used to address the
+    /// configured limit and the usage tracking which are ordered after the `project_id` to provide
+    /// locality of the two related values.
+    Project { project_id: u64, property: ProjectProperty },
     /// A symlink of an object.
     Symlink,
 }
@@ -142,12 +150,18 @@ impl ObjectKey {
 
     /// Creates an ObjectKey for a ProjectLimit entry.
     pub fn project_limit(object_id: u64, project_id: u64) -> Self {
-        Self { object_id, data: ObjectKeyData::ProjectLimit { project_id } }
+        Self {
+            object_id,
+            data: ObjectKeyData::Project { project_id, property: ProjectProperty::Limit },
+        }
     }
 
     /// Creates an ObjectKey for a ProjectUsage entry.
     pub fn project_usage(object_id: u64, project_id: u64) -> Self {
-        Self { object_id, data: ObjectKeyData::ProjectUsage { project_id } }
+        Self {
+            object_id,
+            data: ObjectKeyData::Project { project_id, property: ProjectProperty::Usage },
+        }
     }
 
     /// Returns the search key for this extent; that is, a key which is <= this key under Ord and

@@ -15,7 +15,7 @@ use {
             graveyard::Graveyard,
             AttributeKey, EncryptionKeys, ExtentKey, ExtentValue, ObjectAttributes,
             ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue,
-            DEFAULT_DATA_ATTRIBUTE_ID,
+            ProjectProperty, DEFAULT_DATA_ATTRIBUTE_ID,
         },
         range::RangeExt,
         round::round_up,
@@ -531,7 +531,7 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
-            ObjectKeyData::ProjectLimit { project_id } => {
+            ObjectKeyData::Project { project_id, property: ProjectProperty::Limit } => {
                 // Should only be set on the root object store
                 if self.root_dir_id != key.object_id {
                     self.fsck.error(FsckError::NonRootProjectIdMetadata(
@@ -551,7 +551,7 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
-            ObjectKeyData::ProjectUsage { project_id } => {
+            ObjectKeyData::Project { project_id, property: ProjectProperty::Usage } => {
                 // Should only be set on the root object store
                 if self.root_dir_id != key.object_id {
                     self.fsck.error(FsckError::NonRootProjectIdMetadata(

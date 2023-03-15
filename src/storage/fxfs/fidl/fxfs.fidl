@@ -139,9 +139,8 @@ closed protocol ProjectId {
     }) -> () error zx.status;
 
     /// Apply project id to a node_id from a GetAttrs call. This will return ZX_ERR_NOT_FOUND if
-    /// the project isn't currently tracked or the node doesn't exist, ZX_ERR_ALREADY_EXISTS if
-    /// there is already a `project_id` applied to the node, and ZX_ERR_OUT_OF_RANGE if
-    /// `project_id` is set to zero.
+    /// node doesn't exist, ZX_ERR_ALREADY_EXISTS if there is already a `project_id` applied to
+    /// the node, and ZX_ERR_OUT_OF_RANGE if `project_id` is set to zero.
     strict SetForNode(struct {
         node_id uint64;
         project_id uint64;
@@ -163,10 +162,10 @@ closed protocol ProjectId {
         node_id uint64;
     }) -> () error zx.status;
 
-    /// Fetches project id numbers currently tracked with a limit from lowest to highest. If `token`
-    /// is null, start at the beginning, if `token` is populated with a previously provided
-    /// `next_token` the iteration continues where it left off. If there are more projects to be
-    /// listed then `next_token` will be populated, otherwise it will be null.
+    /// Fetches project id numbers currently tracked with a limit or with non-zero usage from lowest
+    /// to highest. If `token` is null, start at the beginning, if `token` is populated with a
+    /// previously provided `next_token` the iteration continues where it left off. If there are
+    /// more projects to be listed then `next_token` will be populated, otherwise it will be null.
     strict List(struct {
         token box<ProjectIterToken>;
     }) -> (struct {
@@ -175,7 +174,7 @@ closed protocol ProjectId {
     }) error zx.status;
 
     /// Looks up the limit and usage for a tracked `project_id`. If the `project_id` does not have
-    /// a limit set, it will return ZX_ERR_NOT_FOUND.
+    /// a limit set, or non-zero usage it will return ZX_ERR_NOT_FOUND.
     strict Info(struct {
         project_id uint64;
     }) -> (struct {
