@@ -17,6 +17,10 @@ declare_args() {
   ffx_build_dual_mode_plugins_as_subtools = false
 }
 
+# The path within the build where test host tools live
+ffx_test_host_tools_out_dir =
+    "${root_out_dir}/src/developer/ffx/test-host-tools"
+
 # The list of plugins that can be built either as plugins or subtools,
 # used in the main ffx target if `ffx_build_dual_mode_plugns_as_subtools`
 # is false, and in tools/BUILD.gn if it's true (with the suffix of
@@ -67,8 +71,10 @@ dual_mode_defaults = [
 # subtools.
 dual_mode_subtools = []
 dual_mode_subtool_tests = []
+dual_mode_subtool_test_data = []
 
 foreach(plugin, dual_mode_plugins) {
   dual_mode_subtools += [ plugin + "_tool_host_tool" ]
   dual_mode_subtool_tests += [ plugin + "_tests" ]
+  dual_mode_subtool_test_data += [ plugin + "_test_data" ]
 }

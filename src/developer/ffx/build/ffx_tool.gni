@@ -6,6 +6,7 @@ import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/sdk/sdk_atom.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
+import("//src/developer/ffx/config.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 
 # Defines an ffx-compatible subtool in the form of a rust binary target
@@ -46,6 +47,10 @@ import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 #     Installation of the versioned binary and metadata as a host tool.
 #     Output: `host-tools/<output_name>`, `host-tools/<output_name>.json`
 #
+#   `<target_name>_test_data`
+#     A `host_test_data` target that includes the files necessary to make sure
+#     this tool is available to tests.
+#
 # The following target will be produced only if `sdk_target_name` is set:
 #
 #   `<sdk_target_name>`
@@ -63,6 +68,7 @@ template("ffx_tool") {
   target_unversioned = target_name
   target_metadata = "${target_name}_metadata"
   target_host_tool = "${target_name}_host_tool"
+  target_test_data = "${target_name}_test_data"
 
   output_versioned = output_name
   output_unversioned = "${output_name}_unversioned"
@@ -111,6 +117,16 @@ template("ffx_tool") {
       output_name,
       output_metadata,
     ]
+  }
+
+  # Install host tool and metadata as test data
+  host_test_data(target_test_data) {
+    deps = [ ":$target_host_tool" ]
+    sources = [
+      "${host_tools_dir}/${output_metadata}",
+      "${host_tools_dir}/${output_name}",
+    ]
+    outputs = [ "${ffx_test_host_tools_out_dir}/{{source_file_part}}" ]
   }
 
   if (defined(invoker.sdk_target_name)) {
