@@ -5,7 +5,7 @@
 group("tests") {
   testonly = true
   deps = [
-    "ffx:tests",
+    "ffx:tests($host_toolchain)",
     "tests",
   ]
 }

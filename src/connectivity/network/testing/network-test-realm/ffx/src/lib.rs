@@ -6,8 +6,8 @@
 #![deny(unused_results)]
 
 use anyhow::Context as _;
-use ffx_core::ffx_plugin;
 use ffx_net_test_realm_args as ntr_args;
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_test_realm as fntr;
@@ -34,9 +34,26 @@ async fn connect_to_protocol<S: fidl::endpoints::ProtocolMarker>(
         })?;
     Ok(proxy)
 }
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("net.test.realm"))]
+pub struct NetTestRealmTool {
+    remote_control: fremotecontrol::RemoteControlProxy,
+    #[command]
+    cmd: ntr_args::Command,
+}
 
-#[ffx_plugin("net.test.realm")]
-pub async fn net_test_realm(
+fho::embedded_plugin!(NetTestRealmTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for NetTestRealmTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        net_test_realm(self.remote_control, self.cmd).await.map_err(Into::into)
+    }
+}
+
+async fn net_test_realm(
     remote_control: fremotecontrol::RemoteControlProxy,
     cmd: ntr_args::Command,
 ) -> anyhow::Result<()> {

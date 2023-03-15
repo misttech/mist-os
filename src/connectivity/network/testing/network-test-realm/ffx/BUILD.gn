@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
+
+assert(is_host)
 
 ffx_plugin("ffx_net_test_realm") {
   edition = "2021"
@@ -14,9 +17,11 @@ ffx_plugin("ffx_net_test_realm") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm_rust",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
@@ -28,6 +33,17 @@ ffx_plugin("ffx_net_test_realm") {
   ]
   args_sources = [ "src/args.rs" ]
   sources = [ "src/lib.rs" ]
+}
+
+ffx_tool("ffx_net_test_realm_tool") {
+  edition = "2021"
+  output_name = "ffx-net-test-realm"
+  deps = [
+    ":ffx_net_test_realm",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }
 
 group("tests") {
