@@ -4,6 +4,7 @@
 
 use {
     anyhow::{Error, Result},
+    fidl_fuchsia_audio_ffxdaemon::DeviceSelector,
     fidl_fuchsia_media::AudioSampleFormat,
     regex::Regex,
     std::io::{Cursor, Seek, SeekFrom, Write},
@@ -307,6 +308,15 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
             value, DURATION_REGEX
         )),
     }
+}
+
+pub fn path_for_selector(device_selector: DeviceSelector) -> Result<String, Error> {
+    let input = device_selector
+        .is_input
+        .map(|is_input| if is_input { "input" } else { "output" })
+        .ok_or(anyhow::anyhow!("Input/output missing"))?;
+    let id = device_selector.id.ok_or(anyhow::anyhow!("Device id missing"))?;
+    Ok(format!("/dev/class/audio-{}/{}", input, id))
 }
 
 pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_ffxdaemon::ClockType, String> {

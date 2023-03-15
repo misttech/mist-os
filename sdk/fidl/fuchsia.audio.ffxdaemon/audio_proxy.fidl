@@ -56,7 +56,6 @@ type CustomClockInfo = table {
     2: offset int32;
 };
 
-
 /// Where to capture audio data.
 type RecordLocation = flexible union {
     /// Capture audio through an AudioCapturer.
@@ -146,11 +145,11 @@ protocol AudioDaemon {
         3: gain_settings GainSettings;
     }) -> (resource table {
         /// Information from daemon component for ffx plugin to display.
-        /// Required.
+        /// Always present.
         1: stdout zx.handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
-        /// Required.
+        /// Always present.
         2: stderr zx.handle:SOCKET;
     }) error zx.status;
 
@@ -178,11 +177,11 @@ protocol AudioDaemon {
         5: gain_settings GainSettings;
     }) -> (resource table {
         /// Contains audio data in the form of a complete WAV file.
-        /// Required.
+        /// Always present.
         1: stdout zx.handle:SOCKET;
 
         /// Errors from daemon component for ffx plugin to display.
-        /// Required.
+        /// Always present.
         2: stderr zx.handle:SOCKET;
     }) error zx.status;
 
@@ -203,4 +202,15 @@ protocol AudioDaemon {
         /// Information about device.
         1: device_info DeviceInfo;
     }) error zx.status;
+
+    /// Sets the gain of the stream in decibels.
+    DeviceSetGainState(resource table {
+        /// Id of the device to set the gain state.
+        /// Required.
+        1: device DeviceSelector;
+
+        /// Desired gain state.
+        /// Required.
+        2: gain_state fuchsia.hardware.audio.GainState;
+    }) -> () error zx.status;
 };

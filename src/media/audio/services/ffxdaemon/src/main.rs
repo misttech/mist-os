@@ -542,27 +542,15 @@ impl AudioDaemon {
                     };
                     responder
                         .send(&mut Ok(response))
-                        .map_err(|e| anyhow::anyhow!("Failed to send device list response: {}", e))
+                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                 }
 
                 AudioDaemonRequest::DeviceInfo { payload, responder } => {
                     let device_selector =
                         payload.device.ok_or(anyhow::anyhow!("No device specified"))?;
 
-                    let path = format!(
-                        "/dev/class/audio-{}/{}",
-                        if device_selector
-                            .is_input
-                            .ok_or(anyhow::anyhow!("Input/output not specified"))?
-                        {
-                            "input"
-                        } else {
-                            "output"
-                        },
-                        device_selector.id.ok_or(anyhow::anyhow!("No device ID specified"))?
-                    );
-
-                    let device = device::Device::connect(path)?;
+                    let device =
+                        device::Device::connect(format_utils::path_for_selector(device_selector)?)?;
 
                     let info = device.get_info().await?;
                     let response = AudioDaemonDeviceInfoResponse {
@@ -572,18 +560,28 @@ impl AudioDaemon {
 
                     responder
                         .send(&mut Ok(response))
-                        .map_err(|e| anyhow::anyhow!("Failed to send device info response: {}", e))
+                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                }
+
+                AudioDaemonRequest::DeviceSetGainState { payload, responder } => {
+                    let (device_selector, gain_state) = (
+                        payload.device.ok_or(anyhow::anyhow!("No device specified"))?,
+                        payload.gain_state.ok_or(anyhow::anyhow!("No gain state specified"))?,
+                    );
+
+                    let device =
+                        device::Device::connect(format_utils::path_for_selector(device_selector)?)?;
+
+                    device.set_gain(gain_state)?;
+                    responder
+                        .send(&mut Ok(()))
+                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
                 }
             };
-
             match request_result {
-                Ok(_) => request_result,
-                Err(e) => {
-                    let mut async_stderr_socket = fasync::Socket::from_socket(stderr_local)?;
-                    async_stderr_socket.write_all(e.to_string().as_bytes()).await?;
-                    Err(e)
-                }
-            }?
+                Ok(_) => println!("Request succeeded."),
+                Err(e) => println!("Request failed with error {e}"),
+            }
         }
         Ok(())
     }

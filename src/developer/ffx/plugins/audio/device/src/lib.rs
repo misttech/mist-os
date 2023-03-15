@@ -6,11 +6,11 @@ use {
     anyhow::Result,
     blocking::Unblock,
     errors::ffx_bail,
-    ffx_audio_device_args::{DeviceCommand, SubCommand},
+    ffx_audio_device_args::{DeviceCommand, DeviceType, SubCommand},
     ffx_core::ffx_plugin,
     fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonDeviceInfoRequest, AudioDaemonPlayRequest, AudioDaemonProxy,
-        AudioDaemonRecordRequest, DeviceSelector, RecordLocation,
+        AudioDaemonDeviceInfoRequest, AudioDaemonDeviceSetGainStateRequest, AudioDaemonPlayRequest,
+        AudioDaemonProxy, AudioDaemonRecordRequest, DeviceSelector, RecordLocation,
     },
     fidl_fuchsia_hardware_audio::{PcmSupportedFormats, PlugDetectCapabilities},
     fidl_fuchsia_media::AudioStreamType,
@@ -24,12 +24,29 @@ use {
 )]
 pub async fn device_cmd(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
     match cmd.subcommand {
-        SubCommand::Info(_) => device_info(audio_proxy, cmd).await?,
-        SubCommand::Play(_) => device_play(audio_proxy, cmd).await?,
-        SubCommand::Record(_) => device_record(audio_proxy, cmd).await?,
-    }
+        SubCommand::Info(_) => device_info(audio_proxy, cmd).await,
+        SubCommand::Play(_) => device_play(audio_proxy, cmd).await,
+        SubCommand::Record(_) => device_record(audio_proxy, cmd).await,
+        SubCommand::Gain(_) | SubCommand::Mute(_) | SubCommand::Unmute(_) | SubCommand::Agc(_) => {
+            let mut request_info = DeviceGainStateRequest {
+                audio_proxy,
+                device_id: cmd.id,
+                device_type: cmd.device_type,
+                gain_db: None,
+                agc_enabled: None,
+                muted: None,
+            };
 
-    Ok(())
+            match cmd.subcommand {
+                SubCommand::Gain(gain_cmd) => request_info.gain_db = Some(gain_cmd.gain),
+                SubCommand::Mute(..) => request_info.muted = Some(true),
+                SubCommand::Unmute(..) => request_info.muted = Some(false),
+                SubCommand::Agc(agc_command) => request_info.agc_enabled = Some(agc_command.enable),
+                _ => {}
+            }
+            device_set_gain_state(request_info).await
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,12 +99,14 @@ pub struct JsonPcmFormats {
 }
 
 async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
+    let device_type =
+        cmd.device_type.ok_or(anyhow::anyhow!("Device type not passed to info request."))?;
     let info_cmd = match cmd.subcommand {
         SubCommand::Info(cmd) => cmd,
         _ => panic!("Unreachable."),
     };
 
-    let (device_path, is_input) = match info_cmd.device_type {
+    let (device_path, is_input) = match device_type {
         ffx_audio_device_args::DeviceType::Input => {
             (format!("/dev/class/audio-input/{}", cmd.id), true)
         }
@@ -98,7 +117,7 @@ async fn device_info(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
 
     let request = AudioDaemonDeviceInfoRequest {
         device: Some(DeviceSelector {
-            is_input: Some(ffx_audio_device_args::DeviceType::Input == info_cmd.device_type),
+            is_input: Some(ffx_audio_device_args::DeviceType::Input == device_type),
             id: Some(cmd.id),
             ..DeviceSelector::EMPTY
         }),
@@ -380,7 +399,7 @@ async fn device_play(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Resul
     Ok(())
 }
 
-pub async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
+async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) -> Result<()> {
     let device_id = cmd.id;
     let record_command = match cmd.subcommand {
         SubCommand::Record(record_command) => record_command,
@@ -434,4 +453,43 @@ pub async fn device_record(audio_proxy: AudioDaemonProxy, cmd: DeviceCommand) ->
     .await
     .map(|_| ())
     .map_err(|e| anyhow::anyhow!("Error copying data from socket. {}", e))
+}
+
+struct DeviceGainStateRequest {
+    audio_proxy: AudioDaemonProxy,
+    device_id: String,
+    device_type: Option<DeviceType>,
+    muted: Option<bool>,
+    gain_db: Option<f32>,
+    agc_enabled: Option<bool>,
+}
+
+async fn device_set_gain_state(request: DeviceGainStateRequest) -> Result<()> {
+    let Some(device_type) = request.device_type else {
+        return Err(anyhow::anyhow!("Device type missing"));
+    };
+
+    let dev_selector = DeviceSelector {
+        is_input: Some(ffx_audio_device_args::DeviceType::Input == device_type),
+        id: Some(request.device_id),
+        ..DeviceSelector::EMPTY
+    };
+
+    let gain_state = fidl_fuchsia_hardware_audio::GainState {
+        muted: request.muted,
+        gain_db: request.gain_db,
+        agc_enabled: request.agc_enabled,
+        ..fidl_fuchsia_hardware_audio::GainState::EMPTY
+    };
+
+    request
+        .audio_proxy
+        .device_set_gain_state(AudioDaemonDeviceSetGainStateRequest {
+            device: Some(dev_selector),
+            gain_state: Some(gain_state),
+            ..AudioDaemonDeviceSetGainStateRequest::EMPTY
+        })
+        .await
+        .map(|_| ())
+        .map_err(|e| anyhow::anyhow!("Error setting gain state. {e}"))
 }

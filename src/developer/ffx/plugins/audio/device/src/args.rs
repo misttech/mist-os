@@ -14,9 +14,17 @@ use {
     description = "Interact directly with device hardware.",
     example = "\
     To print information about a specific device: \n\
-    \t$ ffx audio device --id 000 info --type input --output text \n\n\
+    \t$ ffx audio device --id 000 --type input info \n\n\
     Play a wav file directly to device hardware: \n\
-    \t$ cat ~/sine.wav | ffx audio device --id 000 play \n"
+    \t$ cat ~/sine.wav | ffx audio device --id 000 play \n\n
+    Record a wav file directly from device hardware: \n\
+    \t$ ffx audio device --id 000 record --format 48000,uint8,1ch --duration 1s \n\n
+    Mute the stream of the output device: \n
+    \t$ ffx audio device --id 000 --type output mute \n\n
+    Set the gain of the output device to -20 dB: \n
+    \t$ ffx audio device --id 000 --type output gain -20 \n\n
+    Turn agc on for the input device: \n
+    \t$ ffx audio device --id 000 --type input agc on"
 )]
 pub struct DeviceCommand {
     #[argh(subcommand)]
@@ -27,6 +35,14 @@ pub struct DeviceCommand {
         description = "device id. stream device node id from either /dev/audio-input/* or /dev/audio-output/*"
     )]
     pub id: String,
+
+    #[argh(
+        option,
+        long = "type",
+        description = "device type. Accepted values: input, output. \
+        Play and record will use output and input respectively by default."
+    )]
+    pub device_type: Option<DeviceType>,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -35,14 +51,15 @@ pub enum SubCommand {
     Info(InfoCommand),
     Play(DevicePlayCommand),
     Record(DeviceRecordCommand),
+    Gain(DeviceGainCommand),
+    Mute(DeviceMuteCommand),
+    Unmute(DeviceUnmuteCommand),
+    Agc(DeviceAgcCommand),
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "info", description = "List information about a specific audio device.")]
 pub struct InfoCommand {
-    #[argh(option, long = "type", description = "device type. Accepted values: input, output")]
-    pub device_type: DeviceType,
-
     #[argh(
         option,
         description = "output format: accepted options are 'text' for readable text, or 'json' for a JSON dictionary. Default: text",
@@ -74,6 +91,50 @@ pub struct DeviceRecordCommand {
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
     pub format: Format,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "gain",
+    description = "Request to set the gain of the stream in decibels."
+)]
+pub struct DeviceGainCommand {
+    #[argh(option, description = "gain (in decibles) to set the stream to.")]
+    pub gain: f32,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "mute", description = "Request to mute a stream.")]
+pub struct DeviceMuteCommand {}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "unmute", description = "Request to unmute a stream.")]
+pub struct DeviceUnmuteCommand {}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "agc",
+    description = "Request to enable or disable automatic gain control for the stream."
+)]
+pub struct DeviceAgcCommand {
+    #[argh(
+        positional,
+        description = "enable or disable agc. Accepted values: on, off",
+        from_str_fn(string_to_enable)
+    )]
+    pub enable: bool,
+}
+
+fn string_to_enable(value: &str) -> Result<bool, String> {
+    if value == "on" {
+        Ok(true)
+    } else if value == "off" {
+        Ok(false)
+    } else {
+        Err(format!("Expected one of: on, off"))
+    }
 }
 
 impl FromStr for InfoOutputFormat {

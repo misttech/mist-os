@@ -8,14 +8,14 @@ use {
     fdio,
     fidl::endpoints::Proxy,
     fidl_fuchsia_audio_ffxdaemon::{AudioDaemonCancelerMarker, DeviceInfo},
-    fidl_fuchsia_hardware_audio::StreamConfigProxy,
+    fidl_fuchsia_hardware_audio::{GainState, StreamConfigProxy},
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx},
     futures::{AsyncWriteExt, StreamExt},
 };
 
 pub struct Device {
-    stream_config_client: StreamConfigProxy,
+    pub stream_config_client: StreamConfigProxy,
 }
 
 impl Device {
@@ -55,6 +55,12 @@ impl Device {
             plug_state: Some(plug_state),
             ..DeviceInfo::EMPTY
         })
+    }
+
+    pub fn set_gain(&self, gain_state: GainState) -> Result<(), Error> {
+        self.stream_config_client
+            .set_gain(gain_state)
+            .map_err(|e| anyhow::anyhow!("Error setting device gain state: {e}"))
     }
 
     pub async fn play(self, mut data_socket: fasync::Socket) -> Result<String, Error> {
