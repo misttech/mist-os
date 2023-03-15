@@ -110,30 +110,33 @@ closed protocol Volume {
 @discoverable
 closed protocol ProjectId {
     /// Set the limit in bytes and node count for an XFS project id. Setting limits lower than
-    /// current usage is accepted but will prevent further increases.
+    /// current usage is accepted but may in the future prevent further increases. Returns
+    ///  ZX_ERR_OUT_OF_RANGE if `project_id` is set to zero.
     strict SetLimit(struct {
         project_id uint64;
-        // TODO(fxbug.dev/114744): Update counters properly during other operations.
         bytes uint64;
         nodes uint64;
     }) -> () error zx.status;
 
-    /// Stop tracking a project id. This should fail if there are any nodes left still referencing
-    /// this project. This will return  ZX_ERR_NOT_FOUND if the project isn't currently tracked,
-    /// or ZX_ERR_NOT_EMPTY if the project is still in use by another node.
+    /// Stop tracking a project id. This will return  ZX_ERR_NOT_FOUND if the project isn't
+    /// currently tracked. It will succeed even if the project is still in use more by one or more
+    /// nodes.
     strict Clear(struct {
         project_id uint64;
     }) -> () error zx.status;
 
     /// Apply project id to a node_id from a GetAttrs call. This will return ZX_ERR_NOT_FOUND if
-    /// the project isn't currently tracked or the node doesn't exist.
+    /// the project isn't currently tracked or the node doesn't exist, ZX_ERR_ALREADY_EXISTS if
+    /// there is already a `project_id` applied to the node, and ZX_ERR_OUT_OF_RANGE if
+    /// `project_id` is set to zero.
     strict SetForNode(struct {
         node_id uint64;
         project_id uint64;
     }) -> () error zx.status;
 
     /// Get the project id based on a given node_id from a GetAttrs call.This will return
-    /// ZX_ERR_NOT_FOUND if the node doesn't exist.
+    /// ZX_ERR_NOT_FOUND if the node doesn't exist, and a `project_id` of zero if one is not
+    /// currently applied.
     strict GetForNode(struct {
         node_id uint64;
     }) -> (struct {
@@ -141,7 +144,8 @@ closed protocol ProjectId {
     }) error zx.status;
 
     /// Remove any project id marker for a given node_id from a GetAttrs call. This will return
-    /// ZX_ERR_NOT_FOUND if the node doesn't exist or it has no project on it.
+    /// ZX_ERR_NOT_FOUND if the node doesn't exist, or success if the node is found to currently
+    /// have no project id applied to it.
     strict ClearForNode(struct {
         node_id uint64;
     }) -> () error zx.status;

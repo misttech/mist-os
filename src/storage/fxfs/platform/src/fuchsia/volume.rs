@@ -13,7 +13,7 @@ use {
         vmo_data_buffer::VmoDataBuffer,
         volumes_directory::VolumesDirectory,
     },
-    anyhow::{bail, Error},
+    anyhow::{bail, ensure, Error},
     async_trait::async_trait,
     fidl_fuchsia_fxfs::{ProjectIdRequest, ProjectIdRequestStream},
     fidl_fuchsia_io as fio,
@@ -456,13 +456,14 @@ impl FxVolumeAndRoot {
     }
 
     /// Adds a mutation to set the project limit as an attribute with `bytes` and `nodes` to root
-    /// node. Adds a zero initialized usage tracking attribute for the project at the same time.
+    /// node.
     async fn set_project_limit(
         &self,
         project_id: u64,
         bytes: u64,
         nodes: u64,
     ) -> Result<(), Error> {
+        ensure!(project_id != 0, FxfsError::OutOfRange);
         let store = self.volume.store();
         let root_id = self.root.directory().object_id();
         let mut transaction = self
@@ -509,10 +510,10 @@ impl FxVolumeAndRoot {
         Ok(())
     }
 
-    /// Apply a `project_id` to a given node, as well as indicating a need to `force_inherit` the
-    /// attribute to new child nodes. Needs to correctly indicate if the node `is_dir` or not to
-    /// enable searching for it.
+    /// Apply a `project_id` to a given node. Fails if node is not found or already has a project
+    /// applied to it.
     async fn set_project_for_node(&self, node_id: u64, project_id: u64) -> Result<(), Error> {
+        ensure!(project_id != 0, FxfsError::OutOfRange);
         let store = self.volume.store();
         let root_id = self.root.directory().object_id();
         let mut transaction = self
@@ -542,9 +543,6 @@ impl FxVolumeAndRoot {
         if attributes.project_id != 0 {
             return Err(FxfsError::AlreadyExists.into());
         }
-        // TODO(fxbug.dev/114744): This is currently always zero size for directories Either update
-        // this to be more intelligent, or hardcode this to zero for directories before making
-        // project id generally available.
         let storage_size = match kind {
             ObjectKind::File { allocated_size, .. } => allocated_size,
             ObjectKind::Directory { .. } => 0,
@@ -574,8 +572,7 @@ impl FxVolumeAndRoot {
         Ok(())
     }
 
-    /// Return the project_id associated with the given `node_id`, or a NotFound error if one is not
-    /// applied.
+    /// Return the project_id associated with the given `node_id`.
     async fn get_project_for_node(&self, node_id: u64) -> Result<u64, Error> {
         match self
             .volume
@@ -587,7 +584,6 @@ impl FxVolumeAndRoot {
             .value
         {
             ObjectValue::Object { attributes, .. } => match attributes.project_id {
-                0 => return Err(FxfsError::NotFound.into()),
                 id => Ok(id),
             },
             ObjectValue::None => return Err(FxfsError::NotFound.into()),
@@ -595,20 +591,15 @@ impl FxVolumeAndRoot {
         }
     }
 
-    /// Remove the project id for a given `node_id`. The call will fail if the `node_id` is not
-    /// currently associated with any project id.
+    /// Remove the project id for a given `node_id`. The call will do nothing and return success
+    /// if the node is found to not be associated with any project.
     async fn clear_project_for_node(&self, node_id: u64) -> Result<(), Error> {
         let store = self.volume.store();
         let root_id = self.root.directory().object_id();
-        // Need to know the project_id up front, so that we can lock properly.
-        let project_id = self.get_project_for_node(node_id).await?;
         let mut transaction = self
             .get_fs()
             .new_transaction(
-                &vec![
-                    LockKey::ProjectId { store_object_id: store.store_object_id(), project_id },
-                    LockKey::object(store.store_object_id(), node_id),
-                ],
+                &vec![LockKey::object(store.store_object_id(), node_id)],
                 Options::default(),
             )
             .await?;
@@ -620,23 +611,17 @@ impl FxVolumeAndRoot {
                 ObjectValue::None => return Err(FxfsError::NotFound.into()),
                 _ => return Err(FxfsError::Inconsistent.into()),
             };
-        // Need to verify that the project on the node is correct, since the lock on the project
-        // id could not have been taken until after the original lookup.
-        if attributes.project_id != project_id {
-            return Err(FxfsError::NotFound.into());
+        if attributes.project_id == 0 {
+            return Ok(());
         }
+        let old_project_id = attributes.project_id;
+        attributes.project_id = 0;
 
-        // TODO(fxbug.dev/114744): This is currently always zero size for directories Either update
-        // this to be more intelligent, or hardcode this to zero for directories before making
-        // project id generally available.
         let storage_size = match kind {
             ObjectKind::File { allocated_size, .. } => allocated_size,
             ObjectKind::Directory { .. } => 0,
             _ => return Err(FxfsError::Inconsistent.into()),
         };
-
-        attributes.project_id = 0;
-
         transaction.add(
             store.store_object_id(),
             Mutation::replace_or_insert_object(
@@ -649,7 +634,7 @@ impl FxVolumeAndRoot {
         transaction.add(
             store.store_object_id(),
             Mutation::merge_object(
-                ObjectKey::project_usage(root_id, project_id),
+                ObjectKey::project_usage(root_id, old_project_id),
                 ObjectValue::BytesAndNodes {
                     bytes: -(storage_size.try_into().map_err(|_| FxfsError::TooBig)?),
                     nodes: -1,
@@ -1347,6 +1332,12 @@ mod tests {
                     .expect("Unable to connect to project id service");
 
             project_proxy
+                .set_limit(0, BYTES_LIMIT_1, NODES_LIMIT_1)
+                .await
+                .unwrap()
+                .expect_err("Should not set limits for project id 0");
+
+            project_proxy
                 .set_limit(PROJECT_ID, BYTES_LIMIT_1, NODES_LIMIT_1)
                 .await
                 .unwrap()
@@ -1387,6 +1378,12 @@ mod tests {
             };
 
             node_id = file_proxy.get_attr().await.unwrap().1.id;
+
+            project_proxy
+                .set_for_node(node_id, 0)
+                .await
+                .unwrap()
+                .expect_err("Should not set 0 project id");
 
             project_proxy
                 .set_for_node(node_id, PROJECT_ID)
@@ -1480,7 +1477,10 @@ mod tests {
                 PROJECT_ID
             );
             project_proxy.clear_for_node(node_id).await.unwrap().expect("Clearing project");
-            project_proxy.get_for_node(node_id).await.unwrap().expect_err("Checking project");
+            assert_eq!(
+                project_proxy.get_for_node(node_id).await.unwrap().expect("Checking project"),
+                0
+            );
 
             assert_eq!(
                 get_project_limit(volume_and_root.volume(), PROJECT_ID)
