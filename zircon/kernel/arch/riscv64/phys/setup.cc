@@ -8,12 +8,17 @@
 
 #include <phys/main.h>
 
+#include "arch-phys-info.h"
 #include "riscv64.h"
 
-// Initialized by start.S.
-uint64_t gBootHartId;
+// The boot_hart_id field is initialized by start.S.
+ArchPhysInfo gArchPhysInfoStorage;
+
+ArchPhysInfo* gArchPhysInfo;
 
 void ArchSetUp(void* zbi) {
+  gArchPhysInfo = &gArchPhysInfoStorage;
+
   arch::RiscvStvec::Get()
       .FromValue(0)
       .set_base(reinterpret_cast<uintptr_t>(ArchPhysExceptionEntry))

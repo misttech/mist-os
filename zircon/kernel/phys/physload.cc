@@ -114,7 +114,7 @@ constexpr size_t kMaxPhysloadModules = 4;
 
   // Call into the entry point.  It must not return, but it will keep using the
   // same stack so it can safely take references to our stack objects.
-  next_elf.Handoff<PhysLoadHandoffFunction>(next_elf, &log, GetUartDriver(), &symbolize,
-                                            gBootOptions, Allocation::GetPool(), times,
+  next_elf.Handoff<PhysLoadHandoffFunction>(next_elf, &log, gArchPhysInfo, GetUartDriver(),
+                                            &symbolize, gBootOptions, Allocation::GetPool(), times,
                                             ktl::move(kernel_storage));
 }

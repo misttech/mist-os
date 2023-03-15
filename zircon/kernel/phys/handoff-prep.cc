@@ -197,6 +197,8 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
   SummarizeMiscZbiItems(zbi);
   gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
 
+  ArchHandoff();
+
   SetInstrumentation();
 
   // This transfers the log, so logging after this is not preserved.

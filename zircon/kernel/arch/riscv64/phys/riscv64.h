@@ -25,9 +25,6 @@ extern "C" void ArchPhysExceptionEntry();
 // Defined in exception.cc, calls generic PhysException.
 extern "C" uint64_t ArchPhysException(PhysExceptionState& state);
 
-// This is set by start.S from the value passed in by the boot loader / SBI.
-extern uint64_t gBootHartId;
-
 #endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_RISCV64_H_

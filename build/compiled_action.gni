@@ -11,37 +11,30 @@ import("//build/config/clang/clang.gni")
 #
 # Parameters
 #
-#   tool (required)
-#       [label] Label of the tool to run. This should be an executable, and
-#       this label should not include a toolchain (anything in parens). The
-#       host compile of this tool will be used.
+#  * tool
+#    - Required: Label of the tool to run. This should be an executable, and
+#    this label should not include a toolchain (anything in parens). The
+#    host compile of this tool will be used.
+#    - Type: label
 #
-#   tool_output_name (optional)
-#       [string] The `output_name` in the `executable()` for `tool`.
-#       This default's to the `tool` target's name.
+#   * tool_output_dir
+#     - Optional: The $output_dir in the executable() for $tool.
+#     - Type: path
 #
-#   outputs (required)
-#       [list of files] Like the outputs of action (if using "compiled_action",
-#       this would be just the list of outputs), or action_foreach (if using
-#       "compiled_action_foreach", this would contain source expansions mapping
+#   * tool_output_name
+#     - Required: The $output_name in the executable() for $tool.
+#     - Type: string
+#     - Default: get_label_info(tool, "name")
+#
+#   * outputs
+#     - Required:  Like the outputs of action() (if using compiled_action(),
+#       this would be just the list of outputs), or action_foreach() (if using
+#       compiled_action_foreach(), this would contain source expansions mapping
 #       input to output files).
+#     - Type: list(path)
 #
-#   args (required)
-#       [list of strings] Same meaning as action/action_foreach.
-#
-#   inputs (optional)
-#   sources (optional)
-#       Files the binary takes as input. The step will be re-run whenever any
-#       of these change. If inputs is empty, the step will run only when the
-#       binary itself changes.
-#
-#   args (all optional)
-#   depfile
-#   deps
-#   public_deps
-#   testonly
-#   visibility
-#       Same meaning as action/action_foreach.
+#   * args, inputs sources, depfile, deps, public_deps, testonly, visibility
+#     - See action() / action_foreach().
 #
 # Example of usage:
 #
@@ -100,6 +93,7 @@ template("_compiled_action_target") {
                              "repeatable",
                              "sources",
                              "testonly",
+                             "tool_output_dir",
                              "tool_output_name",
                              "visibility",
                            ])
@@ -119,8 +113,10 @@ template("_compiled_action_target") {
     if (!defined(tool_output_name)) {
       tool_output_name = get_label_info(host_tool, "name")
     }
-    tool_out_dir = get_label_info(host_tool, "root_out_dir")
-    host_executable = "$tool_out_dir/$tool_output_name"
+    if (!defined(tool_output_dir)) {
+      tool_output_dir = get_label_info(host_tool, "root_out_dir")
+    }
+    host_executable = "$tool_output_dir/$tool_output_name"
 
     # Add the executable itself as an input.
     inputs += [ host_executable ]

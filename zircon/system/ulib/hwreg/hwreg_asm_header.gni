@@ -33,10 +33,12 @@ template("hwreg_asm_header") {
   if (is_host) {
     executable(tool_target) {
       visibility = [ ":*" ]
+      output_dir = target_out_dir
       deps = []
       forward_variables_from(invoker,
                              "*",
                              [
+                               "output_dir",
                                "output_name",
                                "testonly",
                                "visibility",
@@ -52,6 +54,8 @@ template("hwreg_asm_header") {
     compiled_action(gen_target) {
       forward_variables_from(invoker, [ "testonly" ])
       tool = ":$tool_target"
+      tool_output_dir =
+          get_label_info(":$tool_target($host_toolchain)", "target_out_dir")
       outputs = [ "$header_dir/${invoker.output_name}" ]
       args = rebase_path(outputs, root_build_dir) + [ invoker.output_name ]
     }

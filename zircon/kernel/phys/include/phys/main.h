@@ -16,6 +16,11 @@
 #include <ktl/optional.h>
 #include <ktl/span.h>
 
+// This is private to each arch/$cpu/phys directory.  The pointer is
+// initialized in ArchSetUp, so it can be used anywhere after earliest startup.
+struct ArchPhysInfo;
+extern ArchPhysInfo* gArchPhysInfo;
+
 // There's never any such object but the static analysis API requires some
 // C++ object to refer to.  The PHYS_SINGLETHREAD marker on any function
 // asserts that it is only run in the single thread rooted at PhysMain.

@@ -14,6 +14,7 @@
 #include <phys/main.h>
 #include <phys/stack.h>
 
+#include "arch-phys-info.h"
 #include "psci.h"
 
 // The regs.h header is really only used by assembly code.
@@ -94,9 +95,15 @@ const zbi_dcfg_arm_psci_driver_t* FindPsciConfig(void* zbi_ptr) {
   return cfg;
 }
 
+ArchPhysInfo gArchPhysInfoStorage;
+
 }  // namespace
 
+ArchPhysInfo* gArchPhysInfo;
+
 void ArchSetUp(void* zbi) {
+  gArchPhysInfo = &gArchPhysInfoStorage;
+
   // Hereafter any machine exceptions should be handled.
   ArmSetVbar(phys_exception);
 

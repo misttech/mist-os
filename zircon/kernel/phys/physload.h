@@ -39,6 +39,7 @@
 #include <phys/kernel-package.h>
 #include <phys/uart.h>
 
+struct ArchPhysInfo;
 struct BootOptions;
 class ElfImage;
 class Log;
@@ -51,6 +52,7 @@ class Pool;
 using PhysLoadHandoffFunction =
     void(ElfImage& self,                   // The module just handed off to.
          Log* log,                         // Set gLog to this.
+         ArchPhysInfo* arch_phys,          // Set gArchPhysInfo to this.
          UartDriver& uart,                 // From GetUartDriver().
          MainSymbolize* symbolize,         // Set gSymbolize to this.
          const BootOptions* boot_options,  // Set gBootOptions to this.

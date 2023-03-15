@@ -10,6 +10,8 @@
 
 #include <phys/stack.h>
 
+#include "arch-phys-info-asm.h"
+
 // This is the entry point from the boot loader or thereabouts.
 // It receives two arguments, in a0, a1 (x10, x11): a0 is the HART ID and
 // a1 is usually a pointer (physical address).  The MMU is disabled.
@@ -21,8 +23,8 @@
 // and a1 (x11) holds what's usually a Device Tree address.
 .function _start, global
   // As early as possible collect the time stamp.  It will be the second
-  // argument to PhysMain.  We'll leave a2 (time), a0 (ZBI / DTB), and a1 (hart
-  // ID) alone while we clear the bss.
+  // argument to PhysMain.  We'll leave a2 (time), a0 (hart ID), and a1 (ZBI /
+  // DTB) alone while we clear the bss.
   rdtime a2
 
   // Clear return address and frame pointer: at the root of the call stack.
@@ -56,8 +58,8 @@
 
   // Now that bss has been cleared, store the hart ID in a bss variable.
   // And set up the arguments for PhysMain.
-  lla a3, gBootHartId
-  sd a2, (a3)
+  lla a3, gArchPhysInfoStorage
+  sd a0, ARCH_PHYS_INFO_BOOT_HART_ID(a3)
   mv a0, a1 // ZBI / DTB pointer
   mv a1, a2 // arch::EarlyTicks
 

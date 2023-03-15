@@ -536,6 +536,10 @@ void SetUpIdt() {
 
 }  // namespace
 
+// There isn't even a definition for this type since there's nothing
+// that needs to go there. But the pointer variable needs to exist.
+ArchPhysInfo* gArchPhysInfo;
+
 void ArchSetUp(void* zbi) {
   gStandardSegments.Load();
   SetUpIdt();

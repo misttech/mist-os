@@ -6,6 +6,7 @@
 
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
+import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 
 # This has to be variant() rather than config() to be used in the toolchain
 # configs list.
@@ -42,6 +43,8 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     include_dirs = [ "//zircon/.." ]
     deps = [
+      ":arch-phys-info",
+      ":arch-phys-info-asm",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
@@ -65,7 +68,7 @@ if (toolchain_environment == "kernel.phys" ||
   }
 
   source_set("arch-handoff-prep") {
-    sources = [ "arch-handoff-prep-zbi.cc" ]
+    sources = [ "arch-handoff-prep.cc" ]
     deps = [
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:handoff",
@@ -87,6 +90,19 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/phys:boot-zbi.deps",
     ]
   }
+}
+
+source_set("arch-phys-info") {
+  visibility = [ "./*" ]
+  public = [ "arch-phys-info.h" ]
+  public_deps = [ "//zircon/kernel/lib/arch" ]
+}
+
+hwreg_asm_header("arch-phys-info-asm") {
+  visibility = [ ":*" ]
+  output_name = "arch-phys-info-asm.h"
+  sources = [ "gen-arch-phys-info-asm.cc" ]
+  deps = [ ":arch-phys-info" ]
 }
 
 group("tests") {

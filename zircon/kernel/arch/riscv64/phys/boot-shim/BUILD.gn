@@ -8,8 +8,6 @@ import("//build/images/args.gni")
 import("//build/testing/zbi_test.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
-import("//zircon/kernel/phys/phys_executable.gni")
-import("//zircon/kernel/phys/qemu.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
 # Just the one for now, but will be more later.

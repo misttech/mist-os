@@ -6,11 +6,13 @@
 
 #include <lib/arch/arm64/exception-asm.h>
 #include <lib/arch/asm.h>
+#include "arch-phys-info-asm.h"
 
 // Do the magic instruction.
 .macro do_psci_call
-  ldr_global x16, gArmPsciUseHvc
-  cbnz x16, 0f
+  ldr_global x16, gArchPhysInfo
+  ldrb w16, [x16, #ARCH_PHYS_INFO_PSCI_USE_HVC]
+  cbnz w16, 0f
   smc #0
   b 1f
 0:hvc #0
@@ -40,19 +42,22 @@
 
 .function ArmPsciReset, global
 
-  ldr_global x16, gArmPsciDisabled
-  cbnz x16, .Lfail
+  ldr_global x16, gArchPhysInfo
+  ldrb w17, [x16, #ARCH_PHYS_INFO_PSCI_DISABLED]
+  cbnz w17, .Lfail
 
   // Reset the exception vector base address registers in hopes that this will
   // cause any exceptions to lead to a hardware reset rather than a loop back
   // through the exception.S handler code.  There's not really much hope
   // without FEAT_DOUBLEFAULT, but the failure mode might be less confusing.
-  msr_vbar_elx x16, xzr
+  msr_vbar_elx x17, xzr
 
   // Copy in all the register values that might be SMCCC arguments.
-  adr_global x16, gArmPsciResetRegisters
-  ldp x0, x1, [x16, #0]
-  ldp x2, x3, [x16, #16]
+#if ARCH_PHYS_INFO_PSCI_RESET_REGISTERS_COUNT != 4
+#error "ArchPhysInfo::psci_reset_registers has unexpected size"
+#endif
+  ldp x0, x1, [x16, #(ARCH_PHYS_INFO_PSCI_RESET_REGISTERS + 0)]
+  ldp x2, x3, [x16, #(ARCH_PHYS_INFO_PSCI_RESET_REGISTERS + 16)]
 
   // Do the call.
   do_psci_call

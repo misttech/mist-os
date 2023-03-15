@@ -6,9 +6,12 @@
 
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
+import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
 
 if (toolchain_environment == "kernel.phys" ||
     toolchain_environment == "kernel.efi") {
+  assert(current_cpu == "riscv64")
+
   # riscv64-specific definitions for things in <phys/address-space.h>.
   static_library("address-space") {
     visibility = [ "//zircon/kernel/phys:*" ]
@@ -27,6 +30,7 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     public_deps = [ "//zircon/kernel/phys:main" ]
     deps = [
+      ":arch-phys-info-asm",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
@@ -46,8 +50,9 @@ if (toolchain_environment == "kernel.phys" ||
   }
 
   source_set("arch-handoff-prep") {
-    sources = [ "arch-handoff-prep-zbi.cc" ]
+    sources = [ "arch-handoff-prep.cc" ]
     deps = [
+      ":phys",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:handoff",
       "//zircon/kernel/phys:handoff-prep.h",
@@ -71,7 +76,21 @@ if (toolchain_environment == "kernel.phys" ||
   }
 }
 
-group("tests") {
-  testonly = true
-  deps = [ "boot-shim:boot_tests" ]
+source_set("arch-phys-info") {
+  visibility = [ "./*" ]
+  public = [ "arch-phys-info.h" ]
+}
+
+hwreg_asm_header("arch-phys-info-asm") {
+  visibility = [ ":*" ]
+  output_name = "arch-phys-info-asm.h"
+  sources = [ "gen-arch-phys-info-asm.cc" ]
+  deps = [ ":arch-phys-info" ]
+}
+
+if (current_cpu == "riscv64") {
+  group("tests") {
+    testonly = true
+    deps = [ "boot-shim:boot_tests" ]
+  }
 }

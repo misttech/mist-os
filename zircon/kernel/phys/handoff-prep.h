@@ -109,6 +109,9 @@ class HandoffPrep {
 
   void SaveForMexec(const zbi_header_t& header, ktl::span<const ktl::byte> payload);
 
+  // General arch-specific data that isn't drawn from a ZBI item.
+  void ArchHandoff();
+
   // The arch-specific protocol for a given item.
   // Defined in //zircon/kernel/arch/$cpu/phys/arch-handoff-prep-zbi.cc.
   void ArchSummarizeMiscZbiItem(const zbi_header_t& header, ktl::span<const ktl::byte> payload);

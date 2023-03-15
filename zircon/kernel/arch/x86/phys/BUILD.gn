@@ -302,7 +302,7 @@ if (current_toolchain == default_toolchain) {
   }
 
   source_set("arch-handoff-prep") {
-    sources = [ "arch-handoff-prep-zbi.cc" ]
+    sources = [ "arch-handoff-prep.cc" ]
     deps = [
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:handoff",

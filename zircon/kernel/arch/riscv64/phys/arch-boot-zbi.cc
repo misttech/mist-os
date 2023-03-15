@@ -8,12 +8,13 @@
 
 #include <phys/boot-zbi.h>
 
+#include "arch-phys-info.h"
 #include "riscv64.h"
 
 void BootZbi::ZbiBoot(zircon_kernel_t* kernel, void* arg) {
-  arch::ZbiBoot(kernel, arg, gBootHartId);
+  arch::ZbiBoot(kernel, arg, gArchPhysInfo->boot_hart_id);
 }
 
 void BootZbi::ZbiBootRaw(uintptr_t entry, void* data) {
-  arch::ZbiBootRaw(entry, data, gBootHartId);
+  arch::ZbiBootRaw(entry, data, gArchPhysInfo->boot_hart_id);
 }
