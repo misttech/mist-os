@@ -74,12 +74,18 @@ config("color_diagnostics") {
   }
 }
 
-config("crash-diagnostics-dir") {
-  if (!is_gcc && crash_diagnostics_dir != "") {
-    cflags = [ "-fcrash-diagnostics-dir=" +
-               rebase_path(crash_diagnostics_dir, root_build_dir) ]
-    asmflags = cflags
+config("crash_diagnostics") {
+  if (!is_gcc) {
+    cflags = [
+      "-fcrash-diagnostics-dir=" +
+          rebase_path(crash_diagnostics_dir, root_build_dir),
+      "-fcrash-diagnostics=all",
+    ]
+    if (clang_enable_error_reproducers) {
+      cflags += [ "-gen-reproducer=error" ]
+    }
     ldflags = cflags
+    asmflags = cflags
   }
 }
 
@@ -105,7 +111,7 @@ config("compiler") {
   cflags_objcc = [ "-fvisibility-inlines-hidden" ]
   configs = [
     ":color_diagnostics",
-    ":crash-diagnostics-dir",
+    ":crash_diagnostics",
     ":time-trace",
     ":toolchain_version_stamp",
     ":stack-size-section",
@@ -142,15 +148,6 @@ config("cpu_baseline") {
   }
 }
 
-config("compiler_diagnostics") {
-  cflags = [ "-fcrash-diagnostics=all" ]
-  if (clang_enable_error_reproducers) {
-    cflags += [ "-gen-reproducer=error" ]
-  }
-  ldflags = cflags
-  asmflags = cflags
-}
-
 # These flags are enabled by default in Fuchsia's Clang toolchain, but we set
 # them explicitly to support other Clang toolchains and Clang-based tools.
 config("clang_defaults") {
@@ -163,8 +160,6 @@ config("clang_defaults") {
   if (current_cpu == "x64") {
     asmflags = [ "-Wa,--mrelax-relocations=yes" ]
   }
-
-  configs = [ ":compiler_diagnostics" ]
 }
 
 config("ffp_contract") {

@@ -24,15 +24,11 @@ import("//build/toolchain/variant.gni")
 # These flags are enabled by default in Fuchsia's Clang toolchain, but we set
 # them explicitly to support other Clang toolchains and Clang-based tools.
 config("clang_defaults") {
-  cflags = [ "-fcrash-diagnostics=all" ]
   if (clang_embed_bitcode) {
     cflags += [
       "-Xclang",
       "-fembed-bitcode=all",
     ]
-  }
-  if (clang_enable_error_reproducers) {
-    cflags += [ "-gen-reproducer=error" ]
   }
   if (current_cpu == "x64") {
     asmflags = [ "-Wa,--mrelax-relocations=yes" ]
@@ -95,6 +91,8 @@ config("compiler") {
 
   configs += [
     "//build/config:color_diagnostics",
+    "//build/config:crash_diagnostics",
+
     # TODO: "$current_os:compiler",
   ]
   if (!is_gcc) {
@@ -150,11 +148,6 @@ config("compiler") {
   } else if (current_os == "win") {
     # This enables build ID-like PDB UUIDs without timestamp.
     ldflags += [ "-Wl,/Brepro" ]
-  }
-
-  if (!is_gcc && crash_diagnostics_dir != "") {
-    compiler_flags += [ "-fcrash-diagnostics-dir=" +
-                        rebase_path(crash_diagnostics_dir, root_build_dir) ]
   }
 
   # The toolchain-supplied headers come after include_dirs from targets and
