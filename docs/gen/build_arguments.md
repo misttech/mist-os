@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"socket"`
+**Current value (from the default):** `"libcurl"`
 
-From //third_party/crashpad/src/util/net/tls.gni:19
+From //third_party/crashpad/src/util/net/tls.gni:21
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -3115,9 +3115,9 @@ From //build/images/args.gni:118
 
 ### ffmpeg_profile
 
-**Current value (from the default):** `"max"`
+**Current value (from the default):** `"default"`
 
-From //src/media/lib/ffmpeg/BUILD.gn:57
+From //src/media/lib/ffmpeg/BUILD.gn:55
 
 ### ffx_build_dual_mode_plugins_as_subtools
 
@@ -3722,7 +3722,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -5838,7 +5838,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:302
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:305
 
 ### pw_arduino_build_BOARD
 
@@ -6710,6 +6710,15 @@ of the test binary itself cannot generate coverage reports.
 
 From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:29
 
+### pw_toolchain_FUZZING_ENABLED
+
+Indicates if this toolchain supports building fuzzers. This is typically
+set by individual toolchains and not by GN args.
+
+**Current value (from the default):** `false`
+
+From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:33
+
 ### pw_toolchain_OSS_FUZZ_ENABLED
 
 Indicates if this build is a part of OSS-Fuzz, which needs to be able to
@@ -6718,7 +6727,7 @@ should only be used for OSS-Fuzz.
 
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:34
+From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:38
 
 ### pw_toolchain_RBE_DEBUG
 
@@ -7745,21 +7754,13 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:24
+From //src/proc/bin/starnix/BUILD.gn:21
 
 ### starnix_restricted_mode
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:20
-
-### starnix_wayland_protocol_logging
-
-Whether wayland protocol logging should be enabled
-
-**Current value (from the default):** `false`
-
-From //src/proc/bin/starnix/BUILD.gn:14
+From //src/proc/bin/starnix/BUILD.gn:17
 
 ### target_cpu
 
@@ -7968,7 +7969,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8127,6 +8128,18 @@ epoch increased.
 **Current value (from the default):** `0`
 
 From //build/images/args.gni:51
+
+### use_bazel_images_only
+
+If true, the images.json build API modules will only include images from
+`bazel_assembly_targets` and its dependencies.
+
+NOTE: This field is highly experimental, do not set it unless you know
+exactly what you are doing.
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:187
 
 ### use_blink
 
