@@ -18,7 +18,6 @@ group("tests") {
 fidl("fuchsia.device.firmware.test") {
   sources = [ "firmware.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-  excluded_checks = [ "string-bounds-not-specified" ]
 }
 
 driver_bind_rules("ddk-firmware-test-bind") {
