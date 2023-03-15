@@ -200,6 +200,7 @@ impl AvrcpRelay {
                                 .await;
                         match res {
                             Ok(Ok(players)) => {
+                                debug!(%peer_id, "Media players: {players:?}");
                                 let valid_players: Vec<&avrcp::MediaPlayerItem> = players.iter().filter_map(|p| {
                                     // Return player if and only if it's in active playback status.
                                     use avrcp::PlaybackStatus::*;
@@ -213,7 +214,9 @@ impl AvrcpRelay {
                                     player_status_updated = true;
                                 }
                             }
-                            e => info!(%peer_id, ?e, "Error checking available players"),
+                            // Sometimes, browse connection is not yet established when we make the call.
+                            Ok(Err(avrcp::BrowseControllerError::RemoteNotConnected)) => debug!(%peer_id, "Couldn't get media player items because browse connection isn't established"),
+                            e => info!(%peer_id, ?e, "Error checking available player"),
                         }
                     }
 
