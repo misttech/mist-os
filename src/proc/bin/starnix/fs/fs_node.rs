@@ -804,6 +804,11 @@ impl FsNode {
         }
     }
 
+    /// Whether this node is a regular file.
+    pub fn is_reg(&self) -> bool {
+        self.info().mode.is_reg()
+    }
+
     /// Whether this node is a directory.
     pub fn is_dir(&self) -> bool {
         self.info().mode.is_dir()

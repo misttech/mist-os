@@ -11,6 +11,7 @@ use zerocopy::AsBytes;
 
 use crate::auth::{Credentials, SecureBits};
 use crate::execution::*;
+use crate::fs::*;
 use crate::lock::RwLock;
 use crate::logging::{log, log_trace};
 use crate::mm::*;
@@ -137,9 +138,22 @@ pub fn sys_execve(
     user_argv: UserRef<UserCString>,
     user_environ: UserRef<UserCString>,
 ) -> Result<(), Errno> {
+    sys_execveat(current_task, FdNumber::AT_FDCWD, user_path, user_argv, user_environ, 0)
+}
+
+pub fn sys_execveat(
+    current_task: &mut CurrentTask,
+    dir_fd: FdNumber,
+    user_path: UserCString,
+    user_argv: UserRef<UserCString>,
+    user_environ: UserRef<UserCString>,
+    flags: u32,
+) -> Result<(), Errno> {
+    if flags & !(AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW) != 0 {
+        return error!(EINVAL);
+    }
+
     let mut buf = [0u8; PATH_MAX as usize];
-    let path = CString::new(current_task.mm.read_c_string(user_path, &mut buf)?)
-        .map_err(|_| errno!(EINVAL))?;
     // TODO: What is the maximum size for an argument?
     let argv = if user_argv.is_null() {
         Vec::new()
@@ -151,8 +165,77 @@ pub fn sys_execve(
     } else {
         read_c_string_vector(&current_task.mm, user_environ, &mut buf)?
     };
-    log_trace!(current_task, "execve({:?}, argv={:?}, environ={:?})", path, argv, environ);
-    current_task.exec(path, argv, environ)?;
+
+    let path = current_task.mm.read_c_string(user_path, &mut buf)?;
+
+    log_trace!(
+        current_task,
+        "execveat({}, {}, argv={:?}, environ={:?}, flags={})",
+        dir_fd,
+        String::from_utf8_lossy(path),
+        argv,
+        environ,
+        flags
+    );
+
+    let mut open_flags = OpenFlags::RDONLY;
+
+    if flags & AT_SYMLINK_NOFOLLOW != 0 {
+        open_flags |= OpenFlags::NOFOLLOW;
+    }
+
+    let executable = if path.is_empty() {
+        if flags & AT_EMPTY_PATH == 0 {
+            // If AT_EMPTY_PATH is not set, this is an error.
+            return error!(ENOENT);
+        }
+
+        let file = current_task.files.get(dir_fd)?;
+
+        // We are forced to reopen the file with O_RDONLY to get access to the underlying VMO.
+        // Note that we set `check_access` to false in the arguments in case the file mode does
+        // not actually have the read permission bit.
+        //
+        // This can happen because a file could have --x--x--x mode permissions and then
+        // be opened with O_PATH. Internally, the file operations would all be stubbed out
+        // for that file, which is undesirable here.
+        //
+        // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
+        file.name.open(current_task, OpenFlags::RDONLY, false)?
+    } else {
+        current_task.open_file_at(dir_fd, path, open_flags, FileMode::default())?
+    };
+
+    // This path can affect script resolution (the path is appended to the script args)
+    // and the auxiliary value `AT_EXECFN` from the syscall `getauxval()`
+    let path = if dir_fd == FdNumber::AT_FDCWD {
+        // The file descriptor is CWD, so the path is exactly
+        // what the user specified.
+        path.to_vec()
+    } else {
+        // The path is `/dev/fd/N/P` where N is the file descriptor
+        // number and P is the user-provided path (if relative and non-empty).
+        //
+        // See https://man7.org/linux/man-pages/man2/execveat.2.html#NOTES
+        match path.first() {
+            Some(b'/') => {
+                // The user-provided path is absolute, so dir_fd is ignored.
+                path.to_vec()
+            }
+            Some(_) => {
+                // User-provided path is relative, append it.
+                let mut new_path = format!("/dev/fd/{}/", dir_fd.raw()).into_bytes();
+                new_path.append(&mut path.to_vec());
+                new_path
+            }
+            // User-provided path is empty
+            None => format!("/dev/fd/{}", dir_fd.raw()).into_bytes(),
+        }
+    };
+
+    let path = CString::new(path).map_err(|_| errno!(EINVAL))?;
+
+    current_task.exec(executable, path, argv, environ)?;
     Ok(())
 }
 

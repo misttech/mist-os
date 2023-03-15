@@ -85,29 +85,29 @@
                 // Disable InterpreterScript because the script has the path /bin/bash which is not
                 // where bash is located on the Android system image.
                 "ExecTest.InterpreterScript",
-
-                // Disable NoExecPerm because execute rights are not yet checked.
-                "ExecTest.NoExecPerm",
                 "ProcSelfExe.ChangesAcrossExecve",
-                "ExecveatTest.BasicWithFDCWD",
-                "ExecveatTest.Basic",
-                "ExecveatTest.FDNotADirectory",
-                "ExecveatTest.AbsolutePathWithFDCWD",
-                "ExecveatTest.AbsolutePath",
-                "ExecveatTest.EmptyPathBasic",
-                "ExecveatTest.EmptyPathWithDirFD",
-                "ExecveatTest.EmptyPathWithoutEmptyPathFlag",
-                "ExecveatTest.AbsolutePathWithEmptyPathFlag",
-                "ExecveatTest.RelativePathWithEmptyPathFlag",
-                "ExecveatTest.SymlinkNoFollowWithRelativePath",
-                "ExecveatTest.SymlinkNoFollowWithAbsolutePath",
-                "ExecveatTest.SymlinkNoFollowAndEmptyPath",
+
+                // This test attempts to successfully open a symlink in the test dir that points to
+                // `/bin/echo` using NOFOLLOW. The goal is to test that despite specifying NOFOLLOW,
+                // ancestor symlinks are always followed. NOFOLLOW only applies to the final node,
+                // which must not be a symlink.
+                //
+                // The test follows the test dir symlink to `/bin` which points to `/system/bin`.
+                //
+                // Sadly, on the Android system image, `/system/bin/echo` points to `toybox`, making
+                // the final node a symlink which breaks this test.
                 "ExecveatTest.SymlinkNoFollowIgnoreSymlinkAncestor",
+
+                // This test attempts to open `/bin` with read permissions.
+                //
+                // On the Android system image, this points to `/system/bin` which
+                // has `0751` mode permission bits (`drwxr-x--x`).
+                //
+                // A non-root user cannot read the contents of this directory.
+                //
+                // Even if the test were to be running under the root user, the `echo` file inside
+                // is a symlink that points to `toybox`, meaning that using NOFOLLOW will fail.
                 "ExecveatTest.SymlinkNoFollowWithNormalFile",
-                "ExecveatTest.BasicWithCloexecFD",
-                "ExecveatTest.InterpreterScriptWithCloexecFD",
-                "ExecveatTest.InterpreterScriptWithCloexecDirFD",
-                "ExecveatTest.InvalidFlags",
 
                 // exec_binary_test
                 "InterpreterScriptTest.UncleanPath",

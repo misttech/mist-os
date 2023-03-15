@@ -203,7 +203,9 @@ pub async fn create_container() -> Result<Arc<Container>, Error> {
             .iter()
             .map(|s| to_cstr(s))
             .collect::<Vec<_>>();
-    init_task.exec(argv[0].clone(), argv.clone(), vec![])?;
+
+    let executable = init_task.open_file(argv[0].as_bytes(), OpenFlags::RDONLY)?;
+    init_task.exec(executable, argv[0].clone(), argv.clone(), vec![])?;
     execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
 

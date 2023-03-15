@@ -558,7 +558,8 @@ mod tests {
 
     fn exec_hello_starnix(current_task: &mut CurrentTask) -> Result<(), Errno> {
         let argv = vec![CString::new("bin/hello_starnix").unwrap()];
-        current_task.exec(argv[0].clone(), argv, vec![])?;
+        let executable = current_task.open_file(argv[0].as_bytes(), OpenFlags::RDONLY)?;
+        current_task.exec(executable, argv[0].clone(), argv, vec![])?;
         Ok(())
     }
 

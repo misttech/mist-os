@@ -137,7 +137,8 @@ pub async fn start_component(
     let mut argv = vec![binary_path];
     argv.extend(args.into_iter());
 
-    current_task.exec(argv[0].clone(), argv.clone(), environ)?;
+    let executable = current_task.open_file(argv[0].as_bytes(), OpenFlags::RDONLY)?;
+    current_task.exec(executable, argv[0].clone(), argv.clone(), environ)?;
 
     run_component_features(&component_features, &current_task, &mut start_info.outgoing_dir)
         .unwrap_or_else(|e| {

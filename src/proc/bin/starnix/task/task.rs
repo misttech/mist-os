@@ -1185,11 +1185,21 @@ impl CurrentTask {
 
     pub fn exec(
         &mut self,
+        executable: FileHandle,
         path: CString,
         argv: Vec<CString>,
         environ: Vec<CString>,
     ) -> Result<(), Errno> {
-        let executable = self.open_file(path.to_bytes(), OpenFlags::RDONLY)?;
+        // Executable must be a regular file
+        if !executable.name.entry.node.is_reg() {
+            return error!(EACCES);
+        }
+
+        // File node must have EXEC mode permissions.
+        // Note that the ability to execute a file is unrelated to the flags
+        // used in the `open` call.
+        executable.node().check_access(self, Access::EXEC)?;
+
         let resolved_elf = resolve_executable(self, executable, path.clone(), argv, environ)?;
         if let Err(err) = self.finish_exec(path, resolved_elf) {
             // TODO(tbodt): Replace this panic with a log and force a SIGSEGV.

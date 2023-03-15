@@ -86,6 +86,7 @@ pub fn dispatch_syscall(
         eventfd2[2],
         #[cfg(target_arch = "x86_64")] eventfd[1],
         execve[3],
+        execveat[5],
         exit[1],
         exit_group[1],
         faccessat2[4],
