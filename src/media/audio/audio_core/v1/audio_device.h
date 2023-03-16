@@ -270,14 +270,12 @@ class AudioDevice : public AudioObject, public std::enable_shared_from_this<Audi
   virtual const TimelineFunction& driver_ref_time_to_frac_presentation_frame() const
       FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain().token());
 
-  // Maps from a time on the reference clock to the safe read/write frame number
-  // in the stream.  The safe read/write pointer is the point in the stream
-  // which is one fifo_depth away from the interconnect entry/exit point in the
-  // stream.  This is the point at which an input stream is guaranteed to have
-  // moved its captured data from the hardware into RAM, or the point at which
-  // an output stream may have already moved data to be transmitted from RAM
-  // into the hardware.  When consuming or producing audio from an input or
-  // output stream, users must always stay ahead of this point.
+  // Maps from a time on the reference clock to the safe read/write frame number in the stream. The
+  // safe read/write pointer is the point in the stream which is driver_transfer_bytes away from the
+  // interconnect entry/exit point in the stream. This is the point at which an input stream is
+  // guaranteed to have moved its captured data from hardware into RAM, or the point at which an
+  // output stream may have started transmitting data from RAM into hardware. When consuming or
+  // producing audio from an input or output stream, users must always stay ahead of this point.
   virtual const TimelineFunction& driver_ref_time_to_frac_safe_read_or_write_frame() const
       FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain().token());
 

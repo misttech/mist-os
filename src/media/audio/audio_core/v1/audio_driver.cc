@@ -480,10 +480,11 @@ void AudioDriver::RequestRingBufferProperties() {
                                            ? props.needs_cache_flush_or_invalidate()
                                            : true;
 
+    driver_transfer_bytes_ = props.has_driver_transfer_bytes() ? props.driver_transfer_bytes() : 0;
     if constexpr (kLogDriverDelayProperties) {
       FX_LOGS(INFO) << "Audio " << (owner_->is_input() ? " Input" : "Output")
                     << " received turn_on_delay  " << std::setw(5) << turn_on_delay_.to_usecs()
-                    << " usec";
+                    << " usec, driver_transfer_bytes " << driver_transfer_bytes_;
     }
 
     RequestDelayInfo();
@@ -504,46 +505,48 @@ void AudioDriver::RequestDelayInfo() {
     OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
     external_delay_ = zx::nsec(info.has_external_delay() ? info.external_delay() : 0);
     internal_delay_ = zx::nsec(info.has_internal_delay() ? info.internal_delay() : 0);
-    internal_delay_frames_ = internal_delay_.to_nsecs()
-                                 // If internal_delay is non-zero, ceiling up to the next frame.
-                                 ? (internal_delay_.to_nsecs() * GetFormat()->frames_per_second() -
-                                    1) / zx::sec(1).to_nsecs() +
-                                       1
-                                 : 0;
 
     if constexpr (kLogDriverDelayProperties) {
       FX_LOGS(INFO) << "Audio " << (owner_->is_input() ? " Input" : "Output")
                     << " received external_delay " << std::setw(5) << external_delay_.to_usecs()
+                    << " usec, internal_delay " << std::setw(5) << internal_delay_.to_usecs()
                     << " usec";
-      FX_LOGS(INFO) << "Audio " << (owner_->is_input() ? " Input" : "Output")
-                    << " received internal_delay " << std::setw(5) << internal_delay_.to_usecs()
-                    << " usec (" << internal_delay_frames_ << " frames)";
     }
 
     auto format = GetFormat();
     auto bytes_per_frame = format->bytes_per_frame();
-    auto frames_per_second = format->frames_per_second();
+    FX_CHECK(bytes_per_frame > 0);
+    uint32_t frames_per_second = format->frames_per_second();
+    // Ceiling up to the next complete frame, if needed (the client's "safe write/read" zone cannot
+    // extend partially into a frame).
+    driver_transfer_frames_ = (driver_transfer_bytes_ + bytes_per_frame - 1) / bytes_per_frame;
+    // This delay is used in the calculation of the client's minimum lead time. We ceiling up to the
+    // next nsec, just to be cautious.
+    driver_transfer_delay_ = zx::nsec(format->frames_per_ns().Inverse().Scale(
+        *driver_transfer_frames_, TimelineRate::RoundingMode::Ceiling));
 
     // Figure out how many frames we need in our ring buffer.
-    TimelineRate bytes_per_nanosecond(bytes_per_frame * frames_per_second, ZX_SEC(1));
-    int64_t min_bytes_64 = bytes_per_nanosecond.Scale(min_ring_buffer_duration_.to_nsecs());
+    int64_t min_bytes_64 = format->frames_per_ns().Scale(min_ring_buffer_duration_.to_nsecs(),
+                                                         TimelineRate::RoundingMode::Ceiling) *
+                           bytes_per_frame;
     bool overflow = ((min_bytes_64 == TimelineRate::kOverflow) ||
                      (min_bytes_64 > (std::numeric_limits<int64_t>::max() -
-                                      (internal_delay_frames_ * bytes_per_frame))));
+                                      (*driver_transfer_frames_ * bytes_per_frame))));
 
     int64_t min_frames_64;
     if (!overflow) {
       min_frames_64 = min_bytes_64 / bytes_per_frame;
-      min_frames_64 += internal_delay_frames_;
+      min_frames_64 += *driver_transfer_frames_;
       overflow = min_frames_64 > std::numeric_limits<uint32_t>::max();
     }
 
     if (overflow) {
       FX_LOGS(ERROR) << "Overflow while attempting to compute ring buffer size in frames.";
-      FX_LOGS(ERROR) << "duration        : " << min_ring_buffer_duration_.get();
-      FX_LOGS(ERROR) << "bytes per frame : " << bytes_per_frame;
-      FX_LOGS(ERROR) << "frames per sec  : " << frames_per_second;
-      FX_LOGS(ERROR) << "int_delay_frames: " << internal_delay_frames_;
+      FX_LOGS(ERROR) << "duration              : " << min_ring_buffer_duration_.get();
+      FX_LOGS(ERROR) << "bytes per frame       : " << bytes_per_frame;
+      FX_LOGS(ERROR) << "frames per sec        : " << frames_per_second;
+      FX_LOGS(ERROR) << "driver_transfer_frames: " << *driver_transfer_frames_;
+      FX_LOGS(ERROR) << "driver_transfer_delay : " << driver_transfer_delay_->get() << " nsec";
       return;
     }
 
@@ -731,122 +734,108 @@ zx_status_t AudioDriver::Start() {
     auto format = GetFormat();
     auto frac_fps = TimelineRate(Fixed(format->frames_per_second()).raw_value(), zx::sec(1).get());
 
-    auto raw_internal_delay_frames = Fixed(internal_delay_frames_).raw_value();
+    FX_CHECK(driver_transfer_frames_);
+    auto raw_driver_transfer_frames = Fixed(*driver_transfer_frames_).raw_value();
     if (owner_->is_output()) {
       // Abstractly, we can think of the hardware buffer as an infinitely long sequence of frames,
       // where the hardware maintains three pointers into this sequence:
       //
-      //      |<--- external delay --->|<--- internal delay --->|
-      //      +-+----------------------+-+----------------------+-+
-      //  ... |P|                      |F|                      |W| ...
-      //      +-+----------------------+-+----------------------+-+
+      //      |<--external delay-->|<--internal delay-->|<--driver transfer-->|<--safe for client
+      //  ----+-+------------------+--------------------+-+-------------------+-+------------
+      //  ... |P|             "total delay"             |F|                   |W|  writable ...
+      //  ----+-+---------------------------------------+-+-------------------+-+------------
       //
-      // We use a timeline to understand the relationships (specifically the offsets) between three
-      // specific steps in the playback process, at any specific instant in time.
-      //
-      // At that moment:
+      // At any specific instant in time:
       // W refers to the frame that is about to be consumed by the device.
-      // F refers to the frame that just exited the device's internal pipeline.
-      // P refers to the frame being presented to the speaker.
+      // F refers to the frame that just entered any device-internal (post-DMA) pipeline.
+      // P refers to the frame being presented acoustically. P and F differ only if there is a
+      //   device-internal pipeline with any delay and/or the device interconnect is digital (and
+      //   thus additional "external" processing might be performed before acoustic presentation).
       //
-      // When a frame is consumed by an audio output device, it is DMA'ed from the ring buffer and
-      // enters a device-internal pipeline. The pipeline generally starts with a hardware FIFO to
-      // receive DMA transfers; it may apply hardware-based audio processing; and it terminates
-      // at an "interconnect" (e.g. integrated DAC, external digital port, network interface).
-      // Assuming a non-zero internal delay, W is a higher ("later") frame number than F or P.
-      //
-      // For built-in outputs where the pipeline ends at a DAC, external delay would be zero. For
-      // other device types, "device-external" steps may exist beyond the HDMI or S/PDIF port, or
-      // may occur after frames are emitted over Bluetooth.
-      // Assuming a non-zero external delay, F is a higher frame number (it is "later") than P.
-      //
-      // In the above diagram, a specific frame will move right-to-left over time:
-      // - "Internal delay" is the time needed for a frame to move from position W to position F;
-      // - "External delay" is the time needed for a frame to move from position F to position P.
-      //
-      // At ref_start_time_, we define the frame pointed to by F as "0". As time advances by one
-      // frame, each pointer shifts to the right by one frame. We define functions to locate W and P
-      // for any given time T:
-      //
-      //   ref_time_to_frac_presentation_frame(T) = P
-      //   ref_time_to_frac_safe_write_frame(T) = W
+      // Discerning between internal and external delay is not useful; their sum is "total delay".
+      // - "Driver transfer" is the time needed for a frame to move from position W to position F;
+      // - "Total delay" is the time needed for a frame to move from position F to position P.
       //
       // It stands to reason that clients must write frames to the ring buffer BEFORE the hardware
       // reads/processes/outputs them. Compared to frames being actively processed, client frames
-      // are later or "younger"; on our timeline, playback clients must stay "fully to the right".
-      // W is the lowest-numbered (soonest to be presented) frame that clients may write to the
-      // buffer, aka the "first safe" write position. (Device has already consumed frames beyond W.)
+      // are "later" or higher numbered; on our timeline, playback clients must stay "fully to the
+      // right". W is the lowest-numbered (soonest to be presented) frame that clients may write to
+      // the buffer, aka the "first safe" write position.
+      //
+      // We use timelines to compute these three frame positions, at any specific instant in time.
+      // At ref_start_time_, we define the frame pointed to by F as "0". As time advances by one
+      // frame, pointers P, F and W each shift to the right by one frame. For any given time T:
+      //     ref_time_to_frac_presentation_frame(T) = P
+      //     ref_time_to_frac_safe_write_frame(T) = W
       ref_time_to_frac_presentation_frame_ = TimelineFunction(
-          0,                                          // When playback begins, F is 0; we define
-          (ref_start_time_ + external_delay_).get(),  // P as occurring external_delay later.
-          frac_fps                                    // Converts fractional frames to seconds.
+          0,                                                            // F starts at 0.
+          (ref_start_time_ + external_delay_ + internal_delay_).get(),  // P is ext+int_delay later.
+          frac_fps                                                      // frac-frames-->seconds.
       );
       ref_time_to_frac_safe_read_or_write_frame_ = TimelineFunction(
-          raw_internal_delay_frames,  // F is 0, and first safe frame W is internal_delay more,
-          ref_start_time_.get(),      // at the moment that playback begins.
-          frac_fps                    // Converts fractional frames to seconds.
+          raw_driver_transfer_frames,  // F is 0, and first safe frame W is driver_transfer more,
+          ref_start_time_.get(),       // at the moment that playback begins.
+          frac_fps                     // Converts fractional frames to seconds.
       );
 
       if constexpr (kLogDriverDelayProperties) {
         FX_LOGS(INFO)
             << "Setting OUTPUT ref_time_to_frac_presentation_frame_, based on 0 first frac-frame, "
             << ref_start_time_.get() / 1000 << "-usec ref_start_time + " << std::setw(5)
+            << internal_delay_.to_usecs() << "-usec internal delay + " << std::setw(5)
             << external_delay_.to_usecs() << "-usec external delay, and frac-fps "
             << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
         FX_LOGS(INFO) << "Setting ref_time_to_frac_safe_read_or_write_frame_, based on "
-                      << raw_internal_delay_frames << " first frac-frame, "
+                      << raw_driver_transfer_frames << " first frac-frame, "
                       << ref_start_time_.get() / 1000 << "-usec ref_start_time, and frac-fps "
                       << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
       }
     } else {
       // The capture buffer works in a similar way, with three analogous pointers:
       //
-      //        |<--- internal delay --->|<--- external delay --->|
-      //      +-+----------------------+-+----------------------+-+
-      //  ... |R|                      |F|                      |C| ...
-      //      +-+----------------------+-+----------------------+-+
+      //  safe for client-->|<--driver transfer-->|<--internal delay-->|<--external delay-->|
+      //  ----------------+-+---------------------+-+------------------+--------------------+-+----
+      //    ... readable  |R|                     |F|             "total delay"             |C| ...
+      //  ----------------+-+---------------------+-+---------------------------------------+-+----
       //
       // At a specific moment in time:
       // R refers to the frame just written to the ring buffer, newly available to capture clients.
-      // F refers to the frame just emitted by the interconnect, entering any internal pipeline.
+      // F refers to the frame about to enter the DMA/FIFO, emitted by any internal pipeline.
       // C refers to the frame currently being captured by the microphone.
       //
-      // As above, F is a larger frame number than R, because F is not yet available in the ring
-      // buffer (it will only be available after an additional "internal delay" has elapsed).
-      // As with playback, in our diagram any specific frame will move right-to-left over time:
-      // - "External delay" is the time needed for a frame to move from position C to position F;
-      // - "Internal delay" is the time needed for a frame to move from position F to position R.
-      //
-      // Just as with playback, we define F to a value of 0 at ref_start_time_. Pointers shift to
-      // the right as time advances, and we define functions to locate C and R:
-      //
-      //   ref_time_to_frac_presentation_frame(T) = C         more accurately "frac_capture_time"
-      //   ref_time_to_frac_safe_read_frame(T) = R
+      // - "Total delay" is the time needed for a frame to move from position C to position F;
+      // - "Driver transfer" is the time needed for a frame to move from position F to position R.
       //
       // It stands to reason that a client reads a frame from the ring buffer only AFTER a device
       // captures and writes it; frames visible to the client are older than those being currently
-      // captured. Thus capture clients must stay "fully to the left", on our timeline.
-      // R is the highest-numbered (most recently captured) frame that a client may be read from the
-      // buffer, the "last safe" read position. (Device is still producing the frames beyond R.)
+      // captured. Capture clients must stay "fully to the left", on our timeline. R is the
+      // highest-numbered (most recently captured) frame that a client may be read from the buffer,
+      // the "last safe" read position.
+      //
+      // We again define F to be 0 at the instant of ref_start_time_. Pointers shift right as time
+      // advances, and we define functions to locate C and R:
+      //     ref_time_to_frac_presentation_frame(T) = C        more accurately "frac_capture_time"
+      //     ref_time_to_frac_safe_read_frame(T)    = R
       ref_time_to_frac_presentation_frame_ = TimelineFunction(
-          0,                                          // When capture begins, F is 0; C is defined
-          (ref_start_time_ - external_delay_).get(),  // as having occurred external_delay earlier.
-          frac_fps                                    // Converts fractional frames to seconds.
+          0,                                                            // F starts at 0; C is
+          (ref_start_time_ - external_delay_ - internal_delay_).get(),  // ext+int delay earlier.
+          frac_fps                                                      // frac frames-->seconds.
       );
       ref_time_to_frac_safe_read_or_write_frame_ = TimelineFunction(
-          -raw_internal_delay_frames,  // We define R as internal_delay behind (less than) F,
-          ref_start_time_.get(),       // which is 0 at the moment that capture begins.
-          frac_fps                     // Converts fractional frames to seconds.
+          -raw_driver_transfer_frames,  // We define R as driver_transfer behind (less than) F,
+          ref_start_time_.get(),        // which is 0 at the moment that capture begins.
+          frac_fps                      // frac frames-->seconds.
       );
 
       if constexpr (kLogDriverDelayProperties) {
         FX_LOGS(INFO)
             << "Setting INPUT ref_time_to_frac_presentation_frame_, based on 0 first frac-frame, "
             << ref_start_time_.get() / 1000 << "-usec ref_start_time - " << std::setw(5)
-            << external_delay_.to_usecs() << "-usec external delay, and frac-fps "
+            << external_delay_.to_usecs() << "-usec external delay, " << std::setw(5)
+            << internal_delay_.to_usecs() << "-usec internal delay, and frac-fps "
             << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
         FX_LOGS(INFO) << "Setting ref_time_to_frac_safe_read_or_write_frame_, based on "
-                      << -raw_internal_delay_frames << " first frac-frame, "
+                      << -raw_driver_transfer_frames << " first frac-frame, "
                       << ref_start_time_.get() / 1000 << "-usec ref_start_time, and frac-fps "
                       << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
       }
@@ -1133,7 +1122,7 @@ Reporter::AudioDriverInfo AudioDriver::info_for_reporter() const {
       .product_name = product_name(),
       .external_delay = external_delay(),
       .internal_delay = internal_delay(),
-      .internal_delay_frames = internal_delay_frames(),
+      .driver_transfer_bytes = driver_transfer_bytes_,
       .format = GetFormat(),
   };
 }

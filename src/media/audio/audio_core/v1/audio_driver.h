@@ -94,7 +94,8 @@ class AudioDriver {
 
   zx::duration external_delay() const { return external_delay_; }
   zx::duration internal_delay() const { return internal_delay_; }
-  uint32_t internal_delay_frames() const { return internal_delay_frames_; }
+  std::optional<zx::duration> driver_transfer_delay() const { return driver_transfer_delay_; }
+  std::optional<uint32_t> driver_transfer_frames() const { return driver_transfer_frames_; }
 
   zx_koid_t stream_channel_koid() const { return stream_channel_koid_; }
   const HwGainState& hw_gain_state() const { return hw_gain_state_; }
@@ -237,7 +238,9 @@ class AudioDriver {
 
   zx::duration external_delay_ = zx::nsec(0);
   zx::duration internal_delay_ = zx::nsec(0);
-  uint32_t internal_delay_frames_;
+  std::optional<zx::duration> driver_transfer_delay_;
+  std::optional<uint32_t> driver_transfer_frames_;
+  uint32_t driver_transfer_bytes_ = 0;
 
   zx::duration turn_on_delay_ = zx::nsec(0);
   bool needs_cache_flush_or_invalidate_ = true;

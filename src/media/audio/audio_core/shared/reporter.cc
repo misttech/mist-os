@@ -345,7 +345,7 @@ class Reporter::DeviceDriverInfo {
         total_delay_(node_.CreateUint("external delay + internal delay (ns)", 0)),
         external_delay_(node_.CreateUint("external delay (ns)", 0)),
         internal_delay_(node_.CreateUint("internal delay (ns)", 0)),
-        internal_delay_frames_(node_.CreateUint("internal delay (frames)", 0)),
+        driver_transfer_bytes_(node_.CreateUint("driver transfer (bytes)", 0)),
         format_(parent_node, "format"),
         object_tracker_(std::move(object_tracker)) {}
 
@@ -354,7 +354,7 @@ class Reporter::DeviceDriverInfo {
     total_delay_.Set((d.external_delay + d.internal_delay).get());
     external_delay_.Set(d.external_delay.get());
     internal_delay_.Set(d.internal_delay.get());
-    internal_delay_frames_.Set(d.internal_delay_frames);
+    driver_transfer_bytes_.Set(d.driver_transfer_bytes);
     if (d.format.has_value()) {
       format_.Set(*d.format);
       object_tracker_.SetFormat(*d.format);
@@ -368,7 +368,7 @@ class Reporter::DeviceDriverInfo {
   inspect::UintProperty total_delay_;
   inspect::UintProperty external_delay_;
   inspect::UintProperty internal_delay_;
-  inspect::UintProperty internal_delay_frames_;
+  inspect::UintProperty driver_transfer_bytes_;
   FormatInfo format_;
   ObjectTracker object_tracker_;
 };

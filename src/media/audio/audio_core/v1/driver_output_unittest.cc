@@ -255,10 +255,12 @@ TEST_F(DriverOutputTest, MixAtExpectedInterval) {
   supportedSampleFormat.number_of_channels = 2;
   supportedSampleFormat.frame_rate = 48000;
 
-  constexpr zx::duration kInternalDelay = zx::msec(5);
   constexpr zx::duration kExternalDelay = zx::usec(47376);
-  driver_->set_internal_delay(kInternalDelay);
+  constexpr zx::duration kInternalDelay = zx::msec(5);
+  constexpr uint32_t kDriverTransferBytes = 72;
   driver_->set_external_delay(kExternalDelay);
+  driver_->set_internal_delay(kInternalDelay);
+  driver_->set_driver_transfer_bytes(kDriverTransferBytes);
   ConfigureDriverForSampleFormat(supportedSampleFormat);
 
   threading_model().FidlDomain().ScheduleTask(output_->Startup());
@@ -278,16 +280,17 @@ TEST_F(DriverOutputTest, MixAtExpectedInterval) {
   //  *  10ms of frames that contain -0.75 float data.
   //  *  Silence during the rest of the ring.
   const uint32_t kSilentFrame = 0;
-  const uint32_t kPostiveFrame = 0x60006000;
+  const uint32_t kPositiveFrame = 0x60006000;
   const uint32_t kNegativeFrame = 0xA000A000;
   const uint32_t kMixWindowFrames = 480;
 
   // Renderer clients need to provide packets early, by the amount presentation_delay.
   // Audio data will be mixed into the ring buffer, offset by exactly that amount EXCEPT the
   // external_delay component, which is a post-interconnect delay.
-  size_t first_positive_frame = (supportedSampleFormat.frame_rate *
-                                 (output_->presentation_delay() - kExternalDelay).to_nsecs()) /
-                                1'000'000'000;
+  size_t first_positive_frame =
+      (supportedSampleFormat.frame_rate *
+       (output_->presentation_delay() - kInternalDelay - kExternalDelay).to_nsecs()) /
+      1'000'000'000;
   size_t first_negative_frame = first_positive_frame + kMixWindowFrames;
   size_t first_silent_frame = first_negative_frame + kMixWindowFrames;
 
@@ -297,26 +300,36 @@ TEST_F(DriverOutputTest, MixAtExpectedInterval) {
 
   // Now expect the first mix, which adds the positive samples
   RunLoopFor(zx::nsec(1));
-  EXPECT_THAT(RingBufferSlice<uint32_t>(0, first_positive_frame), Each(Eq(kSilentFrame)));
+  EXPECT_THAT(RingBufferSlice<uint32_t>(0, first_positive_frame), Each(Eq(kSilentFrame)))
+      << std::hex << kSilentFrame;
   EXPECT_THAT(RingBufferSlice<uint32_t>(first_positive_frame, kMixWindowFrames),
-              Each(Eq(kPostiveFrame)));
-  EXPECT_THAT(RingBufferSlice<uint32_t>(first_negative_frame, -1), Each(Eq(kSilentFrame)));
+              Each(Eq(kPositiveFrame)))
+      << std::hex << kPositiveFrame;
+  EXPECT_THAT(RingBufferSlice<uint32_t>(first_negative_frame, -1), Each(Eq(kSilentFrame)))
+      << std::hex << kSilentFrame;
 
   // Run until just before the next mix interval. Expect the ring to be unchanged.
   RunLoopFor(expected_mix_interval_ - zx::nsec(1));
-  EXPECT_THAT(RingBufferSlice<uint32_t>(0, first_positive_frame), Each(Eq(kSilentFrame)));
+  EXPECT_THAT(RingBufferSlice<uint32_t>(0, first_positive_frame), Each(Eq(kSilentFrame)))
+      << std::hex << kSilentFrame;
   EXPECT_THAT(RingBufferSlice<uint32_t>(first_positive_frame, kMixWindowFrames),
-              Each(Eq(kPostiveFrame)));
-  EXPECT_THAT(RingBufferSlice<uint32_t>(first_negative_frame, -1), Each(Eq(kSilentFrame)));
+              Each(Eq(kPositiveFrame)))
+      << std::hex << kPositiveFrame;
+  EXPECT_THAT(RingBufferSlice<uint32_t>(first_negative_frame, -1), Each(Eq(kSilentFrame)))
+      << std::hex << kSilentFrame;
 
   // Now run the second mix. Expect the additional negative frames to be added to the ring.
   RunLoopFor(zx::nsec(1));
-  EXPECT_THAT(RingBufferSlice<uint32_t>(0, first_positive_frame), Each(Eq(kSilentFrame)));
+  EXPECT_THAT(RingBufferSlice<uint32_t>(0, first_positive_frame), Each(Eq(kSilentFrame)))
+      << std::hex << kSilentFrame;
   EXPECT_THAT(RingBufferSlice<uint32_t>(first_positive_frame, kMixWindowFrames),
-              Each(Eq(kPostiveFrame)));
+              Each(Eq(kPositiveFrame)))
+      << std::hex << kPositiveFrame;
   EXPECT_THAT(RingBufferSlice<uint32_t>(first_negative_frame, kMixWindowFrames),
-              Each(Eq(kNegativeFrame)));
-  EXPECT_THAT(RingBufferSlice<uint32_t>(first_silent_frame, -1), Each(Eq(kSilentFrame)));
+              Each(Eq(kNegativeFrame)))
+      << std::hex << kNegativeFrame;
+  EXPECT_THAT(RingBufferSlice<uint32_t>(first_silent_frame, -1), Each(Eq(kSilentFrame)))
+      << std::hex << kSilentFrame;
 
   threading_model().FidlDomain().ScheduleTask(output_->Shutdown());
   RunLoopUntilIdle();

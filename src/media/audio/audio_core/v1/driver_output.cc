@@ -171,7 +171,8 @@ std::optional<AudioOutput::FrameSpan> DriverOutput::StartMixJob(zx::time ref_tim
   FX_DCHECK(driver_writable_ring_buffer() != nullptr);
   const auto& output_frames_per_reference_tick = FramesPerRefTick();
   const auto& rb = *driver_writable_ring_buffer();
-  uint32_t internal_delay_frames = driver()->internal_delay_frames();
+  FX_DCHECK(driver()->driver_transfer_frames());
+  uint32_t driver_transfer_frames = *driver()->driver_transfer_frames();
 
   // output_frames_consumed is the number of frames that the audio output
   // device's DMA *may* have read so far.  output_frames_transmitted is the
@@ -181,7 +182,7 @@ std::optional<AudioOutput::FrameSpan> DriverOutput::StartMixJob(zx::time ref_tim
   // interconnect, it still has the device's external_delay before it will
   // finally hit the speaker.
   int64_t output_frames_consumed = RefTimeToSafeWriteFrame(ref_time);
-  int64_t output_frames_transmitted = output_frames_consumed - internal_delay_frames;
+  int64_t output_frames_transmitted = output_frames_consumed - driver_transfer_frames;
 
   auto mono_time = reference_clock()->MonotonicTimeFromReferenceTime(ref_time);
 
@@ -529,10 +530,10 @@ void DriverOutput::OnDriverConfigComplete() {
     return;
   }
 
-  // Driver is configured, we have all the needed info to compute the presentation
-  // delay for this output.
+  // Driver is configured, we have what we need to compute the presentation delay for this output.
+  FX_CHECK(driver()->driver_transfer_delay());
   SetPresentationDelay(driver()->external_delay() + driver()->internal_delay() +
-                       high_water_duration_);
+                       *driver()->driver_transfer_delay() + high_water_duration_);
 
   // Fill our brand new ring buffer with silence
   FX_DCHECK(driver_writable_ring_buffer() != nullptr);
@@ -617,7 +618,8 @@ void DriverOutput::OnDriverStartComplete() {
   frames_sent_ = output_frames_consumed + low_water_frames_;
 
   if (VERBOSE_TIMING_DEBUG) {
-    auto fd_frames = driver()->internal_delay_frames();
+    FX_CHECK(driver()->driver_transfer_frames());
+    auto fd_frames = *driver()->driver_transfer_frames();
     FX_LOGS(INFO) << "Audio output: FIFO depth (" << fd_frames << " frames " << std::fixed
                   << std::setprecision(3) << rate.Inverse().Scale(fd_frames) / 1000000.0
                   << " mSec) Low Water (" << frames_sent_ << " frames " << std::fixed

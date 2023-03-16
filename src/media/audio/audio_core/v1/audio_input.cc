@@ -137,7 +137,9 @@ void AudioInput::OnDriverConfigComplete() {
   driver()->SetPlugDetectEnabled(true);
 
   // We have all the info needed to compute the presentation delay for this input.
-  SetPresentationDelay(driver()->external_delay() + driver()->internal_delay());
+  FX_CHECK(driver()->driver_transfer_delay());
+  SetPresentationDelay(driver()->external_delay() + driver()->internal_delay() +
+                       *driver()->driver_transfer_delay());
 }
 
 void AudioInput::OnDriverStartComplete() {

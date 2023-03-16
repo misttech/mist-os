@@ -120,6 +120,9 @@ void FakeAudioDriver::GetProperties(
   fuchsia::hardware::audio::RingBufferProperties props = {};
 
   props.set_needs_cache_flush_or_invalidate(false);
+  if (driver_transfer_bytes_) {
+    props.set_driver_transfer_bytes(*driver_transfer_bytes_);
+  }
 
   callback(std::move(props));
 }

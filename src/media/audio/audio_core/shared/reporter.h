@@ -64,7 +64,7 @@ class Reporter {
     std::string product_name;
     zx::duration external_delay;
     zx::duration internal_delay;
-    int64_t internal_delay_frames;
+    int64_t driver_transfer_bytes;
     std::optional<Format> format;
   };
 

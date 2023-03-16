@@ -46,11 +46,15 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
   }
   void set_clock_domain(uint32_t clock_domain) { clock_domain_ = clock_domain; }
   void set_plugged(bool plugged) { plugged_ = plugged; }
-  void set_internal_delay(zx::duration internal_delay) { internal_delay_ = internal_delay; }
   void set_external_delay(zx::duration external_delay) { external_delay_ = external_delay; }
+  void set_internal_delay(zx::duration internal_delay) { internal_delay_ = internal_delay; }
+  void set_driver_transfer_bytes(uint32_t driver_transfer_bytes) {
+    driver_transfer_bytes_ = driver_transfer_bytes;
+  }
 
-  void clear_internal_delay() { internal_delay_ = std::nullopt; }
   void clear_external_delay() { external_delay_ = std::nullopt; }
+  void clear_internal_delay() { internal_delay_ = std::nullopt; }
+  void clear_driver_transfer_bytes() { driver_transfer_bytes_ = std::nullopt; }
 
   void SendPositionNotification(zx::time timestamp, uint32_t position);
 
@@ -121,8 +125,9 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
   size_t ring_buffer_size_;
   zx::vmo ring_buffer_;
 
-  std::optional<zx::duration> internal_delay_;
   std::optional<zx::duration> external_delay_;
+  std::optional<zx::duration> internal_delay_;
+  std::optional<uint32_t> driver_transfer_bytes_;
   bool plugged_ = true;
 
   std::optional<fuchsia::hardware::audio::PcmFormat> selected_format_;

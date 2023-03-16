@@ -24,8 +24,9 @@ class AudioDriverTest : public testing::ThreadingModelFixture {
     remote_driver_ = std::make_unique<testing::FakeAudioDriver>(std::move(c1), dispatcher());
 
     // Set fake non-zero internal and external delay, to keep things interesting.
-    remote_driver_->set_internal_delay(kInternalDelay);
     remote_driver_->set_external_delay(kExternalDelay);
+    remote_driver_->set_internal_delay(kInternalDelay);
+    remote_driver_->set_driver_transfer_bytes(kDriverTransferBytes);
 
     ASSERT_EQ(ZX_OK, driver_->Init(std::move(c2)));
     mapped_ring_buffer_ = remote_driver_->CreateRingBuffer(kRingBufferFrames * kChannelCount * 2);
@@ -40,16 +41,18 @@ class AudioDriverTest : public testing::ThreadingModelFixture {
 
   static constexpr auto kSampleFormat = fuchsia::media::AudioSampleFormat::SIGNED_16;
   static constexpr uint32_t kChannelCount = 2;
+  static constexpr uint32_t kBytesPerFrame = 2 * kChannelCount;
   static constexpr uint32_t kFramesPerSec = 48000;
+  static constexpr uint32_t kDriverTransferBytes = 196;  // 49 frames (stereo 16-bit)
   static constexpr zx::duration kInternalDelay = zx::usec(3604);
-  static constexpr uint32_t kInternalDelayFrames =
-      (kInternalDelay.to_usecs() * kFramesPerSec - 1) / zx::sec(1).to_usecs() + 1;  // 173
   static constexpr zx::duration kExternalDelay = zx::usec(47376);
   static constexpr auto kRingBufferMinDuration = zx::msec(200);
   static constexpr size_t kRingBufferFrames =
       fbl::round_up<uint64_t, uint64_t>(kFramesPerSec * kRingBufferMinDuration.get(),
                                         zx::sec(1).get()) /
       zx::sec(1).get();
+  static_assert(kDriverTransferBytes % kBytesPerFrame == 0,
+                "kDriverTransferBytes must be frame-aligned");
 
   std::shared_ptr<testing::FakeAudioOutput> device_{testing::FakeAudioOutput::Create(
       context().process_config().device_config(), &threading_model(), &context().device_manager(),
@@ -147,26 +150,25 @@ TEST_F(AudioDriverTest, SanityCheckTimelineMath) {
   const auto& ref_time_to_frac_safe_read_or_write_frame =
       this->driver_->ref_time_to_frac_safe_read_or_write_frame();
 
-  // Get the driver's external delay and fifo depth expressed in frames.
+  // Get the driver's external/internal delays, and the and driver transfer offset in frames.
   zx::duration external_delay = this->driver_->external_delay();
   zx::duration internal_delay = this->driver_->internal_delay();
-  uint32_t internal_delay_frames = this->driver_->internal_delay_frames();
+  ASSERT_TRUE(this->driver_->driver_transfer_frames());
+  uint32_t driver_transfer_frames = *this->driver_->driver_transfer_frames();
 
-  // The fifo depth and external delay had better match what we told the fake
-  // driver to report.
-  ASSERT_EQ(this->kInternalDelay, internal_delay);
+  // These must match what we told the fake driver to report.
   ASSERT_EQ(this->kExternalDelay, external_delay);
-  ASSERT_EQ(this->kInternalDelayFrames, internal_delay_frames);
+  ASSERT_EQ(this->kInternalDelay, internal_delay);
+  ASSERT_EQ(this->kDriverTransferBytes, driver_transfer_frames * kBytesPerFrame);
 
   // At startup, the tx/rx position should be 0, and the safe read/write position
-  // should be internal_delay_frames ahead of this.
+  // should be driver_transfer_frames ahead of this.
   zx::time ref_now = this->driver_->ref_start_time();
   auto frac_frame = Fixed::FromRaw(ref_time_to_frac_safe_read_or_write_frame.Apply(ref_now.get()));
-  EXPECT_EQ(internal_delay_frames, frac_frame.Floor());
+  EXPECT_EQ(driver_transfer_frames, frac_frame.Floor());
 
-  // After |external_delay| has passed, we should be at frame zero in the
-  // pts/cts timeline.
-  ref_now += external_delay;
+  // After |external_delay+internal_delay|, we should be at frame zero in the pts/cts timeline.
+  ref_now += external_delay + internal_delay;
   EXPECT_EQ(0, ref_time_to_frac_presentation_frame.Apply(ref_now.get()));
 
   // Advance time by an arbitrary amount and sanity check the results of the
@@ -174,19 +176,17 @@ TEST_F(AudioDriverTest, SanityCheckTimelineMath) {
   constexpr zx::duration kSomeTime = zx::usec(87654321);
   ref_now += kSomeTime;
 
-  // The safe_read_write_pos should still be internal_delay_frames ahead of whatever
-  // the tx/rx position is, so the tx/rx position should be the safe read/write
-  // position minus the fifo depth (in frames).
+  // The safe_read_write_pos should still be driver_transfer_frames ahead of the tx/rx position. The
+  // tx/rx position should be the safe read/write position minus the driver transfer size in frames.
   //
-  // After external_delay has passed, the computed tx/rx position should match
-  // the pts/ctx position.  Note, we need convert the fractional frames result
-  // of the pts/cts position to integer frames, rounding down in the process, in
-  // order to compare the two.
+  // After |external_delay+internal_delay| has passed, the computed tx/rx position should match the
+  // pts/ctx position.  Note, we need convert the fractional frames result of the pts/cts position
+  // to integer frames, rounding down in the process, in order to compare the two.
   int64_t safe_read_write_pos =
       Fixed::FromRaw(ref_time_to_frac_safe_read_or_write_frame.Apply(ref_now.get())).Floor();
-  int64_t txrx_pos = safe_read_write_pos - internal_delay_frames;
+  int64_t txrx_pos = safe_read_write_pos - driver_transfer_frames;
 
-  ref_now += external_delay;
+  ref_now += external_delay + internal_delay;
   int64_t ptscts_pos_frames =
       ref_time_to_frac_presentation_frame.Apply(ref_now.get()) / Fixed(1).raw_value();
   EXPECT_EQ(txrx_pos, ptscts_pos_frames);
@@ -208,8 +208,7 @@ TEST_F(AudioDriverTest, RingBufferPropsEmpty) {
   ASSERT_TRUE(device_->driver_info_fetched());
   ASSERT_EQ(driver_->state(), AudioDriver::State::Unconfigured);
 
-  // Now tell it to configure itself using a format we know will be on its fake
-  // format list, and a ring buffer size we know it will be able to give us.
+  // Now configure it with a format on its list, and a ring buffer size we know it can give us.
   fuchsia::media::AudioStreamType fidl_format;
   fidl_format.sample_format = kSampleFormat;
   fidl_format.channels = kChannelCount;
@@ -224,18 +223,17 @@ TEST_F(AudioDriverTest, RingBufferPropsEmpty) {
   ASSERT_TRUE(device_->driver_config_complete());
   ASSERT_EQ(driver_->state(), AudioDriver::State::Configured);
 
-  // Finally, tell the driver to start.  This will establish the start time and
-  // allow the driver to compute the various transformations it will expose to
-  // the rest of the system.
+  // Finally, tell the driver to start. This establishes the start time and allows the driver to
+  // compute the various transformations it exposes to the rest of the system.
   res = driver_->Start();
   ASSERT_EQ(res, ZX_OK);
   RunLoopUntilIdle();
   ASSERT_TRUE(device_->driver_start_complete());
   ASSERT_EQ(driver_->state(), AudioDriver::State::Started);
 
-  // These are unspecified by the driver so they should be zero.
-  ASSERT_EQ(zx::nsec(0), driver_->internal_delay());
+  // These are unspecified by the driver, so they should be zero.
   ASSERT_EQ(zx::nsec(0), driver_->external_delay());
+  ASSERT_EQ(zx::nsec(0), driver_->internal_delay());
 }
 
 }  // namespace

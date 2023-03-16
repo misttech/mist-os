@@ -223,7 +223,7 @@ TEST_F(ReporterTest, DeviceMetrics) {
                                               UintIs("external delay (ns)", 0),
                                               UintIs("external delay + internal delay (ns)", 0),
                                               UintIs("internal delay (ns)", 0),
-                                              UintIs("internal delay (frames)", 0),
+                                              UintIs("driver transfer (bytes)", 0),
                                               StringIs("name", "unknown"))))),
                         NodeMatches(AllOf(
                             NameMatches("format"),
