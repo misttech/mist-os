@@ -374,21 +374,29 @@ void NetworkDeviceClient::GetPortInfoWithMac(netdev::wire::PortId port_id,
     callback(zx::error(port_endpoints.error_value()));
     return;
   }
+  const fidl::OneWayStatus get_port_result =
+      device_->GetPort(port_id, std::move(port_endpoints->server));
+  if (!get_port_result.ok()) {
+    callback(zx::error(get_port_result.status()));
+    return;
+  }
   state->port_client.Bind(std::move(port_endpoints->client), dispatcher_);
+
   // Connect to the port's MacAddressing interface.
   zx::result mac_endpoints = fidl::CreateEndpoints<netdev::MacAddressing>();
   if (mac_endpoints.is_error()) {
     callback(zx::error(mac_endpoints.error_value()));
     return;
   }
+  const fidl::OneWayStatus get_mac_result =
+      state->port_client->GetMac(std::move(mac_endpoints->server));
+  if (!get_mac_result.ok()) {
+    callback(zx::error(get_mac_result.status()));
+    return;
+  }
   state->mac_client.Bind(std::move(mac_endpoints->client), dispatcher_);
 
   // Get the port's information.
-  //
-  // NB: The GetInfo call on port is written before we pipeline the port to
-  // device. That ensures we observe an epitaph in case the port doesn't exist,
-  // instead of PEER_CLOSED when attempting to write the GetInfo request on the
-  // channel.
   fpromise::bridge<void, zx_status_t> bridge;
   state->port_client->GetInfo().ThenExactlyOnce(
       [completer = std::move(bridge.completer),
@@ -406,23 +414,10 @@ void NetworkDeviceClient::GetPortInfoWithMac(netdev::wire::PortId port_id,
         state->result = std::move(info.value());
         completer.complete_ok();
       });
-  const fidl::Status result = device_->GetPort(port_id, std::move(port_endpoints->server));
-  if (!result.ok()) {
-    callback(zx::error(result.status()));
-    return;
-  }
 
   // Get the Mac address of the interface.
-  auto get_mac_address =
-      [state = state.get(),
-       mac_server =
-           std::move(mac_endpoints->server)]() mutable -> fpromise::promise<void, zx_status_t> {
+  auto get_mac_address = [state = state.get()]() -> fpromise::promise<void, zx_status_t> {
     fpromise::bridge<void, zx_status_t> bridge;
-
-    // NB: Like above, the GetUnicastAddress call on mac is written before we
-    // pipeline the mac to the port. That ensures we observe an epitaph in case
-    // mac is not supported, instead of PEER_CLOSED when attempting to write the
-    // GetUnicastAddress request on the channel.
     state->mac_client->GetUnicastAddress().ThenExactlyOnce(
         [completer = std::move(bridge.completer),
          state](fidl::WireUnownedResult<netdev::MacAddressing::GetUnicastAddress>& result) mutable {
@@ -439,10 +434,6 @@ void NetworkDeviceClient::GetPortInfoWithMac(netdev::wire::PortId port_id,
           state->result.unicast_address = result->address;
           completer.complete_ok();
         });
-    const fidl::Status result = state->port_client->GetMac(std::move(mac_server));
-    if (!result.ok()) {
-      return fpromise::make_error_promise(result.status());
-    }
 
     return bridge.consumer.promise();
   };
