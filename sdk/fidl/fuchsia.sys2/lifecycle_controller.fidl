@@ -100,20 +100,24 @@ type CreateError = flexible enum {
 /// Mutates the component instance state in a realm.
 @discoverable
 protocol LifecycleController {
-    /// Starts the instance identified by the given moniker.
+    /// Starts the instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The client can pass in the server end of a channel
     /// for the fuchsia.component.Binder protocol. This protocol
     /// will notify the client when the instance has stopped.
     ///
-    /// The function returns once the instance has been started.
+    /// The function returns once the instance has been started. Calling
+    /// StartInstance() when the instance is already running is a no-op, but
+    /// it will connect the Binder channel if a valid handle is provided.
     @available(added=11)
     StartInstance(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         binder server_end:fuchsia.component.Binder;
     }) -> () error StartError;
 
-    /// Stops the instance identified by the given moniker.
+    /// Stops the instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the instance has been stopped.
     @available(added=11)
@@ -121,7 +125,8 @@ protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error StopError;
 
-    /// Resolves the instance identified by the given moniker.
+    /// Resolves the instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the instance has been resolved.
     @available(added=11)
@@ -129,8 +134,8 @@ protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error ResolveError;
 
-    /// Unresolves the component designated by the provided relative moniker
-    /// relative to the component to which the protocol is scoped.
+    /// Unresolves the component designated by the provided relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the instance has been unresolved.
     @available(added=11)
@@ -138,7 +143,8 @@ protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error UnresolveError;
 
-    /// Creates a new child instance identified by the given moniker.
+    /// Creates a new child instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the child instance has been added to the topology.
     @available(added=11)
@@ -149,7 +155,8 @@ protocol LifecycleController {
         args fuchsia.component.CreateChildArgs;
     }) -> () error CreateError;
 
-    /// Destroys the instance identified by the given moniker.
+    /// Destroys the instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the child instance no longer exists in the topology.
     @available(added=11)
@@ -163,7 +170,8 @@ protocol LifecycleController {
     // in an upcoming API release.
     // ---------------------------------------------------------------
 
-    /// Starts the instance identified by the given moniker.
+    /// Starts the instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the instance has been started.
     @available(added=7, deprecated=11, removed=12, note="Use StartInstance instead", legacy=true)
@@ -173,7 +181,8 @@ protocol LifecycleController {
         result StartResult;
     }) error fuchsia.component.Error;
 
-    /// Stops the instance identified by the given moniker.
+    /// Stops the instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the instance has been stopped.
     ///
@@ -185,7 +194,8 @@ protocol LifecycleController {
         is_recursive bool;
     }) -> () error fuchsia.component.Error;
 
-    /// Resolves the instance identified by the given moniker.
+    /// Resolves the instance identified by the given relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the instance has been resolved
     @available(added=7, deprecated=11, removed=12, note="Use ResolveInstance instead", legacy=true)
@@ -193,8 +203,8 @@ protocol LifecycleController {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
 
-    /// Unresolves the component designated by the provided relative moniker
-    /// relative to the component to which the protocol is scoped.
+    /// Unresolves the component designated by the provided relative moniker. Relative
+    /// monikers must start with "./".
     ///
     /// The function returns once the component successfully unresolves, or the
     /// operation fails.
