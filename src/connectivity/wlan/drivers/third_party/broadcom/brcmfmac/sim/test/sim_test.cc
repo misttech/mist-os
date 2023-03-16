@@ -7,6 +7,9 @@
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
+#include <lib/fdio/directory.h>
+
+#include <fbl/string_buffer.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/factory_device.h"
 
@@ -399,16 +402,50 @@ SimTest::~SimTest() {
     }
   }
 
+  libsync::Completion host_destroyed;
+  async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+    dev_mgr_.reset();
+    host_destroyed.Signal();
+  });
+  host_destroyed.Wait();
+
   if (client_dispatcher_.get()) {
     client_dispatcher_.ShutdownAsync();
+    client_completion_.Wait();
+  }
+
+  if (driver_dispatcher_.get()) {
+    driver_dispatcher_.ShutdownAsync();
     completion_.Wait();
   }
   // Don't have to erase the iface ids here.
 }
 
 zx_status_t SimTest::PreInit() {
-  // Allocate memory for a simulated device and register with dev_mgr
-  return brcmfmac::SimDevice::Create(dev_mgr_->GetRootDevice(), dev_mgr_.get(), env_, &device_);
+  // Create a dispatcher to wait on the runtime channel.
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "sim-test",
+      [&](fdf_dispatcher_t*) { completion_.Signal(); });
+
+  if (dispatcher.is_error()) {
+    BRCMF_ERR("Failed to create dispatcher : %s", zx_status_get_string(dispatcher.error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+
+  driver_dispatcher_ = *std::move(dispatcher);
+
+  // Create the device on driver dispatcher because the outgoing directory is required to be
+  // accessed by a single dispatcher.
+  libsync::Completion created;
+  async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+    // Allocate memory for a simulated device and register with dev_mgr
+    ASSERT_EQ(ZX_OK, brcmfmac::SimDevice::Create(dev_mgr_->GetRootDevice(), dev_mgr_.get(), env_,
+                                                 &device_));
+    created.Signal();
+  });
+  created.Wait();
+
+  return ZX_OK;
 }
 
 zx_status_t SimTest::Init() {
@@ -433,17 +470,9 @@ zx_status_t SimTest::Init() {
   // Create test arena.
   test_arena_ = fdf::Arena('TEST');
 
-  // Create the FIDL endpoints, bind the client end to the test class, and the server end to
-  // wlan::brcmfmac::Device class.
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
-  if (endpoints.is_error()) {
-    BRCMF_ERR("Failed to create endpoints");
-    return ZX_ERR_INTERNAL;
-  }
-
   // Create a dispatcher to wait on the runtime channel.
   auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      {}, "sim-test", [&](fdf_dispatcher_t*) { completion_.Signal(); });
+      {}, "sim-test", [&](fdf_dispatcher_t*) { client_completion_.Signal(); });
 
   if (dispatcher.is_error()) {
     BRCMF_ERR("Failed to create dispatcher : %s", zx_status_get_string(dispatcher.error_value()));
@@ -451,9 +480,38 @@ zx_status_t SimTest::Init() {
   }
 
   client_dispatcher_ = *std::move(dispatcher);
+
+  auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  EXPECT_FALSE(outgoing_dir_endpoints.is_error());
+
+  // Serve WlanPhyImplProtocol to the device's outgoing directory on the driver dispatcher.
+  libsync::Completion served;
+  async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+    ASSERT_EQ(ZX_OK, device_->ServeWlanPhyImplProtocol(std::move(outgoing_dir_endpoints->server)));
+    served.Signal();
+  });
+  served.Wait();
+
+  // Connect WlanPhyImpl protocol from this class, this operation mimics the implementation of
+  // DdkConnectRuntimeProtocol().
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ProtocolType>();
+  EXPECT_FALSE(endpoints.is_error());
+  zx::channel client_token, server_token;
+  EXPECT_EQ(ZX_OK, zx::channel::create(0, &client_token, &server_token));
+  EXPECT_EQ(ZX_OK, fdf::ProtocolConnect(std::move(client_token),
+                                        fdf::Channel(endpoints->server.TakeChannel().release())));
+  fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
+  path.AppendPrintf("svc/%s/default/%s", fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ServiceName,
+                    fuchsia_wlan_phyimpl::Service::WlanPhyImpl::Name);
+  // Serve the WlanPhyImpl protocol on `server_token` found at `path` within
+  // the outgoing directory.
+  EXPECT_EQ(ZX_OK, fdio_service_connect_at(outgoing_dir_endpoints->client.channel().get(),
+                                           path.c_str(), server_token.release()));
+
   client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client),
                                                                      client_dispatcher_.get());
 
+  device_->WaitForProtocolConnection();
   zx::result factory_endpoints = fidl::CreateEndpoints<fuchsia_factory_wlan::Iovar>();
   if (factory_endpoints.is_error()) {
     BRCMF_ERR("Failed to create factory dispatcher : %s",
@@ -474,9 +532,6 @@ zx_status_t SimTest::Init() {
     BRCMF_ERR("Failed to create device");
     return ZX_ERR_INTERNAL;
   }
-
-  device_->DdkServiceConnect(fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>,
-                             endpoints->server.TakeHandle());
   return ZX_OK;
 }
 

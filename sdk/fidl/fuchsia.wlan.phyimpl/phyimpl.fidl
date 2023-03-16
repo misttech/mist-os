@@ -91,3 +91,7 @@ protocol WlanPhyImpl {
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
     }) error zx.status;
 };
+
+service Service {
+    wlan_phy_impl client_end:WlanPhyImpl;
+};

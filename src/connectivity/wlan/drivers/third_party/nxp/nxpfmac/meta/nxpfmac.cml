@@ -9,11 +9,17 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/wlanphy.bindbc",
+        compat: "driver/nxpfmac.so",
+        bind: "meta/bind/nxpfmac_sdio.bindbc",
         colocate: "true",
-        compat: "driver/wlanphy_dfv2.so",
-        default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
     },
-    use: [],
+    capabilities: [
+        { service: "fuchsia.wlan.phyimpl.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.wlan.phyimpl.Service",
+            from: "self",
+        },
+    ],
 }
