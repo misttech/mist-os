@@ -603,3 +603,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/flatbuffers
 	name = third_party/github.com/google/flatbuffers
 	ignore = all
+[submodule "third_party/github.com/google/liblc3/src"]
+	path = third_party/github.com/google/liblc3/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/google/liblc3
+	name = third_party/github.com/google/liblc3
+	ignore = all
