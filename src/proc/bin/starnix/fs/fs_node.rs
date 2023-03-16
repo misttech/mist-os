@@ -877,6 +877,11 @@ impl FsNode {
         #[allow(clippy::unnecessary_cast)]
         let blocks = info.storage_size as i64 / info.blksize as i64;
 
+        #[cfg(target_arch = "x86_64")]
+        let link_count = info.link_count as u32;
+        #[cfg(not(target_arch = "x86_64"))]
+        let link_count = info.link_count;
+
         Ok(statx {
             stx_mask: STATX_NLINK
                 | STATX_UID
@@ -890,7 +895,7 @@ impl FsNode {
                 | STATX_BASIC_STATS,
             stx_blksize: info.blksize as u32,
             stx_attributes: 0, // TODO
-            stx_nlink: info.link_count as u32,
+            stx_nlink: link_count,
             stx_uid: info.uid,
             stx_gid: info.gid,
             stx_mode: info.mode.bits() as u16,

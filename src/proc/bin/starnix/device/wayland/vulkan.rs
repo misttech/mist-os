@@ -141,7 +141,12 @@ impl Loader {
         };
 
         let extension_name: Vec<u8> = b"VK_FUCHSIA_buffer_collection".to_vec();
-        let device_extensions = vec![extension_name.as_ptr() as *const i8];
+        let device_extensions = vec![extension_name.as_ptr()];
+        #[cfg(target_arch = "x86_64")]
+        let device_ptr = device_extensions.as_ptr() as *const *const i8;
+        #[cfg(not(target_arch = "x86_64"))]
+        let device_ptr = device_extensions.as_ptr() as *const *const u8;
+
         let device_create_info = vk::DeviceCreateInfo {
             sType: vk::STRUCTURE_TYPE_DEVICE_CREATE_INFO,
             pNext: std::ptr::null(),
@@ -151,7 +156,7 @@ impl Loader {
             enabledLayerCount: 0,
             ppEnabledLayerNames: std::ptr::null(),
             enabledExtensionCount: device_extensions.len() as u32,
-            ppEnabledExtensionNames: device_extensions.as_ptr(),
+            ppEnabledExtensionNames: device_ptr,
             pEnabledFeatures: std::ptr::null(),
         };
 

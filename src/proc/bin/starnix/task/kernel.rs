@@ -18,6 +18,7 @@ use crate::lock::RwLock;
 use crate::logging::set_zx_name;
 use crate::mm::FutexTable;
 use crate::task::*;
+#[cfg(target_arch = "x86_64")]
 use crate::types::*;
 use crate::types::{DeviceType, Errno, OpenFlags};
 
@@ -101,6 +102,9 @@ pub struct Kernel {
     pub vdso: Option<Arc<zx::Vmo>>,
 }
 
+// TODO(fxbug.dev/121659): This function is only used to load the vDSO, and since only x64 has one
+// this function is considered unused on other architectures
+#[cfg(target_arch = "x86_64")]
 fn sync_open_in_namespace(
     path: &str,
     flags: fidl_fuchsia_io::OpenFlags,

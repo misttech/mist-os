@@ -177,6 +177,7 @@ pub struct DirentSink32<'a> {
 }
 
 impl<'a> DirentSink32<'a> {
+    #[cfg(target_arch = "x86_64")]
     pub fn new(
         current_task: &'a CurrentTask,
         offset: &'a mut off_t,
