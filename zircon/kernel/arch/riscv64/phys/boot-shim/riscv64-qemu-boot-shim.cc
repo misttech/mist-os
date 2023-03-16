@@ -28,11 +28,16 @@
 namespace {
 
 using DtbItem = boot_shim::SingleItem<ZBI_TYPE_DEVICETREE>;
+using PlicItem = boot_shim::SingleOptionalItem<zbi_dcfg_riscv_plic_driver_t, ZBI_TYPE_KERNEL_DRIVER,
+                                               ZBI_KERNEL_DRIVER_RISCV_PLIC>;
+using TimerItem =
+    boot_shim::SingleOptionalItem<zbi_dcfg_riscv_generic_timer_driver_t, ZBI_TYPE_KERNEL_DRIVER,
+                                  ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER>;
 
 using Shim = boot_shim::BootShim<boot_shim::PoolMemConfigItem,     //
                                  boot_shim::UartItem,              //
                                  boot_shim::TestSerialNumberItem,  //
-                                 DtbItem>;
+                                 PlicItem, TimerItem, DtbItem>;
 
 void InitMemory(const devicetree::Devicetree& dt, Shim::ByteView zbi) {
   // For now hard-wire a configuration matching what QEMU does with `-m 8192`.
@@ -167,6 +172,17 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
       dt.size_bytes(),
   };
   shim.Get<DtbItem>().set_payload(fdt);
+
+  constexpr zbi_dcfg_riscv_plic_driver_t kPlicItem = {
+      .mmio_phys = 0x0c00'0000,
+      .num_irqs = 128,
+  };
+  shim.Get<PlicItem>().set_payload(kPlicItem);
+
+  constexpr zbi_dcfg_riscv_generic_timer_driver_t kTimerItem = {
+      .freq_hz = 10000000,
+  };
+  shim.Get<TimerItem>().set_payload(kTimerItem);
 
   BootZbi boot;
   if (shim.Check("Not a bootable ZBI", boot.Init(Shim::InputZbi{zbi})) &&
