@@ -7,18 +7,12 @@ use diagnostics_hierarchy::{
     testing::{DiagnosticsHierarchyGetter, JsonGetter},
     DiagnosticsHierarchy,
 };
-use inspect_format::{constants, Container};
+use inspect_format::{constants, Container, ReadableBlockContainer, WritableBlockContainer};
 use std::{borrow::Cow, cmp::max, default::Default, fmt, sync::Arc};
 use tracing::error;
 
 #[cfg(target_os = "fuchsia")]
-use {
-    fuchsia_zircon::{self as zx, HandleBased},
-    mapped_vmo::Mapping,
-};
-
-#[cfg(not(target_os = "fuchsia"))]
-use std::sync::Mutex;
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 
 /// Root of the Inspect API. Through this API, further nodes can be created and inspect can be
 /// served.
@@ -27,9 +21,8 @@ pub struct Inspector {
     /// The root node.
     root_node: Arc<Node>,
 
-    /// The VMO backing the inspector
-    #[cfg(target_os = "fuchsia")]
-    pub(crate) vmo: Option<Arc<zx::Vmo>>,
+    /// The storage backing the inspector. This is a VMO when working on Fuchsia.
+    pub(crate) storage: Option<<Container as ReadableBlockContainer>::BackingStorage>,
 }
 
 impl fmt::Debug for Inspector {
@@ -54,7 +47,7 @@ impl Inspector {
     ///
     /// The duplicated VMO will be read-only, and is suitable to send to clients over FIDL.
     pub fn duplicate_vmo(&self) -> Option<zx::Vmo> {
-        self.vmo.as_ref().and_then(|vmo| {
+        self.storage.as_ref().and_then(|vmo| {
             vmo.duplicate_handle(
                 zx::Rights::BASIC | zx::Rights::READ | zx::Rights::MAP | zx::Rights::GET_PROPERTY,
             )
@@ -98,7 +91,7 @@ impl Inspector {
     #[cfg(test)]
     pub fn is_frozen(&self) -> Result<(), u64> {
         use inspect_format::Block;
-        let vmo = self.vmo.as_ref().unwrap();
+        let vmo = self.storage.as_ref().unwrap();
         let mut buffer: [u8; 16] = [0; 16];
         vmo.read(&mut buffer, 0).unwrap();
         let block = Block::new(&buffer[..16], inspect_format::BlockIndex::EMPTY);
@@ -107,6 +100,15 @@ impl Inspector {
         } else {
             Err(block.header_generation_count().unwrap())
         }
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl Inspector {
+    pub(crate) fn duplicate_vmo(
+        &self,
+    ) -> Option<<Container as ReadableBlockContainer>::BackingStorage> {
+        self.storage.clone()
     }
 }
 
@@ -129,10 +131,6 @@ impl Inspector {
     /// stored data.
     pub fn copy_vmo_data(&self) -> Option<Vec<u8>> {
         self.root_node.inner.inner_ref().and_then(|inner_ref| inner_ref.state.copy_vmo_bytes())
-    }
-
-    pub fn clone_heap_container(&self) -> Option<Container> {
-        self.root_node.inner.inner_ref().map(|inner_ref| inner_ref.state.clone_container())
     }
 
     pub fn max_size(&self) -> Option<usize> {
@@ -171,9 +169,7 @@ impl Inspector {
 pub struct InspectorConfig {
     is_no_op: bool,
     size: usize,
-
-    #[cfg(target_os = "fuchsia")]
-    vmo: Option<Arc<zx::Vmo>>,
+    storage: Option<<Container as ReadableBlockContainer>::BackingStorage>,
 }
 
 impl Default for InspectorConfig {
@@ -184,12 +180,7 @@ impl Default for InspectorConfig {
     /// Because the default is so cheap to construct, there is
     /// no "empty" `InspectorConfig`.
     fn default() -> Self {
-        Self {
-            is_no_op: false,
-            size: constants::DEFAULT_VMO_SIZE_BYTES,
-            #[cfg(target_os = "fuchsia")]
-            vmo: None,
-        }
+        Self { is_no_op: false, size: constants::DEFAULT_VMO_SIZE_BYTES, storage: None }
     }
 }
 
@@ -207,11 +198,7 @@ impl InspectorConfig {
     }
 
     fn create_no_op(self) -> Inspector {
-        return Inspector {
-            #[cfg(target_os = "fuchsia")]
-            vmo: self.vmo,
-            root_node: Arc::new(Node::new_no_op()),
-        };
+        return Inspector { storage: self.storage, root_node: Arc::new(Node::new_no_op()) };
     }
 
     fn adjusted_buffer_size(max_size: usize) -> usize {
@@ -231,7 +218,7 @@ impl InspectorConfig {
     /// An Inspector with a readable VMO.
     /// Implicitly no-op.
     pub fn vmo(mut self, vmo: Arc<zx::Vmo>) -> Self {
-        self.vmo = Some(vmo);
+        self.storage = Some(vmo);
         self.no_op()
     }
 
@@ -241,7 +228,9 @@ impl InspectorConfig {
         }
 
         match Self::new_root(self.size) {
-            Ok((vmo, root_node)) => Inspector { vmo: Some(vmo), root_node: Arc::new(root_node) },
+            Ok((storage, root_node)) => {
+                Inspector { storage: Some(storage), root_node: Arc::new(root_node) }
+            }
             Err(e) => {
                 error!("Failed to create root node. Error: {:?}", e);
                 return Self::create_no_op(self);
@@ -250,12 +239,14 @@ impl InspectorConfig {
     }
 
     /// Allocates a new VMO and initializes it.
-    fn new_root(max_size: usize) -> Result<(Arc<zx::Vmo>, Node), Error> {
+    fn new_root(
+        max_size: usize,
+    ) -> Result<(<Container as ReadableBlockContainer>::BackingStorage, Node), Error> {
         let size = Self::adjusted_buffer_size(max_size);
-        let (mapping, vmo) = Mapping::allocate_with_name(size, "InspectHeap")
-            .map_err(|status| Error::AllocateVmo(status))?;
-        let vmo = Arc::new(vmo);
-        let heap = Heap::new(Arc::new(mapping)).map_err(|e| Error::CreateHeap(Box::new(e)))?;
+        let (container, vmo) = Container::read_and_write(size).map_err(Error::AllocateVmo)?;
+        let cname = std::ffi::CString::new("InspectHeap").unwrap();
+        vmo.set_name(&cname).map_err(Error::AllocateVmo)?;
+        let heap = Heap::new(container).map_err(|e| Error::CreateHeap(Box::new(e)))?;
         let state =
             State::create(heap, vmo.clone()).map_err(|e| Error::CreateState(Box::new(e)))?;
         Ok((vmo, Node::new_root(state)))
@@ -270,7 +261,9 @@ impl InspectorConfig {
         }
 
         match Self::new_root(self.size) {
-            Ok(root_node) => Inspector { root_node: Arc::new(root_node) },
+            Ok((root_node, storage)) => {
+                Inspector { storage: Some(storage), root_node: Arc::new(root_node) }
+            }
             Err(e) => {
                 error!("Failed to create root node. Error: {:?}", e);
                 return Self::create_no_op(self);
@@ -278,14 +271,15 @@ impl InspectorConfig {
         }
     }
 
-    fn new_root(max_size: usize) -> Result<Node, Error> {
+    fn new_root(
+        max_size: usize,
+    ) -> Result<(Node, <Container as ReadableBlockContainer>::BackingStorage), Error> {
         let size = Self::adjusted_buffer_size(max_size);
-        let mut backer = Vec::<u8>::new();
-        backer.resize(size, 0);
-        let heap =
-            Heap::new(Arc::new(Mutex::new(backer))).map_err(|e| Error::CreateHeap(Box::new(e)))?;
-        let state = State::create(heap).map_err(|e| Error::CreateState(Box::new(e)))?;
-        Ok(Node::new_root(state))
+        let (container, storage) = Container::read_and_write(size).unwrap();
+        let heap = Heap::new(container).map_err(|e| Error::CreateHeap(Box::new(e)))?;
+        let state =
+            State::create(heap, storage.clone()).map_err(|e| Error::CreateState(Box::new(e)))?;
+        Ok((Node::new_root(state), storage))
     }
 }
 
@@ -398,7 +392,7 @@ mod fuchsia_tests {
     fn inspector_duplicate_vmo() {
         let test_object = Inspector::default();
         assert_eq!(
-            test_object.vmo.as_ref().unwrap().get_size().unwrap(),
+            test_object.storage.as_ref().unwrap().get_size().unwrap(),
             constants::DEFAULT_VMO_SIZE_BYTES as u64
         );
         assert_eq!(
@@ -420,7 +414,7 @@ mod fuchsia_tests {
     #[fuchsia::test]
     fn freeze_vmo_works() {
         let inspector = Inspector::default();
-        let initial = inspector.state().unwrap().header.header_generation_count().unwrap();
+        let initial = inspector.state().unwrap().generation_count();
         let vmo = inspector.frozen_vmo_copy();
 
         let is_frozen_result = inspector.is_frozen();
@@ -454,7 +448,7 @@ mod fuchsia_tests {
 
         assert_eq!(
             CString::new("InspectHeap").unwrap(),
-            test_object.vmo.as_ref().unwrap().get_name().expect("Has name")
+            test_object.storage.as_ref().unwrap().get_name().expect("Has name")
         );
 
         // If size is not a multiple of 4096, it'll be rounded up.

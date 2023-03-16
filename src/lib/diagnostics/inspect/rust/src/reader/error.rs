@@ -7,9 +7,6 @@ use diagnostics_hierarchy::Error as HierarchyError;
 use inspect_format::{BlockIndex, BlockType, Error as FormatError};
 use thiserror::Error;
 
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
-
 #[derive(Debug, Error)]
 pub enum ReaderError {
     #[error("FIDL error")]
@@ -54,9 +51,13 @@ pub enum ReaderError {
     #[error("Cannot read from no-op Inspector")]
     NoOpInspector,
 
-    #[error("Failed to call vmo")]
     #[cfg(target_os = "fuchsia")]
-    Vmo(zx::Status),
+    #[error("Failed to call vmo")]
+    Vmo(fuchsia_zircon::Status),
+
+    #[cfg(not(target_os = "fuchsia"))]
+    #[error("Failed to call vmo")]
+    Vmo(()),
 
     #[error("Error creating node hierarchy")]
     Hierarchy(#[source] HierarchyError),

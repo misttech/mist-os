@@ -910,14 +910,14 @@ mod fuchsia_tests {
     use super::*;
     use crate::{assert_json_diff, hierarchy::DiagnosticsHierarchy, reader, NumericProperty};
     use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
-    use std::convert::TryFrom;
+    use std::{convert::TryFrom, sync::Arc};
 
     #[fuchsia::test]
     async fn atomic_update_reader() {
         let inspector = Inspector::default();
 
         // Spawn a read thread that holds a duplicate handle to the VMO that will be written.
-        let vmo = inspector.duplicate_vmo().expect("duplicate vmo handle");
+        let vmo = Arc::new(inspector.duplicate_vmo().expect("duplicate vmo handle"));
         let (p1, p2) = zx::EventPair::create();
 
         macro_rules! notify_and_wait_reader {
@@ -941,28 +941,28 @@ mod fuchsia_tests {
             // Before running the atomic update.
             wait_and_notify_writer! {{
                 let hierarchy: DiagnosticsHierarchy<String> =
-                    reader::PartialNodeHierarchy::try_from(&vmo).unwrap().into();
+                    reader::PartialNodeHierarchy::try_from(vmo.as_ref()).unwrap().into();
                 assert_eq!(hierarchy, DiagnosticsHierarchy::new_root());
             }};
             // After: create_child("child"): Assert that the VMO is in use (locked) and we can't
             // read.
             wait_and_notify_writer! {{
-                assert!(reader::PartialNodeHierarchy::try_from(&vmo).is_err());
+                assert!(reader::PartialNodeHierarchy::try_from(vmo.as_ref()).is_err());
             }};
             // After: record_int("a"): Assert that the VMO is in use (locked) and we can't
             // read.
             wait_and_notify_writer! {{
-                assert!(reader::PartialNodeHierarchy::try_from(&vmo).is_err());
+                assert!(reader::PartialNodeHierarchy::try_from(vmo.as_ref()).is_err());
             }};
             // After: record_int("b"): Assert that the VMO is in use (locked) and we can't
             // read.
             wait_and_notify_writer! {{
-                assert!(reader::PartialNodeHierarchy::try_from(&vmo).is_err());
+                assert!(reader::PartialNodeHierarchy::try_from(vmo.as_ref()).is_err());
             }};
             // After atomic update
             wait_and_notify_writer! {{
                 let hierarchy: DiagnosticsHierarchy<String> =
-                    reader::PartialNodeHierarchy::try_from(&vmo).unwrap().into();
+                    reader::PartialNodeHierarchy::try_from(vmo.as_ref()).unwrap().into();
                 assert_json_diff!(hierarchy, root: {
                    value: 2i64,
                    child: {

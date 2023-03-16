@@ -9,7 +9,7 @@ use crate::{
     block_index::BlockIndex,
     block_type::BlockType,
     constants,
-    container::{BlockContainerEq, ReadableBlockContainer, WritableBlockContainer},
+    container::{PtrEq, ReadBytes, WriteBytes},
     error::Error,
     utils,
 };
@@ -45,8 +45,9 @@ pub struct Block<T> {
     container: T,
 }
 
-impl<T: ReadableBlockContainer> Block<T> {
+impl<T: ReadBytes> Block<T> {
     /// Creates a new block.
+    #[inline]
     pub fn new(container: T, index: BlockIndex) -> Self {
         Block { container, index }
     }
@@ -87,7 +88,7 @@ impl<T: ReadableBlockContainer> Block<T> {
             return Ok(None);
         }
         let mut bytes = [0u8; 4];
-        self.container.read_bytes((self.index + 1).offset(), &mut bytes);
+        self.container.read_at((self.index + 1).offset(), &mut bytes);
         Ok(Some(u32::from_le_bytes(bytes)))
     }
 
@@ -153,7 +154,7 @@ impl<T: ReadableBlockContainer> Block<T> {
         self.check_type(BlockType::Extent)?;
         let length = utils::payload_size_for_order(self.order());
         let mut bytes = vec![0u8; length];
-        self.container.read_bytes(self.payload_offset(), &mut bytes);
+        self.container.read_at(self.payload_offset(), &mut bytes);
         Ok(bytes)
     }
 
@@ -201,7 +202,7 @@ impl<T: ReadableBlockContainer> Block<T> {
             .ok_or(Error::InvalidArrayType(self.index()))?;
         let mut bytes = vec![0u8; entry_type_size];
         self.container
-            .read_bytes((self.index + 1).offset() + slot_index * entry_type_size, &mut bytes);
+            .read_at((self.index + 1).offset() + slot_index * entry_type_size, &mut bytes);
         Ok(BlockIndex::new(u32::from_le_bytes(bytes.try_into().unwrap())))
     }
 
@@ -210,7 +211,7 @@ impl<T: ReadableBlockContainer> Block<T> {
         self.check_array_entry_type(BlockType::IntValue)?;
         self.check_array_index(slot_index)?;
         let mut bytes = [0u8; 8];
-        self.container.read_bytes((self.index + 1).offset() + slot_index * 8, &mut bytes);
+        self.container.read_at((self.index + 1).offset() + slot_index * 8, &mut bytes);
         Ok(i64::from_le_bytes(bytes))
     }
 
@@ -219,7 +220,7 @@ impl<T: ReadableBlockContainer> Block<T> {
         self.check_array_entry_type(BlockType::DoubleValue)?;
         self.check_array_index(slot_index)?;
         let mut bytes = [0u8; 8];
-        self.container.read_bytes((self.index + 1).offset() + slot_index * 8, &mut bytes);
+        self.container.read_at((self.index + 1).offset() + slot_index * 8, &mut bytes);
         Ok(f64::from_bits(u64::from_le_bytes(bytes)))
     }
 
@@ -228,7 +229,7 @@ impl<T: ReadableBlockContainer> Block<T> {
         self.check_array_entry_type(BlockType::UintValue)?;
         self.check_array_index(slot_index)?;
         let mut bytes = [0u8; 8];
-        self.container.read_bytes((self.index + 1).offset() + slot_index * 8, &mut bytes);
+        self.container.read_at((self.index + 1).offset() + slot_index * 8, &mut bytes);
         Ok(u64::from_le_bytes(bytes))
     }
 
@@ -314,7 +315,7 @@ impl<T: ReadableBlockContainer> Block<T> {
         self.check_type(BlockType::Name)?;
         let length = self.name_length()?;
         let mut bytes = vec![0u8; length];
-        self.container.read_bytes(self.payload_offset(), &mut bytes);
+        self.container.read_at(self.payload_offset(), &mut bytes);
         Ok(String::from(std::str::from_utf8(&bytes).map_err(|_| Error::NameNotUtf8)?))
     }
 
@@ -332,7 +333,7 @@ impl<T: ReadableBlockContainer> Block<T> {
             - constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES;
         let length = self.total_length()?;
         let mut bytes = vec![0u8; min(length, max_len_inlined)];
-        self.container.read_bytes(
+        self.container.read_at(
             self.payload_offset() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
             &mut bytes,
         );
@@ -368,7 +369,7 @@ impl<T: ReadableBlockContainer> Block<T> {
     ) -> Result<(), Error> {
         if cfg!(debug_assertions) {
             let mut fill = [0u8; constants::MIN_ORDER_SIZE];
-            self.container.read_bytes(index_to_check.offset(), &mut fill);
+            self.container.read_at(index_to_check.offset(), &mut fill);
             let block = Block::new(&fill[..], 0.into());
             return block.check_type(block_type);
         }
@@ -390,14 +391,14 @@ impl<T: ReadableBlockContainer> Block<T> {
     /// Get the block header.
     fn read_header(&self) -> BlockHeader {
         let mut bytes = [0u8; 8];
-        self.container.read_bytes(self.header_offset(), &mut bytes);
+        self.container.read_at(self.header_offset(), &mut bytes);
         BlockHeader(u64::from_le_bytes(bytes))
     }
 
     /// Get the block payload.
     fn read_payload(&self) -> Payload {
         let mut bytes = [0u8; 8];
-        self.container.read_bytes(self.payload_offset(), &mut bytes);
+        self.container.read_at(self.payload_offset(), &mut bytes);
         Payload(u64::from_le_bytes(bytes))
     }
 
@@ -451,7 +452,7 @@ impl<T: ReadableBlockContainer> Block<T> {
     }
 }
 
-impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Block<T> {
+impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Initializes an empty free block.
     pub fn new_free(
         container: T,
@@ -466,7 +467,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
         header.set_order(order.to_u8().unwrap());
         header.set_block_type(BlockType::Free.to_u8().unwrap());
         header.set_free_next_index(*next_free);
-        let block = Block::new(container, index);
+        let mut block = Block::new(container, index);
         block.write_header(header);
         Ok(block)
     }
@@ -481,7 +482,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Set the order of the block.
-    pub fn set_order(&self, order: usize) -> Result<(), Error> {
+    pub fn set_order(&mut self, order: usize) -> Result<(), Error> {
         if order >= constants::NUM_ORDERS {
             return Err(Error::InvalidBlockOrder(order));
         }
@@ -507,7 +508,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Allows to set the magic value of the header.
     /// NOTE: this should only be used for testing.
-    pub fn set_header_magic(&self, value: u32) -> Result<(), Error> {
+    pub fn set_header_magic(&mut self, value: u32) -> Result<(), Error> {
         self.check_type(BlockType::Header)?;
         let mut header = self.read_header();
         header.set_header_magic(value);
@@ -517,13 +518,12 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Set the size of the part of the VMO that is currently allocated. The size is saved in
     /// a field in the HEADER block.
-    pub fn set_header_vmo_size(&self, size: u32) -> Result<(), Error> {
+    pub fn set_header_vmo_size(&mut self, size: u32) -> Result<(), Error> {
         self.check_type(BlockType::Header)?;
         if self.order() != constants::HEADER_ORDER as usize {
             return Ok(());
         }
-        let bytes_written =
-            self.container.write_bytes((self.index + 1).offset(), &size.to_le_bytes());
+        let bytes_written = self.container.write_at((self.index + 1).offset(), &size.to_le_bytes());
         if bytes_written != 4 {
             return Err(Error::SizeNotWritten(size));
         }
@@ -531,7 +531,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Freeze the HEADER, indicating a VMO is frozen.
-    pub fn freeze_header(&self) -> Result<u64, Error> {
+    pub fn freeze_header(&mut self) -> Result<u64, Error> {
         self.check_type(BlockType::Header)?;
         let mut payload = self.read_payload();
         let value = payload.header_generation_count();
@@ -541,7 +541,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Thaw the HEADER, indicating a VMO is Live again.
-    pub fn thaw_header(&self, gen: u64) -> Result<(), Error> {
+    pub fn thaw_header(&mut self, gen: u64) -> Result<(), Error> {
         self.check_type(BlockType::Header)?;
         let mut payload = Payload(0);
         payload.set_header_generation_count(gen);
@@ -550,7 +550,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Lock a HEADER block
-    pub fn lock_header(&self) -> Result<(), Error> {
+    pub fn lock_header(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::Header)?;
         self.check_locked(false)?;
         self.increment_generation_count();
@@ -559,7 +559,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Unlock a HEADER block
-    pub fn unlock_header(&self) -> Result<(), Error> {
+    pub fn unlock_header(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::Header)?;
         self.check_locked(true)?;
         fence(Ordering::Release);
@@ -568,7 +568,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Initializes a TOMBSTONE block.
-    pub fn become_tombstone(&self) -> Result<(), Error> {
+    pub fn become_tombstone(&mut self) -> Result<(), Error> {
         let header = self.read_header();
         self.check_type_eq(header.block_type(), BlockType::NodeValue)?;
         let mut new_header = BlockHeader(0);
@@ -579,7 +579,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Converts a FREE block to a RESERVED block
-    pub fn become_reserved(&self) -> Result<(), Error> {
+    pub fn become_reserved(&mut self) -> Result<(), Error> {
         let header = self.read_header();
         self.check_type_eq(header.block_type(), BlockType::Free)?;
         let mut new_header = BlockHeader(0);
@@ -589,26 +589,19 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
         Ok(())
     }
 
-    // TODO(fxbug.dev/39975): Uncomment or delete the next line depending on fxbug.dev/40012.
-    // const ZERO_BUFFER: [u8; 2048] = [0; constants::MAX_ORDER_SIZE];
-
     /// Converts a block to a FREE block
-    pub fn become_free(&self, next: BlockIndex) {
+    pub fn become_free(&mut self, next: BlockIndex) {
         let header = self.read_header();
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
         new_header.set_block_type(BlockType::Free.to_u8().unwrap());
         new_header.set_free_next_index(*next);
         self.write_header(new_header);
-        // TODO(fxbug.dev/39975): Uncomment or delete the next lines depending on the resolution of
-        // fxbug.dev/40012. They've been verified to pass the Validator test for cleared Free payload.
-        //self.container.write_bytes((self.index).offset() + 8,
-        //    &Self::ZERO_BUFFER[..utils::payload_size_for_order(self.order())]);
     }
 
     /// Converts a block to an *_ARRAY_VALUE block
     pub fn become_array_value(
-        &self,
+        &mut self,
         slots: usize,
         format: ArrayFormat,
         entry_type: BlockType,
@@ -633,25 +626,24 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
         Ok(())
     }
 
-    fn array_entry_type_size(&self) -> Result<usize, Error> {
+    fn array_entry_type_size(&mut self) -> Result<usize, Error> {
         self.array_entry_type().map(|block_type| {
             block_type.array_element_size().ok_or(Error::InvalidArrayType(self.index()))
         })?
     }
 
     /// Sets all values of the array to zero starting on `start_slot_index` (inclusive).
-    pub fn array_clear(&self, start_slot_index: usize) -> Result<(), Error> {
+    pub fn array_clear(&mut self, start_slot_index: usize) -> Result<(), Error> {
         let array_slots = self.array_slots()? - start_slot_index;
         let type_size = self.array_entry_type_size()?;
         let values = vec![0u8; array_slots * type_size];
-        self.container
-            .write_bytes((self.index + 1).offset() + start_slot_index * type_size, &values);
+        self.container.write_at((self.index + 1).offset() + start_slot_index * type_size, &values);
         Ok(())
     }
 
     /// Sets the value of a string ARRAY_VALUE block.
     pub fn array_set_string_slot(
-        &self,
+        &mut self,
         slot_index: usize,
         string_index: BlockIndex,
     ) -> Result<(), Error> {
@@ -663,7 +655,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
         }
 
         let type_size = self.array_entry_type_size()?;
-        self.container.write_bytes(
+        self.container.write_at(
             (self.index + 1).offset() + slot_index * type_size,
             &string_index.to_le_bytes(),
         );
@@ -672,21 +664,21 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the value of an int ARRAY_VALUE block.
-    pub fn array_set_int_slot(&self, slot_index: usize, value: i64) -> Result<(), Error> {
+    pub fn array_set_int_slot(&mut self, slot_index: usize, value: i64) -> Result<(), Error> {
         self.check_array_entry_type(BlockType::IntValue)?;
         self.check_array_index(slot_index)?;
         let type_size = self.array_entry_type_size()?;
         self.container
-            .write_bytes((self.index + 1).offset() + slot_index * type_size, &value.to_le_bytes());
+            .write_at((self.index + 1).offset() + slot_index * type_size, &value.to_le_bytes());
         Ok(())
     }
 
     /// Sets the value of a double ARRAY_VALUE block.
-    pub fn array_set_double_slot(&self, slot_index: usize, value: f64) -> Result<(), Error> {
+    pub fn array_set_double_slot(&mut self, slot_index: usize, value: f64) -> Result<(), Error> {
         self.check_array_entry_type(BlockType::DoubleValue)?;
         self.check_array_index(slot_index)?;
         let type_size = self.array_entry_type_size()?;
-        self.container.write_bytes(
+        self.container.write_at(
             (self.index + 1).offset() + slot_index * type_size,
             &value.to_bits().to_le_bytes(),
         );
@@ -694,17 +686,17 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the value of a uint ARRAY_VALUE block.
-    pub fn array_set_uint_slot(&self, slot_index: usize, value: u64) -> Result<(), Error> {
+    pub fn array_set_uint_slot(&mut self, slot_index: usize, value: u64) -> Result<(), Error> {
         self.check_array_entry_type(BlockType::UintValue)?;
         self.check_array_index(slot_index)?;
         let type_size = self.array_entry_type_size()?;
         self.container
-            .write_bytes((self.index + 1).offset() + slot_index * type_size, &value.to_le_bytes());
+            .write_at((self.index + 1).offset() + slot_index * type_size, &value.to_le_bytes());
         Ok(())
     }
 
     /// Converts a block to an EXTENT block.
-    pub fn become_extent(&self, next_extent_index: BlockIndex) -> Result<(), Error> {
+    pub fn become_extent(&mut self, next_extent_index: BlockIndex) -> Result<(), Error> {
         self.check_type(BlockType::Reserved)?;
         let mut header = self.read_header();
         header.set_block_type(BlockType::Extent.to_u8().unwrap());
@@ -714,7 +706,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the index of the next EXTENT in the chain.
-    pub fn set_extent_next_index(&self, next_extent_index: BlockIndex) -> Result<(), Error> {
+    pub fn set_extent_next_index(&mut self, next_extent_index: BlockIndex) -> Result<(), Error> {
         self.check_multi_type(&[BlockType::Extent, BlockType::StringReference])?;
         let mut header = self.read_header();
         header.set_extent_next_index(*next_extent_index);
@@ -723,7 +715,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Set the payload of an EXTENT block. The number of bytes written will be returned.
-    pub fn extent_set_contents(&self, value: &[u8]) -> Result<usize, Error> {
+    pub fn extent_set_contents(&mut self, value: &[u8]) -> Result<usize, Error> {
         self.check_type(BlockType::Extent)?;
         let max_bytes = utils::payload_size_for_order(self.order());
         let mut bytes = value;
@@ -736,7 +728,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Converts a RESERVED block into a DOUBLE_VALUE block.
     pub fn become_double_value(
-        &self,
+        &mut self,
         value: f64,
         name_index: BlockIndex,
         parent_index: BlockIndex,
@@ -746,7 +738,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the value of a DOUBLE_VALUE block.
-    pub fn set_double_value(&self, value: f64) -> Result<(), Error> {
+    pub fn set_double_value(&mut self, value: f64) -> Result<(), Error> {
         self.check_type(BlockType::DoubleValue)?;
         let mut payload = Payload(0);
         payload.set_numeric_value(value.to_bits());
@@ -756,7 +748,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Converts a RESERVED block into a INT_VALUE block.
     pub fn become_int_value(
-        &self,
+        &mut self,
         value: i64,
         name_index: BlockIndex,
         parent_index: BlockIndex,
@@ -766,7 +758,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the value of an INT_VALUE block.
-    pub fn set_int_value(&self, value: i64) -> Result<(), Error> {
+    pub fn set_int_value(&mut self, value: i64) -> Result<(), Error> {
         self.check_type(BlockType::IntValue)?;
         let mut payload = Payload(0);
         payload.set_numeric_value(LittleEndian::read_u64(&value.to_le_bytes()));
@@ -776,7 +768,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Converts a block into a UINT_VALUE block.
     pub fn become_uint_value(
-        &self,
+        &mut self,
         value: u64,
         name_index: BlockIndex,
         parent_index: BlockIndex,
@@ -786,7 +778,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the value of a UINT_VALUE block.
-    pub fn set_uint_value(&self, value: u64) -> Result<(), Error> {
+    pub fn set_uint_value(&mut self, value: u64) -> Result<(), Error> {
         self.check_type(BlockType::UintValue)?;
         let mut payload = Payload(0);
         payload.set_numeric_value(value);
@@ -796,7 +788,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Converts a block into a BOOL_VALUE block.
     pub fn become_bool_value(
-        &self,
+        &mut self,
         value: bool,
         name_index: BlockIndex,
         parent_index: BlockIndex,
@@ -806,7 +798,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the value of a BOOL_VALUE block.
-    pub fn set_bool_value(&self, value: bool) -> Result<(), Error> {
+    pub fn set_bool_value(&mut self, value: bool) -> Result<(), Error> {
         self.check_type(BlockType::BoolValue)?;
         let mut payload = Payload(0);
         payload.set_numeric_value(value as u64);
@@ -816,7 +808,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Initializes a NODE_VALUE block.
     pub fn become_node(
-        &self,
+        &mut self,
         name_index: BlockIndex,
         parent_index: BlockIndex,
     ) -> Result<(), Error> {
@@ -827,7 +819,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Converts a *_VALUE block into a BUFFER_VALUE block.
     pub fn become_property(
-        &self,
+        &mut self,
         name_index: BlockIndex,
         parent_index: BlockIndex,
         format: PropertyFormat,
@@ -841,7 +833,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Initializes a STRING_REFERENCE block. Everything is set except for
     /// the payload string and total length.
-    pub fn become_string_reference(&self) -> Result<(), Error> {
+    pub fn become_string_reference(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::Reserved)?;
         let header = self.read_header();
         let mut new_header = BlockHeader(0);
@@ -854,7 +846,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the total length of a BUFFER_VALUE or STRING_REFERENCE block.
-    pub fn set_total_length(&self, length: u32) -> Result<(), Error> {
+    pub fn set_total_length(&mut self, length: u32) -> Result<(), Error> {
         self.check_multi_type(&[BlockType::BufferValue, BlockType::StringReference])?;
         let mut payload = self.read_payload();
         payload.set_total_length(length);
@@ -863,7 +855,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Sets the index of the EXTENT of a BUFFER_VALUE block.
-    pub fn set_property_extent_index(&self, index: BlockIndex) -> Result<(), Error> {
+    pub fn set_property_extent_index(&mut self, index: BlockIndex) -> Result<(), Error> {
         self.check_type(BlockType::BufferValue)?;
         let mut payload = self.read_payload();
         payload.set_property_extent_index(*index);
@@ -872,14 +864,14 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Set the child count of a NODE_VALUE block.
-    pub fn set_child_count(&self, count: u64) -> Result<(), Error> {
+    pub fn set_child_count(&mut self, count: u64) -> Result<(), Error> {
         self.check_multi_type(&[BlockType::NodeValue, BlockType::Tombstone])?;
         self.write_payload(Payload(count));
         Ok(())
     }
 
     /// Increment the reference count by 1.
-    pub fn increment_string_reference_count(&self) -> Result<(), Error> {
+    pub fn increment_string_reference_count(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::StringReference)?;
         let mut header = self.read_header();
         let cur = header.string_reference_count();
@@ -891,7 +883,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Decrement the reference count by 1.
-    pub fn decrement_string_reference_count(&self) -> Result<(), Error> {
+    pub fn decrement_string_reference_count(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::StringReference)?;
         let mut header = self.read_header();
         let cur = header.string_reference_count();
@@ -905,7 +897,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     /// Write the portion of the string that fits into the STRING_REFERENCE block,
     /// as well as write the total length of value to the block.
     /// Returns the number of bytes written.
-    pub fn write_string_reference_inline(&self, value: &[u8]) -> Result<usize, Error> {
+    pub fn write_string_reference_inline(&mut self, value: &[u8]) -> Result<usize, Error> {
         self.check_type(BlockType::StringReference)?;
         self.set_total_length(value.len() as u32)?;
         let max_len = utils::payload_size_for_order(self.order())
@@ -913,14 +905,14 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
         // we do not care about splitting multibyte UTF-8 characters, because the rest
         // of the split will go in an extent and be joined together at read time.
         let to_inline = &value[..min(value.len(), max_len)];
-        Ok(self.container.write_bytes(
+        Ok(self.container.write_at(
             self.payload_offset() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
             to_inline,
         ))
     }
 
     /// Creates a NAME block.
-    pub fn become_name(&self, name: &str) -> Result<(), Error> {
+    pub fn become_name(&mut self, name: &str) -> Result<(), Error> {
         self.check_type(BlockType::Reserved)?;
         let mut bytes = name.as_bytes();
         let max_len = utils::payload_size_for_order(self.order());
@@ -940,7 +932,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Set the next free block.
-    pub fn set_free_next_index(&self, next_free: BlockIndex) -> Result<(), Error> {
+    pub fn set_free_next_index(&mut self, next_free: BlockIndex) -> Result<(), Error> {
         self.check_type(BlockType::Free)?;
         let mut header = self.read_header();
         header.set_free_next_index(*next_free);
@@ -950,7 +942,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Creates a LINK block.
     pub fn become_link(
-        &self,
+        &mut self,
         name_index: BlockIndex,
         parent_index: BlockIndex,
         content_index: BlockIndex,
@@ -964,7 +956,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
         Ok(())
     }
 
-    pub fn set_parent(&self, new_parent_index: BlockIndex) -> Result<(), Error> {
+    pub fn set_parent(&mut self, new_parent_index: BlockIndex) -> Result<(), Error> {
         self.check_any_value()?;
         let mut header = self.read_header();
         header.set_value_parent_index(*new_parent_index);
@@ -974,7 +966,7 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 
     /// Initializes a *_VALUE block header.
     fn write_value_header(
-        &self,
+        &mut self,
         block_type: BlockType,
         name_index: BlockIndex,
         parent_index: BlockIndex,
@@ -994,28 +986,28 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
     }
 
     /// Writes the given header and payload to the block in the container.
-    pub fn write(&self, header: BlockHeader, payload: Payload) {
+    pub fn write(&mut self, header: BlockHeader, payload: Payload) {
         self.write_header(header);
         self.write_payload(payload);
     }
 
     /// Writes the given header to the block in the container.
-    fn write_header(&self, header: BlockHeader) {
-        self.container.write_bytes(self.header_offset(), &header.value().to_le_bytes());
+    fn write_header(&mut self, header: BlockHeader) {
+        self.container.write_at(self.header_offset(), &header.value().to_le_bytes());
     }
 
     /// Writes the given payload to the block in the container.
-    fn write_payload(&self, payload: Payload) {
+    fn write_payload(&mut self, payload: Payload) {
         self.write_payload_from_bytes(&payload.value().to_le_bytes());
     }
 
     /// Write |bytes| to the payload section of the block in the container.
-    fn write_payload_from_bytes(&self, bytes: &[u8]) {
-        self.container.write_bytes(self.payload_offset(), bytes);
+    fn write_payload_from_bytes(&mut self, bytes: &[u8]) {
+        self.container.write_at(self.payload_offset(), bytes);
     }
 
     /// Increment generation counter in a HEADER block for locking/unlocking
-    fn increment_generation_count(&self) {
+    fn increment_generation_count(&mut self) {
         let mut payload = self.read_payload();
         let value = payload.header_generation_count();
         let new_value = if value == u64::max_value() { 0 } else { value + 1 };
@@ -1027,16 +1019,24 @@ impl<T: ReadableBlockContainer + WritableBlockContainer + BlockContainerEq> Bloc
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block_index::BlockIndex;
+    use crate::{block_index::BlockIndex, Container, WritableBlockContainer};
     use std::collections::BTreeSet;
     use std::iter::FromIterator;
 
+    macro_rules! assert_8_bytes {
+        ($container:ident, $offset:expr, $expected:expr) => {
+            let mut buffer = [0u8; 8];
+            $container.read_at($offset, &mut buffer);
+            assert_eq!(buffer, $expected);
+        };
+    }
+
     fn create_with_type(
-        container: &[u8],
+        container: &Container,
         index: BlockIndex,
         block_type: BlockType,
-    ) -> Block<&[u8]> {
-        let block = Block::new(container, index);
+    ) -> Block<Container> {
+        let mut block = Block::new(container.clone(), index);
         let mut header = BlockHeader(0);
         header.set_block_type(block_type.to_u8().unwrap());
         header.set_order(2);
@@ -1045,14 +1045,15 @@ mod tests {
     }
 
     fn test_error_types<T>(
-        f: fn(&Block<&[u8]>) -> Result<T, Error>,
+        f: fn(Block<Container>) -> Result<T, Error>,
         error_types: &BTreeSet<BlockType>,
     ) {
         if cfg!(debug_assertions) {
-            let container = [0u8; constants::MIN_ORDER_SIZE * 3];
+            let (container, _storage) =
+                Container::read_and_write(constants::MIN_ORDER_SIZE * 3).unwrap();
             for block_type in BlockType::all().iter() {
-                let block = create_with_type(&container[..], 0.into(), block_type.clone());
-                let result = f(&block);
+                let block = create_with_type(&container, 0.into(), block_type.clone());
+                let result = f(block);
                 if error_types.contains(&block_type) {
                     assert!(result.is_err());
                 } else {
@@ -1062,14 +1063,15 @@ mod tests {
         }
     }
 
-    fn test_ok_types<T: std::fmt::Debug, F: Fn(Block<&[u8]>) -> Result<T, Error>>(
-        f: F,
+    fn test_ok_types<T: std::fmt::Debug, F: FnMut(Block<Container>) -> Result<T, Error>>(
+        mut f: F,
         ok_types: &BTreeSet<BlockType>,
     ) {
         if cfg!(debug_assertions) {
-            let container = [0u8; constants::MIN_ORDER_SIZE * 3];
+            let (container, _storage) =
+                Container::read_and_write(constants::MIN_ORDER_SIZE * 3).unwrap();
             for block_type in BlockType::all().iter() {
-                let block = create_with_type(&container[..], 0.into(), block_type.clone());
+                let block = create_with_type(&container, 0.into(), block_type.clone());
                 let result = f(block);
                 if ok_types.contains(&block_type) {
                     assert!(
@@ -1087,38 +1089,47 @@ mod tests {
 
     #[fuchsia::test]
     fn test_new_free() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        assert!(Block::new_free(&container[..], 3.into(), constants::NUM_ORDERS, 1.into()).is_err());
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        assert!(
+            Block::new_free(container.clone(), 3.into(), constants::NUM_ORDERS, 1.into()).is_err()
+        );
 
-        let res = Block::new_free(&container[..], 0.into(), 3, 1.into());
+        let res = Block::new_free(container.clone(), 0.into(), 3, 1.into());
         assert!(res.is_ok());
         let block = res.unwrap();
         assert_eq!(*block.index(), 0);
         assert_eq!(block.order(), 3);
         assert_eq!(*block.free_next_index().unwrap(), 1);
         assert_eq!(block.block_type(), BlockType::Free);
-        assert_eq!(container[..8], [0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        let mut buffer = [0u8; 8];
+        container.read(&mut buffer);
+        assert_eq!(buffer, [0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        container.read_at(8, &mut buffer);
+        assert_eq!(buffer, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     #[fuchsia::test]
     fn test_block_type_or() {
-        let mut container = [0u8; constants::MIN_ORDER_SIZE];
-        container[1] = 0x02;
-        let block = Block::new(&container[..], 0.into());
+        let (mut container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        container.write_at(1, &[0x02]);
+        let block = Block::new(container, 0.into());
         assert_eq!(block.block_type_or().unwrap(), BlockType::Header);
-        let mut container = [0u8; constants::MIN_ORDER_SIZE];
-        container[1] = 0x0f;
-        let block = Block::new(&container[..], 0.into());
+
+        let (mut container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        container.write_at(1, &[0x0f]);
+        let block = Block::new(container, 0.into());
         assert!(block.block_type_or().is_err());
     }
 
     #[fuchsia::test]
     fn test_swap() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 3];
-        let mut block1 = Block::new_free(&container[..], 0.into(), 1, 2.into()).unwrap();
-        let mut block2 = Block::new_free(&container[..], 1.into(), 1, 0.into()).unwrap();
-        let mut block3 = Block::new_free(&container[..], 2.into(), 3, 4.into()).unwrap();
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 3).unwrap();
+        let mut block1 = Block::new_free(container.clone(), 0.into(), 1, 2.into()).unwrap();
+        let mut block2 = Block::new_free(container.clone(), 1.into(), 1, 0.into()).unwrap();
+        let mut block3 = Block::new_free(container.clone(), 2.into(), 3, 4.into()).unwrap();
 
         // Can't swap with block of different order
         assert!(block1.swap(&mut block3).is_err());
@@ -1138,56 +1149,59 @@ mod tests {
         assert_eq!(block2.block_type(), BlockType::Free);
         assert_eq!(*block2.free_next_index().unwrap(), 2);
 
-        assert_eq!(container[..8], [0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[8..16], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..32], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[32..40], [0x03, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[40..48], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 32, [0x03, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 40, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     #[fuchsia::test]
     fn test_set_order() {
-        test_error_types(move |b| b.set_order(1), &BTreeSet::new());
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = Block::new_free(&container[..], 0.into(), 1, 1.into()).unwrap();
+        test_error_types(move |mut b| b.set_order(1), &BTreeSet::new());
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = Block::new_free(container.clone(), 0.into(), 1, 1.into()).unwrap();
         assert!(block.set_order(3).is_ok());
         assert_eq!(block.order(), 3);
     }
 
     #[fuchsia::test]
     fn test_become_reserved() {
-        test_ok_types(move |b| b.become_reserved(), &BTreeSet::from_iter(vec![BlockType::Free]));
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = Block::new_free(&container[..], 0.into(), 1, 2.into()).unwrap();
+        test_ok_types(
+            move |mut b| b.become_reserved(),
+            &BTreeSet::from_iter(vec![BlockType::Free]),
+        );
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = Block::new_free(container.clone(), 0.into(), 1, 2.into()).unwrap();
         assert!(block.become_reserved().is_ok());
         assert_eq!(block.block_type(), BlockType::Reserved);
-        assert_eq!(container[..8], [0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     #[fuchsia::test]
     fn test_become_string_reference() {
         test_ok_types(
-            move |b| b.become_string_reference(),
+            move |mut b| b.become_string_reference(),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_string_reference().is_ok());
         assert_eq!(block.block_type(), BlockType::StringReference);
         assert_eq!(*block.next_extent().unwrap(), 0);
         assert_eq!(block.string_reference_count().unwrap(), 0);
         assert_eq!(block.total_length().unwrap(), 0);
         assert_eq!(block.inline_string_reference().unwrap(), Vec::<u8>::new());
-        assert_eq!(container[..8], [0x01, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     #[fuchsia::test]
     fn test_inline_string_reference() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         block.set_order(0).unwrap();
         assert!(block.become_string_reference().is_ok());
 
@@ -1225,8 +1239,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_string_reference_count() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         block.set_order(0).unwrap();
         assert!(block.become_string_reference().is_ok());
         assert_eq!(block.string_reference_count().unwrap(), 0);
@@ -1243,7 +1257,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_become_header() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
         let mut block = get_reserved(&container);
         assert!(block.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()).is_ok());
         assert_eq!(block.block_type(), BlockType::Header);
@@ -1255,10 +1270,10 @@ mod tests {
             block.header_vmo_size().unwrap().unwrap() as usize,
             constants::MIN_ORDER_SIZE * 2
         );
-        assert_eq!(container[..8], [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50]);
-        assert_eq!(container[8..16], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         test_ok_types(
             |mut b| b.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()),
@@ -1270,7 +1285,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_freeze_thaw_header() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
         let mut block = get_reserved(&container);
         assert!(block.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()).is_ok());
         assert_eq!(block.block_type(), BlockType::Header);
@@ -1278,57 +1294,58 @@ mod tests {
         assert_eq!(block.order(), constants::HEADER_ORDER as usize);
         assert_eq!(block.header_magic().unwrap(), constants::HEADER_MAGIC_NUMBER);
         assert_eq!(block.header_version().unwrap(), constants::HEADER_VERSION_NUMBER);
-        assert_eq!(container[..8], [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50]);
-        assert_eq!(container[8..16], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         let old = block.freeze_header().unwrap();
-        assert_eq!(container[8..16], [0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
-        assert_eq!(container[16..24], [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert!(block.thaw_header(old).is_ok());
-        assert_eq!(container[8..16], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x020, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x020, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     #[fuchsia::test]
     fn test_lock_unlock_header() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_header(&container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_header(&container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
         let header_bytes: [u8; 8] = [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50];
         // Can't unlock unlocked header.
         assert!(block.unlock_header().is_err());
         assert!(block.lock_header().is_ok());
         assert!(block.header_is_locked().unwrap());
         assert_eq!(block.header_generation_count().unwrap(), 1);
-        assert_eq!(container[..8], header_bytes[..]);
-        assert_eq!(container[8..16], [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, header_bytes[..]);
+        assert_8_bytes!(container, 8, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         // Can't lock locked header.
         assert!(block.lock_header().is_err());
         assert!(block.unlock_header().is_ok());
         assert!(!block.header_is_locked().unwrap());
         assert_eq!(block.header_generation_count().unwrap(), 2);
-        assert_eq!(container[..8], header_bytes[..]);
-        assert_eq!(container[8..16], [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, header_bytes[..]);
+        assert_8_bytes!(container, 8, [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         // Test overflow: set payload bytes to max u64 value. Ensure we cannot lock
         // and after unlocking, the value is zero.
-        (&container[..]).write_bytes(8, &u64::max_value().to_le_bytes());
+        (container.clone()).write_at(8, &u64::max_value().to_le_bytes());
         assert!(block.lock_header().is_err());
         assert!(block.unlock_header().is_ok());
         assert_eq!(block.header_generation_count().unwrap(), 0);
-        assert_eq!(container[..8], header_bytes[..]);
-        assert_eq!(container[8..16], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, header_bytes[..]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         test_ok_types(
-            move |b| {
+            move |mut b| {
                 b.header_generation_count()?;
                 b.lock_header()?;
                 b.unlock_header()
@@ -1339,15 +1356,16 @@ mod tests {
 
     #[fuchsia::test]
     fn test_header_vmo_size() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_header(&container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_header(&container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
         assert!(block
             .set_header_vmo_size(constants::DEFAULT_VMO_SIZE_BYTES.try_into().unwrap())
             .is_ok());
-        assert_eq!(container[..8], [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50]);
-        assert_eq!(container[8..16], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[16..24], [0x00, 0x00, 0x4, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[24..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x00, 0x00, 0x4, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_eq!(
             block.header_vmo_size().unwrap().unwrap() as usize,
             constants::DEFAULT_VMO_SIZE_BYTES
@@ -1358,13 +1376,14 @@ mod tests {
     fn test_header_vmo_size_only_for_header_block() {
         let valid = BTreeSet::from_iter(vec![BlockType::Header]);
         test_ok_types(move |b| b.header_vmo_size(), &valid);
-        test_ok_types(move |b| b.set_header_vmo_size(1), &valid);
+        test_ok_types(move |mut b| b.set_header_vmo_size(1), &valid);
     }
 
     #[fuchsia::test]
     fn test_header_vmo_size_wrong_order() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_header(&container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_header(&container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
         assert!(block
             .set_header_vmo_size(constants::DEFAULT_VMO_SIZE_BYTES.try_into().unwrap())
             .is_ok());
@@ -1380,47 +1399,47 @@ mod tests {
 
     #[fuchsia::test]
     fn test_become_tombstone() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_node(2.into(), 3.into()).is_ok());
         assert!(block.set_child_count(4).is_ok());
         assert!(block.become_tombstone().is_ok());
         assert_eq!(block.block_type(), BlockType::Tombstone);
         assert_eq!(block.child_count().unwrap(), 4);
-        assert_eq!(container[..8], [0x01, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         test_ok_types(
-            move |b| b.become_tombstone(),
+            move |mut b| b.become_tombstone(),
             &BTreeSet::from_iter(vec![BlockType::NodeValue]),
         );
     }
 
     #[fuchsia::test]
     fn test_child_count() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_node(2.into(), 3.into()).is_ok());
-        assert_eq!(container[..8], [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert!(block.set_child_count(4).is_ok());
         assert_eq!(block.child_count().unwrap(), 4);
-        assert_eq!(container[..8], [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         let types = BTreeSet::from_iter(vec![BlockType::Tombstone, BlockType::NodeValue]);
         test_ok_types(move |b| b.child_count(), &types);
-        test_ok_types(move |b| b.set_child_count(3), &types);
+        test_ok_types(move |mut b| b.set_child_count(3), &types);
     }
 
     #[fuchsia::test]
     fn test_free() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = Block::new_free(&container[..], 0.into(), 1, 1.into()).unwrap();
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = Block::new_free(container.clone(), 0.into(), 1, 1.into()).unwrap();
         assert!(block.set_free_next_index(3.into()).is_ok());
         assert_eq!(*block.free_next_index().unwrap(), 3);
-        assert_eq!(container[..8], [0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         test_error_types(
-            move |b| {
+            move |mut b| {
                 b.become_free(1.into());
                 Ok(())
             },
@@ -1430,27 +1449,32 @@ mod tests {
 
     #[fuchsia::test]
     fn test_extent() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_reserved(&container);
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_extent(3.into()).is_ok());
         assert_eq!(block.block_type(), BlockType::Extent);
         assert_eq!(*block.next_extent().unwrap(), 3);
-        assert_eq!(container[..8], [0x01, 0x08, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(container[8..16], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x08, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         assert_eq!(block.extent_set_contents(&"test-rust-inspect".as_bytes()).unwrap(), 17);
         assert_eq!(
             String::from_utf8(block.extent_contents().unwrap()).unwrap(),
             "test-rust-inspect\0\0\0\0\0\0\0"
         );
-        assert_eq!(&container[8..25], "test-rust-inspect".as_bytes());
-        assert_eq!(container[25..], [0, 0, 0, 0, 0, 0, 0]);
+        let mut buffer = [0u8; 17];
+        container.read_at(8, &mut buffer);
+        assert_eq!(buffer, "test-rust-inspect".as_bytes());
+        let mut buffer = [0u8; 7];
+        container.read_at(25, &mut buffer);
+        assert_eq!(buffer, [0, 0, 0, 0, 0, 0, 0]);
 
         assert!(block.set_extent_next_index(4.into()).is_ok());
         assert_eq!(*block.next_extent().unwrap(), 4);
 
         test_ok_types(
-            move |b| b.become_extent(1.into()),
+            move |mut b| b.become_extent(1.into()),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
         test_ok_types(
@@ -1458,11 +1482,11 @@ mod tests {
             &BTreeSet::from_iter(vec![BlockType::Extent, BlockType::StringReference]),
         );
         test_ok_types(
-            move |b| b.set_extent_next_index(4.into()),
+            move |mut b| b.set_extent_next_index(4.into()),
             &BTreeSet::from_iter(vec![BlockType::Extent, BlockType::StringReference]),
         );
         test_ok_types(
-            move |b| b.extent_set_contents(&"test".as_bytes()),
+            move |mut b| b.extent_set_contents(&"test".as_bytes()),
             &BTreeSet::from_iter(vec![BlockType::Extent]),
         );
     }
@@ -1485,26 +1509,26 @@ mod tests {
 
     #[fuchsia::test]
     fn test_double_value() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_double_value(1.0, 2.into(), 3.into()).is_ok());
         assert_eq!(block.block_type(), BlockType::DoubleValue);
         assert_eq!(*block.name_index().unwrap(), 2);
         assert_eq!(*block.parent_index().unwrap(), 3);
         assert_eq!(block.double_value().unwrap(), 1.0);
-        assert_eq!(container[..8], [0x01, 0x06, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f]);
+        assert_8_bytes!(container, 0, [0x01, 0x06, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f]);
 
         assert!(block.set_double_value(5.0).is_ok());
         assert_eq!(block.double_value().unwrap(), 5.0);
-        assert_eq!(container[..8], [0x01, 0x06, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x40]);
+        assert_8_bytes!(container, 0, [0x01, 0x06, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x40]);
 
         let types = BTreeSet::from_iter(vec![BlockType::DoubleValue]);
         test_ok_types(move |b| b.double_value(), &types);
-        test_ok_types(move |b| b.set_double_value(3.0), &types);
+        test_ok_types(move |mut b| b.set_double_value(3.0), &types);
         test_ok_types(
-            move |b| b.become_double_value(1.0, 1.into(), 2.into()),
+            move |mut b| b.become_double_value(1.0, 1.into(), 2.into()),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
     }
@@ -1512,52 +1536,52 @@ mod tests {
     #[fuchsia::test]
     fn test_int_value() {
         test_ok_types(
-            move |b| b.become_int_value(1, 1.into(), 2.into()),
+            move |mut b| b.become_int_value(1, 1.into(), 2.into()),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_int_value(1, 2.into(), 3.into()).is_ok());
         assert_eq!(block.block_type(), BlockType::IntValue);
         assert_eq!(*block.name_index().unwrap(), 2);
         assert_eq!(*block.parent_index().unwrap(), 3);
         assert_eq!(block.int_value().unwrap(), 1);
-        assert_eq!(container[..8], [0x1, 0x04, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x1, 0x04, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         assert!(block.set_int_value(-5).is_ok());
         assert_eq!(block.int_value().unwrap(), -5);
-        assert_eq!(container[..8], [0x1, 0x04, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0xfb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        assert_8_bytes!(container, 0, [0x1, 0x04, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0xfb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
 
         let types = BTreeSet::from_iter(vec![BlockType::IntValue]);
         test_ok_types(move |b| b.int_value(), &types);
-        test_ok_types(move |b| b.set_int_value(3), &types);
+        test_ok_types(move |mut b| b.set_int_value(3), &types);
     }
 
     #[fuchsia::test]
     fn test_uint_value() {
         test_ok_types(
-            move |b| b.become_uint_value(1, 1.into(), 2.into()),
+            move |mut b| b.become_uint_value(1, 1.into(), 2.into()),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_uint_value(1, 2.into(), 3.into()).is_ok());
         assert_eq!(block.block_type(), BlockType::UintValue);
         assert_eq!(*block.name_index().unwrap(), 2);
         assert_eq!(*block.parent_index().unwrap(), 3);
         assert_eq!(block.uint_value().unwrap(), 1);
-        assert_eq!(container[..8], [0x01, 0x05, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x05, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         assert!(block.set_uint_value(5).is_ok());
         assert_eq!(block.uint_value().unwrap(), 5);
-        assert_eq!(container[..8], [0x01, 0x05, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x05, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         test_ok_types(move |b| b.uint_value(), &BTreeSet::from_iter(vec![BlockType::UintValue]));
         test_ok_types(
-            move |b| b.set_uint_value(3),
+            move |mut b| b.set_uint_value(3),
             &BTreeSet::from_iter(vec![BlockType::UintValue]),
         );
     }
@@ -1565,133 +1589,151 @@ mod tests {
     #[fuchsia::test]
     fn test_bool_value() {
         test_ok_types(
-            move |b| b.become_bool_value(true, 1.into(), 2.into()),
+            move |mut b| b.become_bool_value(true, 1.into(), 2.into()),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_bool_value(false, 2.into(), 3.into()).is_ok());
         assert_eq!(block.block_type(), BlockType::BoolValue);
         assert_eq!(*block.name_index().unwrap(), 2);
         assert_eq!(*block.parent_index().unwrap(), 3);
         assert_eq!(block.bool_value().unwrap(), false);
-        assert_eq!(container[..8], [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         assert!(block.set_bool_value(true).is_ok());
         assert_eq!(block.bool_value().unwrap(), true);
-        assert_eq!(container[..8], [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         test_ok_types(move |b| b.bool_value(), &BTreeSet::from_iter(vec![BlockType::BoolValue]));
         test_ok_types(
-            move |b| b.set_bool_value(true),
+            move |mut b| b.set_bool_value(true),
             &BTreeSet::from_iter(vec![BlockType::BoolValue]),
         );
     }
 
     #[fuchsia::test]
     fn test_become_node() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_node(2.into(), 3.into()).is_ok());
         assert_eq!(block.block_type(), BlockType::NodeValue);
         assert_eq!(*block.name_index().unwrap(), 2);
         assert_eq!(*block.parent_index().unwrap(), 3);
-        assert_eq!(container[..8], [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         test_ok_types(
-            move |b| b.become_node(1.into(), 2.into()),
+            move |mut b| b.become_node(1.into(), 2.into()),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
     }
 
     #[fuchsia::test]
     fn test_property() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_property(2.into(), 3.into(), PropertyFormat::Bytes).is_ok());
         assert_eq!(block.block_type(), BlockType::BufferValue);
         assert_eq!(*block.name_index().unwrap(), 2);
         assert_eq!(*block.parent_index().unwrap(), 3);
         assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
-        assert_eq!(container[..8], [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10]);
+        assert_8_bytes!(container, 0, [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10]);
 
-        let mut bad_format_bytes = [0u8; constants::MIN_ORDER_SIZE];
-        bad_format_bytes.copy_from_slice(&container);
-        bad_format_bytes[15] = 0x30;
-        let bad_block = Block::new(&bad_format_bytes[..], 0.into());
-        assert!(bad_block.property_format().is_err()); // Make sure we get Error not panic
+        {
+            let (mut bad_container, _storage) =
+                Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+            let mut bad_format_bytes = [0u8; constants::MIN_ORDER_SIZE];
+            bad_format_bytes[15] = 0x30;
+            bad_container.write(&bad_format_bytes);
+            let bad_block = Block::new(bad_container, 0.into());
+            assert!(bad_block.property_format().is_err()); // Make sure we get Error not panic
+        }
 
         assert!(block.set_property_extent_index(4.into()).is_ok());
         assert_eq!(*block.property_extent_index().unwrap(), 4);
-        assert_eq!(container[..8], [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x10]);
+        assert_8_bytes!(container, 0, [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x10]);
 
         assert!(block.set_total_length(10).is_ok());
         assert_eq!(block.total_length().unwrap(), 10);
-        assert_eq!(container[..8], [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x0a, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x10]);
+        assert_8_bytes!(container, 0, [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x0a, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x10]);
 
         let ok_for_buffer_and_string_reference =
             BTreeSet::from_iter(vec![BlockType::BufferValue, BlockType::StringReference]);
         let ok_for_buffer = BTreeSet::from_iter(vec![BlockType::BufferValue]);
-        test_ok_types(move |b| b.set_property_extent_index(4.into()), &ok_for_buffer);
-        test_ok_types(move |b| b.set_total_length(4), &ok_for_buffer_and_string_reference);
+        test_ok_types(move |mut b| b.set_property_extent_index(4.into()), &ok_for_buffer);
+        test_ok_types(move |mut b| b.set_total_length(4), &ok_for_buffer_and_string_reference);
         test_ok_types(move |b| b.property_extent_index(), &ok_for_buffer);
         test_ok_types(move |b| b.property_format(), &ok_for_buffer);
         test_ok_types(
-            move |b| b.become_property(2.into(), 3.into(), PropertyFormat::Bytes),
+            move |mut b| b.become_property(2.into(), 3.into(), PropertyFormat::Bytes),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
     }
 
     #[fuchsia::test]
     fn test_name() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_reserved(&container);
+        let (mut container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_name("test-rust-inspect").is_ok());
         assert_eq!(block.block_type(), BlockType::Name);
         assert_eq!(block.name_length().unwrap(), 17);
         assert_eq!(block.name_contents().unwrap(), "test-rust-inspect");
-        assert_eq!(container[..8], [0x01, 0x09, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(&container[8..25], "test-rust-inspect".as_bytes());
-        assert_eq!(container[25..], [0, 0, 0, 0, 0, 0, 0]);
+        assert_8_bytes!(container, 0, [0x01, 0x09, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        let mut buffer = [0u8; 17];
+        container.read_at(8, &mut buffer);
+        assert_eq!(buffer, "test-rust-inspect".as_bytes());
+        let mut buffer = [0u8; 7];
+        container.read_at(25, &mut buffer);
+        assert_eq!(buffer, [0, 0, 0, 0, 0, 0, 0]);
+
         let mut bad_name_bytes = [0u8; constants::MIN_ORDER_SIZE * 2];
-        bad_name_bytes.copy_from_slice(&container);
+        container.read(&mut bad_name_bytes);
         bad_name_bytes[24] = 0xff;
-        let bad_block = Block::new(&bad_name_bytes[..], 0.into());
+        container.write(&bad_name_bytes);
+        let bad_block = Block::new(container, 0.into());
         assert_eq!(bad_block.name_length().unwrap(), 17); // Sanity check we copied correctly
         assert!(bad_block.name_contents().is_err()); // Make sure we get Error not panic
+
         let types = BTreeSet::from_iter(vec![BlockType::Name]);
         test_ok_types(move |b| b.name_length(), &types);
         test_ok_types(move |b| b.name_contents(), &types);
         test_ok_types(
-            move |b| b.become_name("test"),
+            move |mut b| b.become_name("test"),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
         // Test to make sure UTF8 strings are truncated safely if they're too long for the block,
         // even if the last character is multibyte and would be chopped in the middle.
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_reserved(&container);
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_name("abcdefghijklmnopqrstuvwxyz").is_ok());
         assert_eq!(block.name_contents().unwrap(), "abcdefghijklmnopqrstuvwx");
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_reserved(&container);
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_name("😀abcdefghijklmnopqrstuvwxyz").is_ok());
         assert_eq!(block.name_contents().unwrap(), "😀abcdefghijklmnopqrst");
-        let container = [0u8; constants::MIN_ORDER_SIZE * 2];
-        let block = get_reserved(&container);
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block.become_name("abcdefghijklmnopqrstu😀").is_ok());
         assert_eq!(block.name_contents().unwrap(), "abcdefghijklmnopqrstu");
-        assert_eq!(container[31], 0);
+        let mut buf = [0];
+        container.read_at(31, &mut buf);
+        assert_eq!(buf, [0]);
     }
 
     #[fuchsia::test]
     fn test_invalid_type_for_array() {
-        let mut container = [0u8; 2048];
-        container[24..].fill(14u8);
-        let block = get_reserved_of_order(&container, 4);
+        let (mut container, _storage) = Container::read_and_write(2048).unwrap();
+        let buffer = [14u8; 2048 - 24];
+        container.write_at(24, &buffer);
+        let mut block = get_reserved_of_order(&container, 4);
 
         test_ok_types(
             |typed_block| {
@@ -1750,10 +1792,11 @@ mod tests {
     // indexable string reference values.
     #[fuchsia::test]
     fn test_string_arrays() {
-        let mut container = [0u8; 2048];
-        container[48..].fill(14u8);
+        let (mut container, _storage) = Container::read_and_write(2048).unwrap();
+        let buffer = [14u8; 2048 - 48];
+        container.write_at(48, &buffer);
 
-        let block = get_reserved(&container);
+        let mut block = get_reserved(&container);
         let parent_index = BlockIndex::new(0);
         let name_index = BlockIndex::new(1);
         assert!(block
@@ -1775,20 +1818,20 @@ mod tests {
             assert_eq!(*read_index, (i + 4) as u32);
         }
 
-        assert_eq!(
-            container[..8],
+        assert_8_bytes!(
+            container,
+            0,
             [
                 0x01, 0x0b, 0x00, /* parent */
                 0x00, 0x00, 0x01, /* name_index */
                 0x00, 0x00
             ]
         );
-        assert_eq!(container[8..16], [0x0E, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x0E, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         for i in 0..4 {
-            assert_eq!(
-                container[(16 + (i * 4))..((16 + (i * 4)) + 4)],
-                [(i as u8 + 4), 0x00, 0x00, 0x00]
-            );
+            let mut buffer = [0u8; 4];
+            container.read_at(16 + (i * 4), &mut buffer);
+            assert_eq!(buffer, [(i as u8 + 4), 0x00, 0x00, 0x00]);
         }
     }
 
@@ -1796,21 +1839,25 @@ mod tests {
     fn become_array() {
         // primarily these tests are making sure that arrays clear their payload space
 
-        let mut container = [0u8; 128];
+        let (mut container, _storage) = Container::read_and_write(128).unwrap();
+        let buffer = [1u8; 128 - 16];
+        container.write_at(16, &buffer);
 
-        container[16..].fill(1u8);
-        let block = Block::new_free(&container[..], 0.into(), 7, 0.into()).unwrap();
+        let mut block = Block::new_free(container.clone(), 0.into(), 7, 0.into()).unwrap();
         block.become_reserved().unwrap();
         block
             .become_array_value(14, ArrayFormat::Default, BlockType::IntValue, 0.into(), 0.into())
             .unwrap();
-        container[16..]
+        let mut buffer = [0u8; 128 - 16];
+        container.read_at(16, &mut buffer);
+        buffer
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
 
-        container[16..].fill(1u8);
-        let block = Block::new_free(&container[..], 0.into(), 7, 0.into()).unwrap();
+        let buffer = [1u8; 128 - 16];
+        container.write_at(16, &buffer);
+        let mut block = Block::new_free(container.clone(), 0.into(), 7, 0.into()).unwrap();
         block.become_reserved().unwrap();
         block
             .become_array_value(
@@ -1821,13 +1868,16 @@ mod tests {
                 0.into(),
             )
             .unwrap();
-        container[16..]
+        let mut buffer = [0u8; 128 - 16];
+        container.read_at(16, &mut buffer);
+        buffer
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
 
-        container[16..].fill(1u8);
-        let block = Block::new_free(&container[..], 0.into(), 7, 0.into()).unwrap();
+        let buffer = [1u8; 128 - 16];
+        container.write_at(16, &buffer);
+        let mut block = Block::new_free(container.clone(), 0.into(), 7, 0.into()).unwrap();
         block.become_reserved().unwrap();
         block
             .become_array_value(
@@ -1838,13 +1888,16 @@ mod tests {
                 0.into(),
             )
             .unwrap();
-        container[16..]
+        let mut buffer = [0u8; 128 - 16];
+        container.read_at(16, &mut buffer);
+        buffer
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
 
-        container[16..].fill(1u8);
-        let block = Block::new_free(&container[..], 0.into(), 7, 0.into()).unwrap();
+        let buffer = [1u8; 128 - 16];
+        container.write_at(16, &buffer);
+        let mut block = Block::new_free(container.clone(), 0.into(), 7, 0.into()).unwrap();
         block.become_reserved().unwrap();
         block
             .become_array_value(
@@ -1855,7 +1908,9 @@ mod tests {
                 0.into(),
             )
             .unwrap();
-        container[16..]
+        let mut buffer = [0u8; 128 - 16];
+        container.read_at(16, &mut buffer);
+        buffer
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
@@ -1863,8 +1918,9 @@ mod tests {
 
     #[fuchsia::test]
     fn uint_array_value() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 4];
-        let block = Block::new_free(&container[..], 0.into(), 2, 0.into()).unwrap();
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 4).unwrap();
+        let mut block = Block::new_free(container.clone(), 0.into(), 2, 0.into()).unwrap();
         assert!(block.become_reserved().is_ok());
         assert!(block
             .become_array_value(
@@ -1888,27 +1944,34 @@ mod tests {
         }
         assert!(block.array_set_uint_slot(4, 3).is_err());
         assert!(block.array_set_uint_slot(7, 5).is_err());
-        assert_eq!(container[..8], [0x02, 0x0b, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00]);
-        assert_eq!(container[8..16], [0x15, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x02, 0x0b, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x15, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         for i in 0..4 {
-            assert_eq!(
-                container[8 * (i + 2)..8 * (i + 3)],
+            assert_8_bytes!(
+                container,
+                8 * (i + 2),
                 [(i as u8 + 1) * 5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
             );
         }
 
-        let mut bad_bytes = [0u8; constants::MIN_ORDER_SIZE * 4];
-        bad_bytes.copy_from_slice(&container);
-        bad_bytes[8] = 0x12; // LinearHistogram; Header
-        let bad_block = Block::new(&bad_bytes[..], 0.into());
-        assert_eq!(bad_block.array_format().unwrap(), ArrayFormat::LinearHistogram);
-        // Make sure we get Error not panic or BlockType::Header
-        assert!(bad_block.array_entry_type().is_err());
+        {
+            let (mut bad_container, _storage) =
+                Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+            let mut bad_bytes = [0u8; constants::MIN_ORDER_SIZE * 4];
+            container.read(&mut bad_bytes);
+            bad_bytes[8] = 0x12; // LinearHistogram; Header
+            bad_container.write(&bad_bytes);
+            let bad_block = Block::new(bad_container.clone(), 0.into());
+            assert_eq!(bad_block.array_format().unwrap(), ArrayFormat::LinearHistogram);
+            // Make sure we get Error not panic or BlockType::Header
+            assert!(bad_block.array_entry_type().is_err());
 
-        bad_bytes[8] = 0xef; // Not in enum; Not in enum
-        let bad_block = Block::new(&bad_bytes[..], 0.into());
-        assert!(bad_block.array_format().is_err());
-        assert!(bad_block.array_entry_type().is_err());
+            bad_bytes[8] = 0xef; // Not in enum; Not in enum
+            bad_container.write(&bad_bytes);
+            let bad_block = Block::new(bad_container, 0.into());
+            assert!(bad_block.array_format().is_err());
+            assert!(bad_block.array_entry_type().is_err());
+        }
 
         for i in 0..4 {
             assert_eq!(block.array_get_uint_slot(i).unwrap(), (i as u64 + 1) * 5);
@@ -1919,7 +1982,7 @@ mod tests {
         test_ok_types(move |b| b.array_format(), &types);
         test_ok_types(move |b| b.array_slots(), &types);
         test_ok_types(
-            move |b| {
+            move |mut b| {
                 b.become_array_value(
                     2,
                     ArrayFormat::Default,
@@ -1936,10 +1999,11 @@ mod tests {
 
     #[fuchsia::test]
     fn array_slots_bigger_than_block_order() {
-        let container = [0u8; constants::MIN_ORDER_SIZE * 8];
+        let (container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 8).unwrap();
         // A block of size 7 (max) can hold 254 values: 2048B - 8B (header) - 8B (array metadata)
         // gives 2032, which means 254 values of 8 bytes each maximum.
-        let block = Block::new_free(&container[..], 0.into(), 7, 0.into()).unwrap();
+        let mut block = Block::new_free(container.clone(), 0.into(), 7, 0.into()).unwrap();
         block.become_reserved().unwrap();
         assert!(block
             .become_array_value(257, ArrayFormat::Default, BlockType::IntValue, 1.into(), 2.into())
@@ -1950,7 +2014,7 @@ mod tests {
 
         // A block of size 2 can hold 6 values: 64B - 8B (header) - 8B (array metadata)
         // gives 48, which means 6 values of 8 bytes each maximum.
-        let block = Block::new_free(&container[..], 0.into(), 2, 0.into()).unwrap();
+        let mut block = Block::new_free(container.clone(), 0.into(), 2, 0.into()).unwrap();
         block.become_reserved().unwrap();
         assert!(block
             .become_array_value(8, ArrayFormat::Default, BlockType::IntValue, 1.into(), 2.into())
@@ -1962,13 +2026,15 @@ mod tests {
 
     #[fuchsia::test]
     fn array_clear() {
-        let mut container = [0u8; constants::MIN_ORDER_SIZE * 4];
+        let (mut container, _storage) =
+            Container::read_and_write(constants::MIN_ORDER_SIZE * 4).unwrap();
 
-        // Write some dummy data in the container after the slot fields.
-        let dummy = vec![0xff, 0xff, 0xff];
-        container[48..51].copy_from_slice(&dummy);
+        // Write some sample data in the container after the slot fields.
+        let sample = [0xff, 0xff, 0xff];
+        container.write_at(48, &sample);
 
-        let block = Block::new_free(&container[..], 0.into(), 2, 0.into()).expect("new free");
+        let mut block =
+            Block::new_free(container.clone(), 0.into(), 2, 0.into()).expect("new free");
         assert!(block.become_reserved().is_ok());
         assert!(block
             .become_array_value(
@@ -1987,23 +2053,26 @@ mod tests {
         block.array_clear(1).expect("clear array");
 
         assert_eq!(1, block.array_get_uint_slot(0).expect("get uint 0"));
-        assert_eq!(container[16..24], [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 16, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         for i in 1..4 {
             assert_eq!(0, block.array_get_uint_slot(i).expect("get uint"));
-            assert_eq!(
-                container[16 + (i * 8)..24 + (i * 8)],
+            assert_8_bytes!(
+                container,
+                16 + (i * 8),
                 [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
             );
         }
 
-        // Dummy data shouldn't have been overwritten
-        assert_eq!(&container[48..51], &dummy[..]);
+        // Sample data shouldn't have been overwritten
+        let mut buffer = [0u8; 3];
+        container.read_at(48, &mut buffer);
+        assert_eq!(buffer, &sample[..]);
     }
 
     #[fuchsia::test]
     fn become_link() {
-        let container = [0u8; constants::MIN_ORDER_SIZE];
-        let block = get_reserved(&container);
+        let (container, _storage) = Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
+        let mut block = get_reserved(&container);
         assert!(block
             .become_link(
                 BlockIndex::new(1),
@@ -2017,14 +2086,14 @@ mod tests {
         assert_eq!(*block.link_content_index().unwrap(), 3);
         assert_eq!(block.block_type(), BlockType::LinkValue);
         assert_eq!(block.link_node_disposition().unwrap(), LinkNodeDisposition::Inline);
-        assert_eq!(container[..8], [0x01, 0x0c, 0x02, 0x00, 0x00, 0x01, 0x00, 0x00]);
-        assert_eq!(container[8..], [0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10]);
+        assert_8_bytes!(container, 0, [0x01, 0x0c, 0x02, 0x00, 0x00, 0x01, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10]);
 
         let types = BTreeSet::from_iter(vec![BlockType::LinkValue]);
         test_ok_types(move |b| b.link_content_index(), &types);
         test_ok_types(move |b| b.link_node_disposition(), &types);
         test_ok_types(
-            move |b| {
+            move |mut b| {
                 b.become_link(
                     BlockIndex::new(1),
                     BlockIndex::new(2),
@@ -2036,21 +2105,23 @@ mod tests {
         );
     }
 
-    fn get_header(container: &[u8], size: usize) -> Block<&[u8]> {
+    fn get_header(container: &Container, size: usize) -> Block<Container> {
         let mut block = get_reserved(container);
         assert!(block.become_header(size).is_ok());
         block
     }
 
-    fn get_reserved(container: &[u8]) -> Block<&[u8]> {
-        let block = Block::new_free(container, BlockIndex::new(0), 1, BlockIndex::new(0)).unwrap();
+    fn get_reserved(container: &Container) -> Block<Container> {
+        let mut block =
+            Block::new_free(container.clone(), BlockIndex::new(0), 1, BlockIndex::new(0)).unwrap();
         assert!(block.become_reserved().is_ok());
         block
     }
 
-    fn get_reserved_of_order(container: &[u8], order: usize) -> Block<&[u8]> {
-        let block =
-            Block::new_free(container, BlockIndex::new(0), order, BlockIndex::new(0)).unwrap();
+    fn get_reserved_of_order(container: &Container, order: usize) -> Block<Container> {
+        let mut block =
+            Block::new_free(container.clone(), BlockIndex::new(0), order, BlockIndex::new(0))
+                .unwrap();
         assert!(block.become_reserved().is_ok());
         block
     }

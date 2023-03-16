@@ -8,8 +8,7 @@
 
 use crate::writer::Error;
 use inspect_format::{
-    constants, utils, Block, BlockContainerEq, BlockIndex, BlockType, Container,
-    ReadableBlockContainer, WritableBlockContainer,
+    constants, utils, Block, BlockIndex, BlockType, PtrEq, ReadBytes, WriteBytes,
 };
 use num_traits::ToPrimitive;
 use std::{cmp::min, convert::TryInto};
@@ -17,7 +16,7 @@ use std::{cmp::min, convert::TryInto};
 /// The inspect heap.
 #[derive(Debug)]
 pub struct Heap<T> {
-    mapping: T,
+    container: T,
     current_size_bytes: usize,
     free_head_per_order: [BlockIndex; constants::NUM_ORDERS],
     allocated_blocks: usize,
@@ -26,13 +25,11 @@ pub struct Heap<T> {
     header: Option<Block<T>>,
 }
 
-impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + BlockContainerEq>
-    Heap<T>
-{
+impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
     /// Creates a new heap on the underlying mapped VMO.
-    pub fn new(mapping: T) -> Result<Self, Error> {
+    pub fn new(container: T) -> Result<Self, Error> {
         let mut heap = Heap {
-            mapping: mapping,
+            container,
             current_size_bytes: 0,
             free_head_per_order: [BlockIndex::EMPTY; constants::NUM_ORDERS],
             allocated_blocks: 0,
@@ -51,7 +48,7 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
 
     /// Returns the maximum size of this heap in bytes.
     pub fn maximum_size(&self) -> usize {
-        self.mapping.size()
+        self.container.len()
     }
 
     /// Returns the number of blocks allocated since the creation of this heap.
@@ -86,9 +83,9 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
             }
         };
         let next_into = self.free_head_per_order[next_order];
-        let block = self.get_block(next_into).unwrap();
+        let mut block = self.get_block(next_into).unwrap();
         while block.order() > min_fit_order {
-            self.split_block(&block)?;
+            self.split_block(&mut block)?;
         }
         self.remove_free(&block)?;
         block.become_reserved().expect("Failed to reserve make block reserved");
@@ -129,7 +126,7 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
         if offset >= self.current_size_bytes {
             return Err(Error::invalid_index(index, "offset exceeds current size"));
         }
-        let block = Block::new(self.mapping.clone(), index);
+        let block = Block::new(self.container.clone(), index);
         if self.current_size_bytes - offset < utils::order_to_size(block.order()) {
             return Err(Error::invalid_index(index, "order exceeds current size"));
         }
@@ -139,27 +136,23 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
     /// Returns a copy of the bytes stored in this Heap.
     pub(crate) fn bytes(&self) -> Vec<u8> {
         let mut result = vec![0u8; self.current_size_bytes];
-        self.mapping.read_bytes(0, &mut result[..]);
+        self.container.read_at(0, &mut result[..]);
         result
     }
 
-    pub(crate) fn container(&self) -> Container {
-        self.mapping.clone().into()
-    }
-
-    pub fn set_header_block(&mut self, header: &Block<T>) -> Result<(), Error> {
+    pub fn set_header_block(&mut self, header: &mut Block<T>) -> Result<(), Error> {
         header.set_header_vmo_size(self.current_size_bytes.try_into().unwrap())?;
         self.header = Some(header.clone());
         Ok(())
     }
 
     fn grow_heap(&mut self, requested_size: usize) -> Result<(), Error> {
-        let mapping_size = self.mapping.size();
-        if requested_size > mapping_size || requested_size > constants::MAX_VMO_SIZE {
+        let container_size = self.container.len();
+        if requested_size > container_size || requested_size > constants::MAX_VMO_SIZE {
             self.failed_allocations += 1;
             return Err(Error::HeapMaxSizeReached);
         }
-        let new_size = min(mapping_size, requested_size);
+        let new_size = min(container_size, requested_size);
         let min_index = BlockIndex::from_offset(self.current_size_bytes);
         let mut last_index = self.free_head_per_order[constants::NUM_ORDERS - 1];
         let mut curr_index =
@@ -167,7 +160,7 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
         loop {
             curr_index -= BlockIndex::from_offset(constants::MAX_ORDER_SIZE);
             Block::new_free(
-                self.mapping.clone(),
+                self.container.clone(),
                 curr_index,
                 constants::NUM_ORDERS - 1,
                 last_index,
@@ -180,7 +173,7 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
         }
         self.free_head_per_order[constants::NUM_ORDERS - 1] = last_index;
         self.current_size_bytes = new_size;
-        if let Some(header) = self.header.as_ref() {
+        if let Some(header) = self.header.as_mut() {
             header.set_header_vmo_size(self.current_size_bytes.try_into().unwrap())?;
         }
         Ok(())
@@ -208,7 +201,7 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
             return Ok(true);
         }
         while self.is_free_block(next_index, order) {
-            let curr_block = self.get_block(next_index).unwrap();
+            let mut curr_block = self.get_block(next_index).unwrap();
             next_index = curr_block.free_next_index()?;
             if next_index == index {
                 curr_block.set_free_next_index(block.free_next_index()?)?;
@@ -218,7 +211,7 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
         Ok(false)
     }
 
-    fn split_block(&mut self, block: &Block<T>) -> Result<(), Error> {
+    fn split_block(&mut self, block: &mut Block<T>) -> Result<(), Error> {
         if block.order() >= constants::NUM_ORDERS {
             return Err(Error::InvalidBlockOrderAtIndex(block.order(), block.index()));
         }
@@ -228,7 +221,7 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
         block.set_order(order - 1)?;
         block.become_free(buddy_index);
 
-        let buddy = Block::new(self.mapping.clone(), buddy_index);
+        let mut buddy = Block::new(self.container.clone(), buddy_index);
         buddy.set_order(order - 1)?;
         buddy.become_free(self.free_head_per_order[order - 1]);
         self.free_head_per_order[order - 1] = block.index();
@@ -242,19 +235,9 @@ impl<T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + Bloc
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::reader::snapshot::{BackingBuffer, BlockIterator},
-        inspect_format::BlockIndex,
-        inspect_format::{BlockHeader, Payload},
-        std::sync::Arc,
-    };
-
-    #[cfg(target_os = "fuchsia")]
-    use mapped_vmo::Mapping;
-
-    #[cfg(not(target_os = "fuchsia"))]
-    use {std::sync::Mutex, std::vec::Vec};
+    use super::*;
+    use crate::reader::snapshot::{BackingBuffer, BlockIterator};
+    use inspect_format::{BlockHeader, BlockIndex, Container, Payload, WritableBlockContainer};
 
     struct BlockDebug {
         index: BlockIndex,
@@ -262,13 +245,11 @@ mod tests {
         block_type: BlockType,
     }
 
-    fn validate<
-        T: Into<Container> + ReadableBlockContainer + WritableBlockContainer + BlockContainerEq,
-    >(
+    fn validate<T: PtrEq + WriteBytes + ReadBytes + Clone>(
         expected: &[BlockDebug],
         heap: &Heap<T>,
     ) {
-        let buffer = BackingBuffer::from(heap.bytes());
+        let buffer = BackingBuffer::Bytes(heap.bytes());
         let actual: Vec<BlockDebug> = BlockIterator::from(&buffer)
             .map(|block| BlockDebug {
                 order: block.order(),
@@ -284,26 +265,10 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "fuchsia")]
-    macro_rules! create_mapping {
-        ($size:expr) => {{
-            Mapping::allocate($size).unwrap().0
-        }};
-    }
-
-    #[cfg(not(target_os = "fuchsia"))]
-    macro_rules! create_mapping {
-        ($size:expr) => {{
-            let mut data = Vec::new();
-            data.resize($size, 0);
-            Mutex::new(data)
-        }};
-    }
-
     #[fuchsia::test]
     fn new_heap() {
-        let mapping = create_mapping!(4096);
-        let heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) = Container::read_and_write(4096).unwrap();
+        let heap = Heap::new(container).unwrap();
         assert_eq!(heap.current_size_bytes, 4096);
         assert_eq!(heap.free_head_per_order, [BlockIndex::EMPTY; 8]);
         assert!(heap.header.is_none());
@@ -321,8 +286,8 @@ mod tests {
 
     #[fuchsia::test]
     fn allocate_and_free() {
-        let mapping = create_mapping!(4096);
-        let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) = Container::read_and_write(4096).unwrap();
+        let mut heap = Heap::new(container).unwrap();
 
         // Allocate some small blocks and ensure they are all in order.
         for i in 0..=5 {
@@ -421,8 +386,8 @@ mod tests {
 
     #[fuchsia::test]
     fn allocation_counters_work() {
-        let mapping = create_mapping!(4096);
-        let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) = Container::read_and_write(4096).unwrap();
+        let mut heap = Heap::new(container).unwrap();
 
         let block_count_to_allocate: usize = 50;
         for _ in 0..block_count_to_allocate {
@@ -449,8 +414,8 @@ mod tests {
 
     #[fuchsia::test]
     fn allocate_merge() {
-        let mapping = create_mapping!(4096);
-        let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) = Container::read_and_write(4096).unwrap();
+        let mut heap = Heap::new(container).unwrap();
         for i in 0..=3 {
             let block = heap.allocate_block(constants::MIN_ORDER_SIZE).unwrap();
             assert_eq!(*block.index(), i);
@@ -493,8 +458,8 @@ mod tests {
 
     #[fuchsia::test]
     fn extend() {
-        let mapping = create_mapping!(8 * 2048);
-        let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) = Container::read_and_write(8 * 2048).unwrap();
+        let mut heap = Heap::new(container).unwrap();
 
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b.index(), 0);
@@ -546,8 +511,8 @@ mod tests {
 
     #[fuchsia::test]
     fn extend_error() {
-        let mapping = create_mapping!(4 * 2048);
-        let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) = Container::read_and_write(4 * 2048).unwrap();
+        let mut heap = Heap::new(container).unwrap();
 
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b.index(), 0);
@@ -588,8 +553,9 @@ mod tests {
 
     #[fuchsia::test]
     fn extend_vmo_greater_max_size() {
-        let mapping = create_mapping!(constants::MAX_VMO_SIZE + 2048);
-        let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) =
+            Container::read_and_write(constants::MAX_VMO_SIZE + 2048).unwrap();
+        let mut heap = Heap::new(container).unwrap();
 
         for n in 0_u32..(constants::MAX_VMO_SIZE / constants::MAX_ORDER_SIZE).try_into().unwrap() {
             let b = heap.allocate_block(2048).unwrap();
@@ -606,9 +572,8 @@ mod tests {
 
     #[fuchsia::test]
     fn dont_reinterpret_upper_block_contents() {
-        let mapping = create_mapping!(4096);
-        let mapping_arc = Arc::new(mapping);
-        let mut heap = Heap::new(mapping_arc.clone()).unwrap();
+        let (container, _storage) = Container::read_and_write(4096).unwrap();
+        let mut heap = Heap::new(container.clone()).unwrap();
 
         // Allocate 3 blocks.
         assert_eq!(*heap.allocate_block(constants::MIN_ORDER_SIZE).unwrap().index(), 0);
@@ -617,8 +582,7 @@ mod tests {
         assert_eq!(*heap.allocate_block(utils::order_to_size(1)).unwrap().index(), 4);
 
         // Write garbage to the second half of the order 1 block in index 2.
-        Block::new(mapping_arc.clone(), 3.into())
-            .write(BlockHeader(0xffffffff), Payload(0xffffffff));
+        Block::new(container, 3.into()).write(BlockHeader(0xffffffff), Payload(0xffffffff));
 
         // Free order 1 block in index 2.
         assert!(heap.free_block(b1).is_ok());
@@ -648,13 +612,13 @@ mod tests {
 
     #[fuchsia::test]
     fn update_header_vmo_size() {
-        let mapping = create_mapping!(3 * 4096);
-        let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+        let (container, _storage) = Container::read_and_write(3 * 4096).unwrap();
+        let mut heap = Heap::new(container).unwrap();
         let mut block = heap
             .allocate_block(inspect_format::utils::order_to_size(constants::HEADER_ORDER as usize))
             .unwrap();
         assert!(block.become_header(heap.current_size()).is_ok());
-        assert!(heap.set_header_block(&block).is_ok());
+        assert!(heap.set_header_block(&mut block).is_ok());
 
         assert_eq!(block.header_vmo_size().unwrap().unwrap() as usize, heap.current_size());
         let b = heap.allocate_block(2048).unwrap();

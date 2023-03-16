@@ -9,7 +9,7 @@ use {
     futures::future::BoxFuture,
     inspect_format::{
         constants, utils, BlockIndex, BlockType, Container, Error as FormatError,
-        {ArrayFormat, Block, LinkNodeDisposition, PropertyFormat},
+        ReadableBlockContainer, {ArrayFormat, Block, LinkNodeDisposition, PropertyFormat},
     },
     num_traits::ToPrimitive,
     parking_lot::{Mutex, MutexGuard},
@@ -22,9 +22,6 @@ use {
     },
     tracing::error,
 };
-
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon as zx;
 
 /// Callback used to fill inspector lazy nodes.
 pub type LazyNodeContextFnArc =
@@ -106,7 +103,7 @@ macro_rules! metric_fns {
                 value: $type,
                 parent_index: BlockIndex,
             ) -> Result<Block<Container>, Error> {
-                let (block, name_block) = self.allocate_reserved_value(
+                let (mut block, name_block) = self.allocate_reserved_value(
                     name, parent_index, constants::MIN_ORDER_SIZE)?;
                 block.[<become_ $name _value>](value, name_block.index(), parent_index)?;
                 Ok(block)
@@ -114,14 +111,14 @@ macro_rules! metric_fns {
 
             fn [<set_ $name _metric>](&self, block_index: BlockIndex, value: $type)
                 -> Result<(), Error> {
-                let block = self.heap.get_block(block_index)?;
+                let mut block = self.heap.get_block(block_index)?;
                 block.[<set_ $name _value>](value)?;
                 Ok(())
             }
 
             fn [<add_ $name _metric>](&self, block_index: BlockIndex, value: $type)
                 -> Result<(), Error> {
-                let block = self.heap.get_block(block_index)?;
+                let mut block = self.heap.get_block(block_index)?;
                 let current_value = block.[<$name _value>]()?;
                 block.[<set_ $name _value>](current_value.safe_add(value))?;
                 Ok(())
@@ -129,7 +126,7 @@ macro_rules! metric_fns {
 
             fn [<subtract_ $name _metric>](&self, block_index: BlockIndex, value: $type)
                 -> Result<(), Error> {
-                let block = self.heap.get_block(block_index)?;
+                let mut block = self.heap.get_block(block_index)?;
                 let current_value = block.[<$name _value>]()?;
                 let new_value = current_value.safe_sub(value);
                 block.[<set_ $name _value>](new_value)?;
@@ -193,7 +190,7 @@ macro_rules! arithmetic_array_fns {
                 if block_size > constants::MAX_ORDER_SIZE {
                     return Err(Error::BlockSizeTooBig(block_size))
                 }
-                let (block, name_block) = self.allocate_reserved_value(
+                let (mut block, name_block) = self.allocate_reserved_value(
                     name, parent_index, block_size)?;
                 block.become_array_value(
                     slots, array_format, BlockType::$value, name_block.index(), parent_index)?;
@@ -203,7 +200,7 @@ macro_rules! arithmetic_array_fns {
             pub fn [<set_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
             ) -> Result<(), Error> {
-                let block = self.heap.get_block(block_index)?;
+                let mut block = self.heap.get_block(block_index)?;
                 block.[<array_set_ $name _slot>](slot_index, value)?;
                 Ok(())
             }
@@ -211,7 +208,7 @@ macro_rules! arithmetic_array_fns {
             pub fn [<add_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
             ) -> Result<(), Error> {
-                let block = self.heap.get_block(block_index)?;
+                let mut block = self.heap.get_block(block_index)?;
                 let previous_value = block.[<array_get_ $name _slot>](slot_index)?;
                 let new_value = previous_value.safe_add(value);
                 block.[<array_set_ $name _slot>](slot_index, new_value)?;
@@ -221,7 +218,7 @@ macro_rules! arithmetic_array_fns {
             pub fn [<subtract_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
             ) -> Result<(), Error> {
-                let block = self.heap.get_block(block_index)?;
+                let mut block = self.heap.get_block(block_index)?;
                 let previous_value = block.[<array_get_ $name _slot>](slot_index)?;
                 let new_value = previous_value.safe_sub(value);
                 block.[<array_set_ $name _slot>](slot_index, new_value)?;
@@ -236,9 +233,6 @@ macro_rules! arithmetic_array_fns {
 /// `State` writes version 2 of the Inspect Format.
 #[derive(Clone, Debug)]
 pub struct State {
-    /// A reference to the header block in the VMO.
-    pub(crate) header: Block<Container>,
-
     /// The inner state that actually performs the operations.
     /// This should always be accessed by locking the mutex and then locking the header.
     // TODO(fxbug.dev/51298): have a single locking mechanism implemented on top of the vmo header.
@@ -251,42 +245,27 @@ impl PartialEq for State {
     }
 }
 
-#[cfg(target_os = "fuchsia")]
 impl State {
     /// Create a |State| object wrapping the given Heap. This will cause the
     /// heap to be initialized with a header.
-    pub fn create(mut heap: Heap<Container>, vmo: Arc<zx::Vmo>) -> Result<Self, Error> {
-        let mut block = heap.allocate_block(inspect_format::utils::order_to_size(
+    pub fn create(
+        mut heap: Heap<Container>,
+        storage: <Container as ReadableBlockContainer>::BackingStorage,
+    ) -> Result<Self, Error> {
+        let mut header = heap.allocate_block(inspect_format::utils::order_to_size(
             constants::HEADER_ORDER as usize,
         ))?;
-        block.become_header(heap.current_size())?;
-        heap.set_header_block(&block)?;
-        let inner = Arc::new(Mutex::new(InnerState::new(heap, vmo)));
-        Ok(Self { inner, header: block })
+        header.become_header(heap.current_size())?;
+        heap.set_header_block(&mut header)?;
+        let inner = Arc::new(Mutex::new(InnerState::new(heap, storage, header)));
+        Ok(Self { inner })
     }
-}
 
-#[cfg(not(target_os = "fuchsia"))]
-impl State {
-    /// Create a |State| object wrapping the given Heap. This will cause the
-    /// heap to be initialized with a header.
-    pub fn create(mut heap: Heap<Container>) -> Result<Self, Error> {
-        let mut block = heap.allocate_block(inspect_format::utils::order_to_size(
-            constants::HEADER_ORDER as usize,
-        ))?;
-        block.become_header(heap.current_size())?;
-        heap.set_header_block(&block)?;
-        let inner = Arc::new(Mutex::new(InnerState::new(heap)));
-        Ok(Self { inner, header: block })
-    }
-}
-
-impl State {
     /// Locks the state mutex and inspect vmo. The state will be unlocked on drop.
     /// This can fail when the header is already locked.
-    pub fn try_lock<'a>(&'a self) -> Result<LockedStateGuard<'a>, Error> {
+    pub fn try_lock(&self) -> Result<LockedStateGuard<'_>, Error> {
         let inner_lock = self.inner.lock();
-        LockedStateGuard::new(&self.header, inner_lock)
+        LockedStateGuard::new(inner_lock)
     }
 
     /// Locks the state mutex and inspect vmo. The state will be unlocked on drop.
@@ -294,8 +273,8 @@ impl State {
     pub fn begin_transaction(&self) {
         let mut inner_lock = self.inner.lock();
         if inner_lock.transaction_count == 0 {
-            debug_assert!(self.header.check_locked(false).is_ok());
-            let res = self.header.lock_header();
+            debug_assert!(inner_lock.header.check_locked(false).is_ok());
+            let res = inner_lock.header.lock_header();
             debug_assert!(res.is_ok());
         }
         inner_lock.transaction_count += 1;
@@ -307,8 +286,8 @@ impl State {
         let mut inner_lock = self.inner.lock();
         inner_lock.transaction_count -= 1;
         if inner_lock.transaction_count == 0 {
-            debug_assert!(self.header.check_locked(true).is_ok());
-            let res = self.header.unlock_header();
+            debug_assert!(inner_lock.header.check_locked(true).is_ok());
+            let res = inner_lock.header.unlock_header();
             debug_assert!(res.is_ok());
         }
     }
@@ -322,16 +301,16 @@ impl State {
 
         Some(state.heap.bytes())
     }
+}
 
-    /// Copies the bytes in the VMO into the returned vector.
-    pub fn clone_container(&self) -> Container {
-        let state = self.inner.lock();
-        state.heap.container()
+#[cfg(test)]
+impl State {
+    pub(crate) fn generation_count(&self) -> u64 {
+        self.inner.lock().header.header_generation_count().unwrap()
     }
 
-    #[cfg(test)]
-    pub fn generation_count(&self) -> u64 {
-        self.header.header_generation_count().unwrap()
+    fn header(&self) -> Block<Container> {
+        self.inner.lock().header.clone()
     }
 }
 
@@ -359,27 +338,23 @@ pub struct Stats {
 }
 
 pub struct LockedStateGuard<'a> {
-    header: &'a Block<Container>,
     inner_lock: MutexGuard<'a, InnerState>,
 }
 
 #[cfg(target_os = "fuchsia")]
 impl<'a> LockedStateGuard<'a> {
     /// Freezes the VMO, does a CoW duplication, thaws the parent, and returns the child.
-    pub fn frozen_vmo_copy(&mut self) -> Result<Option<zx::Vmo>, Error> {
-        self.inner_lock.frozen_vmo_copy(self.header)
+    pub fn frozen_vmo_copy(&mut self) -> Result<Option<fuchsia_zircon::Vmo>, Error> {
+        self.inner_lock.frozen_vmo_copy()
     }
 }
 
 impl<'a> LockedStateGuard<'a> {
-    fn new(
-        header: &'a Block<Container>,
-        inner_lock: MutexGuard<'a, InnerState>,
-    ) -> Result<Self, Error> {
+    fn new(mut inner_lock: MutexGuard<'a, InnerState>) -> Result<Self, Error> {
         if inner_lock.transaction_count == 0 {
-            header.lock_header()?;
+            inner_lock.header.lock_header()?;
         }
-        Ok(Self { header, inner_lock })
+        Ok(Self { inner_lock })
     }
 
     /// Returns statistics about the current inspect state.
@@ -553,7 +528,7 @@ impl<'a> LockedStateGuard<'a> {
 impl Drop for LockedStateGuard<'_> {
     fn drop(&mut self) {
         if self.inner_lock.transaction_count == 0 {
-            self.header.unlock_header().unwrap_or_else(|e| {
+            self.inner_lock.header.unlock_header().unwrap_or_else(|e| {
                 error!(?e, "Failed to unlock header");
             });
         }
@@ -564,9 +539,10 @@ impl Drop for LockedStateGuard<'_> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct InnerState {
+    #[derivative(Debug = "ignore")]
     heap: Heap<Container>,
-    #[cfg(target_os = "fuchsia")]
-    vmo: Arc<zx::Vmo>,
+    #[allow(dead_code)] //  unused in host.
+    storage: <Container as ReadableBlockContainer>::BackingStorage,
     next_unique_link_id: AtomicU64,
     transaction_count: usize,
 
@@ -575,63 +551,57 @@ struct InnerState {
 
     #[derivative(Debug = "ignore")]
     callbacks: HashMap<StringReference, LazyNodeContextFnArc>,
+
+    header: Block<Container>,
 }
 
 #[cfg(target_os = "fuchsia")]
 impl InnerState {
-    /// Creates a new inner state that performs all operations on the heap.
-    pub fn new(heap: Heap<Container>, vmo: Arc<zx::Vmo>) -> Self {
-        Self {
-            heap,
-            vmo,
-            next_unique_link_id: AtomicU64::new(0),
-            callbacks: HashMap::new(),
-            transaction_count: 0,
-            string_reference_block_indexes: HashMap::new(),
-        }
-    }
-
-    fn frozen_vmo_copy(&self, header: &Block<Container>) -> Result<Option<zx::Vmo>, Error> {
+    fn frozen_vmo_copy(&mut self) -> Result<Option<fuchsia_zircon::Vmo>, Error> {
         if self.transaction_count > 0 {
             return Ok(None);
         }
 
-        let old = header.freeze_header()?;
+        let old = self.header.freeze_header()?;
         let ret = self
-            .vmo
+            .storage
             .create_child(
-                zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::NO_WRITE,
+                fuchsia_zircon::VmoChildOptions::SNAPSHOT
+                    | fuchsia_zircon::VmoChildOptions::NO_WRITE,
                 0,
-                self.vmo.get_size().map_err(|status| Error::VmoSize(status))?,
+                self.storage.get_size().map_err(|status| Error::VmoSize(status))?,
             )
             .ok();
-        header.thaw_header(old)?;
+        self.header.thaw_header(old)?;
         Ok(ret)
     }
 }
 
-#[cfg(not(target_os = "fuchsia"))]
 impl InnerState {
     /// Creates a new inner state that performs all operations on the heap.
-    pub fn new(heap: Heap<Container>) -> Self {
+    pub fn new(
+        heap: Heap<Container>,
+        storage: <Container as ReadableBlockContainer>::BackingStorage,
+        header: Block<Container>,
+    ) -> Self {
         Self {
             heap,
+            storage,
             next_unique_link_id: AtomicU64::new(0),
             callbacks: HashMap::new(),
             transaction_count: 0,
             string_reference_block_indexes: HashMap::new(),
+            header,
         }
     }
-}
 
-impl InnerState {
     /// Allocate a NODE block with the given |name| and |parent_index|.
     fn create_node(
         &mut self,
         name: StringReference,
         parent_index: BlockIndex,
     ) -> Result<Block<Container>, Error> {
-        let (block, name_block) =
+        let (mut block, name_block) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
         block.become_node(name_block.index(), parent_index)?;
         Ok(block)
@@ -687,9 +657,9 @@ impl InnerState {
         disposition: LinkNodeDisposition,
         parent_index: BlockIndex,
     ) -> Result<Block<Container>, Error> {
-        let (value_block, name_block) =
+        let (mut value_block, name_block) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        let result = self.get_or_create_string_reference(content).and_then(|content_block| {
+        let result = self.get_or_create_string_reference(content).and_then(|mut content_block| {
             content_block.increment_string_reference_count()?;
             value_block.become_link(
                 name_block.index(),
@@ -723,10 +693,10 @@ impl InnerState {
         format: PropertyFormat,
         parent_index: BlockIndex,
     ) -> Result<Block<Container>, Error> {
-        let (block, name_block) =
+        let (mut block, name_block) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
         block.become_property(name_block.index(), parent_index, format)?;
-        if let Err(err) = self.inner_set_property_value(&block, &value) {
+        if let Err(err) = self.inner_set_property_value(&mut block, &value) {
             self.heap.free_block(block)?;
             self.release_string_reference(name_block)?;
             return Err(err);
@@ -743,11 +713,11 @@ impl InnerState {
         let string_reference = value.into();
         match self.string_reference_block_indexes.get(&string_reference) {
             None => {
-                let block = self.heap.allocate_block(utils::block_size_for_payload(
+                let mut block = self.heap.allocate_block(utils::block_size_for_payload(
                     string_reference.len() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
                 ))?;
                 block.become_string_reference()?;
-                self.write_string_reference_payload(&block, &string_reference)?;
+                self.write_string_reference_payload(&mut block, &string_reference)?;
                 self.string_reference_block_indexes.insert(string_reference, block.index());
                 Ok(block)
             }
@@ -759,10 +729,10 @@ impl InnerState {
     /// Given a string, write the canonical value out, allocating as needed.
     fn write_string_reference_payload(
         &mut self,
-        block: &Block<Container>,
+        block: &mut Block<Container>,
         value: &str,
     ) -> Result<(), Error> {
-        let head_extent = match self.inline_string_reference(&block, value.as_bytes()) {
+        let head_extent = match self.inline_string_reference(block, value.as_bytes()) {
             Ok(Some(written)) => self.write_extents(&value.as_bytes()[written..])?,
             Ok(None) => BlockIndex::EMPTY,
             Err(e) => return Err(e),
@@ -777,7 +747,7 @@ impl InnerState {
     /// If the data overflows, return the number of bytes written.
     fn inline_string_reference(
         &mut self,
-        block: &Block<Container>,
+        block: &mut Block<Container>,
         value: &[u8],
     ) -> Result<Option<usize>, Error> {
         // only returns an error if you call with wrong block type
@@ -791,7 +761,7 @@ impl InnerState {
 
     /// Decrement the reference count on the block and free it if the count is 0.
     /// This is the function to call if you want to give up your hold on a StringReference.
-    fn release_string_reference(&mut self, block: Block<Container>) -> Result<(), Error> {
+    fn release_string_reference(&mut self, mut block: Block<Container>) -> Result<(), Error> {
         block.decrement_string_reference_count()?;
         self.maybe_free_string_reference(block)
     }
@@ -806,14 +776,7 @@ impl InnerState {
         let block_index = block.index();
         self.heap.free_block(block)?;
 
-        let to_remove = self
-            .string_reference_block_indexes
-            .iter()
-            .find(|(_, vmo_index)| **vmo_index == block_index);
-        if let Some((reference, _)) = to_remove {
-            let reference = reference.clone();
-            self.string_reference_block_indexes.remove(&reference);
-        }
+        self.string_reference_block_indexes.retain(|_, vmo_index| *vmo_index != block_index);
 
         if first_extent == BlockIndex::EMPTY {
             return Ok(());
@@ -854,8 +817,8 @@ impl InnerState {
 
     /// Set the |value| of a String PROPERTY block.
     fn set_property(&mut self, block_index: BlockIndex, value: &[u8]) -> Result<(), Error> {
-        let block = self.heap.get_block(block_index)?;
-        self.inner_set_property_value(&block, value)?;
+        let mut block = self.heap.get_block(block_index)?;
+        self.inner_set_property_value(&mut block, value)?;
         Ok(())
     }
 
@@ -883,10 +846,10 @@ impl InnerState {
 
     fn reparent(&self, being_reparented: BlockIndex, new_parent: BlockIndex) -> Result<(), Error> {
         self.check_lineage(being_reparented, new_parent)?;
-        let being_reparented_block = self.heap.get_block(being_reparented)?;
+        let mut being_reparented_block = self.heap.get_block(being_reparented)?;
         let original_parent_idx = being_reparented_block.parent_index()?;
         if original_parent_idx != BlockIndex::ROOT {
-            let original_parent_block = self.heap.get_block(original_parent_idx)?;
+            let mut original_parent_block = self.heap.get_block(original_parent_idx)?;
             let child_count = original_parent_block.child_count()? - 1;
             original_parent_block.set_child_count(child_count)?;
         }
@@ -894,7 +857,7 @@ impl InnerState {
         being_reparented_block.set_parent(new_parent)?;
 
         if new_parent != BlockIndex::ROOT {
-            let new_parent_block = self.heap.get_block(new_parent)?;
+            let mut new_parent_block = self.heap.get_block(new_parent)?;
             let child_count = new_parent_block.child_count()? + 1;
             new_parent_block.set_child_count(child_count)?;
         }
@@ -908,14 +871,14 @@ impl InnerState {
         value: bool,
         parent_index: BlockIndex,
     ) -> Result<Block<Container>, Error> {
-        let (block, name_block) =
+        let (mut block, name_block) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
         block.become_bool_value(value, name_block.index(), parent_index)?;
         Ok(block)
     }
 
     fn set_bool(&self, block_index: BlockIndex, value: bool) -> Result<(), Error> {
-        let block = self.heap.get_block(block_index)?;
+        let mut block = self.heap.get_block(block_index)?;
         block.set_bool_value(value)?;
         Ok(())
     }
@@ -940,7 +903,8 @@ impl InnerState {
         if block_size > constants::MAX_ORDER_SIZE {
             return Err(Error::BlockSizeTooBig(block_size));
         }
-        let (block, name_block) = self.allocate_reserved_value(name, parent_index, block_size)?;
+        let (mut block, name_block) =
+            self.allocate_reserved_value(name, parent_index, block_size)?;
         block.become_array_value(
             slots,
             ArrayFormat::Default,
@@ -962,13 +926,13 @@ impl InnerState {
         slot_index: usize,
         value: StringReference,
     ) -> Result<(), Error> {
-        let block = self.heap.get_block(block_index)?;
+        let mut block = self.heap.get_block(block_index)?;
         if block.array_slots()? <= slot_index {
             return Err(Error::VmoFormat(FormatError::ArrayIndexOutOfBounds(slot_index)));
         }
 
         let reference_index = if !value.is_empty() {
-            let reference = self.get_or_create_string_reference(value.into())?;
+            let mut reference = self.get_or_create_string_reference(value.into())?;
             reference.increment_string_reference_count()?;
             reference.index()
         } else {
@@ -991,7 +955,7 @@ impl InnerState {
         block_index: BlockIndex,
         start_slot_index: usize,
     ) -> Result<(), Error> {
-        let block = self.heap.get_block(block_index)?;
+        let mut block = self.heap.get_block(block_index)?;
         match block.array_entry_type()? {
             value if value.is_numeric_value() => block.array_clear(start_slot_index)?,
             BlockType::StringReference => {
@@ -1021,7 +985,7 @@ impl InnerState {
     ) -> Result<(Block<Container>, Block<Container>), Error> {
         let block = self.heap.allocate_block(block_size)?;
         let name_block = match self.get_or_create_string_reference(name) {
-            Ok(b) => {
+            Ok(mut b) => {
                 b.increment_string_reference_count()?;
                 b
             }
@@ -1031,15 +995,15 @@ impl InnerState {
             }
         };
 
-        let result = self.heap.get_block(parent_index).and_then(|parent_block| match parent_block
-            .block_type()
-        {
-            BlockType::NodeValue | BlockType::Tombstone => {
-                parent_block.set_child_count(parent_block.child_count().unwrap() + 1)?;
-                Ok(())
+        let result = self.heap.get_block(parent_index).and_then(|mut parent_block| {
+            match parent_block.block_type() {
+                BlockType::NodeValue | BlockType::Tombstone => {
+                    parent_block.set_child_count(parent_block.child_count().unwrap() + 1)?;
+                    Ok(())
+                }
+                BlockType::Header => Ok(()),
+                _ => return Err(Error::InvalidBlockType(parent_index, parent_block.block_type())),
             }
-            BlockType::Header => Ok(()),
-            _ => return Err(Error::InvalidBlockType(parent_index, parent_block.block_type())),
         });
         match result {
             Ok(()) => Ok((block, name_block)),
@@ -1051,11 +1015,11 @@ impl InnerState {
         }
     }
 
-    fn delete_value(&mut self, block: Block<Container>) -> Result<(), Error> {
+    fn delete_value(&mut self, mut block: Block<Container>) -> Result<(), Error> {
         // Decrement parent child count.
         let parent_index = block.parent_index()?;
         if parent_index != BlockIndex::ROOT {
-            let parent = self.heap.get_block(parent_index).unwrap();
+            let mut parent = self.heap.get_block(parent_index).unwrap();
             let child_count = parent.child_count().unwrap() - 1;
             if parent.block_type() == BlockType::Tombstone && child_count == 0 {
                 self.heap.free_block(parent).expect("Failed to free block");
@@ -1086,7 +1050,7 @@ impl InnerState {
 
     fn inner_set_property_value(
         &mut self,
-        block: &Block<Container>,
+        block: &mut Block<Container>,
         value: &[u8],
     ) -> Result<(), Error> {
         self.free_extents(block.property_extent_index()?)?;
@@ -1551,14 +1515,14 @@ mod tests {
         }
 
         {
-            let block = state.get_or_create_string_reference("longer".into()).unwrap();
+            let mut block = state.get_or_create_string_reference("longer".into()).unwrap();
             let index = block.index();
             assert_eq!(block.order(), 1);
             block.increment_string_reference_count().unwrap();
             // not an error to try and free
             assert!(state.maybe_free_string_reference(block).is_ok());
 
-            let block = state.heap().get_block(index).unwrap();
+            let mut block = state.heap().get_block(index).unwrap();
             block.decrement_string_reference_count().unwrap();
             state.maybe_free_string_reference(block).unwrap();
         }
@@ -2109,21 +2073,21 @@ mod tests {
     fn test_with_header_lock() {
         let state = get_state(4096);
         // Initial generation count is 0
-        assert_eq!(state.header.header_generation_count().unwrap(), 0);
+        assert_eq!(state.generation_count(), 0);
 
         // Lock the state
         let mut lock_guard = state.try_lock().expect("lock state");
-        assert!(state.header.check_locked(true).is_ok());
-        assert_eq!(state.header.header_generation_count().unwrap(), 1);
+        assert!(lock_guard.inner_lock.header.check_locked(true).is_ok());
+        assert_eq!(lock_guard.inner_lock.header.header_generation_count().unwrap(), 1);
         // Operations on the lock guard do not change the generation counter.
         let _ = lock_guard.create_node("test".into(), 0.into()).unwrap();
         let _ = lock_guard.create_node("test2".into(), 2.into()).unwrap();
-        assert_eq!(state.header.header_generation_count().unwrap(), 1);
+        assert_eq!(lock_guard.inner_lock.header.header_generation_count().unwrap(), 1);
 
         // Dropping the guard releases the lock.
         drop(lock_guard);
-        assert_eq!(state.header.header_generation_count().unwrap(), 2);
-        assert!(state.header.check_locked(false).is_ok());
+        assert_eq!(state.generation_count(), 2);
+        assert!(state.header().check_locked(false).is_ok());
     }
 
     #[fuchsia::test]
@@ -2249,43 +2213,43 @@ mod tests {
     fn transaction_locking() {
         let state = get_state(4096);
         // Initial generation count is 0
-        assert_eq!(state.header.header_generation_count().unwrap(), 0);
+        assert_eq!(state.generation_count(), 0);
 
         // Begin a transaction
         state.begin_transaction();
-        assert_eq!(state.header.header_generation_count().unwrap(), 1);
-        assert!(state.header.check_locked(true).is_ok());
+        assert_eq!(state.generation_count(), 1);
+        assert!(state.header().check_locked(true).is_ok());
 
         // Operations on the lock  guard do not change the generation counter.
         let mut lock_guard1 = state.try_lock().expect("lock state");
         assert_eq!(lock_guard1.inner_lock.transaction_count, 1);
-        assert_eq!(state.header.header_generation_count().unwrap(), 1);
-        assert!(state.header.check_locked(true).is_ok());
+        assert_eq!(lock_guard1.inner_lock.header.header_generation_count().unwrap(), 1);
+        assert!(lock_guard1.inner_lock.header.check_locked(true).is_ok());
         let _ = lock_guard1.create_node("test".into(), 0.into()).unwrap();
         assert_eq!(lock_guard1.inner_lock.transaction_count, 1);
-        assert_eq!(state.header.header_generation_count().unwrap(), 1);
+        assert_eq!(lock_guard1.inner_lock.header.header_generation_count().unwrap(), 1);
 
         // Dropping the guard releases the mutex lock but the header remains locked.
         drop(lock_guard1);
-        assert_eq!(state.header.header_generation_count().unwrap(), 1);
-        assert!(state.header.check_locked(true).is_ok());
+        assert_eq!(state.generation_count(), 1);
+        assert!(state.header().check_locked(true).is_ok());
 
         // When the transaction finishes, the header is unlocked.
         state.end_transaction();
-        assert_eq!(state.header.header_generation_count().unwrap(), 2);
-        assert!(state.header.check_locked(false).is_ok());
+        assert_eq!(state.generation_count(), 2);
+        assert!(state.header().check_locked(false).is_ok());
 
         // Operations under no transaction work as usual.
         let lock_guard2 = state.try_lock().expect("lock state");
-        assert!(state.header.check_locked(true).is_ok());
-        assert_eq!(state.header.header_generation_count().unwrap(), 3);
+        assert!(lock_guard2.inner_lock.header.check_locked(true).is_ok());
+        assert_eq!(lock_guard2.inner_lock.header.header_generation_count().unwrap(), 3);
         assert_eq!(lock_guard2.inner_lock.transaction_count, 0);
     }
 
     #[fuchsia::test]
     async fn update_header_vmo_size() {
         let core_state = get_state(3 * 4096);
-        assert_eq!(core_state.header.header_vmo_size().unwrap().unwrap(), 4096);
+        assert_eq!(core_state.header().header_vmo_size().unwrap().unwrap(), 4096);
         let block1 = {
             let mut state = core_state.try_lock().expect("lock state");
 
@@ -2294,7 +2258,7 @@ mod tests {
             let block = state
                 .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0.into())
                 .unwrap();
-            assert_eq!(state.header.header_vmo_size().unwrap().unwrap(), 2 * 4096);
+            assert_eq!(state.inner_lock.header.header_vmo_size().unwrap().unwrap(), 2 * 4096);
 
             block
         };
@@ -2307,7 +2271,7 @@ mod tests {
             let block = state
                 .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0.into())
                 .unwrap();
-            assert_eq!(state.header.header_vmo_size().unwrap().unwrap(), 3 * 4096);
+            assert_eq!(state.inner_lock.header.header_vmo_size().unwrap().unwrap(), 3 * 4096);
 
             block
         };

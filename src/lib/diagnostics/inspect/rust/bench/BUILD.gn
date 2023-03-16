@@ -38,11 +38,11 @@ rustc_binary("writer-bin") {
   deps = [
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//src/developer/fuchsia-criterion",
+    "//src/lib/diagnostics/inspect/format/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/mapped-vmo",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:num",

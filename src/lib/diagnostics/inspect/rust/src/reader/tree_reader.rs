@@ -22,9 +22,6 @@ use {
     },
 };
 
-#[cfg(target_os = "fuchsia")]
-use fidl_fuchsia_inspect::TreeProxy;
-
 /// Contains the snapshot of the hierarchy and snapshots of all the lazy nodes in the hierarchy.
 #[derive(Debug)]
 pub struct SnapshotTree {
@@ -35,7 +32,9 @@ pub struct SnapshotTree {
 impl SnapshotTree {
     /// Loads a snapshot tree from the given inspect tree.
     #[cfg(target_os = "fuchsia")]
-    pub async fn try_from(tree: &TreeProxy) -> Result<SnapshotTree, ReaderError> {
+    pub async fn try_from(
+        tree: &fidl_fuchsia_inspect::TreeProxy,
+    ) -> Result<SnapshotTree, ReaderError> {
         load_snapshot_tree(tree, None).await
     }
 

@@ -39,14 +39,9 @@ use {
     std::{borrow::Cow, cmp::min, collections::BTreeMap, convert::TryFrom},
 };
 
-#[cfg(target_os = "fuchsia")]
-use fuchsia_zircon::Vmo;
-
 pub use {
     crate::reader::{
-        error::ReaderError,
-        readable_tree::{ReadSnapshot, ReadableTree, SnapshotSource},
-        tree_reader::read,
+        error::ReaderError, readable_tree::ReadableTree, tree_reader::read,
         tree_reader::read_with_timeout,
     },
     diagnostics_hierarchy::{ArrayContent, ArrayFormat, Bucket, DiagnosticsHierarchy, Property},
@@ -162,10 +157,10 @@ impl TryFrom<Snapshot> for PartialNodeHierarchy {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl TryFrom<&Vmo> for PartialNodeHierarchy {
+impl TryFrom<&fuchsia_zircon::Vmo> for PartialNodeHierarchy {
     type Error = ReaderError;
 
-    fn try_from(vmo: &Vmo) -> Result<Self, Self::Error> {
+    fn try_from(vmo: &fuchsia_zircon::Vmo) -> Result<Self, Self::Error> {
         let snapshot = Snapshot::try_from(vmo)?;
         read_snapshot(&snapshot)
     }
@@ -566,7 +561,7 @@ mod tests {
         },
         anyhow::Error,
         futures::prelude::*,
-        inspect_format::{constants, Payload},
+        inspect_format::{constants, Payload, ReadBytes},
     };
 
     #[fuchsia::test]
@@ -862,9 +857,9 @@ mod tests {
             + constants::HEADER_SIZE_BYTES;
 
         // Get the raw VMO bytes to mess with.
-        let vmo_size = vmo.size().expect("VMO size");
+        let vmo_size = vmo.len();
         let mut buf = vec![0u8; vmo_size as usize];
-        vmo.read_bytes(&mut buf[..], /*offset=*/ 0).expect("read is a success");
+        ReadBytes::read(&vmo, &mut buf[..]);
 
         // Mess up the first byte of the string property value such that the byte is an invalid
         // UTF8 character.  Then build a new node hierarchy based off those bytes, see if invalid
@@ -886,9 +881,9 @@ mod tests {
         let array = root.create_int_array("int-array", 3);
 
         let vmo = inspector.vmo().await.unwrap();
-        let vmo_size = vmo.size()?;
+        let vmo_size = vmo.len();
         let mut buf = vec![0u8; vmo_size as usize];
-        vmo.read_bytes(&mut buf[..], /*offset=*/ 0)?;
+        ReadBytes::read(&vmo, &mut buf[..]);
 
         // Mess up with the block slots by setting them to a too big number.
         let offset = array.get_block().map(|b| b.index()).unwrap().offset() + 8;

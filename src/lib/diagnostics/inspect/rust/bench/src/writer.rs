@@ -8,11 +8,11 @@ use fuchsia_inspect::{
     reader::ReadableTree, ArithmeticArrayProperty, ArrayProperty, ExponentialHistogramParams, Heap,
     HistogramProperty, Inspector, LinearHistogramParams, NumericProperty, Property,
 };
-use mapped_vmo::Mapping;
+use inspect_format::{Container, WritableBlockContainer};
 use num::{pow, traits::FromPrimitive, One};
 use rand::Rng;
 use std::ops::{Add, Mul};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 const NAME: &str = "name";
 
@@ -409,15 +409,15 @@ macro_rules! bench_histogram_property_fn {
 fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Heap/create_1mb_vmo", |b| {
         b.iter_with_large_drop(|| {
-            let (mapping, _) = Mapping::allocate(1 << 21).unwrap();
-            Heap::new(Arc::new(mapping)).unwrap()
+            let (container, _) = Container::read_and_write(1 << 21).unwrap();
+            Heap::new(container).unwrap()
         });
     });
     bench = bench.with_function("Heap/allocate_512k", |b| {
         b.iter_with_large_setup(
             || {
-                let (mapping, _) = Mapping::allocate(1 << 21).unwrap();
-                Heap::new(Arc::new(mapping)).unwrap()
+                let (container, _) = Container::read_and_write(1 << 21).unwrap();
+                Heap::new(container).unwrap()
             },
             |mut heap| {
                 for _ in 0..512 {
@@ -429,8 +429,8 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Heap/extend", |b| {
         b.iter_with_large_setup(
             || {
-                let (mapping, _) = Mapping::allocate(1 << 21).unwrap();
-                let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+                let (container, _) = Container::read_and_write(1 << 21).unwrap();
+                let mut heap = Heap::new(container).unwrap();
                 for _ in 0..512 {
                     heap.allocate_block(2048).unwrap();
                 }
@@ -442,8 +442,8 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Heap/free", |b| {
         b.iter_with_large_setup(
             || {
-                let (mapping, _) = Mapping::allocate(1 << 21).unwrap();
-                let mut heap = Heap::new(Arc::new(mapping)).unwrap();
+                let (container, _) = Container::read_and_write(1 << 21).unwrap();
+                let mut heap = Heap::new(container).unwrap();
                 let mut blocks = vec![];
                 for _ in 0..512 {
                     blocks.push(heap.allocate_block(2048).unwrap());
@@ -460,8 +460,8 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Heap/drop", |b| {
         b.iter_with_large_setup(
             || {
-                let (mapping, _) = Mapping::allocate(1 << 21).unwrap();
-                Heap::new(Arc::new(mapping)).unwrap()
+                let (container, _) = Container::read_and_write(1 << 21).unwrap();
+                Heap::new(container).unwrap()
             },
             |heap| drop(heap),
         );
