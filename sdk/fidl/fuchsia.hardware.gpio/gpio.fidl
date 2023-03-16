@@ -16,6 +16,12 @@ type GpioFlags = strict enum : uint32 {
     PULL_MASK = 0x3;
 };
 
+/// Values for `SetPolarity`.
+type GpioPolarity = strict enum : uint32 {
+    LOW = 0x0;
+    HIGH = 0x1;
+};
+
 protocol Gpio {
     /// Get the pin of a GPIO
     GetPin() -> (struct {
@@ -37,6 +43,12 @@ protocol Gpio {
         initial_value uint8;
     }) -> () error zx.status;
 
+    /// Configures the GPIO pin for an alternate function (I2C, SPI, etc)
+    /// the interpretation of "function" is platform dependent.
+    SetAltFunction(struct {
+        function uint64;
+    }) -> () error zx.status;
+
     /// Reads the current value of a GPIO (0 or 1).
     Read() -> (struct {
         value uint8;
@@ -45,6 +57,11 @@ protocol Gpio {
     /// Sets the current value of the GPIO (any non-zero value maps to 1).
     Write(struct {
         value uint8;
+    }) -> () error zx.status;
+
+    /// Set GPIO polarity.
+    SetPolarity(struct {
+        polarity GpioPolarity;
     }) -> () error zx.status;
 
     /// Sets the drive strength of the GPIO.

@@ -80,6 +80,13 @@ class FakeGpio : public fidl::WireServer<Gpio> {
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
+  void SetAltFunction(SetAltFunctionRequestView request,
+                      SetAltFunctionCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
 
   mock_function::MockFunction<zx_status_t>& MockGetPin() { return mock_get_pin_; }
   mock_function::MockFunction<zx_status_t>& MockGetName() { return mock_get_name_; }

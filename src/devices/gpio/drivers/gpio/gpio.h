@@ -142,6 +142,25 @@ class GpioDevice : public GpioDeviceType,
     }
   }
 
+  void SetAltFunction(SetAltFunctionRequestView request,
+                      SetAltFunctionCompleter::Sync& completer) override {
+    zx_status_t status = GpioSetAltFunction(request->function);
+    if (status == ZX_OK) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(status);
+    }
+  }
+
+  void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override {
+    zx_status_t status = GpioSetPolarity(static_cast<uint32_t>(request->polarity));
+    if (status == ZX_OK) {
+      completer.ReplySuccess();
+    } else {
+      completer.ReplyError(status);
+    }
+  }
+
  private:
   const ddk::GpioImplProtocolClient gpio_ TA_GUARDED(lock_);
   const uint32_t pin_;
