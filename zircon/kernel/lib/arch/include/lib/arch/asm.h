@@ -52,18 +52,20 @@
 #endif
 
   // Set ELF symbol visibility and binding, which represent scope.
-  .ifnc \scope, local
-    .globl \name
-    .ifnc \scope, export
-#ifdef __ELF__
-      .hidden \name
-#endif
-    .else
-      .ifnc \scope, weak
+  .ifnb \scope
+    .ifnc \scope, local
+      .ifc \scope, weak
         .weak \name
-      .else
-        .ifnc \scope, global
-	.error "`scope` argument `\scope` not `local`, `global`, `export`, or `weak`"
+       .else
+        .globl \name
+        .ifc \scope, global
+#ifdef __ELF__
+          .hidden \name
+#endif
+        .else
+          .ifnc \scope, export
+            .error "`scope` argument `\scope` not `local`, `global`, `export`, or `weak`"
+          .endif
         .endif
       .endif
     .endif

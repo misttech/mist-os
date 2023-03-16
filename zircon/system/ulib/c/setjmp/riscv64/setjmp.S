@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/arch/asm.h>
+#include <zircon/tls.h>
+
 #include "setjmp_impl.h"
 
 .function setjmp, export
@@ -54,7 +56,7 @@
   sd a3, JB_SP*8(a0)
   sd a4, JB_FP*8(a0)
   sd a5, JB_USP*8(a0)
-  sd a6, JW_SCSP*8(a0)
+  sd a6, JB_SCSP*8(a0)
 
   mv a0, zero
   ret

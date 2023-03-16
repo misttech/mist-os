@@ -3,7 +3,17 @@
 // found in the LICENSE file.
 
 #include <lib/arch/asm.h>
+#include <zircon/tls.h>
+
 #include "setjmp_impl.h"
+
+#define DW_CFA_val_expression 0x16
+#define DW_CFA_expression 0x0f
+#define DW_OP_breg0 0x70
+#define DW_OP_breg10 (DW_OP_breg0 + 10)
+#define DW_OP_breg12 (DW_OP_breg0 + 12)
+#define DW_OP_deref 0x06
+#define DW_OP_xor 0x27
 
 .function longjmp, export
 
