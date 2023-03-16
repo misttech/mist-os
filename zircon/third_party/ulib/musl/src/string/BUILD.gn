@@ -178,7 +178,7 @@ source_set("stdstr_musl") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-group("stdstr") {
+source_set("stdstr") {
   visibility = [ ":*" ]
   if (use_llvm_libc_string_functions) {
     sources = [ "strerror_r.c" ]
