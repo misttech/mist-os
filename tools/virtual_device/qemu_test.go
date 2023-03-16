@@ -64,6 +64,8 @@ func TestQEMUCommand(t *testing.T) {
 			"name=etc/sercon-port,string=0",
 			"-cpu",
 			"Skylake-Client,-check",
+			"-accel",
+			"tcg,thread=multi",
 			"-net",
 			"none",
 			"-append",

@@ -210,6 +210,7 @@ func (q *QEMUCommandBuilder) SetTarget(target Target, kvm bool) {
 			q.SetFlag("-enable-kvm")
 		} else {
 			q.SetFlag("-machine", "virt-2.12,gic-version=3,virtualization=true")
+			q.SetFlag("-accel", "tcg,thread=multi")
 			q.SetFlag("-cpu", "max")
 		}
 	case TargetEnum.X86_64:
@@ -225,6 +226,7 @@ func (q *QEMUCommandBuilder) SetTarget(target Target, kvm bool) {
 			q.SetFlag("-enable-kvm")
 		} else {
 			q.SetFlag("-cpu", "Skylake-Client,-check")
+			q.SetFlag("-accel", "tcg,thread=multi")
 		}
 	case TargetEnum.RiscV64:
 		if kvm {
@@ -232,6 +234,7 @@ func (q *QEMUCommandBuilder) SetTarget(target Target, kvm bool) {
 		} else {
 			q.SetFlag("-cpu", "rv64")
 			q.SetFlag("-machine", "virt")
+			q.SetFlag("-accel", "tcg,thread=multi")
 		}
 	default:
 		q.recordError(fmt.Errorf("invalid target: %q", target))
