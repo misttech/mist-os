@@ -321,6 +321,7 @@ sdk_molecule("core_lib") {
     "//src/storage/memfs:memfs_sdk",
     "//zircon/system/ulib/async:async-cpp_sdk",
     "//zircon/system/ulib/async:async_sdk",
+    "//zircon/system/ulib/async-default:async-default_sdk",
     "//zircon/system/ulib/async-loop:async-loop-cpp_sdk",
     "//zircon/system/ulib/async-loop:async-loop-default_sdk",
     "//zircon/system/ulib/async-loop:async-loop_sdk",
@@ -331,10 +332,6 @@ sdk_molecule("core_lib") {
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
     "//zircon/system/ulib/trace-provider:trace-provider-so_sdk",
   ]
-
-  if (is_fuchsia) {
-    deps += [ "//zircon/system/ulib/async-default:async-default_sdk" ]
-  }
 }
 
 # Pieces of the IDK sans host tools (which are in ":host_tools").
