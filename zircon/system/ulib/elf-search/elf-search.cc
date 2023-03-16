@@ -191,16 +191,19 @@ zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
   if (status != ZX_OK) {
     return status;
   }
-  fbl::AllocChecker ac;
-  std::unique_ptr<zx_info_maps[]> maps(new (&ac) zx_info_maps[avail]);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  status = process.get_info(ZX_INFO_PROCESS_MAPS, maps.get(), avail * sizeof(zx_info_maps), &actual,
-                            &avail);
-  if (status != ZX_OK) {
-    return status;
-  }
+  std::unique_ptr<zx_info_maps[]> maps;
+  do {
+    fbl::AllocChecker ac;
+    maps.reset(new (&ac) zx_info_maps[avail]);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    status = process.get_info(ZX_INFO_PROCESS_MAPS, maps.get(), avail * sizeof(zx_info_maps),
+                              &actual, &avail);
+    if (status != ZX_OK) {
+      return status;
+    }
+  } while (avail > actual);
   // TODO(jakehehrlich): Check permissions of program headers to make sure they agree with mappings.
   // 'maps' should be sorted in ascending order of base address so we should be able to use that to
   // quickly find the mapping associated with any given PT_LOAD.
