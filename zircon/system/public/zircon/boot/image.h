@@ -418,6 +418,7 @@ typedef enum {
   ZBI_TOPOLOGY_ARCH_UNDEFINED = 0,  // Intended primarily for testing.
   ZBI_TOPOLOGY_ARCH_X86 = 1,
   ZBI_TOPOLOGY_ARCH_ARM = 2,
+  ZBI_TOPOLOGY_ARCH_RISCV = 3,
 } zbi_topology_architecture_t;
 
 typedef struct {
@@ -443,6 +444,11 @@ typedef struct {
 } zbi_topology_x86_info_t;
 
 typedef struct {
+  // ID that represents this CPU in SBI.
+  uint64_t hart_id;
+} zbi_topology_riscv_info_t;
+
+typedef struct {
   uint16_t logical_ids[ZBI_MAX_SMT];
   uint8_t logical_id_count;
 
@@ -454,6 +460,7 @@ typedef struct {
   union {
     zbi_topology_arm_info_t arm;
     zbi_topology_x86_info_t x86;
+    zbi_topology_riscv_info_t riscv;
   } architecture_info;
 
 } zbi_topology_processor_t;
