@@ -63,7 +63,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             )?
             .field("num_threads", num_threads)?
             .field("pipelines_path", "/config/data")?
-            .field("serve_unattributed_logs", false)?;
+            .field("is_unattributed", false)?;
         // LINT.ThenChange(/src/diagnostics/archivist/configs.gni)
 
         let exception_handler_available =
@@ -132,7 +132,7 @@ mod tests {
             archivist_fields.get("pipelines_path"),
             Some(&Value::String("/config/data".to_string()))
         );
-        assert_eq!(archivist_fields.get("serve_unattributed_logs"), Some(&Value::Bool(false)));
+        assert_eq!(archivist_fields.get("is_unattributed"), Some(&Value::Bool(false)));
     }
 
     #[test]

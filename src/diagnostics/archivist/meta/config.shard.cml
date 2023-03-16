@@ -48,7 +48,7 @@
         },
 
         // Whether or not we'll be serving an unattributed LogSink as well.
-        serve_unattributed_logs: { type: "bool" },
+        is_unattributed: { type: "bool" },
     },
 }
 

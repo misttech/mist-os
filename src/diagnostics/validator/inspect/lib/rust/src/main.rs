@@ -542,7 +542,8 @@ async fn run_driver_service(
                     actor.inspector.clone(),
                     service::TreeServerSettings::default(),
                     request_stream,
-                );
+                )
+                .detach();
                 responder.send(Some(tree), TestResult::Ok)?;
                 actor_maybe = Some(actor);
             }

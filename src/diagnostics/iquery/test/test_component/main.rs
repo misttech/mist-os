@@ -190,7 +190,8 @@ async fn main() -> Result<(), Error> {
             inspector_clone.clone(),
             inspect_runtime::service::TreeServerSettings::default(),
             stream,
-        );
+        )
+        .detach();
     });
 
     // TODO(fxbug.dev/41952): remove when all clients writing VMO files today have been migrated to write

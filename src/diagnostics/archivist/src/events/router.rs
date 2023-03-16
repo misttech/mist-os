@@ -22,6 +22,7 @@ use tracing::{debug, error};
 
 const RECENT_EVENT_LIMIT: usize = 200;
 
+#[derive(Debug)]
 pub struct RouterOptions {
     /// Whether or not to validate that the event routing is complete: for each consumer of an
     /// event there exists at least one producer. And for each producer, there exists at least one
@@ -331,7 +332,10 @@ impl EventStreamLogger {
         // TODO(fxbug.dev/92374): leverage string references for the payload.
         match &event.payload {
             EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, .. })
-            | EventPayload::LogSinkRequested(LogSinkRequestedPayload { component, .. }) => {
+            | EventPayload::LogSinkRequested(LogSinkRequestedPayload { component, .. })
+            | EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
+                component, ..
+            }) => {
                 self.log_inspect(ty.as_ref(), component);
             }
         }
@@ -398,6 +402,7 @@ mod tests {
     use crate::events::types::ComponentIdentifier;
     use assert_matches::assert_matches;
     use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_diagnostics::InspectSinkMarker;
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fuchsia_async as fasync;
@@ -450,6 +455,17 @@ mod tests {
                     Event {
                         timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
                         payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+                            component: identity,
+                            request_stream,
+                        }),
+                    }
+                }
+                EventType::InspectSinkRequested => {
+                    let (_, request_stream) =
+                        fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
+                    Event {
+                        timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
+                        payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                             component: identity,
                             request_stream,
                         }),
@@ -660,10 +676,15 @@ mod tests {
         let mut router = EventRouter::new(inspector.root().create_child("events"));
         let mut producer1 = TestEventProducer::default();
         let mut producer2 = TestEventProducer::default();
+        let mut producer3 = TestEventProducer::default();
         let (receiver, consumer) = TestEventConsumer::new();
         router.add_consumer(ConsumerConfig {
             consumer: &consumer,
-            events: vec![EventType::LogSinkRequested, EventType::DiagnosticsReady],
+            events: vec![
+                EventType::InspectSinkRequested,
+                EventType::LogSinkRequested,
+                EventType::DiagnosticsReady,
+            ],
         });
         router.add_producer(ProducerConfig {
             producer: &mut producer1,
@@ -673,9 +694,14 @@ mod tests {
             producer: &mut producer2,
             events: vec![EventType::LogSinkRequested],
         });
+        router.add_producer(ProducerConfig {
+            producer: &mut producer3,
+            events: vec![EventType::InspectSinkRequested],
+        });
 
         producer1.emit(EventType::DiagnosticsReady, LEGACY_IDENTITY.clone()).await;
         producer2.emit(EventType::LogSinkRequested, IDENTITY.clone()).await;
+        producer3.emit(EventType::InspectSinkRequested, IDENTITY.clone()).await;
 
         // Consume the events.
         let (_terminate_handle, fut) = router.start(RouterOptions::default()).unwrap();
@@ -686,7 +712,8 @@ mod tests {
             events: {
                 event_counts: {
                     diagnostics_ready: 1u64,
-                    log_sink_requested: 1u64
+                    log_sink_requested: 1u64,
+                    inspect_sink_requested: 1u64,
                 },
                 recent_events: {
                     "0": {
@@ -697,6 +724,11 @@ mod tests {
                     "1": {
                         "@time": inspect::testing::AnyProperty,
                         event: "log_sink_requested",
+                        moniker: "a/b"
+                    },
+                    "2": {
+                        "@time": inspect::testing::AnyProperty,
+                        event: "inspect_sink_requested",
                         moniker: "a/b"
                     },
                 }

@@ -20,7 +20,7 @@ default_config = {
   maximum_concurrent_snapshots_per_reader = 4
   num_threads = 4
   pipelines_path = "/config/data"
-  serve_unattributed_logs = false
+  is_unattributed = false
 }
 
 # LINT.ThenChange(/src/lib/assembly/platform_configuration/src/subsystems/diagnostics.rs)
@@ -39,5 +39,5 @@ embedded_config = {
 without_attribution_config = {
   forward_variables_from(embedded_config, "*")
   enable_event_source = false
-  serve_unattributed_logs = true
+  is_unattributed = true
 }

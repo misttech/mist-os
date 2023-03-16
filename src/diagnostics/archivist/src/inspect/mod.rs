@@ -26,6 +26,7 @@ use {
 pub mod collector;
 pub mod container;
 pub mod repository;
+pub mod servers;
 
 use container::PopulatedInspectDataContainer;
 

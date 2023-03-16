@@ -9,6 +9,7 @@ use crate::{
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::prelude::*;
 use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger as flogger;
 use fidl_fuchsia_sys_internal::SourceIdentity;
@@ -91,6 +92,7 @@ impl From<UniqueKey> for Vec<FlyStr> {
 pub enum EventType {
     DiagnosticsReady,
     LogSinkRequested,
+    InspectSinkRequested,
 }
 
 impl AsRef<str> for EventType {
@@ -98,6 +100,7 @@ impl AsRef<str> for EventType {
         match &self {
             Self::DiagnosticsReady => "diagnostics_ready",
             Self::LogSinkRequested => "log_sink_requested",
+            Self::InspectSinkRequested => "inspect_sink_requested",
         }
     }
 }
@@ -115,6 +118,7 @@ impl Event {
         match &self.payload {
             EventPayload::DiagnosticsReady(_) => EventType::DiagnosticsReady,
             EventPayload::LogSinkRequested(_) => EventType::LogSinkRequested,
+            EventPayload::InspectSinkRequested(_) => EventType::InspectSinkRequested,
         }
     }
 }
@@ -124,6 +128,20 @@ impl Event {
 pub enum EventPayload {
     DiagnosticsReady(DiagnosticsReadyPayload),
     LogSinkRequested(LogSinkRequestedPayload),
+    InspectSinkRequested(InspectSinkRequestedPayload),
+}
+
+pub struct InspectSinkRequestedPayload {
+    /// The component that is connecting to `InspectSink`.
+    pub component: Arc<ComponentIdentity>,
+    /// The stream containing requests made on the `InspectSink` channel by the component.
+    pub request_stream: fdiagnostics::InspectSinkRequestStream,
+}
+
+impl std::fmt::Debug for InspectSinkRequestedPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InspectSinkRequestedPayload").field("component", &self.component).finish()
+    }
 }
 
 /// Payload for a CapabilityReady(diagnostics) event.

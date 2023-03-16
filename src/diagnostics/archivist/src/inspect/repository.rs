@@ -95,7 +95,7 @@ impl InspectRepository {
                         if let Some((_, container)) =
                             guard.diagnostics_containers.get_mut(&identity_clone.unique_key())
                         {
-                            if container.remove_handle(koid_to_remove).await != 0 {
+                            if container.remove_handle(koid_to_remove) != 0 {
                                 return;
                             }
                         }
@@ -129,7 +129,7 @@ impl InspectRepository {
         }
     }
 
-    async fn handle_diagnostics_ready(
+    pub(crate) async fn add_inspect_handle(
         self: &Arc<Self>,
         component: Arc<ComponentIdentity>,
         handle: impl Into<InspectHandle>,
@@ -138,10 +138,76 @@ impl InspectRepository {
         // Update the central repository to reference the new diagnostics source.
         self.add_inspect_artifacts(Arc::clone(&component), handle).await;
     }
+}
 
-    #[cfg(test)]
+#[cfg(test)]
+impl InspectRepository {
     pub(crate) async fn terminate_inspect(&self, identity: &ComponentIdentity) {
         self.inner.write().await.diagnostics_containers.remove(&identity.unique_key());
+    }
+
+    async fn has_match(&self, identity: &Arc<ComponentIdentity>) -> bool {
+        let lock = self.inner.read().await;
+        lock.get_diagnostics_containers().iter().any(|(_key, val)| match val {
+            Some((actual_id, _)) => actual_id == identity,
+            _ => false,
+        })
+    }
+
+    /// Wait for data to appear for `identity`. Will run indefinitely if no data shows up.
+    async fn wait_for_artifact(&self, identity: &Arc<ComponentIdentity>) {
+        loop {
+            if self.has_match(identity).await {
+                return;
+            }
+
+            fasync::Timer::new(fuchsia_zircon::Time::after(fuchsia_zircon::Duration::from_millis(
+                100,
+            )))
+            .await;
+        }
+    }
+
+    /// Wait until nothing is present for `identity`. Will run indefinitely if data persists.
+    pub(crate) async fn wait_until_gone(&self, identity: &Arc<ComponentIdentity>) {
+        loop {
+            if !self.has_match(identity).await {
+                return;
+            }
+
+            fasync::Timer::new(fuchsia_zircon::Time::after(fuchsia_zircon::Duration::from_millis(
+                100,
+            )))
+            .await;
+        }
+    }
+
+    /// Execute `assertions` on the `InspectArtifactsContainer` found for `identity`, waiting
+    /// for that data to appear.
+    pub(crate) async fn execute_on_identity<F, Fut>(
+        &self,
+        identity: &Arc<ComponentIdentity>,
+        assertions: F,
+    ) -> bool
+    where
+        F: FnOnce(&InspectArtifactsContainer) -> Fut,
+        Fut: futures::Future<Output = ()>,
+    {
+        self.wait_for_artifact(identity).await;
+        if let Some((_, Some((_, container)))) =
+            self.inner.read().await.get_diagnostics_containers().iter().find(
+                |(_key, val)| match val {
+                    Some((actual_id, _)) => actual_id == identity,
+                    _ => false,
+                },
+            )
+        {
+            assertions(container).await;
+            true
+        } else {
+            // this can only happen if somehow the data is removed after waiting for it
+            false
+        }
     }
 }
 
@@ -150,7 +216,7 @@ impl EventConsumer for InspectRepository {
     async fn handle(self: Arc<Self>, event: Event) {
         match event.payload {
             EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, directory }) => {
-                self.handle_diagnostics_ready(component, directory).await;
+                self.add_inspect_handle(component, directory).await;
             }
             _ => unreachable!("Inspect repository is only subscribed to diagnostics ready"),
         }
@@ -179,7 +245,7 @@ impl InspectRepositoryInner {
         proxy_handle: impl Into<InspectHandle>,
     ) -> Option<oneshot::Receiver<Koid>> {
         let unique_key: Vec<_> = identity.unique_key().into();
-        let diag_repo_entry_opt = self.diagnostics_containers.get(&unique_key);
+        let diag_repo_entry_opt = self.diagnostics_containers.get_mut(&unique_key);
 
         match diag_repo_entry_opt {
             None => {
@@ -192,7 +258,7 @@ impl InspectRepositoryInner {
                 self.diagnostics_containers.set(unique_key, (identity, inspect_container));
                 Some(on_closed_fut)
             }
-            Some(_) => None,
+            Some((_, ref mut artifacts_container)) => artifacts_container.push_handle(proxy_handle),
         }
     }
 
@@ -238,20 +304,28 @@ impl InspectRepositoryInner {
 
             // This artifact contains inspect and matches a passed selector.
             if let Some(unpopulated) =
-                container.create_unpopulated(identity, optional_hierarchy_matcher).await
+                container.create_unpopulated(identity, optional_hierarchy_matcher)
             {
                 containers.push(unpopulated);
             }
         }
         containers
     }
+}
 
-    #[cfg(test)]
+#[cfg(test)]
+impl InspectRepositoryInner {
     pub(crate) async fn get(
         &self,
         identity: &ComponentIdentity,
     ) -> Option<&(Arc<ComponentIdentity>, InspectArtifactsContainer)> {
         self.diagnostics_containers.get(&identity.unique_key())
+    }
+
+    pub(crate) fn get_diagnostics_containers(
+        &self,
+    ) -> &trie::Trie<FlyStr, (Arc<ComponentIdentity>, InspectArtifactsContainer)> {
+        &self.diagnostics_containers
     }
 }
 

@@ -8,10 +8,13 @@ use crate::{
     error::Error,
     events::{
         router::{ConsumerConfig, EventRouter, ProducerConfig, RouterOptions},
-        sources::{ComponentEventProvider, EventSource, LogConnector, UnattributedLogSinkSource},
+        sources::{
+            ComponentEventProvider, EventSource, LogConnector, UnattributedInspectSinkSource,
+            UnattributedLogSinkSource,
+        },
         types::*,
     },
-    inspect::repository::InspectRepository,
+    inspect::{repository::InspectRepository, servers::*},
     logs::{repository::LogsRepository, servers::*, KernelDebugLog},
     pipeline::Pipeline,
 };
@@ -67,11 +70,17 @@ pub struct Archivist {
     /// The server handling fuchsia.logger.Log
     log_server: Arc<LogServer>,
 
+    /// The server handling fuchsia.diagnostics.InspectSink
+    inspect_server: Arc<InspectSinkServer>,
+
     /// The server handling fuchsia.diagnostics.LogSettings
     log_settings_server: Arc<LogSettingsServer>,
 
     /// The source that takes care of routing unattributed log sink request streams.
     unattributed_log_sink_source: Option<UnattributedLogSinkSource>,
+
+    /// The source that takes care of routing unattributed InspectSink request streams.
+    unattributed_inspect_sink_source: Option<UnattributedInspectSinkSource>,
 }
 
 impl Archivist {
@@ -89,6 +98,8 @@ impl Archivist {
         .await;
         let inspect_repo =
             Arc::new(InspectRepository::new(pipelines.iter().map(Arc::downgrade).collect()));
+
+        let inspect_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
 
         // Initialize our FIDL servers. This doesn't start serving yet.
         let accessor_server = Arc::new(ArchiveAccessorServer::new(
@@ -113,13 +124,29 @@ impl Archivist {
             consumer: &inspect_repo,
             events: vec![EventType::DiagnosticsReady],
         });
+        event_router.add_consumer(ConsumerConfig {
+            consumer: &inspect_server,
+            events: vec![EventType::InspectSinkRequested],
+        });
 
         // Initialize the unattributed log sink provider.
-        let unattributed_log_sink_source = if config.serve_unattributed_logs {
+        let unattributed_log_sink_source = if config.is_unattributed {
             let mut source = UnattributedLogSinkSource::default();
             event_router.add_producer(ProducerConfig {
                 producer: &mut source,
                 events: vec![EventType::LogSinkRequested],
+            });
+            Some(source)
+        } else {
+            None
+        };
+
+        // Initialize the unattributed InspectSink provider.
+        let unattributed_inspect_sink_source = if config.is_unattributed {
+            let mut source = UnattributedInspectSinkSource::default();
+            event_router.add_producer(ProducerConfig {
+                producer: &mut source,
+                events: vec![EventType::InspectSinkRequested],
             });
             Some(source)
         } else {
@@ -149,6 +176,7 @@ impl Archivist {
         Self {
             accessor_server,
             log_server,
+            inspect_server,
             log_settings_server,
             event_router,
             stop_recv: None,
@@ -159,6 +187,7 @@ impl Archivist {
             _inspect_repository: inspect_repo,
             logs_repository: logs_repo,
             unattributed_log_sink_source,
+            unattributed_inspect_sink_source,
         }
     }
 
@@ -236,6 +265,24 @@ impl Archivist {
                 }
             }
 
+            if !config.is_unattributed {
+                match EventSource::new("/events/inspect_sink_requested_event_stream").await {
+                    Err(err) => {
+                        warn!(?err, "Failed to create event source for InspectSink requests")
+                    }
+                    Ok(mut event_source) => {
+                        event_router.add_producer(ProducerConfig {
+                            producer: &mut event_source,
+                            events: vec![EventType::InspectSinkRequested],
+                        });
+                        incoming_external_event_producers.push(fasync::Task::spawn(async move {
+                            // This should never exit.
+                            let _ = event_source.spawn().await;
+                        }));
+                    }
+                }
+            }
+
             match EventSource::new("/events/diagnostics_ready_event_stream").await {
                 Err(err) => {
                     warn!(?err, "Failed to create event source for diagnostics ready requests")
@@ -305,17 +352,20 @@ impl Archivist {
         let accessor_server = Arc::clone(&self.accessor_server);
         let log_server = Arc::clone(&self.log_server);
         let logs_repo = Arc::clone(&self.logs_repository);
+        let inspect_server = Arc::clone(&self.inspect_server);
         let all_msg = async {
             logs_repo.wait_for_termination().await;
             debug!("Flushing to listeners.");
             accessor_server.wait_for_servers_to_complete().await;
             log_server.wait_for_servers_to_complete().await;
             debug!("Log listeners and batch iterators stopped.");
+            inspect_server.wait_for_servers_to_complete().await;
         };
 
         let (abortable_fut, abort_handle) = abortable(run_outgoing);
 
         let log_server = self.log_server;
+        let inspect_server = self.inspect_server;
         let accessor_server = self.accessor_server;
         let incoming_external_event_producers = self.incoming_external_event_producers;
         let logs_repo = Arc::clone(&self.logs_repository);
@@ -326,7 +376,7 @@ impl Archivist {
                 for task in incoming_external_event_producers {
                     task.cancel().await;
                 }
-                log_server.stop().await;
+                future::join(log_server.stop(), inspect_server.stop()).await;
                 accessor_server.stop().await;
                 logs_repo.stop_accepting_new_log_sinks().await;
                 abort_handle.abort()
@@ -364,7 +414,17 @@ impl Archivist {
         if let Some(mut unattributed_log_sink_source) = self.unattributed_log_sink_source.take() {
             svc_dir.add_fidl_service(move |stream| {
                 debug!("unattributed fuchsia.logger.LogSink connection");
-                futures::executor::block_on(unattributed_log_sink_source.new_connection(stream));
+                unattributed_log_sink_source.new_connection(stream);
+            });
+        }
+
+        // Ingest unattributed fuchsia.diagnostics.InspectSink connections.
+        if let Some(mut unattributed_inspect_sink_source) =
+            self.unattributed_inspect_sink_source.take()
+        {
+            svc_dir.add_fidl_service(move |stream| {
+                debug!("unattributed fuchsia.diagnostics.InspectSink connection");
+                unattributed_inspect_sink_source.new_connection(stream);
             });
         }
 
@@ -406,7 +466,7 @@ mod tests {
             enable_log_connector: false,
             log_to_debuglog: false,
             maximum_concurrent_snapshots_per_reader: 4,
-            serve_unattributed_logs: true,
+            is_unattributed: true,
             logs_max_cached_original_bytes: LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
             num_threads: 1,
             pipelines_path: DEFAULT_PIPELINES_PATH.into(),
@@ -417,10 +477,17 @@ mod tests {
         // Install a fake producer that allows all incoming events. This allows skipping
         // validation for the purposes of the tests here.
         let mut fake_producer = FakeProducer {};
-        archivist.event_router.add_producer(ProducerConfig {
-            producer: &mut fake_producer,
-            events: vec![EventType::LogSinkRequested, EventType::DiagnosticsReady],
-        });
+
+        // must be updated if `is_unattributed` set to false
+        let events = vec![
+            EventType::LogSinkRequested,
+            EventType::DiagnosticsReady,
+            EventType::InspectSinkRequested,
+        ];
+
+        archivist
+            .event_router
+            .add_producer(ProducerConfig { producer: &mut fake_producer, events });
 
         archivist
     }

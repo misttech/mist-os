@@ -108,7 +108,7 @@ pub async fn handle_request_stream(
             }
             TreeRequest::OpenChild { child_name, tree, .. } => {
                 if let Ok(inspector) = inspector.read_tree(&child_name).await {
-                    spawn_tree_server(inspector, settings.clone(), tree.into_stream()?)
+                    spawn_tree_server(inspector, settings.clone(), tree.into_stream()?).detach()
                 }
             }
         }
@@ -118,17 +118,17 @@ pub async fn handle_request_stream(
 
 /// Spawns a server for the `fuchsia.inspect.Tree` protocol. This protocol returns the VMO
 /// associated with the given tree on `get_content` and allows to open linked trees (lazy nodes).
+#[must_use]
 pub fn spawn_tree_server(
     inspector: Inspector,
     settings: TreeServerSettings,
     stream: TreeRequestStream,
-) {
+) -> fasync::Task<()> {
     fasync::Task::spawn(async move {
         handle_request_stream(inspector, settings, stream)
             .await
             .unwrap_or_else(|err: Error| warn!(?err, "failed to run tree server"));
     })
-    .detach();
 }
 
 /// Runs a server for the `fuchsia.inspect.TreeNameIterator` protocol. This protocol returns the
@@ -330,7 +330,7 @@ mod tests {
         settings: TreeServerSettings,
     ) -> Result<TreeProxy, Error> {
         let (tree, request_stream) = fidl::endpoints::create_proxy_and_stream::<TreeMarker>()?;
-        spawn_tree_server(inspector, settings, request_stream);
+        spawn_tree_server(inspector, settings, request_stream).detach();
         Ok(tree)
     }
 

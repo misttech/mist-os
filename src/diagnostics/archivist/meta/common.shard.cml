@@ -16,6 +16,7 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
@@ -28,6 +29,12 @@
             from: "parent",
             path: "/events/log_sink_requested_event_stream",
             filter: { name: "fuchsia.logger.LogSink" },
+        },
+        {
+            event_stream: [ "capability_requested" ],
+            from: "parent",
+            path: "/events/inspect_sink_requested_event_stream",
+            filter: { name: "fuchsia.diagnostics.InspectSink" },
         },
         {
             event_stream: [ "directory_ready" ],
@@ -44,6 +51,7 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.InspectSink",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",

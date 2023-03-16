@@ -1,29 +1,29 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use crate::{
     events::{
         router::{Dispatcher, EventProducer},
-        types::{Event, EventPayload, LogSinkRequestedPayload},
+        types::{Event, EventPayload, InspectSinkRequestedPayload},
     },
     identity::ComponentIdentity,
 };
-use fidl_fuchsia_logger as flogger;
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 
 #[derive(Default)]
-pub struct UnattributedLogSinkSource {
+pub struct UnattributedInspectSinkSource {
     dispatcher: Dispatcher,
 }
 
-impl UnattributedLogSinkSource {
-    pub fn new_connection(&mut self, request_stream: flogger::LogSinkRequestStream) {
+impl UnattributedInspectSinkSource {
+    pub fn new_connection(&mut self, request_stream: fdiagnostics::InspectSinkRequestStream) {
         self.dispatcher
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
-                payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+                payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                     component: Arc::new(ComponentIdentity::unknown()),
                     request_stream,
                 }),
@@ -32,7 +32,7 @@ impl UnattributedLogSinkSource {
     }
 }
 
-impl EventProducer for UnattributedLogSinkSource {
+impl EventProducer for UnattributedInspectSinkSource {
     fn set_dispatcher(&mut self, dispatcher: Dispatcher) {
         self.dispatcher = dispatcher;
     }
@@ -42,7 +42,7 @@ impl EventProducer for UnattributedLogSinkSource {
 mod tests {
     use super::*;
     use crate::events::types::*;
-    use fidl_fuchsia_logger::LogSinkMarker;
+    use fidl_fuchsia_diagnostics::InspectSinkMarker;
     use flyweights::FlyStr;
     use fuchsia_async as fasync;
     use futures::StreamExt;
@@ -50,15 +50,15 @@ mod tests {
 
     #[fuchsia::test]
     async fn events_have_unknown_identity() {
-        let events = BTreeSet::from([EventType::LogSinkRequested]);
+        let events = BTreeSet::from([EventType::InspectSinkRequested]);
         let (mut event_stream, dispatcher) = Dispatcher::new_for_test(events);
-        let mut source = UnattributedLogSinkSource::default();
+        let mut source = UnattributedInspectSinkSource::default();
         source.set_dispatcher(dispatcher);
-        let (_, log_sink_stream) =
-            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (_, inspect_sink_stream) =
+            fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
 
         let _task = fasync::Task::spawn(async move {
-            source.new_connection(log_sink_stream);
+            source.new_connection(inspect_sink_stream);
         });
 
         let event = event_stream.next().await.expect("received event");
@@ -68,7 +68,7 @@ mod tests {
             relative_moniker: vec!["UNKNOWN"].into(),
         };
         match event.payload {
-            EventPayload::LogSinkRequested(LogSinkRequestedPayload {
+            EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component,
                 request_stream: _,
             }) => {

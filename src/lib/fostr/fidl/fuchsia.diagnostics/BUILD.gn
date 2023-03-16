@@ -7,5 +7,8 @@ import("//src/lib/fostr/build/fostr_fidl.gni")
 fostr_fidl("fuchsia.diagnostics") {
   fidl_target = "//sdk/fidl/fuchsia.diagnostics"
 
-  deps = [ "//src/lib/fostr/fidl/fuchsia.mem" ]
+  deps = [
+    "//src/lib/fostr/fidl/fuchsia.inspect",
+    "//src/lib/fostr/fidl/fuchsia.mem",
+  ]
 }
