@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
+// TODO(fxbug.dev/121659): Delete this once signal handling is implemented on arm.
+#![allow(dead_code)]
 
-use crate::logging::{log_trace, log_warn};
-use crate::mm::MemoryAccessor;
 use crate::signals::*;
-use crate::syscalls::SyscallResult;
 use crate::task::*;
 use crate::types::*;
 
@@ -39,22 +37,25 @@ impl SignalStackFrame {
 ///
 /// This function stores the state required to restore after the signal handler on the stack.
 pub fn dispatch_signal_handler(
-    task: &Task,
-    registers: &mut RegisterState,
-    signal_state: &mut SignalState,
-    siginfo: SignalInfo,
-    action: sigaction_t,
+    _task: &Task,
+    _registers: &mut RegisterState,
+    _signal_state: &mut SignalState,
+    _siginfo: SignalInfo,
+    _action: sigaction_t,
 ) {
     // TODO(fxbug.dev/121659) implement this on ARM.
 }
 
-pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(), Errno> {
+pub fn restore_from_signal_handler(_current_task: &mut CurrentTask) -> Result<(), Errno> {
     // TODO(fxbug.dev/121659) implement this on ARM.
     error!(ENOSYS)
 }
 
 /// Maybe adjust a task's registers to restart a syscall once the task switches back to userspace,
 /// based on whether the return value is one of the restartable error codes such as ERESTARTSYS.
-pub fn prepare_to_restart_syscall(current_task: &mut CurrentTask, sigaction: Option<sigaction_t>) {
+pub fn prepare_to_restart_syscall(
+    _current_task: &mut CurrentTask,
+    _sigaction: Option<sigaction_t>,
+) {
     // TODO(fxbug.dev/121659) implement this on ARM.
 }
