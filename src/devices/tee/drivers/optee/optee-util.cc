@@ -18,8 +18,6 @@ Uuid::Uuid(uint32_t time_low, uint16_t time_mid, uint16_t time_hi_and_version,
 
 Uuid::Uuid(const fuchsia_tee::wire::Uuid& uuid) { UuidInternal(uuid); }
 
-Uuid::Uuid(const uuid_t& uuid) { UuidInternal(uuid); }
-
 Uuid::Uuid(const Octets& uuid) {
   time_low_ = (static_cast<uint32_t>(uuid[0]) << 24) | (static_cast<uint32_t>(uuid[1]) << 16) |
               (static_cast<uint32_t>(uuid[2]) << 8) | static_cast<uint32_t>(uuid[3]);
@@ -30,7 +28,7 @@ Uuid::Uuid(const Octets& uuid) {
 
 template <typename T>
 void Uuid::UuidInternal(const T& uuid) {
-  static_assert(std::is_same_v<T, fuchsia_tee::wire::Uuid> || std::is_same_v<T, uuid_t>);
+  static_assert(std::is_same_v<T, fuchsia_tee::wire::Uuid>);
   time_low_ = uuid.time_low;
   time_mid_ = uuid.time_mid;
   time_hi_and_version_ = uuid.time_hi_and_version;

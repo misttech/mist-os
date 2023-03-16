@@ -6,7 +6,6 @@
 #define SRC_DEVICES_TEE_DRIVERS_OPTEE_OPTEE_UTIL_H_
 
 #include <fidl/fuchsia.tee/cpp/wire.h>
-#include <fuchsia/hardware/tee/c/banjo.h>
 #include <lib/ddk/debug.h>
 
 #include <array>
@@ -39,7 +38,6 @@ class Uuid final {
   Uuid(uint32_t time_low, uint16_t time_mid, uint16_t time_hi_and_version,
        const std::array<uint8_t, 8>& clock_seq_and_node);
   explicit Uuid(const fuchsia_tee::wire::Uuid& zx_uuid);
-  explicit Uuid(const uuid_t& uuid);
   explicit Uuid(const Octets& uuid);
 
   uint32_t time_low() const { return time_low_; }

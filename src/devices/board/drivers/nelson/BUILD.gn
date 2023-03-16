@@ -155,9 +155,9 @@ driver_bind_rules("aml_secure_mem_bind") {
   tests = "bind-tests/aml_secure_mem-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.hardware.tee",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
-    "//src/devices/bind/fuchsia.tee",
   ]
 }
 
@@ -274,9 +274,9 @@ driver_bind_rules("nelson_aml_video_bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.hardware.tee",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
-    "//src/devices/bind/fuchsia.tee",
   ]
 }
 

@@ -471,40 +471,6 @@ zx_status_t Fragment::RpcSysmem(const uint8_t* req_buf, uint32_t req_size, uint8
   }
 }
 
-zx_status_t Fragment::RpcTee(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                             uint32_t* out_resp_size, zx::handle* req_handles,
-                             uint32_t req_handle_count, zx::handle* resp_handles,
-                             uint32_t* resp_handle_count) {
-  if (!tee_client_.proto_client().is_valid()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  auto* req = reinterpret_cast<const TeeProxyRequest*>(req_buf);
-  if (req_size < sizeof(*req)) {
-    zxlogf(ERROR, "%s received %u, expecting %zu", __func__, req_size, sizeof(*req));
-    return ZX_ERR_INTERNAL;
-  }
-  if (req_handle_count < 1 || req_handle_count > 2) {
-    zxlogf(ERROR, "%s received %u handles, expecting 1-2", __func__, req_handle_count);
-    return ZX_ERR_INTERNAL;
-  }
-  *out_resp_size = sizeof(ProxyResponse);
-
-  switch (req->op) {
-    case TeeOp::CONNECT_TO_APPLICATION: {
-      zx::channel tee_device_request(std::move(req_handles[0]));
-      zx::channel service_provider;
-      if (req_handle_count == 2) {
-        service_provider.reset(req_handles[1].release());
-      }
-      return tee_client_.proto_client().ConnectToApplication(
-          &req->application_uuid, std::move(tee_device_request), std::move(service_provider));
-    }
-    default:
-      zxlogf(ERROR, "%s: unknown sysmem op %u", __func__, static_cast<uint32_t>(req->op));
-      return ZX_ERR_INTERNAL;
-  }
-}
-
 zx_status_t Fragment::RpcUms(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                              uint32_t* out_resp_size, zx::handle* req_handles,
                              uint32_t req_handle_count, zx::handle* resp_handles,
@@ -686,10 +652,6 @@ zx_status_t Fragment::ReadFidlFromChannel() {
       status = RpcSysmem(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                          resp_handles, &resp_handle_count);
       break;
-    case ZX_PROTOCOL_TEE:
-      status = RpcTee(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
-                      resp_handles, &resp_handle_count);
-      break;
     case ZX_PROTOCOL_USB_MODE_SWITCH:
       status = RpcUms(req_buf, actual, resp_buf, &resp_len, req_handles, req_handle_count,
                       resp_handles, &resp_handle_count);
@@ -799,13 +761,6 @@ zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       sysmem_client_.proto_client().GetProto(static_cast<sysmem_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
-    case ZX_PROTOCOL_TEE: {
-      if (!tee_client_.proto_client().is_valid()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      tee_client_.proto_client().GetProto(static_cast<tee_protocol_t*>(out_protocol));
       return ZX_OK;
     }
     case ZX_PROTOCOL_USB_MODE_SWITCH: {

@@ -548,7 +548,8 @@ zx_status_t OpteeController::Bind() {
   status = DdkAdd(ddk::DeviceAddArgs(kDeviceName.data())
                       .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
                       .set_fidl_service_offers(offers)
-                      .set_outgoing_dir(endpoints->client.TakeChannel()));
+                      .set_outgoing_dir(endpoints->client.TakeChannel())
+                      .set_proto_id(ZX_PROTOCOL_TEE));
   if (status != ZX_OK) {
     LOG(ERROR, "failed to add device");
     return status;
@@ -574,17 +575,6 @@ void OpteeController::DdkUnbind(ddk::UnbindTxn txn) {
 void OpteeController::DdkRelease() {
   // devmgr has given up ownership, so we must clean ourself up.
   delete this;
-}
-
-zx_status_t OpteeController::TeeConnectToApplication(const uuid_t* application_uuid,
-                                                     zx::channel tee_app_request,
-                                                     zx::channel service_provider) {
-  ZX_DEBUG_ASSERT(application_uuid);
-  ZX_DEBUG_ASSERT(tee_app_request.is_valid());
-  return ConnectToApplicationInternal(
-      Uuid(*application_uuid),
-      fidl::ClientEnd<fuchsia_tee_manager::Provider>(std::move(service_provider)),
-      fidl::ServerEnd<fuchsia_tee::Application>(std::move(tee_app_request)));
 }
 
 void OpteeController::ConnectToDeviceInfo(

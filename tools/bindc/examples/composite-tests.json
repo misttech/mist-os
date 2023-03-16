@@ -13,7 +13,7 @@
                 "name": "Abort sysmem",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.tee.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.tee.BIND_FIDL_PROTOCOL.DEVICE"
                 }
             }
         ]
@@ -26,7 +26,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.tee.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.tee.BIND_FIDL_PROTOCOL.DEVICE"
                 }
             },
             {
@@ -34,7 +34,7 @@
                 "expected": "abort",
                 "device": {
                     "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.QEMU",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.tee.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.hardware.tee.BIND_FIDL_PROTOCOL.DEVICE"
                 }
             }
         ]

@@ -16,7 +16,6 @@
 #include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <fuchsia/hardware/tee/cpp/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -45,7 +44,6 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::RegistersProtocol<FragmentProxy>,
                       public ddk::SpiProtocol<FragmentProxy>,
                       public ddk::SysmemProtocol<FragmentProxy>,
-                      public ddk::TeeProtocol<FragmentProxy>,
                       public ddk::UsbModeSwitchProtocol<FragmentProxy> {
  public:
   FragmentProxy(zx_device_t* parent, zx::channel rpc)
@@ -122,8 +120,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection);
   zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection);
   zx_status_t SysmemUnregisterSecureMem();
-  zx_status_t TeeConnectToApplication(const uuid_t* application_uuid, zx::channel tee_app_request,
-                                      zx::channel service_provider);
 
   // USB Mode Switch
   zx_status_t UsbModeSwitchSetMode(usb_mode_t mode);

@@ -6,14 +6,14 @@ composite gizmo_sysmem;
 
 using fuchsia.platform;
 using fuchsia.sysmem;
-using fuchsia.tee;
+using fuchsia.hardware.tee;
 
 primary node "sysmem" {
   fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
 }
 
 node "tee" {
-  if fuchsia.BIND_PROTOCOL == fuchsia.tee.BIND_PROTOCOL.DEVICE {
+  if fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.tee.BIND_FIDL_PROTOCOL.DEVICE {
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
   } else {
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.QEMU;

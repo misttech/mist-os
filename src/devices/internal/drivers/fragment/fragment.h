@@ -26,7 +26,6 @@
 #include <fuchsia/hardware/shareddma/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <fuchsia/hardware/tee/cpp/banjo.h>
 #include <fuchsia/hardware/thermal/cpp/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
@@ -79,7 +78,6 @@ class Fragment : public FragmentBase {
         pwm_client_(parent, ZX_PROTOCOL_PWM),
         spi_client_(parent, ZX_PROTOCOL_SPI),
         sysmem_client_(parent, ZX_PROTOCOL_SYSMEM),
-        tee_client_(parent, ZX_PROTOCOL_TEE),
         ums_client_(parent, ZX_PROTOCOL_USB_MODE_SWITCH),
         power_impl_client_(parent, ZX_PROTOCOL_POWER_IMPL),
         dsi_impl_client_(parent, ZX_PROTOCOL_DSI_IMPL),
@@ -142,9 +140,6 @@ class Fragment : public FragmentBase {
   zx_status_t RpcSysmem(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                         uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
                         zx::handle* resp_handles, uint32_t* resp_handle_count);
-  zx_status_t RpcTee(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
-                     uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
-                     zx::handle* resp_handles, uint32_t* resp_handle_count);
   zx_status_t RpcUms(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,
                      uint32_t* out_resp_size, zx::handle* req_handles, uint32_t req_handle_count,
                      zx::handle* resp_handles, uint32_t* resp_handle_count);
@@ -170,7 +165,6 @@ class Fragment : public FragmentBase {
   ProtocolClient<ddk::PwmProtocolClient, pwm_protocol_t> pwm_client_;
   ProtocolClient<ddk::SpiProtocolClient, spi_protocol_t> spi_client_;
   ProtocolClient<ddk::SysmemProtocolClient, sysmem_protocol_t> sysmem_client_;
-  ProtocolClient<ddk::TeeProtocolClient, tee_protocol_t> tee_client_;
   ProtocolClient<ddk::UsbModeSwitchProtocolClient, usb_mode_switch_protocol_t> ums_client_;
   ProtocolClient<ddk::PowerImplProtocolClient, power_impl_protocol_t> power_impl_client_;
   ProtocolClient<ddk::DsiImplProtocolClient, dsi_impl_protocol_t> dsi_impl_client_;

@@ -22,8 +22,8 @@ bind_test("example_composite_bind_test") {
   rules = "composite-gizmo.bind"
   tests = "composite-tests.json"
   deps = [
+    "//src/devices/bind/fuchsia.hardware.tee",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
-    "//src/devices/bind/fuchsia.tee",
   ]
 }

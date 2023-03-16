@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
 #include <fidl/fuchsia.tee.manager/cpp/wire.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <fuchsia/hardware/tee/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -116,7 +115,6 @@ using DeviceType =
                 ddk::Suspendable, ddk::Unbindable>;
 class OpteeController : public OpteeControllerBase,
                         public DeviceType,
-                        public ddk::TeeProtocol<OpteeController, ddk::base_protocol>,
                         public fidl::WireServer<fuchsia_tee::DeviceInfo> {
  public:
   explicit OpteeController(zx_device_t* parent)
@@ -132,10 +130,6 @@ class OpteeController : public OpteeControllerBase,
   void DdkSuspend(ddk::SuspendTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
-
-  // fuchsia.hardware.Tee
-  zx_status_t TeeConnectToApplication(const uuid_t* application_uuid, zx::channel tee_app_request,
-                                      zx::channel service_provider);
 
   // `DeviceConnector` FIDL protocol
   void ConnectToDeviceInfo(ConnectToDeviceInfoRequestView request,

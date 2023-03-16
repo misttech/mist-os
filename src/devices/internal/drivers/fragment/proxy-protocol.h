@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/pwm/c/banjo.h>
-#include <fuchsia/hardware/tee/c/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/c/banjo.h>
 
 namespace fragment {
@@ -235,17 +234,6 @@ struct SysmemProxyRequest {
   ProxyRequest header;
   SysmemOp op;
   uint64_t heap;
-};
-
-// ZX_PROTOCOL_TEE proxy support.
-enum class TeeOp {
-  CONNECT_TO_APPLICATION,
-};
-
-struct TeeProxyRequest {
-  ProxyRequest header;
-  TeeOp op;
-  uuid_t application_uuid;
 };
 
 // ZX_PROTOCOL_AMLOGIC_CANVAS proxy support.

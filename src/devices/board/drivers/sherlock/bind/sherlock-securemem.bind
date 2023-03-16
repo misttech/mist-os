@@ -4,7 +4,7 @@
 
 composite aml_secure_mem;
 
-using fuchsia.tee;
+using fuchsia.hardware.tee;
 using fuchsia.amlogic.platform;
 using fuchsia.platform;
 using fuchsia.sysmem;
@@ -22,5 +22,5 @@ node "sysmem" {
 }
 
 node "tee" {
-  fuchsia.BIND_PROTOCOL == fuchsia.tee.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.tee.BIND_FIDL_PROTOCOL.DEVICE;
 }
