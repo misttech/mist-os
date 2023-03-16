@@ -103,6 +103,7 @@ fuchsia_test_package("fshost_rust_tests") {
 cmc_merge("fshost_rust_fxfs_component.cml") {
   sources = [
     "//src/storage/fshost/meta/base_fshost.cml",
+    "//src/storage/fshost/meta/blobfs_fshost.cml",
     "//src/storage/fshost/meta/config.cml",
     "//src/storage/fshost/meta/core_fshost.cml",
     "//src/storage/fshost/meta/fxfs_fshost.cml",
