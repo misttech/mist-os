@@ -140,6 +140,12 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:tracing-mutex",
   ]
 
+  # This is x64 only since we don't use it on other architectures yet (it's used for loading the
+  # vDSO which we only do on x64).
+  if (current_cpu == "x64") {
+    test_deps += [ "//src/lib/fuchsia-fs" ]
+  }
+
   non_rust_deps = [ ":restricted_trampoline" ]
 
   sources = [
