@@ -12,11 +12,11 @@ type StoryData = resource table {
     1: story_info fuchsia.modular.StoryInfo2;
 
     /// A client-supplied name for this story.
-    2: story_name string;
+    2: story_name string:MAX;
 
     /// Story metadata and configuration.
     3: story_options fuchsia.modular.StoryOptions;
 
     /// Page id on the user's ledger which stores story information.
-    4: story_page_id string;
+    4: story_page_id string:MAX;
 };
