@@ -220,7 +220,8 @@ TEST_P(ChromiumAppTest, CreateAndNavigate) {
 }
 
 INSTANTIATE_TEST_SUITE_P(ContextFeatureFlags, ChromiumAppTest,
-                         ::testing::Values(fuchsia::web::ContextFeatureFlags::HEADLESS,
-                                           fuchsia::web::ContextFeatureFlags()));
+                         ::testing::Values(fuchsia::web::ContextFeatureFlags(),
+                                           fuchsia::web::ContextFeatureFlags::HEADLESS,
+                                           fuchsia::web::ContextFeatureFlags::VULKAN));
 
 }  // namespace

@@ -6,6 +6,9 @@
         "//src/sys/test_runners/gtest/default.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
+
+        // Required for ContextFeatureFlags::VULKAN.
+        "vulkan/client.shard.cml",
     ],
     program: {
         binary: "bin/web_runner_integration_tests_bin",
