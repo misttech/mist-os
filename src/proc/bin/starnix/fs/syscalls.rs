@@ -353,6 +353,7 @@ fn lookup_at(
 }
 
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
+#[cfg(target_arch = "x86_64")]
 pub fn sys_creat(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -366,6 +367,7 @@ pub fn sys_creat(
     )
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_open(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -409,6 +411,7 @@ pub fn sys_faccessat2(
     name.entry.node.check_access(current_task, mode)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_getdents(
     current_task: &CurrentTask,
     fd: FdNumber,
@@ -465,6 +468,7 @@ pub fn sys_fchdir(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno>
     current_task.fs().chdir(current_task, file.name.clone())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_access(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -473,6 +477,7 @@ pub fn sys_access(
     sys_faccessat(current_task, FdNumber::AT_FDCWD, user_path, mode)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_stat(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -483,6 +488,7 @@ pub fn sys_stat(
     sys_newfstatat(current_task, FdNumber::AT_FDCWD, user_path, buffer, 0)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_lstat(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -576,6 +582,7 @@ pub fn sys_readlinkat(
     Ok(length)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_readlink(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -603,6 +610,7 @@ pub fn sys_ftruncate(current_task: &CurrentTask, fd: FdNumber, length: off_t) ->
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_mkdir(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -634,6 +642,7 @@ pub fn sys_mkdirat(
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_mknod(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -700,10 +709,12 @@ pub fn sys_linkat(
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_rmdir(current_task: &CurrentTask, user_path: UserCString) -> Result<(), Errno> {
     sys_unlinkat(current_task, FdNumber::AT_FDCWD, user_path, AT_REMOVEDIR)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_unlink(current_task: &CurrentTask, user_path: UserCString) -> Result<(), Errno> {
     sys_unlinkat(current_task, FdNumber::AT_FDCWD, user_path, 0)
 }
@@ -725,6 +736,7 @@ pub fn sys_unlinkat(
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_rename(
     current_task: &CurrentTask,
     old_user_path: UserCString,
@@ -777,6 +789,7 @@ pub fn sys_renameat2(
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_chmod(
     current_task: &CurrentTask,
     user_path: UserCString,
@@ -1111,6 +1124,7 @@ fn get_fd_flags(flags: u32) -> FdFlags {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_pipe(current_task: &CurrentTask, user_pipe: UserRef<FdNumber>) -> Result<(), Errno> {
     sys_pipe2(current_task, user_pipe, 0)
 }
@@ -1159,6 +1173,7 @@ pub fn sys_ioctl(
 }
 
 // https://man7.org/linux/man-pages/man2/symlink.2.html
+#[cfg(target_arch = "x86_64")]
 pub fn sys_symlink(
     current_task: &CurrentTask,
     user_target: UserCString,
@@ -1204,6 +1219,7 @@ pub fn sys_dup(current_task: &CurrentTask, oldfd: FdNumber) -> Result<FdNumber, 
     current_task.files.duplicate(oldfd, TargetFdNumber::Default, FdFlags::empty())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_dup2(
     current_task: &CurrentTask,
     oldfd: FdNumber,
@@ -1397,6 +1413,7 @@ pub fn sys_umount2(
     target.unmount()
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_eventfd(current_task: &CurrentTask, value: u32) -> Result<FdNumber, Errno> {
     sys_eventfd2(current_task, value, 0)
 }
@@ -1648,6 +1665,7 @@ pub fn sys_pselect6(
     Ok(num_fds)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_epoll_create(current_task: &CurrentTask, size: i32) -> Result<FdNumber, Errno> {
     if size < 1 {
         // The man page for epoll_create says the size was used in a previous implementation as
@@ -1698,6 +1716,7 @@ pub fn sys_epoll_ctl(
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_epoll_wait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
@@ -1900,6 +1919,7 @@ pub fn sys_ppoll(
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_poll(
     current_task: &mut CurrentTask,
     user_fds: UserRef<pollfd>,
@@ -1939,6 +1959,7 @@ pub fn sys_fallocate(
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_inotify_init(current_task: &CurrentTask) -> Result<FdNumber, Errno> {
     sys_inotify_init1(current_task, 0)
 }

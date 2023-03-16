@@ -145,6 +145,7 @@ pub fn sys_nanosleep(
     sys_clock_nanosleep(current_task, CLOCK_MONOTONIC, 0, user_request, user_remaining)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_time(
     current_task: &CurrentTask,
     time_addr: UserRef<__kernel_time_t>,

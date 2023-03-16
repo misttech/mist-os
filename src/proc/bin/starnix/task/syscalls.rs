@@ -102,6 +102,7 @@ pub fn sys_clone3(
     do_clone(current_task, &clone_args)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
     do_clone(
         current_task,
@@ -275,6 +276,7 @@ pub fn sys_getsid(current_task: &CurrentTask, pid: pid_t) -> Result<pid_t, Errno
     Ok(get_task_or_current(current_task, pid)?.thread_group.read().process_group.session.leader)
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_getpgrp(current_task: &CurrentTask) -> Result<pid_t, Errno> {
     Ok(current_task.thread_group.read().process_group.leader)
 }
@@ -770,18 +772,17 @@ pub fn sys_prctl(
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn sys_arch_prctl(
     current_task: &mut CurrentTask,
     code: u32,
     addr: UserAddress,
 ) -> Result<(), Errno> {
     match code {
-        #[cfg(target_arch = "x86_64")]
         ARCH_SET_FS => {
             current_task.registers.fs_base = addr.ptr() as u64;
             Ok(())
         }
-        #[cfg(target_arch = "x86_64")]
         ARCH_SET_GS => {
             current_task.registers.gs_base = addr.ptr() as u64;
             Ok(())
