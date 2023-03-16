@@ -145,6 +145,7 @@ sysroot_uninstrumented_libc_entries = [
         "bits/posix.h",
         "bits/reg.h",
         "bits/resource.h",
+        "bits/riscv64/fenv.h",
         "bits/riscv64/setjmp.h",
         "bits/sem.h",
         "bits/setjmp.h",
