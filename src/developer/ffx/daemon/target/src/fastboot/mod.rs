@@ -31,6 +31,7 @@ use fidl_fuchsia_developer_ffx::{
 use futures::{
     io::{AsyncRead, AsyncWrite},
     lock::Mutex,
+    TryStreamExt,
 };
 use lazy_static::lazy_static;
 use std::{collections::HashSet, convert::TryInto, fs::read, rc::Rc};
@@ -84,21 +85,46 @@ impl Fastboot {
 
     pub async fn handle_fastboot_requests_from_stream(
         &mut self,
-        stream: FastbootRequestStream,
+        mut stream: FastbootRequestStream,
     ) -> Result<()> {
-        if let Some((_, interface)) = self.target.fastboot_address() {
-            match interface {
-                FastbootInterface::Tcp => {
-                    self.tcp.handle_fastboot_requests_from_stream(stream).await
+        while let Some(req) = stream.try_next().await? {
+            if let Some((_, interface)) = self.target.fastboot_address() {
+                match interface {
+                    FastbootInterface::Tcp => match self.tcp.handle_fastboot_request(req).await {
+                        Ok(_) => (),
+                        Err(e) => {
+                            self.tcp.clear_interface().await;
+                            return Err(e);
+                        }
+                    },
+                    FastbootInterface::Udp => match self.udp.handle_fastboot_request(req).await {
+                        Ok(_) => (),
+                        Err(e) => {
+                            self.udp.clear_interface().await;
+                            return Err(e);
+                        }
+                    },
+                    _ => bail!("Unexpected interface type {:?}", self.target.fastboot_interface()),
                 }
-                FastbootInterface::Udp => {
-                    self.udp.handle_fastboot_requests_from_stream(stream).await
+            } else {
+                match self.usb.handle_fastboot_request(req).await {
+                    Ok(_) => (),
+                    Err(e) => {
+                        self.usb.clear_interface().await;
+                        return Err(e);
+                    }
                 }
-                _ => bail!("Unexpected interface type {:?}", self.target.fastboot_interface()),
             }
-        } else {
-            self.usb.handle_fastboot_requests_from_stream(stream).await
         }
+        // Make sure that the serial numbers are no longer in use.
+        // TODO(https://fxbug.dev/123749): Replace these with a drop guard.
+        futures::future::join3(
+            self.tcp.clear_interface(),
+            self.udp.clear_interface(),
+            self.usb.clear_interface(),
+        )
+        .await;
+        Ok(())
     }
 }
 

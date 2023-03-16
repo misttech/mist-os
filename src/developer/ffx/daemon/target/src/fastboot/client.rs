@@ -14,26 +14,28 @@ use async_trait::async_trait;
 use async_utils::async_once::Once;
 use fastboot::UploadProgressListener as _;
 use ffx_config::get;
-use ffx_daemon_events::{TargetConnectionState, TargetEvent};
+use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent};
 use fidl::{prelude::*, Error as FidlError};
 use fidl_fuchsia_developer_ffx::{
-    FastbootError, FastbootRequest, FastbootRequestStream, RebootError, RebootListenerProxy,
+    FastbootError, FastbootRequest, RebootError, RebootListenerProxy,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy};
+use future::select;
 use futures::{
     io::{AsyncRead, AsyncWrite},
     prelude::*,
     try_join,
 };
 use selectors::{self, VerboseError};
-use std::{rc::Rc, time::Duration};
+use std::{net::SocketAddr, rc::Rc, time::Duration};
 
 /// Timeout in seconds to wait for target after a reboot to fastboot mode
 const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
 
 const ADMIN_SELECTOR: &str =
     "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin";
+const FASTBOOT_PORT: u16 = 5554;
 
 #[async_trait(?Send)]
 pub trait InterfaceFactory<T: AsyncRead + AsyncWrite + Unpin> {
@@ -60,7 +62,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
         }
     }
 
-    async fn clear_interface(&mut self) {
+    pub async fn clear_interface(&mut self) {
         self.interface = None;
         self.interface_factory.close().await;
     }
@@ -70,24 +72,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
             self.interface.replace(self.interface_factory.open(&self.target).await?);
         }
         Ok(self.interface.as_mut().expect("interface interface not available"))
-    }
-
-    pub async fn handle_fastboot_requests_from_stream(
-        &mut self,
-        mut stream: FastbootRequestStream,
-    ) -> Result<()> {
-        while let Some(req) = stream.try_next().await? {
-            match self.handle_fastboot_request(req).await {
-                Ok(_) => (),
-                Err(e) => {
-                    self.clear_interface().await;
-                    return Err(e);
-                }
-            }
-        }
-        // Make sure the serial is no longer in use.
-        self.clear_interface().await;
-        Ok(())
     }
 
     async fn reboot_from_zedboot(&self, listener: &RebootListenerProxy) -> Result<(), RebootError> {
@@ -114,6 +98,17 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
     }
 
     async fn check_for_fastboot(&self) -> Result<(), RebootError> {
+        let check_bootloader_fut = Box::pin(self.check_for_bootloader_fastboot());
+        let check_userspace_fut = Box::pin(self.check_for_userspace_fastboot());
+        match select(check_bootloader_fut, check_userspace_fut).await {
+            future::Either::Left((Ok(_), _)) => Ok(()),
+            future::Either::Left((_, secondfut)) => secondfut.await,
+            future::Either::Right((Ok(_), _)) => Ok(()),
+            future::Either::Right((_, secondfut)) => secondfut.await,
+        }
+    }
+
+    async fn check_for_bootloader_fastboot(&self) -> Result<(), RebootError> {
         for _ in 0..2 {
             if self.is_target_in_fastboot() {
                 return Ok(());
@@ -126,6 +121,37 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                 .await;
 
             if self.is_target_in_fastboot() {
+                return Ok(());
+            }
+        }
+        Err(RebootError::TimedOut)
+    }
+
+    async fn check_for_userspace_fastboot(&self) -> Result<(), RebootError> {
+        // Try and resolve the SSH address of the device in an attempt to
+        // connect to userspace fastboot. If such an address does not exist,
+        // this target cannot be in userspace fastboot, so return an error.
+        let mut addr: SocketAddr =
+            self.target.ssh_address().ok_or(RebootError::FailedToSendTargetReboot)?.into();
+        // TODO(https://fxbug.dev/123747): Remove this hardcoded port.
+        addr.set_port(FASTBOOT_PORT);
+        // We don't want to modify the existing target object until we're
+        // certain that it's actually in userspace fastboot, so create a new
+        // Target object instead.
+        let tclone = Target::new_with_fastboot_addrs(
+            Option::<String>::None,
+            Option::<String>::None,
+            vec![addr].iter().map(|x| From::from(*x)).collect(),
+            FastbootInterface::Tcp,
+        );
+        for _ in 0..2 {
+            if tclone.is_fastboot_tcp().await.unwrap_or(false) {
+                // Now that we've verified that the target is in userspace
+                // fastboot, we can transition it to that state. We need to
+                // perform the transition explicitly, as the discovery loops
+                // are not always able to detect a target in userspace
+                // fastboot.
+                self.target.from_manual_to_tcp_fastboot();
                 return Ok(());
             }
         }
@@ -161,7 +187,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
         }
     }
 
-    async fn handle_fastboot_request(&mut self, req: FastbootRequest) -> Result<()> {
+    pub async fn handle_fastboot_request(&mut self, req: FastbootRequest) -> Result<()> {
         tracing::debug!("fastboot - received req: {:?}", req);
         match req {
             FastbootRequest::Prepare { listener, responder } => {
@@ -562,12 +588,32 @@ mod test {
         let target = Target::new_named("scooby-dooby-doo");
         let mut fb =
             FastbootImpl::<TestTransport>::new(target.clone(), Box::new(TestFactory::new(replies)));
-        let (proxy, stream) = create_proxy_and_stream::<FastbootMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<FastbootMarker>().unwrap();
         fuchsia_async::Task::local(async move {
-            match fb.handle_fastboot_requests_from_stream(stream).await {
-                Ok(_) => tracing::debug!("Fastboot proxy finished - client disconnected"),
-                Err(e) => tracing::error!("There was an error handling fastboot requests: {:?}", e),
+            loop {
+                match stream.try_next().await {
+                    Ok(Some(req)) => match fb.handle_fastboot_request(req).await {
+                        Ok(_) => (),
+                        Err(e) => {
+                            fb.clear_interface().await;
+                            tracing::error!(
+                                "There was an error handling fastboot requests: {:?}",
+                                e
+                            );
+                        }
+                    },
+                    Ok(None) => {
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to obtain next fastboot request: {:?}", e);
+                        break;
+                    }
+                }
             }
+            // Make sure the serial is no longer in use.
+            fb.clear_interface().await;
+            tracing::debug!("Fastboot proxy finished - client disconnected");
             assert!(fb.interface.is_none());
         })
         .detach();
