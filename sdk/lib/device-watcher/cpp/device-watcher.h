@@ -31,16 +31,43 @@ zx::result<zx::channel> RecursiveWaitForFile(int dir_fd, const char* path,
 zx::result<zx::channel> RecursiveWaitForFile(const char* path,
                                              zx::duration timeout = zx::duration::infinite());
 
-using ItemCallback = fit::function<zx_status_t(std::string_view)>;
+using ItemCallback = fit::function<std::optional<std::monostate>(std::string_view)>;
 // Call the callback for each item in the directory, and wait for new items.
 //
 // This function will not call the callback for the '.' file in a directory.
 //
 // If the callback returns a status other than `ZX_OK`, watching stops.
-// If the callback returns `ZX_ERR_STOP` then this function will return `ZX_OK`, otherwise the
-// callback's status is returned to the caller.
+// If the callback returns std::nullopt the watching will continue, otherwise the
+// watching will stop and zx::ok() will be returned to the caller.
 zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                                     ItemCallback callback);
+
+// A templated version of this function.
+// If the callback returns std::nullopt the watching will continue, otherwise the
+// watching will stop and the return value will be returned to the caller.
+template <typename T>
+zx::result<T> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                     fit::function<std::optional<T>(std::string_view)> callback) {
+  std::optional<T> return_value;
+  zx::result result =
+      WatchDirectoryForItems(dir, [&](std::string_view name) -> std::optional<std::monostate> {
+        std::optional callback_result = callback(name);
+        if (!callback_result.has_value()) {
+          return std::nullopt;
+        }
+        return_value = std::move(callback_result);
+        return std::monostate();
+      });
+
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  if (!return_value.has_value()) {
+    ZX_PANIC(
+        "Bad state: Watching the directory returned successfully but the return value wasn't set");
+  }
+  return zx::ok(std::move(return_value.value()));
+}
 
 // DirWatcher can be used to detect when a file has been removed from the filesystem.
 //

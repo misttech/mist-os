@@ -98,16 +98,60 @@ TEST(DeviceWatcherTest, WatchDirectory) {
 
   std::vector<std::string> file_names;
   zx::result watch_result = device_watcher::WatchDirectoryForItems(
-      client, [&file_names](std::string_view file) -> zx_status_t {
+      client, [&file_names](std::string_view file) -> std::optional<std::monostate> {
         file_names.emplace_back(file);
         if (file_names.size() == 2) {
-          return ZX_ERR_STOP;
+          return std::monostate();
         }
-        return ZX_OK;
+        return std::nullopt;
       });
   ASSERT_OK(watch_result.status_value());
 
   EXPECT_THAT(file_names,
+              testing::UnorderedElementsAre(std::string(file1_name), std::string(file2_name)));
+}
+
+TEST(DeviceWatcherTest, WatchDirectoryTemplate) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(
+      [](fbl::String* output) { return ZX_OK; }, [](std::string_view input) { return ZX_OK; });
+  constexpr char file1_name[] = "file1";
+  constexpr char file2_name[] = "file2";
+  auto first = fbl::MakeRefCounted<fs::PseudoDir>();
+  ASSERT_OK(first->AddEntry(file1_name, file));
+  ASSERT_OK(first->AddEntry(file2_name, file));
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(endpoints.status_value());
+  auto& [client, server] = endpoints.value();
+
+  fs::ManagedVfs vfs(loop.dispatcher());
+  ASSERT_OK(vfs.ServeDirectory(first, std::move(server)));
+  auto cleanup = fit::defer([&vfs]() {
+    libsync::Completion shutdown_complete;
+    vfs.Shutdown([&shutdown_complete](zx_status_t status) {
+      EXPECT_OK(status);
+      shutdown_complete.Signal();
+    });
+    shutdown_complete.Wait();
+  });
+
+  ASSERT_OK(loop.StartThread());
+
+  zx::result<std::vector<std::string>> watch_result =
+      device_watcher::WatchDirectoryForItems<std::vector<std::string>>(
+          client,
+          [file_names = std::vector<std::string>()](
+              std::string_view file) mutable -> std::optional<std::vector<std::string>> {
+            file_names.emplace_back(file);
+            if (file_names.size() == 2) {
+              return std::move(file_names);
+            }
+            return std::nullopt;
+          });
+  ASSERT_OK(watch_result.status_value());
+
+  EXPECT_THAT(watch_result.value(),
               testing::UnorderedElementsAre(std::string(file1_name), std::string(file2_name)));
 }
 
