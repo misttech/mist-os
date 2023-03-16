@@ -51,6 +51,13 @@ zx_status_t fdf_env_dispatcher_create_with_owner(const void* driver, uint32_t op
 // Dumps the state of the dispatcher to the INFO log.
 void fdf_env_dispatcher_dump(fdf_dispatcher_t* dispatcher);
 
+// DO NOT USE THIS.
+// This is a temporary function added to debug fxbug.dev/118767.
+//
+// Dumps the state of the dispatcher into |out_dump|, as a NULL terminated string.
+// The caller is responsible for freeing |out_dump|.
+void fdf_env_dispatcher_get_dump_deprecated(fdf_dispatcher_t* dispatcher, char** out_dump);
+
 // Asynchronously shuts down all dispatchers owned by |driver|.
 // |observer| will be notified once shutdown completes. This is guaranteed to be
 // after all the dispatcher's shutdown observers have been called, and will be running

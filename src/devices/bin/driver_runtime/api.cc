@@ -208,6 +208,21 @@ __EXPORT void fdf_env_dispatcher_dump(fdf_dispatcher_t* dispatcher) {
   }
 }
 
+__EXPORT void fdf_env_dispatcher_get_dump_deprecated(fdf_dispatcher_t* dispatcher,
+                                                     char** out_dump) {
+  std::vector<std::string> dump;
+  dispatcher->DumpToString(&dump);
+
+  std::string result = "";
+  for (auto& str : dump) {
+    result += str;
+    result += "\n";
+  }
+  char* buf = (char*)(malloc(result.size() + 1));  // Extra char for NULL.
+  memcpy(buf, result.c_str(), result.size() + 1);
+  *out_dump = buf;
+}
+
 __EXPORT const void* fdf_env_get_current_driver() { return driver_context::GetCurrentDriver(); }
 
 __EXPORT zx_status_t fdf_env_shutdown_dispatchers_async(

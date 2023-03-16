@@ -23,6 +23,7 @@ Symbols:
   - { Name: fdf_env_destroy_all_dispatchers, Type: Func }
   - { Name: fdf_env_dispatcher_create_with_owner, Type: Func }
   - { Name: fdf_env_dispatcher_dump, Type: Func }
+  - { Name: fdf_env_dispatcher_get_dump_deprecated, Type: Func }
   - { Name: fdf_env_dispatcher_has_queued_tasks, Type: Func }
   - { Name: fdf_env_get_current_driver, Type: Func }
   - { Name: fdf_env_register_driver_entry, Type: Func }

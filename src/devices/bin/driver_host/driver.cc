@@ -33,11 +33,13 @@ Driver::~Driver() {
   // However in some tests we don't properly tear down devices so we also shut down here.
   bool has_queued_tasks = fdf_env_dispatcher_has_queued_tasks(dispatcher_.get());
   if (has_queued_tasks) {
-    fdf_env_dispatcher_dump(dispatcher_.get());
+    char* dispatcher_dump;
+    fdf_env_dispatcher_get_dump_deprecated(dispatcher_.get(), &dispatcher_dump);
     ZX_ASSERT_MSG(
         !has_queued_tasks,
-        "Driver '%s' released all devices, but still had queued tasks on the default dispatcher",
-        zx_driver_->libname().c_str());
+        "Driver '%s' released all devices, but still had queued tasks on the default dispatcher\n%s",
+        zx_driver_->libname().c_str(), dispatcher_dump);
+    free(dispatcher_dump);
   }
   ZX_ASSERT(device_count_ == 0);
   dispatcher_.ShutdownAsync();
