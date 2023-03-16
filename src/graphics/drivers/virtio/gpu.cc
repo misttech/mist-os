@@ -197,8 +197,8 @@ zx_status_t GpuDevice::DisplayControllerImplReleaseBufferCollection(uint64_t col
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                         uint32_t index) {
+zx_status_t GpuDevice::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+                                                        uint32_t index) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
@@ -321,8 +321,8 @@ zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysm
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints2(
-    const image_t* config, uint64_t collection_id) {
+zx_status_t GpuDevice::DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
+                                                                           uint64_t collection_id) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",

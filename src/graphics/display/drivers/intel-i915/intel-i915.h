@@ -92,10 +92,10 @@ class Controller : public DeviceType,
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                           zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
-  zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                uint32_t index);
-  zx_status_t DisplayControllerImplImportImageForCapture2(uint64_t collection_id, uint32_t index,
-                                                          uint64_t* out_capture_handle) {
+  zx_status_t DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+                                               uint32_t index);
+  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t collection_id, uint32_t index,
+                                                         uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   void DisplayControllerImplReleaseImage(image_t* image);
@@ -109,8 +109,8 @@ class Controller : public DeviceType,
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
-                                                                   uint64_t collection_id);
+  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
+                                                                  uint64_t collection_id);
   zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
                                                               uint32_t* out_stride) {
     return ZX_ERR_NOT_SUPPORTED;

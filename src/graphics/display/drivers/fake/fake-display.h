@@ -62,8 +62,8 @@ class FakeDisplay : public DeviceType,
   zx_status_t DisplayControllerImplImportBufferCollection(uint64_t collection_id,
                                                           zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(uint64_t collection_id);
-  zx_status_t DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                uint32_t index);
+  zx_status_t DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+                                               uint32_t index);
   void DisplayControllerImplReleaseImage(image_t* image);
   uint32_t DisplayControllerImplCheckConfiguration(const display_config_t** display_configs,
                                                    size_t display_count,
@@ -75,15 +75,15 @@ class FakeDisplay : public DeviceType,
   void DisplayControllerImplSetEld(uint64_t display_id, const uint8_t* raw_eld_list,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
-                                                                   uint64_t collection_id);
+  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
+                                                                  uint64_t collection_id);
   zx_status_t DisplayControllerImplGetSingleBufferFramebuffer(zx::vmo* out_vmo,
                                                               uint32_t* out_stride);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
   zx_status_t DisplayControllerImplSetDisplayCaptureInterface(
       const display_capture_interface_protocol_t* intf);
-  zx_status_t DisplayControllerImplImportImageForCapture2(uint64_t collection_id, uint32_t index,
-                                                          uint64_t* out_capture_handle)
+  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t collection_id, uint32_t index,
+                                                         uint64_t* out_capture_handle)
       __TA_EXCLUDES(capture_lock_);
   zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle)
       __TA_EXCLUDES(capture_lock_);

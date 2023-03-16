@@ -337,42 +337,42 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
       .handle = 0,
   };
   EXPECT_OK(
-      display.DisplayControllerImplSetBufferCollectionConstraints2(&kDefaultImage, kCollectionId));
+      display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage, kCollectionId));
 
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
   uint64_t kInvalidCollectionId = 100;
-  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kInvalidCollectionId, 0),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kInvalidCollectionId, 0),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
   invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
-  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, kInvalidIndex),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, kInvalidIndex),
             ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad width
   invalid_image = kDefaultImage;
   invalid_image.width = invalid_image.width * 2;
-  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, /*index=*/0),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, /*index=*/0),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: bad height
   invalid_image = kDefaultImage;
   invalid_image.height = invalid_image.height * 2;
-  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, /*index=*/0),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, /*index=*/0),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: bad format
   invalid_image = kDefaultImage;
   invalid_image.pixel_format = ZX_PIXEL_FORMAT_NV12;
-  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kCollectionId, /*index=*/0),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kCollectionId, /*index=*/0),
             ZX_ERR_INVALID_ARGS);
 
   // Valid import
   image_t valid_image = kDefaultImage;
   EXPECT_EQ(valid_image.handle, 0u);
-  EXPECT_OK(display.DisplayControllerImplImportImage2(&valid_image, kCollectionId, /*index=*/0));
+  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kCollectionId, /*index=*/0));
   EXPECT_NE(valid_image.handle, 0u);
 
   // Release buffer collection.

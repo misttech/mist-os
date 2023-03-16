@@ -437,7 +437,7 @@ protocol DisplayControllerImpl {
     /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
-    ImportImage2(struct {
+    ImportImage(struct {
         @in_out
         image Image;
         collection_id uint64;
@@ -458,7 +458,7 @@ protocol DisplayControllerImpl {
     /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
-    ImportImageForCapture2(struct {
+    ImportImageForCapture(struct {
         collection_id uint64;
         index uint32;
     }) -> (struct {
@@ -557,7 +557,7 @@ protocol DisplayControllerImpl {
     /// `collection_id`.
     ///
     /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
-    SetBufferCollectionConstraints2(struct {
+    SetBufferCollectionConstraints(struct {
         config Image;
         collection_id uint64;
     }) -> (struct {

@@ -138,8 +138,8 @@ zx_status_t SimpleDisplay::DisplayControllerImplReleaseBufferCollection(uint64_t
   return ZX_OK;
 }
 
-zx_status_t SimpleDisplay::DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                             uint32_t index) {
+zx_status_t SimpleDisplay::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+                                                            uint32_t index) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
@@ -293,7 +293,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplGetSysmemConnection(zx::channel 
   return ZX_OK;
 }
 
-zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
+zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, uint64_t collection_id) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {

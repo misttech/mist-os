@@ -452,32 +452,32 @@ TEST_F(FakeSysmemTest, ImportImage) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints2(&kDefaultConfig,
-                                                                           kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(&kDefaultConfig,
+                                                                          kBufferCollectionId));
 
   constexpr uint64_t kInvalidBufferCollectionId = 100u;
-  EXPECT_EQ(display_->DisplayControllerImplSetBufferCollectionConstraints2(
+  EXPECT_EQ(display_->DisplayControllerImplSetBufferCollectionConstraints(
                 &kDefaultConfig, kInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
   invalid_config.type = IMAGE_TYPE_CAPTURE;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage2(&invalid_config, kBufferCollectionId,
-                                                        /*index=*/0),
+  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
+                                                       /*index=*/0),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: Invalid collection ID.
   invalid_config = kDefaultConfig;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage2(&invalid_config, kInvalidBufferCollectionId,
-                                                        /*index=*/0),
+  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kInvalidBufferCollectionId,
+                                                       /*index=*/0),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
   invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage2(&invalid_config, kBufferCollectionId,
-                                                        kInvalidBufferCollectionIndex),
+  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
+                                                       kInvalidBufferCollectionIndex),
             ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: Unsupported format.
@@ -487,16 +487,16 @@ TEST_F(FakeSysmemTest, ImportImage) {
   });
   invalid_config = kDefaultConfig;
   invalid_config.pixel_format = kUnsupportedPixelFormat;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage2(&invalid_config, kBufferCollectionId,
-                                                        /*index=*/0),
+  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
+                                                       /*index=*/0),
             ZX_ERR_INVALID_ARGS);
   display_->SetFormatSupportCheck([](auto) { return true; });
 
   // Valid import.
   image_t valid_config = kDefaultConfig;
   EXPECT_EQ(valid_config.handle, 0u);
-  EXPECT_OK(display_->DisplayControllerImplImportImage2(&valid_config, kBufferCollectionId,
-                                                        /*index=*/0));
+  EXPECT_OK(display_->DisplayControllerImplImportImage(&valid_config, kBufferCollectionId,
+                                                       /*index=*/0));
   EXPECT_NE(valid_config.handle, 0u);
 
   // Release the image.
@@ -525,26 +525,26 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
       .type = IMAGE_TYPE_CAPTURE,
       .handle = 0,
   };
-  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints2(&kDefaultConfig,
-                                                                           kBufferCollectionId));
+  EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(&kDefaultConfig,
+                                                                          kBufferCollectionId));
 
   // Invalid import: invalid buffer collection ID.
   uint64_t capture_handle = 0;
   const uint64_t kInvalidBufferCollectionId = 100;
-  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture2(kInvalidBufferCollectionId,
-                                                                  /*index=*/0, &capture_handle),
+  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture(kInvalidBufferCollectionId,
+                                                                 /*index=*/0, &capture_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: index out of range.
   const uint64_t kInvalidIndex = 100;
-  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture2(kBufferCollectionId,
-                                                                  kInvalidIndex, &capture_handle),
+  EXPECT_EQ(display_->DisplayControllerImplImportImageForCapture(kBufferCollectionId, kInvalidIndex,
+                                                                 &capture_handle),
             ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
   capture_handle = 0;
-  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture2(kBufferCollectionId, /*index=*/0,
-                                                                  &capture_handle));
+  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture(kBufferCollectionId, /*index=*/0,
+                                                                 &capture_handle));
   EXPECT_NE(capture_handle, 0u);
 
   // Release the image.
@@ -575,7 +575,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
 
   image_t image = {};
   EXPECT_OK(
-      display_->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
+      display_->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
 
   EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());
@@ -607,7 +607,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
 
   image_t image = {};
   EXPECT_OK(
-      display_->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
+      display_->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
 
   EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());
@@ -654,8 +654,8 @@ TEST_F(FakeSysmemTest, NoLeakCaptureCanvas) {
                                                                   token_client.TakeChannel()));
 
   uint64_t capture_handle;
-  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture2(kBufferCollectionId, /*index=*/0,
-                                                                  &capture_handle));
+  EXPECT_OK(display_->DisplayControllerImplImportImageForCapture(kBufferCollectionId, /*index=*/0,
+                                                                 &capture_handle));
   EXPECT_OK(display_->DisplayControllerImplReleaseCapture(capture_handle));
 
   canvas_.CheckThatNoEntriesInUse();

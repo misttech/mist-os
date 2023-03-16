@@ -177,8 +177,8 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(uint64_t c
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                           uint32_t index) {
+zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+                                                          uint32_t index) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
@@ -328,7 +328,7 @@ zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel co
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
+zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, uint64_t collection_id) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
@@ -418,9 +418,9 @@ zx_status_t FakeDisplay::DisplayControllerImplSetDisplayCaptureInterface(
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture2(uint64_t collection_id,
-                                                                     uint32_t index,
-                                                                     uint64_t* out_capture_handle) {
+zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(uint64_t collection_id,
+                                                                    uint32_t index,
+                                                                    uint64_t* out_capture_handle) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);

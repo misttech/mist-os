@@ -185,9 +185,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplReleaseBufferCollection(uint64_
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
-zx_status_t AmlogicDisplay::DisplayControllerImplImportImage2(image_t* image,
-                                                              uint64_t collection_id,
-                                                              uint32_t index) {
+zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+                                                             uint32_t index) {
   if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot import Image on collection %lu: buffer collection doesn't exist",
            collection_id);
@@ -549,7 +548,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel
   return ZX_OK;
 }
 
-zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints2(
+zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, uint64_t collection_id) {
   if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR,
@@ -668,7 +667,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayCaptureInterface(
   return ZX_OK;
 }
 
-zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture2(
+zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
     uint64_t collection_id, uint32_t index, uint64_t* out_capture_handle) {
   if (buffer_collections_.find(collection_id) == buffer_collections_.end()) {
     zxlogf(ERROR, "Cannot import capture image on collection %lu: buffer collection doesn't exist",

@@ -139,7 +139,7 @@ TEST_F(FakeDisplaySysmemTest, ImportBufferCollection) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints2(
+  EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(
       &kDefaultConfig, kValidBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
@@ -187,8 +187,8 @@ TEST_F(FakeDisplaySysmemTest, ImportImage) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints2(&kDefaultConfig,
-                                                                            kBufferCollectionId));
+  EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(&kDefaultConfig,
+                                                                           kBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
   fidl::Status set_constraints_status = buffer_collection()->SetConstraints(
@@ -220,29 +220,29 @@ TEST_F(FakeDisplaySysmemTest, ImportImage) {
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
   invalid_config.type = IMAGE_TYPE_CAPTURE;
-  EXPECT_EQ(display()->DisplayControllerImplImportImage2(&invalid_config, kBufferCollectionId,
-                                                         /*index=*/0),
+  EXPECT_EQ(display()->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
+                                                        /*index=*/0),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: Invalid collection ID.
   invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionId = 100u;
-  EXPECT_EQ(display()->DisplayControllerImplImportImage2(&invalid_config,
-                                                         kInvalidBufferCollectionId, /*index=*/0),
+  EXPECT_EQ(display()->DisplayControllerImplImportImage(&invalid_config, kInvalidBufferCollectionId,
+                                                        /*index=*/0),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
   invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
-  EXPECT_EQ(display()->DisplayControllerImplImportImage2(&invalid_config, kBufferCollectionId,
-                                                         kInvalidBufferCollectionIndex),
+  EXPECT_EQ(display()->DisplayControllerImplImportImage(&invalid_config, kBufferCollectionId,
+                                                        kInvalidBufferCollectionIndex),
             ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
   image_t valid_config = kDefaultConfig;
   EXPECT_EQ(valid_config.handle, 0u);
-  EXPECT_OK(display()->DisplayControllerImplImportImage2(&valid_config, kBufferCollectionId,
-                                                         /*index=*/0));
+  EXPECT_OK(display()->DisplayControllerImplImportImage(&valid_config, kBufferCollectionId,
+                                                        /*index=*/0));
   EXPECT_NE(valid_config.handle, 0u);
 
   // Release the image.

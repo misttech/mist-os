@@ -470,47 +470,47 @@ TEST(IntelI915Display, ImportImage) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0u,
   };
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints2(&kDefaultImage,
-                                                                         kBufferCollectionId));
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
+                                                                        kBufferCollectionId));
 
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
   uint64_t kInvalidCollectionId = 100;
-  EXPECT_EQ(display.DisplayControllerImplImportImage2(&invalid_image, kInvalidCollectionId, 0),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kInvalidCollectionId, 0),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
   invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
   EXPECT_EQ(
-      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, kInvalidIndex),
+      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, kInvalidIndex),
       ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad type
   invalid_image = kDefaultImage;
   invalid_image.type = IMAGE_TYPE_CAPTURE;
   EXPECT_EQ(
-      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, /*index=*/0),
+      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, /*index=*/0),
       ZX_ERR_INVALID_ARGS);
 
   // Invalid import: non-sysmem format
   invalid_image = kDefaultImage;
   invalid_image.pixel_format = ZX_PIXEL_FORMAT_ARGB_2_10_10_10;
   EXPECT_EQ(
-      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, /*index=*/0),
+      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, /*index=*/0),
       ZX_ERR_INVALID_ARGS);
 
   // Invalid import: mismatched format
   invalid_image = kDefaultImage;
   invalid_image.pixel_format = ZX_PIXEL_FORMAT_NV12;
   EXPECT_EQ(
-      display.DisplayControllerImplImportImage2(&invalid_image, kBufferCollectionId, /*index=*/0),
+      display.DisplayControllerImplImportImage(&invalid_image, kBufferCollectionId, /*index=*/0),
       ZX_ERR_INVALID_ARGS);
 
   // Valid import
   image_t valid_image = kDefaultImage;
   EXPECT_EQ(valid_image.handle, 0u);
-  EXPECT_OK(display.DisplayControllerImplImportImage2(&valid_image, kBufferCollectionId, 0));
+  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kBufferCollectionId, 0));
   EXPECT_NE(valid_image.handle, 0u);
 
   display.DisplayControllerImplReleaseImage(&valid_image);
@@ -537,7 +537,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
 
   EXPECT_OK(
-      display_.DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
+      display_.DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -561,7 +561,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemNoneFormat) {
   image.pixel_format = ZX_PIXEL_FORMAT_NONE;
 
   EXPECT_OK(
-      display_.DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
+      display_.DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -584,7 +584,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidFormat) {
   image_t image = {};
   image.pixel_format = UINT32_MAX;
 
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints2(
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
                                      &image, kBufferCollectionId));
 
   loop_.RunUntilIdle();
@@ -610,7 +610,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   image.type = 1000000;
   image.pixel_format = UINT32_MAX;
 
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints2(
+  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
                                      &image, kBufferCollectionId));
 
   loop_.RunUntilIdle();
@@ -707,7 +707,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   image.pixel_format = ZX_PIXEL_FORMAT_ARGB_8888;
   image.width = 128;
   image.height = kImageHeight;
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
 
   RunLoopUntilIdle();
 
@@ -717,7 +717,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   EXPECT_TRUE(collection->set_constraints_called());
 
   PerformBlockingWork([&] {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage2(&image, kBufferCollectionId, /*index=*/0));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBufferCollectionId, /*index=*/0));
   });
 
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_IDENTITY);
@@ -756,14 +756,14 @@ TEST_F(IntegrationTest, SysmemRotated) {
   // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
 
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints2(&image, kBufferCollectionId));
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBufferCollectionId));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(collection->set_constraints_called());
 
   image.type = IMAGE_TYPE_Y_LEGACY_TILED;
   PerformBlockingWork([&]() mutable {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage2(&image, kBufferCollectionId, /*index=*/0));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBufferCollectionId, /*index=*/0));
   });
 
   // Check that rotating the image doesn't hang.

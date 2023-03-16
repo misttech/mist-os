@@ -242,8 +242,8 @@ TEST_F(VirtioGpuTest, ImportVmo) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints2(device_.get(), &kDefaultImage,
-                                                          kBufferCollectionId));
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
+                                                         kBufferCollectionId));
   RunLoopUntilIdle();
 
   PerformBlockingWork([&] {
@@ -278,8 +278,8 @@ TEST_F(VirtioGpuTest, SetConstraints) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints2(device_.get(), &kDefaultImage,
-                                                          kBufferCollectionId));
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
+                                                         kBufferCollectionId));
   RunLoopUntilIdle();
 }
 
@@ -390,8 +390,8 @@ TEST_F(VirtioGpuTest, ImportImage) {
       .type = IMAGE_TYPE_SIMPLE,
       .handle = 0,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints2(device_.get(), &kDefaultImage,
-                                                          kBufferCollectionId));
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
+                                                         kBufferCollectionId));
   RunLoopUntilIdle();
 
   // Invalid import: bad collection id
@@ -399,7 +399,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
   uint64_t kInvalidCollectionId = 100;
   PerformBlockingWork([&] {
     EXPECT_EQ(
-        proto.ops->import_image2(device_.get(), &invalid_image, kInvalidCollectionId, /*index=*/0),
+        proto.ops->import_image(device_.get(), &invalid_image, kInvalidCollectionId, /*index=*/0),
         ZX_ERR_NOT_FOUND);
   });
 
@@ -408,7 +408,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
   uint32_t kInvalidIndex = 100;
   PerformBlockingWork([&] {
     EXPECT_EQ(
-        proto.ops->import_image2(device_.get(), &invalid_image, kBufferCollectionId, kInvalidIndex),
+        proto.ops->import_image(device_.get(), &invalid_image, kBufferCollectionId, kInvalidIndex),
         ZX_ERR_OUT_OF_RANGE);
   });
 

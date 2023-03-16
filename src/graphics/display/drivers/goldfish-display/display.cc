@@ -360,8 +360,8 @@ zx_status_t Display::DisplayControllerImplReleaseBufferCollection(uint64_t colle
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplImportImage2(image_t* image, uint64_t collection_id,
-                                                       uint32_t index) {
+zx_status_t Display::DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
+                                                      uint32_t index) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);
@@ -704,8 +704,8 @@ zx_status_t Display::DisplayControllerImplGetSysmemConnection(zx::channel connec
   return status;
 }
 
-zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints2(const image_t* config,
-                                                                          uint64_t collection_id) {
+zx_status_t Display::DisplayControllerImplSetBufferCollectionConstraints(const image_t* config,
+                                                                         uint64_t collection_id) {
   const auto it = buffer_collections_.find(collection_id);
   if (it == buffer_collections_.end()) {
     zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)", collection_id);

@@ -98,7 +98,7 @@ void Client::ImportImage2(ImportImage2RequestView request, ImportImage2Completer
   dc_image.pixel_format = request->image_config.pixel_format;
   dc_image.type = request->image_config.type;
 
-  zx_status_t status = controller_->dc()->ImportImage2(
+  zx_status_t status = controller_->dc()->ImportImage(
       &dc_image, collections.display_controller_buffer_collection_id, request->index);
   if (status != ZX_OK) {
     completer.Reply(status);
@@ -208,7 +208,7 @@ void Client::SetBufferCollectionConstraints(
 
   zx_status_t status = ZX_ERR_INTERNAL;
 
-  status = controller_->dc()->SetBufferCollectionConstraints2(
+  status = controller_->dc()->SetBufferCollectionConstraints(
       &dc_image, collections.display_controller_buffer_collection_id);
   if (status != ZX_OK) {
     zxlogf(WARNING,
@@ -718,7 +718,7 @@ void Client::ImportImageForCapture(ImportImageForCaptureRequestView request,
   // capture start/release.
   image_t capture_image = {};
 
-  zx_status_t status = controller_->dc()->ImportImageForCapture2(
+  zx_status_t status = controller_->dc()->ImportImageForCapture(
       collections.display_controller_buffer_collection_id, request->index, &capture_image.handle);
 
   if (status == ZX_OK) {
