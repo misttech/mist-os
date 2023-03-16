@@ -430,17 +430,8 @@ fn try_create_install_plan_impl(
         };
 
         update_package_urls.push(if app.id == system_app_id {
-            urgent_update = match update_check.urgent_update {
-                Some(update_value) => {
-                    info!("urgent_update set as {:?} in the response", update_value);
-                    update_value
-                }
-                None => {
-                    info!("No urgent_update attribute set. Defaulting to false.");
-                    false
-                }
-            };
-
+            // If urgent_update is present, assume true.
+            urgent_update = update_check.extra_attributes.contains_key("_urgent_update");
             UpdatePackageUrl::System(pkg_url)
         } else {
             UpdatePackageUrl::Package(pkg_url)
@@ -474,6 +465,7 @@ mod tests {
         futures::future::BoxFuture,
         omaha_client::protocol::response::{App, Manifest, Package, Packages, UpdateCheck},
         parking_lot::Mutex,
+        serde_json::Map,
         std::{convert::TryInto, sync::Arc, task::Poll},
     };
 
@@ -1347,7 +1339,11 @@ mod tests {
         let request_metadata = None;
         let signature = None;
         let mut update_check = UpdateCheck::ok([TEST_URL_BASE]);
-        update_check.urgent_update = Some(true);
+
+        let mut extra_attributes = Map::new();
+        extra_attributes.insert("_urgent_update".to_string(), "true".into());
+        update_check.extra_attributes = extra_attributes;
+
         update_check.manifest = Some(Manifest {
             packages: Packages::new(vec![Package::with_name(TEST_PACKAGE_NAME)]),
             ..Manifest::default()
@@ -1373,39 +1369,5 @@ mod tests {
             .unwrap();
 
         assert!(install_plan.urgent_update);
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_urgent_update_attribute_false() {
-        let request_params = RequestParams::default();
-        let request_metadata = None;
-        let signature = None;
-        let mut update_check = UpdateCheck::ok([TEST_URL_BASE]);
-        update_check.urgent_update = Some(false);
-        update_check.manifest = Some(Manifest {
-            packages: Packages::new(vec![Package::with_name(TEST_PACKAGE_NAME)]),
-            ..Manifest::default()
-        });
-        let response = Response {
-            apps: vec![App {
-                update_check: Some(update_check),
-                id: "system_id".into(),
-                ..App::default()
-            }],
-            ..Response::default()
-        };
-
-        let install_plan = new_installer()
-            .try_create_install_plan(
-                &request_params,
-                request_metadata,
-                &response,
-                vec![],
-                signature,
-            )
-            .await
-            .unwrap();
-
-        assert!(!install_plan.urgent_update);
     }
 }
