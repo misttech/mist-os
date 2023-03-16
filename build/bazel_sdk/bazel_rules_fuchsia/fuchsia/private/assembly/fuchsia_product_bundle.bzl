@@ -511,8 +511,7 @@ fuchsia_product_bundle = rule(
     attrs = {
         "board_name": attr.string(
             doc = "Name of the board this PB runs on. E.g. qemu-x64",
-            # TODO(fxbug.dev/122067): Make mandatory after soft transition.
-            mandatory = False,
+            mandatory = True,
         ),
         "partitions_config": attr.label(
             doc = "Partitions config to use",
@@ -525,8 +524,7 @@ fuchsia_product_bundle = rule(
         ),
         "product_name": attr.string(
             doc = "Name of the Fuchsia product. E.g. workstation_eng",
-            # TODO(fxbug.dev/122067): Make mandatory after soft transition.
-            mandatory = False,
+            mandatory = True,
         ),
         "recovery": attr.label(
             doc = "fuchsia_product_image target to put in slot R",
