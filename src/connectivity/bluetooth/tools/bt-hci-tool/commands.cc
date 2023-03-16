@@ -403,37 +403,39 @@ bool HandleLESetAdvParams(const CommandData* cmd_data, const fxl::CommandLine& c
     return false;
   }
 
-  ::bt::hci_spec::LEAdvertisingType adv_type = ::bt::hci_spec::LEAdvertisingType::kAdvNonConnInd;
+  ::pw::bluetooth::emboss::LEAdvertisingType adv_type =
+      ::pw::bluetooth::emboss::LEAdvertisingType::NOT_CONNECTABLE_UNDIRECTED;
   std::string type;
   if (cmd_line.GetOptionValue("type", &type)) {
     if (type == "adv-ind") {
-      adv_type = ::bt::hci_spec::LEAdvertisingType::kAdvInd;
+      adv_type = ::pw::bluetooth::emboss::LEAdvertisingType::CONNECTABLE_AND_SCANNABLE_UNDIRECTED;
     } else if (type == "direct-low") {
-      adv_type = ::bt::hci_spec::LEAdvertisingType::kAdvDirectIndLowDutyCycle;
+      adv_type = ::pw::bluetooth::emboss::LEAdvertisingType::CONNECTABLE_LOW_DUTY_CYCLE_DIRECTED;
     } else if (type == "direct-high") {
-      adv_type = ::bt::hci_spec::LEAdvertisingType::kAdvDirectIndHighDutyCycle;
+      adv_type = ::pw::bluetooth::emboss::LEAdvertisingType::CONNECTABLE_HIGH_DUTY_CYCLE_DIRECTED;
     } else if (type == "scan") {
-      adv_type = ::bt::hci_spec::LEAdvertisingType::kAdvScanInd;
+      adv_type = ::pw::bluetooth::emboss::LEAdvertisingType::SCANNABLE_UNDIRECTED;
     } else if (type == "nonconn") {
-      adv_type = ::bt::hci_spec::LEAdvertisingType::kAdvNonConnInd;
+      adv_type = ::pw::bluetooth::emboss::LEAdvertisingType::NOT_CONNECTABLE_UNDIRECTED;
     } else {
       std::cout << "  Unrecognized advertising type: " << type << std::endl;
       return false;
     }
   }
 
-  constexpr size_t kPayloadSize = sizeof(::bt::hci_spec::LESetAdvertisingParametersCommandParams);
-  auto packet =
-      ::bt::hci::CommandPacket::New(::bt::hci_spec::kLESetAdvertisingParameters, kPayloadSize);
-  auto params = packet->mutable_payload<::bt::hci_spec::LESetAdvertisingParametersCommandParams>();
-  params->adv_interval_min = htole16(::bt::hci_spec::kLEAdvertisingIntervalDefault);
-  params->adv_interval_max = htole16(::bt::hci_spec::kLEAdvertisingIntervalDefault);
-  params->adv_type = adv_type;
-  params->own_address_type = pw::bluetooth::emboss::LEOwnAddressType::PUBLIC;
-  params->peer_address_type = ::bt::hci_spec::LEPeerAddressType::kPublic;
-  params->peer_address.SetToZero();
-  params->adv_channel_map = ::bt::hci_spec::kLEAdvertisingChannelAll;
-  params->adv_filter_policy = ::bt::hci_spec::LEAdvFilterPolicy::kAllowAll;
+  auto packet = ::bt::hci::EmbossCommandPacket::New<
+      pw::bluetooth::emboss::LESetAdvertisingParametersCommandWriter>(
+      ::bt::hci_spec::kLESetAdvertisingParameters);
+  auto params = packet.view_t();
+  params.advertising_interval_min().UncheckedWrite(::bt::hci_spec::kLEAdvertisingIntervalDefault);
+  params.advertising_interval_max().UncheckedWrite(::bt::hci_spec::kLEAdvertisingIntervalDefault);
+  params.adv_type().Write(adv_type);
+  params.own_address_type().Write(pw::bluetooth::emboss::LEOwnAddressType::PUBLIC);
+  params.peer_address_type().Write(pw::bluetooth::emboss::LEPeerAddressType::PUBLIC);
+  params.advertising_channel_map().BackingStorage().WriteUInt(
+      ::bt::hci_spec::kLEAdvertisingChannelAll);
+  params.advertising_filter_policy().Write(
+      pw::bluetooth::emboss::LEAdvertisingFilterPolicy::ALLOW_ALL);
 
   auto id = SendCompleteCommand(cmd_data, std::move(packet), std::move(complete_cb));
 
