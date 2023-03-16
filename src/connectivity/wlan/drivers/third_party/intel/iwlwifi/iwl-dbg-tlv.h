@@ -49,11 +49,59 @@ struct iwl_apply_point_data {
   int offset;
 };
 
+/**
+ * struct iwl_dbg_tlv_node - debug TLV node
+ * @list: list of &struct iwl_dbg_tlv_node
+ * @tlv: debug TLV
+ */
+struct iwl_dbg_tlv_node {
+  struct list_head list;
+  struct iwl_ucode_tlv tlv;
+};
+
+/**
+ * union iwl_dbg_tlv_tp_data - data that is given in a time point
+ * @fw_pkt: a packet received from the FW
+ */
+union iwl_dbg_tlv_tp_data {
+  struct iwl_rx_packet *fw_pkt;
+};
+
+/**
+ * struct iwl_dbg_tlv_time_point_data
+ * @trig_list: list of triggers
+ * @active_trig_list: list of active triggers
+ * @hcmd_list: list of host commands
+ * @config_list: list of configuration
+ */
+struct iwl_dbg_tlv_time_point_data {
+  struct list_head trig_list;
+  struct list_head active_trig_list;
+  struct list_head hcmd_list;
+  struct list_head config_list;
+};
+
 struct iwl_trans;
+struct iwl_fw_runtime;
 struct iwl_ucode_tlv;
 void iwl_load_fw_dbg_tlv(struct device* dev, struct iwl_trans* trans);
 void iwl_fw_dbg_free(struct iwl_trans* trans);
 void iwl_fw_dbg_copy_tlv(struct iwl_trans* trans, struct iwl_ucode_tlv* tlv, bool ext);
 void iwl_alloc_dbg_tlv(struct iwl_trans* trans, size_t len, const uint8_t* data, bool ext);
+
+void _iwl_dbg_tlv_time_point(struct iwl_fw_runtime *fwrt,
+           enum iwl_fw_ini_time_point tp_id,
+           union iwl_dbg_tlv_tp_data *tp_data,
+           bool sync);
+
+static inline void iwl_dbg_tlv_time_point(struct iwl_fw_runtime *fwrt,
+            enum iwl_fw_ini_time_point tp_id,
+            union iwl_dbg_tlv_tp_data *tp_data)
+{
+#if 0   // NEEDS_PORTING
+  _iwl_dbg_tlv_time_point(fwrt, tp_id, tp_data, false);
+#endif  // NEEDS_PORTING
+}
+
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_IWL_DBG_TLV_H_

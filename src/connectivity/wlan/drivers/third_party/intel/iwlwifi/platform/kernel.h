@@ -252,6 +252,12 @@ static inline void msleep(int msec) {
   zx_nanosleep(zx_deadline_after(ZX_MSEC(msec)));
 }
 
+// We may redefine this struct to use `list_node_t` in the future.
+// TODO(fxbug.dev/119415): clean-up after uprev.
+struct list_head {
+  char dummy;
+};
+
 #if defined(__cplusplus)
 }  // extern "C"
 #endif  // defined(__cplusplus)
