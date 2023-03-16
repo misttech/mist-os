@@ -2,3 +2,4 @@ fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/CPU
 fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/bits_per_second
 fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/jitter_ms
 fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/lost_packets
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/lost_percent

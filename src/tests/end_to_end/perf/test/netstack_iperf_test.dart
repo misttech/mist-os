@@ -97,7 +97,9 @@ void main(List<String> args) {
         case 'bits_per_second':
           return 'bits/second';
         case 'lost_packets':
-          return 'count';
+          return 'count_smallerIsBetter';
+        case 'lost_percent':
+          return 'percent';
         case 'jitter_ms':
           return 'milliseconds';
         default:
@@ -131,6 +133,7 @@ void main(List<String> args) {
       for (var key in receiver.keys) {
         if (key == 'bits_per_second' ||
             key == 'lost_packets' ||
+            key == 'lost_percent' ||
             key == 'jitter_ms') {
           results.add({
             'label': '$protocol/$directionLabel/${msgSize}bytes/$key',
@@ -352,7 +355,7 @@ void main(List<String> args) {
   addIperfTest('ethernet_tcp_send', Protocol.tcp, Direction.deviceToHost);
   addIperfTest('ethernet_tcp_recv', Protocol.tcp, Direction.hostToDevice);
   addIperfTest('ethernet_udp_send', Protocol.udp, Direction.deviceToHost);
-  addIperfTest('ethernet_ucp_recv', Protocol.udp, Direction.hostToDevice);
+  addIperfTest('ethernet_udp_recv', Protocol.udp, Direction.hostToDevice);
 
   runShardTests(args, tests);
 }
