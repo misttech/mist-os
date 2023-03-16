@@ -36,8 +36,9 @@ using ItemCallback = fit::function<zx_status_t(std::string_view)>;
 //
 // This function will not call the callback for the '.' file in a directory.
 //
-// If the callback returns a status other than `ZX_OK`, watching stops and the callback's status is
-// returned to the caller of WatchDirectory.
+// If the callback returns a status other than `ZX_OK`, watching stops.
+// If the callback returns `ZX_ERR_STOP` then this function will return `ZX_OK`, otherwise the
+// callback's status is returned to the caller.
 zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                                     ItemCallback callback);
 

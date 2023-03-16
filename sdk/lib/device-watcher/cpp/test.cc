@@ -105,7 +105,7 @@ TEST(DeviceWatcherTest, WatchDirectory) {
         }
         return ZX_OK;
       });
-  ASSERT_STATUS(ZX_ERR_STOP, watch_result.status_value());
+  ASSERT_OK(watch_result.status_value());
 
   EXPECT_THAT(file_names,
               testing::UnorderedElementsAre(std::string(file1_name), std::string(file2_name)));

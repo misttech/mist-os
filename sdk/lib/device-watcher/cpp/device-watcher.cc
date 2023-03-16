@@ -274,6 +274,9 @@ zx::result<> WatchDirectoryForItems(const fidl::ClientEnd<fuchsia_io::Directory>
         continue;
       }
       if (zx_status_t status = callback(parsed.name); status != ZX_OK) {
+        if (status == ZX_ERR_STOP) {
+          return zx::ok();
+        }
         return zx::error(status);
       }
     }
