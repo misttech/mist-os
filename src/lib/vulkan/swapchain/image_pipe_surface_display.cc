@@ -497,11 +497,11 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     }
 
     uint32_t image_id = next_image_id();
-    display_controller_->ImportImage2(image_config, kBufferCollectionId, image_id, i,
-                                      [this, &status](zx_status_t import_status) {
-                                        status = import_status;
-                                        got_message_response_ = true;
-                                      });
+    display_controller_->ImportImage(image_config, kBufferCollectionId, image_id, i,
+                                     [this, &status](zx_status_t import_status) {
+                                       status = import_status;
+                                       got_message_response_ = true;
+                                     });
 
     if (!WaitForAsyncMessage()) {
       return false;

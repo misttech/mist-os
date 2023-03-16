@@ -276,8 +276,7 @@ impl Controller {
         image_id: ImageId,
         mut config: display::ImageConfig,
     ) -> Result<()> {
-        let result =
-            self.proxy().import_image2(&mut config, collection_id.0, image_id.0, 0).await?;
+        let result = self.proxy().import_image(&mut config, collection_id.0, image_id.0, 0).await?;
         zx::Status::ok(result)?;
         Ok(())
     }

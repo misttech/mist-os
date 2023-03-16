@@ -269,7 +269,8 @@ protocol Controller {
     // compatible with that passed through SetBufferCollectionConstraints on
     // the collection id. If the provided |image_id| is already in use, this
     // function will return |ZX_ERR_ALREADY_EXISTS|.
-    ImportImage2(struct {
+    @selector("ImportImage2")
+    ImportImage(struct {
         image_config ImageConfig;
         collection_id uint64;
         image_id uint64;

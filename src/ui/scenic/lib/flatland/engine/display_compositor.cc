@@ -434,8 +434,8 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   zx_status_t import_image_status = ZX_OK;
   {
     const auto status = (*display_controller_)
-                            ->ImportImage2(image_config, collection_id, metadata.identifier,
-                                           metadata.vmo_index, &import_image_status);
+                            ->ImportImage(image_config, collection_id, metadata.identifier,
+                                          metadata.vmo_index, &import_image_status);
     FX_DCHECK(status == ZX_OK);
   }
 

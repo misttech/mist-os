@@ -333,7 +333,7 @@ impl Frame {
         let image_id = framebuffer.next_image_id();
         let status = framebuffer
             .controller
-            .import_image2(&mut image_config, collection_id, image_id, index)
+            .import_image(&mut image_config, collection_id, image_id, index)
             .await
             .context("controller import_image")?;
 

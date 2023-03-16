@@ -77,7 +77,7 @@ void DisplayConfig::InitializeInspect(inspect::Node* parent) {
       node_.CreateBool("pending_apply_layer_change", pending_apply_layer_change_);
 }
 
-void Client::ImportImage2(ImportImage2RequestView request, ImportImage2Completer::Sync& completer) {
+void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& completer) {
   auto it = collection_map_.find(request->collection_id);
   if (it == collection_map_.end()) {
     completer.Reply(ZX_ERR_INVALID_ARGS);

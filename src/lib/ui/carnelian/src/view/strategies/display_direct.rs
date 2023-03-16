@@ -362,7 +362,7 @@ impl DisplayDirectViewStrategy {
             let image_id = next_image_id();
             let status = display
                 .controller
-                .import_image2(&mut image_config, collection_id, image_id, uindex)
+                .import_image(&mut image_config, collection_id, image_id, uindex)
                 .await
                 .context("controller import_image")?;
             ensure!(status == 0, "import_image error {} ({})", Status::from_raw(status), status);

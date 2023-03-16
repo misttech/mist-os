@@ -485,7 +485,7 @@ bool Image::Import(const fidl::WireSyncClient<fhd::Controller>& dc, uint64_t ima
   fhd::wire::ImageConfig image_config;
   GetConfig(&image_config);
   const fidl::WireResult import_result =
-      dc->ImportImage2(image_config, collection_id_, image_id, /*index=*/0);
+      dc->ImportImage(image_config, collection_id_, image_id, /*index=*/0);
   if (!import_result.ok()) {
     printf("Failed to import image: %s\n", import_result.FormatDescription().c_str());
     return false;

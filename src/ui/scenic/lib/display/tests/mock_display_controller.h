@@ -107,8 +107,8 @@ class MockDisplayController : public fuchsia::hardware::display::testing::Contro
     }
   }
 
-  void ImportImage2(fuchsia::hardware::display::ImageConfig image_config, uint64_t collection_id,
-                    uint64_t image_id, uint32_t index, ImportImage2Callback callback) override {
+  void ImportImage(fuchsia::hardware::display::ImageConfig image_config, uint64_t collection_id,
+                   uint64_t image_id, uint32_t index, ImportImageCallback callback) override {
     callback(ZX_OK);
   }
 

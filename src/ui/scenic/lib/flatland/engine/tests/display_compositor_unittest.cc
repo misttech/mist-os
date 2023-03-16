@@ -227,7 +227,7 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
 TEST_F(DisplayCompositorTest,
        SysmemNegotiationTest_WhenDisplayConstraintsCompatible_TheyShouldBeIncluded) {
   // Expected calls: ImportBufferCollection(), SetBufferCollectionConstraints(),
-  // ImportImage2(), CheckConfig(), and one for deletion.
+  // ImportImage(), CheckConfig(), and one for deletion.
   const auto server = CreateServerWaitingForMessages(*mock_display_controller_, 5);
 
   // Create two tokens: one for acting as the "client" and inspecting allocation results with, and
@@ -287,10 +287,10 @@ TEST_F(DisplayCompositorTest,
                                    });
             callback(ZX_OK);
           }));
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, kGlobalBufferCollectionId, _, 0, _))
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, kGlobalBufferCollectionId, _, 0, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
-             MockDisplayController::ImportImage2Callback callback) { callback(ZX_OK); }));
+             MockDisplayController::ImportImageCallback callback) { callback(ZX_OK); }));
   EXPECT_CALL(*mock_display_controller_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayController::CheckConfigCallback callback) {
         callback(fuchsia::hardware::display::ConfigResult::OK, /*ops=*/{});
@@ -622,10 +622,10 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
       .height = 256,
       .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
   };
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, kGlobalBufferCollectionId, _, 0, _))
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, kGlobalBufferCollectionId, _, 0, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
-             MockDisplayController::ImportImage2Callback callback) { callback(ZX_OK); }));
+             MockDisplayController::ImportImageCallback callback) { callback(ZX_OK); }));
   EXPECT_CALL(*renderer_, ImportBufferImage(image_metadata, _)).WillOnce(Return(true));
   display_compositor_->ImportBufferImage(image_metadata, BufferCollectionUsage::kClientImage);
 
@@ -705,11 +705,11 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
 
   // Make sure that the engine returns true if the display controller returns true.
   EXPECT_CALL(*mock_display_controller_,
-              ImportImage2(_, kGlobalBufferCollectionId, kImageId, kVmoIdx, _))
+              ImportImage(_, kGlobalBufferCollectionId, kImageId, kVmoIdx, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::ImageConfig image_config, uint64_t collection_id,
              uint64_t image_id, uint32_t index,
-             MockDisplayController::ImportImage2Callback callback) { callback(ZX_OK); }));
+             MockDisplayController::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(metadata, _)).WillOnce(Return(true));
 
@@ -724,10 +724,10 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   display_compositor_->ReleaseBufferImage(metadata.identifier);
 
   // Make sure that the engine returns false if the display controller returns an error
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
       .WillOnce(testing::Invoke([](fuchsia::hardware::display::ImageConfig image_config,
                                    uint64_t collection_id, uint64_t image_id, uint32_t index,
-                                   MockDisplayController::ImportImage2Callback callback) {
+                                   MockDisplayController::ImportImageCallback callback) {
         callback(ZX_ERR_INVALID_ARGS);
       }));
 
@@ -738,7 +738,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   EXPECT_FALSE(result);
 
   // Collection ID can't be invalid. This shouldn't reach the display controller.
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
       .Times(0);
   auto copy_metadata = metadata;
   copy_metadata.collection_id = allocation::kInvalidId;
@@ -747,7 +747,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   EXPECT_FALSE(result);
 
   // Image Id can't be 0. This shouldn't reach the display controller.
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
       .Times(0);
   copy_metadata = metadata;
   copy_metadata.identifier = allocation::kInvalidImageId;
@@ -756,7 +756,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   EXPECT_FALSE(result);
 
   // Width can't be 0. This shouldn't reach the display controller.
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, kGlobalBufferCollectionId, _, kVmoIdx, _))
       .Times(0);
   copy_metadata = metadata;
   copy_metadata.width = 0;
@@ -765,7 +765,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   EXPECT_FALSE(result);
 
   // Height can't be 0. This shouldn't reach the display controller.
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, _, _, 0, _)).Times(0);
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, _, _, 0, _)).Times(0);
   copy_metadata = metadata;
   copy_metadata.height = 0;
   result =
@@ -973,10 +973,10 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
   EXPECT_CALL(*mock_display_controller_,
-              ImportImage2(_, kGlobalBufferCollectionId, parent_image_metadata.identifier, 0, _))
+              ImportImage(_, kGlobalBufferCollectionId, parent_image_metadata.identifier, 0, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
-             MockDisplayController::ImportImage2Callback callback) { callback(ZX_OK); }));
+             MockDisplayController::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(parent_image_metadata, _)).WillOnce(Return(true));
 
@@ -984,10 +984,10 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
                                          BufferCollectionUsage::kClientImage);
 
   EXPECT_CALL(*mock_display_controller_,
-              ImportImage2(_, kGlobalBufferCollectionId, child_image_metadata.identifier, 1, _))
+              ImportImage(_, kGlobalBufferCollectionId, child_image_metadata.identifier, 1, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
-             MockDisplayController::ImportImage2Callback callback) { callback(ZX_OK); }));
+             MockDisplayController::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(child_image_metadata, _)).WillOnce(Return(true));
   display_compositor_->ImportBufferImage(child_image_metadata, BufferCollectionUsage::kClientImage);
@@ -1169,10 +1169,10 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
   EXPECT_CALL(*mock_display_controller_,
-              ImportImage2(_, kGlobalBufferCollectionId, parent_image_metadata.identifier, 0, _))
+              ImportImage(_, kGlobalBufferCollectionId, parent_image_metadata.identifier, 0, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
-             MockDisplayController::ImportImage2Callback callback) { callback(ZX_OK); }));
+             MockDisplayController::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(parent_image_metadata, _)).WillOnce(Return(true));
 
@@ -1489,10 +1489,10 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
   // Import image.
-  EXPECT_CALL(*mock_display_controller_, ImportImage2(_, kGlobalBufferCollectionId, _, 0, _))
+  EXPECT_CALL(*mock_display_controller_, ImportImage(_, kGlobalBufferCollectionId, _, 0, _))
       .WillOnce(testing::Invoke(
           [](fuchsia::hardware::display::ImageConfig, uint64_t, uint64_t, uint32_t,
-             MockDisplayController::ImportImage2Callback callback) { callback(ZX_OK); }));
+             MockDisplayController::ImportImageCallback callback) { callback(ZX_OK); }));
 
   EXPECT_CALL(*renderer_, ImportBufferImage(image_metadata, _)).WillOnce(Return(true));
   display_compositor_->ImportBufferImage(image_metadata, BufferCollectionUsage::kClientImage);

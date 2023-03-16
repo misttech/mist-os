@@ -650,7 +650,7 @@ TEST_F(IntegrationTest, ImportImage_InvalidCollection) {
   ASSERT_OK(cl_reply.value().res);
   // Importing an image from a non-existent collection should fail.
   auto ii_reply =
-      client.dc_->ImportImage2(client.displays_[0].image_config_, 0xffeeeedd, /* image_id= */ 1, 0);
+      client.dc_->ImportImage(client.displays_[0].image_config_, 0xffeeeedd, /* image_id= */ 1, 0);
   ASSERT_NE(ii_reply.value().res, ZX_OK);
 }
 

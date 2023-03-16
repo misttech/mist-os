@@ -399,7 +399,7 @@ zx::result<uint64_t> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   auto image_id = next_image_id_++;
-  auto import_result = dc_->ImportImage2(image_config, display_collection_id, image_id, 0);
+  auto import_result = dc_->ImportImage(image_config, display_collection_id, image_id, 0);
   if (!import_result.ok() || import_result.value().res != ZX_OK) {
     zxlogf(ERROR, "Importing image failed (fidl=%d, res=%d)", import_result.status(),
            import_result.value().res);
