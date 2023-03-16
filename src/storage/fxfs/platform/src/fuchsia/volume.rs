@@ -29,12 +29,12 @@ use {
     },
     fxfs::{
         errors::FxfsError,
-        filesystem::{self, Filesystem, SyncOptions},
+        filesystem::{self, SyncOptions},
         log::*,
         object_store::{
             directory::{Directory, ObjectDescriptor},
-            transaction::{LockKey, Mutation, Options},
-            HandleOptions, HandleOwner, ObjectKey, ObjectKind, ObjectStore, ObjectValue,
+            transaction::Options,
+            HandleOptions, HandleOwner, ObjectStore,
         },
     },
     std::{
@@ -433,10 +433,6 @@ impl FxVolumeAndRoot {
         self.root().clone().into_any().downcast::<FxDirectory>().expect("Invalid type for root")
     }
 
-    fn get_fs(&self) -> Arc<dyn Filesystem> {
-        self.volume.store.filesystem()
-    }
-
     pub async fn handle_project_id_requests(
         &self,
         mut requests: ProjectIdRequestStream,
@@ -445,35 +441,49 @@ impl FxVolumeAndRoot {
         while let Some(request) = requests.try_next().await? {
             match request {
                 ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
-                    .send(&mut self.set_project_limit(project_id, bytes, nodes).await.map_err(
+                    .send(
+                        &mut self
+                            .volume
+                            .store()
+                            .set_project_limit(project_id, bytes, nodes)
+                            .await
+                            .map_err(|error| {
+                                error!(?error, store_id, project_id, "Failed to set project limit");
+                                map_to_raw_status(error)
+                            }),
+                    )?,
+                ProjectIdRequest::Clear { responder, project_id } => responder.send(
+                    &mut self.volume.store().clear_project_limit(project_id).await.map_err(
                         |error| {
-                            error!(?error, store_id, project_id, "Failed to set project limit");
+                            error!(?error, store_id, project_id, "Failed to clear project limit");
                             map_to_raw_status(error)
                         },
-                    ))?,
-                ProjectIdRequest::Clear { responder, project_id } => responder.send(
-                    &mut self.clear_project_limit(project_id).await.map_err(|error| {
-                        error!(?error, store_id, project_id, "Failed to clear project limit");
-                        map_to_raw_status(error)
-                    }),
+                    ),
                 )?,
                 ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
-                    &mut self.set_project_for_node(node_id, project_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, project_id, "Failed to apply node.");
-                        map_to_raw_status(error)
-                    }),
+                    &mut self
+                        .volume
+                        .store()
+                        .set_project_for_node(node_id, project_id)
+                        .await
+                        .map_err(|error| {
+                            error!(?error, store_id, node_id, project_id, "Failed to apply node.");
+                            map_to_raw_status(error)
+                        }),
                 )?,
                 ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
-                    &mut self.get_project_for_node(node_id).await.map_err(|error| {
+                    &mut self.volume.store().get_project_for_node(node_id).await.map_err(|error| {
                         error!(?error, store_id, node_id, "Failed to get node.");
                         map_to_raw_status(error)
                     }),
                 )?,
                 ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
-                    &mut self.clear_project_for_node(node_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, "Failed to clear for node.");
-                        map_to_raw_status(error)
-                    }),
+                    &mut self.volume.store().clear_project_for_node(node_id).await.map_err(
+                        |error| {
+                            error!(?error, store_id, node_id, "Failed to clear for node.");
+                            map_to_raw_status(error)
+                        },
+                    ),
                 )?,
                 ProjectIdRequest::List { responder, token } => {
                     responder.send(&mut self.list_projects(&token).await.map_err(|error| {
@@ -489,191 +499,6 @@ impl FxVolumeAndRoot {
                 }
             }
         }
-        Ok(())
-    }
-
-    /// Adds a mutation to set the project limit as an attribute with `bytes` and `nodes` to root
-    /// node.
-    async fn set_project_limit(
-        &self,
-        project_id: u64,
-        bytes: u64,
-        nodes: u64,
-    ) -> Result<(), Error> {
-        ensure!(project_id != 0, FxfsError::OutOfRange);
-        let store = self.volume.store();
-        let root_id = self.root.object_id();
-        let mut transaction = self
-            .get_fs()
-            .new_transaction(
-                &vec![LockKey::ProjectId { store_object_id: store.store_object_id(), project_id }],
-                Options::default(),
-            )
-            .await?;
-        transaction.add(
-            store.store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::project_limit(root_id, project_id),
-                ObjectValue::BytesAndNodes {
-                    bytes: bytes.try_into().map_err(|_| FxfsError::TooBig)?,
-                    nodes: nodes.try_into().map_err(|_| FxfsError::TooBig)?,
-                },
-            ),
-        );
-        transaction.commit().await?;
-        Ok(())
-    }
-
-    /// Clear the limit for a project by tombstoning the limits and usage attributes for the
-    /// given `project_id`. Fails if the project is still in use by one or more nodes.
-    async fn clear_project_limit(&self, project_id: u64) -> Result<(), Error> {
-        let store = self.volume.store();
-        let root_id = self.root.object_id();
-        let mut transaction = self
-            .get_fs()
-            .new_transaction(
-                &vec![LockKey::ProjectId { store_object_id: store.store_object_id(), project_id }],
-                Options::default(),
-            )
-            .await?;
-        transaction.add(
-            store.store_object_id(),
-            Mutation::replace_or_insert_object(
-                ObjectKey::project_limit(root_id, project_id),
-                ObjectValue::None,
-            ),
-        );
-        transaction.commit().await?;
-        Ok(())
-    }
-
-    /// Apply a `project_id` to a given node. Fails if node is not found or already has a project
-    /// applied to it.
-    async fn set_project_for_node(&self, node_id: u64, project_id: u64) -> Result<(), Error> {
-        ensure!(project_id != 0, FxfsError::OutOfRange);
-        let store = self.volume.store();
-        let root_id = self.root.object_id();
-        let mut transaction = self
-            .get_fs()
-            .new_transaction(
-                &vec![
-                    LockKey::ProjectId { store_object_id: store.store_object_id(), project_id },
-                    LockKey::object(store.store_object_id(), node_id),
-                ],
-                Options::default(),
-            )
-            .await?;
-
-        let object_key = ObjectKey::object(node_id);
-        let (kind, mut attributes) =
-            match store.tree().find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
-                ObjectValue::Object { kind, attributes } => (kind, attributes),
-                ObjectValue::None => return Err(FxfsError::NotFound.into()),
-                _ => return Err(FxfsError::Inconsistent.into()),
-            };
-        // Prevent updating this if it is already set.
-        if attributes.project_id != 0 {
-            return Err(FxfsError::AlreadyExists.into());
-        }
-        let storage_size = match kind {
-            ObjectKind::File { allocated_size, .. } => allocated_size,
-            ObjectKind::Directory { .. } => 0,
-            _ => return Err(FxfsError::Inconsistent.into()),
-        };
-
-        attributes.project_id = project_id;
-
-        transaction.add(
-            store.store_object_id(),
-            Mutation::replace_or_insert_object(
-                object_key,
-                ObjectValue::Object { kind, attributes },
-            ),
-        );
-        transaction.add(
-            store.store_object_id(),
-            Mutation::merge_object(
-                ObjectKey::project_usage(root_id, project_id),
-                ObjectValue::BytesAndNodes {
-                    bytes: storage_size.try_into().map_err(|_| FxfsError::TooBig)?,
-                    nodes: 1,
-                },
-            ),
-        );
-        transaction.commit().await?;
-        Ok(())
-    }
-
-    /// Return the project_id associated with the given `node_id`.
-    async fn get_project_for_node(&self, node_id: u64) -> Result<u64, Error> {
-        match self
-            .volume
-            .store
-            .tree()
-            .find(&ObjectKey::object(node_id))
-            .await?
-            .ok_or(FxfsError::NotFound)?
-            .value
-        {
-            ObjectValue::Object { attributes, .. } => match attributes.project_id {
-                id => Ok(id),
-            },
-            ObjectValue::None => return Err(FxfsError::NotFound.into()),
-            _ => return Err(FxfsError::Inconsistent.into()),
-        }
-    }
-
-    /// Remove the project id for a given `node_id`. The call will do nothing and return success
-    /// if the node is found to not be associated with any project.
-    async fn clear_project_for_node(&self, node_id: u64) -> Result<(), Error> {
-        let store = self.volume.store();
-        let root_id = self.root.object_id();
-        let mut transaction = self
-            .get_fs()
-            .new_transaction(
-                &vec![LockKey::object(store.store_object_id(), node_id)],
-                Options::default(),
-            )
-            .await?;
-
-        let object_key = ObjectKey::object(node_id);
-        let (kind, mut attributes) =
-            match store.tree().find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
-                ObjectValue::Object { kind, attributes } => (kind, attributes),
-                ObjectValue::None => return Err(FxfsError::NotFound.into()),
-                _ => return Err(FxfsError::Inconsistent.into()),
-            };
-        if attributes.project_id == 0 {
-            return Ok(());
-        }
-        let old_project_id = attributes.project_id;
-        attributes.project_id = 0;
-
-        let storage_size = match kind {
-            ObjectKind::File { allocated_size, .. } => allocated_size,
-            ObjectKind::Directory { .. } => 0,
-            _ => return Err(FxfsError::Inconsistent.into()),
-        };
-        transaction.add(
-            store.store_object_id(),
-            Mutation::replace_or_insert_object(
-                object_key,
-                ObjectValue::Object { kind, attributes },
-            ),
-        );
-        // Not safe to convert storage_size to i64, as space usage can exceed i64 in size. Not
-        // going to deal with handling such enormous files, fail the request.
-        transaction.add(
-            store.store_object_id(),
-            Mutation::merge_object(
-                ObjectKey::project_usage(root_id, old_project_id),
-                ObjectValue::BytesAndNodes {
-                    bytes: -(storage_size.try_into().map_err(|_| FxfsError::TooBig)?),
-                    nodes: -1,
-                },
-            ),
-        );
-        transaction.commit().await?;
         Ok(())
     }
 

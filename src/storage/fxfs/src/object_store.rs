@@ -12,6 +12,7 @@ pub mod journal;
 mod merge;
 pub mod object_manager;
 mod object_record;
+pub mod project_id;
 mod store_object_handle;
 #[cfg(test)]
 mod testing;
@@ -1772,100 +1773,6 @@ impl ObjectStore {
         self.store_info.lock().unwrap().info_mut().unwrap().mutations_key = Some(wrapped_key);
         // mutations_cipher_offset is updated by flush.
         Ok(())
-    }
-
-    /// Returns a list of project ids currently tracked with project limits or usage in ascending
-    /// order, beginning after `last_id` and providing up to `max_entries`. If `max_entries` would
-    /// be exceeded then it also returns the final id in the list, for use in the following call to
-    /// resume the listing.
-    pub async fn list_projects(
-        &self,
-        start_id: u64,
-        max_entries: usize,
-    ) -> Result<(Vec<u64>, Option<u64>), Error> {
-        let root_dir_id = self.root_directory_object_id();
-        let layer_set = self.tree().layer_set();
-        let mut merger = layer_set.merger();
-        let mut iter =
-            merger.seek(Bound::Included(&ObjectKey::project_limit(root_dir_id, start_id))).await?;
-        let mut entries = Vec::new();
-        let mut prev_entry = 0;
-        let mut next_entry = None;
-        while let Some(ItemRef { key: ObjectKey { object_id, data: key_data }, value, .. }) =
-            iter.get()
-        {
-            // We've moved outside the target object id.
-            if *object_id != root_dir_id {
-                break;
-            }
-            match key_data {
-                ObjectKeyData::Project { project_id, .. } => {
-                    // Bypass deleted or repeated entries.
-                    if *value != ObjectValue::None && prev_entry < *project_id {
-                        if entries.len() == max_entries {
-                            next_entry = Some(*project_id);
-                            break;
-                        }
-                        prev_entry = *project_id;
-                        entries.push(*project_id);
-                    }
-                }
-                // We've moved outside the list of Project limits and usages.
-                _ => {
-                    break;
-                }
-            }
-            iter.advance().await?;
-        }
-        // Skip deleted entries
-        Ok((entries, next_entry))
-    }
-
-    /// Looks up the limit and usage of `project_id` as a pair of bytes and notes. Any of the two
-    /// fields not found will return None for them.
-    pub async fn project_info(
-        &self,
-        project_id: u64,
-    ) -> Result<(Option<(u64, u64)>, Option<(u64, u64)>), Error> {
-        let root_id = self.root_directory_object_id();
-        let layer_set = self.tree().layer_set();
-        let mut merger = layer_set.merger();
-        let mut iter =
-            merger.seek(Bound::Included(&ObjectKey::project_limit(root_id, project_id))).await?;
-        let mut limit = None;
-        let mut usage = None;
-        // The limit should be immediately followed by the usage if both exist.
-        while let Some(ItemRef { key: ObjectKey { object_id, data: key_data }, value, .. }) =
-            iter.get()
-        {
-            // Should be within the bounds of the root dir id.
-            if *object_id != root_id {
-                break;
-            }
-            if let (
-                ObjectKeyData::Project { project_id: found_project_id, property },
-                ObjectValue::BytesAndNodes { bytes, nodes },
-            ) = (key_data, value)
-            {
-                // Outside the range for target project information.
-                if *found_project_id != project_id {
-                    break;
-                }
-                let raw_value: (u64, u64) = (
-                    // Should succeed in conversions since they shouldn't be negative.
-                    (*bytes).try_into().map_err(|_| FxfsError::Inconsistent)?,
-                    (*nodes).try_into().map_err(|_| FxfsError::Inconsistent)?,
-                );
-                match property {
-                    ProjectProperty::Limit => limit = Some(raw_value),
-                    ProjectProperty::Usage => usage = Some(raw_value),
-                }
-            } else {
-                break;
-            }
-            iter.advance().await?;
-        }
-        Ok((limit, usage))
     }
 }
 
