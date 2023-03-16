@@ -81,7 +81,6 @@ group("core") {
     "//src/experiences:tests",
     "//src/factory:tests",
     "//src/firmware:tests",
-    "//src/flutter:tests",
     "//src/fonts:tests",
     "//src/hwinfo:tests",
     "//src/identity:tests",

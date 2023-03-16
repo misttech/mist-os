@@ -7,7 +7,6 @@ group("tests") {
 
   deps = [
     "conformance",
-    "integration_flutter_tests",
     "integration_graphics_tests",
     "integration_input_tests",
     "scenic-stress-tests:tests",

@@ -34,7 +34,7 @@ ensure we uphold correctness and stability of platform functionality that spans
 two or more components, via our prebuilt binaries (such as Scenic) and API
 contracts (over FIDL). This is especially valuable in validating our ongoing
 platform migrations. One example is the set of touch dispatch paths, such as
-from Input Pipeline to Scenic to Flutter.
+from Input Pipeline to Scenic to Chromium.
 
 ### Models of production
 
@@ -234,8 +234,8 @@ gates, but incur a heavy performance penalty and adds complexity to debugging.
 
 Another dimension of complexity is that much of client code does not interact
 directly with Fuchsia graphics APIs; instead they run in an abstracted runner
-environment. Flutter and Web are good examples where the client code cannot
-directly use Scenic APIs. Some facilities can be piped through the runner, but
+environment. Web is a good example where the client code cannot directly use
+Scenic APIs. Some facilities can be piped through the runner, but
 tests generally cannot rely on full API access. Some runners even coarsen the
 timestamps, which also complicates testing a bit.
 
@@ -323,18 +323,10 @@ topologies" that are stable and suitable for the product to build on.
 It's a valuable exercise to capture each of these core topologies in our
 platform integration tests. Some examples:
 
-*   Touch dispatch to the Flutter runner.
-    *   The intra-component connection between the Flutter runner (C++) and the
-        Flutter framework (Dart) is delicate, and a runner test will catch bad
-        rolls into fuchsia.git. Workstation was once broken for many months due
-        to a problem here.
 *   Touch dispatch to the Chromium runner.
     *   Chromium employs a two-view topology as part of its JS sandboxing
         strategy. Having a test ensures that Chromium is correctly using our
         APIs, and that our changes don't accidentally break Chromium.
-*   Touch dispatch from Flutter runner to Chromium runner.
-    *   This scenario models a critical production path where the product
-        reinjects touch events into its Chromium child view.
 *   One parent view and two child views, using assorted runners, to ensure touch
     dispatch is routed to the correct view.
 

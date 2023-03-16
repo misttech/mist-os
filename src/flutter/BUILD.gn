@@ -70,8 +70,3 @@ copy("flutter_tester") {
   sources = [ "//prebuilt/third_party/flutter/${target_cpu}/debug/jit/flutter_binaries/flutter_tester" ]
   outputs = [ "$target_gen_dir/flutter_tester" ]
 }
-
-group("tests") {
-  testonly = true
-  deps = [ "tests" ]
-}

@@ -44,11 +44,7 @@
     ],
     facets: {
         "fuchsia.test": {
-            "deprecated-allowed-packages": [
-                "flutter_aot_runner",
-                "flutter_jit_runner",
-                "web_engine",
-            ],
+            "deprecated-allowed-packages": [ "web_engine" ],
         },
     },
 }

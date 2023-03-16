@@ -49,14 +49,6 @@ before the test completes, increase the amount of time in the `--duration` flag.
 You can use [`tiles-session`](/src/ui/bin/tiles-session/README.md) to manually run and
 interact with any of the child clients under test.
 
-### Play with the Flutter client
-
-To play around with the Flutter client used in the automated test, invoke the client like this:
-
-```shell
-$ ffx session add fuchsia-pkg://fuchsia.com/one-flutter#meta/one-flutter.cm
-```
-
 ### Play with the C++ GFX client
 
 To play around with the C++ GFX client used in the automated test, invoke the client like this:

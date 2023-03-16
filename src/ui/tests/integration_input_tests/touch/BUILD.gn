@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//build/flutter/config.gni")
 import("//src/fonts/build/fonts.gni")
 
 font_collection("single-font-collection") {
@@ -87,9 +86,7 @@ fuchsia_test_package("touch-input-test") {
     # Include some default config (it doesn't matter which, since we're going to override it).
     "//src/ui/testing/test_ui_stack:flatland_scene_manager_config",
     "//src/ui/testing/test_ui_stack:test-ui-stack-component",
-    "//src/ui/tests/integration_input_tests/touch/embedding-flutter:realm",
     "//src/ui/tests/integration_input_tests/touch/one-chromium:component",
-    "//src/ui/tests/integration_input_tests/touch/one-flutter:realm",
     "//src/ui/tests/integration_input_tests/touch/touch-flatland-client:component",
     "//src/ui/tests/integration_input_tests/touch/touch-gfx-client:component",
   ]
@@ -175,14 +172,11 @@ group("tests") {
     # targets above?
     "//src/chromium:uses_web_engine",
     "//src/cobalt/bin/testing/mock_cobalt",
-    "//src/flutter",
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
     "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider",
     "//src/ui/bin/text:text_manager",
-    "//src/ui/tests/integration_input_tests/touch/embedding-flutter",
     "//src/ui/tests/integration_input_tests/touch/one-chromium",
-    "//src/ui/tests/integration_input_tests/touch/one-flutter",
     "//src/ui/tests/integration_input_tests/touch/touch-flatland-client",
     "//src/ui/tests/integration_input_tests/touch/touch-gfx-client",
   ]

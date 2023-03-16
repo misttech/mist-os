@@ -190,7 +190,7 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
         }
 
         if (touch_input_listener_) {
-          // Only report ADD and CHANGE events, for consistency with the flutter client.
+          // Only report ADD and CHANGE events for minimality; add more if necessary.
           if (phase == EventPhase::ADD || phase == EventPhase::CHANGE) {
             // The raw pointer event's coordinates are in pips (logical pixels). The test
             // expects coordinates in physical pixels. The former is transformed into the latter

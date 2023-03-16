@@ -41,7 +41,6 @@ group("tests_no_e2e") {
     "experiences:tests",
     "factory:tests",
     "firmware:tests",
-    "flutter:tests",
     "fonts:tests",
     "graphics:tests",
     "hwinfo:tests",

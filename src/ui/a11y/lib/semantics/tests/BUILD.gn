@@ -15,7 +15,6 @@ group("unit") {
 group("integration") {
   testonly = true
   public_deps = [
-    ":flutter-semantics-test",
     ":web-semantics-test",
 
     # TODO(fxbug.dev/119212): These should be provided by the Product
@@ -116,55 +115,6 @@ source_set("semantics_integration_test_fixture") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
-}
-
-executable("flutter-semantics-test-bin") {
-  testonly = true
-
-  sources = [ "flutter_semantics_tests.cc" ]
-
-  deps = [
-    ":semantics_integration_test_fixture",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/ui/base_view",
-    "//src/ui/testing/views",
-    "//third_party/googletest:gtest",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
-    "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
-  ]
-}
-
-fuchsia_component("flutter-semantics-test-component") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
-  testonly = true
-  manifest = "meta/flutter-semantics-test.cml"
-  deps = [ ":flutter-semantics-test-bin" ]
-}
-
-fuchsia_test_package("flutter-semantics-test") {
-  test_components = [ ":flutter-semantics-test-component" ]
-  deps = [ "//src/ui/a11y/bin/demo:component" ]
-  test_specs = {
-    log_settings = {
-      # Do not fail the test if a message with level ERROR is logged.  Several
-      # components will log ERROR if they miss a non-essential FIDL API in the
-      # sandbox, which would make the test fail if it weren't for this.
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          # Ensure the device has Vulkan.
-          device_type = "AEMU"
-        }
-      },
-    ]
-  }
 }
 
 executable("web-semantics-test-bin") {

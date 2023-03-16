@@ -163,8 +163,7 @@ class TouchFlatlandClient : public fuchsia::ui::app::ViewProvider {
         }
         if (touch_input_listener_) {
           fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
-          // Only report ADD and CHANGE events, for consistency with the
-          // flutter client.
+          // Only report ADD and CHANGE events for minimality; add more if necessary.
           if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD ||
               pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::CHANGE) {
             auto logical = ViewportToViewCoordinates(pointer_sample.position_in_viewport(),

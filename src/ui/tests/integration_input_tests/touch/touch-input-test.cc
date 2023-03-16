@@ -553,96 +553,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
 };
 
 template <typename... Ts>
-class FlutterInputTestBase : public TouchInputBase<Ts...> {
- protected:
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
-    return {
-        std::make_pair(kFlutterRealm, kFlutterRealmUrl),
-    };
-  }
-
-  std::vector<Route> GetTestRoutes() override {
-    return merge({GetFlutterRoutes(ChildRef{kFlutterRealm}),
-                  {
-                      {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-                       .source = ChildRef{kFlutterRealm},
-                       .targets = {ParentRef()}},
-                  }});
-  }
-
-  // Routes needed to setup Flutter client.
-  static std::vector<Route> GetFlutterRoutes(ChildRef target) {
-    return {{.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
-             .source = ChildRef{kMockResponseListener},
-             .targets = {target}},
-            {.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
-                              Protocol{fuchsia::sysmem::Allocator::Name_},
-                              Protocol{fuchsia::tracing::provider::Registry::Name_},
-                              Protocol{fuchsia::vulkan::loader::Loader::Name_}},
-             .source = ParentRef(),
-             .targets = {target}},
-            {.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-             .source = ui_testing::PortableUITest::kTestUIStackRef,
-             .targets = {target}},
-            {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
-                              Protocol{fuchsia::ui::composition::Allocator::Name_}},
-             .source = ui_testing::PortableUITest::kTestUIStackRef,
-             .targets = {target}}};
-  }
-
-  static constexpr auto kFlutterRealm = "flutter_realm";
-  static constexpr auto kFlutterRealmUrl = "#meta/one-flutter-realm.cm";
-};
-
-class FlutterInputTest : public FlutterInputTestBase<> {};
-
-INSTANTIATE_TEST_SUITE_P(FlutterInputTestParameterized, FlutterInputTest,
-                         testing::ValuesIn(AsTuples(UIStackConfigsToTest())));
-
-TEST_P(FlutterInputTest, FlutterTap) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
-
-  InjectInput(TapLocation::kTopLeft);
-  RunLoopUntil([this] {
-    return LastEventReceivedMatches(/*expected_x=*/static_cast<float>(display_height()) / 4.f,
-                                    /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-                                    "one-flutter");
-  });
-}
-
-class FlutterSwipeTest : public FlutterInputTestBase<InjectSwipeParams> {};
-
-INSTANTIATE_TEST_SUITE_P(
-    FlutterSwipeTestParameterized, FlutterSwipeTest,
-    testing::Combine(testing::ValuesIn(UIStackConfigsToTest()),
-                     testing::Values(GetRightSwipeParams(), GetDownwardSwipeParams(),
-                                     GetLeftSwipeParams(), GetUpwardSwipeParams())));
-
-TEST_P(FlutterSwipeTest, SwipeTest) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
-
-  const auto& [direction, begin_x, begin_y, expected_events] = std::get<1>(GetParam());
-
-  // Inject a swipe on the display. As the child view is rotated by 90 degrees, the direction of the
-  // swipe also gets rotated by 90 degrees.
-  InjectEdgeToEdgeSwipe(direction, begin_x, begin_y);
-
-  //  Client sends a response for 1 Down and |swipe_length| Move PointerEventPhase events.
-  RunLoopUntil([this] {
-    return response_state()->events_received().size() >= static_cast<uint32_t>(kMoveEventCount + 1);
-  });
-
-  ASSERT_EQ(response_state()->events_received().size(), expected_events.size());
-  AssertSwipeEvents(response_state()->events_received(), expected_events);
-}
-
-template <typename... Ts>
 class CppInputTestIpBase : public TouchInputBase<Ts...> {
  protected:
   virtual std::string_view GetViewProvider() = 0;
@@ -938,14 +848,14 @@ TEST_P(WebEngineTestIp, ChromiumTap) {
   LaunchClient();
   FX_LOGS(INFO) << "Client launched";
 
-  // Note well: unlike one-flutter and cpp-gfx-client, the web app may be rendering before
-  // it is hittable. Nonetheless, waiting for rendering is better than injecting the touch
-  // immediately. In the event that the app is not hittable, `TryInject()` will retry.
+  // Note well: unlike cpp-gfx-client, the web app may be rendering before it is hittable.
+  // Nonetheless, waiting for rendering is better than injecting the touch immediately. In the event
+  // that the app is not hittable, `TryInject()` will retry.
   client_component().events().OnTerminated = [](int64_t return_code,
                                                 fuchsia::sys::TerminationReason reason) {
-    // Unlike the Flutter and C++ apps, the process hosting the web app's logic doesn't retain
-    // the view token for the life of the app (the process passes that token on to the web
-    // engine process). Consequently, we can't just rely on the IsViewDisconnected message to
+    // Unlike the C++ app, the process hosting the web app's logic doesn't retain the view
+    // token for the life of the app (the process passes that token on to the web engine
+    // process). Consequently, we can't just rely on the IsViewDisconnected message to
     // detect early termination of the app.
     if (return_code != 0) {
       FX_LOGS(FATAL) << "One-Chromium terminated abnormally with return_code=" << return_code
@@ -960,153 +870,6 @@ TEST_P(WebEngineTestIp, ChromiumTap) {
                                     /*expected_y=*/static_cast<float>(display_width()) / 4.f,
                                     /*component_name=*/"one-chromium");
   });
-}
-
-// Tests that rely on Embedding Flutter component. It provides convenience
-// static routes that subclass can inherit.
-class EmbeddingFlutterTestIp {
- protected:
-  // Components needed for Embedding Flutter to be in realm.
-  static std::vector<std::pair<ChildName, std::string>> GetEmbeddingFlutterComponents() {
-    return {
-        std::make_pair(kEmbeddingFlutter, kEmbeddingFlutterUrl),
-    };
-  }
-
-  // Routes needed for Embedding Flutter to run.
-  static std::vector<Route> GetEmbeddingFlutterRoutes() {
-    return {
-        {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-         .source = ChildRef{kEmbeddingFlutter},
-         .targets = {ParentRef()}},
-        {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
-         .source = ChildRef{kMockResponseListener},
-         .targets = {ChildRef{kEmbeddingFlutter}}},
-        {.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-         .source = ui_testing::PortableUITest::kTestUIStackRef,
-         .targets = {ChildRef{kEmbeddingFlutter}}},
-        {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
-                          Protocol{fuchsia::ui::composition::Allocator::Name_}},
-         .source = ui_testing::PortableUITest::kTestUIStackRef,
-         .targets = {ChildRef{kEmbeddingFlutter}}},
-        // Needed for Flutter runner.
-        {.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
-                          Protocol{fuchsia::sysmem::Allocator::Name_},
-                          Protocol{fuchsia::tracing::provider::Registry::Name_},
-                          Protocol{fuchsia::vulkan::loader::Loader::Name_}},
-         .source = ParentRef(),
-         .targets = {ChildRef{kEmbeddingFlutter}}},
-    };
-  }
-
-  static constexpr auto kEmbeddingFlutter = "embedding_flutter";
-  static constexpr auto kEmbeddingFlutterUrl = "#meta/embedding-flutter-realm.cm";
-};
-
-class FlutterInFlutterTestIp : public FlutterInputTest, public EmbeddingFlutterTestIp {
- protected:
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
-    return merge({EmbeddingFlutterTestIp::GetEmbeddingFlutterComponents(),
-                  FlutterInputTest::GetTestComponents()});
-  }
-
-  std::vector<Route> GetTestRoutes() override {
-    return merge({EmbeddingFlutterTestIp::GetEmbeddingFlutterRoutes(),
-                  FlutterInputTest::GetFlutterRoutes(ChildRef{kEmbeddingFlutter}),
-                  FlutterInputTest::GetFlutterRoutes(ChildRef{kFlutterRealm}),
-                  {
-                      {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-                       .source = ChildRef{kFlutterRealm},
-                       .targets = {ChildRef{kEmbeddingFlutter}}},
-                  }});
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(FlutterInFlutterTestIpParameterized, FlutterInFlutterTestIp,
-                         testing::ValuesIn(AsTuples(UIStackConfigsToTest())));
-
-TEST_P(FlutterInFlutterTestIp, FlutterInFlutterTap) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClientWithEmbeddedView();
-  FX_LOGS(INFO) << "Client launched";
-
-  // Embedded app takes up the left half of the screen. Expect response from it when injecting to
-  // the left.
-  {
-    InjectInput(TapLocation::kTopLeft);
-    RunLoopUntil([this] {
-      return LastEventReceivedMatches(/*expected_x=*/static_cast<float>(display_height()) / 4.f,
-                                      /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-                                      /*component_name=*/"one-flutter");
-    });
-  }
-
-  // Parent app takes up the right half of the screen. Expect response from it when injecting to
-  // the right.
-  {
-    InjectInput(TapLocation::kTopRight);
-    RunLoopUntil([this] {
-      return LastEventReceivedMatches(
-          /*expected_x=*/static_cast<float>(display_height()) * (3.f / 4.f),
-          /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-          /*component_name=*/"embedding-flutter");
-    });
-  }
-}
-
-class WebInFlutterTestIp : public WebEngineTestIp, public EmbeddingFlutterTestIp {
- protected:
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
-    return merge({
-        GetEmbeddingFlutterComponents(),
-        WebEngineTestIp::GetTestComponents(),
-    });
-  }
-
-  std::vector<Route> GetTestRoutes() override {
-    return merge({EmbeddingFlutterTestIp::GetEmbeddingFlutterRoutes(),
-                  WebEngineTestIp::GetWebEngineRoutes(ChildRef{kEmbeddingFlutter}),
-                  WebEngineTestIp::GetWebEngineRoutes(ChildRef{kOneChromiumClient}),
-                  {
-                      {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-                       .source = ChildRef{kOneChromiumClient},
-                       .targets = {ChildRef{kEmbeddingFlutter}}},
-                  }});
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(WebInFlutterTestIpParameterized, WebInFlutterTestIp,
-                         testing::ValuesIn(AsTuples(UIStackConfigsToTest())));
-
-TEST_P(WebInFlutterTestIp, WebInFlutterTap) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClientWithEmbeddedView();
-  FX_LOGS(INFO) << "Client launched";
-
-  // Parent app takes up the right half of the screen. Expect response from it when injecting to
-  // the right.
-  {
-    InjectInput(TapLocation::kTopRight);
-    RunLoopUntil([this] {
-      return LastEventReceivedMatches(
-          /*expected_x=*/static_cast<float>(display_height()) * (3.f / 4.f),
-          /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-          /*component_name=*/"embedding-flutter");
-    });
-  }
-
-  // Embedded app takes up the left half of the screen. Expect response from it when injecting to
-  // the left.
-  {
-    TryInject();
-    RunLoopUntil([this] {
-      return LastEventReceivedMatches(/*expected_x=*/static_cast<float>(display_height()) / 4.f,
-                                      /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-                                      /*component_name=*/"one-chromium");
-    });
-  }
 }
 
 }  // namespace
