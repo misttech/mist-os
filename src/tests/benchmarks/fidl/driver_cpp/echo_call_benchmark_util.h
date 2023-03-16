@@ -42,7 +42,7 @@ bool EchoCallBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
   auto deferred = fit::defer([]() { fdf_testing_pop_driver(); });
 
   libsync::Completion dispatcher_shutdown;
-  auto dispatcher = fdf::UnsynchronizedDispatcher::Create(
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
       {}, "", [&](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown.Signal(); });
   ZX_ASSERT(ZX_OK == dispatcher.status_value());
 
