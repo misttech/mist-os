@@ -2587,24 +2587,6 @@ Explicitly specify DWARF version used.
 
 From //build/config/compiler.gni:66
 
-### embedder_test_build_cfg
-
-**Current value (from the default):**
-
-```none
-{
-  enable_asserts = false
-  is_aot = true
-  is_debug = false
-  is_product = false
-  platform_name = "flutter_runner"
-  runner_dep = "//src/flutter:flutter_aot_runner"
-  runtime_meta = "//build/flutter/meta/aot_runtime.cml"
-}
-```
-
-From //src/ui/tests/integration_flutter_tests/embedder/flutter_build_config.gni:16
-
 ### emu_window_size_height
 
 **Current value (from the default):** `false`
@@ -3730,7 +3712,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7977,7 +7959,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
