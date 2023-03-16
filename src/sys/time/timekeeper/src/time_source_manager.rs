@@ -14,7 +14,7 @@ use {
     fuchsia_zircon as zx,
     futures::{FutureExt as _, StreamExt as _},
     std::sync::Arc,
-    tracing::{error, info, warn},
+    tracing::{debug, error, info, warn},
 };
 
 /// Sets the maximum rate at which Timekeeper is willing to accept new updates from a time source in
@@ -25,6 +25,12 @@ const MIN_UPDATE_DELAY: zx::Duration = zx::Duration::from_minutes(1);
 /// The time to wait before restart after a complete failure of the time source. Many time source
 /// failures are likely to repeat so this is useful to limit resource utilization.
 const RESTART_DELAY: zx::Duration = zx::Duration::from_minutes(5);
+
+/// Same as above, except used when *no* valid samples have yet been obtained. This allows us
+/// to restart faster in case of initial issues, which if left unhandled would delay setting
+/// the UTC clock, and would make programs sensitive to correct UTC time (e.g. those that
+/// validate SSL) quite unhappy.
+const RESTART_DELAY_INITIAL: zx::Duration = zx::Duration::from_seconds(10);
 
 /// How frequently a source that declares itself to be healthy needs to produce updates in order to
 /// remain selected. Sources are restarted if they fail to produce updates faster than this.
@@ -45,7 +51,7 @@ impl MonotonicProvider for KernelMonotonicProvider {
     }
 }
 
-/// A wrapper that provide common interface for other time source managers.
+/// A wrapper that provides a common interface for other time source managers.
 ///
 /// In the future `TimeSourceManager` will also handle multiple time sources and the selection
 /// between them. Meaning it will manage up to three sources.
@@ -333,18 +339,33 @@ struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
 
 impl<D: Diagnostics, M: MonotonicProvider> PullSourceManager<D, M> {
     /// Returns the next valid sample from the Pull timesource.
+    ///
+    /// This function will await until it obtains a valid sample from the clock.
+    /// This await may be a long time if the network is not established, and delays
+    /// can make the software depending on correct UTC time very unhappy.
+    ///
+    /// The current pull sampling method will try to sample every
+    /// `RESTART_DELAY_INITIAL` for the initial sample, and will then start
+    /// using a longer delay.
     async fn next_sample_from_pull(&mut self) -> Sample {
         loop {
             let sample = loop {
                 self.last_sample_request_time = Some(self.monotonic.now());
-                // TODO(fxb/116230): Adjust urgency.
-                match self.time_source.sample(&Urgency::Medium).await {
+                let urgency = if self.received_sample { Urgency::Medium } else { Urgency::High };
+                match self.time_source.sample(&urgency).await {
                     Ok(sample) => break sample,
                     Err(err) => {
                         error!("Error obtaining time sample on {:?}: {:?}", self.role, err);
                         self.record_time_source_failure(TimeSourceError::LaunchFailed);
                         if self.delays_enabled {
-                            fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;
+                            let delay = if self.received_sample {
+                                RESTART_DELAY
+                            } else {
+                                warn!("First time pull sample is delayed, this may affect UTC-sensitive programs");
+                                RESTART_DELAY_INITIAL
+                            };
+                            debug!("Time sample delay: {:?}", delay);
+                            fasync::Timer::new(fasync::Time::after(delay)).await;
                         }
                         continue;
                     }
@@ -559,7 +580,7 @@ mod test {
     #[fuchsia::test(allow_stalls = false)]
     async fn event_in_future_pull_source() {
         let time_source = FakePullTimeSource::samples(vec![
-            (Urgency::Medium, create_sample(BACKSTOP_FACTOR + 1, 1)),
+            (Urgency::High, create_sample(BACKSTOP_FACTOR + 1, 1)),
             // Should be ignored since monotonic is in the future
             (Urgency::Medium, create_sample(BACKSTOP_FACTOR + 2, 20)),
             (Urgency::Medium, create_sample(BACKSTOP_FACTOR + 3, 5)),
