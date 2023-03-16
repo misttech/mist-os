@@ -105,7 +105,6 @@ class TestBase : public media::audio::test::TestFixture {
  private:
   static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);
 
-  void ValidateGetFormats();
   void SetMinMaxFormats();
 
   std::optional<component_testing::RealmRoot> realm_;

@@ -29,6 +29,9 @@ class BasicTest : public TestBase {
   void WatchPlugStateAndExpectUpdate();
   void WatchPlugStateAndExpectNoUpdate();
 
+  void ValidateFormatCorrectness();
+  void ValidateFormatOrdering();
+
  private:
   static constexpr size_t kUniqueIdLength = 16;
 
