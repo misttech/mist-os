@@ -209,6 +209,7 @@ void FakeDevMgr::DeviceUnbind(zx_device_t* device) {
     DBG_PRT("%s device %p does not exist\n", __func__, device);
     return;
   }
+
   auto args = device->DevArgs();
   if (args.ops && args.ops->unbind) {
     unbind_thread_id_ = std::this_thread::get_id();

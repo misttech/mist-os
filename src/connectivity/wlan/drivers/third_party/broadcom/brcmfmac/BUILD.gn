@@ -155,7 +155,6 @@ source_set("core") {
     ":timer",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
-    "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/lib/ddk",
@@ -237,13 +236,13 @@ fuchsia_driver("fuchsia_driver-driver") {
 
 fuchsia_driver_component("fuchsia_driver") {
   component_name = "brcmfmac"
-  manifest = "meta/brcmfmac.cml"
   deps = [ ":fuchsia_driver-driver" ]
   visibility += [
     "//bundles/drivers:pci",
     "//src/connectivity/wlan:drivers",
   ]
   info = "fuchsia_driver-info.json"
+  manifest = "meta/brcmfmac_sdio.cml"
 }
 
 # Driver module for the test version of the brcmfmac driver, which includes run_unit_tests() DDK

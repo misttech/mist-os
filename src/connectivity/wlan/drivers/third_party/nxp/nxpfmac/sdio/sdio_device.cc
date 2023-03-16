@@ -35,25 +35,9 @@ zx_status_t SdioDevice::Create(zx_device_t* parent_device) {
   std::unique_ptr<SdioDevice> device(new SdioDevice(parent_device));
   device->async_loop_ = std::move(async_loop);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    NXPF_ERR("Failed to create FIDL endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-
-  if ((status = device->ServeWlanPhyImplProtocol(std::move(endpoints->server)) != ZX_OK)) {
-    NXPF_ERR("Failed to serve WlanPhyImpl service: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  std::array<const char*, 1> offers{
-      fuchsia_wlan_phyimpl::Service::Name,
-  };
-
-  if ((status = device->DdkAdd(ddk::DeviceAddArgs("nxpfmac_sdio-wlanphy")
-                                   .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
-                                   .set_runtime_service_offers(offers)
-                                   .set_outgoing_dir(endpoints->client.TakeChannel()))) != ZX_OK) {
+  if ((status = device->DdkAdd(
+           ddk::DeviceAddArgs("nxpfmac_sdio-wlanphy").set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL))) !=
+      ZX_OK) {
     NXPF_ERR("DdkAdd failed: %s", zx_status_get_string(status));
     return status;
   }

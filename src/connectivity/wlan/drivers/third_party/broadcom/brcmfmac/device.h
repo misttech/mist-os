@@ -17,7 +17,6 @@
 #include <fidl/fuchsia.factory.wlan/cpp/wire.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
-#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/channel_read.h>
@@ -43,7 +42,8 @@ namespace brcmfmac {
 class Device;
 class DeviceInspect;
 class WlanInterface;
-using DeviceType = ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable>;
+using DeviceType =
+    ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable, ddk::ServiceConnectable>;
 class Device : public DeviceType,
                public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                public ::wlan::drivers::components::NetworkDevice::Callbacks {
@@ -67,9 +67,7 @@ class Device : public DeviceType,
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkSuspend(ddk::SuspendTxn txn);
-
-  void WaitForProtocolConnection();
-  zx_status_t ServeWlanPhyImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel);
 
   // WlanPhyImpl interface implementation.
   void GetSupportedMacRoles(fdf::Arena& arena,
@@ -129,9 +127,6 @@ class Device : public DeviceType,
   fdf::Dispatcher dispatcher_;
   libsync::Completion completion_;
 
-  // Notify the protocol connection completion.
-  libsync::Completion protocol_connected_;
-
  private:
   std::unique_ptr<brcmf_pub> brcmf_pub_;
   std::mutex lock_;
@@ -143,9 +138,6 @@ class Device : public DeviceType,
   ::wlan::drivers::components::NetworkDevice network_device_;
   zx_device_t* parent_;
   FactoryDevice* factory_device_;
-
-  // Serves fuchsia_wlan_phyimpl::Service.
-  fdf::OutgoingDirectory outgoing_dir_;
 
   // Helpers
   void ShutdownDispatcher();

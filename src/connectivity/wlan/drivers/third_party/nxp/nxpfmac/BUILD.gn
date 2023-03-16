@@ -64,7 +64,6 @@ source_set("core") {
     "//sdk/banjo/fuchsia.hardware.wlan.fullmac:fuchsia.hardware.wlan.fullmac_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
-    "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/fit",
     "//src/connectivity/wlan/drivers/lib/components:cpp",
     "//src/connectivity/wlan/drivers/lib/timer:cpp",
@@ -120,10 +119,10 @@ fuchsia_driver("nxpfmac_sdio-driver") {
 
 fuchsia_driver_component("nxpfmac_sdio") {
   component_name = "nxpfmac_sdio"
-  manifest = "meta/nxpfmac_sdio.cml"
   deps = [ ":nxpfmac_sdio-driver" ]
   visibility += [ "//src/connectivity/wlan:drivers" ]
   info = "nxpfmac_driver-info.json"
+  manifest = "meta/nxpfmac_sdio.cml"
 }
 
 all_fw_files = [

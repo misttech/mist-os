@@ -21,16 +21,13 @@ namespace wlan::iwlwifi {
 namespace phyimpl_fidl = fuchsia_wlan_phyimpl::wire;
 
 WlanPhyImplDevice::WlanPhyImplDevice(zx_device_t* parent)
-    : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable>(parent),
-      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
+    : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable,
+                    ddk::ServiceConnectable>(parent) {
   auto dispatcher =
       fdf::SynchronizedDispatcher::Create({}, "wlanphy-impl-server", [&](fdf_dispatcher_t*) {
         if (unbind_txn_)
           unbind_txn_->Reply();
       });
-  if (dispatcher.is_error()) {
-    IWL_ERR(this, "Failed to create dispatcher: %s\n", dispatcher.status_string());
-  }
   server_dispatcher_ = std::move(*dispatcher);
   driver_async_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 }
@@ -39,29 +36,15 @@ WlanPhyImplDevice::~WlanPhyImplDevice() = default;
 
 void WlanPhyImplDevice::DdkRelease() { delete this; }
 
-zx_status_t WlanPhyImplDevice::ServeWlanPhyImplProtocol(
-    fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) mutable {
-    if (unbind_txn_) {
-      IWL_WARN(this, "Unbind has started, skip the FIDL server binding.");
-      return;
-    }
-    fdf::BindServer(server_dispatcher_.get(), std::move(server_end), this);
-  };
-  fuchsia_wlan_phyimpl::Service::InstanceHandler handler({.wlan_phy_impl = std::move(protocol)});
-  auto status = outgoing_dir_.AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
-  if (status.is_error()) {
-    IWL_ERR(this, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
-            status.status_string());
-    return status.error_value();
+zx_status_t WlanPhyImplDevice::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
+  // Ensure they are requesting the correct protocol.
+  if (std::string_view(service_name) !=
+      fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>) {
+    IWL_ERR(this, "Service name doesn't match. Connection request from a wrong device.\n");
+    return ZX_ERR_NOT_SUPPORTED;
   }
-  auto result = outgoing_dir_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    IWL_ERR(this, "%s(): Failed to serve outgoing directory: %s\n", __func__,
-            result.status_string());
-    return result.error_value();
-  }
-
+  fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
+  fdf::BindServer(server_dispatcher_.get(), std::move(server_end), this);
   return ZX_OK;
 }
 

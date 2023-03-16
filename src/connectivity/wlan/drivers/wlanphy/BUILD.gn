@@ -67,14 +67,14 @@ fuchsia_driver_component("wlanphy_driver") {
   component_name = "wlanphy"
   deps = [ ":wlanphy_driver-driver" ]
   info = "wlanphy_driver-info.json"
-  manifest = "meta/wlanphy.cml"
+  manifest = "meta/wlanphy_driver.cml"
 }
 
 fuchsia_driver_component("wlanphy_driver_dfv2") {
   component_name = "wlanphy_dfv2"
-  manifest = "meta/wlanphy_dfv2.cml"
   deps = [ ":wlanphy_driver_dfv2-driver" ]
   info = "wlanphy_driver-info.json"
+  manifest = "meta/wlanphy_driver_dfv2.cml"
 }
 
 fuchsia_driver_package("wlanphy") {

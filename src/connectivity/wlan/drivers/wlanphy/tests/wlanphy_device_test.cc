@@ -35,7 +35,7 @@ namespace {
 //    |                           \            | <---- [Driver transport FIDL with protocol:
 //    |                            \           |          fuchsia_wlan_phyimpl::WlanPhyImpl]
 //    |                             \  +---------------+
-//    |                              \ | wlanphyimpl   |
+//    |                              \ | wlanphyimpl  |
 //    |                                |    device     |
 //    |                                +---------------+
 //    |

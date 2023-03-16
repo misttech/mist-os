@@ -77,7 +77,7 @@ fuchsia_driver_component("iwlwifi_driver") {
   ]
   visibility = []
   visibility = [ "*" ]
-  manifest = "platform/meta/iwlwifi.cml"
+  manifest = "meta/iwlwifi.cml"
 }
 
 # TODO(fxbug.dev/93333): Remove this when DFv2 has stabilised.

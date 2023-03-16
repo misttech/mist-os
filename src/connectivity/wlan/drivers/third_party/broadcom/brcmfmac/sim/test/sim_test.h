@@ -239,10 +239,8 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
   fidl::WireSyncClient<fuchsia_factory_wlan::Iovar> factory_device_;
   fdf::Dispatcher client_dispatcher_;
-  fdf::Dispatcher driver_dispatcher_;
   fdf::Arena test_arena_;
   libsync::Completion completion_;
-  libsync::Completion client_completion_;
 
  private:
   // StationIfc methods - by default, do nothing. These can/will be overridden by superclasses.

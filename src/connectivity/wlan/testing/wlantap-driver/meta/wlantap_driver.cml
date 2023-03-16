@@ -9,13 +9,11 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/wlanphy.bindbc",
+        bind: "meta/bind/wlantapctl_bind.bindbc",
         colocate: "true",
-        compat: "driver/wlanphy_dfv2.so",
+        compat: "driver/wlantap.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [
-        { service: "fuchsia.wlan.phyimpl.Service" },
-    ],
+    use: [],
 }
