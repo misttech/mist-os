@@ -53,7 +53,7 @@ where
                 }
                 ok => ok,
             };
-            current_task.signal_exit();
+            current_task.signal_vfork();
             run_result
         }());
     });

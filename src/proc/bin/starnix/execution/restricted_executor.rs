@@ -272,7 +272,7 @@ where
             ok => ok,
         };
 
-        current_task.signal_exit();
+        current_task.signal_vfork();
         task_complete(run_result);
     });
 

@@ -107,29 +107,6 @@ int stack_test_func(void* a) {
   return kChildExpectedExitCode;
 }
 
-// Returns the full path to the syscall_test_exec_child binary. This is in a directory named
-// according to the hash of the package which is inconvenient. Returns empty string on failure.
-//
-// The location is /container/pkg/<hash>/data/tests/syscall_test_exec_child
-std::string GetTestExecChildBinary() {
-  const char kPkgDir[] = "/container/pkg";
-  const char kInPackage[] = "/data/tests/syscall_test_exec_child";
-
-  std::vector<std::string> subs;
-  if (!files::ReadDirContents(kPkgDir, &subs))
-    return std::string();
-
-  for (const auto& cur : subs) {
-    if (cur == "." || cur == "..")
-      continue;
-
-    // Assume the first (normally only) child of the package directory is ours.
-    return std::string(kPkgDir) + "/" + cur + kInPackage;
-  }
-
-  return std::string();
-}
-
 int empty_func(void*) { return 0; }
 
 }  // namespace
@@ -249,76 +226,6 @@ TEST(Task, CloneVfork_exit) {
   // This uses the glibc "clone()" wrapper function which takes a function pointer.
   int result = clone(&CloneVForkFunctionSleepExit, stack_high, CLONE_VFORK, 0);
   ASSERT_NE(result, -1);
-
-  struct timeval end;
-  gettimeofday(&end, &tz);
-
-  // The clone function should have been blocked for at least as long as the sleep was for.
-  uint64_t elapsed_us = ((int64_t)end.tv_sec - (int64_t)begin.tv_sec) * 1000000ll +
-                        ((int64_t)end.tv_usec - (int64_t)begin.tv_usec);
-  EXPECT_GT(elapsed_us, kCloneVforkSleepUS);
-}
-
-// Calls execve() on the binary whose null-terminated string is passed in as the parameter.
-static int CloneVForkFunctionExec(void* void_binary_cstring) {
-  char* binary_name = (char*)void_binary_cstring;
-  char* argv[2] = {binary_name, nullptr};
-  char* envp[1] = {nullptr};
-  execve(binary_name, argv, envp);
-  return 0;
-}
-
-// Tests a CLONE_VFORK followed by a successful call to execve() which should unblock clone().
-TEST(Task, CloneVfork_execve) {
-  std::string test_binary = GetTestExecChildBinary();
-  ASSERT_FALSE(test_binary.empty());
-
-  constexpr size_t kStackSize = 1024 * 16;
-  void* stack_low = mmap(NULL, kStackSize, PROT_READ | PROT_WRITE,
-                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-  ASSERT_NE(stack_low, MAP_FAILED);
-  void* stack_high = static_cast<char*>(stack_low) + kStackSize;  // Pass in the top of the stack.
-
-  // Manually copy the string to ensure the pointer is valid after cloned.
-  size_t binary_name_buf_len = test_binary.size() + 1;
-  char* binary_string = (char*)malloc(binary_name_buf_len);
-  strncpy(binary_string, test_binary.c_str(), binary_name_buf_len);
-
-  struct timeval begin;
-  struct timezone tz;
-  gettimeofday(&begin, &tz);
-
-  // This uses the glibc "clone()" wrapper function which takes a function pointer.
-  int result = clone(&CloneVForkFunctionExec, stack_high, CLONE_VFORK, binary_string);
-  ASSERT_NE(result, -1) << "errno = " << errno;
-
-  struct timeval end;
-  gettimeofday(&end, &tz);
-
-  // The clone function should have been blocked for at least as long as the sleep was for.
-  uint64_t elapsed_us = ((int64_t)end.tv_sec - (int64_t)begin.tv_sec) * 1000000ll +
-                        ((int64_t)end.tv_usec - (int64_t)begin.tv_usec);
-  EXPECT_GT(elapsed_us, kCloneVforkSleepUS);
-}
-
-TEST(Task, Vfork) {
-  std::string test_binary = GetTestExecChildBinary();
-  ASSERT_FALSE(test_binary.empty());
-
-  struct timeval begin;
-  struct timezone tz;
-  gettimeofday(&begin, &tz);
-
-  // This uses the glibc "clone()" wrapper function which takes a function pointer.
-  auto result = vfork();
-  ASSERT_NE(result, -1);
-  if (result == 0) {
-    // In the forked child process.
-    char* binary_str = const_cast<char*>(test_binary.c_str());
-    char* argv[2] = {binary_str, nullptr};
-    char* envp[1] = {nullptr};
-    execve(binary_str, argv, envp);
-  }
 
   struct timeval end;
   gettimeofday(&end, &tz);

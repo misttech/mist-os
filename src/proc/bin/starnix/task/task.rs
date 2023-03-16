@@ -647,9 +647,8 @@ impl Task {
         Ok(child)
     }
 
-    /// Make sure the vfork event is signaled to unblock any waiters in case the task never
-    /// called execve().
-    pub fn signal_exit(&self) {
+    /// Signals the vfork event, if any, to unblock waiters.
+    pub fn signal_vfork(&self) {
         if let Some(event) = &self.vfork_event {
             if let Err(status) = event.signal_handle(Signals::NONE, Signals::USER_0) {
                 log_warn!("Failed to set vfork signal {status}");
@@ -1200,6 +1199,9 @@ impl CurrentTask {
             // TODO(tbodt): Replace this panic with a log and force a SIGSEGV.
             panic!("{self:?} unrecoverable error in exec: {err:?}");
         }
+
+        self.signal_vfork();
+
         Ok(())
     }
 

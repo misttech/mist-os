@@ -1133,9 +1133,6 @@
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
 
-                // vfork_test: Unknown why this fails, this is theoretically implemented.
-                "VforkTest.ParentStopsUntilChildExecves",
-
                 // wait_test - https://fxbug.dev/79451
                 "WaitTest.KillZombie",
                 "WaitTest.Wait4Rusage",
@@ -1143,6 +1140,18 @@
                 "Waiters/WaitAnyChildTest.WaitedChildRusage/*",
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
+
+                // The test runs as follows:
+                // 1. P0T0 forks itself creating P1T0.
+                // 2. P0T0 waits for P1 to exit normally.
+                // 3. P1T0 clones itself using CLONE_THREAD | CLONE_VFORK. This creates P1T1 and
+                //    halts P1T0.
+                // 4. P1T1 invokes execve and successfully changes the running program to /bin/true.
+                //
+                // At this point, because execve was successful, P1T0 is supposed to be destroyed.
+                // However, this is not implemented currently. P1T0 is unblocked, but it segfaults
+                // (most likely due to the change of running program), failing the test.
+                "Waiters/WaitSpecificChildTest.AfterChildExecve/*",
 
                 // write_test
                 "WriteTest.WriteNoExceedsRLimit",
