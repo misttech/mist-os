@@ -209,9 +209,6 @@ static void iwl_pcie_txq_update_byte_cnt_tbl(struct iwl_trans* trans, struct iwl
         break;
     }
 #endif  // NEEDS_PORTING
-  if (trans_pcie->bc_table_dword) {
-    len = DIV_ROUND_UP(len, 4);
-  }
 
   if (len > 0xFFF) {
     IWL_WARN(trans, "%s(): invalid len: %d (expect smaller than 4096\n", __func__, len);

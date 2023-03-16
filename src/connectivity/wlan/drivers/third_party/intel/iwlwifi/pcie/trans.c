@@ -1881,26 +1881,11 @@ static void iwl_trans_pcie_configure(struct iwl_trans* trans,
   trans_pcie->rx_buf_size = trans_cfg->rx_buf_size;
   trans_pcie->rx_page_order = iwl_trans_get_rb_size_order(trans_pcie->rx_buf_size);
 
-  trans_pcie->bc_table_dword = trans_cfg->bc_table_dword;
+	trans->txqs.bc_table_dword = trans_cfg->bc_table_dword;
   trans_pcie->scd_set_active = trans_cfg->scd_set_active;
-  trans_pcie->sw_csum_tx = trans_cfg->sw_csum_tx;
-
-  trans_pcie->page_offs = trans_cfg->cb_data_offs;
-  trans_pcie->dev_cmd_offs = trans_cfg->cb_data_offs + sizeof(void*);
 
   trans->command_groups = trans_cfg->command_groups;
   trans->command_groups_size = trans_cfg->command_groups_size;
-
-#if 0   // NEEDS_PORTING
-    /* Initialize NAPI here - it should be before registering to mac80211
-     * in the opmode but after the HW struct is allocated.
-     * As this function may be called again in some corner cases don't
-     * do anything if NAPI was already initialized.
-     */
-    if (trans_pcie->napi_dev.reg_state != NETREG_DUMMY) {
-        init_dummy_netdev(&trans_pcie->napi_dev);
-    }
-#endif  // NEEDS_PORTING
 }
 
 void iwl_trans_pcie_free(struct iwl_trans* trans) {

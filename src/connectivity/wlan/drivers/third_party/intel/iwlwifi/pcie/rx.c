@@ -253,8 +253,6 @@ static void iwl_pcie_restock_bd(struct iwl_trans* trans, struct iwl_rxq* rxq,
   if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
     struct iwl_rx_transfer_desc* bd = iwl_iobuf_virtual(rxq->descriptors);
 
-    bd[rxq->write].type_n_size = cpu_to_le32((IWL_RX_TD_TYPE & IWL_RX_TD_TYPE_MSK) |
-                                             ((IWL_RX_TD_SIZE_2K >> 8) & IWL_RX_TD_SIZE_MSK));
     bd[rxq->write].addr = cpu_to_le64(iwl_iobuf_physical(rxb->io_buf));
     bd[rxq->write].rbid = cpu_to_le16(rxb->vid);
   } else {
@@ -975,10 +973,6 @@ static struct iwl_rx_mem_buffer* iwl_pcie_get_rxb(struct iwl_trans* trans, struc
   }
 
   IWL_DEBUG_RX(trans, "Got virtual RB ID %u\n", (uint32_t)rxb->vid);
-
-  if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
-    rxb->size = le32_to_cpu(rxq->cd[i].size) & IWL_RX_CD_SIZE;
-  }
 
   rxb->invalid = true;
 
