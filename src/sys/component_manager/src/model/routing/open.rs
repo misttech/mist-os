@@ -8,14 +8,18 @@ use {
         model::{
             component::ComponentInstance,
             error::ModelError,
-            routing::{RouteRequest, RouteSource},
+            routing::{self, RouteRequest, RouteSource},
+            storage,
         },
     },
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::{path::PathBuf, sync::Arc},
 };
 
-/// A container for the data needed to open a capability.
+/// Contains the options to use when opening a capability.
+///
+/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
+/// and `server_chan` parameters are used in the open call.
 pub enum OpenOptions<'a> {
     Directory(OpenDirectoryOptions<'a>),
     EventStream(OpenEventStreamOptions<'a>),
@@ -98,17 +102,28 @@ pub struct OpenEventStreamOptions<'a> {
 }
 
 /// A request to open a capability at its source.
-pub struct OpenRequest<'a> {
-    pub flags: fio::OpenFlags,
-    pub relative_path: PathBuf,
-    pub source: CapabilitySource,
-    pub target: &'a Arc<ComponentInstance>,
-    pub server_chan: &'a mut zx::Channel,
+pub enum OpenRequest<'a> {
+    // Open a capability backed by a component's outgoing directory.
+    OutgoingDirectory {
+        flags: fio::OpenFlags,
+        relative_path: PathBuf,
+        source: CapabilitySource,
+        target: &'a Arc<ComponentInstance>,
+        server_chan: &'a mut zx::Channel,
+    },
+    // Open a storage capability.
+    Storage {
+        flags: fio::OpenFlags,
+        relative_path: String,
+        source: storage::StorageCapabilitySource,
+        target: &'a Arc<ComponentInstance>,
+        server_chan: &'a mut zx::Channel,
+    },
 }
 
 impl<'a> OpenRequest<'a> {
     /// Creates a request to open a capability with source `route_source` for `target`.
-    pub fn new(
+    pub fn new_from_route_source(
         route_source: RouteSource,
         target: &'a Arc<ComponentInstance>,
         options: OpenOptions<'a>,
@@ -116,7 +131,7 @@ impl<'a> OpenRequest<'a> {
         match route_source {
             RouteSource::Directory(source, directory_state) => {
                 if let OpenOptions::Directory(open_dir_options) = options {
-                    return Self {
+                    return Self::OutgoingDirectory {
                         flags: open_dir_options.flags,
                         relative_path: directory_state
                             .make_relative_path(open_dir_options.relative_path),
@@ -128,7 +143,7 @@ impl<'a> OpenRequest<'a> {
             }
             RouteSource::Protocol(source) => {
                 if let OpenOptions::Protocol(open_protocol_options) = options {
-                    return Self {
+                    return Self::OutgoingDirectory {
                         flags: open_protocol_options.flags,
                         relative_path: PathBuf::from(open_protocol_options.relative_path),
                         source,
@@ -139,7 +154,7 @@ impl<'a> OpenRequest<'a> {
             }
             RouteSource::Service(source) => {
                 if let OpenOptions::Service(open_service_options) = options {
-                    return Self {
+                    return Self::OutgoingDirectory {
                         flags: open_service_options.flags,
                         relative_path: PathBuf::from(open_service_options.relative_path),
                         source,
@@ -150,7 +165,7 @@ impl<'a> OpenRequest<'a> {
             }
             RouteSource::Resolver(source) => {
                 if let OpenOptions::Resolver(open_resolver_options) = options {
-                    return Self {
+                    return Self::OutgoingDirectory {
                         flags: open_resolver_options.flags,
                         relative_path: PathBuf::new(),
                         source,
@@ -161,7 +176,7 @@ impl<'a> OpenRequest<'a> {
             }
             RouteSource::Runner(source) => {
                 if let OpenOptions::Runner(open_runner_options) = options {
-                    return Self {
+                    return Self::OutgoingDirectory {
                         flags: open_runner_options.flags,
                         relative_path: PathBuf::new(),
                         source,
@@ -172,7 +187,7 @@ impl<'a> OpenRequest<'a> {
             }
             RouteSource::EventStream(source) => {
                 if let OpenOptions::EventStream(open_event_stream_options) = options {
-                    return Self {
+                    return Self::OutgoingDirectory {
                         flags: open_event_stream_options.flags,
                         relative_path: PathBuf::from(open_event_stream_options.relative_path),
                         source,
@@ -181,8 +196,52 @@ impl<'a> OpenRequest<'a> {
                     };
                 }
             }
-            _ => panic!("unsupported route source"),
+            RouteSource::StorageBackingDirectory(source) => {
+                if let OpenOptions::Storage(open_storage_options) = options {
+                    return Self::Storage {
+                        flags: open_storage_options.flags,
+                        relative_path: open_storage_options.relative_path,
+                        source,
+                        target,
+                        server_chan: open_storage_options.server_chan,
+                    };
+                }
+            }
+            RouteSource::Storage(_) | RouteSource::Event(_) => panic!("unsupported route source"),
         }
         panic!("route source type did not match option type")
+    }
+
+    /// Directly creates a request to open a capability at `source`'s outgoing directory with
+    /// with `flags` and `relative_path`.
+    pub fn new_outgoing_directory(
+        flags: fio::OpenFlags,
+        relative_path: PathBuf,
+        source: CapabilitySource,
+        target: &'a Arc<ComponentInstance>,
+        server_chan: &'a mut zx::Channel,
+    ) -> Self {
+        Self::OutgoingDirectory { flags, relative_path, source, target, server_chan }
+    }
+
+    /// Opens the capability in `self`, triggering a `CapabilityRouted` event and binding
+    /// to the source component instance if necessary.
+    pub async fn open(self) -> Result<(), ModelError> {
+        match self {
+            Self::OutgoingDirectory { flags, relative_path, source, target, server_chan } => {
+                routing::open_capability_at_source(
+                    flags,
+                    relative_path,
+                    source,
+                    target,
+                    server_chan,
+                )
+                .await
+            }
+            Self::Storage { flags, relative_path, source, target, server_chan } => {
+                routing::open_storage_capability(flags, relative_path, &source, target, server_chan)
+                    .await
+            }
+        }
     }
 }

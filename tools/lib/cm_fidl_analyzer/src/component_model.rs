@@ -11,7 +11,6 @@ use {
         PkgUrlMatch,
     },
     anyhow::{anyhow, Context, Result},
-    cm_moniker::InstancedRelativeMoniker,
     cm_rust::{
         CapabilityDecl, CapabilityPath, CapabilityTypeName, ComponentDecl, ExposeDecl,
         ExposeDeclCommon, ExposeEventStreamDecl, OfferDecl, OfferDeclCommon, OfferEventStreamDecl,
@@ -865,9 +864,7 @@ impl ComponentModelForAnalyzer {
                     return vec![];
                 }
 
-                let result = result
-                    .map(|(source, _)| RouteSource::StorageBackingDirectory(source))
-                    .map_err(|e| e.into());
+                let result = result.map_err(|e| e.into());
                 (result, vec![storage_route, dir_route], capability)
             }
             UseDecl::EventStream(use_event_stream_decl) => {
@@ -1256,10 +1253,7 @@ impl ComponentModelForAnalyzer {
         use_decl: UseStorageDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> (
-        Result<
-            (StorageCapabilitySource<ComponentInstanceForAnalyzer>, InstancedRelativeMoniker),
-            RoutingError,
-        >,
+        Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>,
         Vec<RouteSegment>,
         Vec<RouteSegment>,
     ) {

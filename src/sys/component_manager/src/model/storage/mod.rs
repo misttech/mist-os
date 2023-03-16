@@ -457,6 +457,7 @@ mod tests {
             test_helpers::{self, component_decl_with_test_runner},
         },
         assert_matches::assert_matches,
+        cm_moniker::InstancedAbsoluteMoniker,
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
         component_id_index, fidl_fuchsia_io as fio,
@@ -508,6 +509,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: InstancedAbsoluteMoniker::root(),
             },
             false,
             relative_moniker.clone(),
@@ -526,6 +528,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: InstancedAbsoluteMoniker::root(),
             },
             false,
             relative_moniker.clone(),
@@ -544,6 +547,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: InstancedAbsoluteMoniker::root(),
             },
             false,
             relative_moniker.clone(),
@@ -597,6 +601,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: InstancedAbsoluteMoniker::root(),
             },
             false,
             relative_moniker.clone(),
@@ -632,6 +637,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: InstancedAbsoluteMoniker::root(),
             },
             false,
             relative_moniker.clone(),
@@ -665,6 +671,7 @@ mod tests {
                 backing_directory_path: CapabilityPath::try_from("/data").unwrap().clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: InstancedAbsoluteMoniker::root(),
             },
             false,
             relative_moniker.clone(),
@@ -705,6 +712,7 @@ mod tests {
             .await
             .expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
+        let storage_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
         let parent_moniker = InstancedRelativeMoniker::try_from(vec!["c:0"]).unwrap();
         let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
@@ -715,6 +723,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: storage_moniker.clone(),
             },
             false,
             child_moniker.clone(),
@@ -733,6 +742,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: storage_moniker.clone(),
             },
             false,
             parent_moniker.clone(),
@@ -751,6 +761,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: storage_moniker.clone(),
             },
             false,
             child_moniker.clone(),
@@ -766,6 +777,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: storage_moniker.clone(),
             },
             false,
             parent_moniker.clone(),
@@ -788,9 +800,10 @@ mod tests {
                 backing_directory_path: dir_source_path,
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: storage_moniker.clone(),
             },
             false,
-            child_moniker,
+            child_moniker.clone(),
             None,
         )
         .await
@@ -834,6 +847,7 @@ mod tests {
             .await
             .expect("failed to find component for b:0");
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
+        let parent_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
         let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let instance_id = Some(component_id_index::gen_instance_id(&mut rand::thread_rng()));
         // Open and write to the storage for child.
@@ -843,6 +857,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: parent_moniker.clone(),
             },
             false,
             child_moniker.clone(),
@@ -870,6 +885,7 @@ mod tests {
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: parent_moniker.clone(),
             },
             false,
             child_moniker.clone(),
@@ -890,9 +906,10 @@ mod tests {
                 backing_directory_path: dir_source_path,
                 backing_directory_subdir: None,
                 storage_subdir: None,
+                storage_source_moniker: parent_moniker.clone(),
             },
             false,
-            child_moniker,
+            child_moniker.clone(),
             instance_id.as_ref(),
         )
         .await

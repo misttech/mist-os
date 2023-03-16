@@ -39,6 +39,8 @@ use {
     fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::lock::Mutex,
+    moniker::RelativeMonikerBase,
+    std::path::PathBuf,
     std::sync::Arc,
     tracing::{debug, info, warn},
 };
@@ -56,48 +58,44 @@ pub(super) async fn route_and_open_capability(
     target: &Arc<ComponentInstance>,
     open_options: OpenOptions<'_>,
 ) -> Result<(), ModelError> {
-    match route_request {
+    let route_source = match route_request {
         RouteRequest::UseStorage(use_storage_decl) => {
-            let (storage_source_info, relative_moniker) = route_storage_and_backing_directory(
+            route_storage_and_backing_directory(
                 use_storage_decl,
                 target,
                 &mut NoopRouteMapper,
                 &mut NoopRouteMapper,
             )
-            .await?;
-            open_storage_capability(&storage_source_info, relative_moniker, target, open_options)
-                .await
+            .await?
         }
         _ => {
             let optional_use = route_request.target_use_optional();
-            let route_source = route_capability(route_request, target, &mut NoopRouteMapper)
-                .await
-                .map_err(|err| {
-                    if optional_use {
-                        match err {
-                            RoutingError::AvailabilityRoutingError(_) => {
-                                // `err` is already an AvailabilityRoutingError.
-                                // Return it as-is.
-                                err
-                            }
-                            _ => {
-                                // Wrap the error, to surface the target's
-                                // optional usage.
-                                RoutingError::AvailabilityRoutingError(
-                                    AvailabilityRoutingError::FailedToRouteToOptionalTarget {
-                                        reason: err.to_string(),
-                                    },
-                                )
-                            }
+            route_capability(route_request, target, &mut NoopRouteMapper).await.map_err(|err| {
+                if optional_use {
+                    match err {
+                        RoutingError::AvailabilityRoutingError(_) => {
+                            // `err` is already an AvailabilityRoutingError.
+                            // Return it as-is.
+                            err
                         }
-                    } else {
-                        // Not an optional `use` so return the error as-is.
-                        err
+                        _ => {
+                            // Wrap the error, to surface the target's
+                            // optional usage.
+                            RoutingError::AvailabilityRoutingError(
+                                AvailabilityRoutingError::FailedToRouteToOptionalTarget {
+                                    reason: err.to_string(),
+                                },
+                            )
+                        }
                     }
-                })?;
-            open_capability_at_source(OpenRequest::new(route_source, target, open_options)).await
+                } else {
+                    // Not an optional `use` so return the error as-is.
+                    err
+                }
+            })?
         }
-    }
+    };
+    OpenRequest::new_from_route_source(route_source, target, open_options).open().await
 }
 
 /// Routes a capability from `target` to its source.
@@ -332,14 +330,14 @@ async fn get_default_provider(
     }
 }
 
-/// Opens the capability at `source`, triggering a `CapabilityRouted` event and binding
-/// to the source component instance if necessary.
-///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
-/// and `server_chan` parameters are used in the open call.
-pub async fn open_capability_at_source(open_request: OpenRequest<'_>) -> Result<(), ModelError> {
-    let OpenRequest { flags, relative_path, source, target, server_chan } = open_request;
-
+/// Implementation detail of `OpenRequest::open`.
+pub(super) async fn open_capability_at_source(
+    flags: fio::OpenFlags,
+    relative_path: PathBuf,
+    source: CapabilitySource,
+    target: &Arc<ComponentInstance>,
+    server_chan: &mut zx::Channel,
+) -> Result<(), ModelError> {
     let capability_provider =
         if let Some(provider) = get_default_provider(target.as_weak(), &source).await? {
             Some(provider)
@@ -425,21 +423,32 @@ pub(super) async fn route_and_delete_storage(
     use_storage_decl: UseStorageDecl,
     target: &Arc<ComponentInstance>,
 ) -> Result<(), ModelError> {
-    let (storage_source_info, relative_moniker) = route_storage_and_backing_directory(
+    match route_storage_and_backing_directory(
         use_storage_decl,
         target,
         &mut NoopRouteMapper,
         &mut NoopRouteMapper,
     )
-    .await?;
-
-    storage::delete_isolated_storage(
-        storage_source_info,
-        target.persistent_storage,
-        relative_moniker,
-        target.instance_id().as_ref(),
-    )
-    .await
+    .await?
+    {
+        RouteSource::StorageBackingDirectory(storage_source_info) => {
+            // As of today, the storage component instance must contain the target. This is because
+            // it is impossible to expose storage declarations up.
+            let relative_moniker = InstancedRelativeMoniker::scope_down(
+                &storage_source_info.storage_source_moniker,
+                &target.instanced_moniker(),
+            )
+            .unwrap();
+            storage::delete_isolated_storage(
+                storage_source_info,
+                target.persistent_storage,
+                relative_moniker,
+                target.instance_id().as_ref(),
+            )
+            .await
+        }
+        _ => unreachable!("impossible route source"),
+    }
 }
 
 static ROUTE_ERROR_HELP: &'static str = "To learn more, see \
@@ -525,55 +534,55 @@ pub async fn report_routing_failure(
         .await
 }
 
-/// Routes a storage capability from `target` to its source and opens its backing directory
-/// capability, binding to the component instance if necessary.
-///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
-/// and `server_chan` parameters are used in the open call.
-async fn open_storage_capability(
+/// Implementation detail of `OpenRequest::open`.
+pub(super) async fn open_storage_capability(
+    flags: fio::OpenFlags,
+    relative_path: String,
     source: &storage::StorageCapabilitySource,
-    relative_moniker: InstancedRelativeMoniker,
     target: &Arc<ComponentInstance>,
-    options: OpenOptions<'_>,
+    server_chan: &mut zx::Channel,
 ) -> Result<(), ModelError> {
+    // As of today, the storage component instance must contain the target. This is because it is
+    // impossible to expose storage declarations up.
+    let relative_moniker = InstancedRelativeMoniker::scope_down(
+        &source.storage_source_moniker,
+        &target.instanced_moniker(),
+    )
+    .unwrap();
+
     let dir_source = source.storage_provider.clone();
-    match options {
-        OpenOptions::Storage(OpenStorageOptions { flags, relative_path, server_chan, .. }) => {
-            let storage_dir_proxy = storage::open_isolated_storage(
-                &source,
-                target.persistent_storage,
-                relative_moniker.clone(),
-                target.instance_id().as_ref(),
-            )
-            .await
-            .map_err(|e| ModelError::from(e))?;
+    let storage_dir_proxy = storage::open_isolated_storage(
+        &source,
+        target.persistent_storage,
+        relative_moniker.clone(),
+        target.instance_id().as_ref(),
+    )
+    .await
+    .map_err(|e| ModelError::from(e))?;
 
-            // Open the storage with the provided flags, mode, relative_path and server_chan.
-            // We don't clone the directory because we can't specify the mode or path that way.
-            let server_chan = channel::take_channel(server_chan);
+    // Open the storage with the provided flags, mode, relative_path and server_chan.
+    // We don't clone the directory because we can't specify the mode or path that way.
+    let server_chan = channel::take_channel(server_chan);
 
-            // If there is no relative path, assume it is the current directory. We use "."
-            // because `fuchsia.io/Directory.Open` does not accept empty paths.
-            let relative_path = if relative_path.is_empty() { "." } else { &relative_path };
+    // If there is no relative path, assume it is the current directory. We use "."
+    // because `fuchsia.io/Directory.Open` does not accept empty paths.
+    let relative_path = if relative_path.is_empty() { "." } else { &relative_path };
 
-            storage_dir_proxy
-                .open(flags, fio::ModeType::empty(), relative_path, ServerEnd::new(server_chan))
-                .map_err(|err| {
-                    let moniker = match &dir_source {
-                        Some(r) => InstancedExtendedMoniker::ComponentInstance(
-                            r.instanced_moniker().clone(),
-                        ),
-                        None => InstancedExtendedMoniker::ComponentManager,
-                    };
-                    ModelError::OpenStorageFailed {
-                        moniker,
-                        relative_moniker,
-                        path: relative_path.to_string(),
-                        err,
-                    }
-                })?;
-            return Ok(());
-        }
-        _ => unreachable!("expected OpenStorageOptions"),
-    }
+    storage_dir_proxy
+        .open(flags, fio::ModeType::empty(), relative_path, ServerEnd::new(server_chan))
+        .map_err(|err| {
+            let moniker = match &dir_source {
+                Some(r) => {
+                    InstancedExtendedMoniker::ComponentInstance(r.instanced_moniker().clone())
+                }
+                None => InstancedExtendedMoniker::ComponentManager,
+            };
+            ModelError::OpenStorageFailed {
+                moniker,
+                relative_moniker,
+                path: relative_path.to_string(),
+                err,
+            }
+        })?;
+    return Ok(());
 }

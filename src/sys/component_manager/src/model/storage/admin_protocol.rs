@@ -785,9 +785,14 @@ impl StorageAdmin {
                 )
                 .await
                 {
-                    Ok((storage_source_info, relative_moniker))
+                    Ok(RouteSource::StorageBackingDirectory(storage_source_info))
                         if storage_source_info == storage_capability_source_info =>
                     {
+                        let relative_moniker = InstancedRelativeMoniker::scope_down(
+                            &storage_source_info.storage_source_moniker,
+                            &component.instanced_moniker(),
+                        )
+                        .unwrap();
                         storage_users.push(relative_moniker);
                         break;
                     }

@@ -45,7 +45,6 @@ use {
         },
         walk_state::WalkState,
     },
-    cm_moniker::InstancedRelativeMoniker,
     cm_rust::{
         Availability, CapabilityName, DirectoryDecl, EventDecl, ExposeDirectoryDecl,
         ExposeEventStreamDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
@@ -58,7 +57,7 @@ use {
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     from_enum::FromEnum,
-    moniker::{AbsoluteMoniker, ChildMoniker, RelativeMonikerBase},
+    moniker::{AbsoluteMoniker, ChildMoniker},
     std::{
         path::{Path, PathBuf},
         sync::Arc,
@@ -496,7 +495,7 @@ pub async fn route_storage_and_backing_directory<C, SM, BDM>(
     target: &Arc<C>,
     storage_mapper: &mut SM,
     backing_dir_mapper: &mut BDM,
-) -> Result<(StorageCapabilitySource<C>, InstancedRelativeMoniker), RoutingError>
+) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
     SM: DebugRouteMapper + 'static,
@@ -518,27 +517,13 @@ where
         _ => unreachable!("unexpected storage source"),
     };
 
-    // As of today, the storage component instance must contain the target. This is because it is
-    // impossible to expose storage declarations up.
-    let storage_source_moniker = storage_component_instance.instanced_moniker();
-    let target_moniker = target.instanced_moniker();
-
-    let instanced_relative_moniker =
-        InstancedRelativeMoniker::scope_down(storage_source_moniker, target_moniker).unwrap();
-
     // Now route the backing directory capability.
-    match route_capability(
+    route_capability(
         RouteRequest::StorageBackingDirectory(storage_decl),
         &storage_component_instance,
         backing_dir_mapper,
     )
-    .await?
-    {
-        RouteSource::StorageBackingDirectory(storage_source_info) => {
-            Ok((storage_source_info, instanced_relative_moniker))
-        }
-        _ => unreachable!("expected RouteSource::StorageBackingDirectory"),
-    }
+    .await
 }
 
 /// Routes a Protocol capability from `target` to its source, starting from `use_decl`.
@@ -1014,11 +999,13 @@ where
         _ => unreachable!("not valid sources"),
     };
     let dir_subdir = if state.subdir == Path::new("") { None } else { Some(state.subdir.clone()) };
+
     Ok(RouteSource::StorageBackingDirectory(StorageCapabilitySource::<C> {
         storage_provider: dir_source_instance,
         backing_directory_path: dir_source_path,
         backing_directory_subdir: dir_subdir,
         storage_subdir: storage_decl.subdir.clone(),
+        storage_source_moniker: target.instanced_moniker().clone(),
     }))
 }
 

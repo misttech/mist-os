@@ -11,6 +11,7 @@ use {
         error::RoutingError,
     },
     async_trait::async_trait,
+    cm_moniker::InstancedAbsoluteMoniker,
     cm_rust::{
         CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, DirectoryDecl,
         EventDecl, EventStreamDecl, ExposeDecl, ExposeDirectoryDecl, ExposeEventStreamDecl,
@@ -197,6 +198,10 @@ pub struct StorageCapabilitySource<C: ComponentInstanceInterface> {
     /// appended to backing_directory_path first, and component_manager will create this subdir if
     /// it doesn't exist but won't create backing_directory_subdir.
     pub storage_subdir: Option<PathBuf>,
+
+    /// The moniker of the component that defines the storage capability, with instance ids. This
+    /// is used for generating moniker-based storage paths.
+    pub storage_source_moniker: InstancedAbsoluteMoniker,
 }
 
 impl<C: ComponentInstanceInterface> PartialEq for StorageCapabilitySource<C> {
