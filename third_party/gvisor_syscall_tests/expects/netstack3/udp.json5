@@ -37,16 +37,19 @@
 
                 // Cases are either skipped entirely (0, 1) or fail (2)
                 "AllInetTests/UdpSocketControlMessagesTest.SendAndReceiveTOSorTClass/*",
+
+                // Tests that hang in Fuchsia's CQ due to indefinite poll for ICMP response.
+                // TODO(https://fxbug.dev/47321): Implement ICMP sockets in Netstack3.
+                "AllInetTests/UdpSocketTest.ConnectWriteToInvalidPort/*",
+                "AllInetTests/UdpSocketTest.ConnectAndSendNoReceiver/*",
             ],
         },
         {
             type: "expect_failure",
             matchers: [
-                "AllInetTests/UdpSocketTest.ConnectAndSendNoReceiver/*",
                 "AllInetTests/UdpSocketTest.ConnectToZeroPortBound/*",
                 "AllInetTests/UdpSocketTest.ConnectToZeroPortConnected/*",
                 "AllInetTests/UdpSocketTest.ConnectToZeroPortUnbound/*",
-                "AllInetTests/UdpSocketTest.ConnectWriteToInvalidPort/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterBindToAny/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterBindToUnspecAndConnect/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterConnectAnyWithPort/*",
