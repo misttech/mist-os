@@ -94,7 +94,7 @@ class __OWNER(void) GPArena {
     }
 
     vmo_ = ktl::move(vmo);
-    top_ = committed_ = start_ = mapping_->base();
+    top_ = committed_ = start_ = mapping_->base_locking();
     end_ = start_ + mem_sz;
 
     DEBUG_ASSERT(IS_PAGE_ALIGNED(start_));

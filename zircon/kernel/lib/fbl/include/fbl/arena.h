@@ -109,6 +109,8 @@ class __OWNER(void) Arena {
     char* committed_;      // |start|..|mapped| is committed.
     char* committed_max_;  // Largest committed_ value seen.
     char* end_;            // |mapped|..|end| is not committed.
+    vaddr_t mapping_base;
+    size_t mapping_size;
   };
 
   Pool control_;  // Free list nodes

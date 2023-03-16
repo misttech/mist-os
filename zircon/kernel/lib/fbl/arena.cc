@@ -159,8 +159,13 @@ void Arena::Pool::Init(const char* name, fbl::RefPtr<VmObject> vmo, fbl::RefPtr<
   slot_size_ = slot_size;
   mapping_ = ktl::move(mapping);
   vmo_ = ktl::move(vmo);
-  committed_max_ = committed_ = top_ = start_ = reinterpret_cast<char*>(mapping_->base());
-  end_ = start_ + mapping_->size();
+  {
+    Guard<CriticalMutex> guard{mapping_->lock()};
+    committed_max_ = committed_ = top_ = start_ = reinterpret_cast<char*>(mapping_->base_locked());
+    end_ = start_ + mapping_->size_locked();
+    mapping_base = mapping_->base_locked();
+    mapping_size = mapping_->size_locked();
+  }
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(start_));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(end_));
@@ -184,7 +189,7 @@ void* Arena::Pool::Pop() {
       nc = end_;
     }
     LTRACEF("%s: commit 0x%p..0x%p\n", name_, committed_, nc);
-    const size_t offset = reinterpret_cast<vaddr_t>(committed_) - mapping_->base();
+    const size_t offset = reinterpret_cast<vaddr_t>(committed_) - mapping_base;
     const size_t len = nc - committed_;
     zx_status_t st = vmo_->CommitRangePinned(offset, len, true);
     if (st != ZX_OK) {
@@ -224,7 +229,7 @@ void Arena::Pool::Push(void* p) {
       return;
     }
     LTRACEF("%s: decommit 0x%p..0x%p\n", name_, nc, committed_);
-    const size_t offset = reinterpret_cast<vaddr_t>(nc) - mapping_->base();
+    const size_t offset = reinterpret_cast<vaddr_t>(nc) - mapping_base;
     const size_t len = committed_ - nc;
     vmo_->Unpin(offset, len);
     // If this fails or decommits less than we asked for, oh well.
