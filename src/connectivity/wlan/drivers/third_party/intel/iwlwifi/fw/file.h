@@ -245,6 +245,23 @@ typedef unsigned int iwl_ucode_tlv_api_t;
  * @IWL_UCODE_TLV_API_FRAG_EBS: This ucode supports fragmented EBS
  * @IWL_UCODE_TLV_API_REDUCE_TX_POWER: This ucode supports v5 of
  *  the REDUCE_TX_POWER_CMD.
+ * @IWL_UCODE_TLV_API_SHORT_BEACON_NOTIF: This ucode supports the short
+ *	version of the beacon notification.
+ * @IWL_UCODE_TLV_API_BEACON_FILTER_V4: This ucode supports v4 of
+ *	BEACON_FILTER_CONFIG_API_S_VER_4.
+ * @IWL_UCODE_TLV_API_REGULATORY_NVM_INFO: This ucode supports v4 of
+ *	REGULATORY_NVM_GET_INFO_RSP_API_S.
+ * @IWL_UCODE_TLV_API_FTM_NEW_RANGE_REQ: This ucode supports v7 of
+ *	LOCATION_RANGE_REQ_CMD_API_S and v6 of LOCATION_RANGE_RESP_NTFY_API_S.
+ * @IWL_UCODE_TLV_API_SCAN_OFFLOAD_CHANS: This ucode supports v2 of
+ *	SCAN_OFFLOAD_PROFILE_MATCH_RESULTS_S and v3 of
+ *	SCAN_OFFLOAD_PROFILES_QUERY_RSP_S.
+ * @IWL_UCODE_TLV_API_MBSSID_HE: This ucode supports v2 of
+ *	STA_CONTEXT_DOT11AX_API_S
+ * @IWL_UCODE_TLV_API_SAR_TABLE_VER: This ucode supports different sar
+ *	version tables.
+ * @IWL_UCODE_TLV_API_REDUCED_SCAN_CONFIG: This ucode supports v3 of
+ *  SCAN_CONFIG_DB_CMD_API_S.
  *
  * @NUM_IWL_UCODE_TLV_API: number of bits used
  */
@@ -270,6 +287,19 @@ enum iwl_ucode_tlv_api {
   IWL_UCODE_TLV_API_NAN_NOTIF_V2 = (__force iwl_ucode_tlv_api_t)43,
   IWL_UCODE_TLV_API_FRAG_EBS = (__force iwl_ucode_tlv_api_t)44,
   IWL_UCODE_TLV_API_REDUCE_TX_POWER = (__force iwl_ucode_tlv_api_t)45,
+	IWL_UCODE_TLV_API_SHORT_BEACON_NOTIF	= (__force iwl_ucode_tlv_api_t)46,
+	IWL_UCODE_TLV_API_BEACON_FILTER_V4      = (__force iwl_ucode_tlv_api_t)47,
+	IWL_UCODE_TLV_API_REGULATORY_NVM_INFO   = (__force iwl_ucode_tlv_api_t)48,
+	IWL_UCODE_TLV_API_FTM_NEW_RANGE_REQ     = (__force iwl_ucode_tlv_api_t)49,
+	IWL_UCODE_TLV_API_SCAN_OFFLOAD_CHANS    = (__force iwl_ucode_tlv_api_t)50,
+	IWL_UCODE_TLV_API_MBSSID_HE		= (__force iwl_ucode_tlv_api_t)52,
+	IWL_UCODE_TLV_API_WOWLAN_TCP_SYN_WAKE	= (__force iwl_ucode_tlv_api_t)53,
+	IWL_UCODE_TLV_API_FTM_RTT_ACCURACY      = (__force iwl_ucode_tlv_api_t)54,
+	IWL_UCODE_TLV_API_SAR_TABLE_VER         = (__force iwl_ucode_tlv_api_t)55,
+	IWL_UCODE_TLV_API_REDUCED_SCAN_CONFIG   = (__force iwl_ucode_tlv_api_t)56,
+	IWL_UCODE_TLV_API_ADWELL_HB_DEF_N_AP	= (__force iwl_ucode_tlv_api_t)57,
+	IWL_UCODE_TLV_API_SCAN_EXT_CHAN_VER	= (__force iwl_ucode_tlv_api_t)58,
+	IWL_UCODE_TLV_API_BAND_IN_RX_DATA	= (__force iwl_ucode_tlv_api_t)59,
 
   NUM_IWL_UCODE_TLV_API
 #ifdef __CHECKER__
