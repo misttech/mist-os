@@ -54,7 +54,10 @@ async fn create_hello_elf(processargs: ProcessArgs) -> Result<Elf, Error> {
 }
 
 /// Creates an `Elf` that runs an executable from the testbed package.
-async fn create_packaged_elf(executable: &Path, processargs: ProcessArgs) -> Result<Elf, Error> {
+pub async fn create_packaged_elf(
+    executable: &Path,
+    processargs: ProcessArgs,
+) -> Result<Elf, Error> {
     // Open the package directory.
     let pkg_dir = fuchsia_fs::directory::open_in_namespace(
         "/pkg",

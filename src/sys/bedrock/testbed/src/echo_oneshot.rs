@@ -2,10 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Integration test that sends a client end of a FIDL protocol through a Route capability
-/// (server/receiver pair), from an Echo server to a client.
-///
-/// The connection is one-shot, so the client cannot reconnect.
+//! Integration test that sends a client end of a FIDL channel through a pair of capabilities,
+//! `Sender` and `Receiver`, from an Echo server to a client.
+//!
+//! `Sender` and `Receiver` form a one-shot channel used to send a single capability.
+//!
+//! `EchoServer` and `EchoClient` act like programs. They can be started and accept a `Dict`
+//! capability that contains "incoming" capabilities provided to them.
+//!
+//! `EchoServer` gets the `Sender` capability in its incoming `Dict`, and sends the client end
+//! of the Echo protocol through the Sender.
+//!
+//! `EchoClient` gets the `Receiver` capability in its incoming `Dict`, receives the client
+//! end of the Echo protocol, and calls a method.
+//!
+//! Since the `Sender`/`Receiver` channel is one-shot, the client cannot reconnect.
+
 use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
@@ -13,6 +25,7 @@ use {
     fidl::endpoints::{spawn_stream_handler, Proxy},
     fidl::HandleBased,
     fidl_fuchsia_examples as fexamples, fuchsia_async as fasync, fuchsia_zircon as zx,
+    futures::future::BoxFuture,
     futures::try_join,
     tracing::info,
 };
@@ -26,6 +39,11 @@ struct Echo {
     proxy: fexamples::EchoProxy,
 }
 impl cap::Capability for Echo {}
+impl cap::Remote for Echo {
+    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+        unimplemented!()
+    }
+}
 
 impl Echo {
     pub fn new() -> Self {
@@ -68,7 +86,12 @@ impl Start for EchoServer {
         info!("started EchoServer");
 
         let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap = incoming.entries.remove(ECHO_CAP_NAME).context("no echo cap in incoming")?;
+        let echo_cap = incoming
+            .entries
+            .lock()
+            .await
+            .remove(ECHO_CAP_NAME)
+            .context("no echo cap in incoming")?;
         let echo_sender =
             echo_cap.downcast::<cap::Sender>().map_err(|_| anyhow!("echo cap is not a Sender"))?;
         info!("(server) echo sender: {:?}", echo_sender);
@@ -108,12 +131,11 @@ impl Start for EchoClient {
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
         info!("started EchoClient");
         let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap =
-            incoming.entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
+        let mut entries = incoming.entries.lock().await;
+        let echo_cap = entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
         let echo_receiver =
             echo_cap.downcast_mut::<cap::Receiver>().context("echo cap is not a Receiver")?;
         info!("(client) echo receiver: {:?}", echo_receiver);
-
         // Get the echo client end from the receiver.
         let echo_handle = echo_receiver
             .await?
@@ -133,6 +155,8 @@ impl Start for EchoClient {
 
         info!("(client) got a response: {:?}", response);
 
+        drop(entries); // Release the lock.
+
         Ok(self)
     }
 }
@@ -150,12 +174,12 @@ impl Stop for EchoClient {
 async fn test_echo_oneshot() -> Result<(), Error> {
     let (echo_sender, echo_receiver) = cap::oneshot();
 
-    let mut server_incoming = Box::new(cap::Dict::new());
-    server_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_sender));
+    let server_incoming = Box::new(cap::Dict::new());
+    server_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_sender));
     let server = EchoServer::new(server_incoming);
 
-    let mut client_incoming = Box::new(cap::Dict::new());
-    client_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_receiver));
+    let client_incoming = Box::new(cap::Dict::new());
+    client_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_receiver));
     let client = EchoClient::new(client_incoming);
 
     try_join!(server.start(), client.start())?;

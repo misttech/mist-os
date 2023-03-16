@@ -2,10 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Integration test that connects a FIDL protocol server and client with a channel.
-/// The server receives the server end of a channel, and the client receives the client end.
-///
-/// The connection is one-shot, so the client cannot reconnect.
+//! Integration test that sends the server and client ends of a FIDL channel to the server and
+//! client, and verifies that the client can call FIDL methods.
+//!
+//! `EchoServer` and `EchoClient` act like programs. They can be started and accept a `Dict`
+//! capability that contains "incoming" capabilities provided to them.
+//!
+//! `EchoServer` gets a `Handle` capability in its incoming `Dict` for the server end of the
+//! Echo protocol, and serves the protocol.
+//!
+//! `EchoClient` gets a `Handle` capability in its incoming `Dict` for the client end of the
+//! Echo protocol, and calls a method.
+//!
+//! Since the `Handle` capabilities represent a single connection and are sent once,
+//! the client cannot reconnect.
+
 use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
@@ -39,7 +50,12 @@ impl Start for EchoServer {
         info!("started EchoServer");
 
         let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap = incoming.entries.remove(ECHO_CAP_NAME).context("no echo cap in incoming")?;
+        let echo_cap = incoming
+            .entries
+            .lock()
+            .await
+            .remove(ECHO_CAP_NAME)
+            .context("no echo cap in incoming")?;
         let echo_handle =
             echo_cap.downcast::<cap::Handle>().map_err(|_| anyhow!("echo cap is not a Handle"))?;
         info!("(server) echo handle: {:?}", echo_handle);
@@ -99,7 +115,12 @@ impl Start for EchoClient {
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
         info!("started EchoClient");
         let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap = incoming.entries.remove(ECHO_CAP_NAME).context("no echo cap in incoming")?;
+        let echo_cap = incoming
+            .entries
+            .lock()
+            .await
+            .remove(ECHO_CAP_NAME)
+            .context("no echo cap in incoming")?;
         let echo_handle =
             echo_cap.downcast::<cap::Handle>().map_err(|_| anyhow!("echo cap is not a Handle"))?;
         info!("(client) echo handle: {:?}", echo_handle);
@@ -137,12 +158,12 @@ async fn test_echo_oneshot_channel() -> Result<(), Error> {
     let echo_server_cap = cap::Handle::from(zx::Handle::from(echo_server_end));
     let echo_client_cap = cap::Handle::from(zx::Handle::from(echo_client_end));
 
-    let mut server_incoming = Box::new(cap::Dict::new());
-    server_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_server_cap));
+    let server_incoming = Box::new(cap::Dict::new());
+    server_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_server_cap));
     let server = EchoServer::new(server_incoming);
 
-    let mut client_incoming = Box::new(cap::Dict::new());
-    client_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_client_cap));
+    let client_incoming = Box::new(cap::Dict::new());
+    client_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_client_cap));
     let client = EchoClient::new(client_incoming);
 
     try_join!(server.start(), client.start())?;

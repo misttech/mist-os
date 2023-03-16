@@ -7,6 +7,6 @@ import("//build/fidl/fidl.gni")
 visibility = [ "//src/sys/bedrock/*" ]
 
 fidl("fuchsia.component.bedrock") {
-  sources = []
+  sources = [ "cap.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

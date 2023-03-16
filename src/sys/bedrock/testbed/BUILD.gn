@@ -45,6 +45,7 @@ rustc_test("bin") {
   sources = [
     "src/echo_oneshot.rs",
     "src/echo_oneshot_channel.rs",
+    "src/echo_oneshot_remote.rs",
     "src/elf.rs",
     "src/lib.rs",
   ]
@@ -70,6 +71,7 @@ fuchsia_test_package("package") {
     ":component",
     ":runner-component",
     "exec:echo_server",
+    "exec:echo_server_cap",
     "exec:hello",
     "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache_cmp",
   ]

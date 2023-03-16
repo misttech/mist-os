@@ -1,0 +1,44 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.component.bedrock;
+
+using zx;
+
+/// A capability of unknown type.
+alias Capability = zx.handle;
+
+/// The key of a [`DictItem`].
+alias DictKey = string:MAX;
+
+/// A key-value pair in a [`Dict`].
+type DictItem = resource struct {
+    key DictKey;
+    value Capability;
+};
+
+/// Error returned from methods in [`Dict`].
+type DictError = flexible enum {
+    /// The Dict does not contain an item with the given key.
+    NOT_FOUND = 1;
+
+    /// The Dict already contains an item with the given key.
+    ALREADY_EXISTS = 2;
+};
+
+protocol Dict {
+    /// Inserts a key-value pair into the dict.
+    ///
+    /// * error `DictError.ALREADY_EXISTS` if the dict already contains an
+    /// item with the same key.
+    Insert(DictItem) -> () error DictError;
+
+    /// Removes a key from the dict, returning the [`Capability`] value.
+    ///
+    /// * error `DictError.NOT_FOUND` if the dict does not contain the key.
+    Remove(struct {
+        key DictKey;
+    }) -> (resource struct {
+        capability Capability;
+    }) error DictError;
+};
