@@ -50,5 +50,6 @@
             type: "string",
             max_size: 2048,
         },
+        use_vulkan: { type: "bool" },
     },
 }

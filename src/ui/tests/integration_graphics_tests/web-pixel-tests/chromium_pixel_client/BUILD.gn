@@ -40,6 +40,10 @@ fuchsia_structured_config_values("chromium_pixel_client_default_config") {
   cm_label = ":chromium_pixel_client"
   values = {
     html = ""
+
+    # Determines whether Chrome should use vulkan icd provided by fuchsia. When false, Chrome falls
+    # back to swiftshader.
+    use_vulkan = true
   }
 }
 

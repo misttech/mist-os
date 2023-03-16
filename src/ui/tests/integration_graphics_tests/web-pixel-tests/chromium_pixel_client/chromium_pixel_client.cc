@@ -76,7 +76,9 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
   WebApp()
       : loop_(&kAsyncLoopConfigAttachToCurrentThread),
         context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()),
-        view_provider_binding_(this) {
+        view_provider_binding_(this),
+        chromium_pixel_client_config_(
+            chromium_pixel_client_config::Config::TakeFromStartupHandle()) {
     FX_LOGS(INFO) << "Starting web client";
     SetupWebEngine();
     SetupViewProvider();
@@ -93,19 +95,16 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     web_frame_->GetNavigationController(navigation_controller.NewRequest());
 
     // Read HTML from structured config file.
-    auto chromium_pixel_client_config =
-        chromium_pixel_client_config::Config::TakeFromStartupHandle();
-    FX_CHECK(!chromium_pixel_client_config.html().empty());
+    FX_CHECK(!chromium_pixel_client_config_.html().empty());
 
     // Load the web page.
     FX_LOGS(INFO) << "Loading web page";
     navigation_controller->LoadUrl(
-        chromium_pixel_client_config.html(), fuchsia::web::LoadUrlParams(),
-        [chromium_pixel_client_config](auto result) {
+        chromium_pixel_client_config_.html(), fuchsia::web::LoadUrlParams(), [this](auto result) {
           if (result.is_err()) {
             FX_LOGS(FATAL) << "Error while loading URL: " << static_cast<uint32_t>(result.err());
           } else {
-            FX_LOGS(INFO) << "Loaded " << chromium_pixel_client_config.html();
+            FX_LOGS(INFO) << "Loaded " << chromium_pixel_client_config_.html();
           }
         });
 
@@ -116,7 +115,7 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
              navigation_event_listener.is_main_document_loaded_;
     });
 
-    FX_LOGS(INFO) << "Running javascript to inject html: " << chromium_pixel_client_config.html();
+    FX_LOGS(INFO) << "Running javascript to inject html: " << chromium_pixel_client_config_.html();
     bool is_js_loaded = false;
     web_frame_->ExecuteJavaScript({"*"}, BufferFromString(kAppCode), [&is_js_loaded](auto result) {
       if (result.is_err()) {
@@ -212,8 +211,12 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     FX_CHECK(incoming_service_clone.is_valid());
 
     fuchsia::web::CreateContextParams params;
-    params.set_features(fuchsia::web::ContextFeatureFlags::VULKAN |
-                        fuchsia::web::ContextFeatureFlags::NETWORK);
+    fuchsia::web::ContextFeatureFlags features = fuchsia::web::ContextFeatureFlags::NETWORK;
+    if (chromium_pixel_client_config_.use_vulkan()) {
+      features = features | fuchsia::web::ContextFeatureFlags::VULKAN;
+    }
+    params.set_features(features);
+
     params.set_service_directory(std::move(incoming_service_clone));
     web_context_provider->Create(std::move(params), web_context_.NewRequest());
     web_context_.set_error_handler([](zx_status_t status) {
@@ -249,6 +252,7 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
   async::Loop loop_;
   std::unique_ptr<sys::ComponentContext> context_;
   fidl::Binding<fuchsia::ui::app::ViewProvider> view_provider_binding_;
+  chromium_pixel_client_config::Config chromium_pixel_client_config_;
   fuchsia::web::ContextPtr web_context_;
   fuchsia::web::FramePtr web_frame_;
 };

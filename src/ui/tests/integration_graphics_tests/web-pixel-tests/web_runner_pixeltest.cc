@@ -86,7 +86,8 @@ double MaxSumProject(const ui_testing::Pixel& v,
   return maxp;
 }
 
-class WebRunnerPixelTest : public ui_testing::PortableUITest {
+class WebRunnerPixelTest : public ui_testing::PortableUITest,
+                           public ::testing::WithParamInterface<bool> {
  public:
   void SetUp() override {
     ui_testing::PortableUITest::SetUp();
@@ -178,6 +179,8 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
     // Route the html code to the chromium client.
     realm_builder().InitMutableConfigToEmpty(kWebClient);
     realm_builder().SetConfigValue(kWebClient, "html", HtmlForTestCase());
+    realm_builder().SetConfigValue(kWebClient, "use_vulkan",
+                                   component_testing::ConfigValue::Bool(GetParam()));
   }
 
   virtual std::string HtmlForTestCase() = 0;
@@ -314,7 +317,10 @@ class StaticHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
-TEST_F(StaticHtmlPixelTests, ValidPixelTest) {
+INSTANTIATE_TEST_SUITE_P(ParameterizedStaticHtmlPixelTests, StaticHtmlPixelTests,
+                         ::testing::Bool());
+
+TEST_P(StaticHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
   const auto num_pixels = display_width_ * display_height_;
 
@@ -355,7 +361,10 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
-TEST_F(DynamicHtmlPixelTests, ValidPixelTest) {
+INSTANTIATE_TEST_SUITE_P(ParameterizedDynamicHtmlPixelTests, DynamicHtmlPixelTests,
+                         ::testing::Bool());
+
+TEST_P(DynamicHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
   const auto num_pixels = display_width_ * display_height_;
 
@@ -414,7 +423,9 @@ class VideoHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
-TEST_F(VideoHtmlPixelTests, ValidPixelTest) {
+INSTANTIATE_TEST_SUITE_P(ParameterizedVideoHtmlPixelTests, VideoHtmlPixelTests, ::testing::Bool());
+
+TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
   // BGRA values,
   const ui_testing::Pixel kYellow = {0, 255, 255, 255};
   const ui_testing::Pixel kRed = {0, 0, 255, 255};
