@@ -338,13 +338,14 @@ void MsdVsiDevice::HangCheckTimeout() {
   Reset();
 }
 
-void MsdVsiDevice::StartDeviceThread() {
+void MsdVsiDevice::StartDeviceThread(bool disable_suspend) {
   DASSERT(!device_thread_.joinable());
-  device_thread_ = std::thread([this] { this->DeviceThreadLoop(); });
+  device_thread_ =
+      std::thread([this, disable_suspend] { this->DeviceThreadLoop(disable_suspend); });
   interrupt_thread_ = std::thread([this] { this->InterruptThreadLoop(); });
 }
 
-int MsdVsiDevice::DeviceThreadLoop() {
+int MsdVsiDevice::DeviceThreadLoop(bool disable_suspend) {
   magma::PlatformThreadHelper::SetCurrentThreadName("DeviceThread");
 
   device_thread_id_ = std::make_unique<magma::PlatformThreadId>();
@@ -369,10 +370,12 @@ int MsdVsiDevice::DeviceThreadLoop() {
         progress_->GetHangcheckTimeout(kTimeoutMs, std::chrono::steady_clock::now()));
 
 #if defined(MSD_VSI_VIP_ENABLE_SUSPEND)
-    constexpr uint32_t kWaitMs = 10;
+    constexpr uint32_t kWaitForSuspendMs = 10;
     // If there are no more command buffers to execute wait before suspending
-    if (progress_->IsIdle() && power_state_ != PowerState::kSuspended) {
-      timeout = std::chrono::milliseconds(kWaitMs);
+    if (!disable_suspend) {
+      if (progress_->IsIdle() && power_state_ != PowerState::kSuspended) {
+        timeout = std::chrono::milliseconds(kWaitForSuspendMs);
+      }
     }
 #endif
 
@@ -385,13 +388,20 @@ int MsdVsiDevice::DeviceThreadLoop() {
         lock.lock();
         bool empty = device_request_list_.empty();
         lock.unlock();
-        if (empty) {
-          if (progress_->IsIdle()) {
-            StopRingBufferAndSuspend();
-          } else {
-            HangCheckTimeout();
-          }
+        if (!empty) {
+          break;
         }
+
+#if defined(MSD_VSI_VIP_ENABLE_SUSPEND)
+        if (timeout == std::chrono::milliseconds(kWaitForSuspendMs)) {
+          if (progress_->IsIdle() && power_state_ != PowerState::kSuspended) {
+            StopRingBufferAndSuspend();
+          }
+          break;
+        }
+#endif
+
+        HangCheckTimeout();
       } break;
       default:
         MAGMA_LOG(WARNING, "device_request_semaphore_ Wait failed: %d", status.get());
@@ -462,11 +472,11 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
   auto value = irq_status.value();
   bool do_dump = false;
   if (mmu_exception) {
-    DMESSAGE("Interrupt thread received mmu_exception");
+    MAGMA_LOG(ERROR, "Interrupt thread received mmu_exception");
     do_dump = true;
   }
   if (bus_error) {
-    DMESSAGE("Interrupt thread received bus error");
+    MAGMA_LOG(ERROR, "Interrupt thread received bus error");
   }
   // Though events complete in order, we may receive a single interrupt for multiple events
   // simultaneously. We should update the ringbuffer head following the event with the
@@ -509,7 +519,7 @@ magma::Status MsdVsiDevice::ProcessInterrupt() {
     ringbuffer_->update_head(rb_new_head);
     progress_->Completed(max_seq_num, std::chrono::steady_clock::now());
   } else {
-    DMESSAGE("Interrupt thread did not find any interrupt events");
+    MAGMA_LOG(ERROR, "Interrupt thread did not find any interrupt events");
     do_dump = true;
   }
   if (do_dump) {

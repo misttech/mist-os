@@ -158,7 +158,8 @@ TEST_F(TestEvents, WriteUnorderedEventIds) {
   uint32_t num_new_rb_instructions = MsdVsiDevice::kNumEvents + 2;  // Add 2 for WAIT-LINK.
   device_->LinkRingbuffer(prev_wait_link, rb_link_addr, num_new_rb_instructions /* prefetch */);
 
-  device_->StartDeviceThread();
+  // Start the device thread with suspend disabled
+  device_->StartDeviceThread(true);
 
   constexpr uint64_t kTimeoutMs = 5000;
   for (unsigned int j = 0; j < MsdVsiDevice::kNumEvents; j++) {

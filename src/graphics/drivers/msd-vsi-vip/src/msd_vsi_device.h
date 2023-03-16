@@ -210,8 +210,11 @@ class MsdVsiDevice : public msd_device_t,
                          uint32_t buf_size_dwords, uint32_t start_dword, uint32_t dword_count,
                          uint32_t active_head_dword);
 
-  void StartDeviceThread();
-  int DeviceThreadLoop();
+  // It is possible to start the DeviceThread with suspend disabled. The default is suspend is
+  // enabled. Disabling suspend is for testing.
+  void StartDeviceThread(bool disable_suspend = false);
+  int DeviceThreadLoop(bool disable_suspend);
+
   void EnqueueDeviceRequest(std::unique_ptr<DeviceRequest> request);
 
   int InterruptThreadLoop();
