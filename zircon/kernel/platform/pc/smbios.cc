@@ -94,7 +94,7 @@ zx_status_t MapStructs2_1(const smbios::EntryPoint2_1* ep, fbl::RefPtr<VmMapping
   if (status != ZX_OK) {
     return status;
   }
-  *struct_table_virt = m->base() + subpage_offset;
+  *struct_table_virt = m->base_locking() + subpage_offset;
   *mapping = ktl::move(m);
   return ZX_OK;
 }

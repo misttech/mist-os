@@ -1339,7 +1339,7 @@ static zx_status_t x86_map_mchbar_stat_registers(PerfmonState* state) {
     return status;
 
   state->mchbar_data.mapping = mapping;
-  state->mchbar_data.stats_addr = reinterpret_cast<void*>(mapping->base() + begin_offset);
+  state->mchbar_data.stats_addr = reinterpret_cast<void*>(mapping->base_locking() + begin_offset);
 
   // Record the current values of these so that the trace will only include
   // the delta since tracing started.
@@ -1361,7 +1361,8 @@ static zx_status_t x86_map_mchbar_stat_registers(PerfmonState* state) {
   INIT_MC_COUNT(active_gt_engine_cycles);
 #undef INIT_MC_COUNT
 
-  LTRACEF("memory stats mapped: begin 0x%lx, %zu bytes\n", mapping->base(), num_bytes_to_map);
+  LTRACEF("memory stats mapped: begin 0x%lx, %zu bytes\n", mapping->base_locking(),
+          num_bytes_to_map);
 
   return ZX_OK;
 }
@@ -1406,7 +1407,7 @@ static zx_status_t x86_perfmon_map_buffers_locked(PerfmonState* state, Guard<Mut
       break;
     }
     data->buffer_start =
-        reinterpret_cast<perfmon::BufferHeader*>(data->buffer_mapping->base() + vmo_offset);
+        reinterpret_cast<perfmon::BufferHeader*>(data->buffer_mapping->base_locking() + vmo_offset);
     data->buffer_end = reinterpret_cast<char*>(data->buffer_start) + size;
     data->pinned_buffer = ktl::move(buf_pin);
     LTRACEF("buffer mapped: cpu %u, start %p, end %p\n", cpu, data->buffer_start, data->buffer_end);

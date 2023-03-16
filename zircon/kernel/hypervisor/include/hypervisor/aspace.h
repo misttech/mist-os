@@ -43,10 +43,10 @@ class GuestPtr {
 
   template <typename T>
   T* as() const {
-    if (offset_ + sizeof(T) > mapping_->size()) {
+    if (offset_ + sizeof(T) > mapping_->size_locking()) {
       return nullptr;
     }
-    return reinterpret_cast<T*>(mapping_->base() + offset_);
+    return reinterpret_cast<T*>(mapping_->base_locking() + offset_);
   }
 
  private:

@@ -494,7 +494,7 @@ zx_status_t VmAspace::FreeRegion(vaddr_t va) {
   {
     Guard<CriticalMutex> guard{mapping->lock()};
     vmo_offset = mapping->object_offset_locked();
-    unpin_size = mapping->size();
+    unpin_size = mapping->size_locked();
   }
   zx_status_t status = mapping->Destroy();
   vmo->Unpin(vmo_offset, unpin_size);

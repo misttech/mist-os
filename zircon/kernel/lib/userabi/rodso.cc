@@ -61,9 +61,10 @@ zx_status_t EmbeddedVmo::MapSegment(fbl::RefPtr<VmAddressRegionDispatcher> vmar,
     dprintf(CRITICAL, "userboot: %s %s mapping %#zx @ %#" PRIxPTR " size %#zx failed %d\n", name_,
             segment_name, start_offset, vmar->vmar()->base() + vmar_offset, len, status);
   } else {
-    DEBUG_ASSERT(mapping->base() == vmar->vmar()->base() + vmar_offset);
+    Guard<CriticalMutex> guard{mapping->lock()};
+    DEBUG_ASSERT(mapping->base_locked() == vmar->vmar()->base() + vmar_offset);
     dprintf(SPEW, "userboot: %-8s %-6s %#7zx @ [%#" PRIxPTR ",%#" PRIxPTR ")\n", name_,
-            segment_name, start_offset, mapping->base(), mapping->base() + len);
+            segment_name, start_offset, mapping->base_locked(), mapping->base_locked() + len);
   }
 
   return status;
