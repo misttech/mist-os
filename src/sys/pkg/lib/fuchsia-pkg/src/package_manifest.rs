@@ -676,7 +676,7 @@ mod tests {
         super::*,
         crate::{path_to_string::PathToStringExt, PackageBuildManifest, PackageBuilder},
         assert_matches::assert_matches,
-        camino::Utf8Path,
+        camino::{Utf8Path, Utf8PathBuf},
         fuchsia_merkle::Hash,
         pretty_assertions::assert_eq,
         serde_json::json,
@@ -698,6 +698,45 @@ mod tests {
 
     pub(super) fn ones_hash() -> Hash {
         ones_hash_str().parse().unwrap()
+    }
+
+    pub struct TestEnv {
+        pub dir_path: Utf8PathBuf,
+        pub manifest_path: Utf8PathBuf,
+        pub manifest_dir: Utf8PathBuf,
+        pub subpackage_path: Utf8PathBuf,
+        pub subpackage_dir: Utf8PathBuf,
+        pub data_dir: Utf8PathBuf,
+    }
+
+    impl TestEnv {
+        pub fn new() -> Self {
+            let dir = TempDir::new().unwrap();
+            let dir_path = Utf8Path::from_path(dir.path()).unwrap();
+
+            let manifest_dir = dir_path.join("manifest_dir");
+            let manifest_path = manifest_dir.join("package_manifest.json");
+
+            let subpackage_dir = dir_path.join("subpackage_manifests");
+            let subpackage_path = subpackage_dir.join(zeros_hash_str());
+
+            let data_dir = dir_path.join("data_source");
+
+            TestEnv {
+                dir_path: dir_path.to_path_buf(),
+                manifest_path,
+                manifest_dir,
+                subpackage_path,
+                subpackage_dir,
+                data_dir,
+            }
+        }
+
+        pub fn build_files(&self) {
+            std::fs::create_dir_all(&self.data_dir).unwrap();
+            std::fs::create_dir_all(&self.subpackage_dir).unwrap();
+            std::fs::create_dir_all(&self.manifest_dir).unwrap();
+        }
     }
 
     #[test]
@@ -1096,19 +1135,10 @@ mod tests {
 
     #[test]
     fn test_load_from_simple() {
-        let temp = TempDir::new().unwrap();
-        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+        let env = TestEnv::new();
+        env.build_files();
 
-        let data_dir = temp_dir.join("data_source");
-        let subpackage_dir = temp_dir.join("subpackage_manifests");
-        let manifest_dir = temp_dir.join("manifest_dir");
-        let manifest_path = manifest_dir.join("package_manifest.json");
-        let expected_blob_source_path = data_dir.join("p1").to_string();
-        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
-
-        std::fs::create_dir_all(&data_dir).unwrap();
-        std::fs::create_dir_all(&subpackage_dir).unwrap();
-        std::fs::create_dir_all(&manifest_dir).unwrap();
+        let expected_blob_source_path = &env.data_dir.join("p1").to_string();
 
         let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
             package: PackageMetadata {
@@ -1122,7 +1152,7 @@ mod tests {
                 size: 1,
             }],
             subpackages: vec![SubpackageInfo {
-                manifest_path: expected_subpackage_manifest_path.clone(),
+                manifest_path: env.subpackage_path.to_string(),
                 name: "subpackage0".into(),
                 merkle: zeros_hash(),
             }],
@@ -1130,10 +1160,10 @@ mod tests {
             blob_sources_relative: RelativeTo::WorkingDir,
         }));
 
-        let manifest_file = File::create(&manifest_path).unwrap();
+        let manifest_file = File::create(&env.manifest_path).unwrap();
         serde_json::to_writer(manifest_file, &manifest).unwrap();
 
-        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+        let loaded_manifest = PackageManifest::try_load_from(&env.manifest_path).unwrap();
         assert_eq!(loaded_manifest.name(), &"example".parse::<PackageName>().unwrap());
 
         let (blobs, subpackages) = loaded_manifest.into_blobs_and_subpackages();
@@ -1141,29 +1171,19 @@ mod tests {
         assert_eq!(blobs.len(), 1);
         let blob = blobs.first().unwrap();
         assert_eq!(blob.path, "data/p1");
-        assert_eq!(blob.source_path, expected_blob_source_path);
+
+        assert_eq!(&blob.source_path, expected_blob_source_path);
 
         assert_eq!(subpackages.len(), 1);
         let subpackage = subpackages.first().unwrap();
         assert_eq!(subpackage.name, "subpackage0");
-        assert_eq!(subpackage.manifest_path, expected_subpackage_manifest_path);
+        assert_eq!(&subpackage.manifest_path, &env.subpackage_path.to_string());
     }
 
     #[test]
     fn test_load_from_resolves_source_paths() {
-        let temp = TempDir::new().unwrap();
-        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
-
-        let data_dir = temp_dir.join("data_source");
-        let subpackage_dir = temp_dir.join("subpackage_manifests");
-        let manifest_dir = temp_dir.join("manifest_dir");
-        let manifest_path = manifest_dir.join("package_manifest.json");
-        let expected_blob_source_path = data_dir.join("p1").to_string();
-        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
-
-        std::fs::create_dir_all(&data_dir).unwrap();
-        std::fs::create_dir_all(&subpackage_dir).unwrap();
-        std::fs::create_dir_all(&manifest_dir).unwrap();
+        let env = TestEnv::new();
+        env.build_files();
 
         let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
             package: PackageMetadata {
@@ -1185,10 +1205,10 @@ mod tests {
             blob_sources_relative: RelativeTo::File,
         }));
 
-        let manifest_file = File::create(&manifest_path).unwrap();
+        let manifest_file = File::create(&env.manifest_path).unwrap();
         serde_json::to_writer(manifest_file, &manifest).unwrap();
 
-        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+        let loaded_manifest = PackageManifest::try_load_from(&env.manifest_path).unwrap();
         assert_eq!(loaded_manifest.name(), &"example".parse::<PackageName>().unwrap());
 
         let (blobs, subpackages) = loaded_manifest.into_blobs_and_subpackages();
@@ -1196,29 +1216,19 @@ mod tests {
         assert_eq!(blobs.len(), 1);
         let blob = blobs.first().unwrap();
         assert_eq!(blob.path, "data/p1");
-        assert_eq!(blob.source_path, expected_blob_source_path);
+        let expected_blob_source_path = &env.data_dir.join("p1").to_string();
+        assert_eq!(&blob.source_path, expected_blob_source_path);
 
         assert_eq!(subpackages.len(), 1);
         let subpackage = subpackages.first().unwrap();
         assert_eq!(subpackage.name, "subpackage0");
-        assert_eq!(subpackage.manifest_path, expected_subpackage_manifest_path);
+        assert_eq!(&subpackage.manifest_path, &env.subpackage_path.to_string());
     }
 
     #[test]
     fn test_package_and_subpackage_blobs_meta_far_error() {
-        let temp = TempDir::new().unwrap();
-        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
-
-        let data_dir = temp_dir.join("data_source");
-        let subpackage_dir = temp_dir.join("subpackage_manifests");
-        let manifest_dir = temp_dir.join("manifest_dir");
-        let manifest_path = manifest_dir.join("package_manifest.json");
-
-        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
-
-        std::fs::create_dir_all(data_dir).unwrap();
-        std::fs::create_dir_all(&subpackage_dir).unwrap();
-        std::fs::create_dir_all(&manifest_dir).unwrap();
+        let env = TestEnv::new();
+        env.build_files();
 
         let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
             package: PackageMetadata {
@@ -1240,7 +1250,7 @@ mod tests {
             blob_sources_relative: RelativeTo::File,
         }));
 
-        let manifest_file = File::create(&manifest_path).unwrap();
+        let manifest_file = File::create(&env.manifest_path).unwrap();
         serde_json::to_writer(manifest_file, &manifest).unwrap();
 
         let sub_manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
@@ -1259,10 +1269,10 @@ mod tests {
             blob_sources_relative: RelativeTo::File,
         }));
 
-        let sub_manifest_file = File::create(expected_subpackage_manifest_path).unwrap();
+        let sub_manifest_file = File::create(&env.subpackage_path).unwrap();
         serde_json::to_writer(sub_manifest_file, &sub_manifest).unwrap();
 
-        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+        let loaded_manifest = PackageManifest::try_load_from(&env.manifest_path).unwrap();
 
         let result = loaded_manifest.package_and_subpackage_blobs();
         assert_matches!(
@@ -1273,24 +1283,14 @@ mod tests {
 
     #[test]
     fn test_package_and_subpackage_blobs() {
-        let temp = TempDir::new().unwrap();
-        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+        let env = TestEnv::new();
+        let subsubpackage_dir = &env.dir_path.join("subsubpackage_manifests");
 
-        let data_dir = temp_dir.join("data_source");
-        let subpackage_dir = temp_dir.join("subpackage_manifests");
-        let subsubpackage_dir = temp_dir.join("subsubpackage_manifests");
-
-        let manifest_dir = temp_dir.join("manifest_dir");
-        let manifest_path = manifest_dir.join("package_manifest.json");
-        let expected_meta_far_source_path = data_dir.join("p2").to_string();
-        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
         let expected_subsubpackage_manifest_path =
             subsubpackage_dir.join(zeros_hash_str()).to_string();
 
-        std::fs::create_dir_all(&data_dir).unwrap();
-        std::fs::create_dir_all(&subpackage_dir).unwrap();
-        std::fs::create_dir_all(&subsubpackage_dir).unwrap();
-        std::fs::create_dir_all(&manifest_dir).unwrap();
+        env.build_files();
+        std::fs::create_dir_all(subsubpackage_dir).unwrap();
 
         let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
             package: PackageMetadata {
@@ -1317,7 +1317,7 @@ mod tests {
             blob_sources_relative: RelativeTo::File,
         }));
 
-        let manifest_file = File::create(&manifest_path).unwrap();
+        let manifest_file = File::create(&env.manifest_path).unwrap();
         serde_json::to_writer(manifest_file, &manifest).unwrap();
 
         let sub_manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
@@ -1350,7 +1350,7 @@ mod tests {
             blob_sources_relative: RelativeTo::File,
         }));
 
-        let sub_manifest_file = File::create(expected_subpackage_manifest_path).unwrap();
+        let sub_manifest_file = File::create(&env.subpackage_path).unwrap();
         serde_json::to_writer(sub_manifest_file, &sub_manifest).unwrap();
 
         let sub_sub_manifest =
@@ -1375,7 +1375,8 @@ mod tests {
         let sub_sub_manifest_file = File::create(expected_subsubpackage_manifest_path).unwrap();
         serde_json::to_writer(sub_sub_manifest_file, &sub_sub_manifest).unwrap();
 
-        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+        let loaded_manifest = PackageManifest::try_load_from(&env.manifest_path).unwrap();
+        let expected_meta_far_source_path = env.data_dir.join("p2").to_string();
 
         let (meta_far, contents) = loaded_manifest.package_and_subpackage_blobs().unwrap();
         assert_eq!(
@@ -1393,7 +1394,7 @@ mod tests {
         assert_eq!(
             contents.get(zeros_hash_str()),
             Some(&BlobInfo {
-                source_path: data_dir.join("p1").to_string(),
+                source_path: env.data_dir.join("p1").to_string(),
                 path: "data/p1".into(),
                 merkle: zeros_hash(),
                 size: 1,
@@ -1402,7 +1403,7 @@ mod tests {
         assert_eq!(
             contents.get("3333333333333333333333333333333333333333333333333333333333333333"),
             Some(&BlobInfo {
-                source_path: data_dir.join("p3").to_string(),
+                source_path: env.data_dir.join("p3").to_string(),
                 path: "data/p3".into(),
                 merkle: "3333333333333333333333333333333333333333333333333333333333333333"
                     .parse()
@@ -1413,7 +1414,7 @@ mod tests {
         assert_eq!(
             contents.get("4444444444444444444444444444444444444444444444444444444444444444"),
             Some(&BlobInfo {
-                source_path: data_dir.join("p4").to_string(),
+                source_path: env.data_dir.join("p4").to_string(),
                 path: "meta/".into(),
                 merkle: "4444444444444444444444444444444444444444444444444444444444444444"
                     .parse()
@@ -1424,7 +1425,7 @@ mod tests {
         assert_eq!(
             contents.get("5555555555555555555555555555555555555555555555555555555555555555"),
             Some(&BlobInfo {
-                source_path: data_dir.join("p5").to_string(),
+                source_path: env.data_dir.join("p5").to_string(),
                 path: "meta/".into(),
                 merkle: "5555555555555555555555555555555555555555555555555555555555555555"
                     .parse()
@@ -1436,22 +1437,12 @@ mod tests {
 
     #[test]
     fn test_package_and_subpackage_blobs_deduped() {
-        let temp = TempDir::new().unwrap();
-        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+        let env = TestEnv::new();
+        env.build_files();
 
-        let data_dir = temp_dir.join("data_source");
-        let subpackage_dir = temp_dir.join("subpackage_manifests");
-        let manifest_dir = temp_dir.join("manifest_dir");
-        let manifest_path = manifest_dir.join("package_manifest.json");
-        let expected_blob_source_path_1 = data_dir.join("p1").to_string();
-        let expected_meta_far_source_path = data_dir.join("p2").to_string();
-        let expected_blob_source_path_2 = data_dir.join("p3").to_string();
-
-        let expected_subpackage_manifest_path = subpackage_dir.join(zeros_hash_str()).to_string();
-
-        std::fs::create_dir_all(&data_dir).unwrap();
-        std::fs::create_dir_all(&subpackage_dir).unwrap();
-        std::fs::create_dir_all(&manifest_dir).unwrap();
+        let expected_blob_source_path_1 = env.data_dir.join("p1").to_string();
+        let expected_meta_far_source_path = env.data_dir.join("p2").to_string();
+        let expected_blob_source_path_2 = env.data_dir.join("p3").to_string();
 
         let manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
             package: PackageMetadata {
@@ -1484,7 +1475,7 @@ mod tests {
             blob_sources_relative: RelativeTo::File,
         }));
 
-        let manifest_file = File::create(&manifest_path).unwrap();
+        let manifest_file = File::create(&env.manifest_path).unwrap();
         serde_json::to_writer(manifest_file, &manifest).unwrap();
 
         let sub_manifest = PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
@@ -1515,10 +1506,10 @@ mod tests {
             blob_sources_relative: RelativeTo::File,
         }));
 
-        let sub_manifest_file = File::create(expected_subpackage_manifest_path).unwrap();
+        let sub_manifest_file = File::create(&env.subpackage_path).unwrap();
         serde_json::to_writer(sub_manifest_file, &sub_manifest).unwrap();
 
-        let loaded_manifest = PackageManifest::try_load_from(&manifest_path).unwrap();
+        let loaded_manifest = PackageManifest::try_load_from(&env.manifest_path).unwrap();
 
         let (meta_far, contents) = loaded_manifest.package_and_subpackage_blobs().unwrap();
         assert_eq!(
