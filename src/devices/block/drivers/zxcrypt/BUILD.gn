@@ -48,6 +48,7 @@ fuchsia_driver("zxcrypt-driver") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
   ]
 
   # Make sure we don't accidentally pull in a couple of easily-added dynamic

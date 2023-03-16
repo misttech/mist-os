@@ -242,8 +242,7 @@ async fn write_data_file(
         Box::new(BlockDevice::new(partition_path).await.context("failed to make new device")?);
     let mut device: &mut dyn Device = device.as_mut();
     let mut zxcrypt_device;
-    let mut new_device;
-
+    let mut inside_zxcrypt = false;
     if format != DiskFormat::Fxfs && !config.no_zxcrypt {
         if bind_zxcrypt {
             launcher.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
@@ -256,34 +255,25 @@ async fn write_data_file(
             );
             device = zxcrypt_device.as_mut();
         } else {
-            let mut zxcrypt_path = device.topological_path().to_string();
-            zxcrypt_path.push_str("/zxcrypt/unsealed");
-            let zxcrypt_matcher = PartitionMatcher {
-                type_guids: Some(vec![constants::DATA_TYPE_GUID]),
-                labels: Some(data_partition_names()),
-                parent_device: Some(zxcrypt_path),
-                ..Default::default()
-            };
-            let partition_path = find_partition(zxcrypt_matcher, FIND_PARTITION_DURATION)
-                .await
-                .context("Failed to open zxcrypt partition")?;
-            new_device = Box::new(
-                BlockDevice::new(partition_path).await.context("failed to make new device")?,
-            );
-            device = new_device.as_mut();
+            zxcrypt_device = Box::new(ZxcryptDevice::get_zxcrypt_child(device).await?);
+            device = zxcrypt_device.as_mut();
         };
+        inside_zxcrypt = true;
     }
 
     let mut filesystem = match format {
-        DiskFormat::Fxfs => {
-            launcher.serve_data(device, Fxfs::dynamic_child()).await.context("serving fxfs")?
-        }
-        DiskFormat::F2fs => {
-            launcher.serve_data(device, F2fs::dynamic_child()).await.context("serving f2fs")?
-        }
-        DiskFormat::Minfs => {
-            launcher.serve_data(device, Minfs::dynamic_child()).await.context("serving minfs")?
-        }
+        DiskFormat::Fxfs => launcher
+            .serve_data(device, Fxfs::dynamic_child(), inside_zxcrypt)
+            .await
+            .context("serving fxfs")?,
+        DiskFormat::F2fs => launcher
+            .serve_data(device, F2fs::dynamic_child(), inside_zxcrypt)
+            .await
+            .context("serving f2fs")?,
+        DiskFormat::Minfs => launcher
+            .serve_data(device, Minfs::dynamic_child(), inside_zxcrypt)
+            .await
+            .context("serving minfs")?,
         _ => unreachable!(),
     };
 

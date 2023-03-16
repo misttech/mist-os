@@ -4,6 +4,7 @@
 
 pub const HEADER_SIZE: u32 = 4096;
 
+// -- Magic numbers--
 pub const MINFS_MAGIC: [u8; 16] = [
     0x21, 0x4d, 0x69, 0x6e, 0x46, 0x53, 0x21, 0x00, 0x04, 0xd3, 0xd3, 0xd3, 0xd3, 0x00, 0x50, 0x38,
 ];
@@ -33,3 +34,10 @@ pub const VB_META_MAGIC: [u8; 4] = [b'A', b'V', b'B', b'0'];
 pub const F2FS_MAGIC: [u8; 4] = [0x10, 0x20, 0xf5, 0xf2];
 
 pub const FXFS_MAGIC: [u8; 8] = [b'F', b'x', b'f', b's', b'S', b'u', b'p', b'r'];
+
+// -- Partition labels --
+pub const BLOBFS_PARTITION_LABEL: &str = "blobfs";
+
+pub const DATA_PARTITION_LABEL: &str = "data";
+
+pub const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";

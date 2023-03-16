@@ -104,6 +104,14 @@ impl ZxcryptDevice {
         }
         last_res
     }
+
+    /// Creates a new ZxcryptDevice using the outer_device.
+    pub async fn get_zxcrypt_child(device: &dyn Device) -> Result<Self, Error> {
+        Ok(ZxcryptDevice {
+            parent_is_nand: device.is_nand(),
+            inner_device: device.get_child("/zxcrypt/unsealed/block").await?,
+        })
+    }
 }
 
 #[async_trait]

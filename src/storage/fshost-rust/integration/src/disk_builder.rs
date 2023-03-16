@@ -229,6 +229,7 @@ pub struct DiskBuilder {
     // Only used if `format` is Some.
     corrupt_contents: bool,
     gpt: bool,
+    with_account_and_virtualization: bool,
     format_fvm: bool,
     legacy_data_label: bool,
 }
@@ -241,6 +242,7 @@ impl DiskBuilder {
             data_spec: DataSpec { format: None, zxcrypt: false, legacy_crypto_format: false },
             corrupt_contents: false,
             gpt: false,
+            with_account_and_virtualization: false,
             format_fvm: true,
             legacy_data_label: false,
         }
@@ -270,6 +272,11 @@ impl DiskBuilder {
 
     pub fn with_gpt(&mut self) -> &mut Self {
         self.gpt = true;
+        self
+    }
+
+    pub fn with_account_and_virtualization(&mut self) -> &mut Self {
+        self.with_account_and_virtualization = true;
         self
     }
 
@@ -390,6 +397,33 @@ impl DiskBuilder {
                 "f2fs" => self.init_data_f2fs(data_controller).await,
                 _ => panic!("unsupported data filesystem format type"),
             }
+        }
+
+        if self.with_account_and_virtualization {
+            // Create account and virtualization partitions
+            create_fvm_volume(
+                &volume_manager,
+                "account",
+                &DATA_TYPE_GUID,
+                Uuid::new_v4().as_bytes(),
+                None,
+                0,
+            )
+            .await
+            .expect("create_fvm_volume failed");
+
+            // For the sake of the test, we set up virtualization
+            // with a DATA_TYPE_GUID
+            create_fvm_volume(
+                &volume_manager,
+                "virtualization",
+                &DATA_TYPE_GUID,
+                Uuid::new_v4().as_bytes(),
+                None,
+                0,
+            )
+            .await
+            .expect("create_fvm_volume failed");
         }
 
         // Destroy the ramdisk device and return a VMO containing the partitions/filesystems.

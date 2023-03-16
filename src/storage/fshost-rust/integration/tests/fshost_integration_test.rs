@@ -8,8 +8,14 @@ use {
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_fshost::AdminMarker,
     fidl_fuchsia_hardware_block_partition::Guid,
-    fidl_fuchsia_hardware_block_volume::{VolumeAndNodeMarker, VolumeManagerMarker},
+    fidl_fuchsia_hardware_block_volume::{VolumeAndNodeMarker, VolumeManagerMarker, VolumeMarker},
     fidl_fuchsia_io as fio,
+    fs_management::{
+        format::constants::DATA_PARTITION_LABEL,
+        partition::{find_partition_in, PartitionMatcher},
+        DATA_TYPE_GUID,
+    },
+    fshost_test_fixture::disk_builder::DEFAULT_DATA_VOLUME_SIZE,
     fshost_test_fixture::{
         disk_builder::{DataSpec, FVM_SLICE_SIZE},
         TestFixtureBuilder,
@@ -318,12 +324,25 @@ async fn partition_max_size_set() {
     )
     .await;
 
+    let data_matcher = PartitionMatcher {
+        type_guids: Some(vec![DATA_TYPE_GUID]),
+        labels: Some(vec![DATA_PARTITION_LABEL.to_string()]),
+        ignore_if_path_contains: Some("zxcrypt/unsealed".to_string()),
+        ..Default::default()
+    };
+
+    let dev = fixture.dir("dev-topological/class/block");
+    let data_partition_path = find_partition_in(&dev, data_matcher, zx::Duration::from_seconds(10))
+        .await
+        .expect("failed to find data partition");
+
+    let data_path = data_partition_path
+        .strip_prefix("/dev/")
+        .expect("data partition topo path should start with /dev/");
+
     // get data instance guid
-    let mut data_instance_guid = get_instance_guid_from_path(
-        &fixture.dir("dev-topological"),
-        "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/data-p-2/block",
-    )
-    .await;
+    let mut data_instance_guid =
+        get_instance_guid_from_path(&fixture.dir("dev-topological"), &data_path).await;
 
     let fvm_proxy = connect_to_named_protocol_at_dir_root::<VolumeManagerMarker>(
         &fixture.dir("dev-topological"),
@@ -605,4 +624,64 @@ async fn disable_block_watcher() {
     }
 
     fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn reset_fvm_partitions() {
+    let mut builder = new_builder();
+    builder
+        .with_disk()
+        .with_account_and_virtualization()
+        .data_volume_size(DEFAULT_DATA_VOLUME_SIZE / 2);
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let fvm_proxy = fuchsia_fs::directory::open_directory(
+        &fixture.dir("dev-topological"),
+        "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    .expect("Failed to open the fvm");
+
+    // Ensure that the account and virtualization partitions
+    // were successfully destroyed
+    let dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
+        .await
+        .expect("Failed to readdir the fvm DirectoryProxy");
+    let mut count = 0;
+    let mut data_name = "".to_string();
+    for entry in dir_entries {
+        let name = entry.name;
+        if name.contains("blobfs") || name.contains("device") {
+            count += 1;
+        } else if name.contains("data") {
+            data_name = name;
+            count += 1;
+        } else {
+            panic!("Unexpected entry name: {name}");
+        }
+    }
+    assert_eq!(count, 4);
+    assert_ne!(&data_name, "");
+
+    // Ensure that the data partition got larger. We exclude minfs because it automatically handles
+    // resizing and does not call resize_volume() inside format_data.
+    if DATA_FILESYSTEM_FORMAT != "minfs" {
+        let data_volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.dir("dev-topological"),
+            &format!("sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/{}/block", data_name),
+        )
+        .expect("Failed to connect to data VolumeProxy");
+        let (status, manager_info, volume_info) =
+            data_volume_proxy.get_volume_info().await.expect("transport error on get_volume_info");
+        zx::Status::ok(status).expect("get_volume_info failed");
+        let manager_info = manager_info.expect("get_volume_info returned no volume manager info");
+        let volume_info = volume_info.expect("get_volume_info returned no volume info");
+        let slice_size = manager_info.slice_size;
+        let slice_count = volume_info.partition_slice_count;
+        assert!(slice_size * slice_count > (DEFAULT_DATA_VOLUME_SIZE / 2));
+    }
 }

@@ -18,6 +18,7 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
+#include <safemath/clamped_math.h>
 
 #include "lib/inspect/cpp/inspector.h"
 #include "src/devices/block/drivers/zxcrypt/debug.h"
@@ -126,7 +127,7 @@ void Device::BlockImplQuery(block_info_t* out_info, size_t* out_op_size) {
   LOG_ENTRY_ARGS("out_info=%p, out_op_size=%p", out_info, out_op_size);
 
   info_.block_protocol.Query(out_info, out_op_size);
-  out_info->block_count -= info_.reserved_blocks;
+  out_info->block_count = safemath::ClampSub(out_info->block_count, info_.reserved_blocks);
   // Cap largest transaction to a quarter of the VMO buffer.
   out_info->max_transfer_size = std::min(Volume::kBufferSize / 4, out_info->max_transfer_size);
   *out_op_size = info_.op_size;
@@ -214,14 +215,17 @@ zx_status_t Device::BlockVolumeGetInfo(volume_manager_info_t* out_manager,
     return status;
   }
 
-  out_manager->max_virtual_slice -= info_.reserved_slices;
-  out_manager->slice_count -= info_.reserved_slices;
-  out_manager->assigned_slice_count -= info_.reserved_slices;
+  out_manager->max_virtual_slice =
+      safemath::ClampSub(out_manager->max_virtual_slice, info_.reserved_slices);
+  out_manager->slice_count = safemath::ClampSub(out_manager->slice_count, info_.reserved_slices);
+  out_manager->assigned_slice_count =
+      safemath::ClampSub(out_manager->assigned_slice_count, info_.reserved_slices);
 
-  out_volume->partition_slice_count -= info_.reserved_slices;
-  if (out_volume->slice_limit)
-    out_volume->slice_limit -= info_.reserved_slices;
-
+  out_volume->partition_slice_count =
+      safemath::ClampSub(out_volume->partition_slice_count, info_.reserved_slices);
+  if (out_volume->slice_limit) {
+    out_volume->slice_limit = safemath::ClampSub(out_volume->slice_limit, info_.reserved_slices);
+  }
   return ZX_OK;
 }
 

@@ -60,7 +60,7 @@ pub async fn find_partition_in(
     timeout: Duration,
 ) -> Result<String, Error> {
     async {
-        let mut watcher = Watcher::new(&dir).await.context("making watcher")?;
+        let mut watcher = Watcher::new(dir).await.context("making watcher")?;
         while let Some(message) = watcher.next().await {
             let message = message.context("watcher channel returned error")?;
             match message.event {

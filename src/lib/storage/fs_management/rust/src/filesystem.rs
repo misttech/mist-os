@@ -59,6 +59,10 @@ impl Filesystem {
         self.config.as_ref()
     }
 
+    pub fn into_config(self) -> Box<dyn FSConfig> {
+        self.config
+    }
+
     /// Creates a new `Filesystem`.
     pub fn new<FSC: FSConfig + 'static>(
         block_device: fidl_fuchsia_device::ControllerProxy,
@@ -77,6 +81,18 @@ impl Filesystem {
             block_device.into_channel().into();
         let controller = controller.into_proxy()?;
         Ok(Self::new(controller, config))
+    }
+
+    /// Creates a new `Filesystem`. Takes a boxed config.
+    pub fn from_block_device_boxed_config(
+        block_device: ClientEnd<fidl_fuchsia_hardware_block::BlockMarker>,
+        config: Box<dyn FSConfig>,
+    ) -> Result<Self, Error> {
+        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+        let controller: ClientEnd<fidl_fuchsia_device::ControllerMarker> =
+            block_device.into_channel().into();
+        let controller = controller.into_proxy()?;
+        Ok(Self { config, block_device: controller, component: None })
     }
 
     /// If the filesystem is a currently running component, returns its (relative) moniker.

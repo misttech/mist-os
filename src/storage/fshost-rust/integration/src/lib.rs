@@ -125,6 +125,20 @@ impl TestFixtureBuilder {
         builder
             .add_route(
                 Route::new()
+                    .capability(
+                        Capability::directory("dev-class")
+                            .rights(fio::R_STAR_DIR)
+                            .subdir("block")
+                            .as_("dev-class-block"),
+                    )
+                    .from(&drivers)
+                    .to(Ref::parent()),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
                     .capability(Capability::protocol::<fprocess::LauncherMarker>())
                     .capability(Capability::protocol::<flogger::LogSinkMarker>())
                     .from(Ref::parent())

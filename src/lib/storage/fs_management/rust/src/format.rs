@@ -5,7 +5,7 @@
 pub mod constants;
 
 use {
-    anyhow::{ensure, Context as _, Error},
+    anyhow::{anyhow, ensure, Context as _, Error},
     fidl_fuchsia_hardware_block::BlockProxy,
     fuchsia_zircon::{self as zx, HandleBased as _},
 };
@@ -76,8 +76,9 @@ impl From<&str> for DiskFormat {
     }
 }
 
-pub fn round_up(val: u64, divisor: u64) -> u64 {
-    ((val + (divisor - 1)) / divisor) * divisor
+pub fn round_up(val: u64, divisor: u64) -> Option<u64> {
+    // Checked version of ((val + (divisor - 1)) / divisor) * divisor
+    ((val.checked_add(divisor.checked_sub(1)?)?).checked_div(divisor)?).checked_mul(divisor)
 }
 
 pub async fn detect_disk_format(block_proxy: &BlockProxy) -> DiskFormat {
@@ -99,19 +100,28 @@ async fn detect_disk_format_res(block_proxy: &BlockProxy) -> Result<DiskFormat, 
         .context("get_info call failed")?;
     ensure!(block_info.block_size > 0, "block size expected to be non-zero");
 
-    let header_size = if constants::HEADER_SIZE > 2 * block_info.block_size {
+    let double_block_size = (block_info.block_size)
+        .checked_mul(2)
+        .ok_or_else(|| anyhow!("overflow calculating double block size"))?;
+
+    let header_size = if constants::HEADER_SIZE > double_block_size {
         constants::HEADER_SIZE
     } else {
-        2 * block_info.block_size
+        double_block_size
     };
 
-    if header_size as u64 > block_info.block_size as u64 * block_info.block_count {
+    let device_size = (block_info.block_size as u64)
+        .checked_mul(block_info.block_count)
+        .ok_or_else(|| anyhow!("overflow calculating device size"))?;
+
+    if header_size as u64 > device_size {
         // The header we want to read is bigger than the actual device. This isn't necessarily an
         // error, but it does mean we can't inspect the content.
         return Ok(DiskFormat::Unknown);
     }
 
-    let buffer_size = round_up(header_size as u64, block_info.block_size as u64);
+    let buffer_size = round_up(header_size as u64, block_info.block_size as u64)
+        .ok_or_else(|| anyhow!("overflow rounding header size up"))?;
     let vmo = zx::Vmo::create(buffer_size).context("failed to create vmo")?;
     let () = block_proxy
         .read_blocks(
