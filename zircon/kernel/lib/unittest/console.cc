@@ -224,9 +224,6 @@ int run_unittests_locked(int argc, const cmd_args* argv, uint32_t flags)
         chosen++;
 
         bool status = run_testcase_in_thread(testcase);
-        if (!status) {
-          break;
-        }
         printf("\n");
         if (status) {
           passed++;
