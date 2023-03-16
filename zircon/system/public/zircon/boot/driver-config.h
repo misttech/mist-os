@@ -69,6 +69,12 @@ typedef uint32_t zbi_kernel_driver_t;
 // 'IMXU'
 #define ZBI_KERNEL_DRIVER_IMX_UART ((zbi_kernel_driver_t)(0x55584d49u))
 
+// 'PLIC'
+#define ZBI_KERNEL_DRIVER_RISCV_PLIC ((zbi_kernel_driver_t)(0x43494C50u))
+
+// 'RTIM'
+#define ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER ((zbi_kernel_driver_t)(0x4D495452u))
+
 // Kernel driver struct that can be used for simple drivers.
 // Used by ZBI_KERNEL_DRIVER_PL011_UART, ZBI_KERNEL_DRIVER_AMLOGIC_UART, and
 // ZBI_KERNEL_DRIVER_I8250_MMIO_UART.
@@ -193,6 +199,19 @@ typedef struct {
   zbi_kernel_driver_generic32_watchdog_flags_t flags;
   uint32_t reserved;
 } zbi_dcfg_generic32_watchdog_t;
+
+// for ZBI_KERNEL_DRIVER_RISCV_PLIC
+typedef struct {
+  uint64_t mmio_phys;
+  uint32_t num_irqs;
+  uint32_t reserved;
+} zbi_dcfg_riscv_plic_driver_t;
+
+// for ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER
+typedef struct {
+  uint32_t freq_hz;
+  uint32_t reserved;
+} zbi_dcfg_riscv_generic_timer_driver_t;
 
 #if defined(__cplusplus)
 }

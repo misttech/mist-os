@@ -58,6 +58,12 @@ type KernelDriver = enum : uint32 {
 
     /// 'IMXU'
     ImxUart = 0x55584d49;
+
+    /// 'PLIC'
+    RiscvPlic = 0x43494C50;
+
+    /// 'RTIM'
+    RiscvGenericTimer = 0x4D495452;
 };
 
 /// Kernel driver struct that can be used for simple drivers.
@@ -182,5 +188,18 @@ type DcfgGeneric32Watchdog = struct {
     /// was left enabled by the bootloader at startup.
     flags KernelDriverGeneric32WatchdogFlags;
 
+    reserved uint32;
+};
+
+/// for ZBI_KERNEL_DRIVER_RISCV_PLIC
+type DcfgRiscvPlicDriver = struct {
+    mmio_phys uint64;
+    num_irqs uint32;
+    reserved uint32;
+};
+
+/// for ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER
+type DcfgRiscvGenericTimerDriver = struct {
+    freq_hz uint32;
     reserved uint32;
 };
