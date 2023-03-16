@@ -74,8 +74,10 @@ std::unique_ptr<BlobInfo> GenerateBlob(const BlobSrcFunction& data_generator,
   info->size_data = data_size;
 
   auto merkle_tree = CreateMerkleTree(info->data.get(), data_size, /*use_compact_format=*/true);
-  snprintf(info->path, sizeof(info->path), "%s/%s", mount_path.c_str(),
-           merkle_tree->root.ToString().c_str());
+  // Ensure we include a path separator if mount_path is specified and does not include one.
+  const bool requires_separator = !mount_path.empty() && *mount_path.cend() != '/';
+  snprintf(info->path, sizeof(info->path), "%s%s%s", mount_path.c_str(),
+           requires_separator ? "/" : "", merkle_tree->root.ToString().c_str());
 
   return info;
 }

@@ -34,7 +34,7 @@ class HealthCheckServiceTest : public testing::Test {
   void InstallBlob(const BlobInfo& info) {
     auto root = OpenRoot();
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info.path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info.path, 0, &file), ZX_OK);
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info.size_data), ZX_OK);
     ASSERT_EQ(file->Write(info.data.get(), info.size_data, 0, &out_actual), ZX_OK);
@@ -49,7 +49,7 @@ class HealthCheckServiceTest : public testing::Test {
     {
       auto root = OpenRoot();
       fbl::RefPtr<fs::Vnode> file;
-      ASSERT_EQ(root->Lookup(info.path + 1, &file), ZX_OK);
+      ASSERT_EQ(root->Lookup(info.path, &file), ZX_OK);
       auto blob = fbl::RefPtr<Blob>::Downcast(file);
       block = setup_.blobfs()->GetNode(blob->Ino())->extents[0].Start() +
               DataStartBlock(setup_.blobfs()->Info());
@@ -117,7 +117,7 @@ TEST_F(HealthCheckServiceTest, PopulatedFilesystemPassesChecks) {
     InstallBlob(*info);
 
     auto& file = files.emplace_back();
-    EXPECT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+    EXPECT_EQ(root->Lookup(info->path, &file), ZX_OK);
     EXPECT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
   }
 
@@ -138,7 +138,7 @@ TEST_F(HealthCheckServiceTest, NullBlobPassesChecks) {
 
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+  ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
   ASSERT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
 
   fidl::WireSyncClient<fuv::BlobfsVerifier> client = Client();
@@ -157,7 +157,7 @@ TEST_F(HealthCheckServiceTest, InvalidFileFailsChecks) {
 
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+  ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
   ASSERT_EQ(file->OpenValidating(fs::VnodeConnectionOptions(), nullptr), ZX_OK);
 
   fidl::WireSyncClient<fuv::BlobfsVerifier> client = Client();

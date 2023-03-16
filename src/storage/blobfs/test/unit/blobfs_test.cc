@@ -188,7 +188,6 @@ TEST_F(BlobfsTest, TrimsData) {
   fs::Vnode* root_node = root.get();
 
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 1024);
-  memmove(info->path, info->path + 1, strlen(info->path));  // Remove leading slash.
 
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);
@@ -238,7 +237,7 @@ TEST_F(BlobfsTestWithLargeDevice, WritingBlobLargerThanWritebackCapacitySucceeds
   std::unique_ptr<BlobInfo> info =
       GenerateRealisticBlob("", (blobfs()->WriteBufferBlockCount() + 1) * kBlobfsBlockSize);
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root_node->Create(info->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);
   auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
   EXPECT_EQ(blob->Truncate(info->size_data), ZX_OK);
   size_t actual;
@@ -255,7 +254,7 @@ TEST_F(BlobfsTestWithLargeDevice, WritingBlobLargerThanWritebackCapacitySucceeds
   EXPECT_EQ(blob->Close(), ZX_OK);
   blob.reset();
 
-  ASSERT_EQ(root_node->Lookup(info->path + 1, &file), ZX_OK);
+  ASSERT_EQ(root_node->Lookup(info->path, &file), ZX_OK);
   TestScopedVnodeOpen open(file);  // File must be open to read from it.
 
   auto buffer = std::make_unique<uint8_t[]>(info->size_data);
@@ -282,14 +281,14 @@ TEST_F(FsckAtEndOfEveryTransactionTest, FsckAtEndOfEveryTransaction) {
   std::unique_ptr<BlobInfo> info = GenerateRealisticBlob("", 500123);
   {
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root_node->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     size_t actual;
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &actual), ZX_OK);
     EXPECT_EQ(actual, info->size_data);
     EXPECT_EQ(file->Close(), ZX_OK);
   }
-  EXPECT_EQ(root_node->Unlink(info->path + 1, false), ZX_OK);
+  EXPECT_EQ(root_node->Unlink(info->path, false), ZX_OK);
 
   blobfs()->Sync([loop = &loop()](zx_status_t) { loop->Quit(); });
   loop().Run();
@@ -315,7 +314,6 @@ void VnodeSync(fs::Vnode* vnode) {
 
 std::unique_ptr<BlobInfo> CreateBlob(const fbl::RefPtr<fs::Vnode>& root, size_t size) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", size);
-  memmove(info->path, info->path + 1, strlen(info->path));  // Remove leading slash.
 
   fbl::RefPtr<fs::Vnode> file;
   EXPECT_EQ(root->Create(info->path, 0, &file), ZX_OK);

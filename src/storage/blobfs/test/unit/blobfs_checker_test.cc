@@ -67,7 +67,6 @@ class BlobfsCheckerTest : public testing::Test {
   void AddRandomBlob(fs::Vnode& node, size_t size = 1024, uint64_t* block_out = nullptr,
                      uint64_t* size_out = nullptr, std::string* name_out = nullptr) {
     std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", size);
-    memmove(info->path, info->path + 1, strlen(info->path));  // Remove leading slash.
 
     fbl::RefPtr<fs::Vnode> file;
     ASSERT_EQ(node.Create(info->path, 0, &file), ZX_OK);

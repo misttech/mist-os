@@ -31,7 +31,6 @@ uint64_t GetSucceededFlushCalls(block_client::FakeBlockDevice* device) {
 TEST_F(SyncFdioTest, Sync) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
 
-  memmove(info->path, info->path + 1, strlen(info->path));  // Remove leading slash.
   int file = openat(root_fd(), info->path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   EXPECT_TRUE(file >= 1);
 
@@ -79,7 +78,6 @@ TEST(SyncNandTest, Sync) {
 
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
 
-  memmove(info->path, info->path + 1, strlen(info->path));  // Remove leading slash.
   auto snapshot = std::make_unique<uint8_t[]>(kVmoSize);
 
   {

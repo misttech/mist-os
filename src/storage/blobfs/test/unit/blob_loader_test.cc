@@ -87,7 +87,6 @@ class BlobLoaderTest : public TestWithParam<TestParamType> {
     fs::Vnode* root_node = root.get();
 
     std::unique_ptr<BlobInfo> info = GenerateRealisticBlob("", sz);
-    memmove(info->path, info->path + 1, strlen(info->path));  // Remove leading slash.
 
     fbl::RefPtr<fs::Vnode> file;
     EXPECT_EQ(root_node->Create(info->path, 0, &file), ZX_OK);

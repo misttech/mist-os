@@ -121,7 +121,6 @@ TEST_P(BlobTest, SyncBehavior) {
   auto root = OpenRoot();
 
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
-  memmove(info->path, info->path + 1, strlen(info->path));  // Remove leading slash.
 
   fbl::RefPtr<fs::Vnode> file;
   ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
@@ -166,7 +165,7 @@ TEST_P(BlobTest, ReadingBlobZerosTail) {
   {
     auto root = OpenRoot();
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     size_t out_actual = 0;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -203,7 +202,7 @@ TEST_P(BlobTest, ReadingBlobZerosTail) {
 
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+  ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
 
   TestScopedVnodeOpen open(file);  // Must be open to read or get the Vmo.
 
@@ -248,7 +247,7 @@ TEST_P(BlobTest, WriteBlobWithSharedBlockInCompactFormat) {
     }
     fbl::RefPtr<fs::Vnode> file;
     auto root = OpenRoot();
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     size_t out_actual = 0;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -262,7 +261,7 @@ TEST_P(BlobTest, WriteBlobWithSharedBlockInCompactFormat) {
   {
     fbl::RefPtr<fs::Vnode> file;
     auto root = OpenRoot();
-    ASSERT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+    ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
 
     TestScopedVnodeOpen open(file);  // Must be open to read.
     size_t actual;
@@ -278,7 +277,7 @@ TEST_P(BlobTest, WriteErrorsAreFused) {
       GenerateRandomBlob("", static_cast<size_t>(kTestDeviceBlockSize) * kTestDeviceNumBlocks);
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
   uint64_t out_actual;
   EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_ERR_NO_SPACE);
@@ -287,7 +286,7 @@ TEST_P(BlobTest, WriteErrorsAreFused) {
 
   // Whilst we have the failed file still open, we should be able to try again immediately.
   fbl::RefPtr<fs::Vnode> file2;
-  ASSERT_EQ(root->Create(info->path + 1, 0, &file2), ZX_OK);
+  ASSERT_EQ(root->Create(info->path, 0, &file2), ZX_OK);
   ASSERT_EQ(file2->Truncate(info->size_data), ZX_OK);
 }
 
@@ -298,7 +297,7 @@ TEST_P(BlobTest, UnlinkBlocksUntilNoVmoChildren) {
   // Write the blob
   {
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -310,7 +309,7 @@ TEST_P(BlobTest, UnlinkBlocksUntilNoVmoChildren) {
   zx::vmo vmo = [&]() {
     fbl::RefPtr<fs::Vnode> file;
     // Lookup doesn't call Open, so no need to Close later.
-    EXPECT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+    EXPECT_EQ(root->Lookup(info->path, &file), ZX_OK);
 
     // Open the blob, get the vmo, and close the blob.
     TestScopedVnodeOpen open(file);
@@ -324,7 +323,7 @@ TEST_P(BlobTest, UnlinkBlocksUntilNoVmoChildren) {
     return vmo;
   }();
 
-  ASSERT_EQ(root->Unlink(info->path + 1, /* must_be_dir=*/false), ZX_OK);
+  ASSERT_EQ(root->Unlink(info->path, /* must_be_dir=*/false), ZX_OK);
   uint8_t buf[8192];
   for (size_t off = 0; off < 1 << 16; off += kBlobfsBlockSize) {
     EXPECT_EQ(vmo.read(buf, off, kBlobfsBlockSize), ZX_OK);
@@ -338,7 +337,7 @@ TEST_P(BlobTest, VmoChildDeletedTriggersPurging) {
   // Write the blob
   {
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -350,7 +349,7 @@ TEST_P(BlobTest, VmoChildDeletedTriggersPurging) {
   zx::vmo vmo = [&]() {
     fbl::RefPtr<fs::Vnode> file;
     // Lookup doesn't call Open, so no need to Close later.
-    EXPECT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+    EXPECT_EQ(root->Lookup(info->path, &file), ZX_OK);
     zx::vmo vmo;
 
     // Open the blob, get the vmo, and close the blob.
@@ -364,7 +363,7 @@ TEST_P(BlobTest, VmoChildDeletedTriggersPurging) {
     return vmo;
   }();
 
-  ASSERT_EQ(root->Unlink(info->path + 1, /* must_be_dir=*/false), ZX_OK);
+  ASSERT_EQ(root->Unlink(info->path, /* must_be_dir=*/false), ZX_OK);
 
   // Delete the VMO. This should eventually trigger deletion of the blob.
   vmo.reset();
@@ -377,7 +376,7 @@ TEST_P(BlobTest, VmoChildDeletedTriggersPurging) {
     loop().RunUntilIdle();
 
     fbl::RefPtr<fs::Vnode> file;
-    zx_status_t status = root->Lookup(info->path + 1, &file);
+    zx_status_t status = root->Lookup(info->path, &file);
     if (status == ZX_ERR_NOT_FOUND) {
       deleted = true;
       break;
@@ -397,7 +396,7 @@ TEST_P(BlobTest, ReadErrorsTemporary) {
   // Write the blob
   {
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     size_t out_actual = 0;
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -409,7 +408,7 @@ TEST_P(BlobTest, ReadErrorsTemporary) {
   zx::vmo vmo = [&]() {
     fbl::RefPtr<fs::Vnode> file;
     // Lookup doesn't call Open, so no need to Close later.
-    EXPECT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+    EXPECT_EQ(root->Lookup(info->path, &file), ZX_OK);
     zx::vmo vmo;
 
     // Open the blob, get the vmo, and close the blob.
@@ -454,12 +453,12 @@ std::string GetVmoName(const zx::vmo& vmo) {
 TEST_P(BlobTest, VmoNameActiveWhileFdOpen) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
   auto root = OpenRoot();
-  const std::string active_name = std::string("blob-").append(std::string_view(info->path + 1, 8));
+  const std::string active_name = std::string("blob-").append(std::string_view(info->path, 8));
   const std::string inactive_name =
-      std::string("inactive-blob-").append(std::string_view(info->path + 1, 8));
+      std::string("inactive-blob-").append(std::string_view(info->path, 8));
 
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
   size_t out_actual = 0;
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
   ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -489,12 +488,12 @@ TEST_P(BlobTest, VmoNameActiveWhileFdOpen) {
 TEST_P(BlobTest, VmoNameActiveWhileVmoClonesExist) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 64);
   auto root = OpenRoot();
-  const std::string active_name = std::string("blob-").append(std::string_view(info->path + 1, 8));
+  const std::string active_name = std::string("blob-").append(std::string_view(info->path, 8));
   const std::string inactive_name =
-      std::string("inactive-blob-").append(std::string_view(info->path + 1, 8));
+      std::string("inactive-blob-").append(std::string_view(info->path, 8));
 
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
   size_t out_actual = 0;
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
   ASSERT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -544,7 +543,7 @@ TEST_P(BlobTest, GetAttributes) {
     auto root = OpenRoot();
 
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
 
     size_t out_actual;
@@ -564,7 +563,7 @@ TEST_P(BlobTest, GetAttributes) {
 
   auto root = OpenRoot();
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+  ASSERT_EQ(root->Lookup(info->path, &file), ZX_OK);
   fs::VnodeAttributes attributes;
   ASSERT_EQ(file->GetAttributes(&attributes), ZX_OK);
   check_attributes(attributes);
@@ -575,7 +574,7 @@ TEST_P(BlobTest, AppendSetsOutEndCorrectly) {
   auto root = OpenRoot();
 
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
 
   size_t out_end;
@@ -594,7 +593,7 @@ TEST_P(BlobTest, WritesToArbitraryOffsetsFails) {
   auto root = OpenRoot();
 
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
   ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
 
   size_t out_actual;
@@ -612,7 +611,7 @@ TEST_P(BlobTest, WrittenBlobsArePagedOutWhenClosed) {
   auto root = OpenRoot();
   {
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     size_t out_actual = 0;
     EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
     EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &out_actual), ZX_OK);
@@ -629,13 +628,13 @@ TEST_P(BlobTest, WrittenBlobsArePagedOutWhenClosed) {
 
   fbl::RefPtr<fs::Vnode> file;
   // Lookup doesn't call Open, so no need to Close later.
-  EXPECT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+  EXPECT_EQ(root->Lookup(info->path, &file), ZX_OK);
   auto blob = fbl::RefPtr<Blob>::Downcast(std::move(file));
 
   // Unfortunately, the name of the blob is the best signal that we have for whether it's pageable
   // or not.
   const std::string inactive_name =
-      std::string("inactive-blob-").append(std::string_view(info->path + 1, 8));
+      std::string("inactive-blob-").append(std::string_view(info->path, 8));
   EXPECT_EQ(GetVmoName(GetPagedVmo(*blob)), inactive_name) << "VMO wasn't inactive";
 }
 
@@ -651,7 +650,7 @@ TEST_P(BlobTest, WriteBlobChunked) {
   constexpr size_t kWriteLength = 100;
   {
     fbl::RefPtr<fs::Vnode> file;
-    ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+    ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
     ASSERT_EQ(file->Truncate(info->size_data), ZX_OK);
     size_t bytes_written = 0;
     while (bytes_written < info->size_data) {
@@ -668,7 +667,7 @@ TEST_P(BlobTest, WriteBlobChunked) {
 
   fbl::RefPtr<fs::Vnode> file;
   // Lookup doesn't call Open, so no need to Close later.
-  EXPECT_EQ(root->Lookup(info->path + 1, &file), ZX_OK);
+  EXPECT_EQ(root->Lookup(info->path, &file), ZX_OK);
 
   // Open the blob, get the vmo, and close the blob.
   TestScopedVnodeOpen open(file);

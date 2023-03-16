@@ -577,7 +577,7 @@ TEST(AllocatorTest, FreedBlocksAreReservedUntilTransactionCommits) {
   size_t blob_size = setup.blobfs()->Info().data_block_count * kBlobfsBlockSize * 3 / 4;
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob(/*mount_path=*/"", blob_size);
   fbl::RefPtr<fs::Vnode> file;
-  ASSERT_EQ(root->Create(info->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info->path, 0, &file), ZX_OK);
   size_t actual;
   EXPECT_EQ(file->Truncate(info->size_data), ZX_OK);
   EXPECT_EQ(file->Write(info->data.get(), info->size_data, 0, &actual), ZX_OK);
@@ -585,7 +585,7 @@ TEST(AllocatorTest, FreedBlocksAreReservedUntilTransactionCommits) {
 
   // Attempting to create another blob should result in a no-space condition.
   std::unique_ptr<BlobInfo> info2 = GenerateRandomBlob("", blob_size);
-  ASSERT_EQ(root->Create(info2->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info2->path, 0, &file), ZX_OK);
   EXPECT_EQ(file->Truncate(info2->size_data), ZX_OK);
   EXPECT_EQ(file->Write(info2->data.get(), info2->size_data, 0, &actual), ZX_ERR_NO_SPACE);
   EXPECT_EQ(file->Close(), ZX_OK);
@@ -594,7 +594,7 @@ TEST(AllocatorTest, FreedBlocksAreReservedUntilTransactionCommits) {
   device_ref.Pause();
 
   // Unlink the blob we just created.
-  EXPECT_EQ(root->Unlink(info->path + 1, /*must_be_dir=*/false), ZX_OK);
+  EXPECT_EQ(root->Unlink(info->path, /*must_be_dir=*/false), ZX_OK);
 
   std::atomic<bool> done(false);
 
@@ -606,7 +606,7 @@ TEST(AllocatorTest, FreedBlocksAreReservedUntilTransactionCommits) {
     device_ref.Resume();
   });
 
-  ASSERT_EQ(root->Create(info2->path + 1, 0, &file), ZX_OK);
+  ASSERT_EQ(root->Create(info2->path, 0, &file), ZX_OK);
   EXPECT_EQ(file->Truncate(info2->size_data), ZX_OK);
   EXPECT_EQ(file->Write(info2->data.get(), info2->size_data, 0, &actual), ZX_OK);
   EXPECT_EQ(file->Close(), ZX_OK);

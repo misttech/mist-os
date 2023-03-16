@@ -234,7 +234,7 @@ class BlobfsTestFixture : public testing::Test {
         "", data_size);
 
     fbl::RefPtr<fs::Vnode> file;
-    zx_status_t status = root_->Create(blob_info->path + 1, 0, &file);
+    zx_status_t status = root_->Create(blob_info->path, 0, &file);
     EXPECT_EQ(status, ZX_OK) << "Could not create file";
     if (status != ZX_OK) {
       return nullptr;

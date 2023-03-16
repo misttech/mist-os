@@ -84,8 +84,8 @@ namespace {
 TEST_F(OfflineCompressionDisabledTest, CreationFails) {
   std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", kTestBlobSize);
   auto root = OpenRoot();
-  // Remove leading path component.
-  const std::string merkle_root = std::string(info->path + 1);
+
+  const std::string merkle_root = std::string(info->path);
   const std::string compressed_path = merkle_root + blobfs::kChunkedFileExtension;
   fbl::RefPtr<fs::Vnode> file;
   // Ensure creation fails since we mounted Blobfs with offline compression disabled.
@@ -105,8 +105,8 @@ TEST_P(OfflineCompressionTest, WritePreCompressedBlob) {
   ASSERT_EQ(compressor.End(), ZX_OK);
 
   auto root = OpenRoot();
-  // Remove leading path component.
-  const std::string merkle_root = std::string(info->path + 1);
+
+  const std::string merkle_root = std::string(info->path);
   const std::string compressed_path = merkle_root + blobfs::kChunkedFileExtension;
 
   fbl::RefPtr<fs::Vnode> file;
