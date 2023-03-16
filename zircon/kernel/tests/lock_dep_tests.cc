@@ -1230,14 +1230,142 @@ UNITTEST_END_TESTCASE(lock_dep_tests, "lock_dep_tests", "lock_dep_tests")
 #endif
 
 #if WITH_LOCK_DEP
+
+// The test outline, and test states.
+//
+// The overall goal of this test is to engineer the following situation.
+//
+// 1) A thread T is inside of a spinlock X, with interrupts disabled.
+// 2) Before dropping X, an IRQ becomes pending for the CPU which T is running
+//    on.
+// 3) T drops the lock and re-enables interrupts, then immediately ends up in an
+//    IRQ which also wants to obtain X.
+//
+// When bug 84827 was still around, what would happen is that T would drop the
+// lock and re-enable interrupts _before_ updating its lockdep bookkeeping to
+// indicate that X was no longer owned by T.  When IRQs are re-enabled, and the
+// IRQ handler attempts to obtain X, it thinks that we are still holding X, and
+// it complains.
+//
+// Setting up this situation actually involves a bit of work, and needs to be
+// done very carefully in order to prevent deadlock.  Basically, before the test
+// can start, we need to set up a situation where there are two threads running
+// on two different CPUs, each with interrupts disabled.  The "primary" CPU
+// should be holding X, and the secondary CPU should post an IPI to the primary
+// which causes the primary CPU to attempt to obtain X as soon as CPUs are
+// re-enabled.
+//
+// The main test is pretty easy.  The primary enters the lock and sets a
+// variable indicating it is ready for the test to start, then starts to wait
+// for the secondary to tell it to go.  The secondary waits until the primary is
+// ready, then sends it a task via mp_sync_exec (which sends an IPI).  The task
+// will be run at IRQ time as soon as interrupts are re-enabled, and will cause
+// the primary to bounce through the lock.  Finally, the secondary sets the
+// state variable telling the primary to go, and then unwinds.
+//
+// See the notes in the test (below) for details of how we set up the initial
+// situation without accidentally deadlocking (also, see fxb/119371)
+//
 static bool bug_84827_regression_test() {
   BEGIN_TEST;
 
   cpu_mask_t online_cpus = mp_get_online_mask();
   ASSERT_GE(ktl::popcount(online_cpus), 2, "Must have at least 2 CPUs online");
 
+  // See above for an outline of the overall test.  The comments here are meant
+  // to describe the deadlock hazard, and how we avoid it.
+  //
+  // === The Hazard ===
+  //
+  // On x64, any time we need to update the PTEs to invalidate a TLB entry, we
+  // need to make sure that all CPUs in the system take note of the
+  // invalidation, and invalidate any entries in their CPU specific caches
+  // before the invalidation operation can finish.
+  //
+  // When this "TLB-shootdown" needs to take place at IRQ time (usually during a
+  // page-fault handler), we end up with a CPU with IRQs off which needs to send
+  // a task to all other CPUs (via an IPI signal), and then spin (with IRQs off)
+  // before it can finish the fault handler.
+  //
+  // Given the setup of the main test (above), if we have the primary CPU
+  // sitting with interrupts off waiting for the secondary to signal it, but the
+  // CPU the secondary is running on takes a page fault and ends up waiting for
+  // all other CPUs to acknowledge the TLB-shootdown, we end up deadlocking.
+  // The secondary CPU can't tell the primary to go because the shootdown is
+  // happening.  The shootdown cannot finish, because the primary is waiting
+  // with interrupts off for the secondary to tell it to go.
+  //
+  // === Avoiding the Hazard ===
+  //
+  // What we want is to have both threads ready to start the main test, but with
+  // interrupts off ensuring that the test will run to completion even if a page
+  // fault happens and a synchronous TLB shootdown needs to take place.  Here is
+  // the sequence we use.
+  //
+  // The main test thread starts by picks a CPU and takes on the role of the
+  // secondary, setting affinity for and migrating to the CPU it chose (CPU-S).
+  // It then creates a thread to become the secondary which will (as soon as it
+  // starts) set affinity for the primary CPU (CPU-P).
+  //
+  // The primary now does the following:
+  //
+  // 1) Enters the lock, disabling interrupts in the process.
+  // 2) Sets the state to WaitingForSecondaryReady.  Now the secondary can tell
+  //    that the primary has started, is running on the proper CPU, has interrupts
+  //    off, and is ready to start the test.
+  // 3) Now it spin waits for the secondary to declare that it is ready by
+  //    setting the state to SecondaryIsReady.
+  // 4) If a small amount of time has passed, and the secondary is still not
+  //    ready, the primary will back up.  Specifically it will:
+  // 4.1) CMPX the state variable, expecting WaitingForSecondaryReady, and
+  //      attempting to exchange for WaitingForThreadStart.
+  // 4.2) If the CMPX succeeds, then it can drop the lock (allowing any pending
+  //      IRQs to be processed), re-enter the lock, then goto 2, starting the
+  //      process over again.
+  // 4.3) If the CMPX fails, then the secondary must have made it to the
+  //      check-in point and observed that we are also ready.  We can simply
+  //      proceed to #5.
+  // 5) The primary is now ready to start the test.
+  //
+  // Meanwhile, the secondary is doing the following.
+  //
+  // 1) Start by shutting off interrupts.
+  // 2) Attempt to CMPX the state variable, exchanging WaitingForSecondaryReady
+  //    for SecondaryIsReady.
+  // 2.1) If this succeeds, the test is ready to start and we can we can proceed
+  //      to #3.
+  // 2.2) If the CMPX fails, it must be because the primary has either not
+  //      started, or it has rolled the state back.
+  // 2.3) So, we check to see if we have been waiting for a while, and if so, we
+  //      re-enable interrupts, allowing IRQs to be processed, then we goto #1
+  //      and start again.
+  // 2.4) If we have not timed out, we simply goto #2, starting the check again.
+  // 3) The main test is now ready to start.
+  //
+  // Overall, if either thread gets stuck with interrupts off waiting for its
+  // partner to show up, it will eventually re-enable interrupts (potentially
+  // rolling the state machine back in the process) allowing any TLB shootdowns
+  // to finish before starting its cycle again.
+  //
+  // One final note.  We don't _technically_ need to disable interrupts on the
+  // secondary CPU.  It should be sufficient to simply disable preemption.
+  // This, however, assumes that it is not possible for the kernel to ever take
+  // any interrupt while preemption is disabled which would require an IPI which
+  // synchronizes with the primary CPU.
+  //
+  // At the time that this comment was written, the only known potential cause
+  // of this would have been a page fault taken on x64 from a user-mode process.
+  // The kernel should never be taking any page faults in this context.  That
+  // said, if (someday) this assumption becomes invalid, or if there is _any_
+  // other reason that the secondary CPU might take a interrupt which requires
+  // synchronization with the primary, it could cause problems.  Since this is
+  // not production code, we choose to take the future-proofed option and simply
+  // shut interrupts off instead.
+  //
   enum class TestState : uint32_t {
     WaitingForThreadStart,
+    WaitingForSecondaryReady,
+    SecondaryIsReady,
     ThreadWaitingInLock,
     IPIHasBeenQueued,
   };
@@ -1269,6 +1397,7 @@ static bool bug_84827_regression_test() {
 
   // Start up our work thread.  It will migrate to our first chosen core and
   // then signal us via the test args state.
+  constexpr zx_duration_t kDropLockTimeout = ZX_USEC(100);
   Thread* work_thread = Thread::Create(
       "bug_84827_test_thread",
       [](void* ctx) -> int {
@@ -1277,10 +1406,47 @@ static bool bug_84827_regression_test() {
         // Migrate to our chosen cpu.
         Thread::Current::Get()->SetCpuAffinity(args.first_cpu_mask);
 
-        // Enter the lock and signal that we are in the waiting-in-lock state.  Then
-        // wait until the main thread signals to us that it has queued the IPI.
-        {
+        // Enter the lock (disabling interrupts) and signal that we are waiting
+        // for our secondary buddy to join us.
+        zx_time_t deadline = current_time() + kDropLockTimeout;
+        {  // Scope for our lock
           Guard<SpinLock, IrqSave> guard(&args.lock);
+          args.state.store(TestState::WaitingForSecondaryReady);
+
+          // Spin waiting for the signal from our secondary.
+          while (args.state.load() != TestState::SecondaryIsReady) {
+            // If the deadline has been exceeded, attempt to back up the state
+            // machine.
+            if (current_time() >= deadline) {
+              TestState expected = TestState::WaitingForSecondaryReady;
+
+              // Try to exchange WaitingForSecondaryReady for
+              // WaitingForThreadStart.
+              if (args.state.compare_exchange_strong(expected, TestState::WaitingForThreadStart)) {
+                // We succeeded in backing up the state machine.  Drop the lock
+                // briefly, and let any pending interrupts take place.
+                guard.CallUnlocked([]() { arch::Yield(); });
+                DEBUG_ASSERT(args.state.load() == TestState::WaitingForThreadStart);
+
+                // Now advance the state machine back to waiting for secondary,
+                // reset our deadline, and go back to waiting for the secondary
+                // to join us.
+                args.state.store(TestState::WaitingForSecondaryReady);
+                deadline = current_time() + kDropLockTimeout;
+              } else {
+                // The CMPX succeeded!  We must be in the SecondaryIsReady state
+                // at this point.  Break out of our loop so we can start the
+                // test.
+                DEBUG_ASSERT(expected == TestState::SecondaryIsReady);
+                break;
+              }
+            }
+          }
+
+          // Advance to the WaitingInLock state, signaling to the secondary that
+          // the main test has started.  Then wait until the secondary tells us
+          // that an IPI has been queued so we can drop the lock and conclude
+          // the test.
           args.state.store(TestState::ThreadWaitingInLock);
           while (args.state.load() != TestState::IPIHasBeenQueued) {
             // empty body, just spin.
@@ -1299,53 +1465,77 @@ static bool bug_84827_regression_test() {
     work_thread = nullptr;
   });
 
-  // Wait until we know that our work_thread is in the waiting state.
-  while (args.state.load() != TestState::ThreadWaitingInLock) {
-    Thread::Current::SleepRelative(ZX_USEC(100));
-  }
+  // Start by turning off interrupts and joining up with our primary buddy.
+  {  // Explicit scope for the RAII guard.
+    InterruptDisableGuard irqd;
+    zx_time_t deadline = current_time() + kDropLockTimeout;
 
-  // OK, our work thread is now inside of the test spinlock and spinning,
-  // waiting for us to release it by setting the test state variable to
-  // IPIHasBeenQueued.
-  //
-  // We now schedule a small lambda to run at IRQ time on both our core, as well
-  // as the core the work_thread is on, using mp_sync_exec.
-  //
-  // What should happen here is that the task sent to the work_thread will become
-  // pending, but not able to run because the thread we just started is spinning
-  // in the spinlock.  _After_ this task has been queued and the IPI sent, the
-  // local core will run its copy of the task.  Note that this is currently a
-  // side effect of the behavior of mp_sync_exec, but one that we depend on.
-  // The order is important here.
-  //
-  // The local core will spin for just a little bit (to make absolutely sure
-  // that the IPI has been registered with the other core) and then release the
-  // work thread by changing the state variable.
-  //
-  // When the work thread eventually drops the lock, the IPI should immediately
-  // fire and cause the thread to re-obtain the lock again.  If the lockdep
-  // bookkeeping has not been cleared at this point in time, it will appear to
-  // the lockdep code that our thread is re-entering a lock it is already
-  // holding (even though the lock has already been dropped) triggering an OOPS.
-  mp_sync_exec(
-      MP_IPI_TARGET_MASK, args.first_cpu_mask | args.second_cpu_mask,
-      [](void* ctx) {
-        TestArgs& args = *(reinterpret_cast<TestArgs*>(ctx));
+    while (true) {
+      // Try to advance from WaitingForSecondaryReady to SecondaryIsReady.  If
+      // this succeeds, we can break out of the loop and start the main test.
+      TestState expected = TestState::WaitingForSecondaryReady;
+      if (args.state.compare_exchange_strong(expected, TestState::SecondaryIsReady)) {
+        break;
+      }
 
-        if (args.first_cpu_mask == Thread::Current::Get()->GetCpuAffinity()) {
-          bool prev_state = arch_blocking_disallowed();
-          arch_set_blocking_disallowed(false);
-          { Guard<SpinLock, IrqSave> guard(&args.lock); }
-          arch_set_blocking_disallowed(prev_state);
-        } else {
-          zx_time_t spin_deadline = current_time() + ZX_USEC(10);
-          while (current_time() < spin_deadline) {
-            // empty body, just spin.
+      // We have exceeded our deadline waiting for our primary.  Re-enable
+      // interrupts briefly, allowing any pending IRQs to take place.  Then shut
+      // them off again, reset our deadline, and go back to waiting.
+      if (current_time() >= deadline) {
+        arch_disable_ints();
+        arch::Yield();
+        arch_enable_ints();
+        deadline = current_time() + kDropLockTimeout;
+      }
+    }
+
+    // Wait until we know that our work_thread is in the waiting state.
+    while (args.state.load() != TestState::ThreadWaitingInLock) {
+    }
+
+    // OK, our work thread is now inside of the test spinlock and spinning,
+    // waiting for us to release it by setting the test state variable to
+    // IPIHasBeenQueued.
+    //
+    // We now schedule a small lambda to run at IRQ time on both our core, as well
+    // as the core the work_thread is on, using mp_sync_exec.
+    //
+    // What should happen here is that the task sent to the work_thread will become
+    // pending, but not able to run because the thread we just started is spinning
+    // in the spinlock.  _After_ this task has been queued and the IPI sent, the
+    // local core will run its copy of the task.  Note that this is currently a
+    // side effect of the behavior of mp_sync_exec, but one that we depend on.
+    // The order is important here.
+    //
+    // The local core will spin for just a little bit (to make absolutely sure
+    // that the IPI has been registered with the other core) and then release the
+    // work thread by changing the state variable.
+    //
+    // When the work thread eventually drops the lock, the IPI should immediately
+    // fire and cause the thread to re-obtain the lock again.  If the lockdep
+    // bookkeeping has not been cleared at this point in time, it will appear to
+    // the lockdep code that our thread is re-entering a lock it is already
+    // holding (even though the lock has already been dropped) triggering an OOPS.
+    mp_sync_exec(
+        MP_IPI_TARGET_MASK, args.first_cpu_mask | args.second_cpu_mask,
+        [](void* ctx) {
+          TestArgs& args = *(reinterpret_cast<TestArgs*>(ctx));
+
+          if (args.first_cpu_mask == Thread::Current::Get()->GetCpuAffinity()) {
+            bool prev_state = arch_blocking_disallowed();
+            arch_set_blocking_disallowed(false);
+            { Guard<SpinLock, IrqSave> guard(&args.lock); }
+            arch_set_blocking_disallowed(prev_state);
+          } else {
+            zx_time_t spin_deadline = current_time() + ZX_USEC(10);
+            while (current_time() < spin_deadline) {
+              // empty body, just spin.
+            }
+            args.state.store(TestState::IPIHasBeenQueued);
           }
-          args.state.store(TestState::IPIHasBeenQueued);
-        }
-      },
-      &args);
+        },
+        &args);
+  }
 
   END_TEST;
 }
