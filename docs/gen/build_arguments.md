@@ -5846,7 +5846,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:305
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:312
 
 ### pw_arduino_build_BOARD
 
