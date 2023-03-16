@@ -534,10 +534,7 @@ TEST_F(AmlG12TdmDaiTest, RingBufferOperations) {
     ASSERT_OK(ring_buffer.WatchDelayInfo(&delay_info));
 
     EXPECT_FALSE(delay_info.has_external_delay());
-    // Based on FIFO depth = 1024 and
-    // PCM format = frame size of 4 bytes (256 frames per fifo) and frame rate 8'000.
-    // Hence a delay 256 / 8kHz = 32 msecs.
-    EXPECT_EQ(delay_info.internal_delay(), 32'000'000);
+    EXPECT_EQ(delay_info.internal_delay(), 0);
   }
 
   // GetVmo then loose channel.

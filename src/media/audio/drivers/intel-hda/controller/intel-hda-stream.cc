@@ -211,10 +211,7 @@ zx_status_t IntelHDAStream::SetStreamFormat(async_dispatcher_t* dispatcher, uint
     return ZX_ERR_INVALID_ARGS;
   }
 
-  uint32_t driver_transfer_frames =
-      (driver_transfer_bytes_ + bytes_per_frame_ - 1) / bytes_per_frame_;
-  internal_delay_nsec_ = static_cast<uint64_t>(driver_transfer_frames) * 1'000'000'000 /
-                         static_cast<uint64_t>(StreamFormat(encoded_fmt).sample_rate());
+  internal_delay_nsec_ = 0;  // No internal delay known, so we report 0.
 
   return ZX_OK;
 }

@@ -402,10 +402,7 @@ void SimpleAudioStream::CreateRingBuffer(
     return;
   }
 
-  uint32_t driver_transfer_frames =
-      (driver_transfer_bytes_ + bytes_per_frame - 1) / bytes_per_frame;
-  internal_delay_nsec_ = static_cast<uint64_t>(driver_transfer_frames) * 1'000'000'000 /
-                         static_cast<uint64_t>(pcm_format.frame_rate);
+  internal_delay_nsec_ = 0;  // No internal delay known, so we report 0.
 
   number_of_channels_.Set(pcm_format.number_of_channels);
   frame_rate_.Set(pcm_format.frame_rate);

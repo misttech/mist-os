@@ -651,8 +651,7 @@ TEST_F(UsbAudioTest, DelayInfo) {
 
     auto delay_info = fidl::WireCall<audio_fidl::RingBuffer>(local)->WatchDelayInfo();
     ASSERT_OK(delay_info.status());
-    // Internal delay of = 6 (MAX_OUTSTANDING_REQ) x 1 msecs per request.
-    ASSERT_EQ(delay_info.value().delay_info.internal_delay(), zx::msec(6).to_nsecs());
+    ASSERT_EQ(delay_info.value().delay_info.internal_delay(), 0);
     ASSERT_FALSE(delay_info.value().delay_info.has_external_delay());
   }
 }

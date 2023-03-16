@@ -1244,10 +1244,7 @@ TEST_F(SimpleAudioTest, WatchDelays) {
   ASSERT_OK(rb.status());
   auto delay_info = fidl::WireCall(local)->WatchDelayInfo();
   ASSERT_OK(delay_info.status());
-  // Based on MockSimpleAudio::kTestDriverTransferBytes = 16 and
-  // GetDefaultPcmFormat() = frame size of 4 bytes (4 frames per fifo) and frame rate 48'000;
-  // Hence a delay 4 / 48'000 = 83 usecs.
-  ASSERT_EQ(delay_info->delay_info.internal_delay(), 83'333);
+  ASSERT_EQ(delay_info->delay_info.internal_delay(), 0);
   ASSERT_EQ(delay_info->delay_info.external_delay(), MockSimpleAudio::kTestExternalDelay);
 
   loop_.Shutdown();
