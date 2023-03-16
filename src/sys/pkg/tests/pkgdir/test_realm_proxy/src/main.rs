@@ -162,7 +162,7 @@ impl realm_proxy::service::RealmProxy for PkgdirTestRealmProxy {
         server_end: zx::Channel,
     ) -> Result<(), OperationError> {
         if protocol != "fuchsia.io.Directory" {
-            error!("this puppet only serves the fuchsia.io.Directory protocol");
+            error!("this test realm proxy only serves the fuchsia.io.Directory protocol");
             return Err(OperationError::Unsupported);
         }
         self.directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into()).map_err(|e| {
