@@ -166,8 +166,18 @@ class Device : public DeviceType {
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol* interface) {}
 
+  zx_status_t DisplayControllerImplImportBufferCollection(
+      uint64_t collection_id, zx::channel collection_token) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  zx_status_t DisplayControllerImplReleaseBufferCollection(
+      uint64_t collection_id) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   zx_status_t DisplayControllerImplImportImage(
-      image_t* image, zx_unowned_handle_t sysmem_handle, uint32_t index) {
+      image_t* image, uint64_t collection_id, uint32_t index) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -191,7 +201,7 @@ class Device : public DeviceType {
   }
 
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
-      const image_t* config, uint32_t collection) {
+      const image_t* config, uint64_t collection_id) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
