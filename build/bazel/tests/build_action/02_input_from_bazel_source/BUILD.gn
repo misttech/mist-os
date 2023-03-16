@@ -9,9 +9,7 @@ import("//build/bazel/bazel_inputs.gni")
 
 bazel_action("test") {
   command = "build"
-  bazel_targets = [
-    "//build/bazel/tests/build_action/02_input_from_bazel_source:copy_source",
-  ]
-  bazel_outputs = [ "bazel-bin/build/bazel/tests/build_action/02_input_from_bazel_source/foo.out.txt" ]
+  bazel_targets = [ ":copy_source" ]
+  bazel_outputs = [ "{{BAZEL_TARGET_OUT_DIR}}/foo.out.txt" ]
   ninja_outputs = [ "foo.ninja.out" ]
 }

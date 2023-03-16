@@ -15,10 +15,8 @@ bazel_input_resource("bazel_input") {
 
 bazel_action("test") {
   command = "build"
-  bazel_targets = [
-    "//build/bazel/tests/build_action/01_input_resource_from_source:copy_input",
-  ]
   bazel_inputs = [ ":bazel_input" ]
-  bazel_outputs = [ "bazel-bin/build/bazel/tests/build_action/01_input_resource_from_source/foo.out.txt" ]
+  bazel_targets = [ ":copy_input" ]
+  bazel_outputs = [ "{{BAZEL_TARGET_OUT_DIR}}/foo.out.txt" ]
   ninja_outputs = [ "foo.ninja.out" ]
 }

@@ -14,16 +14,14 @@ _gn_x64_partitions_config_target = "//boards/partitions:x64"
 verify_partitions_configuration("x64") {
   testonly = true
   gn_partitions_config_target = _gn_x64_partitions_config_target
-  bazel_partitions_config_target =
-      "//build/bazel/assembly/partitions_configurations:x64"
+  bazel_partitions_config_target = ":x64"
   bazel_inputs = [ "//build/images/flash:esp.bazel_input" ]
 }
 
 verify_partitions_configuration("qemu-x64") {
   testonly = true
   gn_partitions_config_target = "//boards/partitions:qemu-x64"
-  bazel_partitions_config_target =
-      "//build/bazel/assembly/partitions_configurations:qemu-x64"
+  bazel_partitions_config_target = ":qemu-x64"
 }
 
 group("verifications") {

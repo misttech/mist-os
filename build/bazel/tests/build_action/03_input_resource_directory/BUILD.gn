@@ -37,8 +37,8 @@ bazel_input_resource_directory("bazel_input") {
 
 bazel_action("test") {
   command = "build"
-  bazel_targets = [ "//build/bazel/tests/build_action/03_input_resource_directory:list_directory" ]
+  bazel_targets = [ ":list_directory" ]
   bazel_inputs = [ ":bazel_input" ]
-  bazel_outputs = [ "bazel-bin/build/bazel/tests/build_action/03_input_resource_directory/files.txt" ]
+  bazel_outputs = [ "{{BAZEL_TARGET_OUT_DIR}}/files.txt" ]
   ninja_outputs = [ "ninja.files.txt" ]
 }

@@ -509,10 +509,7 @@ def main():
         default=[],
         help='List of bazel target patterns.')
     parser.add_argument(
-        '--bazel-outputs',
-        default=[],
-        nargs='*',
-        help='Bazel output paths, relative to bazel-bin/.')
+        '--bazel-outputs', default=[], nargs='*', help='Bazel output paths')
     parser.add_argument(
         '--ninja-outputs',
         default=[],

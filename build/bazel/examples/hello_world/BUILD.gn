@@ -7,7 +7,7 @@ import("//build/bazel/bazel_action.gni")
 bazel_action("hello_world") {
   testonly = true
   command = "build"
-  bazel_targets = [ "//build/bazel/examples/hello_world" ]
-  bazel_outputs = [ "bazel-bin/build/bazel/examples/hello_world/hello_world" ]
+  bazel_targets = [ ":hello_world" ]
+  bazel_outputs = [ "{{BAZEL_TARGET_OUT_DIR}}/hello_world" ]
   ninja_outputs = [ "hello_world" ]
 }

@@ -153,18 +153,11 @@ template("bazel_assembled_system") {
       _bazel_image_name = invoker.bazel_assembly_image_name
     }
 
-    # Bazel assembly places the outputs of building //some/path:some_target into
-    # the `bazel-bin/some/path/some_target_out/` directory, Compute that path
-    # relative to bazel-bin/ here.
-    _bazel_assembly_out_dir =
-        rebase_path(get_label_info(invoker.bazel_assembly_target, "dir"), "//")
-    _bazel_assembly_out_dir +=
-        "/" + get_label_info(invoker.bazel_assembly_target, "name") + "_out"
-
     bazel_outputs = []
     ninja_outputs = []
     foreach(_out, _assembly_outputs) {
-      bazel_outputs += [ "bazel-bin/${_bazel_assembly_out_dir}/${_out}" ]
+      bazel_outputs +=
+          [ "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/${_out}" ]
       ninja_outputs += [ "${_bazel_image_name}/${_out}" ]
     }
   }

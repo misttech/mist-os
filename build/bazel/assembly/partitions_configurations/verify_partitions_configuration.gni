@@ -46,12 +46,6 @@ template("verify_partitions_configuration") {
   _bazel_partitions_config_target = "${target_name}.bazel_partitions_config"
   _bazel_partitions_config_file = "${target_name}/bazel_partitions_config.json"
 
-  _bazel_partitions_config_out_dir =
-      rebase_path(get_label_info(invoker.bazel_partitions_config_target, "dir"),
-                  "//")
-  _bazel_partitions_config_name =
-      get_label_info(invoker.bazel_partitions_config_target, "name")
-
   bazel_action(_bazel_partitions_config_target) {
     forward_variables_from(invoker,
                            [
@@ -62,8 +56,7 @@ template("verify_partitions_configuration") {
     visibility = [ ":${invoker.target_name}" ]
     command = "build"
     bazel_targets = [ invoker.bazel_partitions_config_target ]
-
-    bazel_outputs = [ "bazel-bin/${_bazel_partitions_config_out_dir}/${_bazel_partitions_config_name}_partitions.json" ]
+    bazel_outputs = [ "{{BAZEL_TARGET_OUT_PATH}}_partitions.json" ]
     ninja_outputs = [ _bazel_partitions_config_file ]
   }
 

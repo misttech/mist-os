@@ -47,15 +47,10 @@ template("bazel_fuchsia_package") {
   if (defined(invoker.bazel_target)) {
     bazel_target = invoker.bazel_target
   } else {
-    bazel_target = get_label_info(":$target_name", "label_no_toolchain")
+    bazel_target = ":$target_name"
   }
 
-  # We need the `.far` file, but building the package outputs it in `bazel-out/`
-  # which is an unpredictable path.
-  # Instead, build the `.publish` target and read the runfiles of the
-  # `.publish.sh` script under `bazel-bin/`.
-  # See: fxbug.dev/115699#c4
-  bazel_target += ".publish"
+  # bazel_output_prefix = get_label_info(bazel_target, "name")
 
   if (defined(invoker.package_name)) {
     package_name = invoker.package_name
@@ -74,13 +69,14 @@ template("bazel_fuchsia_package") {
                              "visibility",
                            ])
     command = "build"
-    bazel_targets = [ bazel_target ]
-    _bazel_target_dir = rebase_path(get_label_info(bazel_target, "dir"), "//")
 
-    # Read the `.far` from the runfiles of the `.publish.sh` output
-    # under `bazel-bin/`.
+    # We need the `.far` file, but building the package outputs it in `bazel-out/`
+    # which is an unpredictable path.
+    # Instead, build the `.publish` target and read the runfiles of the
+    # `.publish.sh` script under `bazel-bin/`.
     # See: fxbug.dev/115699#c4
-    bazel_outputs = [ "bazel-bin/$_bazel_target_dir/_${invoker.target_name}.publish.sh.runfiles/main/$_bazel_target_dir/$package_name.far" ]
+    bazel_targets = [ bazel_target + ".publish" ]
+    bazel_outputs = [ "{{BAZEL_TARGET_OUT_DIR}}/_{{BAZEL_TARGET_NAME}}.sh.runfiles/main/{{BAZEL_TARGET_PACKAGE}}/$package_name.far" ]
     ninja_outputs = [ "$package_name.far" ]
   }
 
