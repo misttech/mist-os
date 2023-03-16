@@ -361,18 +361,11 @@ template("go_build") {
     }
 
     if (is_fuchsia) {
-      # TODO(phosek): drop -Wl,--pack-dyn-relocs=relr once it's the default in Clang.
-      extldflags = "-Wl,--pack-dyn-relocs=relr"
-
-      # TODO(fxbug.dev/53078): Eventually the default in the compler driver.
-      extldflags += ",-zrel"
-
       # When building with an instrumented variant, ensure the binary embeds a reference
       # to the right dynamic linker path.
       if (toolchain_variant.libprefix != "") {
-        extldflags += ",--dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
+        args += [ "--ldflag=-linkmode=external \"-extldflags=-Wl,--dynamic-linker=${toolchain_variant.libprefix}ld.so.1\"" ]
       }
-      args += [ "--ldflag=-linkmode=external \"-extldflags=$extldflags\"" ]
     }
 
     if (defined(invoker.ldflags)) {
