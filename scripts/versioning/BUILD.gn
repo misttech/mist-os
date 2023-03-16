@@ -35,7 +35,7 @@ group("tests") {
 
 action("bump_api_level") {
   # Generate the golden files and manifest before updating the platform version.
-  deps = [ "//sdk:compatibility_testing_goldens" ]
+  deps = [ "//sdk:compatibility_testing_goldens($target_toolchain)" ]
 
   script = "//scripts/versioning/update_platform_version.py"
 
