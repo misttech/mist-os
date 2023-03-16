@@ -7,7 +7,7 @@ quits.
 This component can be configured by the the following kernel commandline
 options:
 - console.shell
-- console.path
+- console.device_topological_path
 - TERM
 
 Console-launcher should be built and launched automatically in every

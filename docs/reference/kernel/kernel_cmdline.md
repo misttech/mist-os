@@ -380,10 +380,11 @@ the bootloader by passing the UUID of the partition containing the Zircon kernel
 that was booted. Setting this also informs the paver that ABR is supported, and
 that it should update the ABR metadata.
 
-## console.path=\<path>
+## console.device_topological_suffix=\<path>
 
-Specify console device path. If not specified device manager will open
-`/dev/misc/console`. Only has effect if kernel.shell=false.
+If this is set then console launcher will connect to the console device whose topological
+path matches this suffix. If not specified then console launcher will connect to `/svc/console`.
+Only has effect if kernel.shell=false.
 
 # Additional Gigaboot Command Line Options
 

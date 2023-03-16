@@ -398,17 +398,11 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
   if (class_name.has_value()) {
     std::optional proto_dir = devfs_.proto_node(class_name.value());
     if (proto_dir.has_value()) {
-      fbl::String instance_name;
-      // TODO(https://fxbug.dev/119949): Stop using device names in /dev/class/console.
-      if (class_name.value() == "console") {
-        instance_name = name;
-      } else {
-        zx::result seq_name = proto_dir.value().get().seq_name();
-        if (seq_name.is_error()) {
-          return seq_name.status_value();
-        }
-        instance_name = seq_name.value();
+      zx::result seq_name = proto_dir.value().get().seq_name();
+      if (seq_name.is_error()) {
+        return seq_name.status_value();
       }
+      fbl::String instance_name = seq_name.value();
 
       zx::result target_clone = clone_target(target);
       if (target_clone.is_error()) {

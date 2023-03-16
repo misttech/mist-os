@@ -14,7 +14,7 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
   std::map<std::string, std::string> arguments;
   arguments["kernel.shell"] = "false";
   arguments["console.shell"] = "true";
-  arguments["console.path"] = "/test/path";
+  arguments["console.device_topological_suffix"] = "/test/path";
   arguments["TERM"] = "FAKE_TERM";
   arguments["zircon.autorun.boot"] = "/boot/bin/ls+/dev/class/";
   arguments["zircon.autorun.system"] = "/boot/bin/ls+/system";
@@ -31,7 +31,8 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
 
   ASSERT_TRUE(args->run_shell);
   ASSERT_EQ(args->term, "TERM=FAKE_TERM");
-  ASSERT_EQ(args->device.path, "/test/path");
+  ASSERT_TRUE(args->device_topological_suffix.has_value());
+  ASSERT_EQ(args->device_topological_suffix.value(), "/test/path");
   ASSERT_EQ(args->autorun_boot, "/boot/bin/ls+/dev/class/");
   ASSERT_EQ(args->autorun_system, "/boot/bin/ls+/system");
 }
@@ -53,7 +54,8 @@ TEST(SystemInstanceTest, CheckBootArgDefaultStrings) {
 
   ASSERT_FALSE(args->run_shell);
   ASSERT_EQ(args->term, "TERM=uart");
-  ASSERT_EQ(args->device.path, "/svc/console");
+  ASSERT_FALSE(args->device_topological_suffix.has_value(), "%s",
+               args->device_topological_suffix.value().c_str());
   ASSERT_EQ(args->autorun_boot, "");
   ASSERT_EQ(args->autorun_system, "");
 }

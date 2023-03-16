@@ -96,7 +96,7 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
 
   fidl::StringView vars[]{
       "TERM",
-      "console.path",
+      "console.device_topological_suffix",
       "zircon.autorun.boot",
       "zircon.autorun.system",
   };
@@ -110,16 +110,16 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
   if (resp->values[0].is_null()) {
     ret.term += "uart";
   } else {
-    ret.term += std::string{resp->values[0].data(), resp->values[0].size()};
+    ret.term += resp->values[0].get();
   }
   if (!resp->values[1].is_null()) {
-    ret.device.path = std::string{resp->values[1].data(), resp->values[1].size()};
+    ret.device_topological_suffix.emplace(resp->values[1].get());
   }
   if (!resp->values[2].is_null()) {
-    ret.autorun_boot = std::string{resp->values[2].data(), resp->values[2].size()};
+    ret.autorun_boot = resp->values[2].get();
   }
   if (!resp->values[3].is_null()) {
-    ret.autorun_system = std::string{resp->values[3].data(), resp->values[3].size()};
+    ret.autorun_system = resp->values[3].get();
   }
 
   return zx::ok(ret);

@@ -20,17 +20,15 @@
 
 namespace console_launcher {
 
-struct Device {
-  std::string path = "/svc/console";
-};
-
 struct Arguments {
   bool run_shell = true;
   bool virtcon_disable = false;
   std::string autorun_boot;
   std::string autorun_system;
 
-  Device device;
+  // If this has a value, search for a PTY device with the given topological suffix.
+  // Otherwise, connect to /svc/console.
+  std::optional<std::string> device_topological_suffix;
   std::string term = "TERM=";
   bool virtual_console_need_debuglog = false;
 };
