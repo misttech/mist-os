@@ -1712,17 +1712,88 @@ impl Command {
     }
 }
 
-/// The state of a given ref count (strong of weak).
+/// The state of a given reference count for an object (strong or weak).
 #[derive(Debug, Default, PartialEq, Eq)]
-enum ClientRefState {
+enum ObjectReferenceCount {
     /// The client is considered to have no reference count.
     #[default]
     NoRef,
     /// The client has been send an increase to its reference count, but didn't yet acknowledge it.
-    WaitingAck,
+    /// The parameter is the actual reference count.
+    WaitingAck(usize),
     /// The client did notified that it took into account an increase of the reference count, and
     /// has not been send a decrease since.
-    HasRef,
+    /// The parameter is the actual reference count.
+    HasRef(usize),
+}
+
+impl ObjectReferenceCount {
+    fn has_ref(&self) -> bool {
+        *self != ObjectReferenceCount::NoRef
+    }
+
+    fn count(&self) -> usize {
+        match self {
+            Self::NoRef => 0,
+            Self::WaitingAck(x) | Self::HasRef(x) => *x,
+        }
+    }
+
+    /// Increment the reference count of the object. Returns whether this object is now awaiting an
+    /// acknowledgement.
+    fn inc(&mut self) -> bool {
+        match self {
+            Self::NoRef => {
+                *self = Self::WaitingAck(1);
+                true
+            }
+            Self::WaitingAck(ref mut x) | Self::HasRef(ref mut x) => {
+                *x += 1;
+                false
+            }
+        }
+    }
+
+    /// Decrements the reference count of the object.
+    fn dec(&mut self) -> Result<(), Errno> {
+        match self {
+            Self::NoRef => error!(EINVAL),
+            Self::WaitingAck(ref mut x) | Self::HasRef(ref mut x) => {
+                if *x == 0 {
+                    error!(EINVAL)
+                } else {
+                    *x -= 1;
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    /// Acknowledge a client ack for a rerence count increase.
+    fn ack(&mut self) -> Result<(), Errno> {
+        match self {
+            Self::WaitingAck(x) => {
+                *self = Self::HasRef(*x);
+                Ok(())
+            }
+            _ => error!(EINVAL),
+        }
+    }
+
+    /// Returns whether this reference count is waiting an acknowledgement for an increase.
+    fn is_waiting_ack(&self) -> bool {
+        matches!(self, ObjectReferenceCount::WaitingAck(_))
+    }
+
+    /// Reset the state to NoRef if the current reference count is 0. Returns true if it happened.
+    fn try_release(&mut self) -> bool {
+        if *self == ObjectReferenceCount::HasRef(0) {
+            *self = ObjectReferenceCount::NoRef;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// Mutable state of a [`BinderObject`], mainly for handling the ordering guarantees of oneway
@@ -1738,25 +1809,11 @@ struct BinderObjectMutableState {
     /// the buffer associated with the last oneway transaction.
     handling_oneway_transaction: bool,
 
-    /// The number of weak references to this `BinderObject`.
-    weak_count: usize,
+    /// The weak reference count of this object.
+    weak_count: ObjectReferenceCount,
 
-    /// The number of strong references to this `BinderObject`.
-    strong_count: usize,
-
-    /// Whether a `BR_INCREFS` has been sent to the owner, and the `BC_INCREFS_DONE` has not been
-    /// received yet.
-    /// When this is the case, no `BR_INCREFS` or `BR_DECREFS` are sent to the owner. Instead, a
-    /// BR_DECREFS will be sent to the owner when receiving the `BC_INCREFS_DONE` if the reference
-    /// count dropped to zero while waiting.
-    weak_client_state: ClientRefState,
-
-    /// Whether a `BR_ACQUIRE` has been sent to the owner, and the `BC_ACQUIRE_DONE` has not been
-    /// received yet.
-    /// When this is the case, no `BR_ACQUIRE` or `BR_RELEASE` are sent to the owner. Instead, a
-    /// BR_RELEASE will be sent to the owner when receiving the `BC_ACQUIRE_DONE` if the reference
-    /// count dropped to zero while waiting.
-    strong_client_state: ClientRefState,
+    /// The strong reference count of this object.
+    strong_count: ObjectReferenceCount,
 }
 
 /// A binder object, which is owned by a process. Process-local unique memory addresses identify it
@@ -1796,7 +1853,7 @@ impl BinderObject {
             local,
             flags,
             state: Mutex::new(BinderObjectMutableState {
-                strong_client_state: ClientRefState::WaitingAck,
+                strong_count: ObjectReferenceCount::WaitingAck(0),
                 ..Default::default()
             }),
         })
@@ -1818,7 +1875,7 @@ impl BinderObject {
 
     /// Returns whether the object has any strong reference.
     fn has_strong(&self) -> bool {
-        self.state.lock().strong_count > 0
+        self.state.lock().strong_count.count() > 0
     }
 
     /// Returns whether the object has any reference, or is waiting for an acknowledgement from the
@@ -1826,18 +1883,14 @@ impl BinderObject {
     /// true.
     fn has_ref(&self) -> bool {
         let state = self.state.lock();
-        state.weak_client_state != ClientRefState::NoRef
-            || state.strong_client_state != ClientRefState::NoRef
+        state.weak_count.has_ref() || state.strong_count.has_ref()
     }
 
     /// Increments the strong reference count of the binder object.
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        let mut state = self.state.lock();
-        state.strong_count += 1;
-        if state.strong_count == 1 && state.strong_client_state == ClientRefState::NoRef {
-            state.strong_client_state = ClientRefState::WaitingAck;
+        if self.state.lock().strong_count.inc() {
             Ok(vec![RefCountAction::Acquire(self.clone())])
         } else {
             Ok(vec![])
@@ -1848,10 +1901,7 @@ impl BinderObject {
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        let mut state = self.state.lock();
-        state.weak_count += 1;
-        if state.weak_count == 1 && state.weak_client_state == ClientRefState::NoRef {
-            state.weak_client_state = ClientRefState::WaitingAck;
+        if self.state.lock().weak_count.inc() {
             Ok(vec![RefCountAction::IncRefs(self.clone())])
         } else {
             Ok(vec![])
@@ -1863,10 +1913,7 @@ impl BinderObject {
     /// `BinderProcess`.
     fn dec_strong(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
-        if state.strong_count == 0 {
-            return error!(EINVAL);
-        }
-        state.strong_count -= 1;
+        state.strong_count.dec()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
 
@@ -1875,10 +1922,7 @@ impl BinderObject {
     /// `BinderProcess`.
     fn dec_weak(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
-        if state.weak_count == 0 {
-            return error!(EINVAL);
-        }
-        state.weak_count -= 1;
+        state.weak_count.dec()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
 
@@ -1887,10 +1931,7 @@ impl BinderObject {
     /// `BinderProcess`.
     fn ack_acquire(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
-        if state.strong_client_state != ClientRefState::WaitingAck {
-            return error!(EINVAL);
-        }
-        state.strong_client_state = ClientRefState::HasRef;
+        state.strong_count.ack()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
 
@@ -1899,10 +1940,7 @@ impl BinderObject {
     /// `BinderProcess`.
     fn ack_incref(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
         let mut state = self.state.lock();
-        if state.weak_client_state != ClientRefState::WaitingAck {
-            return error!(EINVAL);
-        }
-        state.weak_client_state = ClientRefState::HasRef;
+        state.weak_count.ack()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
 
@@ -1917,25 +1955,15 @@ impl BinderObject {
     ) -> Vec<RefCountAction> {
         let mut result = vec![];
         // No decrease action are sent when waiting for any acknowledgement.
-        if state.strong_client_state == ClientRefState::WaitingAck
-            || state.weak_client_state == ClientRefState::WaitingAck
-        {
+        if state.strong_count.is_waiting_ack() || state.weak_count.is_waiting_ack() {
             return result;
         }
-        // If the current ref count is not 0, the state should consider the client has a
-        // reference.
-        debug_assert!(
-            state.strong_count == 0 || state.strong_client_state == ClientRefState::HasRef
-        );
-        debug_assert!(state.weak_count == 0 || state.weak_client_state == ClientRefState::HasRef);
         // If the current ref count is 0, and the client has a reference, notify the client that
         // it can release its reference.
-        if state.strong_count == 0 && state.strong_client_state == ClientRefState::HasRef {
-            state.strong_client_state = ClientRefState::NoRef;
+        if state.strong_count.try_release() {
             result.push(RefCountAction::Release(self.clone()));
         }
-        if state.weak_count == 0 && state.weak_client_state == ClientRefState::HasRef {
-            state.weak_client_state = ClientRefState::NoRef;
+        if state.weak_count.try_release() {
             result.push(RefCountAction::DecRefs(self.clone()));
         }
         result
