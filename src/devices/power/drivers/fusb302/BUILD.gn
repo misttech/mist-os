@@ -40,6 +40,7 @@ fuchsia_driver("fusb302-driver") {
   sources = [
     "fusb302-identity.cc",
     "fusb302.cc",
+    "registers.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
     "usb-pd-message-type.cc",
@@ -71,6 +72,7 @@ test("fusb302-test-bin") {
     "fusb302-test.cc",
     "fusb302.cc",
     "registers-test.cc",
+    "registers.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
     "usb-pd-message-test.cc",

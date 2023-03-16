@@ -4,6 +4,7 @@
 
 #include "src/devices/power/drivers/fusb302/fusb302.h"
 #include "src/devices/power/drivers/fusb302/registers.h"
+#include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
 
 namespace fusb302 {
 
@@ -283,9 +284,9 @@ zx_status_t StateMachine::RunState(Event event, std::shared_ptr<PdMessage> messa
 
       // set msg header
       status = Switches1Reg::ReadFrom(device()->i2c_)
-                   .set_power_role(device()->power_role_.get())
-                   .set_data_role(device()->data_role_.get())
-                   .set_spec_rev(device()->spec_rev_.get())
+                   .set_power_role(static_cast<usb_pd::PowerRole>(device()->power_role_.get()))
+                   .set_data_role(static_cast<usb_pd::DataRole>(device()->data_role_.get()))
+                   .set_spec_rev(static_cast<usb_pd::SpecRevision>(device()->spec_rev_.get()))
                    .WriteTo(device()->i2c_);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Write failed. %d", status);

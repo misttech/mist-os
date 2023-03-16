@@ -22,6 +22,8 @@
 #include <hwreg/bitfields.h>
 #include <hwreg/i2c.h>
 
+#include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
+
 // We reason about the FUSB302B behavior using the functional breakdown
 // described here. Some of the functional units here are outlined in the Rev 5
 // datasheet (Figure 3 page 2), and the rest are inferred.
@@ -173,8 +175,46 @@ class DeviceIdReg : public Fusb302Register<DeviceIdReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<DeviceIdReg>(0x01); }
 };
 
+// Mutually exclusive configurations of the switch blocks attached to CC pins.
+//
+// Rev 5 datasheet: Figure 6 "Configuration Channel Switch Functionality" on
+// page 6, Figure 3 "Functional Block Diagram" on page 3, Table 10 "Type-C CC
+// Switch" on page 15.
+enum class SwitchBlockConfig : int8_t {
+  // The CC pin is floating.
+  kOpen,
+
+  // The CC pin is connected to a <= 2.18V (VUFPDB) current source.
+  //
+  // The current source is used to advertise the power source capability,
+  // following typec2.2 4.5.1.2.1 "Detecting a Valid Source-to-Sink Connection".
+  //
+  // The current source is configured by the HOST_CUR field in the
+  // `Control0Reg` register.
+  kPullUp,
+
+  // The CC pin is connected to the ground via a 5.1 Ohm (RDEVICE) resistor.
+  //
+  // The pull-down resistor value follows Table 4-27 "Sink CC Termination (Rd)
+  // Requirements" in typec2.2 4.11.1 "Termination Parameters".
+  kPullDown,
+
+  // The CC pin is connected to the VCONN source. Powers cable electronics.
+  kConnectorVoltage,
+};
+
+// Descriptor for logging and debugging.
+const char* SwitchBlockConfigToString(SwitchBlockConfig config);
+
+// SWITCHES0 - Controls most CC (Configuration Channel) circuit switches.
+//
+// After reset, both CC pins will be connected to pull-down resistors, and none
+// of them will be connected to the measure block.
+//
+// Rev 5 datasheet: Table 18 on page 20
 class Switches0Reg : public Fusb302Register<Switches0Reg> {
  public:
+  // Read/written by {Set}SwitchBlockConfigFor() and {Set}MeasureConfigChannelPinSwitch().
   DEF_BIT(7, pu_en2);
   DEF_BIT(6, pu_en1);
   DEF_BIT(5, vconn_cc2);
@@ -184,19 +224,70 @@ class Switches0Reg : public Fusb302Register<Switches0Reg> {
   DEF_BIT(1, pdwn2);
   DEF_BIT(0, pdwn1);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Switches0Reg>(SWITCHES0_ADDR); }
+  SwitchBlockConfig SwitchBlockConfigFor(usb_pd::ConfigChannelPinId cc_pin_id) const;
+  Switches0Reg& SetSwitchBlockConfig(usb_pd::ConfigChannelPinId cc_pin_id,
+                                     SwitchBlockConfig connection);
+
+  usb_pd::ConfigChannelPinSwitch MeasureBlockInput() const;
+  Switches0Reg& SetMeasureBlockInput(usb_pd::ConfigChannelPinSwitch input);
+
+  static auto Get() { return hwreg::I2cRegisterAddr<Switches0Reg>(0x02); }
 };
 
+// SWITCHES1 - Configures the BMC PHY.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// After reset, the GoodCRC header bits will be set to (Sink, PD Rev 2.0, UFP).
+//
+// Rev 5 datasheet: Table 19 on page 20, Figure 12 "USB BMC Power Delivery
+// Blocks" on page 11, Figure 3 "Functional Block Diagram" on page 3
 class Switches1Reg : public Fusb302Register<Switches1Reg> {
  public:
-  DEF_BIT(7, power_role);
-  DEF_FIELD(6, 5, spec_rev);
-  DEF_BIT(4, data_role);
+  // The "Port Power Role" bit in the header of auto-generated GoodCRC messages.
+  //
+  // The datasheet values match the values in usbpd3.1 6.2.1.1.4 "Port Power
+  // Role".
+  DEF_ENUM_FIELD(usb_pd::PowerRole, 7, 7, power_role);
+
+  // The "Spec Revision" bits in the header of auto-generated GoodCRC messages.
+  //
+  // The datasheet values match the values in usbpd3.1 6.2.1.1.5 "Specification
+  // Revision". While the Rev 5 datasheet marks 0b10 (Revision 3.0) as "Do Not
+  // Use", experiments with a FUSB302BMPX did not encounter any issue using the
+  // Revision 3.0 value.
+  DEF_ENUM_FIELD(usb_pd::SpecRevision, 6, 5, spec_rev);
+
+  // The "Port Data Role" bit in the header of auto-generated GoodCRC messages.
+  //
+  // The datasheet values are intended to match the values in usbpd3.1 6.2.1.1.6
+  // "Port Data Role". The datasheet conflates the power roles Sink/Source with
+  // the data roles UFP/DFP.
+  DEF_ENUM_FIELD(usb_pd::DataRole, 4, 4, data_role);
+
+  // If true, the PD Protocol Layer generates and sends GoodCRC messages.
+  //
+  // This bit enables the hardware implementation of usbpd3.1 6.3.1 "GoodCRC
+  // Message".
+  //
+  // Delegating GoodCRC generation to the hardware relieves the application
+  // processor from having to react to every USB PD message in 195 us (tTransmit
+  // in usbpd3.1). On the flip side, having the PD Protocol Layer acknowledge
+  // all received messages leads to tighter timing requirements in some cases.
+  // For example, a Sink has 5 seconds (tNoResponse) to generate a Request in
+  // response to a Source_Capabilities, but that time is cut down to 30
+  // milliseconds (tSenderResponse) after the Sink sends GoodCRC.
   DEF_BIT(2, auto_crc);
+
+  // Read/written by {Set}BmcPhyConnection().
   DEF_BIT(1, txcc2);
   DEF_BIT(0, txcc1);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Switches1Reg>(SWITCHES1_ADDR); }
+  usb_pd::ConfigChannelPinSwitch BmcPhyConnection() const;
+  Switches1Reg& SetBmcPhyConnection(usb_pd::ConfigChannelPinSwitch connection);
+
+  static auto Get() { return hwreg::I2cRegisterAddr<Switches1Reg>(0x03); }
 };
 
 class MeasureReg : public Fusb302Register<MeasureReg> {
@@ -468,6 +559,86 @@ inline const char* DeviceIdReg::ProductString() const {
       "FUSB302B11MPX",
   };
   return kVersionBProductIds[product_id()];
+}
+
+inline SwitchBlockConfig Switches0Reg::SwitchBlockConfigFor(
+    usb_pd::ConfigChannelPinId cc_pin_id) const {
+  switch (cc_pin_id) {
+    case usb_pd::ConfigChannelPinId::kCc1: {
+      if (pdwn1()) {
+        return SwitchBlockConfig::kPullDown;
+      }
+      if (vconn_cc1()) {
+        return SwitchBlockConfig::kConnectorVoltage;
+      }
+      if (pu_en1()) {
+        return SwitchBlockConfig::kPullUp;
+      }
+      return SwitchBlockConfig::kOpen;
+    };
+    case usb_pd::ConfigChannelPinId::kCc2: {
+      if (pdwn2()) {
+        return SwitchBlockConfig::kPullDown;
+      }
+      if (vconn_cc2()) {
+        return SwitchBlockConfig::kConnectorVoltage;
+      }
+      if (pu_en2()) {
+        return SwitchBlockConfig::kPullUp;
+      }
+      return SwitchBlockConfig::kOpen;
+    };
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid CC pin ID: %" PRIu8, cc_pin_id);
+}
+
+inline Switches0Reg& Switches0Reg::SetSwitchBlockConfig(usb_pd::ConfigChannelPinId cc_pin_id,
+                                                        SwitchBlockConfig connection) {
+  switch (cc_pin_id) {
+    case usb_pd::ConfigChannelPinId::kCc1: {
+      return set_pdwn1(connection == SwitchBlockConfig::kPullDown)
+          .set_vconn_cc1(connection == SwitchBlockConfig::kConnectorVoltage)
+          .set_pu_en1(connection == SwitchBlockConfig::kPullUp);
+    };
+    case usb_pd::ConfigChannelPinId::kCc2: {
+      return set_pdwn2(connection == SwitchBlockConfig::kPullDown)
+          .set_vconn_cc2(connection == SwitchBlockConfig::kConnectorVoltage)
+          .set_pu_en2(connection == SwitchBlockConfig::kPullUp);
+      break;
+    };
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid CC pin ID: %" PRIu8, cc_pin_id);
+  return *this;
+}
+
+inline usb_pd::ConfigChannelPinSwitch Switches0Reg::MeasureBlockInput() const {
+  if (meas_cc1()) {
+    return usb_pd::ConfigChannelPinSwitch::kCc1;
+  }
+  if (meas_cc2()) {
+    return usb_pd::ConfigChannelPinSwitch::kCc2;
+  }
+  return usb_pd::ConfigChannelPinSwitch::kNone;
+}
+
+inline Switches0Reg& Switches0Reg::SetMeasureBlockInput(usb_pd::ConfigChannelPinSwitch input) {
+  return set_meas_cc1(input == usb_pd::ConfigChannelPinSwitch::kCc1)
+      .set_meas_cc2(input == usb_pd::ConfigChannelPinSwitch::kCc2);
+}
+
+inline usb_pd::ConfigChannelPinSwitch Switches1Reg::BmcPhyConnection() const {
+  if (txcc1()) {
+    return usb_pd::ConfigChannelPinSwitch::kCc1;
+  }
+  if (txcc2()) {
+    return usb_pd::ConfigChannelPinSwitch::kCc2;
+  }
+  return usb_pd::ConfigChannelPinSwitch::kNone;
+}
+
+inline Switches1Reg& Switches1Reg::SetBmcPhyConnection(usb_pd::ConfigChannelPinSwitch connection) {
+  return set_txcc1(connection == usb_pd::ConfigChannelPinSwitch::kCc1)
+      .set_txcc2(connection == usb_pd::ConfigChannelPinSwitch::kCc2);
 }
 
 }  // namespace fusb302

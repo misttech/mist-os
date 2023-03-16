@@ -57,6 +57,116 @@ TEST(DeviceIdRegTest, ProductString) {
   EXPECT_STREQ("FUSB302B01MPX", f302b01mpx_device_id.ProductString());
 }
 
+TEST(Switches0RegTest, SwitchBlockConfigForCC1) {
+  auto switches0 = Switches0Reg::Get().FromValue(0);
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc1,
+                                                  SwitchBlockConfig::kOpen);
+  EXPECT_EQ(false, switches0.pdwn1());
+  EXPECT_EQ(false, switches0.vconn_cc1());
+  EXPECT_EQ(false, switches0.pu_en1());
+  EXPECT_EQ(SwitchBlockConfig::kOpen,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc1));
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc1,
+                                                  SwitchBlockConfig::kPullDown);
+  EXPECT_EQ(true, switches0.pdwn1());
+  EXPECT_EQ(false, switches0.vconn_cc1());
+  EXPECT_EQ(false, switches0.pu_en1());
+  EXPECT_EQ(SwitchBlockConfig::kPullDown,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc1));
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc1,
+                                                  SwitchBlockConfig::kConnectorVoltage);
+  EXPECT_EQ(false, switches0.pdwn1());
+  EXPECT_EQ(true, switches0.vconn_cc1());
+  EXPECT_EQ(false, switches0.pu_en1());
+  EXPECT_EQ(SwitchBlockConfig::kConnectorVoltage,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc1));
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc1,
+                                                  SwitchBlockConfig::kPullUp);
+  EXPECT_EQ(false, switches0.pdwn1());
+  EXPECT_EQ(false, switches0.vconn_cc1());
+  EXPECT_EQ(true, switches0.pu_en1());
+  EXPECT_EQ(SwitchBlockConfig::kPullUp,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc1));
+}
+
+TEST(Switches0RegTest, SwitchBlockConfigForCC2) {
+  auto switches0 = Switches0Reg::Get().FromValue(0);
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc2,
+                                                  SwitchBlockConfig::kOpen);
+  EXPECT_EQ(false, switches0.pdwn2());
+  EXPECT_EQ(false, switches0.vconn_cc2());
+  EXPECT_EQ(false, switches0.pu_en2());
+  EXPECT_EQ(SwitchBlockConfig::kOpen,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc2));
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc2,
+                                                  SwitchBlockConfig::kPullDown);
+  EXPECT_EQ(true, switches0.pdwn2());
+  EXPECT_EQ(false, switches0.vconn_cc2());
+  EXPECT_EQ(false, switches0.pu_en2());
+  EXPECT_EQ(SwitchBlockConfig::kPullDown,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc2));
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc2,
+                                                  SwitchBlockConfig::kConnectorVoltage);
+  EXPECT_EQ(false, switches0.pdwn2());
+  EXPECT_EQ(true, switches0.vconn_cc2());
+  EXPECT_EQ(false, switches0.pu_en2());
+  EXPECT_EQ(SwitchBlockConfig::kConnectorVoltage,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc2));
+
+  switches0.set_reg_value(0).SetSwitchBlockConfig(usb_pd::ConfigChannelPinId::kCc2,
+                                                  SwitchBlockConfig::kPullUp);
+  EXPECT_EQ(false, switches0.pdwn2());
+  EXPECT_EQ(false, switches0.vconn_cc2());
+  EXPECT_EQ(true, switches0.pu_en2());
+  EXPECT_EQ(SwitchBlockConfig::kPullUp,
+            switches0.SwitchBlockConfigFor(usb_pd::ConfigChannelPinId::kCc2));
+}
+
+TEST(Switches0RegTest, MeasureBlockInput) {
+  auto switches0 = Switches0Reg::Get().FromValue(0);
+
+  switches0.set_reg_value(0).SetMeasureBlockInput(usb_pd::ConfigChannelPinSwitch::kNone);
+  EXPECT_EQ(false, switches0.meas_cc1());
+  EXPECT_EQ(false, switches0.meas_cc2());
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kNone, switches0.MeasureBlockInput());
+
+  switches0.set_reg_value(0).SetMeasureBlockInput(usb_pd::ConfigChannelPinSwitch::kCc1);
+  EXPECT_EQ(true, switches0.meas_cc1());
+  EXPECT_EQ(false, switches0.meas_cc2());
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc1, switches0.MeasureBlockInput());
+
+  switches0.set_reg_value(0).SetMeasureBlockInput(usb_pd::ConfigChannelPinSwitch::kCc2);
+  EXPECT_EQ(false, switches0.meas_cc1());
+  EXPECT_EQ(true, switches0.meas_cc2());
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc2, switches0.MeasureBlockInput());
+}
+
+TEST(Switches1RegTest, BmcPhyConnection) {
+  auto switches1 = Switches1Reg::Get().FromValue(0);
+
+  switches1.set_reg_value(0).SetBmcPhyConnection(usb_pd::ConfigChannelPinSwitch::kNone);
+  EXPECT_EQ(false, switches1.txcc1());
+  EXPECT_EQ(false, switches1.txcc2());
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kNone, switches1.BmcPhyConnection());
+
+  switches1.set_reg_value(0).SetBmcPhyConnection(usb_pd::ConfigChannelPinSwitch::kCc1);
+  EXPECT_EQ(true, switches1.txcc1());
+  EXPECT_EQ(false, switches1.txcc2());
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc1, switches1.BmcPhyConnection());
+
+  switches1.set_reg_value(0).SetBmcPhyConnection(usb_pd::ConfigChannelPinSwitch::kCc2);
+  EXPECT_EQ(false, switches1.txcc1());
+  EXPECT_EQ(true, switches1.txcc2());
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc2, switches1.BmcPhyConnection());
+}
+
 class Fusb302RegisterTest : public zxtest::Test {
  public:
   void SetUp() override {
