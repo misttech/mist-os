@@ -3,19 +3,21 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Context, Error},
     fidl::AsHandleRef as _,
     fidl_fuchsia_io as fio,
-    fuchsia_bootfs::BootfsParser,
+    fuchsia_bootfs::{BootfsParser, BootfsParserError},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, HandleBased, Resource},
-    std::convert::TryFrom,
+    std::convert::{From, TryFrom},
     std::mem::replace,
     std::sync::Arc,
+    thiserror::Error,
     tracing::info,
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo,
-        tree_builder::TreeBuilder,
+        directory::entry::DirectoryEntry,
+        execution_scope::ExecutionScope,
+        file::vmo,
+        tree_builder::{self, TreeBuilder},
     },
 };
 
@@ -44,6 +46,36 @@ const BOOTFS_EXECUTABLE_PACKAGE_DIRECTORIES: &[&str] = &["bin", "lib"];
 // Every file in these directories will have ZX_RIGHT_EXECUTE.
 const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "driver", "lib", "test", "blob"];
 
+#[derive(Debug, Error)]
+pub enum BootfsError {
+    #[error("Invalid handle: {handle_type:?}")]
+    InvalidHandle { handle_type: HandleType },
+    #[error("Failed to duplicate handle: {0}")]
+    DuplicateHandle(zx::Status),
+    #[error("Failed to access vmex Resource: {0}")]
+    Vmex(zx::Status),
+    #[error("BootfsParser error: {0}")]
+    Parser(#[from] BootfsParserError),
+    #[error("Failed to add entry to Bootfs VFS: {0}")]
+    AddEntry(#[from] tree_builder::Error),
+    #[error("Failed to locate entry for {name}")]
+    MissingEntry { name: String },
+    #[error("Failed to create an executable VMO: {0}")]
+    ExecVmo(zx::Status),
+    #[error("VMO operation failed: {0}")]
+    Vmo(zx::Status),
+    #[error("Failed to get VMO name: {0}")]
+    VmoName(zx::Status),
+    #[error("Failed to create VMO child at offset {offset}: {err}")]
+    VmoCreateChild { offset: u64, err: zx::Status },
+    #[error("Failed to convert numerical value: {0}")]
+    ConvertNumber(#[from] std::num::TryFromIntError),
+    #[error("Failed to convert string value: {0}")]
+    ConvertString(#[from] std::ffi::IntoStringError),
+    #[error("Failed to bind Bootfs to Component Manager's namespace: {0}")]
+    Namespace(zx::Status),
+}
+
 pub struct BootfsSvc {
     next_inode: u64,
     parser: BootfsParser,
@@ -52,25 +84,25 @@ pub struct BootfsSvc {
 }
 
 impl BootfsSvc {
-    pub fn new() -> Result<Self, Error> {
-        let bootfs_handle = take_startup_handle(HandleType::BootfsVmo.into());
-        let bootfs = Into::<zx::Vmo>::into(bootfs_handle.ok_or_else(|| {
-            anyhow!("Ingesting a bootfs image requires a valid bootfs vmo handle.")
-        })?);
-
+    pub fn new() -> Result<Self, BootfsError> {
+        let bootfs_handle = take_startup_handle(HandleType::BootfsVmo.into())
+            .ok_or(BootfsError::InvalidHandle { handle_type: HandleType::BootfsVmo })?;
+        let bootfs = zx::Vmo::from(bootfs_handle);
         Self::new_internal(bootfs)
     }
 
     // BootfsSvc can be used in hermetic integration tests by providing
     // an arbitrary vmo containing a valid bootfs image.
-    pub fn new_for_test(bootfs: zx::Vmo) -> Result<Self, Error> {
+    pub fn new_for_test(bootfs: zx::Vmo) -> Result<Self, BootfsError> {
         Self::new_internal(bootfs)
     }
 
-    fn new_internal(bootfs: zx::Vmo) -> Result<Self, Error> {
-        let bootfs_dup = bootfs.duplicate_handle(zx::Rights::SAME_RIGHTS)?.into();
+    fn new_internal(bootfs: zx::Vmo) -> Result<Self, BootfsError> {
+        let bootfs_dup = bootfs
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(BootfsError::DuplicateHandle)?
+            .into();
         let parser = BootfsParser::create_from_vmo(bootfs_dup)?;
-
         Ok(Self {
             next_inode: FIRST_INODE_VALUE,
             parser,
@@ -89,23 +121,17 @@ impl BootfsSvc {
         // If the first token is 'pkg', the second token can be anything, with the third
         // token needing to be within the list of allowed executable package directories.
         if path.len() > 2 && path[0] == BOOTFS_PACKAGE_PREFIX {
-            for dir in BOOTFS_EXECUTABLE_PACKAGE_DIRECTORIES.iter() {
-                if path[2] == *dir {
-                    return true;
-                }
+            if BOOTFS_EXECUTABLE_PACKAGE_DIRECTORIES.iter().any(|dir| path[2] == *dir) {
+                return true;
             }
         }
-
         // If the first token is an allowed executable directory, everything beneath it
         // can be marked executable.
         if path.len() > 1 {
-            for dir in BOOTFS_EXECUTABLE_DIRECTORIES.iter() {
-                if path[0] == *dir {
-                    return true;
-                }
+            if BOOTFS_EXECUTABLE_DIRECTORIES.iter().any(|dir| path[0] == *dir) {
+                return true;
             }
         }
-
         false
     }
 
@@ -115,7 +141,7 @@ impl BootfsSvc {
         size: u64,
         executable: bool,
         inode: u64,
-    ) -> Result<Arc<dyn DirectoryEntry>, Error> {
+    ) -> Result<Arc<dyn DirectoryEntry>, BootfsError> {
         // If this is a VMO with execution rights, passing zx::VmoChildOptions::NO_WRITE will
         // allow the child to also inherit execution rights. Without that flag execution
         // rights are stripped, even if the VMO already lacked write permission.
@@ -125,13 +151,7 @@ impl BootfsSvc {
                 offset,
                 size,
             )
-            .with_context(|| {
-                format!(
-                    "Failed to create child VMO region of size {} with offset {}.",
-                    size, offset
-                )
-            })?;
-
+            .map_err(|err| BootfsError::VmoCreateChild { offset, err })?;
         Ok(BootfsSvc::create_dir_entry(child, executable, inode))
     }
 
@@ -145,45 +165,36 @@ impl BootfsSvc {
     /// This is required for configs needed to run the VFS, such as the component manager config
     /// which specifies the number of threads for the executor which the VFS needs to run within.
     /// Path should be relative to '/boot' without a leading forward slash.
-    pub fn read_config_from_uninitialized_vfs(&self, config_path: &str) -> Result<Vec<u8>, Error> {
+    pub fn read_config_from_uninitialized_vfs(
+        &self,
+        config_path: &str,
+    ) -> Result<Vec<u8>, BootfsError> {
         for entry in self.parser.zero_copy_iter() {
-            match entry {
-                Ok(entry) => {
-                    assert!(entry.payload.is_none()); // Using the zero copy iterator.
-                    if entry.name == config_path {
-                        let mut buffer = vec![0; usize::try_from(entry.size)?];
-                        if let Err(error) = self.bootfs.read(&mut buffer, entry.offset) {
-                            return Err(anyhow!(
-                                "[BootfsSvc] Found file but failed to load it into a buffer: {}.",
-                                error
-                            ));
-                        } else {
-                            return Ok(buffer);
-                        }
-                    }
-                }
-                Err(error) => {
-                    info!("[BootfsSvc] Bootfs parsing error: {}", error);
-                }
+            let entry = entry?;
+            assert!(entry.payload.is_none()); // Using the zero copy iterator.
+            if entry.name == config_path {
+                let mut buffer = vec![0; usize::try_from(entry.size)?];
+                self.bootfs.read(&mut buffer, entry.offset).map_err(BootfsError::Vmo)?;
+                return Ok(buffer);
             }
         }
-
-        Err(anyhow!("Unable to find config: {}.", config_path))
+        Err(BootfsError::MissingEntry { name: config_path.to_string() })
     }
 
-    pub fn ingest_bootfs_vmo(self, system: &Option<Resource>) -> Result<Self, Error> {
-        let system = system.as_ref().ok_or(anyhow!(
-            "Bootfs requires a valid system resource handle so that it can make \
-            VMO regions executable."
-        ))?;
+    pub fn ingest_bootfs_vmo(self, system: &Option<Resource>) -> Result<Self, BootfsError> {
+        let system = system
+            .as_ref()
+            .ok_or(BootfsError::InvalidHandle { handle_type: HandleType::Resource })?;
 
-        let vmex = system.create_child(
-            zx::ResourceKind::SYSTEM,
-            None,
-            zx::sys::ZX_RSRC_SYSTEM_VMEX_BASE,
-            1,
-            BOOTFS_VMEX_NAME.as_bytes(),
-        )?;
+        let vmex = system
+            .create_child(
+                zx::ResourceKind::SYSTEM,
+                None,
+                zx::sys::ZX_RSRC_SYSTEM_VMEX_BASE,
+                1,
+                BOOTFS_VMEX_NAME.as_bytes(),
+            )
+            .map_err(BootfsError::Vmex)?;
 
         // The bootfs VFS is comprised of multiple child VMOs which are just offsets into a
         // single backing parent VMO.
@@ -192,8 +203,12 @@ impl BootfsSvc {
         // number of syscalls required. Files in directories that are read-only will just
         // be children of the original read-only VMO, and files in directories that are
         // read-execution will be children of the duplicated read-execution VMO.
-        let bootfs_exec: zx::Vmo = self.bootfs.duplicate_handle(zx::Rights::SAME_RIGHTS)?.into();
-        let bootfs_exec = bootfs_exec.replace_as_executable(&vmex)?;
+        let bootfs_exec: zx::Vmo = self
+            .bootfs
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(BootfsError::DuplicateHandle)?
+            .into();
+        let bootfs_exec = bootfs_exec.replace_as_executable(&vmex).map_err(BootfsError::ExecVmo)?;
 
         self.ingest_bootfs_vmo_internal(bootfs_exec)
     }
@@ -202,63 +217,45 @@ impl BootfsSvc {
     // functionality except execution of contents; the permission to convert arbitrary vmos
     // to executable requires the root System resource, which is not available to fuchsia
     // test components.
-    pub fn ingest_bootfs_vmo_for_test(self) -> Result<Self, Error> {
-        let fake_exec: zx::Vmo = self.bootfs.duplicate_handle(zx::Rights::SAME_RIGHTS)?.into();
+    pub fn ingest_bootfs_vmo_for_test(self) -> Result<Self, BootfsError> {
+        let fake_exec: zx::Vmo = self
+            .bootfs
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(BootfsError::DuplicateHandle)?
+            .into();
         self.ingest_bootfs_vmo_internal(fake_exec)
     }
 
-    pub fn ingest_bootfs_vmo_internal(mut self, bootfs_exec: zx::Vmo) -> Result<Self, Error> {
+    pub fn ingest_bootfs_vmo_internal(mut self, bootfs_exec: zx::Vmo) -> Result<Self, BootfsError> {
         for entry in self.parser.zero_copy_iter() {
-            match entry {
-                Ok(entry) => {
-                    assert!(entry.payload.is_none()); // Using the zero copy iterator.
+            let entry = entry?;
+            assert!(entry.payload.is_none()); // Using the zero copy iterator.
 
-                    let name = entry.name;
-                    let path_parts: Vec<&str> =
-                        name.split("/").filter(|&x| !x.is_empty()).collect();
+            let name = entry.name;
+            let path_parts: Vec<&str> = name.split("/").filter(|&x| !x.is_empty()).collect();
 
-                    let is_exec = BootfsSvc::file_in_executable_directory(&path_parts);
-                    let vmo = if is_exec { &bootfs_exec } else { &self.bootfs };
-                    match BootfsSvc::create_dir_entry_with_child(
-                        vmo,
-                        entry.offset,
-                        entry.size,
-                        is_exec,
-                        BootfsSvc::get_next_inode(&mut self.next_inode),
-                    ) {
-                        Ok(dir_entry) => {
-                            self.tree_builder.add_entry(&path_parts, dir_entry).unwrap_or_else(
-                                |error| {
-                                    info!(%error, %name, "[BootfsSvc] Failed to add bootfs entry to directory.");
-                                },
-                            );
-                        }
-                        Err(error) => {
-                            return Err(anyhow!(
-                                "Unable to create VMO for binary {}: {}",
-                                name,
-                                error
-                            ));
-                        }
-                    }
-                }
-                Err(error) => {
-                    info!(%error, "[BootfsSvc] Bootfs parsing error");
-                }
-            }
+            let is_exec = BootfsSvc::file_in_executable_directory(&path_parts);
+            let vmo = if is_exec { &bootfs_exec } else { &self.bootfs };
+            let dir_entry = BootfsSvc::create_dir_entry_with_child(
+                vmo,
+                entry.offset,
+                entry.size,
+                is_exec,
+                BootfsSvc::get_next_inode(&mut self.next_inode),
+            )?;
+            self.tree_builder.add_entry(&path_parts, dir_entry)?;
         }
 
         Ok(self)
     }
 
     // Publish a VMO beneath '/boot/kernel'. Used to publish VDSOs and kernel files.
-    pub fn publish_kernel_vmo(mut self, vmo: zx::Vmo) -> Result<Self, Error> {
-        let name = vmo.get_name()?.into_string()?;
+    pub fn publish_kernel_vmo(mut self, vmo: zx::Vmo) -> Result<Self, BootfsError> {
+        let name = vmo.get_name().map_err(BootfsError::VmoName)?.into_string()?;
         if name.is_empty() {
             // Skip VMOs without names.
             return Ok(self);
         }
-
         let path = format!("{}{}", KERNEL_VMO_SUBDIRECTORY, name);
         let mut path_parts: Vec<&str> = path.split("/").filter(|&x| !x.is_empty()).collect();
 
@@ -267,18 +264,18 @@ impl BootfsSvc {
             path_parts = LAST_PANIC_FILEPATH.split("/").filter(|&x| !x.is_empty()).collect();
         }
 
-        let vmo_size = vmo.get_size()?;
+        let vmo_size = vmo.get_size().map_err(BootfsError::Vmo)?;
         if vmo_size == 0 {
             // Skip empty VMOs.
             return Ok(self);
         }
 
         // If content size is zero, set it to the size of the VMO.
-        if vmo.get_content_size()? == 0 {
-            vmo.set_content_size(&vmo_size)?;
+        if vmo.get_content_size().map_err(BootfsError::Vmo)? == 0 {
+            vmo.set_content_size(&vmo_size).map_err(BootfsError::Vmo)?;
         }
 
-        let info = vmo.basic_info()?;
+        let info = vmo.basic_info().map_err(BootfsError::Vmo)?;
         let is_exec = info.rights.contains(zx::Rights::EXECUTE);
 
         let dir_entry = BootfsSvc::create_dir_entry(
@@ -286,9 +283,7 @@ impl BootfsSvc {
             is_exec,
             BootfsSvc::get_next_inode(&mut self.next_inode),
         );
-        self.tree_builder.add_entry(&path_parts, dir_entry).unwrap_or_else(|error| {
-            info!(%error, %path, "[BootfsSvc] Failed to publish kernel VMO to directory.");
-        });
+        self.tree_builder.add_entry(&path_parts, dir_entry)?;
 
         Ok(self)
     }
@@ -300,7 +295,7 @@ impl BootfsSvc {
         mut self,
         handle_type: HandleType,
         first_index: u16,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, BootfsError> {
         info!(
             "[BootfsSvc] Adding kernel VMOs of type {:?} starting at index {}.",
             handle_type, first_index
@@ -321,7 +316,7 @@ impl BootfsSvc {
         Ok(self)
     }
 
-    pub fn create_and_bind_vfs(&mut self) -> Result<(), Error> {
+    pub fn create_and_bind_vfs(&mut self) -> Result<(), BootfsError> {
         info!("[BootfsSvc] Finalizing rust bootfs service.");
 
         let tree_builder = replace(&mut self.tree_builder, TreeBuilder::empty_dir());
@@ -339,13 +334,13 @@ impl BootfsSvc {
             fidl::endpoints::ServerEnd::<fio::NodeMarker>::new(directory_server_end.into_channel()),
         );
 
-        let ns = fdio::Namespace::installed()?;
+        let ns = fdio::Namespace::installed().map_err(BootfsError::Namespace)?;
         assert!(
             ns.unbind("/boot").is_err(),
             "No filesystem should already be bound to /boot when BootfsSvc is starting."
         );
 
-        ns.bind("/boot", directory)?;
+        ns.bind("/boot", directory).map_err(BootfsError::Namespace)?;
 
         info!("[BootfsSvc] Bootfs is ready and is now serving /boot.");
 
