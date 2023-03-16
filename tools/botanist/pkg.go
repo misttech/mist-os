@@ -166,22 +166,41 @@ func (c *cachedPkgRepo) fetchFromGCS(w http.ResponseWriter, r *http.Request, loc
 	}
 	defer gcsRdr.Close()
 
-	// Create a locally cached copy for future requests to use.
-	f, err := os.Create(localPath)
+	// Create a tempfile to store the blob contents. We will insert this
+	// into the blob cache if the download succeeds.
+	tf, err := os.CreateTemp("", "")
 	if err != nil {
-		c.logf("failed to create local blob %s: %s", localPath, err)
+		c.logf("failed to create tempfile to hold blob %s: %s", localPath, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	defer f.Close()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			os.Remove(tf.Name())
+		}
+	}()
 
-	// Copy the blob from the remote to both the client and the cache.
+	// Copy the blob from the remote to both the client and the file.
 	w.Header().Set("Content-Length", strconv.Itoa(size))
-	mw := io.MultiWriter(w, f)
+	mw := io.MultiWriter(w, tf)
 	if _, err := io.Copy(mw, gcsRdr); err != nil {
 		c.logf("failed to copy blob %s: %s", localPath, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	// At this point, we know that the download succeeded, so move the
+	// temporary file holding the blob into the cache.
+	tf.Close()
+	if err := os.Rename(tf.Name(), localPath); err != nil {
+		// This is not a fatal error, as future requests will just re-download
+		// the blob.
+		c.logf("failed to move downloaded blob %s to cache: %s", localPath, err)
+	} else {
+		// The blob has been renamed, and thus we no longer need to delete the
+		// temp file.
+		cleanup = false
 	}
 
 	// Update metrics and download records.
