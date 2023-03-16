@@ -367,6 +367,8 @@ static tcp6_result fb_tcp_connect(void) {
   tcp6_result result = tcp6_accept(&fb_tcp_socket);
   if (result == TCP6_RESULT_SUCCESS) {
     fb_tcp_state = TCP_STATE_HANDSHAKE_RX;
+    // Reset the command phase in case the previous connection was disconnected
+    cmd_phase = IDLE;
   }
   return result;
 }
