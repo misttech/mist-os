@@ -69,6 +69,18 @@ local_repository(
     path = "third_party/bazel_rules_python",
 )
 
+# Create the @fuchsia_icu_config repository which contains the constants.bzl file
+# exporting generating configuration constants related to the ICU library flavors
+# buildifier: disable=load-on-top
+load(
+    "//:build/bazel/icu/repository_rules.bzl",
+    "fuchsia_icu_config_repository",
+)
+
+fuchsia_icu_config_repository(
+    name = "fuchsia_icu_config",
+)
+
 # buildifier: disable=load-on-top
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies")
 
