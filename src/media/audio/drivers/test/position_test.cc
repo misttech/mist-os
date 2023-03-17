@@ -203,19 +203,19 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
 #define REGISTER_POSITION_TEST(CLASS_NAME, DEVICE)                                              \
   testing::RegisterTest("PositionTest", TestNameForEntry(#CLASS_NAME, DEVICE).c_str(), nullptr, \
                         DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                    \
-                        [=]() -> PositionTest* { return new CLASS_NAME(DEVICE); })
+                        [&]() -> PositionTest* { return new CLASS_NAME(DEVICE); })
 
 #define REGISTER_DISABLED_POSITION_TEST(CLASS_NAME, DEVICE)                                       \
   testing::RegisterTest(                                                                          \
       "PositionTest", (std::string("DISABLED_") + TestNameForEntry(#CLASS_NAME, DEVICE)).c_str(), \
       nullptr, DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                               \
-      [=]() -> PositionTest* { return new CLASS_NAME(DEVICE); })
+      [&]() -> PositionTest* { return new CLASS_NAME(DEVICE); })
 
 void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
                                     bool expect_audio_core_connected, bool enable_position_tests) {
   // If audio_core is connected to the audio driver, admin tests will fail.
   // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
-  if (device_entry.dir_fd == DeviceEntry::kA2dp || !expect_audio_core_connected) {
+  if (device_entry.isA2DP() || !expect_audio_core_connected) {
     if (enable_position_tests) {
       REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
       REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);

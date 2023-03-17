@@ -20,7 +20,8 @@ class RadarProviderProxy
 
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
 
-  void DeviceAdded(int dir_fd, const std::string& filename) override;
+  void DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                   const std::string& filename) override;
 
   void on_fidl_error(fidl::UnbindInfo info) override;
 

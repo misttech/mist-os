@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
@@ -38,13 +37,11 @@ void HardwareDisplayControllerProviderImpl::OpenController(
   std::unique_ptr<fsl::DeviceWatcher> watcher = fsl::DeviceWatcher::Create(
       kDisplayDir,
       [id, holders = &holders_, request = std::move(request), callback = std::move(callback)](
-          int dir_fd, const std::string& filename) mutable {
+          const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) mutable {
         FX_LOGS(INFO) << "Found display controller at path: " << kDisplayDir << '/' << filename
                       << '.';
 
-        fdio_cpp::UnownedFdioCaller caller(dir_fd);
-        zx::result client =
-            component::ConnectAt<fuchsia_hardware_display::Provider>(caller.directory(), filename);
+        zx::result client = component::ConnectAt<fuchsia_hardware_display::Provider>(dir, filename);
         if (client.is_error()) {
           FX_PLOGS(ERROR, client.error_value())
               << "Failed to open display_controller at path: " << kDisplayDir << '/' << filename;

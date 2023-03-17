@@ -19,10 +19,10 @@ sdk_source_set("io") {
   ]
 
   deps = [
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/fdio-caller",
   ]
 
   public_deps = [

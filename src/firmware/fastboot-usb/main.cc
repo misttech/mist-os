@@ -7,8 +7,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fastboot/fastboot.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/syscalls.h>
@@ -23,16 +21,15 @@ ConnectToUsbFastbootDevice() {
   fidl::ClientEnd<fuchsia_hardware_fastboot::FastbootImpl> client;
   auto watcher = fsl::DeviceWatcher::Create(
       kUsbFastbootDirectory,
-      [&](int dir_fd, const std::string &filename) {
+      [&](const fidl::ClientEnd<fuchsia_io::Directory> &dir, const std::string &filename) {
         if (client.is_valid()) {
           FX_LOGS(INFO) << "There's already a connected client. Ignoring new devices";
           return;
         }
 
         FX_LOGS(INFO) << "Connecting to " << kUsbFastbootDirectory << "/" << filename.data();
-        fdio_cpp::UnownedFdioCaller caller(dir_fd);
-        auto client_end = component::ConnectAt<fuchsia_hardware_fastboot::FastbootImpl>(
-            caller.directory(), filename.c_str());
+        auto client_end =
+            component::ConnectAt<fuchsia_hardware_fastboot::FastbootImpl>(dir, filename);
         if (!client_end.is_ok()) {
           FX_LOGS(INFO) << "Fail to call connect to driver";
           return;

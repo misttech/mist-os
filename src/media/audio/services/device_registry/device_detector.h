@@ -43,8 +43,8 @@ class DeviceDetector {
 
   // Open a devnode at the given path; use its FDIO device channel as a StreamConfigConnector to
   // connect (retrieve) the device's StreamConfig.
-  void StreamConfigFromDevFs(int dir_fd, std::string_view name,
-                             fuchsia_audio_device::DeviceType device_type);
+  void StreamConfigFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                             const std::string& name, fuchsia_audio_device::DeviceType device_type);
 
   DeviceDetectionHandler handler_;
   std::vector<std::unique_ptr<fsl::DeviceWatcher>> watchers_;

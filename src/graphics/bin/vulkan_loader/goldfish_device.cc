@@ -6,28 +6,27 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/graphics/bin/vulkan_loader/app.h"
 
 // static
-std::unique_ptr<GoldfishDevice> GoldfishDevice::Create(LoaderApp* app, int dir_fd, std::string name,
-                                                       inspect::Node* parent) {
+std::unique_ptr<GoldfishDevice> GoldfishDevice::Create(
+    LoaderApp* app, const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name,
+    inspect::Node* parent) {
   std::unique_ptr<GoldfishDevice> device(new GoldfishDevice(app));
-  if (!device->Initialize(dir_fd, name, parent))
+  if (!device->Initialize(dir, name, parent))
     return nullptr;
   return device;
 }
 
-bool GoldfishDevice::Initialize(int dir_fd, std::string name, inspect::Node* parent) {
+bool GoldfishDevice::Initialize(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                const std::string& name, inspect::Node* parent) {
   node() = parent->CreateChild("goldfish-" + name);
   icd_list_.Initialize(&node());
   auto pending_action_token = app()->GetPendingActionToken();
 
-  fdio_cpp::UnownedFdioCaller caller(dir_fd);
-  zx::result controller =
-      component::ConnectAt<fuchsia_hardware_goldfish::Controller>(caller.directory(), name);
+  zx::result controller = component::ConnectAt<fuchsia_hardware_goldfish::Controller>(dir, name);
   if (controller.is_error()) {
     FX_PLOGS(ERROR, controller.error_value()) << "Failed to connect to service";
     return false;

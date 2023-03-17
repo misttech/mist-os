@@ -401,7 +401,7 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   {                                                                                            \
     testing::RegisterTest("BasicTest", TestNameForEntry(#CLASS_NAME, DEVICE).c_str(), nullptr, \
                           DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                 \
-                          [=]() -> BasicTest* { return new CLASS_NAME(DEVICE); });             \
+                          [&]() -> BasicTest* { return new CLASS_NAME(DEVICE); });             \
   }
 
 void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {

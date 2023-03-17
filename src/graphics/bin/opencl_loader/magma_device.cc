@@ -4,7 +4,6 @@
 
 #include "src/graphics/bin/opencl_loader/magma_device.h"
 
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/syslog/cpp/macros.h>
@@ -12,22 +11,23 @@
 #include "src/graphics/bin/opencl_loader/app.h"
 
 // static
-std::unique_ptr<MagmaDevice> MagmaDevice::Create(LoaderApp* app, int dir_fd, std::string name,
-                                                 inspect::Node* parent) {
+std::unique_ptr<MagmaDevice> MagmaDevice::Create(LoaderApp* app,
+                                                 const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                                 const std::string& name, inspect::Node* parent) {
   std::unique_ptr<MagmaDevice> device(new MagmaDevice(app));
-  if (!device->Initialize(dir_fd, name, parent))
+  if (!device->Initialize(dir, name, parent))
     return nullptr;
   return device;
 }
 
-bool MagmaDevice::Initialize(int dir_fd, const std::string& name, inspect::Node* parent) {
+bool MagmaDevice::Initialize(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                             const std::string& name, inspect::Node* parent) {
   FIT_DCHECK_IS_THREAD_VALID(main_thread_);
   node() = parent->CreateChild("magma-" + name);
   icd_list_.Initialize(&node());
   auto pending_action_token = app()->GetPendingActionToken();
 
-  fdio_cpp::UnownedFdioCaller caller(dir_fd);
-  zx_status_t status = fdio_service_connect_at(caller.directory().channel()->get(), name.c_str(),
+  zx_status_t status = fdio_service_connect_at(dir.channel().get(), name.c_str(),
                                                device_.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to connect to service";
@@ -38,8 +38,8 @@ bool MagmaDevice::Initialize(int dir_fd, const std::string& name, inspect::Node*
     app()->RemoveDevice(this);
   });
 
-  device_->GetIcdList([this, name, pending_action_token = std::move(pending_action_token)](
-                          std::vector<fuchsia::gpu::magma::IcdInfo> icd_info) mutable {
+  device_->GetIcdList([this, pending_action_token = std::move(pending_action_token)](
+                          const std::vector<fuchsia::gpu::magma::IcdInfo>& icd_info) mutable {
     FIT_DCHECK_IS_THREAD_VALID(main_thread_);
     uint32_t i = 0;
     for (auto& icd : icd_info) {

@@ -58,7 +58,6 @@ executable("opencl-server-bin") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
-    "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",

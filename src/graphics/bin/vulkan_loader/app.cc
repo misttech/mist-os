@@ -7,7 +7,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
 #include <lib/vfs/cpp/remote_dir.h>
 
 #include "src/graphics/bin/vulkan_loader/goldfish_device.h"
@@ -42,6 +41,8 @@ zx_status_t LoaderApp::InitDeviceFs() {
   for (const char* dev_class : kDevClassList) {
     fidl::InterfaceHandle<fuchsia::io::Directory> gpu_dir;
     std::string input_path = std::string("/dev/class/") + dev_class;
+    // NB: RIGHT_READABLE is needed here because downstream code in vulkan will attempt to open this
+    // directory using POSIX APIs which cannot express opening without any rights.
     zx_status_t status =
         fdio_open(input_path.c_str(), static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
                   gpu_dir.NewRequest().TakeChannel().release());
@@ -97,11 +98,11 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
   auto gpu_watcher_token = GetPendingActionToken();
   gpu_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
       "/dev/class/gpu",
-      [this](int dir_fd, const std::string& filename) {
+      [this](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
         if (filename == ".") {
           return;
         }
-        auto device = MagmaDevice::Create(this, dir_fd, filename, &devices_node_);
+        auto device = MagmaDevice::Create(this, dir, filename, &devices_node_);
         if (device) {
           devices_.emplace_back(std::move(device));
         }
@@ -114,11 +115,11 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
   auto goldfish_watcher_token = GetPendingActionToken();
   goldfish_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
       "/dev/class/goldfish-pipe",
-      [this](int dir_fd, const std::string& filename) {
+      [this](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
         if (filename == ".") {
           return;
         }
-        auto device = GoldfishDevice::Create(this, dir_fd, filename, &devices_node_);
+        auto device = GoldfishDevice::Create(this, dir, filename, &devices_node_);
         if (device) {
           devices_.emplace_back(std::move(device));
         }

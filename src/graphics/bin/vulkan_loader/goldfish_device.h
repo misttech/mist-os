@@ -18,15 +18,17 @@ class LoaderApp;
 
 class GoldfishDevice : public GpuDevice {
  public:
-  static std::unique_ptr<GoldfishDevice> Create(LoaderApp* app, int dir_fd, std::string name,
-                                                inspect::Node* parent);
+  static std::unique_ptr<GoldfishDevice> Create(LoaderApp* app,
+                                                const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                                const std::string& name, inspect::Node* parent);
 
   IcdList& icd_list() override { return icd_list_; }
 
  private:
   explicit GoldfishDevice(LoaderApp* app) : GpuDevice(app) {}
 
-  bool Initialize(int dir_fd, std::string name, inspect::Node* parent);
+  bool Initialize(const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name,
+                  inspect::Node* parent);
 
   IcdList icd_list_;
   fuchsia::hardware::goldfish::PipeDevicePtr device_;

@@ -275,10 +275,9 @@ zx::result<std::unique_ptr<fsl::DeviceWatcher>> CreateWatcher(
 
   std::unique_ptr watcher = fsl::DeviceWatcher::Create(
       classdir,
-      [dispatcher, classdir, topological_path, dir_channel = std::move(dir_channel.value()),
-       &selected_ifc](int dir_fd, const std::string& filename) {
-        std::optional r =
-            netifc_evaluate(topological_path, dir_channel.borrow(), classdir, filename);
+      [dispatcher, classdir, topological_path, &selected_ifc](
+          const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
+        std::optional r = netifc_evaluate(topological_path, dir, classdir, filename);
         if (r.has_value()) {
           Netdevice::Process(selected_ifc, dispatcher, std::move(r.value()));
         }

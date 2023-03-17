@@ -117,7 +117,6 @@ source_set("device_registry_lib") {
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
     "//src/media/audio/services/common",
-    "//zircon/system/ulib/fdio-caller",
   ]
 
   deps = [

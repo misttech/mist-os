@@ -8,12 +8,9 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fit/function.h>
-#include <lib/zx/channel.h>
 
 #include <memory>
 #include <string>
-
-#include <fbl/unique_fd.h>
 
 #include "src/lib/fxl/fxl_export.h"
 #include "src/lib/fxl/macros.h"
@@ -28,9 +25,10 @@ namespace fsl {
 class FXL_EXPORT DeviceWatcher {
  public:
   // Callback function which is invoked whenever a device is found.
-  // |dir_fd| is the file descriptor of the directory (use for openat()).
+  // |dir| is the directory handle provided at construction.
   // |filename| is the name of the file relative to the directory.
-  using ExistsCallback = fit::function<void(int dir_fd, const std::string& filename)>;
+  using ExistsCallback = fit::function<void(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                            const std::string& filename)>;
   // Callback function which is invoked after the existing files have been
   // reported via ExistsCallback, and before newly-arriving files are delivered
   // via ExistsCallback.
@@ -81,18 +79,18 @@ class FXL_EXPORT DeviceWatcher {
       async_dispatcher_t* dispatcher = nullptr);
 
   static std::unique_ptr<DeviceWatcher> CreateWithIdleCallback(
-      fbl::unique_fd dir_fd, ExistsCallback exists_callback, IdleCallback idle_callback,
-      async_dispatcher_t* dispatcher = nullptr);
+      fidl::ClientEnd<fuchsia_io::Directory> dir, ExistsCallback exists_callback,
+      IdleCallback idle_callback, async_dispatcher_t* dispatcher = nullptr);
 
  private:
-  DeviceWatcher(async_dispatcher_t* dispatcher, fbl::unique_fd dir_fd,
+  DeviceWatcher(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_io::Directory> dir,
                 fidl::ClientEnd<fuchsia_io::DirectoryWatcher> dir_watcher,
                 ExistsCallback exists_callback, IdleCallback idle_callback);
 
   void Handler(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                const zx_packet_signal* signal);
 
-  fbl::unique_fd dir_fd_;
+  fidl::ClientEnd<fuchsia_io::Directory> dir_;
   fidl::ClientEnd<fuchsia_io::DirectoryWatcher> dir_watcher_;
   ExistsCallback exists_callback_;
   IdleCallback idle_callback_;

@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
@@ -37,7 +36,7 @@ using component_testing::Route;
 void TestBase::SetUp() {
   media::audio::test::TestFixture::SetUp();
 
-  if (device_entry().dir_fd == DeviceEntry::kA2dp) {
+  if (device_entry().isA2DP()) {
     ConnectToBluetoothDevice();
   } else {
     ConnectToDevice(device_entry());
@@ -110,9 +109,10 @@ void TestBase::ConnectToBluetoothDevice() {
 
 // Given this device_entry, open the device and set the FIDL config_channel
 void TestBase::ConnectToDevice(const DeviceEntry& device_entry) {
-  fdio_cpp::UnownedFdioCaller caller(device_entry.dir_fd);
   fuchsia::hardware::audio::StreamConfigConnectorPtr device;
-  ASSERT_EQ(fdio_service_connect_at(caller.borrow_channel(), device_entry.filename.c_str(),
+  ASSERT_EQ(device_entry.dir.index(), 1u);
+  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
+                                    device_entry.filename.c_str(),
                                     device.NewRequest().TakeChannel().release()),
             ZX_OK)
       << "AudioDriver::TestBase failed to open device node at '" << device_entry.filename << "'";
@@ -169,7 +169,8 @@ void TestBase::RequestFormats() {
   }
 }
 
-void TestBase::LogFormat(const fuchsia::hardware::audio::PcmFormat& format, std::string tag) {
+void TestBase::LogFormat(const fuchsia::hardware::audio::PcmFormat& format,
+                         const std::string& tag) {
   FX_LOGS(WARNING) << tag << ": rate " << format.frame_rate << ", fmt "
                    << static_cast<int>(format.sample_format) << ", " << format.bytes_per_sample * 8u
                    << "b (" << static_cast<uint16_t>(format.valid_bits_per_sample)

@@ -28,7 +28,6 @@ executable("bin") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.hardware.fastboot:fuchsia.hardware.fastboot_cpp_wire",
-    "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//src/firmware/lib/fastboot",
@@ -36,7 +35,6 @@ executable("bin") {
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fdio-caller",
   ]
 }
 

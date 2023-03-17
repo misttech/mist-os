@@ -15,7 +15,7 @@ zx_status_t PrintFeatureReports(std::string filename, Printer* printer,
                                 fidl::WireSharedClient<fuchsia_input_report::InputDevice> client,
                                 fit::closure callback) {
   client->GetFeatureReport().ThenExactlyOnce(
-      [filename, printer, callback = std::move(callback), _ = client.Clone()](
+      [filename = std::move(filename), printer, callback = std::move(callback), _ = client.Clone()](
           fidl::WireUnownedResult<fuchsia_input_report::InputDevice::GetFeatureReport>&
               call_result) {
         if (!call_result.ok()) {
@@ -104,7 +104,7 @@ zx_status_t PrintInputDescriptor(std::string filename, Printer* printer,
                                  fidl::WireSharedClient<fuchsia_input_report::InputDevice> client,
                                  fit::closure callback) {
   client->GetDescriptor().ThenExactlyOnce(
-      [filename, printer, callback = std::move(callback), _ = client.Clone()](
+      [filename = std::move(filename), printer, callback = std::move(callback), _ = client.Clone()](
           fidl::WireUnownedResult<fuchsia_input_report::InputDevice::GetDescriptor>& call_result) {
         if (!call_result.ok()) {
           return;
@@ -210,7 +210,7 @@ void PrintSensorDesc(Printer* printer,
   for (size_t i = 0; i < sensor_desc.values().count(); i++) {
     printer->Print("Value %02d:\n", i);
     printer->IncreaseIndent();
-    printer->Print("SensorType: %s\n", printer->SensorTypeToString(sensor_desc.values()[i].type));
+    printer->Print("SensorType: %s\n", Printer::SensorTypeToString(sensor_desc.values()[i].type));
     printer->PrintAxis(sensor_desc.values()[i].axis);
     printer->DecreaseIndent();
   }
@@ -226,7 +226,7 @@ void PrintTouchDesc(Printer* printer,
     printer->IncreaseIndent();
     const auto& input = touch_desc.input();
     if (input.has_touch_type()) {
-      printer->Print("Touch Type: %s\n", printer->TouchTypeToString(input.touch_type()));
+      printer->Print("Touch Type: %s\n", Printer::TouchTypeToString(input.touch_type()));
     }
     if (input.has_max_contacts()) {
       printer->Print("Max Contacts: %ld\n", input.max_contacts());
@@ -281,11 +281,11 @@ void PrintTouchDesc(Printer* printer,
 }
 
 void PrintKeyboardDesc(Printer* printer,
-                       const fuchsia_input_report::wire::KeyboardDescriptor& descriptor) {
+                       const fuchsia_input_report::wire::KeyboardDescriptor& keyboard_desc) {
   printer->Print("Keyboard Descriptor:\n");
 
-  if (descriptor.has_input()) {
-    const fuchsia_input_report::wire::KeyboardInputDescriptor& input = descriptor.input();
+  if (keyboard_desc.has_input()) {
+    const fuchsia_input_report::wire::KeyboardInputDescriptor& input = keyboard_desc.input();
     printer->Print("Input Report:\n");
     printer->IncreaseIndent();
     if (input.has_keys3()) {
@@ -295,8 +295,8 @@ void PrintKeyboardDesc(Printer* printer,
     }
     printer->DecreaseIndent();
   }
-  if (descriptor.has_output()) {
-    const fuchsia_input_report::wire::KeyboardOutputDescriptor& output = descriptor.output();
+  if (keyboard_desc.has_output()) {
+    const fuchsia_input_report::wire::KeyboardOutputDescriptor& output = keyboard_desc.output();
     printer->Print("Output Report:\n");
     printer->IncreaseIndent();
     if (output.has_leds()) {
@@ -337,7 +337,7 @@ void PrintInputReports(std::string filename, Printer* printer,
   // We need the ReadInputReport's callback to be mutable because the PrintInputReports callback is
   // moved into the next ReadInputReport's call.
   reader->ReadInputReports().ThenExactlyOnce(
-      [=, reader = reader.Clone(), callback = std::move(callback)](
+      [=, filename = std::move(filename), reader = reader.Clone(), callback = std::move(callback)](
           fidl::WireUnownedResult<fuchsia_input_report::InputReportsReader::ReadInputReports>&
               call_result) mutable {
         if (!call_result.ok()) {
@@ -396,7 +396,7 @@ void GetAndPrintInputReport(std::string filename,
                             fit::closure callback) {
   client->GetInputReport(device_type)
       .ThenExactlyOnce(
-          [=, callback = std::move(callback), _ = client.Clone()](
+          [=, filename = std::move(filename), callback = std::move(callback), _ = client.Clone()](
               fidl::WireUnownedResult<fuchsia_input_report::InputDevice::GetInputReport>&
                   call_result) {
             if (!call_result.ok()) {
@@ -446,9 +446,9 @@ zx::result<fidl::WireSharedClient<fuchsia_input_report::InputReportsReader>> Get
     async_dispatcher_t* dispatcher) {
   fidl::ClientEnd<fuchsia_input_report::InputReportsReader> reader_client;
   auto reader_server = fidl::CreateEndpoints(&reader_client);
-
-  if (!reader_server.is_ok())
-    return zx::error(reader_server.take_error());
+  if (reader_server.is_error()) {
+    return reader_server.take_error();
+  }
   auto result = (*client)->GetInputReportsReader(std::move(*reader_server));
 
   if (result.status() != ZX_OK) {

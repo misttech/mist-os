@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 
@@ -61,9 +60,10 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
   for (const auto& dev_node : kAudioDevNodes) {
     auto watcher = fsl::DeviceWatcher::Create(
         dev_node.path,
-        [this, device_type = dev_node.device_type](int dir_fd, std::string_view filename) {
+        [this, device_type = dev_node.device_type](
+            const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
           if (dispatcher_) {
-            StreamConfigFromDevFs(dir_fd, filename, device_type);
+            StreamConfigFromDevFs(dir, filename, device_type);
           } else {
             FX_LOGS(ERROR) << "DeviceWatcher fired but dispatcher is gone";
           }
@@ -84,13 +84,13 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
   return ZX_OK;
 }
 
-void DeviceDetector::StreamConfigFromDevFs(int dir_fd, std::string_view name,
+void DeviceDetector::StreamConfigFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                           const std::string& name,
                                            fuchsia_audio_device::DeviceType device_type) {
   FX_CHECK(handler_);
 
-  fdio_cpp::UnownedFdioCaller caller(dir_fd);
   zx::result client_end =
-      component::ConnectAt<fuchsia_hardware_audio::StreamConfigConnector>(caller.directory(), name);
+      component::ConnectAt<fuchsia_hardware_audio::StreamConfigConnector>(dir, name);
   if (client_end.is_error()) {
     FX_PLOGS(ERROR, client_end.error_value())
         << "DeviceDetector failed to connect to device node at '" << name << "'";

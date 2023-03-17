@@ -25,17 +25,19 @@ static const struct {
     {.path = "/dev/class/audio-output", .device_type = DeviceType::Output},
 };
 
-// static
-static std::vector<std::unique_ptr<fsl::DeviceWatcher>>& device_watchers() {
-  static std::vector<std::unique_ptr<fsl::DeviceWatcher>>* device_watchers =
-      new std::vector<std::unique_ptr<fsl::DeviceWatcher>>();
-  return *device_watchers;
+namespace {
+
+std::vector<std::unique_ptr<fsl::DeviceWatcher>>& device_watchers() {
+  static std::vector<std::unique_ptr<fsl::DeviceWatcher>> device_watchers;
+  return device_watchers;
 }
 
-static std::set<DeviceEntry>& device_entries() {
-  static std::set<DeviceEntry>* device_entries = new std::set<DeviceEntry>();
-  return *device_entries;
+std::set<DeviceEntry>& device_entries() {
+  static std::set<DeviceEntry> device_entries;
+  return device_entries;
 }
+
+}  // namespace
 
 // Called once, before RUN_ALL_TESTS() is invoked. This generates the set of device entries.
 void AddDevices(bool devfs_only = false) {
@@ -47,9 +49,10 @@ void AddDevices(bool devfs_only = false) {
 
     auto watcher = fsl::DeviceWatcher::CreateWithIdleCallback(
         devnode.path,
-        [dev_type = devnode.device_type](int dir_fd, const std::string& filename) {
-          FX_LOGS(TRACE) << "dir_fd " << dir_fd << " for '" << filename << "'";
-          device_entries().insert({dir_fd, filename, dev_type});
+        [dev_type = devnode.device_type](const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                         const std::string& filename) {
+          FX_LOGS(TRACE) << "dir handle " << dir.channel().get() << " for '" << filename << "'";
+          device_entries().insert({dir, filename, dev_type});
         },
         [&initial_enumeration_done]() { initial_enumeration_done = true; });
 
@@ -67,7 +70,7 @@ void AddDevices(bool devfs_only = false) {
   if (!devfs_only) {
     // Unless expressly excluded, add a device entry for the a2dp-source output device driver.
     // This validates admin functionality even if AudioCore has connected to "real" audio drivers.
-    device_entries().insert({DeviceEntry::kA2dp, "audio-a2dp", DeviceType::Output});
+    device_entries().insert({{}, "audio-a2dp", DeviceType::Output});
   }
 }
 

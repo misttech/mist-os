@@ -26,9 +26,10 @@ void RadarProviderProxy::Connect(ConnectRequest& request, ConnectCompleter::Sync
       });
 }
 
-void RadarProviderProxy::DeviceAdded(int dir_fd, const std::string& filename) {
+void RadarProviderProxy::DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                                     const std::string& filename) {
   if (!radar_client_) {
-    connector_->ConnectToRadarDevice(dir_fd, filename, [&](auto client_end) {
+    connector_->ConnectToRadarDevice(dir, filename, [&](auto client_end) {
       radar_client_.Bind(std::move(client_end), dispatcher_, this);
       return true;
     });

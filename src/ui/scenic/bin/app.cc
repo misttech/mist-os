@@ -347,7 +347,8 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
   device_watcher_ = fsl::DeviceWatcher::Create(
       kDependencyPath,
       [this, vulkan_loader = std::move(vulkan_loader),
-       completer = std::move(escher_bridge.completer)](int dir_fd, std::string filename) mutable {
+       completer = std::move(escher_bridge.completer)](
+          const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) mutable {
         auto escher = gfx::GfxSystem::CreateEscher(app_context_.get());
         if (!escher) {
           FX_LOGS(WARNING) << "Escher creation failed.";

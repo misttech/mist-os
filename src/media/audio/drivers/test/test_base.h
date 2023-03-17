@@ -5,6 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_TEST_TEST_BASE_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_TEST_TEST_BASE_H_
 
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/async-loop/default.h>
@@ -33,15 +34,15 @@ namespace media::audio::drivers::test {
 enum DeviceType : uint16_t { Input = 0, Output = 1 };
 
 struct DeviceEntry {
-  int dir_fd;
+  // `index() == 0` means A2DP.
+  std::variant<std::monostate, fidl::UnownedClientEnd<fuchsia_io::Directory>> dir;
   std::string filename;
   DeviceType dev_type;
 
-  // File descriptors only use the non-negative range, leaving room for special values such as A2DP.
-  static constexpr int kA2dp = -1;
+  bool isA2DP() const { return dir.index() == 0; }
 
   bool operator<(const DeviceEntry& rhs) const {
-    return std::tie(dir_fd, filename, dev_type) < std::tie(rhs.dir_fd, rhs.filename, rhs.dev_type);
+    return std::tie(dir, filename, dev_type) < std::tie(rhs.dir, rhs.filename, rhs.dev_type);
   }
 };
 
@@ -52,7 +53,7 @@ struct DeviceEntry {
 // Devices are displayed in the 'audio-output/000' format, or simply the filename, if the
 // special dir_fd value is observed (an example might be 'Bluetooth-A2DP' for Bluetooth devices).
 std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
-  if (device_entry.dir_fd == DeviceEntry::kA2dp) {
+  if (device_entry.isA2DP()) {
     return device_entry.filename;
   }
 
@@ -96,7 +97,8 @@ class TestBase : public media::audio::test::TestFixture {
 
   const fuchsia::hardware::audio::PcmFormat& min_format() const { return min_format_; }
   const fuchsia::hardware::audio::PcmFormat& max_format() const { return max_format_; }
-  void LogFormat(const fuchsia::hardware::audio::PcmFormat& format, std::string tag = "");
+  static void LogFormat(const fuchsia::hardware::audio::PcmFormat& format,
+                        const std::string& tag = {});
 
   void WaitForError(zx::duration wait_duration = kWaitForErrorDuration) {
     RunLoopWithTimeoutOrUntil([]() { return HasFailure() || IsSkipped(); }, wait_duration);

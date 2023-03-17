@@ -48,9 +48,9 @@ TEST_F(DeviceWatcher, IgnoreDot) {
   auto defer_unbind = fit::defer([&]() { fdio_ns_unbind(ns, kDevicePath); });
   auto device_watcher = fsl::DeviceWatcher::CreateWithIdleCallback(
       kDevicePath,
-      [](int dir_fd, const std::string& filename) {
+      [](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
         // The pseudo-directory is empty, so this callback should never be called.
-        EXPECT_TRUE(false) << filename;
+        ADD_FAILURE() << filename;
       },
       [this]() { QuitLoop(); });
   ASSERT_TRUE(device_watcher);

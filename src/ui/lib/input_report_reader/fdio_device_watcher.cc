@@ -4,7 +4,6 @@
 
 #include "src/ui/lib/input_report_reader/fdio_device_watcher.h"
 
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 
 #include "src/lib/fsl/io/device_watcher.h"
@@ -18,15 +17,16 @@ FdioDeviceWatcher::~FdioDeviceWatcher() = default;
 void FdioDeviceWatcher::Watch(ExistsCallback callback) {
   FX_DCHECK(!watch_);
   watch_ = fsl::DeviceWatcher::Create(
-      directory_path_, [callback = std::move(callback)](int dir_fd, const std::string& filename) {
+      directory_path_,
+      [callback = std::move(callback)](const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                       const std::string& filename) {
         zx::channel client, server;
         if (zx_status_t status = zx::channel::create(0, &client, &server); status != ZX_OK) {
           FX_PLOGS(ERROR, status) << "failed to create channel";
           return;
         }
-        fdio_cpp::UnownedFdioCaller caller(dir_fd);
-        if (zx_status_t status = fdio_service_connect_at(caller.borrow_channel(), filename.c_str(),
-                                                         server.release());
+        if (zx_status_t status =
+                fdio_service_connect_at(dir.channel().get(), filename.c_str(), server.release());
             status != ZX_OK) {
           FX_PLOGS(ERROR, status) << "failed to connect to " << filename;
           return;

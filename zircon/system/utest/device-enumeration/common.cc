@@ -38,7 +38,7 @@ void RecursiveWaitFor(const std::string& full_path, size_t slash_index,
   watchers.push_back(fsl::DeviceWatcher::Create(
       dir_path,
       [file_name, full_path, next_slash, callback = std::move(callback), &watchers, dispatcher](
-          int dir_fd, const std::string& name) mutable {
+          const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name) mutable {
         if (name == file_name) {
           RecursiveWaitFor(full_path, next_slash, std::move(callback), watchers, dispatcher);
         }

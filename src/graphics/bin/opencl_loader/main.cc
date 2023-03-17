@@ -8,8 +8,6 @@
 #include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/sys/cpp/component_context.h>

@@ -50,7 +50,6 @@ source_set("app") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
   ]
 }
 executable("bin") {
@@ -64,7 +63,6 @@ executable("bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.opencl.loader:fuchsia.opencl.loader_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
-    "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/inspect/cpp",

@@ -26,6 +26,7 @@
 
 #include "codec_factory_impl.h"
 #include "codec_isolate.h"
+#include "src/lib/fxl/strings/concatenate.h"
 
 namespace {
 
@@ -53,7 +54,7 @@ const SwVideoDecoderInfo kSwVideoDecoderInfos[] = {
     },
 };
 
-static const char* CodecProfileToString(fuchsia::media::CodecProfile profile) {
+const char* CodecProfileToString(fuchsia::media::CodecProfile profile) {
   switch (profile) {
     case fuchsia::media::CodecProfile::H264PROFILE_BASELINE:
       return "H264PROFILE_BASELINE";
@@ -296,7 +297,7 @@ const fuchsia::mediacodec::CodecFactoryPtr* CodecFactoryApp::FindHwCodec(
   return nullptr;
 }
 
-const std::optional<std::string> CodecFactoryApp::FindHwIsolate(
+std::optional<std::string> CodecFactoryApp::FindHwIsolate(
     fit::function<bool(const fuchsia::mediacodec::DetailedCodecDescription&)> is_match) {
   for (auto& hw_factory : hw_factories_) {
     // Isolate codecs are connected by launching a component using the URL.
@@ -341,46 +342,29 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
   // including for the first client request.
   device_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
       kDeviceClass,
-      [this](int dir_fd, std::string filename) {
-        std::string device_path = std::string(kDeviceClass) + "/" + filename;
-        zx::channel device_channel, device_remote;
-        zx_status_t status = zx::channel::create(0, &device_channel, &device_remote);
-        if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Failed to create channel - status: " << status;
-          return;
-        }
-        zx::channel client_factory_channel, client_factory_remote;
-        status = zx::channel::create(0, &client_factory_channel, &client_factory_remote);
-        if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Failed to create channel - status: " << status;
-          return;
-        }
-
-        status = fdio_service_connect(device_path.c_str(), device_remote.release());
-        if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Failed to connect to device by filename -"
-                         << " status: " << status << " device_path: " << device_path;
-          return;
-        }
-
+      [this](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
         fuchsia::hardware::mediacodec::DevicePtr device_interface;
-        status = device_interface.Bind(std::move(device_channel));
-        if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Failed to bind to interface -"
-                         << " status: " << status << " device_path: " << device_path;
+        if (zx_status_t status =
+                fdio_service_connect_at(dir.channel().get(), filename.c_str(),
+                                        device_interface.NewRequest().TakeChannel().release());
+            status != ZX_OK) {
+          FX_PLOGS(ERROR, status) << "Failed to connect to device '" << filename << "'";
           return;
         }
 
         fidl::InterfaceHandle<fuchsia::io::Directory> aux_service_directory;
-        status = outgoing_codec_aux_service_directory_->Serve(
-            fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE |
-                fuchsia::io::OpenFlags::DIRECTORY,
-            aux_service_directory.NewRequest().TakeChannel(), dispatcher_);
-        if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "outgoing_codec_aux_service_directory_.Serve() failed - status: "
-                         << status;
+        if (zx_status_t status = outgoing_codec_aux_service_directory_->Serve(
+                fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE |
+                    fuchsia::io::OpenFlags::DIRECTORY,
+                aux_service_directory.NewRequest().TakeChannel(), dispatcher_);
+            status != ZX_OK) {
+          FX_PLOGS(ERROR, status) << "outgoing_codec_aux_service_directory_.Serve() failed";
           return;
         }
+
+        auto discovery_entry = std::make_unique<DeviceDiscoveryEntry>();
+        discovery_entry->device_path = fxl::Concatenate({kDeviceClass, "/", filename});
+        discovery_entry->codec_factory = std::make_shared<fuchsia::mediacodec::CodecFactoryPtr>();
 
         // It's ok for a codec that doesn't need the aux service directory to just close the client
         // handle to it, so there's no need to attempt to detect a codec closing the aux service
@@ -389,18 +373,15 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
         // TODO(dustingreen): Combine these two calls into "Connect" and use FIDL table with the
         // needed fields.
         device_interface->SetAuxServiceDirectory(std::move(aux_service_directory));
-        device_interface->GetCodecFactory(std::move(client_factory_remote));
+        device_interface->GetCodecFactory(
+            discovery_entry->codec_factory->NewRequest(dispatcher()).TakeChannel());
 
         // From here on in the current lambda, we're doing stuff that can't fail
         // here locally (at least, not without exiting the whole process).  The
         // error handler will handle channel error async.
 
-        auto discovery_entry = std::make_unique<DeviceDiscoveryEntry>();
-        discovery_entry->device_path = device_path;
-
-        discovery_entry->codec_factory = std::make_shared<fuchsia::mediacodec::CodecFactoryPtr>();
         discovery_entry->codec_factory->set_error_handler(
-            [this, device_path,
+            [this, device_path = discovery_entry->device_path,
              factory = discovery_entry->codec_factory.get()](zx_status_t status) {
               // Any given factory won't be in both lists, but will be in one or
               // the other by the time this error handler runs.
@@ -418,8 +399,6 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
                     return factory == factory_entry->codec_factory.get();
                   });
             });
-
-        discovery_entry->codec_factory->Bind(std::move(client_factory_channel), dispatcher());
 
         // Queue up a call to |GetDetailedCodecDescriptions()| and store the output in the
         // discovery_entry.
@@ -447,15 +426,15 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
 }
 
 void CodecFactoryApp::TeardownMagmaCodec(
-    std::shared_ptr<fuchsia::gpu::magma::IcdLoaderDevicePtr> magma_device) {
+    const std::shared_ptr<fuchsia::gpu::magma::IcdLoaderDevicePtr>& magma_device) {
   // Any given magma device won't be in both lists, but will be in one or
   // the other by the time this error handler runs.
   device_discovery_queue_.remove_if(
-      [magma_device](const std::unique_ptr<DeviceDiscoveryEntry>& entry) {
+      [&magma_device](const std::unique_ptr<DeviceDiscoveryEntry>& entry) {
         return magma_device.get() == entry->magma_device.get();
       });
 
-  hw_factories_.remove_if([magma_device](const std::unique_ptr<CodecFactoryEntry>& factory_entry) {
+  hw_factories_.remove_if([&magma_device](const std::unique_ptr<CodecFactoryEntry>& factory_entry) {
     return magma_device.get() == factory_entry->magma_device.get();
   });
 
@@ -469,26 +448,25 @@ void CodecFactoryApp::DiscoverMagmaCodecDriversAndListenForMoreAsync() {
   num_codec_discoveries_in_flight_++;
   gpu_device_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
       kGpuDeviceClass,
-      [this](int dir_fd, std::string filename) {
-        std::string device_path = std::string(kGpuDeviceClass) + "/" + filename;
+      [this](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
         auto magma_device = std::make_shared<fuchsia::gpu::magma::IcdLoaderDevicePtr>();
-        zx_status_t status = fdio_service_connect(
-            device_path.c_str(), magma_device->NewRequest().TakeChannel().release());
+        zx_status_t status =
+            fdio_service_connect_at(dir.channel().get(), filename.c_str(),
+                                    magma_device->NewRequest().TakeChannel().release());
         if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Failed to connect to device by filename -"
-                         << " status: " << status << " device_path: " << device_path;
+          FX_PLOGS(ERROR, status) << "Failed to connect to device '" << filename << "'";
           return;
         }
+
         auto discovery_entry = std::make_unique<DeviceDiscoveryEntry>();
-        discovery_entry->device_path = device_path;
+        discovery_entry->device_path = fxl::Concatenate({kGpuDeviceClass, "/", filename});
         discovery_entry->magma_device = magma_device;
         discovery_entry->magma_device->set_error_handler(
-            [this, device_path, magma_device](zx_status_t status) {
-              TeardownMagmaCodec(magma_device);
-            });
+            [this, magma_device](zx_status_t status) { TeardownMagmaCodec(magma_device); });
         (*magma_device)
             ->GetIcdList([this, discovery_entry = discovery_entry.get(), magma_device,
-                          device_path](std::vector<fuchsia::gpu::magma::IcdInfo> icd_infos) {
+                          device_path = discovery_entry->device_path](
+                             const std::vector<fuchsia::gpu::magma::IcdInfo>& icd_infos) {
               bool found_media_icd = false;
               for (auto& icd_entry : icd_infos) {
                 if (!icd_entry.has_flags() || !icd_entry.has_component_url())

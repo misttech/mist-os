@@ -18,6 +18,7 @@
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/zx/vmo.h>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 #include "src/graphics/bin/vulkan_loader/app.h"
@@ -71,15 +72,14 @@ TEST_F(LoaderUnittest, MagmaDevice) {
   FakeMagmaDevice magma_device;
   const char* kDeviceNodeName = "dev";
   root.AddEntry(kDeviceNodeName, std::make_unique<vfs::Service>(magma_device.GetHandler()));
-  fidl::InterfaceHandle<fuchsia::io::Directory> pkg_dir;
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto& [client, server] = endpoints.value();
   async::Loop vfs_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   vfs_loop.StartThread("vfs-loop");
-  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, pkg_dir.NewRequest().TakeChannel(),
-             vfs_loop.dispatcher());
+  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, server.TakeChannel(), vfs_loop.dispatcher());
 
-  fbl::unique_fd dir_fd;
-  EXPECT_EQ(ZX_OK, fdio_fd_create(pkg_dir.TakeChannel().release(), dir_fd.reset_and_get_address()));
-  auto device = MagmaDevice::Create(&app, dir_fd.get(), kDeviceNodeName, &inspector.GetRoot());
+  auto device = MagmaDevice::Create(&app, client, kDeviceNodeName, &inspector.GetRoot());
   EXPECT_TRUE(device);
   auto device_ptr = device.get();
 
@@ -135,16 +135,14 @@ TEST_F(LoaderUnittest, GoldfishDevice) {
   FakeGoldfishController goldfish_device;
   const char* kDeviceNodeName = "dev";
   root.AddEntry(kDeviceNodeName, std::make_unique<vfs::Service>(goldfish_device.GetHandler()));
-  fidl::InterfaceHandle<fuchsia::io::Directory> pkg_dir;
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto& [client, server] = endpoints.value();
   async::Loop vfs_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   vfs_loop.StartThread("vfs-loop");
-  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, pkg_dir.NewRequest().TakeChannel(),
-             vfs_loop.dispatcher());
+  root.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, server.TakeChannel(), vfs_loop.dispatcher());
 
-  fbl::unique_fd dir_fd;
-  ASSERT_EQ(ZX_OK, fdio_fd_create(pkg_dir.TakeChannel().release(), dir_fd.reset_and_get_address()));
-
-  auto device = GoldfishDevice::Create(&app, dir_fd.get(), kDeviceNodeName, &inspector.GetRoot());
+  auto device = GoldfishDevice::Create(&app, client, kDeviceNodeName, &inspector.GetRoot());
   EXPECT_TRUE(device);
   auto device_ptr = device.get();
 

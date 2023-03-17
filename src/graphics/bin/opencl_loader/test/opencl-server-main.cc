@@ -7,8 +7,6 @@
 #include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/processargs.h>

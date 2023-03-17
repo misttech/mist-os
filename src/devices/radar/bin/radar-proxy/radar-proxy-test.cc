@@ -13,6 +13,7 @@
 #include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 
 namespace radar {
+namespace {
 
 class FakeRadar : public fidl::Server<fuchsia_hardware_radar::RadarBurstReader> {
  public:
@@ -45,7 +46,8 @@ class TestRadarDeviceConnector : public RadarDeviceConnector {
   explicit TestRadarDeviceConnector(async_dispatcher_t* dispatcher)
       : fake_driver_(dispatcher), dispatcher_(dispatcher) {}
 
-  void ConnectToRadarDevice(int dir_fd, const std::filesystem::path& path,
+  void ConnectToRadarDevice(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                            const std::string& path,
                             ConnectDeviceCallback connect_device) override {
     ConnectToFirstRadarDevice(std::move(connect_device));
   }
@@ -110,9 +112,11 @@ class RadarProxyTest : public zxtest::Test {
   fidl::SyncClient<fuchsia_hardware_radar::RadarBurstReaderProvider> service_client_;
 };
 
+constexpr fidl::UnownedClientEnd<fuchsia_io::Directory> kInvalidDir(FIDL_HANDLE_INVALID);
+
 TEST_F(RadarProxyTest, Connect) {
   EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
-                proxy_.DeviceAdded(0, "000");
+                proxy_.DeviceAdded(kInvalidDir, "000");
               }).is_ok());
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
@@ -135,7 +139,7 @@ TEST_F(RadarProxyTest, Connect) {
 
 TEST_F(RadarProxyTest, Reconnect) {
   EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
-                proxy_.DeviceAdded(0, "000");
+                proxy_.DeviceAdded(kInvalidDir, "000");
               }).is_ok());
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
@@ -185,7 +189,7 @@ TEST_F(RadarProxyTest, Reconnect) {
   EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
                 // Signal that a new device was added to /dev/class/radar.
                 connector_.connect_fail_ = false;
-                proxy_.DeviceAdded(0, "000");
+                proxy_.DeviceAdded(kInvalidDir, "000");
               }).is_ok());
 
   // The proxy should now be able to connect to the new radar driver.
@@ -206,4 +210,5 @@ TEST_F(RadarProxyTest, Reconnect) {
   }
 }
 
+}  // namespace
 }  // namespace radar

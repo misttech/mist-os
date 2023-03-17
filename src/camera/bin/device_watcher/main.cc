@@ -46,11 +46,10 @@ class DeviceWatcherTesterImpl : public fidl::Server<fuchsia_camera_test::DeviceW
 
   fidl::ProtocolHandler<fuchsia_camera_test::DeviceWatcherTester> GetHandler(
       async_dispatcher_t* dispatcher) {
-    return bindings_.CreateHandler(this, dispatcher,
-                                   std::mem_fn(&DeviceWatcherTesterImpl::OnClosed));
+    return bindings_.CreateHandler(this, dispatcher, &DeviceWatcherTesterImpl::OnClosed);
   }
 
-  void OnClosed(fidl::UnbindInfo info) {
+  static void OnClosed(fidl::UnbindInfo info) {
     if (info.is_user_initiated()) {
       return;
     }
@@ -92,7 +91,10 @@ int main(int argc, char* argv[]) {
 
   auto server = server_create_result.take_value();
   auto watcher = fsl::DeviceWatcher::CreateWithIdleCallback(
-      camera::kCameraPath, [&](int dir_fd, std::string path) { server->AddDeviceByPath(path); },
+      camera::kCameraPath,
+      [&](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& path) {
+        server->AddDeviceByPath(path);
+      },
       [&]() { server->UpdateClients(); });
   if (!watcher) {
     FX_LOGS(FATAL) << "Failed to create fsl::DeviceWatcher";
@@ -117,8 +119,8 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  DeviceWatcherTesterImpl tester([&](std::string path) {
-    server->AddDeviceByPath(std::move(path));
+  DeviceWatcherTesterImpl tester([&](const std::string& path) {
+    server->AddDeviceByPath(path);
     server->UpdateClients();
   });
   zx::result tester_result =

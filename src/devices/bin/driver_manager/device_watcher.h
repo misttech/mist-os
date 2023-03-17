@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fidl/cpp/wire/transaction.h>
@@ -20,10 +19,9 @@
 
 class DeviceWatcher : public fidl::WireServer<fuchsia_device_manager::DeviceWatcher> {
  public:
-  DeviceWatcher(async_dispatcher_t* dispatcher, fbl::unique_fd fd)
+  DeviceWatcher(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_io::Directory> dir)
       : watcher_(fsl::DeviceWatcher::CreateWithIdleCallback(
-            std::move(fd), fit::bind_member<&DeviceWatcher::FdCallback>(this), [] {}, dispatcher)) {
-  }
+            std::move(dir), fit::bind_member<&DeviceWatcher::Callback>(this), [] {}, dispatcher)) {}
 
   void NextDevice(NextDeviceCompleter::Sync& completer) override {
     if (request_) {
@@ -39,15 +37,14 @@ class DeviceWatcher : public fidl::WireServer<fuchsia_device_manager::DeviceWatc
   }
 
  private:
-  void FdCallback(int dir_fd, const std::string& filename) {
+  void Callback(const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
     zx::channel client, server;
     if (const zx_status_t status = zx::channel::create(0, &client, &server); status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "failed to create channel";
       return;
     }
     if (const zx_status_t status =
-            fdio_service_connect_at(fdio_cpp::UnownedFdioCaller(dir_fd).borrow_channel(),
-                                    filename.c_str(), server.release());
+            fdio_service_connect_at(dir.channel().get(), filename.c_str(), server.release());
         status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "failed to connect to device";
       return;

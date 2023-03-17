@@ -48,7 +48,6 @@ source_set("fdio") {
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
   ]
 }

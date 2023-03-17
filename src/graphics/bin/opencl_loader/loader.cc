@@ -4,9 +4,6 @@
 
 #include "src/graphics/bin/opencl_loader/loader.h"
 
-#include <lib/fdio/directory.h>
-#include <lib/fdio/io.h>
-
 LoaderImpl::~LoaderImpl() { app_->RemoveObserver(this); }
 
 // static

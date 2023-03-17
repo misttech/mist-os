@@ -19,15 +19,17 @@ class LoaderApp;
 
 class MagmaDevice : public GpuDevice {
  public:
-  static std::unique_ptr<MagmaDevice> Create(LoaderApp* app, int dir_fd, std::string name,
-                                             inspect::Node* parent);
+  static std::unique_ptr<MagmaDevice> Create(LoaderApp* app,
+                                             const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                             const std::string& name, inspect::Node* parent);
 
   IcdList& icd_list() override { return icd_list_; }
 
  private:
   explicit MagmaDevice(LoaderApp* app) : GpuDevice(app) {}
 
-  bool Initialize(int dir_fd, const std::string& name, inspect::Node* parent);
+  bool Initialize(const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name,
+                  inspect::Node* parent);
 
   FIT_DECLARE_THREAD_CHECKER(main_thread_)
   IcdList icd_list_;

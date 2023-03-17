@@ -345,7 +345,8 @@ int RunDfv1(driver_manager_config::Config dm_config,
           // Move off the main loop, which is also serving devfs.
           async::PostTask(
               dispatcher, [&devfs_client, dispatcher, request = std::move(request)]() mutable {
-                zx::result fd = [&devfs_client]() -> zx::result<fbl::unique_fd> {
+                zx::result dir =
+                    [&devfs_client]() -> zx::result<fidl::ClientEnd<fuchsia_io::Directory>> {
                   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
                   if (endpoints.is_error()) {
                     return endpoints.take_error();
@@ -361,19 +362,13 @@ int RunDfv1(driver_manager_config::Config dm_config,
                     return zx::error(status);
                   }
 
-                  fbl::unique_fd fd;
-                  if (const zx_status_t status = fdio_fd_create(client.TakeChannel().release(),
-                                                                fd.reset_and_get_address());
-                      status != ZX_OK) {
-                    return zx::error(status);
-                  }
-                  return zx::ok(std::move(fd));
+                  return zx::ok(std::move(client));
                 }();
-                if (fd.is_error()) {
-                  request.Close(fd.status_value());
+                if (dir.is_error()) {
+                  request.Close(dir.status_value());
                 }
                 std::unique_ptr watcher =
-                    std::make_unique<DeviceWatcher>(dispatcher, std::move(fd.value()));
+                    std::make_unique<DeviceWatcher>(dispatcher, std::move(dir.value()));
                 fidl::BindServer(dispatcher, std::move(request), std::move(watcher));
               });
         },

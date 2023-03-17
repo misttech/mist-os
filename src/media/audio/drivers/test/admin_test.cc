@@ -571,19 +571,19 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
 #define REGISTER_ADMIN_TEST(CLASS_NAME, DEVICE)                                              \
   testing::RegisterTest("AdminTest", TestNameForEntry(#CLASS_NAME, DEVICE).c_str(), nullptr, \
                         DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                 \
-                        [=]() -> AdminTest* { return new CLASS_NAME(DEVICE); })
+                        [&]() -> AdminTest* { return new CLASS_NAME(DEVICE); })
 
 #define REGISTER_DISABLED_ADMIN_TEST(CLASS_NAME, DEVICE)                                       \
   testing::RegisterTest(                                                                       \
       "AdminTest", (std::string("DISABLED_") + TestNameForEntry(#CLASS_NAME, DEVICE)).c_str(), \
       nullptr, DevNameForEntry(DEVICE).c_str(), __FILE__, __LINE__,                            \
-      [=]() -> AdminTest* { return new CLASS_NAME(DEVICE); })
+      [&]() -> AdminTest* { return new CLASS_NAME(DEVICE); })
 
 void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
                                  bool expect_audio_core_connected) {
   // If audio_core is connected to the audio driver, admin tests will fail.
   // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
-  if (device_entry.dir_fd == DeviceEntry::kA2dp || !expect_audio_core_connected) {
+  if (device_entry.isA2DP() || !expect_audio_core_connected) {
     REGISTER_ADMIN_TEST(GetRingBufferProperties, device_entry);
     REGISTER_ADMIN_TEST(GetBuffer, device_entry);
     REGISTER_ADMIN_TEST(InternalDelayIsValid, device_entry);

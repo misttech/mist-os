@@ -6,7 +6,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/trace/event.h>
 #include <string.h>
@@ -81,12 +80,12 @@ std::optional<fuchsia_input_report::wire::DeviceType> GetDeviceTypeFromString(
 int ReadAllDevices(async::Loop* loop, Printer* printer) {
   // Start watching the directory and read all of the input reports for each.
   auto watcher = fsl::DeviceWatcher::Create(
-      "/dev/class/input-report/", [&](int dir_fd, const std::string& filename) {
+      "/dev/class/input-report/",
+      [&](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
         printer->Print("Reading reports from %s:\n", filename.c_str());
-        fdio_cpp::UnownedFdioCaller caller(dir_fd);
 
         zx::result connection =
-            component::ConnectAt<fuchsia_input_report::InputDevice>(caller.directory(), filename);
+            component::ConnectAt<fuchsia_input_report::InputDevice>(dir, filename);
         if (connection.is_error()) {
           printer->Print("could not open %s: %s\n", filename.c_str(), connection.status_string());
           return;
@@ -111,12 +110,12 @@ int ReadAllDevices(async::Loop* loop, Printer* printer) {
 int ReadAllDescriptors(async::Loop* loop, Printer* printer) {
   // Start watching the directory and read all of the input reports for each.
   auto watcher = fsl::DeviceWatcher::Create(
-      "/dev/class/input-report/", [&](int dir_fd, const std::string& filename) {
+      "/dev/class/input-report/",
+      [&](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
         printer->Print("Reading descriptor from %s:\n", filename.c_str());
-        fdio_cpp::UnownedFdioCaller caller(dir_fd);
 
         zx::result connection =
-            component::ConnectAt<fuchsia_input_report::InputDevice>(caller.directory(), filename);
+            component::ConnectAt<fuchsia_input_report::InputDevice>(dir, filename);
         if (connection.is_error()) {
           printer->Print("could not open %s: %s\n", filename.c_str(), connection.status_string());
           return;

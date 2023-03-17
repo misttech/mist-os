@@ -45,7 +45,7 @@ class CodecFactoryApp {
   [[nodiscard]] const fuchsia::mediacodec::CodecFactoryPtr* FindHwCodec(
       fit::function<bool(const fuchsia::mediacodec::DetailedCodecDescription&)> is_match);
 
-  [[nodiscard]] const std::optional<std::string> FindHwIsolate(
+  [[nodiscard]] std::optional<std::string> FindHwIsolate(
       fit::function<bool(const fuchsia::mediacodec::DetailedCodecDescription&)> is_match);
 
   [[nodiscard]] std::vector<fuchsia::mediacodec::CodecDescription> MakeCodecList() const;
@@ -99,7 +99,8 @@ class CodecFactoryApp {
   void IdledCodecDiscovery();
   // Remove a magma codec from the discovery queue and codec lists and ensure
   // the discovery queue is processed correctly.
-  void TeardownMagmaCodec(std::shared_ptr<fuchsia::gpu::magma::IcdLoaderDevicePtr> magma_device);
+  void TeardownMagmaCodec(
+      const std::shared_ptr<fuchsia::gpu::magma::IcdLoaderDevicePtr>& magma_device);
 
   [[nodiscard]] std::string GetBoardName();
 

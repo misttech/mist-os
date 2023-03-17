@@ -6,7 +6,6 @@
 
 #include <fcntl.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
@@ -52,8 +51,9 @@ class PlugDetectorImpl : public PlugDetector {
     for (const auto& devnode : AUDIO_DEVNODES) {
       auto watcher = fsl::DeviceWatcher::Create(
           devnode.path,
-          [this, is_input = devnode.is_input](int dir_fd, const std::string& filename) {
-            AddAudioDevice(dir_fd, filename, is_input);
+          [this, is_input = devnode.is_input](const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                              const std::string& filename) {
+            AddAudioDevice(dir, filename, is_input);
           });
 
       if (watcher != nullptr) {
@@ -76,15 +76,15 @@ class PlugDetectorImpl : public PlugDetector {
   }
 
  private:
-  void AddAudioDevice(int dir_fd, const std::string& name, bool is_input) {
+  void AddAudioDevice(const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name,
+                      bool is_input) {
     TRACE_DURATION("audio", "PlugDetectorImpl::AddAudioDevice");
     if (!observer_) {
       return;
     }
 
-    fdio_cpp::UnownedFdioCaller caller(dir_fd);
     fuchsia::hardware::audio::StreamConfigConnectorPtr device;
-    if (zx_status_t status = fdio_service_connect_at(caller.borrow_channel(), name.c_str(),
+    if (zx_status_t status = fdio_service_connect_at(dir.channel().get(), name.c_str(),
                                                      device.NewRequest().TakeChannel().release());
         status != ZX_OK) {
       Reporter::Singleton().FailedToConnectToDevice(name, is_input, status);

@@ -137,7 +137,6 @@ source_set("audio_core_lib") {
     "//src/media/audio/drivers/lib/audio-proto-utils",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
   ]
 

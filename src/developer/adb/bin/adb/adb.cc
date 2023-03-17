@@ -6,7 +6,6 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -226,10 +225,9 @@ zx::result<std::unique_ptr<Adb>> Adb::Create(async_dispatcher_t* dispatcher) {
       fidl::ClientEnd<fuchsia_hardware_adb::Device> client;
       auto watcher = fsl::DeviceWatcher::Create(
           kAdbDirectory,
-          [&](int dir_fd, const std::string& filename) {
-            fdio_cpp::UnownedFdioCaller caller(dir_fd);
-            auto client_end =
-                component::ConnectAt<fuchsia_hardware_adb::Device>(caller.directory(), filename);
+          [&](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
+            zx::result client_end =
+                component::ConnectAt<fuchsia_hardware_adb::Device>(dir, filename);
             if (client_end.is_ok() && !client.is_valid()) {
               client = std::move(client_end.value());
               loop.Quit();

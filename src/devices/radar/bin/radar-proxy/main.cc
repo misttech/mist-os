@@ -5,9 +5,9 @@
 #include <dirent.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <sys/stat.h>
@@ -21,31 +21,28 @@ namespace radar {
 
 class DefaultRadarDeviceConnector : public RadarDeviceConnector {
  public:
-  void ConnectToRadarDevice(int dir_fd, const std::filesystem::path& path,
+  void ConnectToRadarDevice(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                            const std::string& path,
                             ConnectDeviceCallback connect_device) override {
-    fdio_cpp::UnownedFdioCaller caller(dir_fd);
-    zx::result endpoints =
-        fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReaderProvider>();
-    if (endpoints.is_error()) {
+    zx::result client_end =
+        component::ConnectAt<fuchsia_hardware_radar::RadarBurstReaderProvider>(dir, path);
+    if (client_end.is_error()) {
       return;
     }
-
-    zx_status_t status = fdio_service_connect_at(caller.directory().channel()->get(), path.c_str(),
-                                                 endpoints->server.TakeChannel().release());
-    if (status == ZX_OK) {
-      connect_device(std::move(endpoints->client));
-    }
+    connect_device(std::move(client_end.value()));
   }
 
   void ConnectToFirstRadarDevice(ConnectDeviceCallback connect_device) override {
+    // TODO(https://fxbug.dev/113882): Use device_watcher's waiting helper when it exists.
     DIR* const devices_dir = opendir(RadarProxy::kRadarDeviceDirectory);
     if (!devices_dir) {
       return;
     }
+    fdio_cpp::UnownedFdioCaller caller(dirfd(devices_dir));
 
     for (const dirent* device = readdir(devices_dir); device; device = readdir(devices_dir)) {
       bool found = false;
-      ConnectToRadarDevice(dirfd(devices_dir), device->d_name, [&](auto client_end) {
+      ConnectToRadarDevice(caller.directory(), device->d_name, [&](auto client_end) {
         return found = connect_device(std::move(client_end));
       });
       if (found) {

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.radar/cpp/fidl.h>
 #include <lib/fit/function.h>
 
-#include <filesystem>
 #include <string>
 
 #include "src/lib/fsl/io/device_watcher.h"
@@ -26,7 +25,8 @@ class RadarDeviceConnector {
   // Synchronously connects to the given radar device and passes the client end to the callback. The
   // callback is not called if the connection could not be made. The callback return value is
   // ignored.
-  virtual void ConnectToRadarDevice(int dir_fd, const std::filesystem::path& path,
+  virtual void ConnectToRadarDevice(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                                    const std::string& path,
                                     ConnectDeviceCallback connect_device) = 0;
 
   // Calls ConnectToRadarDevice() on available devices until the callback returns true.
@@ -40,11 +40,14 @@ class RadarProxy : public fidl::Server<fuchsia_hardware_radar::RadarBurstReaderP
   RadarProxy()
       : device_watcher_(fsl::DeviceWatcher::Create(
             kRadarDeviceDirectory,
-            [&](int dir_fd, const std::string& filename) { DeviceAdded(dir_fd, filename); })) {}
+            [&](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
+              DeviceAdded(dir, filename);
+            })) {}
 
   // Called by a DeviceWatcher when /dev/class/radar has a new device, and for each existing device
   // during construction.
-  virtual void DeviceAdded(int dir_fd, const std::string& filename) = 0;
+  virtual void DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                           const std::string& filename) = 0;
 
  private:
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
