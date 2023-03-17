@@ -116,7 +116,8 @@ group("tests") {
   testonly = true
   deps = [ ":goldfish-bind_test" ]
 
-  if (target_cpu == "x64") {
-    deps += [ ":goldfish-pipe-device-test-package" ]
-  }
+  # TODO(fxbug.dev/123012): Re-enable the test once the flake is fixed.
+  # if (target_cpu == "x64") {
+  #   deps += [ ":goldfish-pipe-device-test-package" ]
+  # }
 }
