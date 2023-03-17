@@ -616,8 +616,14 @@ class Control3Reg : public Fusb302Register<Control3Reg> {
   static auto Get() { return hwreg::I2cRegisterAddr<Control3Reg>(0x09); }
 };
 
+// MASK - Individual interrupt masking for the requests in `InterruptReg`.
+//
+// After reset, no interrupt is individually masked.
+//
+// Rev 5 datasheet: Table 26 on page 23
 class MaskReg : public Fusb302Register<MaskReg> {
  public:
+  // See the corresponding bits in `InterruptReg` for interrupt definitions.
   DEF_BIT(7, m_vbusok);
   DEF_BIT(6, m_activity);
   DEF_BIT(5, m_comp_chng);
@@ -627,7 +633,9 @@ class MaskReg : public Fusb302Register<MaskReg> {
   DEF_BIT(1, m_collision);
   DEF_BIT(0, m_bc_lvl);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<MaskReg>(MASK_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<MaskReg>(0x0a); }
+
+  static MaskReg FromAllInterruptsMasked() { return Get().FromValue(0xff); }
 };
 
 // POWER - Configures the chip's power gates.
@@ -715,8 +723,15 @@ class OcpReg : public Fusb302Register<OcpReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<OcpReg>(0x0d); }
 };
 
+// MASKA - Individual interrupt masking for the requests in `InterruptAReg`.
+//
+// After reset, no interrupt is individually masked.
+//
+// Rev 5 datasheet: Table 30 on page 24
 class MaskAReg : public Fusb302Register<MaskAReg> {
  public:
+  // See the corresponding bits in `InterruptAReg` for interrupt definitions.
+
   DEF_BIT(7, m_ocp_temp);
   DEF_BIT(6, m_togdone);
   DEF_BIT(5, m_softfail);
@@ -726,14 +741,24 @@ class MaskAReg : public Fusb302Register<MaskAReg> {
   DEF_BIT(1, m_softrst);
   DEF_BIT(0, m_hardrst);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<MaskAReg>(MASK_A_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<MaskAReg>(0x0e); }
+
+  static MaskAReg FromAllInterruptsMasked() { return Get().FromValue(0xff); }
 };
 
+// MASKB - Individual interrupt masking for the requests in `InterruptBReg`.
+//
+// After reset, no interrupt is individually masked.
+//
+// Rev 5 datasheet: Table 31 on page 24
 class MaskBReg : public Fusb302Register<MaskBReg> {
  public:
+  // See the corresponding bits in `InterruptBReg` for interrupt definitions.
   DEF_BIT(0, m_gcrcsent);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<MaskBReg>(MASK_B_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<MaskBReg>(0x0f); }
+
+  static MaskBReg FromAllInterruptsMasked() { return Get().FromValue(0x01); }
 };
 
 // CONTROL4 - Additional configuration for automated power role detection.
@@ -869,25 +894,76 @@ class Status1AReg : public Fusb302Register<Status1AReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<Status1AReg>(0x3d); }
 };
 
+// INTERRUPTA - Interrupt requests for some events
+//
+// This is a read-only register. The interrupt request bits are cleared when the
+// register is read.
+//
+// The `MaskAReg` register has corresponding bits for individually masking the
+// interrupt requests here.
+//
+// Rev 5 datasheet: Table 35 on page 26
 class InterruptAReg : public Fusb302Register<InterruptAReg> {
  public:
+  // One of the thermal monitors signaled an issue.
+  //
+  // The fields `ocp` and / or `ovrtemp` in
+  // `Status1Reg` became true.
   DEF_BIT(7, i_ocp_temp);
+
+  // The hardware power role detection process finished.
+  //
+  // The field `togss` in `Status0AReg` transitioned away
+  // from `kDetecting`.
   DEF_BIT(6, i_togdone);
+
+  // The field `soft_reset_loss_detected` in `Status0AReg` became true.
   DEF_BIT(5, i_softfail);
+
+  // The field `message_loss_detected` in `Status0AReg` became true.
   DEF_BIT(4, i_retryfail);
+
+  // The transmitter in the BMC PHY sent a Hard Reset ordered set.
   DEF_BIT(3, i_hardsent);
+
+  // The PD protocol layer got a GoodCRC matching the last sent message.
+  //
+  // Experiments with FUSB302BMPX indicate that this interrupt is redundant with
+  // reading the message data from the Rx (receiver) FIFO. In other words, all
+  // GoodCRC messages signaled by this interrupt will show up in the Rx FIFO.
   DEF_BIT(2, i_txsent);
+
+  // The field `softrst` in `Status0AReg` became true.
+  //
+  // Experiments with FUSB302BMPX indicate that this interrupt is redundant with
+  // reading the message data from the Rx (receiver) FIFO. In other words, all
+  // Soft Reset messages signaled by this interrupt will show up in the Rx FIFO.
   DEF_BIT(1, i_softrst);
+
+  // The field `hardrst` in `Status0AReg` became true.
   DEF_BIT(0, i_hardrst);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<InterruptAReg>(INTERRUPT_A_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<InterruptAReg>(0x3e); }
 };
 
+// INTERRUPTB - Interrupt requests for some events
+//
+// This is a read-only register. The interrupt request bits are cleared when the
+// register is read.
+//
+// The `MaskBReg` register has corresponding bits for individually masking the
+// interrupt requests here.
+//
+// Rev 5 datasheet: Table 36 on page 26
 class InterruptBReg : public Fusb302Register<InterruptBReg> {
  public:
+  // The BMC PHY transmitted a GoodCRC message generated by the Protocol Layer.
+  //
+  // This interrupt should not occur if `auto_crc` in
+  // `Switches1Reg` is false.
   DEF_BIT(0, i_gcrcsent);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<InterruptBReg>(INTERRUPT_B_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<InterruptBReg>(0x3f); }
 };
 
 // CC pin voltage, as reported by the fixed comparators in the measure block.
@@ -1039,18 +1115,47 @@ class Status1Reg : public Fusb302Register<Status1Reg> {
   static auto Get() { return hwreg::I2cRegisterAddr<Status1Reg>(0x41); }
 };
 
+// INTERRUPT - Interrupt requests for some events
+//
+// This is a read-only register. The interrupt request bits are cleared when the
+// register is read.
+//
+// The `MaskReg` register has corresponding bits for individually masking the
+// interrupt requests here.
+//
+// Rev 5 datasheet: Table 39 on page 28
 class InterruptReg : public Fusb302Register<InterruptReg> {
  public:
+  // The `vbusok` field in `Status0Reg` changed.
   DEF_BIT(7, i_vbusok);
+
+  // The `cc_activity_detected` field in `Status0Reg` changed to true.
   DEF_BIT(6, i_activity);
+
+  // The `variable_comparator_result` field in `Status0Reg` changed.
   DEF_BIT(5, i_comp_chng);
+
+  // The `crc_chk` field in `Status0Reg` became valid.
+  //
+  // This is a signal that the BMC PHY layer just finished receiving a message.
   DEF_BIT(4, i_crc_chk);
+
+  // The `alert` field in `Status0Reg` changed to true.
   DEF_BIT(3, i_alert);
+
+  // The `wake` field in `Status0Reg` changed to true.
   DEF_BIT(2, i_wake);
+
+  // The BMC PHY discarded a packet it was about to transmit due to CC activity.
+  //
+  // This behavior implements usbpd3.1 5.7 "Collision Avoidance". Collisions at
+  // the PHY layer signal an incorrect PD Protocol implementation.
   DEF_BIT(1, i_collision);
+
+  // The `bc_lvl` field in `Status0Reg` changed.
   DEF_BIT(0, i_bc_lvl);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<InterruptReg>(INTERRUPT_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<InterruptReg>(0x42); }
 };
 
 class FifosReg : public Fusb302Register<FifosReg> {
