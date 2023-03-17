@@ -4,16 +4,13 @@
 
 use crate::webdriver::types::{EnableDevToolsResult, GetDevToolsPortsResult};
 use anyhow::{format_err, Error};
-use fidl::endpoints::{create_proxy, create_request_stream, ClientEnd, ServerEnd};
+use fidl::endpoints::{create_request_stream, ServerEnd};
 use fidl_fuchsia_web::{
-    ContextMarker, ContextProviderMarker, ContextProviderProxy, CreateContextParams, DebugMarker,
-    DebugProxy, DevToolsListenerMarker, DevToolsListenerRequest, DevToolsListenerRequestStream,
+    DevToolsListenerMarker, DevToolsListenerRequest, DevToolsListenerRequestStream,
     DevToolsPerContextListenerMarker, DevToolsPerContextListenerRequest,
-    DevToolsPerContextListenerRequestStream, FrameMarker,
+    DevToolsPerContextListenerRequestStream,
 };
 use fuchsia_async as fasync;
-use fuchsia_component as app;
-use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use parking_lot::Mutex;
@@ -70,22 +67,14 @@ struct WebdriverFacadeInternal {
     dev_tools_ports: HashSet<u16>,
     /// Receiving end for port update channel.
     port_update_receiver: mpsc::UnboundedReceiver<PortUpdateMessage>,
-    /// Proxy to ContextProvider that is held to ensure WebDriver is running
-    /// for the duration of the test.
-    _context_provider: ContextProviderProxy,
 }
 
 impl WebdriverFacadeInternal {
     /// Create a new `WebdriverFacadeInternal`.  Can fail if connecting to the
     /// debug service fails.
     pub async fn new() -> Result<WebdriverFacadeInternal, Error> {
-        let context_provider = Self::get_context_provider_proxy().await?;
         let port_update_receiver = Self::get_port_event_receiver().await?;
-        Ok(WebdriverFacadeInternal {
-            dev_tools_ports: HashSet::new(),
-            port_update_receiver,
-            _context_provider: context_provider,
-        })
+        Ok(WebdriverFacadeInternal { dev_tools_ports: HashSet::new(), port_update_receiver })
     }
 
     /// Returns a copy of the available ports.
@@ -104,40 +93,12 @@ impl WebdriverFacadeInternal {
         }
     }
 
-    /// Returns a proxy to ContextProvider.  Completion of this method
-    /// guarantees that the debug service is published on the Hub.
-    async fn get_context_provider_proxy() -> Result<ContextProviderProxy, Error> {
-        // Walk through creating a frame and navigation controller.
-        // Completion of fuchsia.web.Frame.GetPrivateMemorySize() is used to
-        // wait until the Frame has actually been created, thereby ensuring that
-        // the debug service is ready to accept requests.
-        let context_provider = app::client::connect_to_protocol::<ContextProviderMarker>()?;
-        let (context_proxy, context_server_end) = create_proxy::<ContextMarker>()?;
-
-        let (client, server) = zx::Channel::create();
-        fdio::service_connect("/svc", server)?;
-        let service_directory = ClientEnd::new(client);
-
-        context_provider.create(
-            CreateContextParams {
-                service_directory: Some(service_directory),
-                ..CreateContextParams::EMPTY
-            },
-            context_server_end,
-        )?;
-
-        let (frame_proxy, frame_server_end) = create_proxy::<FrameMarker>()?;
-        context_proxy.create_frame(frame_server_end)?;
-
-        frame_proxy.get_private_memory_size().await?;
-        Ok(context_provider)
-    }
-
     /// Setup a channel to receive port open/close channels and return the
     /// receiving end.  Assumes Webdriver is already running.
     async fn get_port_event_receiver() -> Result<mpsc::UnboundedReceiver<PortUpdateMessage>, Error>
     {
-        let debug_proxy = Self::get_debug_proxy().await?;
+        let debug_proxy =
+            fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_web::DebugMarker>()?;
         let (dev_tools_client, dev_tools_stream) =
             create_request_stream::<DevToolsListenerMarker>()?;
         let (port_update_sender, port_update_receiver) = mpsc::unbounded();
@@ -145,23 +106,6 @@ impl WebdriverFacadeInternal {
         Self::spawn_dev_tools_listener(dev_tools_stream, port_update_sender);
         debug_proxy.enable_dev_tools(dev_tools_client).await?;
         Ok(port_update_receiver)
-    }
-
-    /// Get a client to the WebDriver Debug service published in the Hub.
-    async fn get_debug_proxy() -> Result<DebugProxy, Error> {
-        let query = fuchsia_component::client::connect_to_protocol::<
-            fidl_fuchsia_sys2::RealmQueryMarker,
-        >()?;
-        let resolved_dirs = query
-            .get_instance_directories("./core/context_provider")
-            .await?
-            .map_err(|s| format_err!("could not get context_provider directories: {:?}", s))?
-            .ok_or(format_err!("context_provider component is not resolved"))?;
-        let exposed_dir = resolved_dirs.exposed_dir.into_proxy().unwrap();
-        let debug_proxy = fuchsia_component::client::connect_to_protocol_at_dir_root::<DebugMarker>(
-            &exposed_dir,
-        )?;
-        Ok(debug_proxy)
     }
 
     /// Spawn an instance of `DevToolsListener` that forwards port open/close

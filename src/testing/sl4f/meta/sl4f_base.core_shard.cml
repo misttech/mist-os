@@ -118,6 +118,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.web.Debug",
+            from: "#context_provider",
+            to: "#sl4f",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.metricslogger.test.MetricsLogger",
             from: "#metrics-logger",
             to: "#sl4f",

@@ -132,6 +132,10 @@
             path: "/svc/fuchsia.sys2.RealmQuery",
         },
         {
+            protocol: "fuchsia.web.Debug",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
