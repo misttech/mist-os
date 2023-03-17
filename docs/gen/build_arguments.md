@@ -197,7 +197,7 @@ AVB metadata which will be used to validate public key
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/arm64.gni:38
+From //boards/arm64.gni:37
 
 **Overridden from the default:** `""`
 
@@ -217,7 +217,7 @@ a key which will be used to sign VBMETA and images for AVB
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/arm64.gni:40
+From //boards/arm64.gni:39
 
 **Overridden from the default:** `""`
 
@@ -457,7 +457,7 @@ A list of binary labels to include in the ZBI.
 
 **Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/drivers/virtio:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc"]`
 
-From //boards/arm64.gni:25
+From //boards/arm64.gni:24
 
 **Overridden from the default:** `[]`
 
@@ -595,7 +595,7 @@ physical/virtual device spec or both.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:30
+From //boards/arm64.gni:29
 
 **Overridden from the default:** `false`
 
@@ -613,7 +613,7 @@ From //build/board.gni:105
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //boards/arm64.gni:31
+From //boards/arm64.gni:30
 
 **Overridden from the default:** `true`
 
@@ -699,9 +699,9 @@ From //build/board.gni:39
 
 A list of binary labels to include in the recovery ZBI.
 
-**Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/drivers/virtio:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc", "//src/graphics/display/drivers/fake:fake-display"]`
+**Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/drivers/virtio:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc"]`
 
-From //boards/arm64.gni:26
+From //boards/arm64.gni:25
 
 **Overridden from the default:** `[]`
 
@@ -768,9 +768,9 @@ From //build/board.gni:94
 
 A list of binary labels to include in the zedboot ZBI.
 
-**Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/drivers/virtio:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc", "//src/graphics/display/drivers/fake:fake-display"]`
+**Current value for `target_cpu = "arm64"`:** `["//src/devices/bus/drivers/pci:bus-pci", "//src/devices/usb/drivers/xhci", "//src/power/power-manager:base_config", "//src/security/policy/zxcrypt:null", "//src/devices/block/drivers/nvme", "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice", "//src/devices/block/drivers/virtio:virtio_block", "//src/devices/block/drivers/virtio:virtio_scsi", "//src/devices/misc/drivers/virtio-rng:virtio_rng", "//src/devices/serial/drivers/virtio-console:virtio_console", "//src/graphics/drivers/misc:goldfish_fuchsia_drivers", "//src/graphics/display/drivers/goldfish-display", "//src/graphics/drivers/virtio:virtio_gpu", "//src/ui/input/drivers/virtio:virtio_input", "//src/ui/input/drivers/goldfish_sensor:sensor_driver", "//src/devices/block/drivers/ahci", "//src/devices/board/drivers/acpi-arm64", "//src/devices/board/drivers/qemu-arm64", "//src/devices/rtc/drivers/pl031-rtc"]`
 
-From //boards/arm64.gni:27
+From //boards/arm64.gni:26
 
 **Overridden from the default:** `[]`
 
@@ -953,7 +953,7 @@ Generate a UEFI disk image
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:34
+From //boards/arm64.gni:33
 
 **Overridden from the default:** `false`
 
@@ -4037,7 +4037,7 @@ The images config information used during assembly.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/images:arm64"`
 
-From //boards/arm64.gni:42
+From //boards/arm64.gni:41
 
 **Overridden from the default:** `false`
 
@@ -5544,7 +5544,7 @@ From //zircon/kernel/params.gni:140
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:45
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `[]`
 
@@ -5565,7 +5565,7 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:44
+From //boards/arm64.gni:43
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
@@ -8226,7 +8226,7 @@ Build the gigaboot bootloader.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:35
+From //boards/arm64.gni:34
 
 **Overridden from the default:** `false`
 
@@ -8429,7 +8429,7 @@ and the paving script will pave vbmeta images to the target device.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:36
+From //boards/arm64.gni:35
 
 **Overridden from the default:** `false`
 
@@ -8693,7 +8693,7 @@ The images config information used for zedboot images.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/images:zedboot_default"`
 
-From //boards/arm64.gni:43
+From //boards/arm64.gni:42
 
 **Overridden from the default:** `false`
 
