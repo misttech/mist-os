@@ -211,6 +211,7 @@ pub fn dispatch_syscall(
         sched_setaffinity[3],
         sched_setscheduler[3],
         sched_yield[0],
+        seccomp[3],
         sendmmsg[4],
         sendmsg[3],
         sendto[6],

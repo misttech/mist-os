@@ -985,6 +985,41 @@ pub fn sys_capset(
     Ok(())
 }
 
+pub fn sys_seccomp(
+    current_task: &CurrentTask,
+    operation: u32,
+    flags: u32,
+    _args: UserAddress,
+) -> Result<(), Errno> {
+    match operation {
+        SECCOMP_SET_MODE_STRICT => {
+            if flags != 0 {
+                return error!(EINVAL);
+            }
+        }
+        SECCOMP_SET_MODE_FILTER => match flags {
+            SECCOMP_FILTER_FLAG_LOG
+            | SECCOMP_FILTER_FLAG_NEW_LISTENER
+            | SECCOMP_FILTER_FLAG_SPEC_ALLOW
+            | SECCOMP_FILTER_FLAG_TSYNC => (),
+            _ => return error!(EINVAL),
+        },
+        SECCOMP_GET_ACTION_AVAIL => {
+            if flags != 0 {
+                return error!(EINVAL);
+            }
+        }
+        SECCOMP_GET_NOTIF_SIZES => {
+            if flags != 0 {
+                return error!(EINVAL);
+            }
+        }
+        _ => return error!(EINVAL),
+    }
+    not_implemented!(current_task, "seccomp not implemented");
+    error!(ENOSYS)
+}
+
 pub fn sys_setgroups(
     current_task: &CurrentTask,
     size: usize,

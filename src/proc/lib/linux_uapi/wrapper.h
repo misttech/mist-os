@@ -40,6 +40,7 @@
 #include <linux/resource.h>
 #include <linux/sched.h>
 #include <linux/sched/types.h>
+#include <linux/seccomp.h>
 #include <linux/securebits.h>
 #include <linux/signal.h>
 #include <linux/signalfd.h>

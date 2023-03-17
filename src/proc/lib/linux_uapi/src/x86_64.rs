@@ -3069,6 +3069,35 @@ pub const SCHED_FLAG_UTIL_CLAMP: u32 = 96;
 pub const SCHED_FLAG_ALL: u32 = 127;
 pub const SCHED_ATTR_SIZE_VER0: u32 = 48;
 pub const SCHED_ATTR_SIZE_VER1: u32 = 56;
+pub const SECCOMP_MODE_DISABLED: u32 = 0;
+pub const SECCOMP_MODE_STRICT: u32 = 1;
+pub const SECCOMP_MODE_FILTER: u32 = 2;
+pub const SECCOMP_SET_MODE_STRICT: u32 = 0;
+pub const SECCOMP_SET_MODE_FILTER: u32 = 1;
+pub const SECCOMP_GET_ACTION_AVAIL: u32 = 2;
+pub const SECCOMP_GET_NOTIF_SIZES: u32 = 3;
+pub const SECCOMP_FILTER_FLAG_TSYNC: u32 = 1;
+pub const SECCOMP_FILTER_FLAG_LOG: u32 = 2;
+pub const SECCOMP_FILTER_FLAG_SPEC_ALLOW: u32 = 4;
+pub const SECCOMP_FILTER_FLAG_NEW_LISTENER: u32 = 8;
+pub const SECCOMP_FILTER_FLAG_TSYNC_ESRCH: u32 = 16;
+pub const SECCOMP_FILTER_FLAG_WAIT_KILLABLE_RECV: u32 = 32;
+pub const SECCOMP_RET_KILL_PROCESS: u32 = 2147483648;
+pub const SECCOMP_RET_KILL_THREAD: u32 = 0;
+pub const SECCOMP_RET_KILL: u32 = 0;
+pub const SECCOMP_RET_TRAP: u32 = 196608;
+pub const SECCOMP_RET_ERRNO: u32 = 327680;
+pub const SECCOMP_RET_USER_NOTIF: u32 = 2143289344;
+pub const SECCOMP_RET_TRACE: u32 = 2146435072;
+pub const SECCOMP_RET_LOG: u32 = 2147221504;
+pub const SECCOMP_RET_ALLOW: u32 = 2147418112;
+pub const SECCOMP_RET_ACTION_FULL: u32 = 4294901760;
+pub const SECCOMP_RET_ACTION: u32 = 2147418112;
+pub const SECCOMP_RET_DATA: u32 = 65535;
+pub const SECCOMP_USER_NOTIF_FLAG_CONTINUE: u32 = 1;
+pub const SECCOMP_ADDFD_FLAG_SETFD: u32 = 1;
+pub const SECCOMP_ADDFD_FLAG_SEND: u32 = 2;
+pub const SECCOMP_IOC_MAGIC: u8 = 33u8;
 pub const SECUREBITS_DEFAULT: u32 = 0;
 pub const SECURE_NOROOT: u32 = 0;
 pub const SECURE_NOROOT_LOCKED: u32 = 1;
@@ -9051,6 +9080,46 @@ pub struct sched_attr {
     pub sched_period: __u64,
     pub sched_util_min: __u32,
     pub sched_util_max: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct seccomp_data {
+    pub nr: crate::x86_64_types::c_int,
+    pub arch: __u32,
+    pub instruction_pointer: __u64,
+    pub args: [__u64; 6usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct seccomp_notif_sizes {
+    pub seccomp_notif: __u16,
+    pub seccomp_notif_resp: __u16,
+    pub seccomp_data: __u16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct seccomp_notif {
+    pub id: __u64,
+    pub pid: __u32,
+    pub flags: __u32,
+    pub data: seccomp_data,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct seccomp_notif_resp {
+    pub id: __u64,
+    pub val: __s64,
+    pub error: __s32,
+    pub flags: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct seccomp_notif_addfd {
+    pub id: __u64,
+    pub flags: __u32,
+    pub srcfd: __u32,
+    pub newfd: __u32,
+    pub newfd_flags: __u32,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]

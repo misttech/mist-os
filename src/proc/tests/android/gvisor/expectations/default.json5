@@ -771,7 +771,6 @@
                 "RtSignalTest.ValueDelivered",
 
                 // seccomp_test
-                "SeccompTest.SeccompRejectsUnknownFlags",
                 "SeccompTest.RetErrnoReturnsErrno",
                 "SeccompTest.TsyncAppliesToAllThreads",
                 "SeccompTest.LeastPermissiveFilterReturnValueApplies",
