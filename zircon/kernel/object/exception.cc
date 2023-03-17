@@ -257,7 +257,7 @@ zx_status_t dispatch_user_exception(uint exception_type,
   };
 
   bool processed = false;
-  zx_status_t status;
+  zx_status_t status = ZX_ERR_INTERNAL;
   {
     // We're about to handle the exception.  Use a |ScopedThreadExceptionContext| to make the
     // thread's user register state available to debuggers and exception handlers while the thread
@@ -284,12 +284,15 @@ zx_status_t dispatch_user_exception(uint exception_type,
       dump_context(get_name(process));
     }
   } else {
-    // The exception was not handled. Normally, at least crashsvc would handle the exception and
-    // make a smarter decision about what to do with it, but in case it didn't, dump some info to
-    // the kernel logs.
     auto pname = get_name(process);
-    printf("KERN: exception_handler_worker returned %d\n", status);
-    dump_context(pname);
+
+    if (!processed) {
+      // The exception was not handled. Normally, at least crashsvc would handle the exception and
+      // make a smarter decision about what to do with it, but in case it didn't, dump some info to
+      // the kernel logs.
+      printf("KERN: exception_handler_worker returned %d\n", status);
+      dump_context(pname);
+    }
 
     printf("KERN: terminating process '%s' (%lu)\n", pname.data(), process->get_koid());
     process->Kill(ZX_TASK_RETCODE_EXCEPTION_KILL);
