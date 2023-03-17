@@ -1,5 +1,5 @@
-abarth@google.com
 fmil@google.com
-jamesr@google.com
+
+include /src/intl/OWNERS
 
 # COMPONENT: I18N>Libraries
