@@ -106,6 +106,7 @@ zbi_executable("phys-1mb-hello-world") {
   configs += [ "//zircon/kernel/arch/x86/phys:load-1mb" ]
 
   deps = [
+    "//zircon/kernel/phys:symbolize",
     "//zircon/kernel/phys/test:hello-world-test.source",
     "//zircon/kernel/phys/test:zbi-test-main",
   ]
