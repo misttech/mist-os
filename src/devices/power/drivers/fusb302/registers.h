@@ -360,61 +360,260 @@ class SliceReg : public Fusb302Register<SliceReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<SliceReg>(0x05); }
 };
 
+// CONTROL0 - Various settings. Most apply to BMC transmission.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// After reset, all interrupts will be masked, the pull-up current source will
+// be set to 80 uA, and the transmitter optimization will be disabled.
+//
+// Rev 5 datasheet: Table 22 on page 21
 class Control0Reg : public Fusb302Register<Control0Reg> {
  public:
+  // Set to true by the driver to start flushing the transmitter FIFO.
+  //
+  // The hardware sets this bit to false when it's done flushing the FIFO.
   DEF_BIT(6, tx_flush);
+
+  // If true, all interrupts are masked, regardless of other mask registers.
+  //
+  // This bit is a central switch that supplements the masks set by
   DEF_BIT(5, int_mask);
-  enum HostCur {
-    NO_CURRENT = 0b00,
-    DEFAULT = 0b01,
-    MEDIUM_1A5 = 0b10,
-    HIGH_3A0 = 0b11,
+
+  // Values for `host_cur`.
+  //
+  // The values follow Table 4-26 "Source Termination (Rp)" in typec2.2 4.11.1
+  // "Termination Parameters".
+  enum PullUpCurrent {
+    kNone = 0b00,
+
+    // Standard USB current capability.
+    kUsbStandard_80uA = 0b01,
+
+    // USB Type C Current, maximum 1.5A @ 5V.
+    kUsb1500mA_180uA = 0b10,
+
+    // USB Type C Current, maximum 3A @ 5V.
+    kUsb3000mA_330uA = 0b11,
   };
-  DEF_ENUM_FIELD(HostCur, 3, 2, host_cur);
+
+  // Amount of current generated in the pull-up current source.
+  //
+  // The pull-up current source can be connected to CC1 or CC2, by setting
+  // `Switches1Reg::SetBmcPhyConnection()`, to advertise USB power source
+  // capabilities.
+  DEF_ENUM_FIELD(PullUpCurrent, 3, 2, host_cur);
+
+  // If true, the transmitter is started upon the reception of a correct CRC.
+  //
+  // To take advantage of this optimization, the driver needs to start writing
+  // to the transmitter FIFO within 330 microseconds of the FUSB302 asserting
+  // the I_CRC_CHK interrupt. This only seems plausible in a constrained
+  // environment.
   DEF_BIT(1, auto_pre);
+
+  // Set to true by the driver to start a transmission.
+  //
+  // The hardware sets this bit to false when it's done powering up the
+  // transmitter driver.
+  //
+  // After the transmitter is powered up, it starts transmitting the USB PD
+  // message preamble. The driver can keep writing to the transmitter FIFO while
+  // the preamble is transmitted.
   DEF_BIT(0, tx_start);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Control0Reg>(CONTROL0_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<Control0Reg>(0x06); }
 };
 
+// CONTROL1 - Configures the BMC PHY. Most bits apply to the Rx (receiver).
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// After reset, all SOP' / SOP" messages are dropped, and the BIST Carrier Mode
+// pattern is disabled.
+//
+// Rev 5 datasheet: Table 23 on page 22
 class Control1Reg : public Fusb302Register<Control1Reg> {
  public:
+  // If false, SOP" (double-prime) debug messages are silently dropped.
+  //
+  // The USB PD spec does not standardize any SOP" debug messages.
   DEF_BIT(6, ensop2db);
+
+  // If false, SOP' (prime) debug messages are silently dropped.
+  //
+  // The USB PD spec does not standardize any SOP' debug messages.
   DEF_BIT(5, ensop1db);
+
+  // If true, the transmitter will send the BIST Carrier Mode pattern.
+  //
+  // This helps implement usbpd3.1 6.4.3.1 "BIST Carrier Mode".
   DEF_BIT(4, bist_mode2);
+
+  // Set to true by the driver to start flushing the receiver FIFO.
+  //
+  // The hardware sets this bit to false when it's done flushing the FIFO.
   DEF_BIT(2, rx_flush);
+
+  // If false, SOP" (prime) messages are silently dropped.
+  //
+  // SOP" messages are only exchanged between the Source and a Cable Plug. They
+  // are not used in Source / Sink communication.
   DEF_BIT(1, ensop2);
+
+  // If false, SOP' (prime) messages are silently dropped.
+  //
+  // SOP' messages are only exchanged between the Source and a Cable Plug. They
+  // are not used in Source / Sink communication.
   DEF_BIT(0, ensop1);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Control1Reg>(CONTROL1_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<Control1Reg>(0x07); }
 };
 
+// Values for `mode`.
+enum class Fusb302RoleDetectionMode : int8_t {
+  kReserved = 0b00,
+
+  // DPR (Dual-Power-Role) toggles between advertising a Source and Sink.
+  //
+  // This is a partial implementation of the DRP (Dual Power Role) toggling
+  // functionality in the Type C spec. According to Table 10 in the Rev 5
+  // datasheet, a power detection cycle consists of advertising as a Sink
+  // for ~45 ms (tTOG1) and advertising as a Source for ~30 ms (tTOG2). The
+  // tDIS description mentions that a full "toggle" cycle takes tTOG1 + tTOG2.
+  kDualPowerRole = 0b01,
+
+  // Advertise Sink capabilities, check for attached Source.
+  //
+  // This is a partial implementation of the state machine in Figure 4-13
+  // "Connection State Diagram: Sink" in the USB Type C spec.
+  kSinkOnly = 0b10,
+
+  // Advertise Source capabilities, check for attached Sink.
+  //
+  // This is a partial implementation of the state machine in Figure 4-12
+  // "Connection State Diagram: Source" in the USB Type C spec.
+  kSourceOnly = 0b11,
+};
+
+// Descriptor for logging and debugging.
+const char* Fusb302RoleDetectionModeToString(Fusb302RoleDetectionMode mode);
+
+// CONTROL2 - Configures automated power role detection.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// The Rev 5 datasheet refers to the entire power role detection feature as
+// "toggling". That term is a bit misleading, as the process can be configured
+// to only advertise as a Source or Sink, in which case no DRP toggling is
+// involved.
+//
+// After reset, automated power role detection is disabled.
+//
+// Rev 5 datasheet: Table 23 on page 22
 class Control2Reg : public Fusb302Register<Control2Reg> {
  public:
-  DEF_FIELD(7, 6, tog_save_pwr);
-  DEF_BIT(5, tog_rd_only);
-  DEF_BIT(3, wake_en);
-  enum ToggleMode {
-    ENABLE_DRP = 0b01,
-    ENABLE_SNK = 0b10,
-    ENABLE_SRC = 0b11,
+  // Values for `tog_save_pwr`.
+  enum class SleepDuration {
+    k0ms = 0b00,
+    k40ms = 0b01,
+    k80ms = 0b10,
+    k160ms = 0b11,
   };
-  DEF_ENUM_FIELD(ToggleMode, 2, 1, mode);
+
+  // The duration of sleep intervals between power role detection cycles.
+  //
+  // This field is only used when `automated_dual_power_role_toggle` is set. It
+  // configures the amount of time spent in a low-power sleep state after one
+  // cycle of the power role detection process completes.
+  DEF_ENUM_FIELD(SleepDuration, 7, 6, tog_save_pwr);
+
+  // If true, the power role detection process will ignore Ra termination.
+  //
+  // This bit is only used when `toggle` is set. If set,
+  // the hardware will not end the DRP toggling cycle when it detects Ra
+  // termination (used by Audio Accessories) on its CC pins.
+  DEF_BIT(5, tog_rd_only);
+
+  // If true, Wake Detection is enabled.
+  //
+  // Wake Detection only works if the `wake_detection_powered_on` field in the
+  // `PowerReg` register is set to true.
+  DEF_BIT(3, wake_en);
+
+  // The behavior in a cycle of the automated power role detection process.
+  DEF_ENUM_FIELD(Fusb302RoleDetectionMode, 2, 1, mode);
+
+  // If true, the hardware performs automated Type C power role detection.
+  //
+  // This bit enables the partial hardware implementation of the state machines
+  // in usbpd2.2 4.5 "Configuration Channel (CC)". The driver sets this bit to
+  // true to start the power role detection process.  The hardware sets this bit
+  // to false after it detects a Port Partner and establishes its own power
+  // role.
+  //
+  // Before setting this bit to true, the driver should configure other
+  // registers as described in the "Toggle Functionality" section on page 7 of
+  // the Rev 5 datasheet.
   DEF_BIT(0, toggle);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Control2Reg>(CONTROL2_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<Control2Reg>(0x08); }
 };
 
+// CONTROL3 - Configures the PD Protocol Layer above the BMC PHY.
+//
+// After reset, all automated transmissions are disabled. The GoodCRC timeout
+// retry count is set to 3, but the setting is not in effect, because
+// re-transmissions are disabled.
+//
+// Rev 5 datasheet: Table 23 on page 22
 class Control3Reg : public Fusb302Register<Control3Reg> {
  public:
+  // Set to true by the driver to transmit a Hard Reset message.
+  //
+  // The transmitter in the BMC PHY follows usbpd3.1 5.6.4 "Hard Reset" to
+  // send a Hard Reset packet over the CC pin that it is currently connected to.
+  //
+  // The hardware sets this bit to false when it's done transmitting.
   DEF_BIT(6, send_hard_reset);
+
+  // If true, received messages are dropped after generating GoodCRC replies.
+  //
+  // This helps implement usbpd3.1 6.4.3.2 "BIST Test Data".  Enabling it helps
+  // avoid receiver FIFO overflow when the USB PD compliance testing equipment
+  // repeatedly sends the same data message.
   DEF_BIT(5, bist_tmode);
+
+  // If true, automatically send HardReset messages per the USB PD spec.
+  //
+  //
   DEF_BIT(4, auto_hardreset);
+
+  // If true, automatically send SoftReset messages per the USB PD spec.
+  //
+  // This bit enables the hardware implementation of the SoftReset provision in
+  // usbpd3.1 6.7.2 "Retry Counter" and 6.6.9.1 "tSoftReset".
   DEF_BIT(3, auto_softreset);
+
+  // Number of re-transmissions after timing out waiting for a GoodCRC message.
+  //
+  // Only meaningful if `auto_retry` is true.
+  //
+  // This field acts as the nRetryCount value in usbpd3.1 6.7.2 "Retry Counter".
+  // usbpd3.1 6.7.7 "Counter Values and Counters" states that this value should
+  // be set to 2.
   DEF_FIELD(2, 1, n_retries);
+
+  // If true, messages are retransmitted after timing out waiting for a GoodCRC.
+  //
+  // This bit enables the hardware implementation of usbpd3.1 6.6.1
+  // "CRCReceiveTimer".
   DEF_BIT(0, auto_retry);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Control3Reg>(CONTROL3_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<Control3Reg>(0x09); }
 };
 
 class MaskReg : public Fusb302Register<MaskReg> {
@@ -478,11 +677,28 @@ class MaskBReg : public Fusb302Register<MaskBReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<MaskBReg>(MASK_B_ADDR); }
 };
 
+// CONTROL4 - Additional configuration for automated power role detection.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// After reset, Audio Accessories are not a special case for power role
+// detection.
+//
+// Rev 5 datasheet: Table 31 on page 24
 class Control4Reg : public Fusb302Register<Control4Reg> {
  public:
+  // If true, power role detection takes Audio Accessories into account.
+  //
+  // When this bit is true, automated power role detection succeeds when Ra is
+  // detected on both CC pins, which signals an Audio Accessory.
+  //
+  // This bit is only used when the `tog_rd_only` field in
+  // `Control2Reg` is true. It effectively carves out an Ra case that is not
+  // ignored by the power role detection logic.
   DEF_BIT(0, tog_exit_aud);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Control4Reg>(CONTROL4_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<Control4Reg>(0x10); }
 };
 
 class Status0AReg : public Fusb302Register<Status0AReg> {

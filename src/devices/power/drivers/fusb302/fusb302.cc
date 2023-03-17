@@ -504,7 +504,7 @@ zx_status_t Fusb302::InitHw() {
 
   // Start DRP toggling
   status = Control2Reg::ReadFrom(i2c_)
-               .set_mode(Control2Reg::ENABLE_DRP)
+               .set_mode(Fusb302RoleDetectionMode::kDualPowerRole)
                .set_toggle(1)
                .set_tog_rd_only(1)
                .WriteTo(i2c_);
@@ -515,7 +515,7 @@ zx_status_t Fusb302::InitHw() {
 
   // Set Host Current and Enable Interrupts
   status = Control0Reg::ReadFrom(i2c_)
-               .set_host_cur(Control0Reg::MEDIUM_1A5)
+               .set_host_cur(Control0Reg::PullUpCurrent::kUsb1500mA_180uA)
                .set_int_mask(0)
                .WriteTo(i2c_);
   if (status != ZX_OK) {

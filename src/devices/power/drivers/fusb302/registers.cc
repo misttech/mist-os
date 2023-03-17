@@ -21,4 +21,19 @@ const char* SwitchBlockConfigToString(SwitchBlockConfig config) {
   return nullptr;
 }
 
+const char* Fusb302RoleDetectionModeToString(Fusb302RoleDetectionMode mode) {
+  switch (mode) {
+    case Fusb302RoleDetectionMode::kReserved:
+      return "(reserved)";
+    case Fusb302RoleDetectionMode::kDualPowerRole:
+      return "DPR (Dual Power Role)";
+    case Fusb302RoleDetectionMode::kSinkOnly:
+      return "only Sink";
+    case Fusb302RoleDetectionMode::kSourceOnly:
+      return "only Source";
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Fusb302RoleDetectionMode: %" PRId8, mode);
+  return nullptr;
+}
+
 }  // namespace fusb302
