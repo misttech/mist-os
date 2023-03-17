@@ -206,6 +206,34 @@ magma_status_t magma_buffer_get_info(magma_buffer_t buffer, magma_buffer_info_t*
   return static_cast<magma_status_t>(response.result_return);
 }
 
+magma_status_t magma_buffer_set_name(magma_buffer_t buffer, const char* name) {
+  auto buffer_wrapped = virtmagma_buffer_t::Get(buffer);
+
+  struct virtmagma_buffer_set_name_wrapper wrapper = {
+      .name_address = reinterpret_cast<uintptr_t>(name),
+      .name_size = strlen(name) + 1,  // include null terminate byte
+  };
+
+  virtio_magma_buffer_set_name_ctrl_t request{
+      .hdr = {.type = VIRTIO_MAGMA_CMD_BUFFER_SET_NAME},
+      .buffer = reinterpret_cast<uint64_t>(buffer_wrapped->Object()),
+      .name = reinterpret_cast<uintptr_t>(&wrapper),
+  };
+  virtio_magma_buffer_set_name_resp_t response{};
+
+  auto connection_wrapped = virtmagma_connection_t::Get(buffer_wrapped->Parent());
+
+  if (!virtmagma_send_command(connection_wrapped->Parent().fd(), &request, sizeof(request),
+                              &response, sizeof(response))) {
+    assert(false);
+    return DRET(MAGMA_STATUS_INTERNAL_ERROR);
+  }
+  if (response.hdr.type != VIRTIO_MAGMA_RESP_BUFFER_SET_NAME)
+    return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Wrong response header: %u", response.hdr.type);
+
+  return static_cast<magma_status_t>(response.result_return);
+}
+
 magma_status_t magma_initialize_tracing(magma_handle_t channel) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }

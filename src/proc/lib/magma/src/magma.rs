@@ -243,9 +243,9 @@ pub struct virtmagma_get_image_info_wrapper {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
-pub struct virtmagma_buffer_get_info_wrapper {
-    pub buffer_info_out: __u64,
-    pub buffer_info_size: __u64,
+pub struct virtmagma_buffer_set_name_wrapper {
+    pub name_address: __u64,
+    pub name_size: __u64,
 }
 pub type __u_char = ::std::os::raw::c_uchar;
 pub type __u_short = ::std::os::raw::c_ushort;

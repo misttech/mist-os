@@ -1156,6 +1156,29 @@ class TestConnection {
     magma_connection_release_buffer(connection(), buffer);
   }
 
+  void BufferNaming() {
+    uint64_t size = page_size() + 16;
+    uint64_t actual_size = 0;
+    magma_buffer_t buffer = 0;
+    magma_buffer_id_t buffer_id = 0;
+
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection(), size, &actual_size,
+                                                              &buffer, &buffer_id));
+
+    const char* kSomeName = "some_name";
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_set_name(buffer, kSomeName));
+
+#if defined(__Fuchsia__)
+    zx::vmo vmo;
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_buffer_get_handle(buffer, vmo.reset_and_get_address()));
+    char name[ZX_MAX_NAME_LEN] = {};
+    ASSERT_EQ(ZX_OK, vmo.get_property(ZX_PROP_NAME, name, sizeof(name)));
+    EXPECT_EQ(0, strcmp(name, kSomeName));
+#endif
+
+    magma_connection_release_buffer(connection(), buffer);
+  }
+
 #if defined(__Fuchsia__)
   void CheckAccessWithInvalidToken(magma_status_t expected_result) {
     FakePerfCountAccessServer server;
@@ -1697,3 +1720,5 @@ TEST_F(Magma, BufferUncached) { TestConnection().BufferCaching(MAGMA_CACHE_POLIC
 TEST_F(Magma, BufferWriteCombining) {
   TestConnection().BufferCaching(MAGMA_CACHE_POLICY_WRITE_COMBINING);
 }
+
+TEST_F(Magma, BufferNaming) { TestConnection().BufferNaming(); }

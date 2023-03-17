@@ -713,6 +713,31 @@ impl FileOps for MagmaFile {
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_SET_NAME => {
+                let (control, mut response): (
+                    virtio_magma_buffer_set_name_ctrl_t,
+                    virtio_magma_buffer_set_name_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                let wrapper_ref = UserRef::<virtmagma_buffer_set_name_wrapper>::new(
+                    UserAddress::from(control.name),
+                );
+                let wrapper = current_task.mm.read_object(wrapper_ref)?;
+
+                let name = current_task.mm.read_buffer(&UserBuffer {
+                    address: UserAddress::from(wrapper.name_address),
+                    length: wrapper.name_size as usize, // name_size includes null terminate byte
+                })?;
+
+                response.result_return = unsafe {
+                    magma_buffer_set_name(control.buffer, &name[0] as *const u8 as *const i8) as u64
+                };
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_SET_NAME as u32;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
             t => {
                 log_warn!(current_task, "Got unknown request: {:?}", t);
                 error!(ENOSYS)

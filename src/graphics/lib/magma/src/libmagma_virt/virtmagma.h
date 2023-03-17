@@ -54,6 +54,11 @@ struct virtmagma_get_image_info_wrapper {
   __u64 image_info_size;
 };
 
+struct virtmagma_buffer_set_name_wrapper {
+  __u64 name_address;
+  __u64 name_size;
+};
+
 #define VIRTMAGMA_IOCTL_HANDSHAKE VIRTMAGMA_IOWR(0x00, struct virtmagma_ioctl_args_handshake)
 // Removed: VIRTMAGMA_IOCTL_GET_MMFD (0x01)
 #define VIRTMAGMA_IOCTL_MAGMA_COMMAND \
