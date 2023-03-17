@@ -29,4 +29,8 @@ void* PhysHandoffPtrImportPhysAddr<PhysHandoffPtrEncoding::PhysAddr>(uintptr_t p
   return reinterpret_cast<void*>(ptr);
 }
 
+// This is what ZX_ASSERT calls.
 void __zx_panic(const char* format, ...) { __builtin_trap(); }
+
+// This is what libc++ headers call.
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) { __builtin_trap(); }

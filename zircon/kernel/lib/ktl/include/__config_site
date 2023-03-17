@@ -23,6 +23,9 @@
 #define _LIBCPP_ABI_VERSION 2
 #define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS
 
+// This has to be defined to some `__*` string but what doesn't really matter.
+#define _LIBCPP_ABI_NAMESPACE __ktl
+
 // When compiling in the UEFI environment, the predefines look like Windows
 // but there is no Windows runtime environment to use.
 #define _LIBCPP_NO_VCRUNTIME
