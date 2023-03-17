@@ -18,6 +18,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.device.NameProvider",
                 "fuchsia.gpu.agis.ComponentRegistry",
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Product",

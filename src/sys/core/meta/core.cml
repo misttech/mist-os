@@ -194,6 +194,7 @@
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
             to: [
+                "#agis",
                 "#bluetooth-core",
                 "#mdns",
                 "#network",

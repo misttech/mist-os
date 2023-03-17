@@ -29,6 +29,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.device.NameProvider",
                 "fuchsia.hwinfo.Board",
                 "fuchsia.hwinfo.Product",
                 "fuchsia.logger.LogSink",
