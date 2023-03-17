@@ -15,7 +15,6 @@
 
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
 #include "src/developer/forensics/last_reboot/last_reboot_info_provider.h"
-#include "src/developer/forensics/last_reboot/reboot_watcher.h"
 #include "src/developer/forensics/last_reboot/reporter.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/redact/redactor.h"
@@ -28,7 +27,6 @@ class LastReboot {
   struct Options {
     bool is_first_instance;
     RebootLog reboot_log;
-    std::string graceful_reboot_reason_write_path;
     zx::duration oom_crash_reporting_delay;
   };
 
@@ -39,7 +37,6 @@ class LastReboot {
   fuchsia::feedback::LastRebootInfoProvider* LastRebootInfoProvider();
 
  private:
-  last_reboot::ImminentGracefulRebootWatcher reboot_watcher_;
   last_reboot::Reporter reporter_;
   last_reboot::LastRebootInfoProvider last_reboot_info_provider_;
 };

@@ -24,25 +24,6 @@ source_set("last_reboot_info_provider") {
   deps = [ "//sdk/lib/syslog/cpp" ]
 }
 
-source_set("reboot_watcher") {
-  sources = [
-    "reboot_watcher.cc",
-    "reboot_watcher.h",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//src/developer/forensics/utils/cobalt",
-  ]
-
-  deps = [
-    "//src/developer/forensics/feedback/reboot_log",
-    "//src/lib/files",
-    "//src/lib/fxl",
-  ]
-}
-
 source_set("reporter") {
   sources = [
     "reporter.cc",

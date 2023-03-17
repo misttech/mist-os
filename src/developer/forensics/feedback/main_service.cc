@@ -5,6 +5,10 @@
 #include "src/developer/forensics/feedback/main_service.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
+#include <fuchsia/hardware/power/statecontrol/cpp/fidl.h>
+#include <fuchsia/process/lifecycle/cpp/fidl.h>
+#include <lib/fidl/cpp/interface_request.h>
+#include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
@@ -13,7 +17,9 @@
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/feedback/annotations/device_id_provider.h"
 #include "src/developer/forensics/feedback/annotations/provider.h"
+#include "src/developer/forensics/feedback/reboot_log/graceful_reboot_reason.h"
 #include "src/developer/forensics/feedback/redactor_factory.h"
+#include "src/developer/forensics/feedback/stop_signals.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/lib/backoff/exponential_backoff.h"
 #include "src/lib/timekeeper/system_clock.h"
@@ -36,11 +42,14 @@ std::unique_ptr<CachedAsyncAnnotationProvider> MakeDeviceIdProvider(
 
 }  // namespace
 
-MainService::MainService(async_dispatcher_t* dispatcher,
-                         std::shared_ptr<sys::ServiceDirectory> services, timekeeper::Clock* clock,
-                         inspect::Node* inspect_root, cobalt::Logger* cobalt,
-                         const Annotations& startup_annotations, Options options)
+MainService::MainService(
+    async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
+    timekeeper::Clock* clock, inspect::Node* inspect_root, cobalt::Logger* cobalt,
+    const Annotations& startup_annotations,
+    fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle> lifecycle_channel,
+    Options options)
     : dispatcher_(dispatcher),
+      executor_(dispatcher),
       services_(services),
       clock_(clock),
       inspect_root_(inspect_root),
@@ -71,11 +80,43 @@ MainService::MainService(async_dispatcher_t* dispatcher,
                                          "/fidl/fuchsia.feedback.DataProviderController"),
       last_reboot_info_bindings_(dispatcher_, last_reboot_.LastRebootInfoProvider(),
                                  &inspect_node_manager_,
-                                 "/fidl/fuchsia.feedback.LastRebootInfoProvider") {}
+                                 "/fidl/fuchsia.feedback.LastRebootInfoProvider") {
+  executor_.schedule_task(
+      WaitForLifecycleStop(dispatcher_, std::move(lifecycle_channel))
+          .and_then([this](LifecycleStopSignal& signal) {
+            FX_LOGS(INFO) << "Received stop signal; stopping upload, but not exiting "
+                             "to continue persisting new reports and logs";
 
-void MainService::ShutdownImminent(::fit::deferred_callback stop_respond) {
-  crash_reports_.ShutdownImminent();
-  feedback_data_.ShutdownImminent(std::move(stop_respond));
+            crash_reports_.ShutdownImminent();
+            feedback_data_.ShutdownImminent(
+                fit::defer_callback([s = std::move(signal)]() mutable { s.Respond(); }));
+          })
+          .or_else([](const Error& error) {
+            FX_LOGS(ERROR) << "Won't receive lifecycle signal: " << ToString(error);
+          }));
+
+  fidl::InterfaceHandle<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> handle;
+  executor_.schedule_task(WaitForRebootReason(dispatcher_, handle.NewRequest())
+                              .and_then([this, path = options.graceful_reboot_reason_write_path](
+                                            GracefulRebootReasonSignal& signal) {
+                                FX_LOGS(INFO) << "Received reboot reason '"
+                                              << ToFileContent(signal.Reason()) << "'";
+
+                                WriteGracefulRebootReason(signal.Reason(), cobalt_, path);
+                                signal.Respond();
+                              })
+                              .or_else([](const Error& error) {
+                                FX_LOGS(ERROR)
+                                    << "Won't receive reboot reason: " << ToString(error);
+                              }));
+
+  // We register ourselves with RebootMethodsWatcher using a fire-and-forget request that gives
+  // an endpoint to a long-lived connection we maintain.
+  //
+  // The ack response is ignored because the failures aren't expected unless the system is in a dire
+  // state.
+  services->Connect<fuchsia::hardware::power::statecontrol::RebootMethodsWatcherRegister>()
+      ->RegisterWithAck(std::move(handle), [] {});
 }
 
 template <>

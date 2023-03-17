@@ -18,7 +18,6 @@
 #include "src/developer/forensics/testing/stubs/cobalt_logger.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
 #include "src/developer/forensics/testing/stubs/crash_reporter.h"
-#include "src/developer/forensics/testing/stubs/reboot_methods_watcher_register.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/lib/files/path.h"
@@ -32,13 +31,8 @@ using ::testing::UnorderedElementsAreArray;
 
 class LastRebootTest : public UnitTestFixture {
  public:
-  LastRebootTest()
-      : clock_(dispatcher()),
-        cobalt_(dispatcher(), services(), &clock_),
-        reboot_watcher_register_server_(
-            std::make_unique<stubs::RebootMethodsWatcherRegisterHangs>()) {
+  LastRebootTest() : clock_(dispatcher()), cobalt_(dispatcher(), services(), &clock_) {
     SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
-    InjectServiceProvider(reboot_watcher_register_server_.get());
   }
 
   void TearDown() override {
@@ -55,16 +49,11 @@ class LastRebootTest : public UnitTestFixture {
 
   fuchsia::feedback::CrashReporter* CrashReporter() { return crash_reporter_server_.get(); }
 
-  stubs::RebootMethodsWatcherRegisterBase* RebootWatcherRegisterServer() {
-    return reboot_watcher_register_server_.get();
-  }
-
  private:
   timekeeper::AsyncTestClock clock_;
   cobalt::Logger cobalt_;
   IdentityRedactor redactor_{inspect::BoolProperty()};
 
-  std::unique_ptr<stubs::RebootMethodsWatcherRegisterBase> reboot_watcher_register_server_;
   std::unique_ptr<stubs::CrashReporterBase> crash_reporter_server_;
 };
 
@@ -84,13 +73,11 @@ TEST_F(LastRebootTest, FirstInstance) {
                          LastReboot::Options{
                              .is_first_instance = true,
                              .reboot_log = reboot_log,
-                             .graceful_reboot_reason_write_path = "n/a",
                              .oom_crash_reporting_delay = oom_crash_reporting_delay,
                          });
 
   RunLoopFor(oom_crash_reporting_delay);
 
-  EXPECT_TRUE(RebootWatcherRegisterServer()->IsBound());
   EXPECT_THAT(
       ReceivedCobaltEvents(),
       UnorderedElementsAreArray({
@@ -108,13 +95,11 @@ TEST_F(LastRebootTest, IsNotFirstInstance) {
                          LastReboot::Options{
                              .is_first_instance = false,
                              .reboot_log = reboot_log,
-                             .graceful_reboot_reason_write_path = "n/a",
                              .oom_crash_reporting_delay = oom_crash_reporting_delay,
                          });
 
   RunLoopFor(oom_crash_reporting_delay);
 
-  EXPECT_TRUE(RebootWatcherRegisterServer()->IsBound());
   EXPECT_THAT(ReceivedCobaltEvents(), IsEmpty());
 }
 

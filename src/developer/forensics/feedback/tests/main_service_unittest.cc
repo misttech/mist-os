@@ -36,15 +36,15 @@ class MainServiceTest : public UnitTestFixture {
       : clock_(dispatcher()),
         cobalt_(dispatcher(), services(), &clock_),
         main_service_(dispatcher(), services(), &clock_, &InspectRoot(), &cobalt_,
-                      /*startup_annotations=*/{},
+                      /*startup_annotations=*/{}, {},
                       MainService::Options{
                           BuildTypeConfig{},
+                          "",
                           "",
                           LastReboot::Options{
                               .is_first_instance = kIsFirstInstance,
                               .reboot_log = RebootLog(RebootReason::kUserRequest, "reboot log",
                                                       zx::sec(100), std::nullopt),
-                              .graceful_reboot_reason_write_path = "n/a",
                               .oom_crash_reporting_delay = zx::sec(1),
                           },
                           CrashReports::Options{

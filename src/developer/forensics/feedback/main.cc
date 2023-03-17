@@ -15,13 +15,13 @@
 #include <fbl/unique_fd.h>
 
 #include "src/developer/forensics/feedback/annotations/startup_annotations.h"
-#include "src/developer/forensics/feedback/config.h"
 #include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/feedback/main_service.h"
 #include "src/developer/forensics/feedback/namespace_init.h"
 #include "src/developer/forensics/feedback/reboot_log/annotations.h"
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
 #include "src/developer/forensics/feedback/redactor_factory.h"
+#include "src/developer/forensics/feedback/stop_signals.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/component/component.h"
 #include "src/lib/files/file.h"
@@ -82,34 +82,35 @@ int main() {
   }
 
   const auto startup_annotations = GetStartupAnnotations(reboot_log);
+  zx::channel lifecycle_channel(zx_take_startup_handle(PA_LIFECYCLE));
 
   std::unique_ptr<MainService> main_service = std::make_unique<MainService>(
       component.Dispatcher(), component.Services(), component.Clock(), component.InspectRoot(),
       cobalt.get(), startup_annotations,
-      MainService::Options{
-          *build_type_config, local_device_id_path,
-          LastReboot::Options{
-              .is_first_instance = component.IsFirstInstance(),
-              .reboot_log = reboot_log,
-              .graceful_reboot_reason_write_path = kCurrentGracefulRebootReasonFile,
-              .oom_crash_reporting_delay = kOOMCrashReportingDelay,
-          },
-          CrashReports::Options{
-              .build_type_config = *build_type_config,
-              .snapshot_store_max_archives_size = kSnapshotArchivesMaxSize,
-              .snapshot_persistence_max_tmp_size =
-                  product_config->snapshot_persistence_max_tmp_size,
-              .snapshot_persistence_max_cache_size =
-                  product_config->snapshot_persistence_max_cache_size,
-              .snapshot_collector_window_duration = kSnapshotSharedRequestWindow,
-          },
-          FeedbackData::Options{
-              .config = *snapshot_config,
-              .is_first_instance = component.IsFirstInstance(),
-              .limit_inspect_data = build_type_config->enable_limit_inspect_data,
-              .spawn_system_log_recorder = spawn_system_log_recorder,
-              .delete_previous_boot_logs_time = delete_previous_boot_logs_time,
-          }});
+      fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle>(std::move(lifecycle_channel)),
+      MainService::Options{*build_type_config, local_device_id_path,
+                           kCurrentGracefulRebootReasonFile,
+                           LastReboot::Options{
+                               .is_first_instance = component.IsFirstInstance(),
+                               .reboot_log = reboot_log,
+                               .oom_crash_reporting_delay = kOOMCrashReportingDelay,
+                           },
+                           CrashReports::Options{
+                               .build_type_config = *build_type_config,
+                               .snapshot_store_max_archives_size = kSnapshotArchivesMaxSize,
+                               .snapshot_persistence_max_tmp_size =
+                                   product_config->snapshot_persistence_max_tmp_size,
+                               .snapshot_persistence_max_cache_size =
+                                   product_config->snapshot_persistence_max_cache_size,
+                               .snapshot_collector_window_duration = kSnapshotSharedRequestWindow,
+                           },
+                           FeedbackData::Options{
+                               .config = *snapshot_config,
+                               .is_first_instance = component.IsFirstInstance(),
+                               .limit_inspect_data = build_type_config->enable_limit_inspect_data,
+                               .spawn_system_log_recorder = spawn_system_log_recorder,
+                               .delete_previous_boot_logs_time = delete_previous_boot_logs_time,
+                           }});
 
   component.AddPublicService(main_service->GetHandler<fuchsia::feedback::LastRebootInfoProvider>());
   component.AddPublicService(main_service->GetHandler<fuchsia::feedback::CrashReporter>());
@@ -118,16 +119,6 @@ int main() {
   component.AddPublicService(main_service->GetHandler<fuchsia::feedback::ComponentDataRegister>());
   component.AddPublicService(main_service->GetHandler<fuchsia::feedback::DataProvider>());
   component.AddPublicService(main_service->GetHandler<fuchsia::feedback::DataProviderController>());
-
-  zx::channel lifecycle_channel(zx_take_startup_handle(PA_LIFECYCLE));
-  component.OnStopSignal(::fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle>(
-                             std::move(lifecycle_channel)),
-                         [&](::fit::deferred_callback stop_respond) {
-                           FX_LOGS(INFO)
-                               << "Received stop signal; stopping upload, but not exiting "
-                                  "to continue persisting new reports and logs";
-                           main_service->ShutdownImminent(std::move(stop_respond));
-                         });
 
   component.RunLoop();
   return EXIT_SUCCESS;

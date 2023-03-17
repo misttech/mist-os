@@ -4,7 +4,6 @@
 
 #include "src/developer/forensics/utils/component/component.h"
 
-#include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/component_context.h>
@@ -64,30 +63,6 @@ TEST_F(ComponentTest, LogPreviousStarts) {
                                std::make_unique<sys::ComponentContext>(nullptr, dispatcher()));
     EXPECT_FALSE(instance3.IsFirstInstance());
   }
-}
-
-TEST_F(ComponentTest, OnStopSignal) {
-  // The loop in |component| doesn't need to be attached to a thread.
-  ComponentForTest component(dispatcher(), TakeContext());
-
-  ::fit::deferred_callback disconnect;
-  bool stopped{false};
-  fuchsia::process::lifecycle::LifecyclePtr lifecycle_ptr;
-  component.OnStopSignal(lifecycle_ptr.NewRequest(dispatcher()),
-                         [&](::fit::deferred_callback send_stop) {
-                           stopped = true;
-                           disconnect = std::move(send_stop);
-                         });
-
-  lifecycle_ptr->Stop();
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(stopped);
-  EXPECT_TRUE(lifecycle_ptr.is_bound());
-
-  disconnect.call();
-  RunLoopUntilIdle();
-  EXPECT_FALSE(lifecycle_ptr.is_bound());
 }
 
 }  // namespace

@@ -4,7 +4,15 @@
 
 #include "src/developer/forensics/feedback/reboot_log/graceful_reboot_reason.h"
 
+#include <fcntl.h>
 #include <lib/syslog/cpp/macros.h>
+
+#include <string>
+
+#include <fbl/unique_fd.h>
+
+#include "src/lib/files/file_descriptor.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {
 namespace feedback {
@@ -58,6 +66,8 @@ std::string ToString(const GracefulRebootReason reason) {
     case GracefulRebootReason::kNotParseable:
       return kReasonNotParseable;
   }
+
+  return kReasonNotSet;
 }
 
 std::string ToFileContent(const GracefulRebootReason reason) {
@@ -80,6 +90,8 @@ std::string ToFileContent(const GracefulRebootReason reason) {
       FX_LOGS(ERROR) << "Invalid persisted graceful reboot reason: " << ToString(reason);
       return kReasonNotSupported;
   }
+
+  return kReasonNotSupported;
 }
 
 GracefulRebootReason FromFileContent(const std::string reason) {
@@ -139,6 +151,29 @@ GracefulRebootReason ToGracefulRebootReason(
     default:
       return GracefulRebootReason::kNotSupported;
   }
+}
+
+void WriteGracefulRebootReason(GracefulRebootReason reason, cobalt::Logger* cobalt,
+                               const std::string& path) {
+  const size_t timer_id = cobalt->StartTimer();
+
+  fbl::unique_fd fd(open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR));
+  if (!fd.is_valid()) {
+    FX_LOGS(INFO) << "Failed to open reboot reason file: " << path;
+    return;
+  }
+
+  if (const std::string content = ToFileContent(reason);
+      fxl::WriteFileDescriptor(fd.get(), content.data(), content.size())) {
+    cobalt->LogElapsedTime(cobalt::RebootReasonWriteResult::kSuccess, timer_id);
+  } else {
+    cobalt->LogElapsedTime(cobalt::RebootReasonWriteResult::kFailure, timer_id);
+    FX_LOGS(ERROR) << "Failed to write reboot reason '" << content << "' to " << path;
+  }
+
+  // Force the flush as we want to persist the content asap and we don't have more content to
+  // write.
+  fsync(fd.get());
 }
 
 }  // namespace feedback

@@ -5,6 +5,8 @@
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_MAIN_SERVICE_H_
 
 #include <fuchsia/feedback/cpp/fidl.h>
+#include <fuchsia/process/lifecycle/cpp/fidl.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/fidl/cpp/interface_request.h>
@@ -37,6 +39,7 @@ class MainService {
   struct Options {
     BuildTypeConfig build_type_config;
     std::optional<std::string> local_device_id_path;
+    std::string graceful_reboot_reason_write_path;
     LastReboot::Options last_reboot_options;
     CrashReports::Options crash_reports_options;
     FeedbackData::Options feedback_data_options;
@@ -44,15 +47,16 @@ class MainService {
 
   MainService(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
               timekeeper::Clock* clock, inspect::Node* inspect_root, cobalt::Logger* cobalt,
-              const Annotations& startup_annotations, Options options);
+              const Annotations& startup_annotations,
+              fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle> lifecycle_channel,
+              Options options);
 
   template <typename Protocol>
   ::fidl::InterfaceRequestHandler<Protocol> GetHandler();
 
-  void ShutdownImminent(::fit::deferred_callback stop_respond);
-
  private:
   async_dispatcher_t* dispatcher_;
+  async::Executor executor_;
   std::shared_ptr<sys::ServiceDirectory> services_;
   timekeeper::Clock* clock_;
   inspect::Node* inspect_root_;

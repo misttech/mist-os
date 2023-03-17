@@ -5,11 +5,8 @@
 #ifndef SRC_DEVELOPER_FORENSICS_UTILS_COMPONENT_COMPONENT_H_
 #define SRC_DEVELOPER_FORENSICS_UTILS_COMPONENT_COMPONENT_H_
 
-#include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/binding.h>
-#include <lib/fit/defer.h>
-#include <lib/fit/function.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
@@ -51,14 +48,6 @@ class Component {
   // since boot.
   bool IsFirstInstance() const;
 
-  // Handle stopping the component when the Stop signal is received. The parent will be notified
-  // that it can stop the component when |deferred_callback| is executed.
-  //
-  // Note: This will start serving the outgoing directory if |lazy_outgoing_dir| was set to true.
-  void OnStopSignal(
-      ::fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle> lifecycle_channel,
-      ::fit::function<void(::fit::deferred_callback)> on_stop);
-
  protected:
   // Constructor for testing when the component should run on a different loop than |loop_|.
   Component(async_dispatcher_t* dispatcher, std::unique_ptr<sys::ComponentContext> context);
@@ -73,9 +62,6 @@ class Component {
   sys::ComponentInspector inspector_;
   timekeeper::SystemClock clock_;
   size_t instance_index_;
-
-  std::unique_ptr<fuchsia::process::lifecycle::Lifecycle> lifecycle_;
-  std::unique_ptr<::fidl::Binding<fuchsia::process::lifecycle::Lifecycle>> lifecycle_connection_;
 };
 
 }  // namespace component

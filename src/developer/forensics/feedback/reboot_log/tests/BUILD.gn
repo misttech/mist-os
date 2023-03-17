@@ -15,7 +15,13 @@ executable("graceful_reboot_reason_unittest_exe") {
 
   deps = [
     "//src/developer/forensics/feedback/reboot_log",
+    "//src/developer/forensics/testing:gpretty_printers",
+    "//src/developer/forensics/testing:unit_test_fixture",
+    "//src/developer/forensics/testing/stubs:cobalt",
+    "//src/lib/files",
+    "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/timekeeper:testing",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
@@ -60,7 +66,10 @@ executable("reboot_reason_unittest_exe") {
 # COMPONENTS
 ###############################################################################
 fuchsia_unittest_component("graceful_reboot_reason_unittest") {
-  deps = [ ":graceful_reboot_reason_unittest_exe" ]
+  deps = [
+    ":graceful_reboot_reason_unittest_exe",
+    "//src/sys/test_runners:tmp_storage",
+  ]
 }
 
 fuchsia_unittest_component("reboot_log_unittest") {

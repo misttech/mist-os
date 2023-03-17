@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include "src/developer/forensics/utils/cobalt/logger.h"
+
 namespace forensics {
 namespace feedback {
 
@@ -43,6 +45,10 @@ GracefulRebootReason FromFileContent(std::string content);
 
 // The input is limited to values corresponding to |power::statecontrol::RebootReason|.
 std::string ToFileContent(GracefulRebootReason reason);
+
+// Writes the graceful reboot reason to `path` and records metrics about the write.
+void WriteGracefulRebootReason(GracefulRebootReason reason, cobalt::Logger* cobalt,
+                               const std::string& path);
 
 }  // namespace feedback
 }  // namespace forensics

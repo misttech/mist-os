@@ -20,18 +20,6 @@ namespace {
 constexpr char kComponentDirectory[] = "/tmp/component";
 constexpr char kInstanceIndexPath[] = "/tmp/component/instance_index.txt";
 
-// Handles executing the passed callback when the Stop signal is received.
-class Lifecycle : public fuchsia::process::lifecycle::Lifecycle {
- public:
-  Lifecycle(::fit::closure on_stop) : on_stop_(std::move(on_stop)) {}
-
-  // |fuchsia.process.lifecycle.Lifecycle|
-  void Stop() override { on_stop_(); }
-
- private:
-  ::fit::closure on_stop_;
-};
-
 }  // namespace
 
 Component::Component()
@@ -40,9 +28,7 @@ Component::Component()
       context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()),
       inspector_(context_.get()),
       clock_(),
-      instance_index_(InitialInstanceIndex()),
-      lifecycle_(nullptr),
-      lifecycle_connection_(nullptr) {
+      instance_index_(InitialInstanceIndex()) {
   WriteInstanceIndex();
 }
 
@@ -52,9 +38,7 @@ Component::Component(async_dispatcher_t* dispatcher, std::unique_ptr<sys::Compon
       context_(std::move(context)),
       inspector_(context_.get()),
       clock_(),
-      instance_index_(InitialInstanceIndex()),
-      lifecycle_(nullptr),
-      lifecycle_connection_(nullptr) {
+      instance_index_(InitialInstanceIndex()) {
   WriteInstanceIndex();
 }
 
@@ -71,25 +55,6 @@ bool Component::IsFirstInstance() const { return instance_index_ == 1; }
 zx_status_t Component::RunLoop() { return loop_.Run(); }
 
 void Component::ShutdownLoop() { return loop_.Shutdown(); }
-
-void Component::OnStopSignal(
-    ::fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle> lifecycle_channel,
-    ::fit::function<void(::fit::deferred_callback)> on_stop) {
-  using ProcLifecycle = fuchsia::process::lifecycle::Lifecycle;
-
-  lifecycle_ = std::make_unique<Lifecycle>([this, on_stop = std::move(on_stop)] {
-    on_stop(::fit::defer<::fit::callback<void()>>([this] {
-      // Close the channel to indicate to the client that stop procedures have completed.
-      lifecycle_connection_->Close(ZX_OK);
-    }));
-  });
-  lifecycle_connection_ = std::make_unique<::fidl::Binding<ProcLifecycle>>(
-      lifecycle_.get(), std::move(lifecycle_channel), Dispatcher());
-
-  lifecycle_connection_->set_error_handler([](const zx_status_t status) {
-    FX_PLOGS(WARNING, status) << "Lost connection to lifecycle client";
-  });
-}
 
 size_t Component::InitialInstanceIndex() const {
   // The default is this is the first instance.

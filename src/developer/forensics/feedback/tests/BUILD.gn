@@ -446,6 +446,20 @@ executable("startup_annotations_unittest_exe") {
   ]
 }
 
+executable("stop_signals_unittest_exe") {
+  testonly = true
+
+  sources = [ "stop_signals_unittest.cc" ]
+
+  deps = [
+    "//src/developer/forensics/feedback:stop_signals",
+    "//src/developer/forensics/testing:unit_test_fixture",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 executable("system_log_unittest_exe") {
   testonly = true
 
@@ -684,6 +698,10 @@ fuchsia_unittest_component("startup_annotations_unittest") {
   deps = [ ":startup_annotations_unittest_exe" ]
 }
 
+fuchsia_unittest_component("stop_signals_unittest") {
+  deps = [ ":stop_signals_unittest_exe" ]
+}
+
 fuchsia_unittest_component("system_log_unittest") {
   deps = [
     ":system_log_unittest_exe",
@@ -731,6 +749,7 @@ fuchsia_test_package("feedback-tests") {
     ":product_info_provider_unittest",
     ":redactor_factory_unittest",
     ":startup_annotations_unittest",
+    ":stop_signals_unittest",
     ":system_log_unittest",
     ":target_channel_provider_unittest",
     ":time_provider_unittest",
