@@ -155,7 +155,7 @@ async fn run_overnet(
 ) -> Result<(), Error> {
     let node_id = node.node_id();
     tracing::info!(?node_id, "RUN OVERNET");
-    let lpc = Arc::new(node.new_list_peers_context());
+    let lpc = Arc::new(node.new_list_peers_context().await);
     // Run application loop
     rx.for_each_concurrent(None, move |cmd| {
         let node = node.clone();

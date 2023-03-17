@@ -431,7 +431,7 @@ fn log_request<
 async fn handle_request(node: Arc<Router>, req: HostOvernetRequest) -> Result<(), Error> {
     match req {
         HostOvernetRequest::ConnectServiceConsumer { svc, control_handle: _ } => {
-            let list_peers_context = Arc::new(node.new_list_peers_context());
+            let list_peers_context = Arc::new(node.new_list_peers_context().await);
             svc.into_stream()?
                 .map_err(Into::<Error>::into)
                 .try_for_each_concurrent(

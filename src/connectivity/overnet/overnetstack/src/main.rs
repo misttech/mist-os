@@ -68,7 +68,7 @@ async fn run_service_consumer_server(
     node: Arc<Router>,
     stream: ServiceConsumerRequestStream,
 ) -> Result<(), Error> {
-    let list_peers_context = Arc::new(node.new_list_peers_context());
+    let list_peers_context = Arc::new(node.new_list_peers_context().await);
     stream
         .map_err(Into::into)
         .try_for_each_concurrent(None, |request| {

@@ -116,7 +116,7 @@ mod test {
     use std::time::Duration;
 
     async fn await_peer(router: Arc<Router>, peer: NodeId) {
-        let lp = router.new_list_peers_context();
+        let lp = router.new_list_peers_context().await;
         while lp.list_peers().await.unwrap().into_iter().find(|p| peer == p.id.into()).is_none() {}
     }
 

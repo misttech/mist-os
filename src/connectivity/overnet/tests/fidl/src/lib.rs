@@ -105,7 +105,7 @@ impl Fixture {
             .await
             .unwrap();
         // Wait til we can see both peers in the service map before progressing.
-        let lpc = router1.new_list_peers_context();
+        let lpc = router1.new_list_peers_context().await;
         loop {
             let peers = lpc.list_peers().await.unwrap();
             let has_peer = |node_id: NodeId| {

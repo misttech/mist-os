@@ -211,7 +211,7 @@ impl PeerMaps {
             local_node_id,
             conn_id,
             &mut config,
-            router.service_map.new_local_service_observer(),
+            router.service_map.new_local_service_observer().await,
             router,
             wait_for_route,
         )?;
@@ -585,8 +585,8 @@ impl Router {
     }
 
     /// Create a new list_peers context
-    pub fn new_list_peers_context(&self) -> ListPeersContext {
-        ListPeersContext(Mutex::new(Some(self.service_map.new_list_peers_observer())))
+    pub async fn new_list_peers_context(&self) -> ListPeersContext {
+        ListPeersContext(Mutex::new(Some(self.service_map.new_list_peers_observer().await)))
     }
 
     /// Diagnostic information for links
@@ -1174,7 +1174,7 @@ async fn run_circuits(
                         conn,
                         writer,
                         reader,
-                        router.service_map.new_local_service_observer(),
+                        router.service_map.new_local_service_observer().await,
                         &router,
                     )?;
 
@@ -1299,7 +1299,7 @@ mod tests {
             .await;
         let serving_node_id = serving_router.node_id();
         println!("{} wait for service to appear @ client", service);
-        let lpc = client_router.new_list_peers_context();
+        let lpc = client_router.new_list_peers_context().await;
         loop {
             let peers = lpc.list_peers().await.unwrap();
             println!("{} got peers {:?}", service, peers);
@@ -1446,7 +1446,7 @@ mod tests {
     async fn concurrent_list_peer_calls_will_error(run: usize) -> Result<(), Error> {
         let mut node_id_gen = NodeIdGenerator::new("concurrent_list_peer_calls_will_error", run);
         let n = node_id_gen.new_router().unwrap();
-        let lp = n.new_list_peers_context();
+        let lp = n.new_list_peers_context().await;
         lp.list_peers().await.unwrap();
         let mut never_completes = async {
             lp.list_peers().await.unwrap();

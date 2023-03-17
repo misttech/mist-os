@@ -49,12 +49,16 @@ impl ListablePeerSet {
     }
 }
 
-pub struct ServiceMap {
-    local_services: Mutex<BTreeMap<String, Box<dyn ServiceProviderProxyInterface>>>,
-    local_node_id: NodeId,
+pub struct ServiceMapInner {
+    local_services: BTreeMap<String, Box<dyn ServiceProviderProxyInterface>>,
     local_service_list: Observable<Vec<String>>,
     list_peers: Observable<Vec<ListablePeer>>,
-    listable_peer_set: Mutex<ListablePeerSet>,
+    listable_peer_set: ListablePeerSet,
+}
+
+pub struct ServiceMap {
+    inner: Mutex<ServiceMapInner>,
+    local_node_id: NodeId,
 }
 
 impl ServiceMap {
@@ -62,13 +66,15 @@ impl ServiceMap {
         let listable_peers =
             vec![ListablePeer { node_id: local_node_id, is_self: true, services: vec![] }];
         ServiceMap {
-            local_services: Mutex::new(BTreeMap::new()),
             local_node_id,
-            local_service_list: Observable::new(Vec::new()),
-            list_peers: Observable::new(listable_peers.clone()),
-            listable_peer_set: Mutex::new(ListablePeerSet {
-                listable_peers,
-                peers_with_client_connection: std::iter::once((local_node_id, 1)).collect(),
+            inner: Mutex::new(ServiceMapInner {
+                local_services: BTreeMap::new(),
+                local_service_list: Observable::new(Vec::new()),
+                list_peers: Observable::new(listable_peers.clone()),
+                listable_peer_set: ListablePeerSet {
+                    listable_peers,
+                    peers_with_client_connection: std::iter::once((local_node_id, 1)).collect(),
+                },
             }),
         }
     }
@@ -79,9 +85,10 @@ impl ServiceMap {
         chan: Channel,
         connection_info: ConnectionInfo,
     ) -> Result<(), Error> {
-        self.local_services
+        self.inner
             .lock()
             .await
+            .local_services
             .get(service_name)
             .ok_or_else(|| format_err!("Service not found: {}", service_name))?
             .connect_to_service(chan, connection_info)?;
@@ -94,12 +101,11 @@ impl ServiceMap {
         provider: Box<dyn ServiceProviderProxyInterface>,
     ) {
         tracing::trace!("Request register_service '{}'", service_name);
-        let mut local_services = self.local_services.lock().await;
-        if local_services.insert(service_name.clone(), provider).is_none() {
+        let mut inner = self.inner.lock().await;
+        if inner.local_services.insert(service_name.clone(), provider).is_none() {
             tracing::trace!("Publish new service '{}'", service_name);
-            let services: Vec<String> = local_services.keys().cloned().collect();
-            drop(local_services);
-            self.local_service_list.maybe_push(services.clone()).await;
+            let services: Vec<String> = inner.local_services.keys().cloned().collect();
+            inner.local_service_list.maybe_push(services).await;
         }
     }
 
@@ -112,41 +118,41 @@ impl ServiceMap {
     }
 
     async fn update_list_peers(&self, update_peer: ListablePeer) {
-        let mut lsp = self.listable_peer_set.lock().await;
-        let peers = &mut lsp.listable_peers;
+        let mut inner = self.inner.lock().await;
+        let peers = &mut inner.listable_peer_set.listable_peers;
         for existing_peer in peers.iter_mut() {
             if existing_peer.node_id == update_peer.node_id {
                 if *existing_peer == update_peer {
                     return;
                 }
                 *existing_peer = update_peer;
-                self.list_peers.maybe_push(lsp.publish()).await;
+                inner.list_peers.maybe_push(inner.listable_peer_set.publish()).await;
                 return;
             }
         }
         peers.push(update_peer);
-        self.list_peers.maybe_push(lsp.publish()).await;
+        inner.list_peers.maybe_push(inner.listable_peer_set.publish()).await;
     }
 
     pub async fn add_client_connection(&self, peer_id: NodeId) {
-        let mut lsp = self.listable_peer_set.lock().await;
-        match lsp.peers_with_client_connection.entry(peer_id) {
+        let mut inner = self.inner.lock().await;
+        match inner.listable_peer_set.peers_with_client_connection.entry(peer_id) {
             btree_map::Entry::Occupied(o) => *o.into_mut() += 1,
             btree_map::Entry::Vacant(v) => {
                 v.insert(1);
-                self.list_peers.maybe_push(lsp.publish()).await;
+                inner.list_peers.maybe_push(inner.listable_peer_set.publish()).await;
             }
         }
     }
 
     pub async fn remove_client_connection(&self, peer_id: NodeId) {
-        let mut lsp = self.listable_peer_set.lock().await;
-        match lsp.peers_with_client_connection.entry(peer_id) {
+        let mut inner = self.inner.lock().await;
+        match inner.listable_peer_set.peers_with_client_connection.entry(peer_id) {
             btree_map::Entry::Occupied(mut o) => match *o.get() {
                 0 => unreachable!(),
                 1 => {
                     o.remove();
-                    self.list_peers.maybe_push(lsp.publish()).await;
+                    inner.list_peers.maybe_push(inner.listable_peer_set.publish()).await;
                 }
                 n => *o.get_mut() = n - 1,
             },
@@ -154,11 +160,11 @@ impl ServiceMap {
         }
     }
 
-    pub fn new_local_service_observer(&self) -> Observer<Vec<String>> {
-        self.local_service_list.new_observer()
+    pub async fn new_local_service_observer(&self) -> Observer<Vec<String>> {
+        self.inner.lock().await.local_service_list.new_observer()
     }
 
-    pub fn new_list_peers_observer(&self) -> Observer<Vec<ListablePeer>> {
-        self.list_peers.new_observer()
+    pub async fn new_list_peers_observer(&self) -> Observer<Vec<ListablePeer>> {
+        self.inner.lock().await.list_peers.new_observer()
     }
 }
