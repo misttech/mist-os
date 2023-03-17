@@ -20,7 +20,7 @@
 #include <string.h>
 #include <zircon/boot/crash-reason.h>
 
-#include <arch/regs.h>
+#include <arch/crashlog.h>
 #include <fbl/enum_bits.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
@@ -155,106 +155,15 @@ size_t crashlog_to_string(ktl::span<char> target, zircon_crash_reason_t reason) 
   if (static_cast<bool>(regions & RenderRegion::DebugInfo)) {
     PrintSymbolizerContext(&outfile);
 
-    if (g_crashlog.iframe) {
-#if defined(__aarch64__)
-      fprintf(&outfile,
-              // clang-format off
-              "REGISTERS\n"
-              "  x0: %#18" PRIx64 "\n"
-              "  x1: %#18" PRIx64 "\n"
-              "  x2: %#18" PRIx64 "\n"
-              "  x3: %#18" PRIx64 "\n"
-              "  x4: %#18" PRIx64 "\n"
-              "  x5: %#18" PRIx64 "\n"
-              "  x6: %#18" PRIx64 "\n"
-              "  x7: %#18" PRIx64 "\n"
-              "  x8: %#18" PRIx64 "\n"
-              "  x9: %#18" PRIx64 "\n"
-              " x10: %#18" PRIx64 "\n"
-              " x11: %#18" PRIx64 "\n"
-              " x12: %#18" PRIx64 "\n"
-              " x13: %#18" PRIx64 "\n"
-              " x14: %#18" PRIx64 "\n"
-              " x15: %#18" PRIx64 "\n"
-              " x16: %#18" PRIx64 "\n"
-              " x17: %#18" PRIx64 "\n"
-              " x18: %#18" PRIx64 "\n"
-              " x19: %#18" PRIx64 "\n"
-              " x20: %#18" PRIx64 "\n"
-              " x21: %#18" PRIx64 "\n"
-              " x22: %#18" PRIx64 "\n"
-              " x23: %#18" PRIx64 "\n"
-              " x24: %#18" PRIx64 "\n"
-              " x25: %#18" PRIx64 "\n"
-              " x26: %#18" PRIx64 "\n"
-              " x27: %#18" PRIx64 "\n"
-              " x28: %#18" PRIx64 "\n"
-              " x29: %#18" PRIx64 "\n"
-              "  lr: %#18" PRIx64 "\n"
-              " usp: %#18" PRIx64 "\n"
-              " elr: %#18" PRIx64 "\n"
-              "spsr: %#18" PRIx64 "\n"
-              " esr: %#18" PRIx32 "\n"
-              " far: %#18" PRIx64 "\n"
-              "\n",
-              // clang-format on
-              g_crashlog.iframe->r[0], g_crashlog.iframe->r[1], g_crashlog.iframe->r[2],
-              g_crashlog.iframe->r[3], g_crashlog.iframe->r[4], g_crashlog.iframe->r[5],
-              g_crashlog.iframe->r[6], g_crashlog.iframe->r[7], g_crashlog.iframe->r[8],
-              g_crashlog.iframe->r[9], g_crashlog.iframe->r[10], g_crashlog.iframe->r[11],
-              g_crashlog.iframe->r[12], g_crashlog.iframe->r[13], g_crashlog.iframe->r[14],
-              g_crashlog.iframe->r[15], g_crashlog.iframe->r[16], g_crashlog.iframe->r[17],
-              g_crashlog.iframe->r[18], g_crashlog.iframe->r[19], g_crashlog.iframe->r[20],
-              g_crashlog.iframe->r[21], g_crashlog.iframe->r[22], g_crashlog.iframe->r[23],
-              g_crashlog.iframe->r[24], g_crashlog.iframe->r[25], g_crashlog.iframe->r[26],
-              g_crashlog.iframe->r[27], g_crashlog.iframe->r[28], g_crashlog.iframe->r[29],
-              g_crashlog.iframe->lr, g_crashlog.iframe->usp, g_crashlog.iframe->elr,
-              g_crashlog.iframe->spsr, g_crashlog.esr, g_crashlog.far);
-#elif defined(__x86_64__)
-      fprintf(&outfile,
-              // clang-format off
-              "REGISTERS\n"
-              "  CS: %#18" PRIx64 "\n"
-              " RIP: %#18" PRIx64 "\n"
-              " EFL: %#18" PRIx64 "\n"
-              " CR2: %#18lx\n"
-              " RAX: %#18" PRIx64 "\n"
-              " RBX: %#18" PRIx64 "\n"
-              " RCX: %#18" PRIx64 "\n"
-              " RDX: %#18" PRIx64 "\n"
-              " RSI: %#18" PRIx64 "\n"
-              " RDI: %#18" PRIx64 "\n"
-              " RBP: %#18" PRIx64 "\n"
-              " RSP: %#18" PRIx64 "\n"
-              "  R8: %#18" PRIx64 "\n"
-              "  R9: %#18" PRIx64 "\n"
-              " R10: %#18" PRIx64 "\n"
-              " R11: %#18" PRIx64 "\n"
-              " R12: %#18" PRIx64 "\n"
-              " R13: %#18" PRIx64 "\n"
-              " R14: %#18" PRIx64 "\n"
-              " R15: %#18" PRIx64 "\n"
-              "errc: %#18" PRIx64 "\n"
-              "\n",
-              // clang-format on
-              g_crashlog.iframe->cs, g_crashlog.iframe->ip, g_crashlog.iframe->flags, x86_get_cr2(),
-              g_crashlog.iframe->rax, g_crashlog.iframe->rbx, g_crashlog.iframe->rcx,
-              g_crashlog.iframe->rdx, g_crashlog.iframe->rsi, g_crashlog.iframe->rdi,
-              g_crashlog.iframe->rbp, g_crashlog.iframe->user_sp, g_crashlog.iframe->r8,
-              g_crashlog.iframe->r9, g_crashlog.iframe->r10, g_crashlog.iframe->r11,
-              g_crashlog.iframe->r12, g_crashlog.iframe->r13, g_crashlog.iframe->r14,
-              g_crashlog.iframe->r15, g_crashlog.iframe->err_code);
-#endif
-    } else {
-      fprintf(&outfile, "REGISTERS: missing\n");
-    }
+    // Note; it is the architecture specific implementation which is responsible
+    // for determining if the crashlog registers are valid, and what (if
+    // anything) to print.
+    arch_render_crashlog_registers(outfile, g_crashlog.regs);
 
     fprintf(&outfile, "BACKTRACE (up to 16 calls)\n");
-
     Backtrace bt;
     Thread::Current::GetBacktrace(bt);
     bt.PrintWithoutVersion(&outfile);
-
     fprintf(&outfile, "\n");
   }
 

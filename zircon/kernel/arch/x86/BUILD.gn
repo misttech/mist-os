@@ -123,6 +123,7 @@ zx_library("x86") {
     "asm.S",
     "bootstrap16.cc",
     "cache.cc",
+    "crashlog.cc",
     "debugger.cc",
     "descriptor.cc",
     "exceptions.S",

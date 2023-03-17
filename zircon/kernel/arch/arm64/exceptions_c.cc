@@ -19,6 +19,7 @@
 #include <arch/arch_ops.h>
 #include <arch/arm64.h>
 #include <arch/arm64/uarch.h>
+#include <arch/crashlog_regs.h>
 #include <arch/exception.h>
 #include <arch/regs.h>
 #include <arch/thread.h>
@@ -154,9 +155,9 @@ __NO_RETURN static void exception_die(iframe_t* iframe, uint32_t esr, uint64_t f
   printf("ESR %#x: ec %#x, il %#x, iss %#x\n", esr, ec, il, iss);
   printf("FAR %#" PRIx64 "\n", far);
   dump_iframe(iframe);
-  g_crashlog.iframe = iframe;
-  g_crashlog.esr = esr;
-  g_crashlog.far = far;
+  g_crashlog.regs.iframe = iframe;
+  g_crashlog.regs.esr = esr;
+  g_crashlog.regs.far = far;
 
   platform_halt(HALT_ACTION_HALT, ZirconCrashReason::Panic);
 }

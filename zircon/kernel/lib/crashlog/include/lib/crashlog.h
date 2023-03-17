@@ -10,19 +10,10 @@
 #include <lib/crashlog/panic_buffer.h>
 #include <zircon/boot/crash-reason.h>
 
+#include <arch/crashlog_regs.h>
 #include <kernel/persistent_ram.h>
 #include <ktl/span.h>
 #include <vm/vm_object.h>
-
-#if defined(__aarch64__)
-
-#include <arch/arm64.h>
-
-#elif defined(__x86_64__)
-
-#include <arch/x86.h>
-
-#endif
 
 #ifndef MIN_CRASHLOG_SIZE
 #define MIN_CRASHLOG_SIZE 2048
@@ -35,13 +26,7 @@ static_assert((kMinCrashlogSize % kPersistentRamAllocationGranularity) == 0,
 
 typedef struct {
   uintptr_t base_address;
-  iframe_t* iframe;
-#if defined(__aarch64__)
-  // On arm64, the ESR and FAR are important for diagnosing kernel crashes, but
-  // are not included in the iframe_t.
-  uint32_t esr;
-  uint64_t far;
-#endif
+  crashlog_regs_t regs;
 } crashlog_t;
 
 extern crashlog_t g_crashlog;

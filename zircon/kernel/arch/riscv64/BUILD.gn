@@ -66,5 +66,6 @@ if (toolchain_base_environment == "kernel") {
   }
 
   source_set("riscv64") {
+    sources = [ "crashlog.cc" ]
   }
 }

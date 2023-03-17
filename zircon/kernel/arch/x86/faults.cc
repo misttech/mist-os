@@ -74,7 +74,8 @@ __NO_RETURN static void exception_die(iframe_t* frame, const char* msg) {
   printf("vector %lu\n", (ulong)frame->vector);
   dprintf(CRITICAL, "%s", msg);
   dump_fault_frame(frame);
-  g_crashlog.iframe = frame;
+  g_crashlog.regs.iframe = frame;
+  g_crashlog.regs.cr2 = x86_get_cr2();
 
   // try to dump the user stack
   if (is_user_accessible(frame->user_sp)) {
