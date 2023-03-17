@@ -49,7 +49,7 @@
 
   // Clear .bss.  The linker script ensures these are aligned to 16 bytes.
   lla a3, _edata
-  lla t4, _end
+  lla a4, _end
 0:
   sd zero, (a3)
   sd zero, 8(a3)

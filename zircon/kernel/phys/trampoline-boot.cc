@@ -34,15 +34,15 @@ bool IsLegacyEntryAddress(uint64_t address) { return address > TrampolineBoot::k
 // Relocated blob size must be aligned to |kRelocateAlign|.
 constexpr size_t kRelocateAlign = 1;
 
-// When a RelocatedTarget is copied forward, source and destination offsets must be adjusted by
-// |kForwardBiad|.
+// When a RelocatedTarget is copied forward, source and destination offsets
+// must be adjusted by this.
 constexpr int64_t kForwardBias = 0;
 
-// When a RelocatedTarget is copied backwards, source and destination offsets must be adjusted by
-// |kForwardBiad|.
+// When a RelocatedTarget is copied backwards, source and destination offsets
+// must be adjusted by this.
 constexpr int64_t kBackwardBias = -1;
 
-#else
+#elif defined(__aarch64__)
 
 // ARM does not use legacy fixed address format.
 bool IsLegacyEntryAddress(uint64_t address) { return false; }
@@ -50,13 +50,33 @@ bool IsLegacyEntryAddress(uint64_t address) { return false; }
 // Relocated blob size must be aligned to |kRelocateAlign|.
 constexpr size_t kRelocateAlign = 32;
 
-// When a RelocatedTarget is copied forward, source and destination offsets must be adjusted by
-// |kForwardBiad|.
+// When a RelocatedTarget is copied forward, source and destination offsets
+// must be adjusted by this.
 constexpr int64_t kForwardBias = -16;
 
-// When a RelocatedTarget is copied backwards, source and destination offsets must be adjusted by
-// |kForwardBiad|.
+// When a RelocatedTarget is copied backwards, source and destination offsets
+// must be adjusted by this.
 constexpr int64_t kBackwardBias = 0;
+
+#elif defined(__riscv)
+
+// RISC-V does not use legacy fixed address format.
+bool IsLegacyEntryAddress(uint64_t address) { return false; }
+
+// Relocated blob size must be aligned to |kRelocateAlign|.
+constexpr size_t kRelocateAlign = 8;
+
+// When a RelocatedTarget is copied forward, source and destination offsets
+// must be adjusted by this.
+constexpr int64_t kForwardBias = 0;
+
+// When a RelocatedTarget is copied backwards, source and destination offsets
+// must be adjusted by this.
+constexpr int64_t kBackwardBias = 0;
+
+#else
+
+#error "What architecture?"
 
 #endif
 
@@ -121,14 +141,14 @@ class TrampolineBoot::Trampoline {
   static size_t size() { return offsetof(Trampoline, code_) + TrampolineCode().size(); }
 
   [[noreturn]] void Boot(RelocateTarget kernel, RelocateTarget zbi, uint64_t entry_address) {
-    args = {
+    args_ = {
         .kernel = kernel,
         .zbi = zbi,
         .data_zbi = zbi.destination(),
         .entry = entry_address,
     };
-    ZX_ASSERT(args.entry == entry_address);
-    ZbiBootRaw(reinterpret_cast<uintptr_t>(code_), &args);
+    ZX_ASSERT(args_.entry == entry_address);
+    ZbiBootRaw(reinterpret_cast<uintptr_t>(code_), &args_);
   }
 
  private:
@@ -348,7 +368,7 @@ mov %[size], (.Ltrampoline_end.%= - .Ltrampoline_start.%=)
           add t3, t3, -8
           add t1, t1, 8
           add t2, t2, 8
-          beqz t3, .Lcopy_forward.%=
+          bnez t3, .Lcopy_forward.%=
           ret
 
         .Lcopy_backwards.%=:
@@ -357,7 +377,7 @@ mov %[size], (.Ltrampoline_end.%= - .Ltrampoline_start.%=)
           add t3, t3, -8
           add t1, t1, -8
           add t2, t2, -8
-          beqz t3, .Lcopy_backwards.%=
+          bnez t3, .Lcopy_backwards.%=
           ret
 
         .Ltrampoline_end.%=:
@@ -370,7 +390,7 @@ mov %[size], (.Ltrampoline_end.%= - .Ltrampoline_start.%=)
         : [kernel_offset] "i"(offsetof(TrampolineArgs, kernel)),
           [data_offset] "i"(offsetof(TrampolineArgs, zbi)),
           [src_offset] "i"(offsetof(RelocateTarget, src)),
-          [dst_offset] "i"(offsetof(RelocateTarget, src)),
+          [dst_offset] "i"(offsetof(RelocateTarget, dst)),
           [count_offset] "i"(offsetof(RelocateTarget, count)),
           [backwards_offset] "i"(offsetof(RelocateTarget, backwards)),
           [zbi_dst_offset] "i"(offsetof(TrampolineArgs, data_zbi)),
@@ -382,7 +402,7 @@ mov %[size], (.Ltrampoline_end.%= - .Ltrampoline_start.%=)
     return {code, size};
   }
 
-  TrampolineArgs args;
+  TrampolineArgs args_;
   ktl::byte code_[];
 };
 
@@ -486,8 +506,6 @@ fit::result<BootZbi::Error> TrampolineBoot::Load(uint32_t extra_data_capacity,
     // This is a new-style position-independent kernel.  Boot it where it is.
     BootZbi::Boot(argument);
   }
-
-  Log();
 
   uintptr_t zbi_location =
       reinterpret_cast<uintptr_t>(argument.value_or(DataZbi().storage().data()));
