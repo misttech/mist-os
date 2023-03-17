@@ -789,6 +789,7 @@ mod tests {
         check_page_eq(&current_task, new_addr + *PAGE_SIZE, 'z');
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn test_map_32_bit() {
         let (_kernel, current_task) = create_kernel_and_task();

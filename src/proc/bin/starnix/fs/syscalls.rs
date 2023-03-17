@@ -2112,6 +2112,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn test_sys_dup2() {
         // Most tests are handled by test_sys_dup3, only test the case where both fds are equals.
@@ -2125,6 +2126,7 @@ mod tests {
         assert_eq!(sys_dup2(&current_task, fd, fd), Ok(fd));
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn test_sys_creat() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task();
@@ -2202,8 +2204,9 @@ mod tests {
             .write_memory(no_slash_path_addr, no_slash_path)
             .expect("failed to write path");
         let no_slash_user_path = UserCString::new(no_slash_path_addr);
-        sys_mkdir(
+        sys_mkdirat(
             &current_task,
+            FdNumber::AT_FDCWD,
             no_slash_user_path,
             FileMode::ALLOW_ALL.with_type(FileMode::IFDIR),
         )

@@ -358,6 +358,7 @@ mod test {
         thread.join().expect("join");
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn test_time() {
         let (_kernel, current_task) = create_kernel_and_task();

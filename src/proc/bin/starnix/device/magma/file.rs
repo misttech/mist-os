@@ -730,7 +730,11 @@ impl FileOps for MagmaFile {
                 })?;
 
                 response.result_return = unsafe {
-                    magma_buffer_set_name(control.buffer, &name[0] as *const u8 as *const i8) as u64
+                    #[cfg(target_arch = "x86_64")]
+                    let name_ptr = &name[0] as *const u8 as *const i8;
+                    #[cfg(target_arch = "aarch64")]
+                    let name_ptr = &name[0] as *const u8 as *const u8;
+                    magma_buffer_set_name(control.buffer, name_ptr) as u64
                 };
 
                 response.hdr.type_ =

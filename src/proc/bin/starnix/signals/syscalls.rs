@@ -643,6 +643,7 @@ mod tests {
     use std::convert::TryInto;
     use zerocopy::AsBytes;
 
+    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn test_sigaltstack() {
         let (_kernel, current_task) = create_kernel_and_task();
@@ -708,6 +709,7 @@ mod tests {
         assert_eq!(sys_sigaltstack(&current_task, user_ss, nullptr), error!(ENOMEM));
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn test_sigaltstack_active_stack() {
         let (_kernel, mut current_task) = create_kernel_and_task();
@@ -747,6 +749,7 @@ mod tests {
         sys_sigaltstack(&current_task, user_ss, nullptr).expect("failed to call sigaltstack");
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn test_sigaltstack_active_stack_saturates() {
         let (_kernel, mut current_task) = create_kernel_and_task();

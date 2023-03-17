@@ -22,17 +22,13 @@ declare_args() {
 }
 
 group("starnix") {
-  if (target_cpu == "x64") {
-    deps = [ ":starnix_kernel_bin" ]
-  }
+  deps = [ ":starnix_kernel_bin" ]
 }
 
 group("tests") {
   testonly = true
 
-  if (target_cpu == "x64") {
-    deps = [ ":starnix-tests" ]
-  }
+  deps = [ ":starnix-tests" ]
 }
 
 static_library("restricted_trampoline") {
@@ -52,7 +48,6 @@ rustc_binary("starnix_kernel_bin") {
   source_root = "main.rs"
   deps = [
     ":starnix_kernel_config",
-    ":vdso-data($target_linux_toolchain)",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
@@ -80,7 +75,6 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-image-format",
     "//src/lib/fuchsia-runtime",
     "//src/lib/process_builder",
@@ -108,7 +102,6 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:macro_rules_attribute",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:memchr",
-    "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:paste",
@@ -126,6 +119,7 @@ rustc_binary("starnix_kernel_bin") {
   if (current_cpu == "x64") {
     deps += [
       ":vdso-data($target_linux_toolchain)",
+      "//src/lib/fuchsia-fs",
       "//third_party/rust_crates:memoffset",
     ]
   }
@@ -137,6 +131,7 @@ rustc_binary("starnix_kernel_bin") {
   test_deps = [
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:tracing-mutex",
   ]
 

@@ -99,14 +99,10 @@ fuchsia_unittest_package("starnix-test-runner-tests") {
 
 group("starnix") {
   testonly = true
-  if (target_cpu == "x64") {
-    deps = [ ":starnix-test-runners" ]
-  }
+  deps = [ ":starnix-test-runners" ]
 }
 
 group("tests") {
   testonly = true
-  if (target_cpu == "x64") {
-    deps = [ ":starnix-test-runner-tests" ]
-  }
+  deps = [ ":starnix-test-runner-tests" ]
 }
