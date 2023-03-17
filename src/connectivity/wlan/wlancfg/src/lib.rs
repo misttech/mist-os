@@ -14,6 +14,10 @@
 #![warn(clippy::from_over_into)]
 #![warn(clippy::collapsible_else_if)]
 #![warn(clippy::len_zero)]
+// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
+#![allow(unknown_lints)]
+// TODO(fxbug.dev/123778): Fix redundant async blocks.
+#![allow(clippy::redundant_async_block)]
 
 pub mod access_point;
 pub mod client;

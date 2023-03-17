@@ -5,6 +5,10 @@
 #![deny(missing_docs)]
 #![warn(clippy::all)]
 #![allow(clippy::let_unit_value)]
+// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
+#![allow(unknown_lints)]
+// TODO(fxbug.dev/123778): Fix redundant async blocks.
+#![allow(clippy::redundant_async_block)]
 
 //! This is a crate for broadcasting events to multiple clients and waiting for each client to
 //! receive it before sending another event to that client. If an event was failed to send, or if

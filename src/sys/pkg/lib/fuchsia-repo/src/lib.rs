@@ -5,6 +5,10 @@
 #![warn(clippy::all)]
 #![allow(clippy::result_large_err)]
 #![allow(clippy::let_unit_value)]
+// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
+#![allow(unknown_lints)]
+// TODO(fxbug.dev/123778): Fix redundant async blocks.
+#![allow(clippy::redundant_async_block)]
 
 pub mod manager;
 pub mod package_manifest_watcher;

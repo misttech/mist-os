@@ -7,6 +7,10 @@
 #![warn(clippy::all)]
 #![allow(clippy::let_unit_value)]
 #![deny(missing_docs)]
+// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
+#![allow(unknown_lints)]
+// TODO(fxbug.dev/123778): Fix redundant async blocks.
+#![allow(clippy::redundant_async_block)]
 
 mod package;
 pub use crate::package::{BlobContents, Package, PackageBuilder, PackageDir, VerificationError};

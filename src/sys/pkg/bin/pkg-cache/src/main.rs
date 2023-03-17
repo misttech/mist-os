@@ -7,6 +7,10 @@
 #![allow(clippy::enum_variant_names)]
 #![allow(clippy::from_over_into)]
 #![allow(clippy::too_many_arguments)]
+// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
+#![allow(unknown_lints)]
+// TODO(fxbug.dev/123778): Fix redundant async blocks.
+#![allow(clippy::redundant_async_block)]
 
 use {
     crate::{base_packages::BasePackages, index::PackageIndex},

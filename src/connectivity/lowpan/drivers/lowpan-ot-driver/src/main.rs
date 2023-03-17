@@ -5,6 +5,10 @@
 //! LoWPAN OpenThread Driver
 #![warn(rust_2018_idioms)]
 #![warn(clippy::all)]
+// TODO(fxbug.dev/123528): Remove unknown_lints after toolchain rolls.
+#![allow(unknown_lints)]
+// TODO(fxbug.dev/123778): Fix redundant async blocks.
+#![allow(clippy::redundant_async_block)]
 
 use anyhow::Error;
 use fidl_fuchsia_factory_lowpan::{FactoryRegisterMarker, FactoryRegisterProxyInterface};
