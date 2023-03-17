@@ -19,7 +19,6 @@ _bootfs_deps += _imports.virtio_drivers + [
                   "//src/devices/board/drivers/acpi-arm64",
                   "//src/devices/board/drivers/qemu-arm64",
                   "//src/devices/rtc/drivers/pl031-rtc",
-                  "//src/graphics/display/drivers/fake:fake-display",
                 ]
 
 board_bootfs_labels += _bootfs_deps

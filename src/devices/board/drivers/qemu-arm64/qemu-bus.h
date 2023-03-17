@@ -36,7 +36,6 @@ class QemuArm64 : public ddk::Device<QemuArm64> {
   zx_status_t PciAdd();
   zx_status_t RtcInit();
   zx_status_t SysmemInit();
-  zx_status_t DisplayInit();
 
   // TODO(fxbug.dev/108070): Switch to fdf::SyncClient once it's supported.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;

@@ -24,26 +24,9 @@
 namespace board_qemu_arm64 {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-static bool use_fake_display(zx_device_t* dev) {
-  char ufd[32];
-  zx_status_t status =
-      device_get_variable(dev, "driver.qemu_bus.use_fake_display", ufd, sizeof(ufd), nullptr);
-  return (status == ZX_OK && (!strcmp(ufd, "1") || !strcmp(ufd, "true") || !strcmp(ufd, "on")));
-}
-
 int QemuArm64::Thread() {
   zx_status_t status;
   zxlogf(INFO, "qemu-bus thread running ");
-
-  if (use_fake_display(zxdev())) {
-    status = DisplayInit();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: DisplayInit() failed %d", __func__, status);
-      return thrd_error;
-    }
-    zxlogf(INFO, "qemu.use_fake_display=1, disabling goldfish-display");
-    setenv("driver.goldfish-display.disable", "true", 1);
-  }
 
   status = PciInit();
   if (status != ZX_OK) {

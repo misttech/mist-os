@@ -29,7 +29,6 @@ fuchsia_driver("qemu-arm64-driver") {
   ]
   sources = [
     "qemu-bus.cc",
-    "qemu-display.cc",
     "qemu-kpci.cc",
     "qemu-rtc.cc",
     "qemu-sysmem.cc",
