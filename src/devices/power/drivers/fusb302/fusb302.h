@@ -180,8 +180,8 @@ class Fusb302 : public DeviceType {
   zx_status_t SetCC(DataRole mode);
   zx_status_t RxEnable(bool enable);
 
-  zx_status_t GetCC(uint8_t* cc1, uint8_t* cc2);
-  uint8_t MeasureCC(Polarity polarity);
+  zx_status_t GetCC(FixedComparatorResult* cc1, FixedComparatorResult* cc2);
+  FixedComparatorResult MeasureCC(Polarity polarity);
   zx_status_t Debounce();
 
   zx_status_t FifoTransmit(const PdMessage& message);

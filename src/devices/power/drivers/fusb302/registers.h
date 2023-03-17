@@ -890,31 +890,153 @@ class InterruptBReg : public Fusb302Register<InterruptBReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<InterruptBReg>(INTERRUPT_B_ADDR); }
 };
 
-class Status0Reg : public Fusb302Register<Status0Reg> {
- public:
-  DEF_BIT(7, vbusok);
-  DEF_BIT(6, activity);
-  DEF_BIT(5, comp);
-  DEF_BIT(4, crc_chk);
-  DEF_BIT(3, alert);
-  DEF_BIT(2, wake);
-  DEF_FIELD(1, 0, bc_lvl);
+// CC pin voltage, as reported by the fixed comparators in the measure block.
+//
+// The fixed comparators can distinguish between the Sink terminations in
+// typec2.2 4.11.3 "Voltage Parameters", Table 4.38 "Voltage on Sink CC pins
+// (Multiple Source Current Announcements)".
+//
+// Rev 5 datasheet: Table 37 on page 27, field BC_LVL[1:0]
+enum class FixedComparatorResult {
+  // The voltage threshold for rA. Below 200 mV.
+  kRa = 0b00,
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Status0Reg>(STATUS0_ADDR); }
+  // The voltage threshold for rD and Standard USB power rP. 200 mV - 660 mV.
+  kStandardUsbRd = 0b01,
+
+  // The voltage threshold for rD and Type C 1.5A power rP. 660 mV - 1,230 mV.
+  kTypeC1500mARd = 0b10,
+
+  // The voltage threshold for rD and Type C 3.0A power rP. Above 1,230 mV.
+  //
+  // When this level is reported, Table 5 in the Rev 5 datasheet recommends
+  // using the variable comparator in the measure block to confirm that the CC
+  // voltage is below 2.05 V.
+  kTypeC3000mARd = 0b11,
 };
 
+// Best-effort mapping from fixed comparator outcomes.
+//
+// A result of `kRp3000mA` means "anything above 1,230 mV" and should be
+// supplemented by an upper bound check.
+usb_pd::ConfigChannelTermination ConfigChannelTerminationFromFixedComparatorResult(
+    FixedComparatorResult result);
+
+// STATUS0
+//
+// This is a read-only register.
+//
+// Rev 5 datasheet: Table 37 on page 27
+class Status0Reg : public Fusb302Register<Status0Reg> {
+ public:
+  // If true, the VBUS voltage exceeds the minimum power supply voltage.
+  //
+  // Changes in this value trigger the `vbusok_change` interrupt
+  // request in the Interrupt register.
+  //
+  // This bit is only valid (and generates interrupts) if the measure block is
+  // powered on, which is gated by the `pwr2` field in
+  // `PowerReg`.
+  //
+  // The Rev 5 datasheet defines the "vVBUSthr" as 4.0 V in Table 10 "Type-C CC
+  // Switch" on page 15. typec2.2 4.4.2 "VBUS" defers to usb3.2 for the valid
+  // VBUS ranges. usb3.2 11.4.5 "VBUS Electrical Characteristics" states that
+  // the minimum VBUS voltage at an upstream connector Port is 4.0 V.
+  DEF_BIT(7, vbusok);
+
+  // If true, the BMC activity detector for the CC wire was triggered.
+  //
+  // The BMC activity detector triggers after 3 voltage transitions, and remains
+  // triggered while there are BMC transitions.
+  //
+  // The BMC activity detector uses the CC wire connected to ?? (what is
+  // "active CC line"?)
+  DEF_BIT(6, activity);
+
+  // If true, the variable voltage comparator's input exceeds the reference.
+  //
+  // Changes in this value trigger the `variable_comparator_result_pending`
+  // interrupt request in the `Interrupt` register.
+  DEF_BIT(5, comp);
+
+  // If true, the last message received by the BMC PHY had a correct CRC.
+  //
+  // This bit becomes valid after CRC comparison completes, and becomes invalid
+  // (is reset) when the BMC PHY receives the SOP* of a new message.
+  DEF_BIT(4, crc_chk);
+
+  // If true, the BMC PHY has encountered an error.
+  //
+  // The errors signaled are surfaced by the `tx_full` and
+  // `rx_full` bits in `Status1Reg.
+  //
+  // Despite the name used by the datasheet, this seems unrelated to the PD
+  // message defined in usbpd3.1 6.4.6 "Alert Message".
+  DEF_BIT(3, alert);
+
+  // If true, the Wake Detector was triggered.
+  //
+  // The Wake Detector triggers if the voltage of any of the CC pins is between
+  // 0.25 V (WAKE_low) and 1.45V (WAKE_high).
+  //
+  // The Wake Detector only works if its power gate is enabled, via the
+  // `pwr0` bit in `PowerReg`.
+  DEF_BIT(2, wake);
+
+  // The result of the fixed comparators in the measure block.
+  //
+  // This result is only meaningful when the measure block's input is connected
+  // to one of the CC pins. The driver is responsible for handling the CC pin
+  // voltage variation produced by BMC communication.
+  //
+  // Also, the result is only meaningful when power gates 1-3 are enabled, via
+  // the `pwr0`, `pwr1`, and `pwr2` bits in `PowerReg`.
+  DEF_ENUM_FIELD(FixedComparatorResult, 1, 0, bc_lvl);
+
+  static auto Get() { return hwreg::I2cRegisterAddr<Status0Reg>(0x40); }
+};
+
+// STATUS1
+//
+// This is a read-only register.
+//
+// Rev 5 datasheet: Table 39 on page 28
 class Status1Reg : public Fusb302Register<Status1Reg> {
  public:
+  // If true, the last message in the Rx (receive) FIFO starts with SOP".
+  //
+  // This bit can't become true if `ensop2` in
+  // `Control1Reg` is false.
   DEF_BIT(7, rxsop2);
+
+  // If true, the last message in the Rx (receive) FIFO starts with SOP'.
+  //
+  // This bit can't become true if `ensop1` in `Control1Reg`
+  // is false.
   DEF_BIT(6, rxsop1);
+
+  // Indicators for the BMC PHY Rx (receiver) FIFO.
   DEF_BIT(5, rx_empty);
   DEF_BIT(4, rx_full);
+
+  // Indicators for the BMC PHY Tx (transmitter) FIFO.
   DEF_BIT(3, tx_empty);
   DEF_BIT(2, tx_full);
+
+  // If true, the chip temperature is too high.
   DEF_BIT(1, ovrtemp);
+
+  // If true, the VCONN OCP (over-current protection) circuit was tripped.
+  //
+  // The OCP current threshold is configured in the `OcpReg` register. The OCP
+  // circuit also trips if its temperature exceeds 145 Celsius (Tshut in the
+  // Rev 5 datashet).
+  //
+  // The OCP circuit is not connected if no CC pin is connected to the VCONN
+  // pin.
   DEF_BIT(0, ocp);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Status1Reg>(STATUS1_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<Status1Reg>(0x41); }
 };
 
 class InterruptReg : public Fusb302Register<InterruptReg> {
@@ -1131,6 +1253,24 @@ inline usb_pd::PowerRole PowerRoleFromDetectionState(PowerRoleDetectionState sta
 
   const bool is_sink = (static_cast<int8_t>(state) & 0b100) != 0;
   return is_sink ? usb_pd::PowerRole::kSink : usb_pd::PowerRole::kSource;
+}
+
+inline usb_pd::ConfigChannelTermination ConfigChannelTerminationFromFixedComparatorResult(
+    FixedComparatorResult result) {
+  switch (result) {
+    case FixedComparatorResult::kRa:
+      return usb_pd::ConfigChannelTermination::kRa;
+    case FixedComparatorResult::kStandardUsbRd:
+      return usb_pd::ConfigChannelTermination::kRpStandardUsb;
+    case FixedComparatorResult::kTypeC1500mARd:
+      return usb_pd::ConfigChannelTermination::kRp1500mA;
+    case FixedComparatorResult::kTypeC3000mARd:
+      return usb_pd::ConfigChannelTermination::kRp3000mA;
+  }
+
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid result");
+  // This can use `kOpen` if we decide to remove `kUnknown`.
+  return usb_pd::ConfigChannelTermination::kUnknown;
 }
 
 }  // namespace fusb302

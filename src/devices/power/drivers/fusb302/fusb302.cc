@@ -153,7 +153,7 @@ zx_status_t Fusb302::IrqThread() {
               state_machine_.Restart();
             }
           } else {
-            uint8_t cc1, cc2;
+            FixedComparatorResult cc1, cc2;
             status = GetCC(&cc1, &cc2);
             if (status != ZX_OK) {
               zxlogf(ERROR, "Failed to get CC. %d", status);
@@ -162,7 +162,7 @@ zx_status_t Fusb302::IrqThread() {
             if (polarity_.get() == CC2) {
               cc1 = cc2;
             }
-            if (cc1 == 0) {
+            if (cc1 == FixedComparatorResult::kRa) {
               InitHw();
               state_machine_.Restart();
             }
@@ -308,18 +308,18 @@ zx::result<PdMessage> Fusb302::FifoReceive() {
   return zx::ok(PdMessage(header_val, &data[0]));
 }
 
-zx_status_t Fusb302::GetCC(uint8_t* cc1, uint8_t* cc2) {
+zx_status_t Fusb302::GetCC(FixedComparatorResult* cc1, FixedComparatorResult* cc2) {
   auto save = Switches0Reg::ReadFrom(i2c_).reg_value();  // save
   *cc1 = MeasureCC(CC1);
   *cc2 = MeasureCC(CC2);
   return Switches0Reg::Get().FromValue(save).WriteTo(i2c_);  // restore
 }
 
-uint8_t Fusb302::MeasureCC(Polarity polarity) {
+FixedComparatorResult Fusb302::MeasureCC(Polarity polarity) {
   if (power_role_.get() != sink) {
     // Only sink operations allowed for now. Implement source when the need arises.
     zxlogf(ERROR, "Can't measure for source!");
-    return 0;
+    return FixedComparatorResult::kRa;
   }
 
   auto status = Switches0Reg::ReadFrom(i2c_)
@@ -332,7 +332,7 @@ uint8_t Fusb302::MeasureCC(Polarity polarity) {
                     .WriteTo(i2c_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-    return status;
+    return FixedComparatorResult::kRa;
   }
   zx::nanosleep(zx::deadline_after(tMeasureSleep));
 
@@ -341,7 +341,7 @@ uint8_t Fusb302::MeasureCC(Polarity polarity) {
 
 zx_status_t Fusb302::Debounce() {
   uint32_t count = 10, debounce_count = 0;
-  uint8_t old_cc1, old_cc2;
+  FixedComparatorResult old_cc1, old_cc2;
   auto status = GetCC(&old_cc1, &old_cc2);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get CC. %d", status);
@@ -349,7 +349,7 @@ zx_status_t Fusb302::Debounce() {
   }
 
   while (count--) {
-    uint8_t cc1, cc2;
+    FixedComparatorResult cc1, cc2;
     status = GetCC(&cc1, &cc2);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to get CC. %d", status);
@@ -366,7 +366,8 @@ zx_status_t Fusb302::Debounce() {
 
     zx::nanosleep(zx::deadline_after(zx::usec(2000)));
     if (debounce_count > 9) {
-      if ((old_cc1 != old_cc2) && (!old_cc1 || !old_cc2)) {
+      if ((old_cc1 != old_cc2) &&
+          ((old_cc1 == FixedComparatorResult::kRa) || (old_cc2 == FixedComparatorResult::kRa))) {
         return ZX_OK;
       }
     }
