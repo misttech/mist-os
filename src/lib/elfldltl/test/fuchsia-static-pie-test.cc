@@ -6,6 +6,7 @@
 
 #include <zircon/syscalls.h>
 
+#include <__verbose_abort>
 #include <string_view>
 
 using namespace std::literals;
@@ -51,4 +52,9 @@ extern "C" [[noreturn]] void _start(zx_handle_t bootstrap, const void* vdso) {
 
   DebugWrite("Hello, world!\n"sv);
   zx_process_exit(0);
+}
+
+// Inline functions in libc++ headers call this.
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) {
+  Panic("libc++ abort, message lost"sv);
 }

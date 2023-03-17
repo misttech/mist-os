@@ -4,6 +4,7 @@
 
 #include "linux-static-pie.h"
 
+#include <__verbose_abort>
 #include <array>
 #include <string_view>
 
@@ -108,4 +109,9 @@ extern "C" [[noreturn]] void TestMain() {
 
   WriteString(1, "Hello, world!\n"sv);
   Exit(0);
+}
+
+// Inline functions in libc++ headers call this.
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) {
+  Panic("libc++ abort, message lost"sv);
 }
