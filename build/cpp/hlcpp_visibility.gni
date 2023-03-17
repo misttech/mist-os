@@ -159,6 +159,7 @@ hlcpp_visibility = [
   "//src/developer/shell/josh/lib:*",
   "//src/developer/sshd-host:*",
   "//src/devices/bin/driver_host:*",
+  "//src/devices/bin/driver_host/tests:*",
   "//src/devices/bin/driver_host2:*",
   "//src/devices/bin/driver_manager/v2:*",
   "//src/devices/bus/drivers/platform/test:*",

@@ -17,7 +17,7 @@
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/bin/driver_host/driver-host-restart-bind.h"
+#include "src/devices/bin/driver_host/tests/driver-host-restart-bind.h"
 
 namespace {
 

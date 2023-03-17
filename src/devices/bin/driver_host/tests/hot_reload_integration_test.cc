@@ -17,7 +17,7 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bin/driver_host/test-metadata.h"
+#include "src/devices/bin/driver_host/tests/test-metadata.h"
 
 namespace {
 

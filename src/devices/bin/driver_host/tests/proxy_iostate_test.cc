@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "proxy_iostate.h"
+#include "src/devices/bin/driver_host/proxy_iostate.h"
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -10,8 +10,8 @@
 #include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
-#include "driver_host_context.h"
-#include "zx_device.h"
+#include "src/devices/bin/driver_host/driver_host_context.h"
+#include "src/devices/bin/driver_host/zx_device.h"
 
 namespace {
 

@@ -18,8 +18,8 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/bin/driver_host/test-devhost-parent-bind.h"
-#include "src/devices/bin/driver_host/test-metadata.h"
+#include "src/devices/bin/driver_host/tests/test-devhost-parent-bind.h"
+#include "src/devices/bin/driver_host/tests/test-metadata.h"
 
 using fuchsia_device_restarttest::TestDevice;
 

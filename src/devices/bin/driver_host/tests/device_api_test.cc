@@ -9,9 +9,9 @@
 #include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
-#include "driver_host_context.h"
-#include "proxy_iostate.h"
-#include "zx_device.h"
+#include "src/devices/bin/driver_host/driver_host_context.h"
+#include "src/devices/bin/driver_host/proxy_iostate.h"
+#include "src/devices/bin/driver_host/zx_device.h"
 
 namespace {
 

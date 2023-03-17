@@ -15,9 +15,9 @@
 #include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
-#include "device_controller_connection.h"
-#include "driver_host.h"
-#include "zx_device.h"
+#include "src/devices/bin/driver_host/device_controller_connection.h"
+#include "src/devices/bin/driver_host/driver_host.h"
+#include "src/devices/bin/driver_host/zx_device.h"
 
 namespace {
 

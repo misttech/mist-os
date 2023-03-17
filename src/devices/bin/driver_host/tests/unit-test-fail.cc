@@ -7,7 +7,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <stdio.h>
 
-#include "src/devices/bin/driver_host/unit-test-fail-bind.h"
+#include "src/devices/bin/driver_host/tests/unit-test-fail-bind.h"
 
 static zx_device_t* dev = NULL;
 

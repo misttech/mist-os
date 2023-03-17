@@ -17,8 +17,8 @@
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/bin/driver_host/test-devhost-child-bind.h"
-#include "src/devices/bin/driver_host/test-metadata.h"
+#include "src/devices/bin/driver_host/tests/test-devhost-child-bind.h"
+#include "src/devices/bin/driver_host/tests/test-metadata.h"
 
 class TestDevhostDriverChild;
 using DeviceType = ddk::Device<TestDevhostDriverChild, ddk::Initializable>;

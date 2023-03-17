@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "inspect.h"
+#include "src/devices/bin/driver_host/inspect.h"
 
 #include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <zxtest/zxtest.h>
 
-#include "driver_host.h"
+#include "src/devices/bin/driver_host/driver_host.h"
 #include "src/lib/storage/vfs/cpp/dir_test_util.h"
 
 namespace {

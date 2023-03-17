@@ -193,5 +193,5 @@ fx set core.x64 --args='product_bootfs_labels+=["//bundles:diagnostics-eng"]'
 [example_test_driver]: /src/devices/tests/driver-inspect-test/test-driver.cc
 [property_types]: /docs/development/diagnostics/inspect/README.md#property
 [inspect_codelab]: /docs/development/diagnostics/inspect/codelab/README.md
-[driver_host_inspect_test]: /src/devices/bin/driver_host/inspect_test.cc
+[driver_host_inspect_test]: /src/devices/bin/driver_host/tests/inspect_test.cc
 [selectors]: /docs/reference/diagnostics/selectors.md
