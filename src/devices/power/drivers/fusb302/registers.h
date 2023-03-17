@@ -331,12 +331,33 @@ class MeasureReg : public Fusb302Register<MeasureReg> {
   int16_t MdacBaseMv() const;
 };
 
+// SLICE - Configures the receiver in the BMC PHY.
+//
+// The Rev 5 datasheet is a bit vague around this register, so getting a clear
+// description would require an investigation. This investigation wasn't done,
+// because the driver doesn't need to modify the register.
+//
+// Rev 5 datasheet: Table 21 on page 21
 class SliceReg : public Fusb302Register<SliceReg> {
  public:
-  DEF_FIELD(7, 6, sdac_hys);
+  // Values for `sdac_hys`.
+  enum class Hysteresis {
+    kNone = 0b00,   // Higher threshold = lower threshold
+    k85mV = 0b01,   // Higher threshold = lower threshold + 5
+    k170mV = 0b10,  // Higher threshold = lower threshold + 10 (0x0A)
+    k255mV = 0b11,  // Higher threshold = lower threshold + 32 (0x20)
+  };
+
+  // Configures the higher threshold used by the BMC SDAC (Slicer DAC).
+  DEF_ENUM_FIELD(Hysteresis, 7, 6, sdac_hys);
+
+  // Configures the lower threshold used by the BMC SDAC (Slicer DAC).
+  //
+  // The threshold can be used to meet the BMC receive mask under various noise
+  // conditions.
   DEF_FIELD(5, 0, sdac);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<SliceReg>(SLICE_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<SliceReg>(0x05); }
 };
 
 class Control0Reg : public Fusb302Register<Control0Reg> {
