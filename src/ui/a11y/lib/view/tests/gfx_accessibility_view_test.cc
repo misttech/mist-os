@@ -71,6 +71,7 @@ class GfxAccessibilityViewTest : public gtest::TestLoopFixture {
     context_provider_.service_directory_provider()->AddService(mock_scenic_->GetHandler());
     context_provider_.service_directory_provider()->AddService(
         fake_accessibility_view_registry_->GetHandler());
+    context_provider_.service_directory_provider()->AddService(mock_local_hit_.GetHandler());
 
     RunLoopUntilIdle();
   }
@@ -80,6 +81,7 @@ class GfxAccessibilityViewTest : public gtest::TestLoopFixture {
   MockSession* mock_session_;
   std::unique_ptr<MockScenic> mock_scenic_;
   std::unique_ptr<FakeAccessibilityViewRegistry> fake_accessibility_view_registry_;
+  MockLocalHit mock_local_hit_;
   fuchsia::ui::views::ViewHolderToken client_view_holder_token_;
 };
 
@@ -289,6 +291,47 @@ TEST_F(GfxAccessibilityViewTest, ViewHolderDisconnectedUninitializedView) {
   // made.
   EXPECT_EQ(views.size(), 1u);
   EXPECT_EQ(a11y::GetKoid(views.begin()->second.view_ref), a11y::GetKoid(first_a11y_view_ref));
+}
+
+TEST_F(GfxAccessibilityViewTest, ObtainsATouchSourceAfterA11yViewIsInitialized) {
+  a11y::GfxAccessibilityView a11y_view(context_provider_.context());
+
+  RunLoopUntilIdle();
+
+  bool scene_ready = false;
+  a11y_view.add_scene_ready_callback([&scene_ready]() {
+    scene_ready = true;
+    return true;
+  });
+  RunLoopUntilIdle();
+
+  const auto& views = mock_session_->views();
+  EXPECT_EQ(views.size(), 1u);
+  const auto a11y_view_id = views.begin()->second.id;
+  mock_session_->SendViewAttachedToSceneEvent(a11y_view_id);
+
+  RunLoopUntilIdle();
+
+  auto new_view_properties = MockSession::kDefaultViewProperties;
+  new_view_properties.bounding_box.min.z = 100;
+  mock_session_->SendViewPropertiesChangedEvent(a11y_view_id, new_view_properties);
+
+  RunLoopUntilIdle();
+
+  const auto& view_holders = mock_session_->view_holders();
+  auto proxy_view_id = view_holders.begin()->second.id;
+
+  mock_session_->SendViewConnectedEvent(proxy_view_id);
+
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(scene_ready);
+
+  RunLoopUntilIdle();
+
+  auto touch_source = a11y_view.TakeTouchSource();
+  EXPECT_TRUE(touch_source.is_bound());
+  a11y_view.SetTouchSource(std::move(touch_source));
 }
 
 }  // namespace

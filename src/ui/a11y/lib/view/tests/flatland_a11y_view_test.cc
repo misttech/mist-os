@@ -128,7 +128,8 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
     a11y_view_ = std::make_unique<a11y::FlatlandAccessibilityView>(
         realm_exposed_services()->template Connect<fuchsia::ui::composition::Flatland>(),
         realm_exposed_services()->template Connect<fuchsia::ui::composition::Flatland>(),
-        realm_exposed_services()->template Connect<fuchsia::ui::observation::scope::Registry>());
+        realm_exposed_services()->template Connect<fuchsia::ui::observation::scope::Registry>(),
+        realm_exposed_services()->template Connect<fuchsia::ui::pointer::augment::LocalHit>());
 
     // Set up the display, and add the a11y viewport as the display content.
     // Note that we don't need an extra view between the display and the a11y
@@ -174,6 +175,11 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
 
     // Verify that the a11y view has its ViewRef.
     EXPECT_TRUE(a11y_view_->view_ref().has_value());
+
+    // Verify that the a11y view has a touch source initialized.
+    auto touch_source = a11y_view_->TakeTouchSource();
+    EXPECT_TRUE(touch_source.is_bound());
+    a11y_view_->SetTouchSource(std::move(touch_source));
   }
 
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }

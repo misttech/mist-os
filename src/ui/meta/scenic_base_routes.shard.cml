@@ -17,7 +17,7 @@
 // (1) Routes that have different sources in different ui realms. For
 //     example, scenic consumes the metrics logger factory from "parent"
 //     in production ui realms, but "#mock_cobalt" in test ui realms.
-// (2) Scenic's child definition, as we may use a differnt url for
+// (2) Scenic's child definition, as we may use a different url for
 //     scenic in test vs. production ui realms.
 // (3) Capabilities that other components consume from scenic. Those
 //     routes belong on those components' routing shards.
@@ -55,6 +55,7 @@
                 "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.focus.FocusChainListenerRegistry",
                 "fuchsia.ui.pointer.augment.GlobalMouse",
+                "fuchsia.ui.pointer.augment.LocalHit",
                 "fuchsia.ui.pointerinjector.Registry",
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.ui.views.ViewRefInstalled",

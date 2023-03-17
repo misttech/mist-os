@@ -56,6 +56,16 @@ class MockAccessibilityView : public a11y::AccessibilityViewInterface {
     focus_callback_(std::move(value));
   }
 
+  // |AccessibilityViewInterface|
+  fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr TakeTouchSource() override {
+    fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source;
+    return touch_source;
+  }
+
+  // |AccessibilityViewInterface|
+  void SetTouchSource(
+      fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) override {}
+
  private:
   std::optional<fuchsia::ui::gfx::ViewProperties> a11y_view_properties_;
   std::optional<fuchsia::ui::views::ViewRef> a11y_view_ref_;

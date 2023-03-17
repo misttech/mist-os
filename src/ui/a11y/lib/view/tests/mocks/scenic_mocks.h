@@ -5,6 +5,7 @@
 #ifndef SRC_UI_A11Y_LIB_VIEW_TESTS_MOCKS_SCENIC_MOCKS_H_
 #define SRC_UI_A11Y_LIB_VIEW_TESTS_MOCKS_SCENIC_MOCKS_H_
 
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl_test_base.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -14,6 +15,8 @@
 #include <set>
 #include <unordered_map>
 #include <vector>
+
+#include "lib/fidl/cpp/binding.h"
 
 namespace accessibility_test {
 
@@ -158,13 +161,14 @@ class MockSession : public fuchsia::ui::scenic::testing::Session_TestBase {
   std::unordered_map<uint32_t, RectangleAttributes> rectangles_;
 };
 
-class MockScenic : public fuchsia::ui::scenic::testing::Scenic_TestBase {
+class MockScenic : public fuchsia::ui::scenic::testing::Scenic_TestBase,
+                   public fuchsia::ui::pointer::TouchSource {
  public:
   // TODO(fxb.dev/85349): Instantiate mock_session_ in CreateSession() instead
   // of taking a constructor argument, and offer a method to retrieve the
   // MockSession*.
   explicit MockScenic(std::unique_ptr<MockSession> mock_session)
-      : mock_session_(std::move(mock_session)) {}
+      : mock_session_(std::move(mock_session)), touch_source_binding_(this) {}
   ~MockScenic() override = default;
 
   void NotImplemented_(const std::string& name) override {
@@ -185,9 +189,52 @@ class MockScenic : public fuchsia::ui::scenic::testing::Scenic_TestBase {
   bool create_session_called() { return create_session_called_; }
 
  private:
+  void Watch(std::vector<::fuchsia::ui::pointer::TouchResponse> responses,
+             WatchCallback callback) override {}
+  void UpdateResponse(fuchsia::ui::pointer::TouchInteractionId interaction,
+                      fuchsia::ui::pointer::TouchResponse response,
+                      UpdateResponseCallback callback) override {}
+
   fidl::BindingSet<fuchsia::ui::scenic::Scenic> bindings_;
   std::unique_ptr<MockSession> mock_session_;
+  fidl::Binding<fuchsia::ui::pointer::TouchSource> touch_source_binding_;
   bool create_session_called_;
+};
+
+class MockLocalHit : public fuchsia::ui::pointer::augment::LocalHit,
+                     public fuchsia::ui::pointer::augment::TouchSourceWithLocalHit {
+ public:
+  MockLocalHit();
+  ~MockLocalHit() = default;
+
+  fidl::InterfaceRequestHandler<fuchsia::ui::pointer::augment::LocalHit> GetHandler(
+      async_dispatcher_t* dispatcher = nullptr) {
+    return [this,
+            dispatcher](fidl::InterfaceRequest<fuchsia::ui::pointer::augment::LocalHit> request) {
+      bindings_.AddBinding(this, std::move(request), dispatcher);
+    };
+  }
+
+  // |fuchsia::ui::pointer::augment::TouchSourceWithLocalHit|
+  void Watch(std::vector<fuchsia::ui::pointer::TouchResponse> responses,
+             WatchCallback callback) override {}
+
+  // |fuchsia::ui::pointer::augment::TouchSourceWithLocalHit|
+  void UpdateResponse(fuchsia::ui::pointer::TouchInteractionId stream,
+                      fuchsia::ui::pointer::TouchResponse response,
+                      UpdateResponseCallback callback) override {}
+
+  // |fuchsia::ui::pointer::augment::LocalHit|
+  void Upgrade(fidl::InterfaceHandle<fuchsia::ui::pointer::TouchSource> original,
+               fuchsia::ui::pointer::augment::LocalHit::UpgradeCallback callback) override {
+    // fidl::InterfaceHandle<fuchsia::ui::pointer::augment::TouchSourceWithLocalHit> handle;
+    // touch_source_binding_.Bind(handle.NewRequest());
+    callback(touch_source_binding_.NewBinding(), nullptr);
+  }
+
+ private:
+  fidl::BindingSet<fuchsia::ui::pointer::augment::LocalHit> bindings_;
+  fidl::Binding<fuchsia::ui::pointer::augment::TouchSourceWithLocalHit> touch_source_binding_;
 };
 
 }  // namespace accessibility_test

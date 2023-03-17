@@ -32,7 +32,8 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
  public:
   explicit FlatlandAccessibilityView(fuchsia::ui::composition::FlatlandPtr flatland1,
                                      fuchsia::ui::composition::FlatlandPtr flatland2,
-                                     fuchsia::ui::observation::scope::RegistryPtr registry);
+                                     fuchsia::ui::observation::scope::RegistryPtr registry,
+                                     fuchsia::ui::pointer::augment::LocalHitPtr local_hit);
   ~FlatlandAccessibilityView() override = default;
 
   // |AccessibilityViewInterface|
@@ -46,6 +47,13 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
 
   // |AccessibilityViewInterface|
   void RequestFocus(fuchsia::ui::views::ViewRef view_ref, RequestFocusCallback callback) override;
+
+  // |AccessibilityViewInterface|
+  fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr TakeTouchSource() override;
+
+  // |AccessibilityViewInterface|
+  void SetTouchSource(
+      fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) override;
 
   // |fuchsia::accessibility::scene::Provider|
   void CreateView(fuchsia::ui::views::ViewCreationToken a11y_view_token,
@@ -71,6 +79,10 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
   // Helper method to handle layout changes.
   void ResizeLayout(fuchsia::math::SizeU logical_size);
 
+  // Watches and responds no to pointer events.
+  // TODO(fxbug.com/100030): Delete once a11y is using the new gd protocol.
+  void WatchForTouchEvents(std::vector<fuchsia::ui::pointer::TouchResponse> old_responses);
+
   // Manages a11y view's flatland connection.
   FlatlandConnection flatland_a11y_;
 
@@ -80,6 +92,9 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
   // Scenic focuser used to request focus chain updates in the a11y view's subtree.
   fuchsia::ui::views::FocuserPtr focuser_;
 
+  // Touch source used to listen for pointer events.
+  std::optional<fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr> touch_source_;
+
   // Used to retrieve a11y view layout info.
   fuchsia::ui::composition::ParentViewportWatcherPtr parent_watcher_;
 
@@ -87,6 +102,8 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
   // view space.
   std::optional<fuchsia::ui::observation::scope::RegistryPtr> registry_;
 
+  // Used to connect to the touch source registry to upgrade a touch source.
+  fuchsia::ui::pointer::augment::LocalHitPtr local_hit_;
   // True if we've received a CreateView request.
   bool received_create_view_request_ = false;
 
