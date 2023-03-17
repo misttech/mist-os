@@ -2,11 +2,22 @@
 /*
  * Copyright (C) 2020-2022 Intel Corporation
  */
-#ifndef __iwl_trans_queue_tx_h__
-#define __iwl_trans_queue_tx_h__
+#ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_QUEUE_TX_H_
+#define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_QUEUE_TX_H_
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/tx.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-fh.h"
+
+
+// The reserved space in TxQ before we can insert more packets.
+//
+// The number comes from the comment of 'DMA-QUEUE-GENERAL-FUNCTIONS' section in the tx.c.
+// The driver needs to keep at least 2 empty entries to distinguish the full/empty state.
+//
+// (Note that this is how the original code does. It looks too conservative. But there might be
+//  some hardware/firmware design consideration.
+//
+#define TX_RESERVED_SPACE 3
 
 struct iwl_tso_hdr_page {
 	struct page *page;
@@ -22,7 +33,7 @@ iwl_txq_get_first_tb_dma(struct iwl_txq *txq, int idx)
 
 static inline u16 iwl_txq_get_cmd_index(const struct iwl_txq *q, u32 index)
 {
-	return index & (q->n_window - 1);
+	return (u16)(index & (q->n_window - 1));
 }
 
 void iwl_txq_gen2_unmap(struct iwl_trans *trans, int txq_id);
@@ -137,7 +148,7 @@ static inline u8 iwl_txq_gen1_tfd_get_num_tbs(struct iwl_trans *trans,
 	struct iwl_tfd *tfd;
 
 	if (trans->trans_cfg->use_tfh) {
-		struct iwl_tfh_tfd *tfh_tfd = _tfd;
+		struct iwl_tfh_tfd *tfh_tfd = (struct iwl_tfh_tfd *)_tfd;
 
 		return le16_to_cpu(tfh_tfd->num_tbs) & 0x1f;
 	}
@@ -153,7 +164,7 @@ static inline u16 iwl_txq_gen1_tfd_tb_get_len(struct iwl_trans *trans,
 	struct iwl_tfd_tb *tb;
 
 	if (trans->trans_cfg->use_tfh) {
-		struct iwl_tfh_tfd *tfh_tfd = _tfd;
+		struct iwl_tfh_tfd *tfh_tfd = (struct iwl_tfh_tfd *)_tfd;
 		struct iwl_tfh_tb *tfh_tb = &tfh_tfd->tbs[idx];
 
 		return le16_to_cpu(tfh_tb->tb_len);
@@ -181,4 +192,6 @@ void iwl_trans_txq_freeze_timer(struct iwl_trans *trans, unsigned long txqs,
 void iwl_txq_progress(struct iwl_txq *txq);
 void iwl_txq_free_tfd(struct iwl_trans *trans, struct iwl_txq *txq);
 int iwl_trans_txq_send_hcmd(struct iwl_trans *trans, struct iwl_host_cmd *cmd);
-#endif /* __iwl_trans_queue_tx_h__ */
+
+
+#endif /* SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_QUEUE_TX_H_ */
