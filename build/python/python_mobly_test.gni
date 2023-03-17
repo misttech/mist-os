@@ -149,6 +149,22 @@ template("python_mobly_test") {
   }
 
   #
+  # Define FFX binary host_test_data()
+  #
+
+  # This is currently required by Honeydew for Fuchsia device interactions.
+  # It's safe to assume that any python_mobly_test() will be performing some
+  # form of Fuchsia interactions so including FFX in this template would
+  # centralize this data deps for all users.
+
+  _ffx_test_data_target = "${target_name}_ffx_bin_test_data"
+  host_test_data(_ffx_test_data_target) {
+    sources = [ "${root_out_dir}/ffx" ]
+    deps = [ "//src/developer/ffx:ffx_bin" ]
+    outputs = [ "${_test_dir}/ffx" ]
+  }
+
+  #
   # Construct host test arguments.
   #
 
@@ -158,12 +174,15 @@ template("python_mobly_test") {
   #
   # We define Mobly Driver outside of this template so that the Mobly Driver
   # binary is built only once but can be used/referenced for any Mobly tests.
+
   _md_test_data_dir =
       get_label_info("//src/testing/end_to_end/mobly_driver", "target_out_dir")
   _host_test_args = [
     rebase_path("${_md_test_data_dir}/test_data/mobly_driver.pyz",
                 root_build_dir),
     rebase_path("${_test_dir}/${_test_binary_name}", root_build_dir),
+    "-test_data_path",
+    rebase_path(_test_dir, root_build_dir),
   ]
   _additional_deps = []
 
@@ -218,6 +237,7 @@ template("python_mobly_test") {
 
     deps =
         [
+          ":${_ffx_test_data_target}",
           ":${_mobly_test_data_target}",
           "//build/python:interpreter",
           "//src/testing/end_to_end/mobly_driver:mobly_driver_test_data_target",

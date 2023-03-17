@@ -13,20 +13,23 @@ import mobly_driver_lib
 parser = argparse.ArgumentParser()
 parser.add_argument(
     'mobly_test_path',
-    help=
-    'Absolute path to the Mobly test archive produced by the GN build system.')
+    help='path to the Mobly test archive produced by the GN build system.')
 parser.add_argument(
     '-config_yaml_path',
     default=None,
-    help='Absolute path to the Mobly test config YAML file.')
+    help='path to the Mobly test config YAML file.')
 parser.add_argument(
     '-params_yaml_path',
     default=None,
-    help='Absolute path to the Mobly test params YAML file.')
+    help='path to the Mobly test params YAML file.')
 parser.add_argument(
     '-test_timeout_sec',
     default=0,
     help='Integer to specify number of seconds before a Mobly test times out.')
+parser.add_argument(
+    '-test_data_path',
+    default=None,
+    help='path to directory containing test-time data dependencies.')
 args = parser.parse_args()
 
 
@@ -49,4 +52,5 @@ def main():
         driver=driver,
         python_path=sys.executable,
         test_path=args.mobly_test_path,
-        timeout_sec=args.test_timeout_sec)
+        timeout_sec=args.test_timeout_sec,
+        test_data_path=args.test_data_path)

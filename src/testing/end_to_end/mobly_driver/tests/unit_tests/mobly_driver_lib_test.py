@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for Mobly driver's mobly_driver_lib.py."""
 
+import os
 import unittest
 from unittest import mock
 
@@ -88,3 +89,25 @@ class MoblyDriverLibTest(unittest.TestCase):
         self.mock_driver.teardown.assert_called()
         self.assertIn(
             mock.call('MOCK_FAILURE_OUTPUT'), mock_print.call_args_list)
+
+    @mock.patch('builtins.print')
+    @mock.patch('subprocess.Popen')
+    def test_run_updates_env_with_testdata_dir(self, mock_popen, *unused_args):
+        """Test case to ensure env is updated when test_data_path is provided"""
+        self.mock_process.stdout.readline.return_value = 'TEST_OUTPUT'
+        self.mock_process.poll.side_effect = [None, 0]
+        mock_popen.return_value.__enter__.return_value = self.mock_process
+
+        env = {'PATH': '/system/path'}
+        with mock.patch.dict(os.environ, env, clear=True):
+            mobly_driver_lib.run(
+                self.mock_driver,
+                '/py/path',
+                '/test/path',
+                test_data_path='/test_data/path')
+            mock_popen.assert_called_once_with(
+                mock.ANY,
+                stdout=mock.ANY,
+                stderr=mock.ANY,
+                universal_newlines=mock.ANY,
+                env={'PATH': '/test_data/path:/system/path'})
