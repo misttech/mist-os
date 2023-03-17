@@ -102,6 +102,19 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
     screenshotter_ = realm_->component().ConnectSync<fuc::Screenshot>();
   }
 
+  void TearDown() override {
+    root_flatland_->Clear();
+    BlockingPresent(root_flatland_);
+    root_flatland_.Unbind();
+    flatland_display_.Unbind();
+
+    bool complete = false;
+    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
+    RunLoopUntil([&]() { return complete; });
+
+    gtest::RealLoopFixture::TearDown();
+  }
+
   // Draws a rectangle of size |width|*|height|, color |color|, opacity |opacity| and origin
   // (|x|,|y|) in |flatland|'s view.
   // Note: |BlockingPresent| must be called after this function to present the rectangle on the
