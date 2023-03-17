@@ -230,20 +230,29 @@ def copy_file_if_changed(src_path, dst_path):
         else:
             os.remove(dst_path)
 
-    # See https://fxbug.dev/121003 for context.
-    # If the file is writable, try to hard-link it directly. Otherwise,
-    # or if hard-linking fails due to a cross-device link, do a simple
-    # copy.
+    # See https://fxbug.dev/121003 for context. This logic is kept here
+    # to avoid incremental failures when performing copies across
+    # different revisions of the Fuchsia checkout (e.g. when bisecting
+    # or simply in CQ).
+    #
+    # If the file is writable, and not a directory, try to hard-link it
+    # directly. Otherwise, or if hard-linking fails due to a cross-device
+    # link, do a simple copy.
     do_copy = True
-    file_mode = os.stat(src_path).st_mode
-    is_src_readonly = file_mode & stat.S_IWUSR == 0
-    if not is_src_readonly:
-        try:
-            os.link(src_path, dst_path)
-            do_copy = False
-        except OSError as e:
-            if e.errno != errno.EXDEV:
-                raise
+    if os.path.isfile(src_path):
+        file_mode = os.stat(src_path).st_mode
+        is_src_readonly = file_mode & stat.S_IWUSR == 0
+        if not is_src_readonly:
+            try:
+                os.link(src_path, dst_path)
+                # Update timestamp to avoid Ninja no-op failures that can
+                # happen because Bazel does not maintain consistent timestamps
+                # in the execroot when sandboxing or remote builds are enabled.
+                os.utime(dst_path)
+                do_copy = False
+            except OSError as e:
+                if e.errno != errno.EXDEV:
+                    raise
 
     def make_writable(p):
         file_mode = os.stat(p).st_mode

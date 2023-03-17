@@ -58,6 +58,11 @@ cquery:quiet --show_result=0
 aquery:quiet --show_result=0
 build:quiet --show_result=0
 
+# Ensure outputs are writable (umask 0755) instead of readonly (0555),
+# which prevent removing output directories with `rm -rf`.
+# See https://fxbug.dev/121003
+build --experimental_writable_outputs
+
 # Ensure the embedded JDK that comes with Bazel is always used
 # This prevents Bazel from downloading extra host JDKs from the
 # network, even when a project never uses Java-related  rules
