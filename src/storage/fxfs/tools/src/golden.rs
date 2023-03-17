@@ -24,6 +24,7 @@ const IMAGE_BLOCKS: u64 = 8192;
 const IMAGE_BLOCK_SIZE: u32 = 1024;
 const EXPECTED_FILE_CONTENT: &[u8; 8] = b"content.";
 const FXFS_GOLDEN_IMAGE_DIR: &str = "src/storage/fxfs/testdata";
+const PROJECT_ID: u64 = 4;
 
 /// Uses FUCHSIA_DIR environment variable to generate a path to the expected location of golden
 /// images. Note that we do this largely for ergonomics because this binary is typically invoked
@@ -80,9 +81,15 @@ pub async fn create_image() -> Result<(), Error> {
     let fs = FxFilesystem::open(device_holder).await?;
     let vol = ops::open_volume(&fs, crypt.clone()).await?;
     ops::mkdir(&fs, &vol, Path::new("some")).await?;
+    // Apply limit to project id and apply that both to the "some" directory to have it get applied
+    // everywhere else.
+    ops::set_project_limit(&vol, PROJECT_ID, 102400, 1024).await?;
+    ops::set_project_for_node(&vol, PROJECT_ID, &Path::new("some")).await?;
+
     ops::put(&fs, &vol, &Path::new("some/file.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
     ops::put(&fs, &vol, &Path::new("some/deleted.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
     ops::unlink(&fs, &vol, &Path::new("some/deleted.txt")).await?;
+
     // Write enough stuff to the journal (journal::BLOCK_SIZE per sync) to ensure we would fill
     // the disk without reclaim of both journal and file data.
     let num_iters = 2000;

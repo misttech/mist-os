@@ -6,6 +6,7 @@ use {
     anyhow::{bail, Error},
     chrono::{TimeZone, Utc},
     fxfs::{
+        errors::FxfsError,
         filesystem::{Filesystem, OpenFxFilesystem},
         fsck,
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
@@ -223,4 +224,24 @@ pub async fn mkdir(
     dir.create_child_dir(&mut transaction, &filename).await?;
     transaction.commit().await?;
     Ok(())
+}
+
+pub async fn set_project_limit(
+    vol: &Arc<ObjectStore>,
+    project_id: u64,
+    byte_limit: u64,
+    node_limit: u64,
+) -> Result<(), Error> {
+    vol.set_project_limit(project_id, byte_limit, node_limit).await
+}
+
+pub async fn set_project_for_node(
+    vol: &Arc<ObjectStore>,
+    project_id: u64,
+    path: &Path,
+) -> Result<(), Error> {
+    let dir = walk_dir(vol, path.parent().unwrap()).await?;
+    let filename = path.file_name().unwrap().to_str().unwrap();
+    let (node_id, _) = dir.lookup(filename).await?.ok_or(FxfsError::NotFound)?;
+    vol.set_project_for_node(node_id, project_id).await
 }
