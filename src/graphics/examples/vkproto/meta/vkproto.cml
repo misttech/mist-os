@@ -19,6 +19,8 @@
         {
             protocol: [
                 "fuchsia.gpu.agis.ComponentRegistry",
+                "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Product",
                 "fuchsia.sysmem.Allocator",
             ],
         },

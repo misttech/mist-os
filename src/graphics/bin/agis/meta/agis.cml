@@ -29,6 +29,8 @@
     offer: [
         {
             protocol: [
+                "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Product",
                 "fuchsia.logger.LogSink",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.vulkan.loader.Loader",

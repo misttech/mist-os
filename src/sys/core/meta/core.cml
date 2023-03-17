@@ -375,6 +375,14 @@
             to: "#remote-control",
         },
         {
+            protocol: [
+                "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Product",
+            ],
+            from: "#hwinfo",
+            to: "#agis",
+        },
+        {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
             to: "#remote-control",
