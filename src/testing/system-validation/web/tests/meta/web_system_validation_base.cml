@@ -49,6 +49,11 @@
             from: "parent",
             to: "#context_provider",
         },
+        {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            to: "#context_provider",
+        },
     ],
     facets: {
         "fuchsia.test": {

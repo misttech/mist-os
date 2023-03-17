@@ -50,10 +50,12 @@
             protocol: [
                 //  web_engine_base.shard
                 "fuchsia.buildinfo.Provider",
+                "fuchsia.device.NameProvider",
                 "fuchsia.fonts.Provider",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.logger.LogSink",
                 "fuchsia.memorypressure.Provider",
+                "fuchsia.process.Launcher",
                 "fuchsia.sysmem.Allocator",
             ],
             from: "parent",
@@ -81,6 +83,7 @@
             protocol: [
                 //  web_engine_feature_network.shard
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
             ],
             from: "parent",
@@ -90,6 +93,7 @@
             protocol: [
                 //  web_engine_view.shard
                 "fuchsia.accessibility.semantics.SemanticsManager",
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.input3.Keyboard",

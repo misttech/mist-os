@@ -78,6 +78,11 @@
             from: "parent",
             to: "#system-validation-tests",
         },
+        {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            to: "#system-validation-tests",
+        },
 
         // NOTE:: spinning_square uses this capability, however if offered it'll switch to create views that
         // directly runs on the display controller. For system validation testing, we want to run the app
