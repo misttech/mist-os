@@ -5,7 +5,7 @@
 #ifndef SRC_STORAGE_F2FS_TEST_COMPATIBILITY_COMPATIBILITY_H_
 #define SRC_STORAGE_F2FS_TEST_COMPATIBILITY_COMPATIBILITY_H_
 
-#include <lib/fdio/fdio.h>
+#include <lib/fdio/fd.h>
 #include <lib/fit/defer.h>
 
 #include <cinttypes>
