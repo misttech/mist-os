@@ -15,6 +15,7 @@ go_binary("bin") {
   library = "stub"
   output_name = string_replace(target_name, "bin", "netstack")
   include_dirs = udp_serde_include_dirs + netdevice_include_dirs
+  gcflags = [ "all=-d=inlstaticinit=1" ]
 }
 
 fuchsia_component("component") {
