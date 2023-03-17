@@ -252,9 +252,8 @@ impl State {
         mut heap: Heap<Container>,
         storage: <Container as ReadableBlockContainer>::BackingStorage,
     ) -> Result<Self, Error> {
-        let mut header = heap.allocate_block(inspect_format::utils::order_to_size(
-            constants::HEADER_ORDER as usize,
-        ))?;
+        let mut header =
+            heap.allocate_block(inspect_format::utils::order_to_size(constants::HEADER_ORDER))?;
         header.become_header(heap.current_size())?;
         heap.set_header_block(&mut header)?;
         let inner = Arc::new(Mutex::new(InnerState::new(heap, storage, header)));

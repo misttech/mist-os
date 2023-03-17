@@ -9,7 +9,7 @@ use crate::block_type::BlockType;
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum Error {
     #[error("{slots} exceeds the maximum number of slots for order {order}: {max_capacity}")]
-    ArrayCapacityExceeded { slots: usize, order: usize, max_capacity: usize },
+    ArrayCapacityExceeded { slots: usize, order: u8, max_capacity: usize },
 
     #[error("Array index out of bounds: {0}")]
     ArrayIndexOutOfBounds(usize),
@@ -18,7 +18,7 @@ pub enum Error {
     ExpectedLockState(bool),
 
     #[error("Invalid order {0}")]
-    InvalidBlockOrder(usize),
+    InvalidBlockOrder(u8),
 
     #[error("Cannot swap blocks of different order or container")]
     InvalidBlockSwap,
@@ -52,7 +52,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn array_capacity_exceeded(slots: usize, order: usize, max_capacity: usize) -> Self {
+    pub fn array_capacity_exceeded(slots: usize, order: u8, max_capacity: usize) -> Self {
         Self::ArrayCapacityExceeded { slots, order, max_capacity }
     }
 

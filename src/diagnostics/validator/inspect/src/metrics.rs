@@ -193,7 +193,6 @@ impl Metrics {
 
 #[cfg(test)]
 mod tests {
-    use num_traits::ToPrimitive;
     use std::convert::TryFrom;
     use {
         super::*,
@@ -258,11 +257,6 @@ mod tests {
         dest[offset..offset + source.len()].copy_from_slice(source);
     }
 
-    macro_rules! enum_value {
-        ($name:expr) => {
-            $name.to_u8().unwrap()
-        };
-    }
     macro_rules! put_header {
         ($header:ident, $index:expr, $buffer:expr) => {
             copy_into(&$header.value().to_le_bytes(), $buffer, $index, 0);
@@ -275,7 +269,7 @@ mod tests {
     }
     macro_rules! set_type {
         ($header:ident, $block_type:ident) => {
-            $header.set_block_type(enum_value!(BlockType::$block_type))
+            $header.set_block_type(BlockType::$block_type as u8)
         };
     }
 
@@ -377,7 +371,7 @@ mod tests {
         let mut property_payload = Payload(0);
         property_payload.set_total_length(12);
         property_payload.set_property_extent_index(4);
-        property_payload.set_property_flags(enum_value!(PropertyFormat::String));
+        property_payload.set_property_flags(PropertyFormat::String as u8);
         put_payload!(property_payload, 2, &mut buffer);
         let mut extent_header = BlockHeader(0);
         set_type!(extent_header, Extent);
@@ -387,7 +381,7 @@ mod tests {
         put_header!(extent_header, 5, &mut buffer);
         test_metrics(&buffer, 15, 256, "EXTENT", 2, 16, 12, 32, 37)?;
         test_metrics(&buffer, 15, 256, "STRING", 1, 16, 0, 16, 0)?;
-        property_payload.set_property_flags(enum_value!(PropertyFormat::Bytes));
+        property_payload.set_property_flags(PropertyFormat::Bytes as u8);
         put_payload!(property_payload, 2, &mut buffer);
         test_metrics(&buffer, 15, 256, "EXTENT", 2, 16, 12, 32, 37)?;
         test_metrics(&buffer, 15, 256, "BYTES", 1, 16, 0, 16, 0)?;
@@ -409,25 +403,25 @@ mod tests {
         value_header.set_value_parent_index(0);
         put_header!(value_header, 4, &mut buffer);
         let mut property_payload = Payload(0);
-        property_payload.set_array_entry_type(enum_value!(BlockType::IntValue));
-        property_payload.set_array_flags(enum_value!(ArrayFormat::Default));
+        property_payload.set_array_entry_type(BlockType::IntValue as u8);
+        property_payload.set_array_flags(ArrayFormat::Default as u8);
         property_payload.set_array_slots_count(4);
         put_payload!(property_payload, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, "ARRAY(Default, INT_VALUE)", 1, 16, 32, 128, 25)?;
-        property_payload.set_array_flags(enum_value!(ArrayFormat::LinearHistogram));
+        property_payload.set_array_flags(ArrayFormat::LinearHistogram as u8);
         property_payload.set_array_slots_count(8);
         put_payload!(property_payload, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, "ARRAY(LinearHistogram, INT_VALUE)", 1, 16, 64, 128, 50)?;
-        property_payload.set_array_flags(enum_value!(ArrayFormat::ExponentialHistogram));
+        property_payload.set_array_flags(ArrayFormat::ExponentialHistogram as u8);
         // avoid line-wrapping the parameter list of test_metrics()
         let name = "ARRAY(ExponentialHistogram, INT_VALUE)";
         put_payload!(property_payload, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, name, 1, 16, 64, 128, 50)?;
-        property_payload.set_array_entry_type(enum_value!(BlockType::UintValue));
+        property_payload.set_array_entry_type(BlockType::UintValue as u8);
         let name = "ARRAY(ExponentialHistogram, UINT_VALUE)";
         put_payload!(property_payload, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, name, 1, 16, 64, 128, 50)?;
-        property_payload.set_array_entry_type(enum_value!(BlockType::DoubleValue));
+        property_payload.set_array_entry_type(BlockType::DoubleValue as u8);
         let name = "ARRAY(ExponentialHistogram, DOUBLE_VALUE)";
         put_payload!(property_payload, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, name, 1, 16, 64, 128, 50)?;

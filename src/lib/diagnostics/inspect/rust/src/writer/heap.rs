@@ -18,7 +18,7 @@ use std::{cmp::min, convert::TryInto};
 pub struct Heap<T> {
     container: T,
     current_size_bytes: usize,
-    free_head_per_order: [BlockIndex; constants::NUM_ORDERS],
+    free_head_per_order: [BlockIndex; constants::NUM_ORDERS as usize],
     allocated_blocks: usize,
     deallocated_blocks: usize,
     failed_allocations: usize,
@@ -31,7 +31,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
         let mut heap = Heap {
             container,
             current_size_bytes: 0,
-            free_head_per_order: [BlockIndex::EMPTY; constants::NUM_ORDERS],
+            free_head_per_order: [BlockIndex::EMPTY; constants::NUM_ORDERS as usize],
             allocated_blocks: 0,
             deallocated_blocks: 0,
             failed_allocations: 0,
@@ -69,12 +69,13 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
     /// Allocates a new block of the given `min_size`.
     pub fn allocate_block(&mut self, min_size: usize) -> Result<Block<T>, Error> {
         let min_fit_order = utils::fit_order(min_size);
-        if min_fit_order >= constants::NUM_ORDERS {
+        if min_fit_order >= constants::NUM_ORDERS as usize {
             return Err(Error::InvalidBlockOrder(min_fit_order));
         }
+        let min_fit_order = min_fit_order as u8;
         // Find free block with order >= min_fit_order
         let order_found = (min_fit_order..constants::NUM_ORDERS)
-            .find(|&i| self.is_free_block(self.free_head_per_order[i], i));
+            .find(|&i| self.is_free_block(self.free_head_per_order[i as usize], i));
         let next_order = match order_found {
             Some(order) => order,
             None => {
@@ -82,7 +83,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
                 constants::NUM_ORDERS - 1
             }
         };
-        let next_into = self.free_head_per_order[next_order];
+        let next_into = self.free_head_per_order[next_order as usize];
         let mut block = self.get_block(next_into).unwrap();
         while block.order() > min_fit_order {
             self.split_block(&mut block)?;
@@ -114,8 +115,8 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
             buddy_index = self.buddy(block_to_free.index(), block_to_free.order());
             buddy_block = self.get_block(buddy_index).unwrap();
         }
-        block_to_free.become_free(self.free_head_per_order[block_to_free.order()]);
-        self.free_head_per_order[block_to_free.order()] = block_to_free.index();
+        block_to_free.become_free(self.free_head_per_order[block_to_free.order() as usize]);
+        self.free_head_per_order[block_to_free.order() as usize] = block_to_free.index();
         self.deallocated_blocks += 1;
         Ok(())
     }
@@ -154,7 +155,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
         }
         let new_size = min(container_size, requested_size);
         let min_index = BlockIndex::from_offset(self.current_size_bytes);
-        let mut last_index = self.free_head_per_order[constants::NUM_ORDERS - 1];
+        let mut last_index = self.free_head_per_order[(constants::NUM_ORDERS - 1) as usize];
         let mut curr_index =
             BlockIndex::from_offset(new_size - new_size % constants::PAGE_SIZE_BYTES);
         loop {
@@ -171,7 +172,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
                 break;
             }
         }
-        self.free_head_per_order[constants::NUM_ORDERS - 1] = last_index;
+        self.free_head_per_order[(constants::NUM_ORDERS - 1) as usize] = last_index;
         self.current_size_bytes = new_size;
         if let Some(header) = self.header.as_mut() {
             header.set_header_vmo_size(self.current_size_bytes.try_into().unwrap())?;
@@ -179,7 +180,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
         Ok(())
     }
 
-    fn is_free_block(&self, index: BlockIndex, expected_order: usize) -> bool {
+    fn is_free_block(&self, index: BlockIndex, expected_order: u8) -> bool {
         if index.to_usize().unwrap() >= self.current_size_bytes / constants::MIN_ORDER_SIZE {
             return false;
         }
@@ -195,9 +196,9 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
         if order >= constants::NUM_ORDERS {
             return Ok(false);
         }
-        let mut next_index = self.free_head_per_order[order];
+        let mut next_index = self.free_head_per_order[order as usize];
         if next_index == index {
-            self.free_head_per_order[order] = block.free_next_index()?;
+            self.free_head_per_order[order as usize] = block.free_next_index()?;
             return Ok(true);
         }
         while self.is_free_block(next_index, order) {
@@ -222,13 +223,14 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
         block.become_free(buddy_index);
 
         let mut buddy = Block::new(self.container.clone(), buddy_index);
-        buddy.set_order(order - 1)?;
-        buddy.become_free(self.free_head_per_order[order - 1]);
-        self.free_head_per_order[order - 1] = block.index();
+        let buddy_order = order - 1;
+        buddy.set_order(buddy_order)?;
+        buddy.become_free(self.free_head_per_order[buddy_order as usize]);
+        self.free_head_per_order[buddy_order as usize] = block.index();
         Ok(())
     }
 
-    fn buddy(&self, index: BlockIndex, order: usize) -> BlockIndex {
+    fn buddy(&self, index: BlockIndex, order: u8) -> BlockIndex {
         index ^ BlockIndex::from_offset(utils::order_to_size(order))
     }
 }
@@ -241,7 +243,7 @@ mod tests {
 
     struct BlockDebug {
         index: BlockIndex,
-        order: usize,
+        order: u8,
         block_type: BlockType,
     }
 
@@ -615,7 +617,7 @@ mod tests {
         let (container, _storage) = Container::read_and_write(3 * 4096).unwrap();
         let mut heap = Heap::new(container).unwrap();
         let mut block = heap
-            .allocate_block(inspect_format::utils::order_to_size(constants::HEADER_ORDER as usize))
+            .allocate_block(inspect_format::utils::order_to_size(constants::HEADER_ORDER))
             .unwrap();
         assert!(block.become_header(heap.current_size()).is_ok());
         assert!(heap.set_header_block(&mut block).is_ok());

@@ -19,7 +19,7 @@ pub const HEADER_MAGIC_NUMBER: u32 = 0x50534e49;
 pub const HEADER_VERSION_NUMBER: u32 = 2;
 
 /// Maximum number order of a block.
-pub const NUM_ORDERS: usize = 8;
+pub const NUM_ORDERS: u8 = 8;
 
 /// The shift for order 0.
 pub const MIN_ORDER_SHIFT: usize = 4;
@@ -28,7 +28,7 @@ pub const MIN_ORDER_SHIFT: usize = 4;
 pub const MIN_ORDER_SIZE: usize = 1 << MIN_ORDER_SHIFT; // 16 bytes
 
 /// The shift for order NUM_ORDERS-1 (the maximum order)
-pub const MAX_ORDER_SHIFT: usize = MIN_ORDER_SHIFT + NUM_ORDERS - 1;
+pub const MAX_ORDER_SHIFT: usize = MIN_ORDER_SHIFT + (NUM_ORDERS as usize) - 1;
 
 /// The size for order NUM_ORDERS-1 (the maximum order)
 pub const MAX_ORDER_SIZE: usize = 1 << MAX_ORDER_SHIFT;
@@ -54,9 +54,4 @@ pub const STRING_REFERENCE_TOTAL_LENGTH_BYTES: usize = 4;
 pub const VMO_FROZEN: u64 = u64::max_value() - 1;
 
 /// The order of the header block.
-pub const HEADER_ORDER: HeaderSize = HeaderSize::LARGE;
-
-#[repr(u8)]
-pub enum HeaderSize {
-    LARGE = 1,
-}
+pub const HEADER_ORDER: u8 = 1;

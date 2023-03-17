@@ -16,7 +16,7 @@ pub fn fit_order(size: usize) -> usize {
 }
 
 /// Get size in bytes of a given |order|.
-pub fn order_to_size(order: usize) -> usize {
+pub fn order_to_size(order: u8) -> usize {
     constants::MIN_ORDER_SIZE << order
 }
 
@@ -30,12 +30,12 @@ pub fn block_size_for_payload(payload_size: usize) -> usize {
 }
 
 /// Get the size in bytes for the payload section of a block of the given |order|.
-pub fn payload_size_for_order(order: usize) -> usize {
+pub fn payload_size_for_order(order: u8) -> usize {
     order_to_size(order) - constants::HEADER_SIZE_BYTES
 }
 
 /// Get the array capacity size for the given |order|.
-pub fn array_capacity(order: usize, entry_type: BlockType) -> Option<usize> {
+pub fn array_capacity(order: u8, entry_type: BlockType) -> Option<usize> {
     entry_type.array_element_size().map(|size| {
         (order_to_size(order)
             - constants::HEADER_SIZE_BYTES
@@ -73,7 +73,7 @@ mod test {
     fn fit_payload_test() {
         for payload_size in 0..500 {
             let block_size = block_size_for_payload(payload_size);
-            let order = fit_order(block_size);
+            let order = fit_order(block_size) as u8;
             let payload_max = payload_size_for_order(order);
             assert!(
                 payload_size <= payload_max,

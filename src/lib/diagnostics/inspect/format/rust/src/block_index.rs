@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::constants;
-use num_traits::ToPrimitive;
 use std::fmt;
 use std::ops::{Add, AddAssign, BitXor, Deref, Sub, SubAssign};
 
@@ -21,7 +20,7 @@ impl BlockIndex {
 
     /// Get index in the VMO for a given |offset|.
     pub fn from_offset(offset: usize) -> BlockIndex {
-        Self::new((offset / constants::MIN_ORDER_SIZE).to_u32().unwrap())
+        Self::new(u32::try_from(offset / constants::MIN_ORDER_SIZE).unwrap())
     }
 
     /// Get offset in the VMO for |self|.

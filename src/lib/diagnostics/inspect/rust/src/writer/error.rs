@@ -77,7 +77,7 @@ pub enum Error {
     InvalidBlockOrder(usize),
 
     #[error("Invalid order {0} at index {1}")]
-    InvalidBlockOrderAtIndex(usize, BlockIndex),
+    InvalidBlockOrderAtIndex(u8, BlockIndex),
 
     #[error("Cannot swap blocks of different order or container")]
     InvalidBlockSwap,
@@ -86,7 +86,7 @@ pub enum Error {
     InvalidArrayType(BlockIndex),
 
     #[error("{slots} exceeds the maximum number of slots for order {order}: {max_capacity}")]
-    ArrayCapacityExceeded { slots: usize, order: usize, max_capacity: usize },
+    ArrayCapacityExceeded { slots: usize, order: u8, max_capacity: usize },
 
     #[error("Invalid {value_type} flags={flags} at index {index}")]
     InvalidFlags { value_type: &'static str, flags: u8, index: BlockIndex },
@@ -134,7 +134,7 @@ impl Error {
         Self::InvalidFlags { value_type, flags, index }
     }
 
-    pub fn array_capacity_exceeded(slots: usize, order: usize, max_capacity: usize) -> Self {
+    pub fn array_capacity_exceeded(slots: usize, order: u8, max_capacity: usize) -> Self {
         Self::ArrayCapacityExceeded { slots, order, max_capacity }
     }
 }

@@ -105,8 +105,8 @@ fn high_bits(number: u8, n_bits: usize) -> u8 {
 const BITS_PER_BYTE: usize = 8;
 
 /// Get size in bytes of a given |order|. Copied from private mod fuchsia-inspect/src/utils.rs
-fn order_to_size(order: usize) -> usize {
-    MIN_ORDER_SIZE << order
+fn order_to_size(order: u8) -> usize {
+    MIN_ORDER_SIZE << (order as usize)
 }
 
 // Checks if these bits (start...end) are 0. Restricts the range checked to the given block.

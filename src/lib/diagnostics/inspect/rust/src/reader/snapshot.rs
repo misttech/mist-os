@@ -73,9 +73,8 @@ impl Snapshot {
             }
 
             // Read the buffer
-            let order = header_block.order();
-            let vmo_size = if order == constants::HeaderSize::LARGE as usize {
-                cmp::min(header_block.header_vmo_size()?.unwrap() as usize, constants::MAX_VMO_SIZE)
+            let vmo_size = if let Some(vmo_size) = header_block.header_vmo_size()? {
+                cmp::min(vmo_size as usize, constants::MAX_VMO_SIZE)
             } else {
                 cmp::min(source.len(), constants::MAX_VMO_SIZE)
             };
@@ -298,12 +297,8 @@ mod tests {
     fn scan() -> Result<(), Error> {
         let size = 4096;
         let (container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
-            container.clone(),
-            0.into(),
-            constants::HEADER_ORDER as usize,
-            0.into(),
-        )?;
+        let mut header =
+            Block::new_free(container.clone(), 0.into(), constants::HEADER_ORDER, 0.into())?;
         header.become_reserved()?;
         header.become_header(size)?;
 
@@ -321,7 +316,7 @@ mod tests {
 
         assert_eq!(blocks[0].block_type(), BlockType::Header);
         assert_eq!(*blocks[0].index(), 0);
-        assert_eq!(blocks[0].order(), constants::HEADER_ORDER as usize);
+        assert_eq!(blocks[0].order(), constants::HEADER_ORDER);
         assert_eq!(blocks[0].header_magic().unwrap(), constants::HEADER_MAGIC_NUMBER);
         assert_eq!(blocks[0].header_version().unwrap(), constants::HEADER_VERSION_NUMBER);
 
@@ -388,12 +383,8 @@ mod tests {
     fn invalid_pending_write() -> Result<(), Error> {
         let size = 4096;
         let (container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
-            container.clone(),
-            0.into(),
-            constants::HEADER_ORDER as usize,
-            0.into(),
-        )?;
+        let mut header =
+            Block::new_free(container.clone(), 0.into(), constants::HEADER_ORDER, 0.into())?;
         header.become_reserved()?;
         header.become_header(size)?;
         header.lock_header()?;
@@ -405,12 +396,8 @@ mod tests {
     fn invalid_magic_number() -> Result<(), Error> {
         let size = 4096;
         let (container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
-            container.clone(),
-            0.into(),
-            constants::HEADER_ORDER as usize,
-            0.into(),
-        )?;
+        let mut header =
+            Block::new_free(container.clone(), 0.into(), constants::HEADER_ORDER, 0.into())?;
         header.become_reserved()?;
         header.become_header(size)?;
         header.set_header_magic(3)?;
@@ -422,12 +409,8 @@ mod tests {
     fn invalid_generation_count() -> Result<(), Error> {
         let size = 4096;
         let (container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
-            container.clone(),
-            0.into(),
-            constants::HEADER_ORDER as usize,
-            0.into(),
-        )?;
+        let mut header =
+            Block::new_free(container.clone(), 0.into(), constants::HEADER_ORDER, 0.into())?;
         header.become_reserved()?;
         header.become_header(size)?;
         assert!(Snapshot::try_from_with_callback(&storage, || {
@@ -451,12 +434,8 @@ mod tests {
     fn snapshot_frozen_vmo() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
-            container.clone(),
-            0.into(),
-            constants::HEADER_ORDER as usize,
-            0.into(),
-        )?;
+        let mut header =
+            Block::new_free(container.clone(), 0.into(), constants::HEADER_ORDER, 0.into())?;
         header.become_reserved()?;
         header.become_header(size)?;
         container.write_at(8, &[0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
@@ -476,12 +455,8 @@ mod tests {
     fn snapshot_vmo_with_unused_space() -> Result<(), Error> {
         let size = 4 * constants::PAGE_SIZE_BYTES;
         let (container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
-            container.clone(),
-            0.into(),
-            constants::HEADER_ORDER as usize,
-            0.into(),
-        )?;
+        let mut header =
+            Block::new_free(container.clone(), 0.into(), constants::HEADER_ORDER, 0.into())?;
         header.become_reserved()?;
         header.become_header(constants::PAGE_SIZE_BYTES)?;
 
@@ -495,12 +470,8 @@ mod tests {
     fn snapshot_vmo_with_very_large_vmo() -> Result<(), Error> {
         let size = 2 * constants::MAX_VMO_SIZE;
         let (container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(
-            container.clone(),
-            0.into(),
-            constants::HEADER_ORDER as usize,
-            0.into(),
-        )?;
+        let mut header =
+            Block::new_free(container.clone(), 0.into(), constants::HEADER_ORDER, 0.into())?;
         header.become_reserved()?;
         header.become_header(size)?;
 

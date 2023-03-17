@@ -14,8 +14,8 @@ use crate::{
     utils,
 };
 use byteorder::{ByteOrder, LittleEndian};
-use num_derive::{FromPrimitive, ToPrimitive};
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use std::{
     cmp::min,
     convert::TryInto,
@@ -25,14 +25,16 @@ use std::{
 pub use diagnostics_hierarchy::ArrayFormat;
 
 /// Disposition of a Link value.
-#[derive(Clone, Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Clone, Debug, PartialEq, Eq, FromPrimitive)]
+#[repr(u8)]
 pub enum LinkNodeDisposition {
     Child = 0,
     Inline = 1,
 }
 
 /// Format in which the property will be read.
-#[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Debug, PartialEq, Eq, FromPrimitive)]
+#[repr(u8)]
 pub enum PropertyFormat {
     String = 0,
     Bytes = 1,
@@ -58,8 +60,8 @@ impl<T: ReadBytes> Block<T> {
     }
 
     /// Returns the order of the block.
-    pub fn order(&self) -> usize {
-        self.read_header().order().to_usize().unwrap()
+    pub fn order(&self) -> u8 {
+        self.read_header().order()
     }
 
     /// Returns the magic number in a HEADER block.
@@ -84,7 +86,7 @@ impl<T: ReadBytes> Block<T> {
     /// a field in the HEADER block.
     pub fn header_vmo_size(&self) -> Result<Option<u32>, Error> {
         self.check_type(BlockType::Header)?;
-        if self.order() != constants::HEADER_ORDER as usize {
+        if self.order() != constants::HEADER_ORDER {
             return Ok(None);
         }
         let mut bytes = [0u8; 4];
@@ -132,7 +134,7 @@ impl<T: ReadBytes> Block<T> {
     /// Gets the total length of a PROPERTY or STRING_REFERERENCE block.
     pub fn total_length(&self) -> Result<usize, Error> {
         self.check_multi_type(&[BlockType::BufferValue, BlockType::StringReference])?;
-        Ok(self.read_payload().total_length().to_usize().unwrap())
+        Ok(self.read_payload().total_length() as usize)
     }
 
     /// Gets the flags of a PROPERTY block.
@@ -175,10 +177,7 @@ impl<T: ReadBytes> Block<T> {
     /// Gets the number of slots in an ARRAY_VALUE block.
     pub fn array_slots(&self) -> Result<usize, Error> {
         self.check_type(BlockType::ArrayValue)?;
-        self.read_payload()
-            .array_slots_count()
-            .to_usize()
-            .ok_or(Error::FailedToConvertArraySlotsToUsize)
+        Ok(self.read_payload().array_slots_count() as usize)
     }
 
     /// Gets the type of each slot in an ARRAY_VALUE block.
@@ -307,7 +306,7 @@ impl<T: ReadBytes> Block<T> {
     /// Get the length of the name of a NAME block
     pub fn name_length(&self) -> Result<usize, Error> {
         self.check_type(BlockType::Name)?;
-        Ok(self.read_header().name_length().to_usize().unwrap())
+        Ok(self.read_header().name_length() as usize)
     }
 
     /// Returns the contents of a NAME block.
@@ -457,15 +456,15 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     pub fn new_free(
         container: T,
         index: BlockIndex,
-        order: usize,
+        order: u8,
         next_free: BlockIndex,
     ) -> Result<Self, Error> {
         if order >= constants::NUM_ORDERS {
             return Err(Error::InvalidBlockOrder(order));
         }
         let mut header = BlockHeader(0);
-        header.set_order(order.to_u8().unwrap());
-        header.set_block_type(BlockType::Free.to_u8().unwrap());
+        header.set_order(order);
+        header.set_block_type(BlockType::Free as u8);
         header.set_free_next_index(*next_free);
         let mut block = Block::new(container, index);
         block.write_header(header);
@@ -482,12 +481,12 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     }
 
     /// Set the order of the block.
-    pub fn set_order(&mut self, order: usize) -> Result<(), Error> {
+    pub fn set_order(&mut self, order: u8) -> Result<(), Error> {
         if order >= constants::NUM_ORDERS {
             return Err(Error::InvalidBlockOrder(order));
         }
         let mut header = self.read_header();
-        header.set_order(order.to_u8().unwrap());
+        header.set_order(order);
         self.write_header(header);
         Ok(())
     }
@@ -497,8 +496,8 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         self.check_type(BlockType::Reserved)?;
         self.index = BlockIndex::HEADER;
         let mut header = BlockHeader(0);
-        header.set_order(constants::HEADER_ORDER as u8);
-        header.set_block_type(BlockType::Header.to_u8().unwrap());
+        header.set_order(constants::HEADER_ORDER);
+        header.set_block_type(BlockType::Header as u8);
         header.set_header_magic(constants::HEADER_MAGIC_NUMBER);
         header.set_header_version(constants::HEADER_VERSION_NUMBER);
         self.write(header, Payload(0));
@@ -520,7 +519,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// a field in the HEADER block.
     pub fn set_header_vmo_size(&mut self, size: u32) -> Result<(), Error> {
         self.check_type(BlockType::Header)?;
-        if self.order() != constants::HEADER_ORDER as usize {
+        if self.order() != constants::HEADER_ORDER {
             return Ok(());
         }
         let bytes_written = self.container.write_at((self.index + 1).offset(), &size.to_le_bytes());
@@ -573,7 +572,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         self.check_type_eq(header.block_type(), BlockType::NodeValue)?;
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
-        new_header.set_block_type(BlockType::Tombstone.to_u8().unwrap());
+        new_header.set_block_type(BlockType::Tombstone as u8);
         self.write_header(new_header);
         Ok(())
     }
@@ -584,7 +583,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         self.check_type_eq(header.block_type(), BlockType::Free)?;
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
-        new_header.set_block_type(BlockType::Reserved.to_u8().unwrap());
+        new_header.set_block_type(BlockType::Reserved as u8);
         self.write_header(new_header);
         Ok(())
     }
@@ -594,7 +593,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         let header = self.read_header();
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
-        new_header.set_block_type(BlockType::Free.to_u8().unwrap());
+        new_header.set_block_type(BlockType::Free as u8);
         new_header.set_free_next_index(*next);
         self.write_header(new_header);
     }
@@ -618,9 +617,9 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         }
         self.write_value_header(BlockType::ArrayValue, name_index, parent_index)?;
         let mut payload = Payload(0);
-        payload.set_array_entry_type(entry_type.to_u8().unwrap());
-        payload.set_array_flags(format.to_u8().unwrap());
-        payload.set_array_slots_count(slots.to_u8().unwrap());
+        payload.set_array_entry_type(entry_type as u8);
+        payload.set_array_flags(format as u8);
+        payload.set_array_slots_count(slots as u8);
         self.write_payload(payload);
         self.array_clear(0)?;
         Ok(())
@@ -699,7 +698,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     pub fn become_extent(&mut self, next_extent_index: BlockIndex) -> Result<(), Error> {
         self.check_type(BlockType::Reserved)?;
         let mut header = self.read_header();
-        header.set_block_type(BlockType::Extent.to_u8().unwrap());
+        header.set_block_type(BlockType::Extent as u8);
         header.set_extent_next_index(*next_extent_index);
         self.write_header(header);
         Ok(())
@@ -826,7 +825,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     ) -> Result<(), Error> {
         self.write_value_header(BlockType::BufferValue, name_index, parent_index)?;
         let mut payload = Payload(0);
-        payload.set_property_flags(format.to_u8().unwrap());
+        payload.set_property_flags(format as u8);
         self.write_payload(payload);
         Ok(())
     }
@@ -838,7 +837,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         let header = self.read_header();
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
-        new_header.set_block_type(BlockType::StringReference.to_u8().unwrap());
+        new_header.set_block_type(BlockType::StringReference as u8);
         new_header.set_extent_next_index(*BlockIndex::EMPTY);
         new_header.set_string_reference_count(0);
         self.write_header(new_header);
@@ -924,7 +923,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
             }
         }
         let mut header = self.read_header();
-        header.set_block_type(BlockType::Name.to_u8().unwrap());
+        header.set_block_type(BlockType::Name as u8);
         header.set_name_length(u16::from_usize(bytes.len()).unwrap());
         self.write_header(header);
         self.write_payload_from_bytes(bytes);
@@ -951,7 +950,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         self.write_value_header(BlockType::LinkValue, name_index, parent_index)?;
         let mut payload = Payload(0);
         payload.set_content_index(*content_index);
-        payload.set_disposition_flags(disposition_flags.to_u8().unwrap());
+        payload.set_disposition_flags(disposition_flags as u8);
         self.write_payload(payload);
         Ok(())
     }
@@ -978,7 +977,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         self.check_type_eq(header.block_type(), BlockType::Reserved)?;
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
-        new_header.set_block_type(block_type.to_u8().unwrap());
+        new_header.set_block_type(block_type as u8);
         new_header.set_value_name_index(*name_index);
         new_header.set_value_parent_index(*parent_index);
         self.write_header(new_header);
@@ -1038,7 +1037,7 @@ mod tests {
     ) -> Block<Container> {
         let mut block = Block::new(container.clone(), index);
         let mut header = BlockHeader(0);
-        header.set_block_type(block_type.to_u8().unwrap());
+        header.set_block_type(block_type as u8);
         header.set_order(2);
         block.write_header(header);
         block
@@ -1263,7 +1262,7 @@ mod tests {
         assert!(block.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()).is_ok());
         assert_eq!(block.block_type(), BlockType::Header);
         assert_eq!(*block.index(), 0);
-        assert_eq!(block.order(), constants::HEADER_ORDER as usize);
+        assert_eq!(block.order(), constants::HEADER_ORDER);
         assert_eq!(block.header_magic().unwrap(), constants::HEADER_MAGIC_NUMBER);
         assert_eq!(block.header_version().unwrap(), constants::HEADER_VERSION_NUMBER);
         assert_eq!(
@@ -1291,7 +1290,7 @@ mod tests {
         assert!(block.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()).is_ok());
         assert_eq!(block.block_type(), BlockType::Header);
         assert_eq!(*block.index(), 0);
-        assert_eq!(block.order(), constants::HEADER_ORDER as usize);
+        assert_eq!(block.order(), constants::HEADER_ORDER);
         assert_eq!(block.header_magic().unwrap(), constants::HEADER_MAGIC_NUMBER);
         assert_eq!(block.header_version().unwrap(), constants::HEADER_VERSION_NUMBER);
         assert_8_bytes!(container, 0, [0x01, 0x02, 0x02, 0x00, 0x49, 0x4e, 0x53, 0x50]);
@@ -2118,7 +2117,7 @@ mod tests {
         block
     }
 
-    fn get_reserved_of_order(container: &Container, order: usize) -> Block<Container> {
+    fn get_reserved_of_order(container: &Container, order: u8) -> Block<Container> {
         let mut block =
             Block::new_free(container.clone(), BlockIndex::new(0), order, BlockIndex::new(0))
                 .unwrap();
