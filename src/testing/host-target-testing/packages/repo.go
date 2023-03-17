@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/repo"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
@@ -179,4 +180,79 @@ func (r *Repository) lookupUpdateContentPackageMerkle(ctx context.Context, updat
 	}
 
 	return merkle, nil
+}
+
+// CreatePackage creates a package in this repository named `packagePath` by:
+// * creating a temporary directory
+// * passing it to the `createFunc` closure. The closure then adds any necessary files.
+// * creating a package from the directory contents.
+// * publishing the package to the repository with the `packagePath` path.
+func (r *Repository) CreatePackage(ctx context.Context, packagePath string, createFunc func(path string) error) (string, error) {
+	// Extract the package name from the path. The variant currently is optional, but if specified, must be "0".
+	packageName, packageVariant, found := strings.Cut(packagePath, "/")
+	if found && packageVariant != "0" {
+		return "", fmt.Errorf("invalid package path found: %q", packagePath)
+	}
+	packageVariant = "0"
+
+	// Create temp directory. The content of this directory will be included in the package.
+	tempDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return "", fmt.Errorf("failed to create a temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Package content will be created by the user by leveraging the createFunc closure.
+	if err := createFunc(tempDir); err != nil {
+		return "", fmt.Errorf("failed to create content of the package: %w", err)
+	}
+
+	// Create package from the temp directory. The package builder doesn't use
+	// the repository name, so it can be set as `testrepository.com`.
+	pkgBuilder, err := NewPackageBuilderFromDir(tempDir, packageName, packageVariant, "testrepository.com")
+	if err != nil {
+		return "", fmt.Errorf("failed to parse the package from %q: %w", tempDir, err)
+	}
+
+	// Publish the package and ger the merkle of the package.
+	_, pkgMerkle, err := pkgBuilder.Publish(ctx, r)
+	if err != nil {
+		return "", fmt.Errorf("failed to publish the package %q: %w", packagePath, err)
+	}
+
+	return pkgMerkle, nil
+}
+
+// EditPackage takes the content of the source package from srcPacgePath, copies the content to
+// destination package at dstPackagePath and edits the content at destination with the help of
+// editFunc closure.
+func (r *Repository) EditPackage(ctx context.Context, srcPackagePath string, dstPackagePath string, editFunc func(path string) error) (Package, error) {
+
+	// First get the source package located at srcPackagePath
+	pkg, err := r.OpenPackage(ctx, srcPackagePath)
+	if err != nil {
+		return Package{}, fmt.Errorf("failed to open the package %q: %w", srcPackagePath, err)
+	}
+
+	// Next create a destination package based on the content oft the source package.
+	pkgMerkle, err := r.CreatePackage(ctx, dstPackagePath, func(tempDir string) error {
+		if err := pkg.Expand(ctx, tempDir); err != nil {
+			return fmt.Errorf("failed to expand the package to %s: %w", tempDir, err)
+		}
+
+		// User can edit the content and return it.
+		return editFunc(tempDir)
+	})
+
+	if err != nil {
+		return Package{}, fmt.Errorf("failed to create the package %q: %w", dstPackagePath, err)
+	}
+
+	// Get the newly edited package located at pkgMerkle and return it.
+	pkg, err = newPackage(ctx, r, pkgMerkle)
+	if err != nil {
+		return Package{}, fmt.Errorf("failed to edit the package %q: %w", pkgMerkle, err)
+	}
+
+	return pkg, nil
 }
