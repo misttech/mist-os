@@ -529,9 +529,8 @@ btf::_fail() {
 
 #######################################
 # Outputs the absolute path to the given file, also resolving symbolic links.
-# (Note: This attempts to use the 'realpath' binary, and falls back to
-# look for a valid parent, "cd" to it and use pwd -P.
-# otherwise)
+# (Note: This doesn't use the 'realpath' binary due to flag and behavioral
+# differences between platforms.)
 # Arguments:
 #   $1 - a relative file path. The full path does not have to exist, but
 #   all left-most path components that do exist are evaluated, resolving
@@ -545,27 +544,20 @@ btf::realpath() {
   local path="$1"
   [[ "${path}" != "" ]] ||
     btf::abort 1 "btf::realpath: input path cannot be blank"
-  local rp
-  local -i status
-  if hash realpath >/dev/null 2>&1; then
-    rp="$(realpath -m "$path" 2>/dev/null)"
-    status=$?
-  fi
-  if [[ -z "${rp}" || ${status} -ne 0 ]]; then
-    local parent child
-    parent="$(dirname "$path")"
-    child="$(basename "$path")"
-    while [[ -n "$parent" && ! -d "$parent" ]]; do
-      child="$(basename "$parent")/${child}"
-      parent="$(dirname "$parent")"
-    done
 
-    if [[ -z "$parent" ]]; then
-      btf::abort 1 "btf::realpath: path has no valid parent and 'realpath' is not available. Cannot resolve: '${path}'"
-    fi
+  local parent child
+  parent="$(dirname "$path")"
+  child="$(basename "$path")"
+  while [[ -n "$parent" && ! -d "$parent" ]]; do
+    child="$(basename "$parent")/${child}"
+    parent="$(dirname "$parent")"
+  done
 
-    rp="$(cd "$parent" && pwd -P)/$child"
+  if [[ -z "$parent" ]]; then
+    btf::abort 1 "btf::realpath: path has no valid parent: '${path}'"
   fi
+
+  rp="$(cd "$parent" && pwd -P)/$child"
   [[ -n "${rp}" ]] ||
     btf::abort 1 "btf::realpath: result for '${path}' was unexpectedly blank, status=${status}"
   printf "%s" "${rp}"
