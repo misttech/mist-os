@@ -92,6 +92,7 @@ zx_library("zxdump") {
     ]
     deps += [
       "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
       "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/fdio",

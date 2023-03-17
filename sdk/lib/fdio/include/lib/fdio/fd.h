@@ -79,7 +79,7 @@ zx_status_t fdio_fd_clone(int fd, zx_handle_t* out_handle) ZX_AVAILABLE_SINCE(1)
 //
 // Upon success, `out_handle` contains a handle that represents the given file descriptor. This
 // handle represents the connection to the file or service that was previously represented by the
-// `fd`. This behavior is identical to that of fdio_get_service_handle().
+// `fd`.
 //
 // A file descriptor may not always be in a state that its underlying handle can be transferred in
 // this way. For example, if it has been dup()-ed, there will be more than one descriptor referring

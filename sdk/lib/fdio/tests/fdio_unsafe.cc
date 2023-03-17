@@ -53,7 +53,10 @@ TEST(UnsafeTest, BorrowChannelFromUnsupportedObject) {
   fdio_unsafe_release(io);
 
   zx_handle_t handle = ZX_HANDLE_INVALID;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, fdio_get_service_handle(ns_fd.release(), &handle));
+#pragma clang diagnostic pop
   EXPECT_EQ(ZX_HANDLE_INVALID, handle);
 
   ASSERT_OK(fdio_ns_destroy(ns));

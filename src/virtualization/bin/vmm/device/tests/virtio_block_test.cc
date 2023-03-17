@@ -6,9 +6,7 @@
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/virtualization/cpp/fidl.h>
-#include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
@@ -92,7 +90,7 @@ class VirtioBlockTest : public TestWithDevice,
     fd_ = CreateBlockFile(path_template);
     ASSERT_TRUE(fd_);
     zx::channel client;
-    zx_status_t status = fdio_get_service_handle(fd_.release(), client.reset_and_get_address());
+    zx_status_t status = fdio_fd_transfer(fd_.release(), client.reset_and_get_address());
     ASSERT_EQ(ZX_OK, status);
     fd_ = fbl::unique_fd(open(path_template, O_RDWR));
     ASSERT_TRUE(fd_);

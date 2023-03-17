@@ -186,18 +186,17 @@ zx::result<zx::channel> FormatFvm(const fbl::unique_fd& devfs_root,
   }
 
   {
-    auto status = AllocateEmptyPartitions(devfs_root, fvm_fd);
+    zx::result<> status = AllocateEmptyPartitions(devfs_root, fvm_fd);
     if (status.is_error()) {
       ERROR("Couldn't allocate empty partitions\n");
       return status.take_error();
     }
 
     zx::channel channel;
-    status =
-        zx::make_result(fdio_get_service_handle(fvm_fd.release(), channel.reset_and_get_address()));
-    if (status.is_error()) {
+    if (zx_status_t status = fdio_fd_transfer(fvm_fd.release(), channel.reset_and_get_address());
+        status != ZX_OK) {
       ERROR("Couldn't get fvm handle\n");
-      return zx::error(ZX_ERR_IO);
+      return zx::error(status);
     }
     return zx::ok(std::move(channel));
   }

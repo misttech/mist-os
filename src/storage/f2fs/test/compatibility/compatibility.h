@@ -207,8 +207,7 @@ class F2fsDebianGuest : public DebianEnclosedGuest {
       : DebianEnclosedGuest(dispatcher, std::move(run_loop_until)) {}
 
   zx_status_t BuildLaunchInfo(GuestLaunchInfo* launch_info) override {
-    zx_status_t status = DebianEnclosedGuest::BuildLaunchInfo(launch_info);
-    if (status != ZX_OK) {
+    if (zx_status_t status = DebianEnclosedGuest::BuildLaunchInfo(launch_info); status != ZX_OK) {
       return status;
     }
 
@@ -238,8 +237,8 @@ class F2fsDebianGuest : public DebianEnclosedGuest {
     }
 
     zx::channel channel;
-    status = fdio_get_service_handle(fd.release(), channel.reset_and_get_address());
-    if (status != ZX_OK) {
+    if (zx_status_t status = fdio_fd_transfer(fd.release(), channel.reset_and_get_address());
+        status != ZX_OK) {
       return status;
     }
     block_specs.emplace_back(fuchsia::virtualization::BlockSpec{

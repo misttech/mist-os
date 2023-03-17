@@ -18,6 +18,8 @@
 
 #include "predicates.h"
 
+namespace {
+
 TEST(FDIOTest, CreateNull) {
   fdio_t* io = fdio_null_create();
   fbl::unique_fd fd(fdio_bind_to_fd(io, -1, 0));
@@ -100,7 +102,7 @@ TEST(FDIOTest, BindToFDAgain) {
   ASSERT_TRUE(observed & ZX_SOCKET_PEER_CLOSED);
 }
 
-static bool find_unused_fd(int starting_fd, int* out_fd) {
+bool find_unused_fd(int starting_fd, int* out_fd) {
   for (int fd = starting_fd; fd < FDIO_MAX_FD; ++fd) {
     if (fcntl(fd, F_GETFD) == -1) {
       *out_fd = fd;
@@ -137,23 +139,32 @@ TEST(FDIOTest, GetServiceHandle) {
   ASSERT_EQ(-1, fcntl(unused_fd, F_GETFD));
 
   zx::channel h1;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   EXPECT_STATUS(ZX_ERR_INVALID_ARGS,
                 fdio_get_service_handle(unused_fd, h1.reset_and_get_address()));
   EXPECT_STATUS(ZX_ERR_INVALID_ARGS, fdio_get_service_handle(-1, h1.reset_and_get_address()));
+#pragma clang diagnostic pop
 
   fdio_t* io = fdio_default_create();
   fbl::unique_fd fd(fdio_bind_to_fd(io, -1, 0));
   EXPECT_LE(0, fd.get());
   EXPECT_EQ(0, fcntl(fd.get(), F_GETFD));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
                 fdio_get_service_handle(fd.get(), h1.reset_and_get_address()));
+#pragma clang diagnostic pop
   EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
   (void)fd.release();
 
   fd.reset(open("/svc", O_DIRECTORY | O_RDONLY));
   EXPECT_LE(0, fd.get());
   EXPECT_EQ(0, fcntl(fd.get(), F_GETFD));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   EXPECT_OK(fdio_get_service_handle(fd.get(), h1.reset_and_get_address()));
+#pragma clang diagnostic pop
   EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
   (void)fd.release();
 
@@ -163,7 +174,10 @@ TEST(FDIOTest, GetServiceHandle) {
   EXPECT_LE(0, fd2.get());
   EXPECT_EQ(0, fcntl(fd.get(), F_GETFD));
   EXPECT_EQ(0, fcntl(fd2.get(), F_GETFD));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   EXPECT_STATUS(ZX_ERR_UNAVAILABLE, fdio_get_service_handle(fd.get(), h1.reset_and_get_address()));
+#pragma clang diagnostic pop
   EXPECT_EQ(-1, fcntl(fd.get(), F_GETFD));
   (void)fd.release();
   EXPECT_EQ(0, fcntl(fd2.get(), F_GETFD));
@@ -180,3 +194,5 @@ TEST(FDIOTest, GetZxio) {
   EXPECT_EQ(storage, reinterpret_cast<zxio_storage_t*>(zxio));
   fdio_unsafe_release(fdio);
 }
+
+}  // namespace

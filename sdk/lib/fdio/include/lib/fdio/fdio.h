@@ -93,7 +93,8 @@ zx_status_t fdio_unbind_from_fd(int fd, fdio_t** io_out) ZX_AVAILABLE_SINCE(1);
 //
 //   * `ZX_ERR_UNAVAILABLE`: `fd` is busy or has been dup'ed and therefore is referenced by multiple
 //     entries in the file descriptor table.
-zx_status_t fdio_get_service_handle(int fd, zx_handle_t* out) ZX_AVAILABLE_SINCE(1);
+zx_status_t fdio_get_service_handle(int fd, zx_handle_t* out)
+    ZX_DEPRECATED_SINCE(1, 12, "Use fdio_open instead of operating on file descriptors");
 
 // Storage for a ZXIO object.
 //

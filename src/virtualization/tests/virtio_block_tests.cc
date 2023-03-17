@@ -4,9 +4,7 @@
 
 #include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
 #include <lib/syslog/cpp/macros.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -148,7 +146,7 @@ static zx_status_t create_test_device(TestDevice* test_device,
   }
 
   zx::channel channel;
-  zx_status_t status = fdio_get_service_handle(fd.release(), channel.reset_and_get_address());
+  zx_status_t status = fdio_fd_transfer(fd.release(), channel.reset_and_get_address());
   if (status != ZX_OK) {
     return status;
   }

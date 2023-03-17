@@ -19,10 +19,11 @@
 
 #ifdef __Fuchsia__
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/fdio.h>
+#include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/zxdump/task.h>
 #include <zircon/syscalls/object.h>
@@ -33,7 +34,6 @@
 #else
 #include <libgen.h>
 #include <sys/wait.h>
-#include <unistd.h>
 #endif
 
 #ifdef __APPLE__
@@ -179,17 +179,17 @@ class TestToolProcess::SandboxLoop {
 // own private /tmp and /svc endpoints.
 void TestToolProcess::SandboxCommand(PipedCommand& command) {
   std::vector<fdio_spawn_action_t> actions;
-
-  fbl::unique_fd tmp_fd{open(tmp_path_.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
-  ASSERT_TRUE(tmp_fd) << tmp_path_ << ": " << strerror(errno);
-  zx::channel tmp_handle;
-  zx_status_t status =
-      fdio_get_service_handle(tmp_fd.release(), tmp_handle.reset_and_get_address());
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  zx::channel client, server;
+  ASSERT_EQ(ZX_OK, zx::channel::create(0, &client, &server));
+  ASSERT_EQ(ZX_OK, fdio_open(tmp_path_.c_str(),
+                             static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
+                                                   fuchsia_io::OpenFlags::kRightWritable |
+                                                   fuchsia_io::OpenFlags::kDirectory),
+                             server.release()));
   actions.push_back({.action = FDIO_SPAWN_ACTION_ADD_NS_ENTRY,
                      .ns = {
                          .prefix = "/tmp",
-                         .handle = tmp_handle.release(),
+                         .handle = client.release(),
                      }});
 
   fidl::ClientEnd<fuchsia_io::Directory> svc;
