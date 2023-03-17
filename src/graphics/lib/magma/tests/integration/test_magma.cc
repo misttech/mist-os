@@ -1131,6 +1131,31 @@ class TestConnection {
     }
   }
 
+  void BufferCaching(magma_cache_policy_t policy) {
+    uint64_t size = page_size() + 16;
+    uint64_t actual_size = 0;
+    magma_buffer_t buffer = 0;
+    magma_buffer_id_t buffer_id = 0;
+
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection(), size, &actual_size,
+                                                              &buffer, &buffer_id));
+
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_set_cache_policy(buffer, policy));
+
+    {
+      magma_cache_policy_t policy_check;
+      EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_cache_policy(buffer, &policy_check));
+      EXPECT_EQ(policy_check, policy);
+    }
+
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_buffer_clean_cache(buffer, 0, actual_size, MAGMA_CACHE_OPERATION_CLEAN));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_clean_cache(buffer, 0, actual_size,
+                                                        MAGMA_CACHE_OPERATION_CLEAN_INVALIDATE));
+
+    magma_connection_release_buffer(connection(), buffer);
+  }
+
 #if defined(__Fuchsia__)
   void CheckAccessWithInvalidToken(magma_status_t expected_result) {
     FakePerfCountAccessServer server;
@@ -1663,4 +1688,12 @@ TEST_F(Magma, MaxBufferMappings) {
 TEST_F(Magma, Flush) {
   TestConnection connection;
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection.connection()));
+}
+
+TEST_F(Magma, BufferCached) { TestConnection().BufferCaching(MAGMA_CACHE_POLICY_CACHED); }
+
+TEST_F(Magma, BufferUncached) { TestConnection().BufferCaching(MAGMA_CACHE_POLICY_UNCACHED); }
+
+TEST_F(Magma, BufferWriteCombining) {
+  TestConnection().BufferCaching(MAGMA_CACHE_POLICY_WRITE_COMBINING);
 }

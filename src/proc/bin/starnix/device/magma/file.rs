@@ -656,6 +656,63 @@ impl FileOps for MagmaFile {
 
                 current_task.mm.write_object(UserRef::new(response_address), &response)
             }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_SET_CACHE_POLICY => {
+                let (control, mut response): (
+                    virtio_magma_buffer_set_cache_policy_ctrl_t,
+                    virtio_magma_buffer_set_cache_policy_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                response.result_return = unsafe {
+                    magma_buffer_set_cache_policy(
+                        control.buffer,
+                        control.policy as magma_cache_policy_t,
+                    ) as u64
+                };
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_SET_CACHE_POLICY as u32;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_GET_CACHE_POLICY => {
+                let (control, mut response): (
+                    virtio_magma_buffer_get_cache_policy_ctrl_t,
+                    virtio_magma_buffer_get_cache_policy_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                let mut policy: magma_cache_policy_t = MAGMA_CACHE_POLICY_CACHED;
+
+                let status = unsafe { magma_buffer_get_cache_policy(control.buffer, &mut policy) };
+
+                if status == MAGMA_STATUS_OK {
+                    response.cache_policy_out = policy as u64;
+                }
+                response.result_return = status as u64;
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_CACHE_POLICY as u32;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_BUFFER_CLEAN_CACHE => {
+                let (control, mut response): (
+                    virtio_magma_buffer_clean_cache_ctrl_t,
+                    virtio_magma_buffer_clean_cache_resp_t,
+                ) = read_control_and_response(current_task, &command)?;
+
+                response.result_return = unsafe {
+                    magma_buffer_clean_cache(
+                        control.buffer,
+                        control.offset,
+                        control.size,
+                        control.operation as magma_cache_operation_t,
+                    ) as u64
+                };
+
+                response.hdr.type_ =
+                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_CLEAN_CACHE as u32;
+
+                current_task.mm.write_object(UserRef::new(response_address), &response)
+            }
             t => {
                 log_warn!(current_task, "Got unknown request: {:?}", t);
                 error!(ENOSYS)

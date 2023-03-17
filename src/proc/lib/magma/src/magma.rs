@@ -17,6 +17,10 @@ pub const MAGMA_COHERENCY_DOMAIN_RAM: u32 = 1;
 pub const MAGMA_COHERENCY_DOMAIN_INACCESSIBLE: u32 = 2;
 pub const MAGMA_POLL_TYPE_SEMAPHORE: u32 = 1;
 pub const MAGMA_POLL_TYPE_HANDLE: u32 = 2;
+pub const MAGMA_CACHE_POLICY_CACHED: u32 = 0;
+pub const MAGMA_CACHE_POLICY_WRITE_COMBINING: u32 = 1;
+pub const MAGMA_CACHE_POLICY_UNCACHED: u32 = 2;
+
 // TODO: END remove these hardcoded values when bindgen is fixed
 
 pub const _IOC_NRBITS: u32 = 8;
