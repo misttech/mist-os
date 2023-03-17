@@ -7,7 +7,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/tx.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-fh.h"
-#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/pcie/internal.h"
 
 struct iwl_tso_hdr_page {
 	struct page *page;
@@ -32,20 +31,6 @@ static inline void iwl_wake_queue(struct iwl_trans *trans,
 				  struct iwl_txq *txq)
 {
 	if (test_and_clear_bit(txq->id, trans->txqs.queue_stopped)) {
-		IWL_DEBUG_TX_QUEUES(trans, "Wake hwq %d\n", txq->id);
-		iwl_op_mode_queue_not_full(trans->op_mode, txq->id);
-	}
-
-	// TODO(fxbug.dev/119415): Remember to remove this after uprev.
-  //
-  // We are in the process of moving the `queue_stopped` from `iwl_trans_pcie` to `iwl_trans_txqs`
-  // (see above).  The current code  is still using the original one (trans_pcie->queue_stopped).
-  // But we will switch to the new one (trans->txqs.queue_stopped) in the incoming CL.
-  //
-  // Once we switched, we shall remove this field in the `struct iwl_trans_pcie` and remove this
-  // code.
-	struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-	if (test_and_clear_bit(txq->id, trans_pcie->queue_stopped)) {
 		IWL_DEBUG_TX_QUEUES(trans, "Wake hwq %d\n", txq->id);
 		iwl_op_mode_queue_not_full(trans->op_mode, txq->id);
 	}
