@@ -12,20 +12,33 @@ import sys
 
 # Verifies that the candidate golden file matches the provided golden.
 
+MANUAL_UPDATE_HEADER = """
+Please run the following to acknowledge this change:
+```"""
 
-def print_failure_msg(golden, candidate, label):
-    print(
-        f"""
-Please acknowledge this change by updating the golden as follows:
-```
-fx build {candidate} &&
-fx run-in-build-dir cp \\
+MANUAL_UPDATE_BODY_ENTRY = """fx run-in-build-dir cp \\
     {candidate} \\
     {golden}
-```
-Or you can rebuild with `update_goldens=true` in your GN args and {label} in your build graph.
+"""
 
-""")
+MANUAL_UPDATE_FOOTER = """```
+
+Or, you can simply rebuild with `update_goldens=true` set in your GN args.
+
+Note: If you are seeing this on an automated build failure and are trying to
+reproduce, ensure that
+    {label}
+is in your GN graph.
+"""
+
+
+def print_failure_msg(manual_updates, label):
+    print(MANUAL_UPDATE_HEADER)
+    for update in manual_updates:
+        print(
+            MANUAL_UPDATE_BODY_ENTRY.format(
+                candidate=update["candidate"], golden=update["golden"]))
+    print(MANUAL_UPDATE_FOOTER.format(label=label))
 
 
 def main():
@@ -59,8 +72,8 @@ def main():
     with open(args.comparisons) as f:
         comparisons = json.load(f)
 
-    any_comparison_failed = False
     inputs = []
+    manual_updates = []
     for comparison in comparisons:
         # Unlike the candidate and formatted_golden, which are build directory
         # -relative paths, the golden is source-relative.
@@ -81,18 +94,21 @@ def main():
             current_comparison_failed = True
 
         if current_comparison_failed:
-            any_comparison_failed = True
             type = 'Warning' if args.warn or args.bless else 'Error'
-            print(f'{type}: Golden file mismatch: {comparison["golden"]}')
+            print(f'\n{type}: Golden file mismatch: {comparison["golden"]}')
 
             if args.bless:
                 os.makedirs(os.path.dirname(golden), exist_ok=True)
                 shutil.copyfile(candidate, golden)
             else:
-                print_failure_msg(golden, candidate, args.label)
+                manual_updates.append(dict(golden=golden, candidate=candidate))
 
-    if any_comparison_failed and not args.bless and not args.warn:
-        return 1
+    # Print all of the manual update instructions once at the end to reduce the
+    # amount of rebuilding and copy-pasting.
+    if manual_updates:
+        print_failure_msg(manual_updates, args.label)
+        if not args.warn:
+            return 1
 
     with open(args.stamp_file, 'w') as stamp_file:
         stamp_file.write('Golden!\n')
