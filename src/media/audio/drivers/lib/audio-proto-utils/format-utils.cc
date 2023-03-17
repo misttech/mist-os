@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <span>
 
 #include <audio-proto-utils/format-utils.h>
 
@@ -193,84 +194,40 @@ bool FormatIsCompatible(uint32_t frame_rate, uint16_t channels, audio_sample_for
   return false;
 }
 
-FrameRateEnumerator::iterator::iterator(const FrameRateEnumerator* enumerator)
-    : enumerator_(enumerator) {
-  // If we have no enumerator, then we cannot advance to the first valid frame
-  // rate.  Just get out.
-  if (!enumerator_)
-    return;
+void FrameRateEnumerator::InsertRates(const audio_stream_format_range_t& range,
+                                      cpp20::span<const uint32_t> rates) {
+  for (uint32_t rate : rates) {
+    // If the rate in the table is less than the minimum
+    // frames_per_second, keep advancing the index.
+    if (rate < range.min_frames_per_second)
+      continue;
 
-  // Sanity check our range first.  If it is continuous, or invalid in any
-  // way, then we are not going to enumerate any valid frame rates.  Just set
-  // our enumerator to nullptr and get out.
-  const auto& range = enumerator_->range();
-  if ((range.flags & ASF_RANGE_FLAG_FPS_CONTINUOUS) || !(range.flags & DISCRETE_FLAGS) ||
-      (range.min_frames_per_second > range.max_frames_per_second)) {
-    enumerator_ = nullptr;
-    return;
+    // If the rate in the table is greater than the maximum
+    // frames_per_second, then we are done with this table.  There are
+    // no more matches to be found in it.
+    if (rate > range.max_frames_per_second)
+      break;
+
+    // The rate in this table is between the min and the max rates
+    // supported by this range, so we record it.
+    rates_.insert(rate);
   }
-
-  // Reset our current iterator state, then advance to the first valid
-  // frame rate (if any)
-  cur_flag_ = ASF_RANGE_FLAG_FPS_48000_FAMILY;
-  fmt_ndx_ = static_cast<uint16_t>(-1);
-  Advance();
 }
 
-void FrameRateEnumerator::iterator::Advance() {
-  if (enumerator_ == nullptr) {
-    ZX_DEBUG_ASSERT(!cur_rate_ && !cur_flag_ && !fmt_ndx_);
+FrameRateEnumerator::FrameRateEnumerator(const audio_stream_format_range_t& range) {
+  // Sanity check our range first.  If it is continuous, or invalid in any
+  // way, then we are not going to enumerate any valid frame rates, just return.
+  if ((range.flags & ASF_RANGE_FLAG_FPS_CONTINUOUS) || !(range.flags & DISCRETE_FLAGS) ||
+      (range.min_frames_per_second > range.max_frames_per_second)) {
     return;
   }
 
-  const auto& range = enumerator_->range();
-
-  while (cur_flag_ & DISCRETE_FLAGS) {
-    const uint32_t* rates;
-    uint16_t rates_count;
-
-    if (cur_flag_ == ASF_RANGE_FLAG_FPS_48000_FAMILY) {
-      rates = RATES_48000_FAMILY;
-      rates_count = std::size(RATES_48000_FAMILY);
-    } else {
-      ZX_DEBUG_ASSERT(cur_flag_ == ASF_RANGE_FLAG_FPS_44100_FAMILY);
-      rates = RATES_44100_FAMILY;
-      rates_count = std::size(RATES_44100_FAMILY);
-    }
-
-    if (range.flags & cur_flag_) {
-      for (++fmt_ndx_; fmt_ndx_ < rates_count; ++fmt_ndx_) {
-        uint32_t rate = rates[fmt_ndx_];
-
-        // If the rate in the table is less than the minimum
-        // frames_per_second, keep advancing the index.
-        if (rate < range.min_frames_per_second)
-          continue;
-
-        // If the rate in the table is greater than the maximum
-        // frames_per_second, then we are done with this table.  There are
-        // no more matches to be found in it.
-        if (rate > range.max_frames_per_second)
-          break;
-
-        // The rate in this table is between the min and the max rates
-        // supported by this range.  Record it and get out.
-        cur_rate_ = rate;
-        return;
-      }
-    }
-
-    // We are done with this table.  If we were searching the 48KHz family,
-    // move on to the 44.1KHz family.  Otherwise, we are finished.
-    if (cur_flag_ == ASF_RANGE_FLAG_FPS_48000_FAMILY) {
-      cur_flag_ = ASF_RANGE_FLAG_FPS_44100_FAMILY;
-      fmt_ndx_ = static_cast<uint16_t>(-1);
-    } else {
-      break;
-    }
+  if (range.flags & ASF_RANGE_FLAG_FPS_48000_FAMILY) {
+    InsertRates(range, {RATES_48000_FAMILY, std::size(RATES_48000_FAMILY)});
   }
-
-  memset(this, 0, sizeof(*this));
+  if (range.flags & ASF_RANGE_FLAG_FPS_44100_FAMILY) {
+    InsertRates(range, {RATES_44100_FAMILY, std::size(RATES_44100_FAMILY)});
+  }
 }
 
 }  // namespace utils

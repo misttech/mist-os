@@ -513,6 +513,53 @@ TEST_F(SimpleAudioTest, Enumerate2) {
   mock_ddk::ReleaseFlaggedDevices(root_.get());
 }
 
+TEST_F(SimpleAudioTest, EnumerateMultipleRateFamilies) {
+  struct MockSimpleAudioLocal : public MockSimpleAudio {
+    MockSimpleAudioLocal(zx_device_t* parent) : MockSimpleAudio(parent) {}
+    zx_status_t Init() __TA_REQUIRES(domain_token()) override {
+      auto status = MockSimpleAudio::Init();
+
+      SimpleAudioStream::SupportedFormat format = {};
+
+      format.range.min_channels = 2;
+      format.range.max_channels = 2;
+      format.range.sample_formats = AUDIO_SAMPLE_FORMAT_24BIT_IN32;
+      format.range.min_frames_per_second = 44'100;
+      format.range.max_frames_per_second = 96'000;
+      format.range.flags = ASF_RANGE_FLAG_FPS_48000_FAMILY | ASF_RANGE_FLAG_FPS_44100_FAMILY;
+
+      supported_formats_ = fbl::Vector<SupportedFormat>{format};
+      return status;
+    }
+  };
+
+  auto server = SimpleAudioStream::Create<MockSimpleAudioLocal>(root_.get());
+  ASSERT_NOT_NULL(server);
+
+  auto stream_client = GetStreamClient(GetClient(server.get()));
+  ASSERT_TRUE(stream_client.is_valid());
+
+  auto ret = stream_client->GetSupportedFormats();
+  auto& supported_formats = ret.value().supported_formats;
+  ASSERT_EQ(1, supported_formats.count());
+
+  auto& formats = supported_formats[0].pcm_supported_formats();
+  ASSERT_EQ(1, formats.channel_sets().count());
+  ASSERT_EQ(2, formats.channel_sets()[0].attributes().count());
+  ASSERT_EQ(1, formats.sample_formats().count());
+  ASSERT_EQ(audio_fidl::wire::SampleFormat::kPcmSigned, formats.sample_formats()[0]);
+  ASSERT_EQ(4, formats.frame_rates().count());
+  // Must enumerate them in ascending order.
+  ASSERT_EQ(formats.frame_rates()[0], 44'100);
+  ASSERT_EQ(formats.frame_rates()[1], 48'000);
+  ASSERT_EQ(formats.frame_rates()[2], 88'200);
+  ASSERT_EQ(formats.frame_rates()[3], 96'000);
+
+  loop_.Shutdown();
+  server->DdkAsyncRemove();
+  mock_ddk::ReleaseFlaggedDevices(root_.get());
+}
+
 TEST_F(SimpleAudioTest, CreateRingBuffer1) {
   auto server = SimpleAudioStream::Create<MockSimpleAudio>(root_.get());
   ASSERT_NOT_NULL(server);
