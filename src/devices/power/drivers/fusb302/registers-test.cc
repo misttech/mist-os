@@ -209,6 +209,42 @@ TEST(MeasureReg, ComparatorVoltageMv) {
   EXPECT_EQ(26'880, measure.ComparatorVoltageMv());
 }
 
+TEST(OcpReg, ThresholdMilliamps) {
+  auto ocp = OcpReg::Get().FromValue(0);
+
+  // The test cases attempt to cover the branches from page 24 of the datasheet.
+
+  ocp.set_reg_value(0).SetThresholdMilliamps(10);
+  EXPECT_EQ(false, ocp.ocp_range());
+  EXPECT_EQ(0b000, ocp.ocp_cur());
+  EXPECT_EQ(10, ocp.ThresholdMilliamps());
+
+  ocp.set_reg_value(0).SetThresholdMilliamps(20);
+  EXPECT_EQ(false, ocp.ocp_range());
+  EXPECT_EQ(0b001, ocp.ocp_cur());
+  EXPECT_EQ(20, ocp.ThresholdMilliamps());
+
+  ocp.set_reg_value(0).SetThresholdMilliamps(80);
+  EXPECT_EQ(false, ocp.ocp_range());
+  EXPECT_EQ(0b111, ocp.ocp_cur());
+  EXPECT_EQ(80, ocp.ThresholdMilliamps());
+
+  ocp.set_reg_value(0).SetThresholdMilliamps(100);
+  EXPECT_EQ(true, ocp.ocp_range());
+  EXPECT_EQ(0b000, ocp.ocp_cur());
+  EXPECT_EQ(100, ocp.ThresholdMilliamps());
+
+  ocp.set_reg_value(0).SetThresholdMilliamps(700);
+  EXPECT_EQ(true, ocp.ocp_range());
+  EXPECT_EQ(0b110, ocp.ocp_cur());
+  EXPECT_EQ(700, ocp.ThresholdMilliamps());
+
+  ocp.set_reg_value(0).SetThresholdMilliamps(800);
+  EXPECT_EQ(true, ocp.ocp_range());
+  EXPECT_EQ(0b111, ocp.ocp_cur());
+  EXPECT_EQ(800, ocp.ThresholdMilliamps());
+}
+
 class Fusb302RegisterTest : public zxtest::Test {
  public:
   void SetUp() override {

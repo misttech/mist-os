@@ -630,30 +630,89 @@ class MaskReg : public Fusb302Register<MaskReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<MaskReg>(MASK_ADDR); }
 };
 
+// POWER - Configures the chip's power gates.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// After reset, only the Wake Detection power gate is enabled.
+//
+// Rev 5 datasheet: Table 27 on page 23
 class PowerReg : public Fusb302Register<PowerReg> {
  public:
+  // If true, PWR[3] (power gate 3) is enabled.
+  //
+  // PWR[3] gates power to the oscillator used by the Tx (transmitter) in the
+  // BMC PHY. Experiments with a FUSB302BMPX indicate that BMC reception works
+  // when this power gate is disabled, but transmission fails silently.
   DEF_BIT(3, pwr3);
+
+  // If true, PWR[2] (power gate 2) is enabled.
+  //
+  // Gates power to the measure block.
   DEF_BIT(2, pwr2);
+
+  // If true, PWR[1] (power gate 1) is enabled.
+  //
+  // Gates power to the Rx (receiver) in the BMC PHY, and to the
+  // reference voltage generators used by the comparators in the measure block.
   DEF_BIT(1, pwr1);
+
+  // If true, PWR[0] (power gate 0) is enabled.
+  //
+  // Gates power to the Wake Detector, which includes a bandgap voltage
+  // reference circuit and a voltage comparator.
   DEF_BIT(0, pwr0);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<PowerReg>(POWER_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<PowerReg>(0x0b); }
 };
 
+// RESET - Triggers for the reset unit.
+//
+// Reset bits are W/C (write/clear). The register should not be changed using
+// read-modify-write.
+//
+// Rev 5 datasheet: Table 28 on page 24
 class ResetReg : public Fusb302Register<ResetReg> {
  public:
+  // Set to true by the driver to start a transmitter / receiver PD logic reset.
+  //
+  // The hardware sets this bit to false when it's done resetting the PD (Power
+  // Delivery) logic in the transmitter and receiver.
   DEF_BIT(1, pd_reset);
+
+  // Set to true by the driver to start a full software reset.
+  //
+  // The hardware sets this bit to false when it's done resetting. This involves
+  // setting all I2C registers to their default values.
   DEF_BIT(0, sw_res);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<ResetReg>(RESET_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<ResetReg>(0x0c); }
 };
 
+// OCPREG - Configures the VCONN OCP (Overcurrent Protection) circuit threshold.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// After reset, the VCONN OCP threshold is 800 mA.
+//
+// Rev 5 datasheet: Table 29 on page 24
 class OcpReg : public Fusb302Register<OcpReg> {
  public:
+  // If true, the threshold baseline is 100 mA. If false, the baseline is 10 mA.
   DEF_BIT(3, ocp_range);
+
+  // Multiplies the threshold baseline by a number between 1 and 8.
   DEF_FIELD(2, 0, ocp_cur);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<OcpReg>(OCP_REG_ADDR); }
+  // The OCP (Overcurrent Protection) circuit threshold, in mA.
+  int16_t ThresholdMilliamps() const;
+
+  // Sets the OCP (Overcurrent Protection) circuit threshold, in mA.
+  OcpReg& SetThresholdMilliamps(int16_t threshold_ma);
+
+  static auto Get() { return hwreg::I2cRegisterAddr<OcpReg>(0x0d); }
 };
 
 class MaskAReg : public Fusb302Register<MaskAReg> {
@@ -941,6 +1000,37 @@ inline MeasureReg& MeasureReg::SetComparatorVoltageMv(int32_t voltage_mv) {
   const int8_t mdac_multiplier =
       static_cast<int8_t>((static_cast<int16_t>(voltage_mv) + mdac_base / 2) / mdac_base - 1);
   return set_mdac(mdac_multiplier);
+}
+
+inline int16_t OcpReg::ThresholdMilliamps() const {
+  const int16_t baseline_ma = ocp_range() ? 100 : 10;
+
+  // The addition will not overflow (causing UB) because
+  // `ocp_cur()` is a 3-bit field.
+  const int16_t multiplier = static_cast<int16_t>(int16_t{ocp_cur()} + 1);
+
+  // The multiplication will not overflow (causing UB) because the result is
+  // between 100 and 800.
+  return static_cast<int16_t>(baseline_ma * multiplier);
+}
+
+inline OcpReg& OcpReg::SetThresholdMilliamps(int16_t threshold_ma) {
+  ZX_DEBUG_ASSERT(threshold_ma >= 10);
+  ZX_DEBUG_ASSERT(threshold_ma <= 800);
+
+  ZX_DEBUG_ASSERT(threshold_ma % 10 == 0);
+  ZX_DEBUG_ASSERT(threshold_ma < 100 || threshold_ma % 100 == 0);
+
+  ZX_DEBUG_ASSERT(threshold_ma != 90);
+
+  const bool ocp_range = threshold_ma >= 100;
+
+  const int16_t baseline = ocp_range ? 100 : 10;
+  const int8_t multiplier = static_cast<int8_t>(threshold_ma / baseline);
+
+  // The subtraction will not overflow (causing UB) because `multiplier` will be
+  // between 1 and 8.
+  return set_ocp_range(ocp_range).set_ocp_cur(static_cast<int8_t>(multiplier - 1));
 }
 
 }  // namespace fusb302
