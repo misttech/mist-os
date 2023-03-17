@@ -18,6 +18,8 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <__verbose_abort>
+
 #include <arch/ops.h>
 #include <dev/hw_rng.h>
 #include <kernel/lockdep.h>
@@ -25,7 +27,8 @@
 #include <ktl/algorithm.h>
 #include <platform/debug.h>
 
-#include <ktl/enforce.h>
+// Note <ktl/enforce.h> can't be used here because we need to define a function
+// that was declared in the std:: namespace by <__verbose_abort>.
 
 namespace {
 
@@ -67,6 +70,21 @@ bool EndsWith(const char* str, char x) {
   return len > 0 && str[len - 1] == x;
 }
 
+[[noreturn]] void vpanic(void* pc, void* frame, const char* fmt, va_list ap) {
+  PanicStart(pc, frame);
+
+  // Print the user message.
+  vfprintf(&stdout_panic_buffer, fmt, ap);
+  va_end(ap);
+
+  // Add a newline to the end of the panic message if it was missing.
+  if (!EndsWith(fmt, '\n')) {
+    fprintf(&stdout_panic_buffer, "\n");
+  }
+
+  PanicFinish();
+}
+
 }  // namespace
 
 void spin(uint32_t usecs) {
@@ -78,20 +96,16 @@ void spin(uint32_t usecs) {
 }
 
 void panic(const char* fmt, ...) {
-  PanicStart(__GET_CALLER(), __GET_FRAME());
-
-  // Print the user message.
   va_list ap;
   va_start(ap, fmt);
-  vfprintf(&stdout_panic_buffer, fmt, ap);
-  va_end(ap);
+  vpanic(__GET_CALLER(), __GET_FRAME(), fmt, ap);
+}
 
-  // Add a newline to the end of the panic message if it was missing.
-  if (!EndsWith(fmt, '\n')) {
-    fprintf(&stdout_panic_buffer, "\n");
-  }
-
-  PanicFinish();
+// Inline functions in libc++ headers call this.
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) {
+  va_list ap;
+  va_start(ap, format);
+  vpanic(__GET_CALLER(), __GET_FRAME(), format, ap);
 }
 
 void assert_fail_msg(const char* file, int line, const char* expression, const char* fmt, ...) {
