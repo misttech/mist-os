@@ -13,7 +13,6 @@ group("drivers") {
     "drivers/amlogic-display:amlogic-display-vim3",
     "drivers/display",
     "drivers/dsi-dw",
-    "drivers/fake:fake-display",
     "drivers/goldfish-display",
     "drivers/intel-i915",
     "drivers/simple:simple.amd-kaveri",
