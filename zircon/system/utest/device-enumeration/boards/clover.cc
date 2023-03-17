@@ -28,6 +28,8 @@ TEST_F(DeviceEnumerationTest, CloverTest) {
 
       // USB
       "sys/platform/05:08:36/a1-usb-phy",
+      // Enter into usb host mode
+      "sys/platform/05:08:36/a1-usb-phy/xhci/xhci/xhci/usb-bus",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

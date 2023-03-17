@@ -20,8 +20,7 @@
 namespace a1_usb_phy {
 
 class A1UsbPhy;
-using A1UsbPhyType =
-    ddk::Device<A1UsbPhy, ddk::Initializable, ddk::Unbindable, ddk::ChildPreReleaseable>;
+using A1UsbPhyType = ddk::Device<A1UsbPhy, ddk::Initializable, ddk::Unbindable>;
 
 // This is the main class for the platform bus driver.
 class A1UsbPhy : public A1UsbPhyType, public ddk::UsbPhyProtocol<A1UsbPhy, ddk::base_protocol> {
@@ -33,7 +32,13 @@ class A1UsbPhy : public A1UsbPhyType, public ddk::UsbPhyProtocol<A1UsbPhy, ddk::
     PERIPHERAL,
   };
 
-  explicit A1UsbPhy(zx_device_t* parent) : A1UsbPhyType(parent), pdev_(parent) {}
+  // TODO(123426) Remove. See issue details.
+  struct TestMetadata {
+    // True to short circuit (not invoke) the zx_smc_call syscall.
+    bool smc_short_circuit;
+  };
+
+  explicit A1UsbPhy(zx_device_t* parent) : A1UsbPhyType(parent) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -43,7 +48,6 @@ class A1UsbPhy : public A1UsbPhyType, public ddk::UsbPhyProtocol<A1UsbPhy, ddk::
   // Device protocol implementation.
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkChildPreRelease(void* child_ctx);
   void DdkRelease();
 
   // Public for testing.
@@ -63,11 +67,15 @@ class A1UsbPhy : public A1UsbPhyType, public ddk::UsbPhyProtocol<A1UsbPhy, ddk::
   using SetModeCompletion = fit::callback<void(void)>;
   void SetMode(UsbMode mode, SetModeCompletion completion) __TA_REQUIRES(lock_);
 
+  zx_status_t AddXhciDevice() __TA_REQUIRES(lock_);
+  void RemoveXhciDevice() __TA_REQUIRES(lock_);
+
   zx_status_t Init();
   void InitUsbClk();
+
+  bool smc_short_circuit_ = false;
   zx_status_t UsbPowerOn();
 
-  ddk::PDevFidl pdev_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy_mmio_;
   std::optional<fdf::MmioBuffer> reset_mmio_;
@@ -80,6 +88,9 @@ class A1UsbPhy : public A1UsbPhyType, public ddk::UsbPhyProtocol<A1UsbPhy, ddk::
 
   // Magic numbers for PLL from metadata
   uint32_t pll_settings_[8];
+
+  // Device node for binding XHCI driver.
+  zx_device_t* xhci_device_ __TA_GUARDED(lock_) = nullptr;
 
   UsbMode phy_mode_ __TA_GUARDED(lock_) = UsbMode::UNKNOWN;  // Physical USB mode.
   usb_mode_t dr_mode_ = USB_MODE_OTG;  // USB Controller Mode. Internal to Driver.

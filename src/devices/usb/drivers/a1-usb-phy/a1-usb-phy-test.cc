@@ -30,7 +30,6 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/devices/registers/testing/mock-registers/mock-registers.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/a1-usb-phy/a1_usb_phy_bind.h"
 #include "src/devices/usb/drivers/a1-usb-phy/usb-phy-regs.h"
@@ -82,17 +81,22 @@ class A1UsbPhyTest : public zxtest::Test {
  public:
   A1UsbPhyTest() {
     static constexpr uint32_t kMagicNumbers[8] = {};
+    A1UsbPhy::TestMetadata test_meta{.smc_short_circuit = true};
+    usb_mode_t mode = USB_MODE_HOST;
     root_->SetMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers, sizeof(kMagicNumbers));
+    root_->SetMetadata(DEVICE_METADATA_TEST, &test_meta, sizeof(test_meta));
+    root_->SetMetadata(DEVICE_METADATA_USB_MODE, &mode, sizeof(mode));
 
     fake_pdev::FakePDevFidl::Config config;
-    config.mmios[0] = mmio_[0].mmio();
-    config.mmios[1] = mmio_[1].mmio();
-    config.mmios[2] = mmio_[2].mmio();
-    config.mmios[3] = mmio_[3].mmio();
+    config.mmios[0] = mmio_[0].mmio();  // MMIO_USB_CONTROL
+    config.mmios[1] = mmio_[1].mmio();  // MMIO_USB_PHY
+    config.mmios[2] = mmio_[2].mmio();  // MMIO_USB_RESET
+    config.mmios[3] = mmio_[3].mmio();  // MMIO_USB_CLOCK
 
-    ASSERT_OK(fake_root_resource_create(smc_monitor_.reset_and_get_address()));
-    config.smcs[0] = {};
-    smc_monitor_.duplicate(ZX_RIGHT_SAME_RIGHTS, &config.smcs[0]);
+    auto& ctl_mmio = std::get<fdf::MmioBuffer>(config.mmios[0]);
+    U2P_R1_V2::Get(0).FromValue(0).set_phy_rdy(1).WriteTo(&ctl_mmio);
+
+    ASSERT_OK(fake_root_resource_create(root_resource_.reset_and_get_address()));
 
     zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(outgoing_endpoints);
@@ -106,9 +110,10 @@ class A1UsbPhyTest : public zxtest::Test {
     });
     ASSERT_NO_FATAL_FAILURE();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(outgoing_endpoints->client), "pdev");
+                          std::move(outgoing_endpoints->client));
 
-    ASSERT_OK(A1UsbPhy::Create(nullptr, root_.get()));
+    ASSERT_OK(a1_usb_phy::A1UsbPhy::Create(nullptr, root_.get()));
+    ASSERT_EQ(root_->child_count(), 1);
   }
 
   void TearDown() override {}
@@ -121,7 +126,27 @@ class A1UsbPhyTest : public zxtest::Test {
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
-  zx::resource smc_monitor_;
+  zx::resource root_resource_;
 };
+
+TEST_F(A1UsbPhyTest, XhciTest) {
+  // The a1-usb-phy device should be added.
+  ASSERT_EQ(root_->child_count(), 1);
+  auto* mock_phy = root_->GetLatestChild();
+  ASSERT_NOT_NULL(mock_phy);
+  auto* phy = mock_phy->GetDeviceContext<A1UsbPhy>();
+
+  // Call DdkInit
+  mock_phy->InitOp();
+  mock_phy->WaitUntilInitReplyCalled();
+  EXPECT_EQ(mock_phy->child_count(), 1);
+  EXPECT_TRUE(mock_phy->InitReplyCalled());
+
+  auto* xhci = mock_phy->GetLatestChild();
+  ASSERT_NOT_NULL(xhci);
+  auto* xhci_ctx = xhci->GetDeviceContext<void>();
+  ASSERT_EQ(xhci_ctx, phy);
+  ASSERT_EQ(phy->mode(), A1UsbPhy::UsbMode::HOST);
+}
 
 }  // namespace a1_usb_phy

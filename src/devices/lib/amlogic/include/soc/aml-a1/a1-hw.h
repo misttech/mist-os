@@ -123,6 +123,7 @@
 #define A1_I2C_B_IRQ 100     // 32+68
 #define A1_I2C_C_IRQ 108     // 32+76
 #define A1_I2C_D_IRQ 110     // 32+78
+#define A1_USB_IRQ 122       // 32+90
 #define A1_DDR_BW_IRQ 141    // 109+32
 
 // PWM
@@ -170,6 +171,8 @@
 #define A1_USBCTRL_LENGTH 0x400
 #define A1_USBPHY_BASE 0xfe004000
 #define A1_USBPHY_LENGTH 0x400
+#define A1_USB_BASE 0xff400000
+#define A1_USB_LENGTH 0x100000
 // sys_ctrl
 #define A1_SYS_CTRL_BASE 0xfe005800
 #define A1_SYS_CTRL_LENGTH 0x400

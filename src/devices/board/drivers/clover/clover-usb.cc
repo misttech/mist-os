@@ -26,6 +26,7 @@
 #include <usb/usb.h>
 
 #include "src/devices/board/drivers/clover/clover.h"
+#include "src/devices/board/drivers/clover/xhci-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace clover {
@@ -99,6 +100,32 @@ static const fpbus::Node usb_phy_dev = []() {
   return dev;
 }();
 
+static const std::vector<fpbus::Mmio> xhci_mmios{
+    {{
+        .base = A1_USB_BASE,
+        .length = A1_USB_LENGTH,
+    }},
+};
+
+static const std::vector<fpbus::Irq> xhci_irqs{
+    {{
+        .irq = A1_USB_IRQ,
+        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+    }},
+};
+
+static const fpbus::Node xhci_dev = []() {
+  fpbus::Node dev = {};
+  dev.name() = "xhci";
+  dev.vid() = PDEV_VID_GENERIC;
+  dev.pid() = PDEV_PID_GENERIC;
+  dev.did() = PDEV_DID_USB_XHCI_COMPOSITE;
+  dev.mmio() = xhci_mmios;
+  dev.irq() = xhci_irqs;
+  dev.bti() = usb_btis;
+  return dev;
+}();
+
 zx_status_t Clover::UsbInit() {
   // Create USB Phy Device
   fidl::Arena<> fidl_arena;
@@ -112,6 +139,25 @@ zx_status_t Clover::UsbInit() {
     zxlogf(ERROR, "NodeAdd Usb(usb_phy_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
+  }
+
+  // Create XHCI device.
+  {
+    auto result = pbus_.buffer(arena)->AddComposite(
+        fidl::ToWire(fidl_arena, xhci_dev),
+        platform_bus_composite::MakeFidlFragment(fidl_arena, xhci_fragments,
+                                                 std::size(xhci_fragments)),
+        "xhci-phy");
+    if (!result.ok()) {
+      zxlogf(ERROR, "AddComposite Usb(xhci_dev) request failed: %s",
+             result.FormatDescription().data());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "AddComposite Usb(xhci_dev) failed: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   return ZX_OK;

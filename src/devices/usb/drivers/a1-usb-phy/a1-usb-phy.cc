@@ -218,6 +218,13 @@ void A1UsbPhy::SetMode(UsbMode mode, SetModeCompletion completion) {
         .WriteTo(phy_mmio);
     PLL_REGISTER_34::Get().FromValue(pll_settings_[5]).WriteTo(phy_mmio);
   }
+
+  if (mode == UsbMode::HOST) {
+    auto status = AddXhciDevice();
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "AddXhciDevice() error %s", zx_status_get_string(status));
+    }
+  }
 }
 
 zx_status_t A1UsbPhy::Create(void* ctx, zx_device_t* parent) {
@@ -233,16 +240,19 @@ zx_status_t A1UsbPhy::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t A1UsbPhy::UsbPowerOn() {
-  ZX_ASSERT(smc_monitor_.is_valid());
   static const zx_smc_parameters_t kSetPdCall = aml_pd_smc::CreatePdSmcCall(A1_PDID_USB, kPwrOn);
 
-  zx_smc_result_t result;
-  zx_status_t status = zx_smc_call(smc_monitor_.get(), &kSetPdCall, &result);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Call zx_smc_call failed: %s", zx_status_get_string(status));
+  if (!smc_short_circuit_) {
+    ZX_ASSERT(smc_monitor_.is_valid());
+    zx_smc_result_t result;
+    auto status = zx_smc_call(smc_monitor_.get(), &kSetPdCall, &result);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Call zx_smc_call failed: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
-  return status;
+  return ZX_OK;
 }
 
 void A1UsbPhy::InitUsbClk() {
@@ -257,8 +267,53 @@ void A1UsbPhy::InitUsbClk() {
       .WriteTo(clk_mmio);
 }
 
+zx_status_t A1UsbPhy::AddXhciDevice() {
+  if (xhci_device_) {
+    zxlogf(ERROR, "Add xhci device repeatedly!");
+    return ZX_ERR_BAD_STATE;
+  }
+
+  static zx_protocol_device_t ops = {
+      .version = DEVICE_OPS_VERSION,
+      // Defer get_protocol() to parent.
+      .get_protocol =
+          [](void* ctx, uint32_t id, void* proto) {
+            return device_get_protocol(reinterpret_cast<A1UsbPhy*>(ctx)->zxdev(), id, proto);
+          },
+      .release = [](void*) {},
+  };
+
+  zx_device_prop_t props[] = {
+      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GENERIC},
+      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GENERIC},
+      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_USB_XHCI_COMPOSITE},
+  };
+
+  // clang-format off
+  device_add_args_t args = (ddk::DeviceAddArgs("xhci")
+                            .set_context(this)
+                            .set_props(props)
+                            .set_proto_id(ZX_PROTOCOL_USB_PHY)
+                            .set_ops(&ops)).get();
+  // clang-format on
+
+  auto status = device_add(zxdev(), &args, &xhci_device_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "device_add() error %s", zx_status_get_string(status));
+  }
+  return status;
+}
+
+void A1UsbPhy::RemoveXhciDevice() {
+  if (xhci_device_) {
+    device_async_remove(xhci_device_);
+    xhci_device_ = nullptr;
+  }
+}
+
 zx_status_t A1UsbPhy::Init() {
-  if (!pdev_.is_valid()) {
+  ddk::PDevFidl pdev(parent());
+  if (!pdev.is_valid()) {
     zxlogf(ERROR, "A1UsbPhy::Init: could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -278,34 +333,45 @@ zx_status_t A1UsbPhy::Init() {
     dr_mode_ = USB_MODE_OTG;
   }
 
-  status = pdev_.MapMmio(MMIO_USB_CONTROL, &usbctrl_mmio_);
+  // TODO(123426) Remove. See issue details.
+  TestMetadata test_meta;
+  status = DdkGetMetadata(DEVICE_METADATA_TEST, &test_meta, sizeof(test_meta), &actual);
+  if (status == ZX_OK && actual == sizeof(test_meta)) {
+    // Only supplied by tests, not otherwise present.
+    smc_short_circuit_ = test_meta.smc_short_circuit;
+  }
+
+  status = pdev.MapMmio(MMIO_USB_CONTROL, &usbctrl_mmio_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio usbctrl failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "pdev.MapMmio usbctrl failed %s", zx_status_get_string(status));
     return status;
   }
 
-  status = pdev_.MapMmio(MMIO_USB_PHY, &usbphy_mmio_);
+  status = pdev.MapMmio(MMIO_USB_PHY, &usbphy_mmio_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio usbphy failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "pdev.MapMmio usbphy failed %s", zx_status_get_string(status));
     return status;
   }
 
-  status = pdev_.MapMmio(MMIO_RESET, &reset_mmio_);
+  status = pdev.MapMmio(MMIO_RESET, &reset_mmio_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio reset failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "pdev.MapMmio reset failed %s", zx_status_get_string(status));
     return status;
   }
 
-  status = pdev_.MapMmio(MMIO_CLK, &clk_mmio_);
+  status = pdev.MapMmio(MMIO_CLK, &clk_mmio_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_.MapMmio clk failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "pdev.MapMmio clk failed %s", zx_status_get_string(status));
     return status;
   }
 
-  status = pdev_.GetSmc(0, &smc_monitor_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "unable to sip monitor handle %s", zx_status_get_string(status));
-    return status;
+  if (!smc_short_circuit_) {
+    // TODO(123426) Can't (yet) use fake smc resources. See issue details.
+    status = pdev.GetSmc(0, &smc_monitor_);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "unable to sip monitor handle %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   // USB module power supply.
@@ -348,7 +414,10 @@ void A1UsbPhy::DdkInit(ddk::InitTxn txn) {
     return txn.Reply(ZX_OK);
   }
 
-  return txn.Reply(ZX_OK);
+  // If dr_mode_ is USB_MODE_OTG, the controller does not support OTG negotiation, and an error is
+  // reported.
+  zxlogf(ERROR, "controller does not support OTG mode");
+  return txn.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 
 // PHY tuning based on connection state
@@ -370,9 +439,11 @@ void A1UsbPhy::UsbPhyConnectStatusChanged(bool connected) {
   dwc2_connected_ = connected;
 }
 
-void A1UsbPhy::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
-
-void A1UsbPhy::DdkChildPreRelease(void* child_ctx) {}
+void A1UsbPhy::DdkUnbind(ddk::UnbindTxn txn) {
+  fbl::AutoLock lock(&lock_);
+  RemoveXhciDevice();
+  txn.Reply();
+}
 
 void A1UsbPhy::DdkRelease() { delete this; }
 

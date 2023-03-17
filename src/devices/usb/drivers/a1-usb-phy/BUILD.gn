@@ -68,7 +68,6 @@ test("a1-usb-phy-test-bin") {
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
-    "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/fake-resource",
     "//src/devices/testing/mock-ddk",
