@@ -226,25 +226,14 @@ zx_status_t Fusb302::FifoTransmit(const PdMessage& message) {
   if (tx_state_.get() == busy) {
     return ZX_ERR_SHOULD_WAIT;
   }
-  enum TxToken : uint8_t {
-    kTxOn = 0xA1,
-    kSOP1 = 0x12,
-    kSOP2 = 0x13,
-    kSOP3 = 0x1B,
-    kReset1 = 0x15,
-    kReset2 = 0x16,
-    kPackSym = 0x80,
-    kJamCrc = 0xFF,
-    kEOP = 0x14,
-    kTxOff = 0xFE,
-  };
 
   uint8_t buf[11 + message.header().num_data_objects() * 4];
-  buf[0] = kSOP1;
-  buf[1] = kSOP1;
-  buf[2] = kSOP1;
-  buf[3] = kSOP2;  // SOP
-  buf[4] = kPackSym | (message.header().num_data_objects() * 4 + 2);
+  buf[0] = TransmitToken::kSync1;
+  buf[1] = TransmitToken::kSync1;
+  buf[2] = TransmitToken::kSync1;
+  buf[3] = TransmitToken::kSync2;  // SOP
+  buf[4] =
+      TransmitToken::PacketData(static_cast<int8_t>(message.header().num_data_objects() * 4 + 2));
 
   buf[5] = message.header().value & 0xFF;
   buf[6] = (message.header().value >> 8) & 0xFF;
@@ -252,10 +241,10 @@ zx_status_t Fusb302::FifoTransmit(const PdMessage& message) {
   // Data
   memcpy(&buf[7], message.payload().data(), message.header().num_data_objects() * 4);
 
-  buf[7 + message.header().num_data_objects() * 4] = kJamCrc;
-  buf[8 + message.header().num_data_objects() * 4] = kEOP;
-  buf[9 + message.header().num_data_objects() * 4] = kTxOff;
-  buf[10 + message.header().num_data_objects() * 4] = kTxOn;
+  buf[7 + message.header().num_data_objects() * 4] = TransmitToken::kInsertCrc;
+  buf[8 + message.header().num_data_objects() * 4] = TransmitToken::kEop;
+  buf[9 + message.header().num_data_objects() * 4] = TransmitToken::kTxOff;
+  buf[10 + message.header().num_data_objects() * 4] = TransmitToken::kTxOn;
 
   // Specs say WriteSync is supported, but it doesn't work.
   for (size_t i = 0; i < sizeof(buf); i++) {
@@ -270,17 +259,10 @@ zx_status_t Fusb302::FifoTransmit(const PdMessage& message) {
 }
 
 zx::result<PdMessage> Fusb302::FifoReceive() {
-  enum RxToken : uint8_t {
-    kRxSop = 0b111,
-    kRxSop1 = 0b110,
-    kRxSop2 = 0b101,
-    kRxSop1Db = 0b100,
-    kRxSop2Db = 0b011,
-  };
-
-  auto sop = FifosReg::ReadFrom(i2c_).reg_value();
-  if ((sop >> 5) != kRxSop) {
-    zxlogf(ERROR, "Invalid SOP token 0x%x", sop >> 5);
+  const uint8_t start_token = FifosReg::ReadFrom(i2c_).reg_value();
+  const ReceiveTokenType start_token_type = FifosReg::AsReceiveTokenType(start_token);
+  if (start_token_type != ReceiveTokenType::kSop) {
+    zxlogf(ERROR, "Unexpected packet start token 0x%02x", start_token);
     return zx::error(ZX_ERR_INTERNAL);
   }
   // header

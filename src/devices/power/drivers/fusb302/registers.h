@@ -1158,11 +1158,90 @@ class InterruptReg : public Fusb302Register<InterruptReg> {
   static auto Get() { return hwreg::I2cRegisterAddr<InterruptReg>(0x42); }
 };
 
+// Receive fifo tokens decoded by FifosReg::AsReceiveTokenType().
+//
+// Rev 5 datasheet: Table 42 page 28
+enum class ReceiveTokenType : uint8_t {
+  kSop = 0b111,                  // SOP (Source <-> Sink messages)
+  kSopPrime = 0b110,             // SOP' (VCONN Source <-> Cable Plug messages)
+  kSopDoublePrime = 0b101,       // SOP" (VCONN Source <-> Cable Plug messages)
+  kSopPrimeDebug = 0b100,        // SOP' Debug - not specified
+  kSopDoublePrimeDebug = 0b011,  // SOP" Debug - not specified
+  kUndocumented = 0b000,         // Undocumented token
+};
+
+// Factory for transmit tokens used by the FIFOS register.
+//
+// Rev 5 datasheet: Table 41 page 28
+class TransmitToken {
+ public:
+  // The special symbols in usbpd3.1 5.3 "Symbol Encoding".
+  //
+  // With the exception of EOP, these symbols only appear in the 4-symbol
+  // ordered sets described in usbpd3.1 5.4 "Ordered Sets".
+  static constexpr uint8_t kSync1 = 0x12;
+  static constexpr uint8_t kSync2 = 0x13;
+  static constexpr uint8_t kSync3 = 0x1b;
+  static constexpr uint8_t kRst1 = 0x15;
+  static constexpr uint8_t kRst2 = 0x16;
+  static constexpr uint8_t kEop = 0x14;
+
+  // Replaced with the packet CRC computed by the hardware.
+  //
+  // Drivers offload CRC computation to the hardware by placing this token in
+  // the transmit FIFO, right before `kEop`.
+  static constexpr uint8_t kInsertCrc = 0xff;
+
+  // Turns on the Tx (transmitter) driver in the BMC PHY.
+  //
+  // This is an alternative to setting the `start_transmitter` field in
+  // `Control0Reg` to true. This alternative results in less I2C communication,
+  // assuming the driver uses burst I2C writes to fill the FIFO.
+  //
+  // The Rev 5 datasheet recommends placing this token in the transmitter FIFO
+  // after all the message data.
+  static constexpr uint8_t kTxOn = 0xa1;
+
+  // Turns off the Tx (transmitter) driver in the BMC PHY.
+  //
+  // Should be used when done transmitting, to conserve power.
+  static constexpr uint8_t kTxOff = 0xfe;
+
+  // The transmitter will not interpret the following `data_bytes` as tokens.
+  static constexpr uint8_t PacketData(int8_t data_bytes);
+
+  // Instancing not allowed.
+  TransmitToken() = delete;
+  ~TransmitToken() = delete;
+};
+
+// FIFOS (Transmit and Receive FIFOs)
+//
+// Writing to this register enqueues data into the transmit FIFO. Writing
+// multiple bytes must be done without address auto-increment.
+//
+// Reading from this register dequeues data from the receive FIFO. Reading must
+// be done without address auto-increment.
+//
+// The Rev 5 datasheet is unclear as to whether it's possible to queue up
+// multiple messages (such as a GoodCRC and a control / data message) in the
+// transmit FIFO. Experiments with a FUSB302BMPX indicate that this optimization
+// is not supported, and the chip may either silently drop one of the two
+// messages, or take a long time to carry out the I2C writes.
+//
+// Rev 5 datasheet: Table 40 page 28
 class FifosReg : public Fusb302Register<FifosReg> {
  public:
+  // Rev 5 datasheet: Table 41 "Tokens used in FIFOs" ("FIFOs" should probably
+  // be "TxFIFO") and Table 42 "Tokens used in RxFIFO", both on page 29.
   DEF_FIELD(7, 0, tx_rx_token);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<FifosReg>(FIFOS_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<FifosReg>(0x43); }
+
+  // Interprets a FIFO byte as a Rx (receiver) token.
+  //
+  // This is not meaningful for bytes that represent message data.
+  static ReceiveTokenType AsReceiveTokenType(uint8_t rx_token);
 };
 
 inline char DeviceIdReg::VersionCharacter() const {
@@ -1376,6 +1455,26 @@ inline usb_pd::ConfigChannelTermination ConfigChannelTerminationFromFixedCompara
   ZX_DEBUG_ASSERT_MSG(false, "Invalid result");
   // This can use `kOpen` if we decide to remove `kUnknown`.
   return usb_pd::ConfigChannelTermination::kUnknown;
+}
+
+// static
+constexpr uint8_t TransmitToken::PacketData(int8_t data_bytes) {
+  ZX_DEBUG_ASSERT_MSG(data_bytes >= 2, "Missing header bytes");
+  ZX_DEBUG_ASSERT_MSG(data_bytes <= 30, "At most 2 header bytes and 7x4 data object bytes");
+  return (0b100 << 5) | data_bytes;
+}
+
+// static
+inline ReceiveTokenType FifosReg::AsReceiveTokenType(uint8_t rx_token) {
+  const uint8_t token_type_bits = rx_token >> 5;
+  if (token_type_bits < 0b011) {
+    // The Rev 5 datasheet labels this range as "Do not use".
+    return ReceiveTokenType::kUndocumented;
+  }
+
+  // The check above guarantees that `token_type_bits` matches one of the enum's
+  // members.
+  return static_cast<ReceiveTokenType>(token_type_bits);
 }
 
 }  // namespace fusb302

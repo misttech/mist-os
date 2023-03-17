@@ -271,6 +271,41 @@ TEST(PowerRoleFromDetectionState, AllValidInputs) {
             PowerRoleFromDetectionState(PowerRoleDetectionState::kSinkOnCC2));
 }
 
+TEST(TransmitToken, PacketData) {
+  // Control message.
+  EXPECT_EQ(0x82u, TransmitToken::PacketData(2));
+
+  // Data message with one object.
+  EXPECT_EQ(0x86u, TransmitToken::PacketData(6));
+
+  // Maximum data message size.
+  EXPECT_EQ(0x9eu, TransmitToken::PacketData(30));
+}
+
+TEST(FifosReg, AsReceiveTokenType) {
+  EXPECT_EQ(ReceiveTokenType::kSop, FifosReg::AsReceiveTokenType(0b111'00000));
+  EXPECT_EQ(ReceiveTokenType::kSop, FifosReg::AsReceiveTokenType(0b111'00001));
+  EXPECT_EQ(ReceiveTokenType::kSop, FifosReg::AsReceiveTokenType(0b111'11111));
+
+  EXPECT_EQ(ReceiveTokenType::kSopPrime, FifosReg::AsReceiveTokenType(0b110'00000));
+  EXPECT_EQ(ReceiveTokenType::kSopPrime, FifosReg::AsReceiveTokenType(0b110'01110));
+
+  EXPECT_EQ(ReceiveTokenType::kSopDoublePrime, FifosReg::AsReceiveTokenType(0b101'00000));
+  EXPECT_EQ(ReceiveTokenType::kSopDoublePrime, FifosReg::AsReceiveTokenType(0b101'11011));
+
+  EXPECT_EQ(ReceiveTokenType::kSopPrimeDebug, FifosReg::AsReceiveTokenType(0b100'00000));
+  EXPECT_EQ(ReceiveTokenType::kSopPrimeDebug, FifosReg::AsReceiveTokenType(0b100'11111));
+
+  EXPECT_EQ(ReceiveTokenType::kSopDoublePrimeDebug, FifosReg::AsReceiveTokenType(0b011'00000));
+  EXPECT_EQ(ReceiveTokenType::kSopDoublePrimeDebug, FifosReg::AsReceiveTokenType(0b011'11100));
+
+  EXPECT_EQ(ReceiveTokenType::kUndocumented, FifosReg::AsReceiveTokenType(0b000'00000));
+  EXPECT_EQ(ReceiveTokenType::kUndocumented, FifosReg::AsReceiveTokenType(0b001'00000));
+  EXPECT_EQ(ReceiveTokenType::kUndocumented, FifosReg::AsReceiveTokenType(0b001'00100));
+  EXPECT_EQ(ReceiveTokenType::kUndocumented, FifosReg::AsReceiveTokenType(0b010'00000));
+  EXPECT_EQ(ReceiveTokenType::kUndocumented, FifosReg::AsReceiveTokenType(0b010'10101));
+}
+
 class Fusb302RegisterTest : public zxtest::Test {
  public:
   void SetUp() override {
