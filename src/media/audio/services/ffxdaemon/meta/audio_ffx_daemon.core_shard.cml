@@ -27,6 +27,12 @@
             to: [ "#audio_ffx_daemon" ],
         },
         {
+            protocol: [ "fuchsia.ultrasound.Factory" ],
+            from: "#audio_core",
+            to: [ "#audio_ffx_daemon" ],
+            availability: "optional",
+        },
+        {
             directory: "dev-class",
             from: "parent",
             as: "dev-audio-input",

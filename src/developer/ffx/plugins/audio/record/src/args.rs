@@ -30,8 +30,8 @@ pub struct RecordCommand {
     #[argh(
         option,
         description = "purpose of the stream being recorded.\
-        Accepted values: BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, or LOOPBACK.\
-        Default: COMMUNICATION.",
+        Accepted values: BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, ULTRASOUND,\
+        or LOOPBACK. Default: COMMUNICATION.",
         from_str_fn(str_to_usage),
         default = "AudioCaptureUsageExtended::Communication(AudioCaptureUsage::Communication)"
     )]
@@ -74,6 +74,7 @@ pub enum AudioCaptureUsageExtended {
     Foreground(AudioCaptureUsage),
     SystemAgent(AudioCaptureUsage),
     Communication(AudioCaptureUsage),
+    Ultrasound,
     Loopback,
 }
 
@@ -87,10 +88,11 @@ fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
         "COMMUNICATION" => {
             Ok(AudioCaptureUsageExtended::Communication(AudioCaptureUsage::Communication))
         }
+        "ULTRASOUND" => Ok(AudioCaptureUsageExtended::Ultrasound),
         "LOOPBACK" => Ok(AudioCaptureUsageExtended::Loopback),
         _ => Err(String::from(
-            "Couldn't parse usage. Expected one of: 
-        BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, or LOOPBACK",
+            "Couldn't parse usage. Expected one of:
+        BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, ULTRASOUND, or LOOPBACK",
         )),
     }
 }

@@ -5,7 +5,8 @@
 // Helper functions for reading and writing wav files to and from sockets.
 
 use {
-    anyhow::Error, fuchsia_async as _, fuchsia_zircon as _, futures::prelude::*, std::io::Cursor,
+    anyhow::Error, byteorder::ByteOrder, fuchsia_async as _, fuchsia_zircon as _,
+    futures::prelude::*, std::io::Cursor,
 };
 
 pub struct Socket<'a> {
@@ -31,14 +32,32 @@ impl<'a> Socket<'a> {
     }
 
     pub async fn read_wav_header(&mut self) -> Result<hound::WavSpec, Error> {
-        let spec = {
-            let mut header_buf = vec![0u8; 44];
-            self.socket.read_exact(&mut header_buf).await?;
-            let cursor_header = Cursor::new(header_buf);
-            let reader = hound::WavReader::new(cursor_header.clone())?;
-            reader.spec()
-        };
-        Ok(spec)
+        // 12 bytes for the RIFF chunk descriptor.
+        let mut riff_chunk_descriptor = vec![0u8; 12];
+        self.socket.read_exact(&mut riff_chunk_descriptor).await?;
+
+        // fmt chunk ID and size are 4 bytes each.
+        let mut fmt_subchunk_info = vec![0u8; 8];
+        self.socket.read_exact(&mut fmt_subchunk_info).await?;
+
+        // Chunk size field is Little endian.
+        let fmt_chunk_size = byteorder::LittleEndian::read_u32(&fmt_subchunk_info[4..]) as usize;
+
+        // fmt subchunk can differ in length depending on the file format.
+        let mut fmt_chunk = vec![0u8; fmt_chunk_size];
+        self.socket.read_exact(&mut fmt_chunk).await?;
+
+        // data sub chunk ID and size are 4 bytes each.
+        let mut data_subchunk_info = vec![0u8; 8];
+        self.socket.read_exact(&mut data_subchunk_info).await?;
+
+        let wav_header =
+            [riff_chunk_descriptor, fmt_subchunk_info, fmt_chunk, data_subchunk_info].concat();
+
+        let cursor_header = Cursor::new(wav_header);
+        let reader = hound::WavReader::new(cursor_header.clone())?;
+
+        Ok(reader.spec())
     }
 
     // Reads up to buffer size bytes from the socket. Similiar to `std::io::Read::read_exact()`,

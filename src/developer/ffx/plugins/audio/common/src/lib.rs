@@ -67,6 +67,8 @@ pub async fn wait_for_keypress(
     proxy
         .cancel()
         .await
-        .unwrap()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))
+        .and_then(|res| {
+            Ok(res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))))
+        })
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e)))?
 }

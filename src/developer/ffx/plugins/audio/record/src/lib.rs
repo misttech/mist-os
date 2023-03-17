@@ -11,10 +11,9 @@ use {
     ffx_audio_record_args::RecordCommand,
     ffx_core::ffx_plugin,
     fidl_fuchsia_audio_ffxdaemon::{
-        AudioDaemonProxy, AudioDaemonRecordRequest, CapturerInfo, RecordLocation,
+        AudioDaemonProxy, AudioDaemonRecordRequest, CapturerInfo, CapturerType, RecordLocation,
     },
     fidl_fuchsia_media::AudioStreamType,
-    futures::{future::OptionFuture, FutureExt},
 };
 
 #[ffx_plugin(
@@ -30,7 +29,6 @@ pub async fn record_capture(
     audio_proxy: AudioDaemonProxy,
     record_command: RecordCommand,
 ) -> Result<()> {
-    let loopback = record_command.usage == AudioCaptureUsageExtended::Loopback;
     let capturer_usage = match record_command.usage {
         AudioCaptureUsageExtended::Background(usage)
         | AudioCaptureUsageExtended::Foreground(usage)
@@ -39,39 +37,46 @@ pub async fn record_capture(
         _ => None,
     };
 
-    let (cancel_client, cancel_server) = if record_command.duration.is_some() {
-        let (c, s) = fidl::endpoints::create_endpoints::<
-            fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker,
-        >();
-        (Some(c), Some(s))
-    } else {
-        (None, None)
+    let (location, gain_settings) = match record_command.usage {
+        AudioCaptureUsageExtended::Loopback => {
+            (RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}), None)
+        }
+        AudioCaptureUsageExtended::Ultrasound => (
+            RecordLocation::Capturer(CapturerType::UltrasoundCapturer(
+                fidl_fuchsia_audio_ffxdaemon::UltrasoundCapturer {},
+            )),
+            None,
+        ),
+        _ => (
+            RecordLocation::Capturer(CapturerType::StandardCapturer(CapturerInfo {
+                usage: capturer_usage,
+                ..CapturerInfo::EMPTY
+            })),
+            Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
+                mute: Some(record_command.mute),
+                gain: Some(record_command.gain),
+                ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
+            }),
+        ),
     };
 
+    let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
+        fidl_fuchsia_audio_ffxdaemon::AudioDaemonCancelerMarker,
+    >();
+
     let request = AudioDaemonRecordRequest {
-        location: if loopback {
-            Some(RecordLocation::Loopback(fidl_fuchsia_audio_ffxdaemon::Loopback {}))
-        } else {
-            Some(RecordLocation::Capturer(CapturerInfo {
-                usage: capturer_usage,
-                buffer_size: record_command.buffer_size,
-                ..CapturerInfo::EMPTY
-            }))
-        },
+        location: Some(location),
         stream_type: Some(AudioStreamType::from(&record_command.format)),
         duration: record_command.duration.map(|duration| duration.as_nanos() as i64),
-        canceler: cancel_server,
-        gain_settings: Some(fidl_fuchsia_audio_ffxdaemon::GainSettings {
-            mute: Some(record_command.mute),
-            gain: Some(record_command.gain),
-            ..fidl_fuchsia_audio_ffxdaemon::GainSettings::EMPTY
-        }),
+        canceler: Some(cancel_server),
+        gain_settings,
+        buffer_size: record_command.buffer_size,
         ..AudioDaemonRecordRequest::EMPTY
     };
 
     let (stdout_sock, stderr_sock) = match audio_proxy.record(request).await? {
         Ok(value) => (
-            value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
+            value.stdout.ok_or(anyhow::anyhow!("No stdout socket."))?,
             value.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
         ),
         Err(err) => ffx_bail!("Record failed with err: {}", err),
@@ -80,15 +85,10 @@ pub async fn record_capture(
     let mut stdout = Unblock::new(std::io::stdout());
     let mut stderr = Unblock::new(std::io::stderr());
 
-    let canceler_future = OptionFuture::from(
-        cancel_client.map(|canceler| ffx_audio_common::wait_for_keypress(canceler)),
-    )
-    .map(|_| Ok(()));
-
     futures::future::try_join3(
         futures::io::copy(fidl::AsyncSocket::from_socket(stdout_sock)?, &mut stdout),
         futures::io::copy(fidl::AsyncSocket::from_socket(stderr_sock)?, &mut stderr),
-        canceler_future,
+        ffx_audio_common::wait_for_keypress(cancel_client),
     )
     .await
     .map(|_| ())

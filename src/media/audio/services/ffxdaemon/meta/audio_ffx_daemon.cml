@@ -18,6 +18,10 @@
     use: [
         { protocol: "fuchsia.media.Audio" },
         {
+            protocol: "fuchsia.ultrasound.Factory",
+            availability: "optional",
+        },
+        {
             directory: "dev-audio-input",
             rights: [ "r*" ],
             path: "/dev/class/audio-input",

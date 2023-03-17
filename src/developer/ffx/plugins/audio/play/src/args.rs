@@ -16,12 +16,12 @@ pub struct PlayCommand {
     #[argh(
         option,
         description = "purpose of the stream being used to render audio.\
-        Accepted values: BACKGROUND, MEDIA, SYSTEM-AGENT, COMMUNICATION, INTERRUPTION.\
-        Default: MEDIA.",
+        Accepted values: BACKGROUND, MEDIA, SYSTEM-AGENT, COMMUNICATION, INTERRUPTION,\
+        ULTRASOUND. Default: MEDIA.",
         from_str_fn(str_to_usage),
-        default = "AudioRenderUsage::Media"
+        default = "AudioRenderUsageExtended::Media(AudioRenderUsage::Media)"
     )]
-    pub usage: AudioRenderUsage,
+    pub usage: AudioRenderUsageExtended,
 
     #[argh(
         option,
@@ -54,13 +54,28 @@ pub struct PlayCommand {
     pub clock: fidl_fuchsia_audio_ffxdaemon::ClockType,
 }
 
-fn str_to_usage(src: &str) -> Result<AudioRenderUsage, String> {
+#[derive(Debug, PartialEq)]
+pub enum AudioRenderUsageExtended {
+    Background(AudioRenderUsage),
+    Media(AudioRenderUsage),
+    SystemAgent(AudioRenderUsage),
+    Communication(AudioRenderUsage),
+    Interruption(AudioRenderUsage),
+    Ultrasound,
+}
+
+fn str_to_usage(src: &str) -> Result<AudioRenderUsageExtended, String> {
     match src.to_uppercase().as_str() {
-        "BACKGROUND" => Ok(AudioRenderUsage::Background),
-        "MEDIA" => Ok(AudioRenderUsage::Media),
-        "INTERRUPTION" => Ok(AudioRenderUsage::Interruption),
-        "SYSTEM-AGENT" => Ok(AudioRenderUsage::SystemAgent),
-        "COMMUNICATION" => Ok(AudioRenderUsage::Communication),
+        "BACKGROUND" => Ok(AudioRenderUsageExtended::Background(AudioRenderUsage::Background)),
+        "MEDIA" => Ok(AudioRenderUsageExtended::Media(AudioRenderUsage::Media)),
+        "INTERRUPTION" => {
+            Ok(AudioRenderUsageExtended::Interruption(AudioRenderUsage::Interruption))
+        }
+        "SYSTEM-AGENT" => Ok(AudioRenderUsageExtended::SystemAgent(AudioRenderUsage::SystemAgent)),
+        "COMMUNICATION" => {
+            Ok(AudioRenderUsageExtended::Communication(AudioRenderUsage::Communication))
+        }
+        "ULTRASOUND" => Ok(AudioRenderUsageExtended::Ultrasound),
         _ => Err(String::from("Couldn't parse usage.")),
     }
 }

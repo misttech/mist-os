@@ -14,20 +14,29 @@ using zx;
 /// Where to route incoming audio data.
 type PlayLocation = flexible union {
     /// Play audio through an AudioRenderer.
-    1: renderer RendererInfo;
+    1: renderer RendererType;
 
     /// Play audio directly to device ring buffer.
     2: ring_buffer DeviceSelector;
 };
 
 /// Configuration for AudioRenderer.
-type RendererInfo = table {
+type RendererConfig = table {
     /// The usage of the audio stream.
     /// Required.
     1: usage fuchsia.media.AudioRenderUsage;
 
     /// How to set the reference clock.
     2: clock ClockType;
+};
+
+/// Options for AudioRenderers.
+type RendererType = flexible union {
+    /// Renderer for standard frequencies.
+    1: standard_renderer RendererConfig;
+
+    /// Renderer for ultrasonic frequencies.
+    2: ultrasound_renderer struct {};
 };
 
 /// Reference clock options for AudioRenderer and AudioCapturer.
@@ -59,7 +68,7 @@ type CustomClockInfo = table {
 /// Where to capture audio data.
 type RecordLocation = flexible union {
     /// Capture audio through an AudioCapturer.
-    1: capturer CapturerInfo;
+    1: capturer CapturerType;
 
     /// Capture audio loopback.
     2: loopback struct {};
@@ -68,17 +77,23 @@ type RecordLocation = flexible union {
     3: ring_buffer DeviceSelector;
 };
 
+/// Options for AudioCapturers.
+type CapturerType = flexible union {
+    /// AudioCapturer for standard frequencies.
+    1: standard_capturer CapturerInfo;
+
+    /// AudioCapturer for ultrasonic frequencies.
+    2: ultrasound_capturer struct {};
+};
+
 /// Configuration for AudioCapturer.
 type CapturerInfo = table {
     /// The usage of the audio stream.
     /// Required.
     1: usage fuchsia.media.AudioCaptureUsage;
 
-    /// Buffer size in bytes for retrieving audio data.
-    2: buffer_size uint64;
-
     /// How to set the reference clock.
-    3: clock ClockType;
+    2: clock ClockType;
 };
 
 /// Gain settings.
@@ -175,6 +190,10 @@ protocol AudioDaemon {
         /// Record gain settings.
         /// Optional.
         5: gain_settings GainSettings;
+
+        /// Buffer size.
+        /// Optional.
+        6: buffer_size uint64;
     }) -> (resource table {
         /// Contains audio data in the form of a complete WAV file.
         /// Always present.
