@@ -128,17 +128,16 @@ impl From<crate::error::ExistsError> for AddRouteError {
 ///
 /// `ForwardingTable` maps destination subnets to the nearest IP hosts (on the
 /// local network) able to route IP packets to those subnets.
-// TODO(https://fxbug.dev/122489): Consider Route Metrics when making routing
-// decisions.
 pub struct ForwardingTable<I: Ip, D> {
     /// All the routes available to forward a packet.
     ///
     /// `table` may have redundant, but unique, paths to the same
     /// destination.
     ///
-    /// The entries are sorted based on the subnet's prefix length and
-    /// local-ness; when there's a tie in prefix length, on-linkness breaks the
-    /// tie (with the on-link routes appearing before off-link ones).
+    /// Entries in the table are sorted from most-preferred to least preferred.
+    /// Preference is determined first by longest prefix, then by lowest metric,
+    /// then by locality (prefer on-link routes over off-link routes), and
+    /// finally by the entry's tenure in the table.
     table: Vec<ip::types::Entry<I::Addr, D>>,
 }
 
@@ -164,23 +163,47 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             return Err(crate::error::ExistsError);
         }
 
-        // Insert the new entry after the last route to a more specific and/or
-        // local subnet to maintain the invariant that the table is sorted by
-        // subnet prefix length and local-ness.
-        // TODO(https://fxbug.dev/122489): Consider Route Metrics when sorting.
-        let ip::types::Entry { subnet, device: _, gateway: _, metric: _ } = entry;
-        let prefix = subnet.prefix();
-        let index =
-            table.partition_point(|ip::types::Entry { subnet, device: _, gateway, metric: _ }| {
-                let subnet_prefix = subnet.prefix();
-                subnet_prefix > prefix
-                    || (subnet_prefix == prefix
-                        && match gateway {
-                            Some(SpecifiedAddr { .. }) => false,
-                            // on-link routes have a higher preference.
-                            None => true,
-                        })
-            });
+        // `OrderedLocality` provides an implementation of
+        // `core::cmp::PartialOrd` for a routes "locality". Define an enum, so
+        // that `OnLink` routes are sorted before `OffLink` routes. See
+        // https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable
+        // for more details.
+        #[derive(PartialEq, PartialOrd)]
+        enum OrderedLocality {
+            // The route does not have a gateway.
+            OnLink,
+            // The route does have a gateway.
+            OffLink,
+        }
+        // `OrderedRoute` provides an implementation of `std::cmp::PartialOrd`
+        // for routes. Note that the fields are consulted in the order they are
+        // declared. For more details, see
+        // https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable.
+        #[derive(PartialEq, PartialOrd)]
+        struct OrderedEntry {
+            // Order longer prefixes before shorter prefixes.
+            prefix_len: core::cmp::Reverse<u8>,
+            // Order lower metrics before larger metrics.
+            metric: u32,
+            // Order `OnLink` routes before `OffLink` routes.
+            locality: OrderedLocality,
+        }
+        impl<A: net_types::ip::IpAddress, D> From<&ip::types::Entry<A, D>> for OrderedEntry {
+            fn from(entry: &ip::types::Entry<A, D>) -> OrderedEntry {
+                let ip::types::Entry { subnet, device: _, gateway, metric } = entry;
+                OrderedEntry {
+                    prefix_len: core::cmp::Reverse(subnet.prefix()),
+                    metric: metric.value().into(),
+                    locality: gateway
+                        .map_or(OrderedLocality::OnLink, |_gateway| OrderedLocality::OffLink),
+                }
+            }
+        }
+
+        let ordered_entry: OrderedEntry = (&entry).into();
+        // Note, compare with "greater than or equal to" here, to ensure
+        // that existing entries are preferred over new entries.
+        let index = table.partition_point(|entry| ordered_entry.ge(&entry.into()));
 
         table.insert(index, entry);
 
@@ -300,7 +323,9 @@ pub(crate) mod testutil {
 mod tests {
     use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
+    use itertools::Itertools;
     use log::trace;
+    use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 
     use super::*;
@@ -795,5 +820,78 @@ mod tests {
         // If no devices exist, then we can't get a route.
         sync_ctx.get_mut().ip_device_id_ctx.set_device_removed(LESS_SPECIFIC_SUB_DEVICE, true);
         assert_eq!(table.lookup(&mut sync_ctx, None, next_hop), None,);
+    }
+
+    #[ip_test]
+    fn test_add_entry_keeps_table_sorted<I: Ip>() {
+        const DEVICE_A: MultipleDevicesId = MultipleDevicesId::A;
+        const DEVICE_B: MultipleDevicesId = MultipleDevicesId::B;
+        let (more_specific_sub, less_specific_sub) = I::map_ip(
+            (),
+            |()| (net_subnet_v4!("192.168.0.0/24"), net_subnet_v4!("192.168.0.0/16")),
+            |()| (net_subnet_v6!("fe80::/64"), net_subnet_v6!("fe80::/16")),
+        );
+        let lower_metric = Metric::ExplicitMetric(RawMetric(0));
+        let higher_metric = Metric::ExplicitMetric(RawMetric(1));
+        let on_link = None;
+        let off_link = Some(SpecifiedAddr::<I::Addr>::new(I::map_ip(
+            (),
+            |()| net_ip_v4!("192.168.0.1"),
+            |()| net_ip_v6!("fe80::1"),
+        )))
+        .unwrap();
+
+        fn entry<I: Ip, D>(
+            d: D,
+            s: Subnet<I::Addr>,
+            m: Metric,
+            g: Option<SpecifiedAddr<I::Addr>>,
+        ) -> ip::types::Entry<I::Addr, D> {
+            ip::types::Entry { device: d, subnet: s, metric: m, gateway: g }
+        }
+
+        // Expect the forwarding table to be sorted by longest matching prefix,
+        // followed by metric, followed by on/off link, followed by insertion
+        // order.
+        // Note that the test adds entries for `DEVICE_B` after `DEVICE_A`.
+        let expected_table = [
+            entry::<I, _>(DEVICE_A, more_specific_sub, lower_metric, on_link),
+            entry::<I, _>(DEVICE_B, more_specific_sub, lower_metric, on_link),
+            entry::<I, _>(DEVICE_A, more_specific_sub, lower_metric, off_link),
+            entry::<I, _>(DEVICE_B, more_specific_sub, lower_metric, off_link),
+            entry::<I, _>(DEVICE_A, more_specific_sub, higher_metric, on_link),
+            entry::<I, _>(DEVICE_B, more_specific_sub, higher_metric, on_link),
+            entry::<I, _>(DEVICE_A, more_specific_sub, higher_metric, off_link),
+            entry::<I, _>(DEVICE_B, more_specific_sub, higher_metric, off_link),
+            entry::<I, _>(DEVICE_A, less_specific_sub, lower_metric, on_link),
+            entry::<I, _>(DEVICE_B, less_specific_sub, lower_metric, on_link),
+            entry::<I, _>(DEVICE_A, less_specific_sub, lower_metric, off_link),
+            entry::<I, _>(DEVICE_B, less_specific_sub, lower_metric, off_link),
+            entry::<I, _>(DEVICE_A, less_specific_sub, higher_metric, on_link),
+            entry::<I, _>(DEVICE_B, less_specific_sub, higher_metric, on_link),
+            entry::<I, _>(DEVICE_A, less_specific_sub, higher_metric, off_link),
+            entry::<I, _>(DEVICE_B, less_specific_sub, higher_metric, off_link),
+        ];
+        let device_a_routes = expected_table
+            .iter()
+            .cloned()
+            .filter(|entry| entry.device == DEVICE_A)
+            .collect::<Vec<_>>();
+        let device_b_routes = expected_table
+            .iter()
+            .cloned()
+            .filter(|entry| entry.device == DEVICE_B)
+            .collect::<Vec<_>>();
+
+        // Add routes to the table in all possible permutations, asserting that
+        // they always yield the expected order. Add `DEVICE_B` routes after
+        // `DEVICE_A` routes.
+        for insertion_order in device_a_routes.iter().permutations(device_a_routes.len()) {
+            let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+            for entry in insertion_order.into_iter().chain(device_b_routes.iter()) {
+                assert_eq!(table.add_entry(entry.clone()), Ok(entry));
+            }
+            assert_eq!(table.iter_table().cloned().collect::<Vec<_>>(), expected_table);
+        }
     }
 }
