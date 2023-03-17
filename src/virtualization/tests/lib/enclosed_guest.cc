@@ -677,7 +677,7 @@ zx_status_t TerminaEnclosedGuest::BuildLaunchInfo(GuestLaunchInfo* launch_info) 
   launch_info->interface_name = fuchsia::virtualization::TerminaGuestManager::Name_;
   launch_info->config.set_virtio_gpu(false);
 
-  for (auto [path, id] : {
+  for (auto [path, id] : (std::pair<const char*, const char*>[]){
            // Add the block device that contains the VM extras
            {"/pkg/data/vm_extras.img", "vm_extras"},
            // Add the block device that contains the test binaries.
