@@ -145,8 +145,9 @@ impl ToolSuite for ExternalSubToolSuite {
             return Ok(Some(Box::new(cmd)));
         }
         // then try the sdk
-        let sdk = self.context.get_sdk().await?;
-        if let Some(cmd) = self.find_sdk_tool(&sdk, ffx_cmd) {
+        let sdk_cmd =
+            self.context.get_sdk().await.ok().and_then(|sdk| self.find_sdk_tool(&sdk, ffx_cmd));
+        if let Some(cmd) = sdk_cmd {
             return Ok(Some(Box::new(cmd)));
         }
         // and we're done

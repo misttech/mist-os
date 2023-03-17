@@ -108,6 +108,7 @@ pub trait ToolSuite: Sized {
             Error::Help { command, mut output, code } => {
                 let cmd = command.join(" ");
                 writeln!(&mut output).and_then(|_| {
+                    writeln!(&mut output)?;
                     print_command_list(
                         &mut output,
                         &Vec::from_iter(

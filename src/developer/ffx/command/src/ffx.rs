@@ -13,6 +13,7 @@ use ffx_writer::Format;
 use hoist::Hoist;
 use std::{
     collections::HashMap,
+    fmt::Write,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -117,6 +118,7 @@ impl FfxCommandLine {
                     .expect_err("argh should always return help from a help command");
                 let mut output = help_err.output;
                 let code = help_err.status.map_or(1, |_| 0);
+                writeln!(&mut output).ok();
                 suite.print_command_list(&mut output).await.ok();
                 Error::Help { command: self.command.clone(), output, code }
             }
