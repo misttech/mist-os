@@ -313,17 +313,14 @@ def main():
     if args.verbose:
         cmd += ['-x']
     if args.tag:
-        # Separate tags by spaces. This behavior is actually deprecated in the
-        # go command line, but Fuchsia currently has an older version of go
-        # that hasn't switched to commas.
-        cmd += ['-tags', ' '.join(args.tag)]
+        cmd += ['-tags=%s' % ','.join(args.tag)]
     if args.gcflag:
-        cmd += ['-gcflags', ' '.join(args.gcflag)]
+        cmd += ['-gcflags=%s' % ' '.join(args.gcflag)]
     # Clear the buildid to make the build reproducible
+    ldflag = ['-buildid=']
     if args.ldflag:
-        cmd += ['-ldflags=-buildid= ' + ' '.join(args.ldflag)]
-    else:
-        cmd += ['-ldflags=-buildid=']
+        ldflag += args.ldflag
+    cmd += ['-ldflags=%s' % ' '.join(ldflag)]
 
     cmd += [
         # Omit version control information so that binaries are deterministic
