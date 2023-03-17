@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <zircon/compiler.h>
+#include <zircon/listnode.h>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/debug.h"
 
@@ -141,7 +142,8 @@ static inline uint16_t be16_to_cpup(const uint16_t* x) {
 #define ARRAY_SIZE(x) (countof(x))
 #endif
 
-#define container_of(value, type, member) ((type*)((char*)(value)-offsetof(type, member)))
+#define container_of(value, type, member) containerof(value, type, member)
+
 #define offsetofend(type, member) (offsetof(type, member) + sizeof(((type*)NULL)->member))
 
 // NEEDS_TYPES: need to be generic
