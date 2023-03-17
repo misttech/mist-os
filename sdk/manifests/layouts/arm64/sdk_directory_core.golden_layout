@@ -39,7 +39,6 @@ arch/arm64/sysroot/include/assert.h
 arch/arm64/sysroot/include/bits/aarch64/endian.h
 arch/arm64/sysroot/include/bits/aarch64/fenv.h
 arch/arm64/sysroot/include/bits/aarch64/io.h
-arch/arm64/sysroot/include/bits/aarch64/ioctl.h
 arch/arm64/sysroot/include/bits/aarch64/ipc.h
 arch/arm64/sysroot/include/bits/aarch64/reg.h
 arch/arm64/sysroot/include/bits/aarch64/setjmp.h
@@ -70,7 +69,6 @@ arch/arm64/sysroot/include/bits/termios.h
 arch/arm64/sysroot/include/bits/x86_64/endian.h
 arch/arm64/sysroot/include/bits/x86_64/fenv.h
 arch/arm64/sysroot/include/bits/x86_64/io.h
-arch/arm64/sysroot/include/bits/x86_64/ioctl.h
 arch/arm64/sysroot/include/bits/x86_64/ipc.h
 arch/arm64/sysroot/include/bits/x86_64/reg.h
 arch/arm64/sysroot/include/bits/x86_64/setjmp.h
