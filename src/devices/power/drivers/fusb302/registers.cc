@@ -36,4 +36,22 @@ const char* Fusb302RoleDetectionModeToString(Fusb302RoleDetectionMode mode) {
   return nullptr;
 }
 
+const char* PowerRoleDetectionStateToString(PowerRoleDetectionState state) {
+  switch (state) {
+    case PowerRoleDetectionState::kDetecting:
+      return "Running";
+    case PowerRoleDetectionState::kSourceOnCC1:
+      return "Source, CC wire on CC1 pin";
+    case PowerRoleDetectionState::kSourceOnCC2:
+      return "Source, CC wire on CC2 pin";
+    case PowerRoleDetectionState::kSinkOnCC1:
+      return "Sink, CC wire on CC1 pin";
+    case PowerRoleDetectionState::kSinkOnCC2:
+      return "Sink, CC wire on CC2 pin";
+    case PowerRoleDetectionState::kAudioAccessory:
+      return "Audio Accessory connected";
+  }
+  return "(undocumented)";
+}
+
 }  // namespace fusb302

@@ -245,6 +245,32 @@ TEST(OcpReg, ThresholdMilliamps) {
   EXPECT_EQ(800, ocp.ThresholdMilliamps());
 }
 
+TEST(WiredCcPinFromPowerRoleDetectionState, AllInputs) {
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kNone,
+            WiredCcPinFromPowerRoleDetectionState(PowerRoleDetectionState::kDetecting));
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc1,
+            WiredCcPinFromPowerRoleDetectionState(PowerRoleDetectionState::kSourceOnCC1));
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc2,
+            WiredCcPinFromPowerRoleDetectionState(PowerRoleDetectionState::kSourceOnCC2));
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc1,
+            WiredCcPinFromPowerRoleDetectionState(PowerRoleDetectionState::kSinkOnCC1));
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc2,
+            WiredCcPinFromPowerRoleDetectionState(PowerRoleDetectionState::kSinkOnCC2));
+  EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kNone,
+            WiredCcPinFromPowerRoleDetectionState(PowerRoleDetectionState::kAudioAccessory));
+}
+
+TEST(PowerRoleFromDetectionState, AllValidInputs) {
+  EXPECT_EQ(usb_pd::PowerRole::kSource,
+            PowerRoleFromDetectionState(PowerRoleDetectionState::kSourceOnCC1));
+  EXPECT_EQ(usb_pd::PowerRole::kSource,
+            PowerRoleFromDetectionState(PowerRoleDetectionState::kSourceOnCC2));
+  EXPECT_EQ(usb_pd::PowerRole::kSink,
+            PowerRoleFromDetectionState(PowerRoleDetectionState::kSinkOnCC1));
+  EXPECT_EQ(usb_pd::PowerRole::kSink,
+            PowerRoleFromDetectionState(PowerRoleDetectionState::kSinkOnCC2));
+}
+
 class Fusb302RegisterTest : public zxtest::Test {
  public:
   void SetUp() override {

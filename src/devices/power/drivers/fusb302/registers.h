@@ -760,35 +760,113 @@ class Control4Reg : public Fusb302Register<Control4Reg> {
   static auto Get() { return hwreg::I2cRegisterAddr<Control4Reg>(0x10); }
 };
 
+// STATUS0A - Additional configuration for automated power role detection.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// This is a read-only register.
+//
+// Rev 5 datasheet: Table 31 on page 24
 class Status0AReg : public Fusb302Register<Status0AReg> {
  public:
+  // If true, the PD Protocol Layer signaled that a Soft Reset was not received.
+  //
+  // The hardware implements usbpd3.1 6.6.1 "CRCReceiveTimer" and 6.7.2 "Retry
+  // Counter". This bit signals that the retry counter has reached the
+  // nRetryCount limit set by `n_retries` in `Control3Reg`
+  // after sending a a Soft Reset message.
+  //
+  // This bit is cleared when the BMC PHY is asked to start a transmission via
+  // the `tx_start` bit in `Control0Reg` or via the TXON token, and
+  // when the BMC PHY is asked to send a Hard Reset message via the
+  // `send_hard_reset` bit in the `Control3Reg` register.
   DEF_BIT(5, softfail);
+
+  // If true, the PD Protocol Layer signaled that a message was not received.
+  //
+  // The hardware implements usbpd3.1 6.6.1 "CRCReceiveTimer" and 6.7.2 "Retry
+  // Counter". This bit signals that the retry counter has reached the
+  // nRetryCount limit set by `n_retries` in `Control3Reg`
+  // after sending a non-Reset message.
+  //
+  // This bit is cleared under the same conditions as `softfail`.
   DEF_BIT(4, retryfail);
-  DEF_FIELD(3, 2, power);
+
+  // If true, the hardware is forcing PWR[3] (power gate 3) to be enabled.
+  //
+  // This is a hardware override for the `pwr3` bit in the
+  // `PowerReg` register.
+  DEF_BIT(3, power3);
+
+  // If true, the hardware is forcing PWR[2] (power gate 2) to be enabled.
+  //
+  // This is a hardware override for the `pwr2` bit in the
+  // `PowerReg` register.
+  DEF_BIT(2, power2);
+
+  // If true, the receiver in the BMC PHY decoded a Soft Reset message.
+  //
+  // The Rev 5 datasheet does not specify when this bit gets reset.
   DEF_BIT(1, softrst);
+
+  // If true, the receiver in the BMC PHY decoded a Hard Reset ordered set.
+  //
+  // The Rev 5 datasheet does not specify when this bit gets reset.
   DEF_BIT(0, hardrst);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Status0AReg>(STATUS0_A_ADDR); }
+  static auto Get() { return hwreg::I2cRegisterAddr<Status0AReg>(0x3c); }
 };
 
+// The reported state of the power role detection hardware logic.
+//
+// Values are obtained from the `togss` field in the
+// `Status1AReg` register
+enum class PowerRoleDetectionState {
+  kDetecting = 0b000,       // Power role detection process still running
+  kSourceOnCC1 = 0b001,     // Power Source, Configuration Channel is on CC1
+  kSourceOnCC2 = 0b010,     // Power Source, Configuration Channel is on CC2
+  kSinkOnCC1 = 0b101,       // Power Sink, Configuration Channel is on CC1
+  kSinkOnCC2 = 0b110,       // Power Sink, Configuration Channel is on CC2
+  kAudioAccessory = 0b111,  // Audio Accessory found, no Configuration Channel
+};
+
+usb_pd::ConfigChannelPinSwitch WiredCcPinFromPowerRoleDetectionState(PowerRoleDetectionState state);
+
+// `state` must be one of the states that has a Configuration Channel.
+usb_pd::PowerRole PowerRoleFromDetectionState(PowerRoleDetectionState state);
+
+// Descriptor for logging and debugging.
+const char* PowerRoleDetectionStateToString(PowerRoleDetectionState state);
+
+// STATUS1A
+//
+// This is a read-only register.
+//
+// Rev 5 datasheet: Table 34 on page 25
 class Status1AReg : public Fusb302Register<Status1AReg> {
  public:
-  enum TogSS {
-    toggle_running = 0b000,   // TOGGLE = 1
-    stop_src1 = 0b001,        // SRCon CC1 (STOP_SRC1)
-    stop_src2 = 0b010,        // SRCon CC2 (STOP_SRC2)
-    stop_snk1 = 0b101,        // SNKon CC1 (STOP_SNK1)
-    stop_snk2 = 0b110,        // SNKon CC2 (STOP_SNK2)
-    audio_accessory = 0b111,  // AudioAccessory with vRa on both CC1 and CC2 (STOP_SRC1)
-  };
-  DEF_ENUM_FIELD(TogSS, 5, 3, togss);
+  // The state of the power role detection hardware.
+  //
+  //
+  DEF_ENUM_FIELD(PowerRoleDetectionState, 5, 3, togss);
+
+  // If true, the last message in the Rx (receive) FIFO starts with SOP" Debug.
+  //
+  // This bit can't become true if `ensop2db` in
+  // `Control1Reg` is false.
   DEF_BIT(2, rxsop2db);
+
+  // If true, the last message in the Rx (receive) FIFO starts with SOP' Debug.
+  //
+  // This bit can't become true if `ensop1db` in
+  // `Control1Reg` is false.
   DEF_BIT(1, rxsop1db);
+
+  // If true, the last message in the Rx (receive) FIFO starts with SOP.
   DEF_BIT(0, rxsop);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<Status1AReg>(STATUS1_A_ADDR); }
-  static Polarity GetPolarity(TogSS val) { return (val & 0x01) ? CC1 : CC2; }
-  static PowerRole GetPowerRole(TogSS val) { return (val & 0x04) ? sink : source; }
+  static auto Get() { return hwreg::I2cRegisterAddr<Status1AReg>(0x3d); }
 };
 
 class InterruptAReg : public Fusb302Register<InterruptAReg> {
@@ -1031,6 +1109,28 @@ inline OcpReg& OcpReg::SetThresholdMilliamps(int16_t threshold_ma) {
   // The subtraction will not overflow (causing UB) because `multiplier` will be
   // between 1 and 8.
   return set_ocp_range(ocp_range).set_ocp_cur(static_cast<int8_t>(multiplier - 1));
+}
+
+inline usb_pd::ConfigChannelPinSwitch WiredCcPinFromPowerRoleDetectionState(
+    PowerRoleDetectionState state) {
+  const bool cc1_terminated = (static_cast<int8_t>(state) & 0b001) != 0;
+  const bool cc2_terminated = (static_cast<int8_t>(state) & 0b010) != 0;
+
+  if (cc1_terminated == cc2_terminated) {
+    return usb_pd::ConfigChannelPinSwitch::kNone;
+  }
+
+  return cc1_terminated ? usb_pd::ConfigChannelPinSwitch::kCc1
+                        : usb_pd::ConfigChannelPinSwitch::kCc2;
+}
+
+inline usb_pd::PowerRole PowerRoleFromDetectionState(PowerRoleDetectionState state) {
+  const bool cc1_terminated = (static_cast<int8_t>(state) & 0b001) != 0;
+  const bool cc2_terminated = (static_cast<int8_t>(state) & 0b010) != 0;
+  ZX_DEBUG_ASSERT(cc1_terminated != cc2_terminated);
+
+  const bool is_sink = (static_cast<int8_t>(state) & 0b100) != 0;
+  return is_sink ? usb_pd::PowerRole::kSink : usb_pd::PowerRole::kSource;
 }
 
 }  // namespace fusb302

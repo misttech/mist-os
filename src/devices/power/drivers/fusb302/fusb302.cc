@@ -13,6 +13,7 @@
 
 #include "src/devices/power/drivers/fusb302/fusb302-bind.h"
 #include "src/devices/power/drivers/fusb302/registers.h"
+#include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
 
 namespace fusb302 {
 
@@ -49,26 +50,34 @@ zx::result<Event> Fusb302::GetInterrupt() {
   }
 
   if (interrupt_a.i_togdone()) {
-    event.set_cc(true);
-    auto cc_state = Status1AReg::ReadFrom(i2c_).togss();
-    power_role_.set(Status1AReg::GetPowerRole(cc_state));
-    polarity_.set(Status1AReg::GetPolarity(cc_state));
+    const PowerRoleDetectionState detection_state = Status1AReg::ReadFrom(i2c_).togss();
+    const usb_pd::ConfigChannelPinSwitch cc_pin_switch =
+        WiredCcPinFromPowerRoleDetectionState(detection_state);
 
-    status = Control2Reg::ReadFrom(i2c_).set_toggle(0).WriteTo(i2c_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-      return zx::error(status);
-    }
+    if (cc_pin_switch != usb_pd::ConfigChannelPinSwitch::kNone) {
+      event.set_cc(true);
 
-    status = Switches0Reg::ReadFrom(i2c_)
-                 .set_pu_en1(power_role_.get() == source)
-                 .set_pu_en2(power_role_.get() == source)
-                 .set_pdwn1(power_role_.get() == sink)
-                 .set_pdwn2(power_role_.get() == sink)
-                 .WriteTo(i2c_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-      return zx::error(status);
+      polarity_.set(cc_pin_switch == usb_pd::ConfigChannelPinSwitch::kCc1 ? CC1 : CC2);
+
+      const usb_pd::PowerRole power_role = PowerRoleFromDetectionState(detection_state);
+      power_role_.set(power_role == usb_pd::PowerRole::kSink ? sink : source);
+
+      status = Control2Reg::ReadFrom(i2c_).set_toggle(0).WriteTo(i2c_);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
+        return zx::error(status);
+      }
+
+      status = Switches0Reg::ReadFrom(i2c_)
+                   .set_pu_en1(power_role_.get() == source)
+                   .set_pu_en2(power_role_.get() == source)
+                   .set_pdwn1(power_role_.get() == sink)
+                   .set_pdwn2(power_role_.get() == sink)
+                   .WriteTo(i2c_);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
+        return zx::error(status);
+      }
     }
   }
 
