@@ -181,10 +181,12 @@ fn init_scene(
 /// most of the failures would be unexpected and unrecoverable.
 pub fn spawn_view_provider(
     server: Arc<FramebufferServer>,
+    view_bound_protocols: fuicomposition::ViewBoundProtocols,
     outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
 ) {
     std::thread::spawn(|| {
         let mut executor = fasync::LocalExecutor::new();
+        let mut view_bound_protocols = Some(view_bound_protocols);
         executor.run_singlethreaded(async move {
             let mut service_fs = ServiceFs::new_local();
             service_fs.dir("svc").add_fidl_service(ExposedProtocols::ViewProvider);
@@ -200,9 +202,6 @@ pub fn spawn_view_provider(
                             let mut view_identity = fuiviews::ViewIdentityOnCreation::from(
                                 ViewRefPair::new().expect("Failed to create ViewRefPair"),
                             );
-                            let view_bound_protocols = fuicomposition::ViewBoundProtocols {
-                                ..fuicomposition::ViewBoundProtocols::EMPTY
-                            };
                             // We don't actually care about the parent viewport at the moment, because we don't resize.
                             let (_parent_viewport_watcher, parent_viewport_watcher_request) =
                                 create_proxy::<fuicomposition::ParentViewportWatcherMarker>()
@@ -212,7 +211,7 @@ pub fn spawn_view_provider(
                                 .create_view2(
                                     &mut view_creation_token,
                                     &mut view_identity,
-                                    view_bound_protocols,
+                                    view_bound_protocols.take().expect("cannot create view because view bound protocols have been consumed"),
                                     parent_viewport_watcher_request,
                                 )
                                 .expect("FIDL error");

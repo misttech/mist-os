@@ -15,6 +15,7 @@ use crate::syscalls::{SyscallResult, SUCCESS};
 use crate::task::CurrentTask;
 use crate::types::*;
 
+use fidl_fuchsia_ui_composition as fuicomposition;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
 use zerocopy::AsBytes;
@@ -62,12 +63,17 @@ impl Framebuffer {
     }
 
     /// Starts serving a view based on this framebuffer in `outgoing_dir`.
+    ///
+    /// # Parameters
+    /// * `view_bound_protocols`: handles to input clients which will be associated with the view
+    /// * `outgoing_dir`: the path under which the `ViewProvider` protocol will be served
     pub fn start_server(
         &self,
+        view_bound_protocols: fuicomposition::ViewBoundProtocols,
         outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
     ) {
         if let Some(server) = &self.server {
-            spawn_view_provider(server.clone(), outgoing_dir);
+            spawn_view_provider(server.clone(), view_bound_protocols, outgoing_dir);
         }
     }
 }

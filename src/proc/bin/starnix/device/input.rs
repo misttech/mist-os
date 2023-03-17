@@ -12,6 +12,11 @@ use crate::syscalls::SUCCESS;
 use crate::task::{CurrentTask, EventHandler, WaitKey, Waiter};
 use crate::types::*;
 
+use fidl::endpoints::Proxy as _; // for `on_closed()`
+use fidl::handle::fuchsia_handles::Signals;
+use fidl_fuchsia_ui_pointer::{self as fuipointer, TouchResponse, TouchResponseType};
+use fuchsia_async as fasync;
+use futures::future::{self, Either};
 use std::sync::Arc;
 
 pub struct InputFile {
@@ -41,6 +46,7 @@ impl InputFile {
     const INPUT_ID: uapi::input_id =
         uapi::input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
 
+    /// Creates an `InputFile` instance suitable for emulating a touchscreen.
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             driver_version: Self::DRIVER_VERSION,
@@ -54,6 +60,66 @@ impl InputFile {
             supported_misc_features: BitSet::new(),     // None supported
             properties: touch_properties(),
             waiter: Waiter::new(),
+        })
+    }
+
+    /// Starts reading events from the Fuchsia input system, and making those events available
+    /// to the guest system.
+    ///
+    /// # Parameters
+    /// * `touch_source_proxy`: a connection to the Fuchsia input system, which will provide
+    ///   touch events associated with the Fuchsia `View` created by Starnix.
+    pub fn start_relay(
+        &self,
+        touch_source_proxy: fuipointer::TouchSourceProxy,
+    ) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                let mut previous_event_disposition = vec![];
+                // TODO(https://fxbug.dev/123718): Remove `close_fut`.
+                let mut close_fut = touch_source_proxy.on_closed();
+                loop {
+                    let query_fut =
+                        touch_source_proxy.watch(&mut previous_event_disposition.into_iter());
+                    let query_res = match future::select(close_fut, query_fut).await {
+                        Either::Left((Ok(Signals::CHANNEL_PEER_CLOSED), _)) => {
+                            log_warn!("TouchSource server closed connection; input is stopped");
+                            break;
+                        }
+                        Either::Left((on_closed_res, _)) => {
+                            log_warn!(
+                                "on_closed() resolved with unexpected value {:?}; input is stopped",
+                                on_closed_res
+                            );
+                            break;
+                        }
+                        Either::Right((query_res, pending_close_fut)) => {
+                            close_fut = pending_close_fut;
+                            query_res
+                        }
+                    };
+                    match query_res {
+                        Ok(touch_events) => {
+                            previous_event_disposition = touch_events
+                                .iter()
+                                .map(|event| TouchResponse {
+                                    response_type: Some(TouchResponseType::Yes),
+                                    trace_flow_id: event.trace_flow_id,
+                                    ..TouchResponse::EMPTY
+                                })
+                                .collect();
+                            not_implemented!("?", "process touch events");
+                        }
+                        Err(e) => {
+                            log_warn!(
+                                "error {:?} reading from TouchSourceProxy; input is stopped",
+                                e
+                            );
+                            break;
+                        }
+                    };
+                }
+            })
         })
     }
 }
@@ -228,4 +294,76 @@ fn touch_properties() -> BitSet<{ min_bytes(INPUT_PROP_CNT) }> {
     let mut attrs = BitSet::new();
     attrs.set(INPUT_PROP_DIRECT);
     attrs
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuipointer::{TouchEvent, TouchSourceMarker, TouchSourceRequest};
+    use futures::StreamExt as _; // for `next()`
+
+    #[::fuchsia::test()]
+    async fn initial_watch_request_has_empty_responses_arg() {
+        // Set up resources.
+        let input_file = InputFile::new();
+        let (touch_source_proxy, mut touch_source_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let relay_thread = input_file.start_relay(touch_source_proxy);
+
+        // Verify that the watch request has empty `responses`.
+        assert_matches!(
+            touch_source_stream.next().await,
+            Some(Ok(TouchSourceRequest::Watch { responses, .. }))
+                => assert_eq!(responses.as_slice(), [])
+        );
+
+        // Cleanly tear down the client.
+        std::mem::drop(touch_source_stream); // Close Zircon channel.
+        relay_thread.join().expect("client thread failed"); // Wait for client thread to finish.
+    }
+
+    #[::fuchsia::test]
+    async fn later_watch_requests_have_responses_arg_matching_earlier_watch_replies() {
+        // Set up resources.
+        let input_file = InputFile::new();
+        let (touch_source_proxy, mut touch_source_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let fake_touch_events = std::iter::repeat(TouchEvent::EMPTY);
+        let relay_thread = input_file.start_relay(touch_source_proxy);
+
+        // Reply to first `Watch` with two `TouchEvent`s.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => responder
+                .send(&mut fake_touch_events.clone().take(2).collect::<Vec<_>>().into_iter())
+                .expect("failure sending Watch reply"),
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Verify second `Watch` has two elements in `responses`.
+        // Then reply with five `TouchEvent`s.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
+                assert_matches!(responses.as_slice(), [_, _]);
+                responder
+                    .send(&mut fake_touch_events.clone().take(5).collect::<Vec<_>>().into_iter())
+                    .expect("failure sending Watch reply")
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Verify third `Watch` has five elements in `responses`.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, .. })) => {
+                assert_matches!(responses.as_slice(), [_, _, _, _, _]);
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        // Cleanly tear down the client.
+        std::mem::drop(touch_source_stream); // Close Zircon channel.
+        relay_thread.join().expect("client thread failed"); // Wait for client thread to finish.
+    }
 }

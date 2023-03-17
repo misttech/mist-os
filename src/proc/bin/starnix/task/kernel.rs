@@ -9,6 +9,7 @@ use std::iter::FromIterator;
 use std::sync::Arc;
 
 use crate::device::framebuffer::Framebuffer;
+use crate::device::input::InputFile;
 use crate::device::{BinderDriver, DeviceMode, DeviceRegistry};
 use crate::dynamic_thread_pool::DynamicThreadPool;
 use crate::fs::file_server::FileServer;
@@ -76,6 +77,16 @@ pub struct Kernel {
     /// When a component is run in that container and also specifies the `framebuffer` feature, the
     /// framebuffer will be served as the view of the component.
     pub framebuffer: Arc<Framebuffer>,
+
+    /// An `InputFile` that can read input events from Fuchsia, and offer them to a component running
+    /// under Starnix.
+    ///
+    /// If the container specifies the `framebuffer` features, this `InputFile` will be registered
+    /// as a device.
+    ///
+    /// When a component is run in that container, and also specifies the `framebuffer` feature,
+    /// Starnix will relay input events from Fuchsia to the component.
+    pub input_file: Arc<InputFile>,
 
     /// The binder driver registered for this container, indexed by their device type.
     pub binders: RwLock<BTreeMap<DeviceType, Arc<BinderDriver>>>,
@@ -175,6 +186,7 @@ impl Kernel {
             device_registry: RwLock::new(DeviceRegistry::new_with_common_devices()),
             features: HashSet::from_iter(features.iter().cloned()),
             framebuffer: Framebuffer::new().expect("Failed to create framebuffer"),
+            input_file: InputFile::new(),
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),

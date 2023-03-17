@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{binder::create_binders, input::InputFile, starnix::StarnixDevice};
+use crate::device::{binder::create_binders, starnix::StarnixDevice};
 use crate::fs::{devtmpfs::dev_tmp_fs, SpecialNode};
 use crate::logging::log_warn;
 use crate::task::CurrentTask;
 use crate::types::*;
+
+use fidl_fuchsia_ui_composition as fuicomposition;
 
 /// Parses and runs the features from the provided "program strvec". Some features,
 /// should be enabled on a per-component basis. We run this when we first
@@ -33,13 +35,10 @@ pub fn run_features(entries: &Vec<String>, current_task: &CurrentTask) -> Result
                 // Note: input requires the `framebuffer` feature, because Starnix cannot receive
                 // input events without a Fuchsia `View`.
                 //
-                // TODO(quiche): Pass in the Fuchsia `View` for the `framebuffer`, so that
-                // `InputFile` can receive pointer events from Fuchsia.
-                //
                 // TODO(quiche): When adding support for multiple input devices, ensure
                 // that the appropriate `InputFile` is associated with the appropriate
                 // `INPUT_MINOR`.
-                dev_reg.register_chrdev_major(InputFile::new(), INPUT_MAJOR)?;
+                dev_reg.register_chrdev_major(kernel.input_file.clone(), INPUT_MAJOR)?;
             }
             "magma" => {
                 // Add the starnix device group.
@@ -74,7 +73,15 @@ pub fn run_component_features(
     for entry in entries {
         match entry.as_str() {
             "framebuffer" => {
-                current_task.kernel().framebuffer.start_server(outgoing_dir.take().unwrap());
+                let kernel = current_task.kernel();
+                let (touch_source_proxy, touch_source_stream) =
+                    fidl::endpoints::create_proxy().expect("failed to create TouchSourceProxy");
+                let view_bound_protocols = fuicomposition::ViewBoundProtocols {
+                    touch_source: Some(touch_source_stream),
+                    ..fuicomposition::ViewBoundProtocols::EMPTY
+                };
+                kernel.framebuffer.start_server(view_bound_protocols, outgoing_dir.take().unwrap());
+                kernel.input_file.start_relay(touch_source_proxy);
             }
             "binder" => {}
             "logd" => {}
