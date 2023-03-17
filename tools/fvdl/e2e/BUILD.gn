@@ -5,6 +5,7 @@
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 import("//build/images/args.gni")
+import("//build/images/paths.gni")
 import("//build/testing/host_test_data.gni")
 
 go_library("lib") {
@@ -31,7 +32,6 @@ if (is_linux) {
   _grpcwebproxy_dir = "//prebuilt/third_party/grpcwebproxy/${host_platform}"
 
   _build_out = "${target_gen_dir}/fvdl_test_runtime_deps/images"
-  _tools_out = "${target_gen_dir}/fvdl_test_runtime_deps/host_tools"
 
   host_test_data("prebuilt_aemu") {
     sources = [ _aemu_dir ]
@@ -47,49 +47,49 @@ if (is_linux) {
 
   host_test_data("copy_host_tools") {
     sources = [
-      "${host_tools_dir}/far",
-      "${host_tools_dir}/ffx",
-      "${host_tools_dir}/fvdl",
-      "${host_tools_dir}/pm",
+      get_label_info("//src/developer/ffx:ffx_bin", "root_out_dir") + "/ffx",
+      get_label_info("//src/sys/pkg/bin/pm:pm_bin", "root_out_dir") + "/pm",
+      get_label_info("//src/sys/pkg/bin/far:bin", "root_out_dir") + "/far",
+      get_label_info("//tools/fvdl:bin", "root_out_dir") + "/fvdl",
       get_label_info("//src/storage/bin/fvm", "root_out_dir") + "/fvm",
       get_label_info("//zircon/tools/zbi", "root_out_dir") + "/zbi",
     ]
     deps = [
-      "//src/developer/ffx:host($host_toolchain)",
+      "//src/developer/ffx:ffx_bin($host_toolchain)",
       "//src/storage/bin/fvm($host_toolchain)",
-      "//src/sys/pkg/bin/far:host($host_toolchain)",
-      "//src/sys/pkg/bin/pm:host($host_toolchain)",
-      "//tools/fvdl:host($host_toolchain)",
+      "//src/sys/pkg/bin/far:bin($host_toolchain)",
+      "//src/sys/pkg/bin/pm:pm_bin($host_toolchain)",
+      "//tools/fvdl:bin($host_toolchain)",
       "//zircon/tools/zbi($host_toolchain)",
     ]
-    outputs = [ "${_tools_out}/{{source_file_part}}" ]
   }
 
   host_test_data("copy_images") {
-    sources = [ get_label_info("//build/images/fuchsia($target_toolchain)",
-                               "root_out_dir") + "/fuchsia.zbi" ]
+    sources = [ files.zbi ]
     if (!bootfs_only) {
-      sources += [ get_label_info("//build/images/fuchsia($target_toolchain)",
-                                  "target_out_dir") + "/fuchsia/fvm.blk" ]
+      sources += [ files.fvm ]
     }
+
+    # Copy the files to a common directory to mimic the image tarball which is
+    # normally downloaded.
     outputs = [ "${_build_out}/{{source_file_part}}" ]
-    deps = [ "//build/images/fuchsia($target_toolchain)" ]
+    deps = [ "${labels.images}" ]
     if (target_cpu == "x64") {
-      sources += [ "${root_build_dir}/multiboot.bin" ]
-      deps += [ "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim($target_toolchain)" ]
+      sources += [ files.qemu_kernel ]
+      deps += [ "${labels.qemu_kernel}($target_toolchain)" ]
     }
   }
 
   go_test("fvdl_sdk_test") {
     library = ":lib"
     output_name = "fvdl_sdk_test"
-    non_go_deps = [
+    data_deps = [
       ":copy_host_tools",
+      ":copy_images",
       ":prebuilt_aemu",
       ":prebuilt_device_launcher",
       ":prebuilt_grpcwebproxy",
     ]
-    data_deps = [ ":copy_images" ]
     args = [
       "-test.run",
       "TestStartFVDLSDK.*",

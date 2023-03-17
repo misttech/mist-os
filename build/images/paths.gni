@@ -41,16 +41,17 @@ labels = {
     # we consolidate metadata on the same product bundle GN wrapper.
     images_prime = bazel_assembly_targets[0]
   } else if (use_bringup_assembly) {
-    images = "//build/images/bringup"
+    images = "//build/images/bringup(${default_toolchain})"
     assembly_name = "bringup"
   } else {
-    images = "//build/images/fuchsia"
+    _images_without_toolchain = "//build/images/fuchsia"
+    images = "${_images_without_toolchain}(${default_toolchain})"
     assembly_name = "fuchsia"
-    images_prime = "${images}:${assembly_name}_prime"
+    images_prime = "${_images_without_toolchain}:${assembly_name}_prime"
 
-    fuchsia_netboot = "${images}:netboot"
+    fuchsia_netboot = "${_images_without_toolchain}:netboot"
 
-    meta_packages = "${images}:fuchsia.meta_packages"
+    meta_packages = "${_images_without_toolchain}:fuchsia.meta_packages"
   }
   zedboot_images = "//build/images/zedboot"
 

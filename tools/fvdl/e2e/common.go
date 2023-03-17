@@ -68,12 +68,19 @@ func setUp(t *testing.T, intree bool) {
 		}
 		t.Logf("[test info] fuchsia_build_dir %s", exDir)
 		t.Logf("[test info] fvdl_test_runtime_deps %s", runtimeDir)
-		hostToolsDir = filepath.Join(runtimeDir, "host_tools")
+		hostToolsDir = exDir
 		if _, err := os.Stat(hostToolsDir); os.IsNotExist(err) {
 			t.Fatalf("Invalid host tools dir %q err: %s", hostToolsDir, err)
 		}
 		fvdl = filepath.Join(hostToolsDir, "fvdl")
 		if _, err := os.Stat(fvdl); os.IsNotExist(err) {
+			// fvdl is missing, find it.
+			t.Logf("[test info] Cannot stat  %s", fvdl)
+			if fvdl = e2etest.FindFileFromDir(filepath.Join(hostToolsDir, ".."), "fvdl"); fvdl == "" {
+				t.Fatalf("Cannot find fvdl binary from %q", filepath.Join(hostToolsDir, ".."))
+			} else {
+				t.Logf("Did you mean %s?", fvdl)
+			}
 			t.Fatal(err)
 		}
 		ffx = filepath.Join(hostToolsDir, "ffx")
@@ -99,14 +106,6 @@ func setUp(t *testing.T, intree bool) {
 		amberFiles = filepath.Join(fuchsiaBuildDir, "amber-files")
 		if err := os.Mkdir(amberFiles, 0o755); err != nil && !os.IsExist(err) {
 			t.Fatal(err)
-		}
-		if intree {
-			if err := e2etest.GenerateFakeArgsFile(filepath.Join(fuchsiaBuildDir, "args.gn")); err != nil {
-				t.Fatal(err)
-			}
-			if err := e2etest.GenerateFakeImagesJson(filepath.Join(fuchsiaBuildDir, "images.json")); err != nil {
-				t.Fatal(err)
-			}
 		}
 		if err := e2etest.CreateSSHKeyPairFiles(runtimeDir); err != nil {
 			t.Fatal(err)
