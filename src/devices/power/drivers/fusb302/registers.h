@@ -290,12 +290,45 @@ class Switches1Reg : public Fusb302Register<Switches1Reg> {
   static auto Get() { return hwreg::I2cRegisterAddr<Switches1Reg>(0x03); }
 };
 
+// MEASURE - Configures the measuring block.
+//
+// This register has reserved/undocumented bits. It can only be safely updated
+// via read/modify/write operations.
+//
+// After reset, the measure block will be set up to measure CC pins, and its
+// MDAC will generate 2.142 V.
+//
+// Rev 5 datasheet: Table 20 on page 21
 class MeasureReg : public Fusb302Register<MeasureReg> {
  public:
+  // If true, the VBUS is connected to the measure block's input.
+  //
+  // If this bit is true, `Switches0Reg::MeasureConfigChannelPinSwitch()` must be kNone. The
+  // datasheet schematics suggest that breaking this precondition will short the
+  // VBUS and one of the CC pins.
+  //
+  // If this bit is true, the MDAC's base is multiplied by 10 (420mV, instead of
+  // 42mV).
   DEF_BIT(6, meas_vbus);
+
+  // Read/written by {Set}ComparatorVoltageMv().
   DEF_FIELD(5, 0, mdac);
 
-  static auto Get() { return hwreg::I2cRegisterAddr<MeasureReg>(MEASURE_ADDR); }
+  // The reference voltage for the comparator, in mV.
+  int32_t ComparatorVoltageMv() const;
+
+  // Configures the MDAC that generates the comparator reference voltage.
+  //
+  // The comparator's other input must be configured (via
+  // `set_meas_vbus()`) for the intended comparison before
+  // using this helper.
+  MeasureReg& SetComparatorVoltageMv(int32_t voltage_mv);
+
+  static auto Get() { return hwreg::I2cRegisterAddr<MeasureReg>(0x04); }
+
+ private:
+  // The base voltage for the measuring block's MDAC (Multiplier DAC).
+  int16_t MdacBaseMv() const;
 };
 
 class SliceReg : public Fusb302Register<SliceReg> {
@@ -639,6 +672,38 @@ inline usb_pd::ConfigChannelPinSwitch Switches1Reg::BmcPhyConnection() const {
 inline Switches1Reg& Switches1Reg::SetBmcPhyConnection(usb_pd::ConfigChannelPinSwitch connection) {
   return set_txcc1(connection == usb_pd::ConfigChannelPinSwitch::kCc1)
       .set_txcc2(connection == usb_pd::ConfigChannelPinSwitch::kCc2);
+}
+
+inline int16_t MeasureReg::MdacBaseMv() const {
+  // The MDAC base when the comparator input is a CC pin.
+  static constexpr int16_t kMdacCcBaseMv = 42;
+
+  // The MDAC base when the comparator input is the VBUS pin.
+  static constexpr int16_t kMdacVbusBaseMv = 420;
+
+  return meas_vbus() ? kMdacVbusBaseMv : kMdacCcBaseMv;
+}
+
+inline int32_t MeasureReg::ComparatorVoltageMv() const {
+  // The multiplication will not overflow (causing UB) because `mdac`
+  // is a 6-bit field. The maximum result is 26,880.
+  return int32_t{MdacBaseMv() * static_cast<int16_t>(mdac() + 1)};
+}
+
+inline MeasureReg& MeasureReg::SetComparatorVoltageMv(int32_t voltage_mv) {
+  const int16_t mdac_base = MdacBaseMv();
+
+  // We check the input range instead of clamping because the voltages involved
+  // in the USB specifications pass the checks, so we can rely on the checks to
+  // catch bugs.
+  ZX_DEBUG_ASSERT(voltage_mv > mdac_base / 2);
+  ZX_DEBUG_ASSERT(voltage_mv < mdac_base * 64 + mdac_base / 2);
+
+  // The input range documented above guarantees that the addition and casts do
+  // not overflow (causing UB).
+  const int8_t mdac_multiplier =
+      static_cast<int8_t>((static_cast<int16_t>(voltage_mv) + mdac_base / 2) / mdac_base - 1);
+  return set_mdac(mdac_multiplier);
 }
 
 }  // namespace fusb302

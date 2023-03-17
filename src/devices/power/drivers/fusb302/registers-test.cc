@@ -167,6 +167,48 @@ TEST(Switches1RegTest, BmcPhyConnection) {
   EXPECT_EQ(usb_pd::ConfigChannelPinSwitch::kCc2, switches1.BmcPhyConnection());
 }
 
+TEST(MeasureReg, ComparatorVoltageMv) {
+  auto measure = MeasureReg::Get().FromValue(0);
+
+  // Test cases from page 21 of the datasheet.
+
+  measure.set_reg_value(0).set_meas_vbus(false).SetComparatorVoltageMv(42);
+  EXPECT_EQ(0b00'0000, measure.mdac());
+  EXPECT_EQ(42, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(true).SetComparatorVoltageMv(420);
+  EXPECT_EQ(0b00'0000, measure.mdac());
+  EXPECT_EQ(420, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(false).SetComparatorVoltageMv(84);
+  EXPECT_EQ(0b00'0001, measure.mdac());
+  EXPECT_EQ(84, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(true).SetComparatorVoltageMv(840);
+  EXPECT_EQ(0b00'0001, measure.mdac());
+  EXPECT_EQ(840, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(false).SetComparatorVoltageMv(2'058);
+  EXPECT_EQ(0b11'0000, measure.mdac());
+  EXPECT_EQ(2'058, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(false).SetComparatorVoltageMv(2'184);
+  EXPECT_EQ(0b11'0011, measure.mdac());
+  EXPECT_EQ(2'184, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(false).SetComparatorVoltageMv(2'646);
+  EXPECT_EQ(0b11'1110, measure.mdac());
+  EXPECT_EQ(2'646, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(false).SetComparatorVoltageMv(2'688);
+  EXPECT_EQ(0b11'1111, measure.mdac());
+  EXPECT_EQ(2'688, measure.ComparatorVoltageMv());
+
+  measure.set_reg_value(0).set_meas_vbus(true).SetComparatorVoltageMv(26'880);
+  EXPECT_EQ(0b11'1111, measure.mdac());
+  EXPECT_EQ(26'880, measure.ComparatorVoltageMv());
+}
+
 class Fusb302RegisterTest : public zxtest::Test {
  public:
   void SetUp() override {
