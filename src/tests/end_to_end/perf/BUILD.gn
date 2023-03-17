@@ -28,8 +28,9 @@ test_list = [
   "netstack3_benchmarks_test",
   "network_device_microbenchmarks_test",
   "perftest_trace_events_test",
-  "storage_benchmarks_test",
   "rust_inspect_benchmarks_test",
+  "storage_benchmarks_test",
+  "tracing_microbenchmarks_test",
 
   # TODO(https://fxbug.dev/108167): Re-enable input_latency_benchmarks_test.
   # It is disabled because it has been getting broken by rolls of the
