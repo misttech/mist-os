@@ -281,7 +281,8 @@ TEST_F(DhubTest, SizePerNotification) {
   auto notify_cb = [](void* ctx, dma_state_t state) -> void {};
   notify.callback = notify_cb;
   proto_client().SetNotifyCallback(DmaId::kDmaIdPdmW0, &notify, &size_per_notification);
-  ASSERT_EQ(size_per_notification, 16 * 1024);
+  // 8KB when MTUs size is 128 bytes, and DMAs set to 64 x MTUs (see SynDhub channel_info_).
+  ASSERT_EQ(size_per_notification, 8 * 1024);
 }
 
 TEST_F(DhubTest, TransferSize) {
