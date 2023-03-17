@@ -139,7 +139,9 @@ class VmAddressRegionOrMapping
       TA_REQ(lock()) = 0;
 
   // WAVL tree key function
-  vaddr_t GetKey() const { return base(); }
+  // For use in WAVL tree code only.
+  // base_ access is safe as WAVL tree is guarded by aspace lock.
+  vaddr_t GetKey() const TA_NO_THREAD_SAFETY_ANALYSIS { return base_; }
 
   // Dump debug info
   virtual void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) = 0;
