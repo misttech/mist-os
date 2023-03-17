@@ -135,11 +135,7 @@ ${archive_path}:  ../../tools/devshell/lib/platform.sh "
       for d in "${vendor_dir}"/*; do
           echo "vendor file ${d}"
           if [[ "${d}" != *"/*" ]]; then
-            if hash realpath >/dev/null 2>&1; then
-              rel_path="$(realpath --relative-to="${PWD}" "$d")"
-            else
-              rel_path="$(realpath_relative_to_pwd "${d}")"
-            fi
+            rel_path="$(realpath_relative_to_pwd "${d}")"
             printf %s "${rel_path} " >> "${depfile_prefix}"
           fi
       done
@@ -279,11 +275,7 @@ function handle-directory {
 
   for f in "${files[@]}"; do
     if [[ "${create_depfile}" -eq 1 ]]; then
-      if hash realpath >/dev/null 2>&1; then
-        rel_path="$(realpath --relative-to="${PWD}" "$f")"
-      else
-        rel_path="$(realpath_relative_to_pwd "${f}")"
-      fi
+      rel_path="$(realpath_relative_to_pwd "${f}")"
       printf %s "${rel_path} " >> "${depfile_prefix}"
     fi
 
