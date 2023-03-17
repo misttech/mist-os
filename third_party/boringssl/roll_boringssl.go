@@ -182,8 +182,8 @@ func main() {
 	log.Println()
 	log.Println("To verify Zircon linkage (see zircon-unused.c):")
 	log.Println("  $ fx --dir out/bringup.x64.no_opt set bringup.x64 --args=optimize='\"none\"'")
-	log.Println("  $ fx --dir out/bringup.x64.no_opt build")
-	log.Println("  $ fx use default")
+	log.Println("  $ fx build")
+	log.Println("  $ fx use out/default")
 
 	log.Println("If tests pass; commit the changes in //third_party/boringssl (you may need to bypass the CQ)")
 	log.Println("Then, update the BoringSSL revision in the internal integration repository")
