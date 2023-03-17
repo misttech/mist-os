@@ -63,40 +63,37 @@ impl Snapshot {
         let header_block = Block::new(&header_bytes[..], BlockIndex::HEADER);
         let generation = header_block.header_generation_count();
 
-        if let Ok(gen) = generation {
-            if gen == constants::VMO_FROZEN {
-                match BackingBuffer::try_from(source) {
-                    Ok(buffer) => return Ok(Snapshot { buffer }),
-                    // on error, try and read via the full snapshot algo
-                    Err(_) => {}
-                }
-            }
-
-            // Read the buffer
-            let vmo_size = if let Some(vmo_size) = header_block.header_vmo_size()? {
-                cmp::min(vmo_size as usize, constants::MAX_VMO_SIZE)
-            } else {
-                cmp::min(source.len(), constants::MAX_VMO_SIZE)
-            };
-            let mut buffer = vec![0u8; vmo_size];
-            ReadBytes::read(source, &mut buffer[..]);
-            if cfg!(test) {
-                read_callback();
-            }
-
-            // Read the generation count one more time to ensure the previous buffer read is
-            // consistent.
-            ReadBytes::read(source, &mut header_bytes);
-            match header_generation_count(&header_bytes[..]) {
-                None => return Err(ReaderError::InconsistentSnapshot),
-                Some(new_generation) if new_generation != gen => {
-                    return Err(ReaderError::InconsistentSnapshot);
-                }
-                Some(_) => return Ok(Snapshot { buffer: BackingBuffer::from(buffer) }),
+        let Ok(gen) = generation else {
+            return Err(ReaderError::InconsistentSnapshot);
+        };
+        if gen == constants::VMO_FROZEN {
+            match BackingBuffer::try_from(source) {
+                Ok(buffer) => return Ok(Snapshot { buffer }),
+                // on error, try and read via the full snapshot algo
+                Err(_) => {}
             }
         }
 
-        Err(ReaderError::InconsistentSnapshot)
+        // Read the buffer
+        let vmo_size = if let Some(vmo_size) = header_block.header_vmo_size()? {
+            cmp::min(vmo_size as usize, constants::MAX_VMO_SIZE)
+        } else {
+            cmp::min(source.len(), constants::MAX_VMO_SIZE)
+        };
+        let mut buffer = vec![0u8; vmo_size];
+        ReadBytes::read(source, &mut buffer[..]);
+        if cfg!(test) {
+            read_callback();
+        }
+
+        // Read the generation count one more time to ensure the previous buffer read is
+        // consistent.
+        ReadBytes::read(source, &mut header_bytes);
+        match header_generation_count(&header_bytes[..]) {
+            None => Err(ReaderError::InconsistentSnapshot),
+            Some(new_generation) if new_generation != gen => Err(ReaderError::InconsistentSnapshot),
+            Some(_) => Ok(Snapshot { buffer: BackingBuffer::from(buffer) }),
+        }
     }
 
     fn try_from_with_callback<F>(
