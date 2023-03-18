@@ -119,32 +119,16 @@ If it's a directory, all binaries under the given path are indexed.
 ### Source code location is correctly set up
 
 The Fuchsia build generates symbols relative to the build directory so relative paths look like
-`../../src/my_component/file.cc`). The build directory is usually provided by the symbol index.
+`../../src/my_component/file.cc`. The build directory is usually provided by the symbol index,
+so the source files can be located.
 
-If your files are not being found with the default build directories, you will need to provide a
-build directory to locate the files. This build directory does not need have been used to build, it
-just needs to produce correct absolute paths when concatenated with the relative paths from the
-symbol file.
-
-You can add additional build directories on the command line:
-
-```posix-terminal
-ffx debug connect -- --build-dir /home/me/fuchsia/out/x64
-```
-
-Or interactively from within the debugger:
+If your files are not being found, you will need to manually tweak the source map setting.
+For example, if the debugger cannot find `./../../src/my_component/file.cc`, and the file is
+located at `/path/to/fuchsia/src/my_component/file.cc`, you could
 
 ```none
-[zxdb] set build-dirs += /home/me/fuchsia/out/x64
+[zxdb] set source-map += ./../..=/path/to/fuchsia
 ```
 
-If debugger is finding the wrong file, you can replace the entire build directory list by omitting
-the `+=`:
-
-```none
-[zxdb] set build-dirs /home/me/fuchsia/out/x64
-```
-
-If your build produces DWARF symbols with absolute file paths the files must be in that location on
-the local system. Absolute file paths in the symbols are not affected by the build search path.
-Clang users should use the `-fdebug-prefix-map`, which will also help with build hermeticity.
+So the debugger will look for `/path/to/fuchsia/src/my_component/file.cc` instead. For more help,
+please check `get source-map`.

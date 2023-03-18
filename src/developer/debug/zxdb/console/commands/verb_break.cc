@@ -145,7 +145,7 @@ Breakpoints on overloaded functions
 Breakpoint Conditions
 
   Breakpoints can optionally have conditions attached to them to catch specific
-  situations. The condition takes the form of an binary expression, which can
+  situations. The condition takes the form of a boolean expression, which can
   include variables at the specific breakpoint location.
 
   To set a conditional breakpoint on line 100 that will only stop execution if a

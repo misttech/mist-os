@@ -45,10 +45,6 @@ const char kListHelp[] =
   instruction pointer. This can be overridden by supplying an explicit frame,
   or by specifying a symbol or address to list.
 
-  Files are found by taking each path in the "build-dirs" (see "get build-dirs")
-  setting and appending the string specified in the symbol file. The first file
-  that is found will be used.
-
 Switches
 
   -a

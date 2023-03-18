@@ -60,9 +60,9 @@ Casting
 
   The following casts are supported in a C++-compatible way:
 
-    • (Foo*)0x1234567
+    • (Foo*)0x1234567
     • reinterpret_cast<Foo*>(bar)
-    • static_cast<int>(foo)
+    • static_cast<int>(foo)
 
   Unlike in C++, const has no effect in the debugger so there is no const_cast.
 
@@ -167,16 +167,16 @@ CPU registers
   notation can be used to refer to individual values. Using "double" vector
   format on a 128-bit ARM "v6" register would give:
 
-    [zxdb] print v6
-    {0.0, 3.14}
+    [zxdb] print v6
+    {0.0, 3.14}
 
-    [zxdb] print $reg(v6)
-    {0.0, 3.14}
+    [zxdb] print $reg(v6)
+    {0.0, 3.14}
 
-    [zxdb] print $reg(v6)[1]
-    3.14
+    [zxdb] print $reg(v6)[1]
+    3.14
 
-    [zxdb] print $v6[0] = 2.71    # Assignment to a vector sub-value.
+    [zxdb] print $v6[0] = 2.71    # Assignment to a vector sub-value.
     2.71
 
   Importantly, since they are arrays, vector registers used in expressions print

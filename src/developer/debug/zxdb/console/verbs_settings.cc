@@ -224,7 +224,7 @@ get <setting-name>
     thread, followed by the current process, and then global settings.
 
     Examples:
-      get build-dirs
+      get display
       get show-stdout
 
 <object> get
@@ -390,23 +390,21 @@ Examples
   [zxdb] pr 3 set vector-format double
   Set process 3 vector-format = double
 
-  [zxdb] get build-dirs
-    • /home/me/build
-    • /home/me/other/out
+  [zxdb] get display
+    • var_a
 
-  [zxdb] set build-dirs += /tmp/build
-  Set global build-dirs =
-    • /home/me/build
-    • /home/me/other/out
-    • /tmp/build
+  [zxdb] set display += var_b
+  Set global display =
+    • var_a
+    • var_b
 
-  [zxdb] set build-dirs = /other/build/location /other/build2
-  Set global build-dirs build-dirs =
-    • /other/build/location
-    • /other/build2
+  [zxdb] set display = var_b var_c
+  Set global display =
+    • var_b
+    • var_c
 
-  [zxdb] set build-dirs =
-  Set global build-dirs = <empty>
+  [zxdb] set display =
+  Set global display = <empty>
 )";
 
 Err SetBool(SettingStore* store, const std::string& setting_name, const std::string& value) {
