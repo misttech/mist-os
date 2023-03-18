@@ -117,6 +117,7 @@ class FenceCollection : private FenceCallback {
 
   // fired_cb will be called whenever a fence fires, from dispatcher's threads.
   FenceCollection(async_dispatcher_t* dispatcher, fit::function<void(FenceReference*)>&& fired_cb);
+  virtual ~FenceCollection() = default;
 
   // Explicit destruction step. Use this to control when fences are destroyed.
   void Clear() __TA_EXCLUDES(mtx_);

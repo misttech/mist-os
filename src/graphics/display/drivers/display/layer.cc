@@ -164,31 +164,24 @@ void Layer::DiscardChanges() {
   memcpy(pending_color_bytes_, current_color_bytes_, sizeof(pending_color_bytes_));
 }
 
-bool Layer::CleanUpImage(Image* image) {
-  if (pending_image_ && (image == nullptr || pending_image_.get() == image)) {
-    pending_image_->DiscardAcquire();
-    pending_image_ = nullptr;
-  }
-  if (image == nullptr) {
-    EarlyRetireUpTo(waiting_images_, waiting_images_.end());
-  } else {
-    auto it = waiting_images_.find_if([image](const Image& node) { return &node == image; });
-    if (it != waiting_images_.end()) {
-      fbl::RefPtr<Image> to_retire = waiting_images_.erase(it);
-      ZX_DEBUG_ASSERT(to_retire);
-      to_retire->EarlyRetire();
-    }
-  }
-  if (displayed_image_ && (image == nullptr || displayed_image_.get() == image)) {
-    {
-      fbl::AutoLock lock(displayed_image_->mtx());
-      displayed_image_->StartRetire();
-    }
-    displayed_image_ = nullptr;
+bool Layer::CleanUpAllImages() {
+  RetirePendingImage();
 
-    if (current_node_.InContainer()) {
-      return true;
-    }
+  // Retire all waiting images.
+  EarlyRetireUpTo(waiting_images_, waiting_images_.end());
+
+  return RetireDisplayedImage();
+}
+
+bool Layer::CleanUpImage(const Image& image) {
+  if (pending_image_.get() == &image) {
+    RetirePendingImage();
+  }
+
+  RetireWaitingImage(image);
+
+  if (displayed_image_.get() == &image) {
+    return RetireDisplayedImage();
   }
   return false;
 }
@@ -339,6 +332,36 @@ void Layer::SetImage(fbl::RefPtr<Image> image, uint64_t wait_event_id, uint64_t 
   pending_image_ = image;
   pending_wait_event_id_ = wait_event_id;
   pending_signal_event_id_ = signal_event_id;
+}
+
+void Layer::RetirePendingImage() {
+  if (pending_image_) {
+    pending_image_->DiscardAcquire();
+    pending_image_ = nullptr;
+  }
+}
+
+void Layer::RetireWaitingImage(const Image& image) {
+  auto it = waiting_images_.find_if([&image](const Image& node) { return &node == &image; });
+  if (it != waiting_images_.end()) {
+    fbl::RefPtr<Image> to_retire = waiting_images_.erase(it);
+    ZX_DEBUG_ASSERT(to_retire);
+    to_retire->EarlyRetire();
+  }
+}
+
+bool Layer::RetireDisplayedImage() {
+  if (!displayed_image_) {
+    return false;
+  }
+
+  {
+    fbl::AutoLock lock(displayed_image_->mtx());
+    displayed_image_->StartRetire();
+  }
+  displayed_image_ = nullptr;
+
+  return current_node_.InContainer();
 }
 
 }  // namespace display

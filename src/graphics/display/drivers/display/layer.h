@@ -73,9 +73,13 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   // Discard the pending changes
   void DiscardChanges();
 
-  // Remove references to the provided image or all refs if image is nullptr. Returns true if the
-  // current config was affected.
-  bool CleanUpImage(Image* image);
+  // Removes references to all Images associated with this Layer.
+  // Returns true if the current config has been affected.
+  bool CleanUpAllImages();
+
+  // Removes references to the provided Image. `image` must be valid.
+  // Returns true if the current config has been affected.
+  bool CleanUpImage(const Image& image);
 
   // If a new image is available, retire current_image() and other pending images. Returns false if
   // no images were ready.
@@ -101,6 +105,17 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   void SetImage(fbl::RefPtr<Image> image_id, uint64_t wait_event_id, uint64_t signal_event_id);
 
  private:
+  // Retires the `pending_image_`.
+  void RetirePendingImage();
+
+  // Retires the `image` from the `waiting_images_` list.
+  // Does nothing if `image` is not in the list.
+  void RetireWaitingImage(const Image& image);
+
+  // Retires the image that is being displayed.
+  // Returns true if this affects the current display config.
+  bool RetireDisplayedImage();
+
   layer_t pending_layer_;
   layer_t current_layer_;
   // flag indicating that there are changes in pending_layer that

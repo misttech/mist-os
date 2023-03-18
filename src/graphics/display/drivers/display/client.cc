@@ -134,7 +134,7 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
     return;
   }
 
-  if (CleanUpImage(&(*image))) {
+  if (CleanUpImage(*image)) {
     ApplyConfig();
   }
 }
@@ -1306,7 +1306,7 @@ void Client::TearDown() {
 
   running_ = false;
 
-  CleanUpImage(nullptr);
+  CleanUpAllImages();
   zxlogf(INFO, "Releasing %lu capture images cur=%lu, pending=%lu", capture_images_.size(),
          current_capture_image_, pending_capture_release_image_);
   current_capture_image_ = pending_capture_release_image_ = INVALID_ID;
@@ -1333,35 +1333,39 @@ void Client::TearDown() {
 
 void Client::TearDownTest() { running_ = false; }
 
-bool Client::CleanUpImage(Image* image) {
-  // Clean up any fences associated with the image
+bool Client::CleanUpAllImages() {
+  // Clean up all image fences.
   {
     fbl::AutoLock lock(controller_->mtx());
-    if (image) {
-      controller_->AssertMtxAliasHeld(image->mtx());
-      image->ResetFences();
-    } else {
-      for (auto& image : images_) {
-        controller_->AssertMtxAliasHeld(image.mtx());
-        image.ResetFences();
-      }
+    for (auto& image : images_) {
+      controller_->AssertMtxAliasHeld(image.mtx());
+      image.ResetFences();
     }
   }
 
   // Clean up any layer state associated with the images
-  bool current_config_change = false;
-  for (auto& layer : layers_) {
-    current_config_change |= layer.CleanUpImage(image);
+  bool current_config_changed = std::any_of(layers_.begin(), layers_.end(),
+                                            [](Layer& layer) { return layer.CleanUpAllImages(); });
+
+  images_.clear();
+  return current_config_changed;
+}
+
+bool Client::CleanUpImage(Image& image) {
+  // Clean up any fences associated with the image
+  {
+    fbl::AutoLock lock(controller_->mtx());
+    controller_->AssertMtxAliasHeld(image.mtx());
+    image.ResetFences();
   }
 
-  // Clean up the image id map
-  if (image) {
-    images_.erase(*image);
-  } else {
-    images_.clear();
-  }
+  // Clean up any layer state associated with the images
+  bool current_config_changed = std::any_of(
+      layers_.begin(), layers_.end(),
+      [&image = std::as_const(image)](Layer& layer) { return layer.CleanUpImage(image); });
 
-  return current_config_change;
+  images_.erase(image);
+  return current_config_changed;
 }
 
 void Client::CleanUpCaptureImage(uint64_t id) {

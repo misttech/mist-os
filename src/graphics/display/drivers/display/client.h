@@ -289,9 +289,13 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Controller> {
                        SetDisplayPowerCompleter::Sync& _completer) override;
 
  private:
-  // Cleans up layer state associated with an image. If image == nullptr, then
-  // cleans up all image state. Return true if a current layer was modified.
-  bool CleanUpImage(Image* image);
+  // Cleans up states of all current Images.
+  // Returns true if any current layer has been modified.
+  bool CleanUpAllImages();
+
+  // Cleans up layer state associated with an Image. `image` must be valid.
+  // Returns true if a current layer has been modified.
+  bool CleanUpImage(Image& image);
   void CleanUpCaptureImage(uint64_t id);
 
   Controller* controller_;
