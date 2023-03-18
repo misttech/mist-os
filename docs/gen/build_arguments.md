@@ -1265,9 +1265,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -1604,7 +1604,7 @@ be removed after everyone has had a chance to get hold of their machines.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:31
+From //zircon/kernel/BUILD.gn:32
 
 ### dev_bootfs_labels
 
@@ -2657,7 +2657,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:148
+From //zircon/kernel/params.gni:151
 
 ### enable_mdns_trace
 
@@ -2726,7 +2726,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2761,7 +2761,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -3639,7 +3639,7 @@ Use Fxfs's blob implementation
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:50
+From //src/storage/fshost/generated_fshost_config.gni:45
 
 ### gcc_tool_dir
 
@@ -3712,7 +3712,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -5538,7 +5538,7 @@ in testing but disable for production.
 
 **Current value (from the default):** `true`
 
-From //zircon/kernel/params.gni:140
+From //zircon/kernel/params.gni:143
 
 ### partitions_config_contents
 
@@ -5828,7 +5828,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:312
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:313
 
 ### pw_arduino_build_BOARD
 
@@ -7959,7 +7959,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8212,6 +8212,14 @@ to migrate from minfs to fxfs.
 
 From //src/storage/fshost/generated_fshost_config.gni:42
 
+### use_elf_kernel
+
+Build an ELF kernel rather than a ZBI image kernel.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:133
+
 ### use_flatland_by_default
 
 If true, Flatland is the default graphics protocol in Scenic.
@@ -8284,16 +8292,6 @@ Use link time optimization (LTO).
 
 From //build/config/lto/config.gni:7
 
-### use_native_fxfs_crypto
-
-Enables the use of Fxfs' native encryption scheme, using a hardware key source when
-available.
-If set, devices not already using this scheme will be forcibly migrated, losing data.
-
-**Current value (from the default):** `true`
-
-From //src/storage/fshost/generated_fshost_config.gni:47
-
 ### use_netstack3
 
 DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR NETSTACK DEVELOPER USE ONLY
@@ -8324,7 +8322,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
