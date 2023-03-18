@@ -33,8 +33,6 @@ App::App(bool auto_update_packages, std::shared_ptr<sys::ServiceDirectory> incom
   auto env_request = env_.NewRequest();
   fuchsia::sys::ServiceProviderPtr env_services;
   env_->GetServices(env_services.NewRequest());
-  fidl::InterfaceRequest<fuchsia::io::Directory> directory;
-  env_->GetDirectory(std::move(directory));
 
   // Configure loader.
   if (auto_updates_enabled_) {
