@@ -33,6 +33,7 @@
   rodso_image_section name, NAME##_##CODE_or_DATA##_END; \
   DATA(name##_image) \
   .incbin NAME##_FILENAME, 0, NAME##_##CODE_or_DATA##_END; \
+  .p2align PAGE_SIZE_SHIFT; \
   END_DATA(name##_image)
 
 #endif  // ZIRCON_KERNEL_LIB_USERABI_RODSO_ASM_H_

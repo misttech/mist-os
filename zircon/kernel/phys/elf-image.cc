@@ -233,9 +233,12 @@ void ElfImage::AssertInterpMatchesBuildId(ktl::string_view prefix,
   ZX_ASSERT_MSG(interp_, "%.*s: ELF image has no PT_INTERP (expected %.*s)",
                 static_cast<int>(prefix.size()), prefix.data(),
                 static_cast<int>(build_id_hex.size()), build_id_hex.data());
-  ZX_ASSERT_MSG(*interp_ == build_id_hex, "%.*s: ELF image PT_INTERP %.*s != expected %.*s)",
+  ZX_ASSERT_MSG(*interp_ == build_id_hex,
+                "%.*s: ELF image PT_INTERP (size %zu) %.*s != expected (size %zu) %.*s",
                 static_cast<int>(prefix.size()), prefix.data(),      //
+                interp_->size(),                                     //
                 static_cast<int>(interp_->size()), interp_->data(),  //
+                build_id_hex.size(),                                 //
                 static_cast<int>(build_id_hex.size()), build_id_hex.data());
 }
 

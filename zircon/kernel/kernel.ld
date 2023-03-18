@@ -42,6 +42,15 @@ SECTIONS
     PROVIDE_HIDDEN(__dso_handle = 0);
 
     /*
+     * These are used by elf-kernel.ld and the kernel code ignores them if
+     * they're equal so they're defined away here.  In this layout the RELRO
+     * data is just merged directly into the primary RODATA segment.  The
+     * interim elf-kernel.ld layout has to do it differently.
+     */
+    PROVIDE_HIDDEN(__relro_start = 0);
+    PROVIDE_HIDDEN(__relro_end = 0);
+
+    /*
      * This just leaves space in the memory image for the boot headers.
      * The actual boot header will be constructed in image.S, which see.
      */

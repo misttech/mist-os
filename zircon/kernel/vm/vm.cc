@@ -65,6 +65,12 @@ const ktl::array _kernel_regions = {
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
     },
     kernel_region{
+        .name = "kernel_relro",
+        .base = (vaddr_t)__relro_start,
+        .size = ROUNDUP((uintptr_t)__relro_end - (uintptr_t)__relro_start, PAGE_SIZE),
+        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
+    },
+    kernel_region{
         .name = "kernel_data",
         .base = (vaddr_t)__data_start,
         .size = ROUNDUP((uintptr_t)__data_end - (uintptr_t)__data_start, PAGE_SIZE),

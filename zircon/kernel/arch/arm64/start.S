@@ -68,6 +68,9 @@ handoff_paddr           .req x25
 // ignore it if this code were in .text.boot, so don't put it there).
 .text
 FUNCTION(_start)
+.globl PhysbootHandoff
+PhysbootHandoff = _start
+
     // As early as possible collect the time stamp.
     sample_ticks
 
@@ -100,6 +103,9 @@ FUNCTION(_start)
     /* if we entered at a higher EL than 1, drop to EL1 */
     bl      arm64_elX_to_el1
 
+    // Make sure no old exception handlers are installed.
+    msr     vbar_el1, xzr
+
     /* enable caches so atomics and spinlocks work */
     mrs     tmp, sctlr_el1
     orr     tmp, tmp, #(1<<12) /* Enable icache */
@@ -118,24 +124,18 @@ FUNCTION(_start)
     // Send secondary cpus over to a waiting spot for the primary to finish.
     cbnz    cpuid, .Lmmu_enable_secondary
 
-    // The fixup code appears right after the kernel image (at __data_end in
-    // our view).  Note this code overlaps with the kernel's bss!  It
-    // expects x0 to contain the actual runtime address of __code_start.
+    // When using zbi-start.S, it needs the kernel_vaddr in x0.
+    // Use a direct jump there and back so it doesn't need to spill
+    // x30 someplace to make its call.
     mov     x0, kernel_vaddr
-    bl      __data_end
+    b       ImageFixup
+.globl AfterImageFixup
+AfterImageFixup:
 
-    /* clear out the kernel's bss using current physical location */
-    /* NOTE: Relies on __bss_start and _end being 16 byte aligned */
-.Ldo_bss:
-    adr_global tmp, __bss_start
-    adr_global tmp2, _end
-    sub     tmp2, tmp2, tmp
-    cbz     tmp2, .Lbss_loop_done
-.Lbss_loop:
-    sub     tmp2, tmp2, #16
-    stp     xzr, xzr, [tmp], #16
-    cbnz    tmp2, .Lbss_loop
-.Lbss_loop_done:
+    // When not using zbi-start.S, physboot has taken care of both
+    // relocation and zeroing .bss already.
+.weak ImageFixup
+ImageFixup = AfterImageFixup
 
     /* set up a functional stack pointer */
     adr_global tmp, boot_cpu_kstack_end

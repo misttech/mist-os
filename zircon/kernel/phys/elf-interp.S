@@ -15,6 +15,7 @@
 // its ELF build ID as a text string of lowercase hexadecimal.
 
 .section .interp, "aR", %progbits
+.balign 1
 
 // This is a generated file that does `.incbin "some-file-name"`.
 // The file it includes is expected to contain text with no trailing newline.

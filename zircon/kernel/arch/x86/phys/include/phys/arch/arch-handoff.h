@@ -19,4 +19,7 @@ struct ArchPhysHandoff {
   ktl::optional<zbi_swfb_t> framebuffer;
 };
 
+// This is not actually used for real on x86, but needs to be defined.
+inline constexpr uint64_t kArchHandoffVirtualAddress = 0;
+
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_

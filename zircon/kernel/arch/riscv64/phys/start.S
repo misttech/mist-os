@@ -47,6 +47,9 @@
   // almost certainly will be violating the assumptions of).
   csrw stvec, zero
 
+  // Disable the MMU just in case it was left on (it should not have been).
+  csrw satp, zero
+
   // Clear .bss.  The linker script ensures these are aligned to 16 bytes.
   lla a3, _edata
   lla a4, _end

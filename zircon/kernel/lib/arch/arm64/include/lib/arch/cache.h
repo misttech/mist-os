@@ -75,6 +75,14 @@ extern "C" void CleanAndInvalidateLocalCaches();
 // (along with the TLB).
 extern "C" void DisableLocalCachesAndMmu();
 
+// arch::DisableMmu() is a common name between a few architectures.
+// On ARM, disabling the MMU implies disabling the caches too.
+inline void DisableMmu() {
+  // Note this is an implied compiler barrier (like atomic_signal_fence)
+  // because the call is implemented in assembly.
+  DisableLocalCachesAndMmu();
+}
+
 }  // namespace arch
 
 #else  // __ASSEMBLER__

@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <inttypes.h>
+#include <lib/arch/cache.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/code-patching/code-patches.h>
 #include <lib/fit/function.h>
@@ -47,6 +48,7 @@ fit::result<ElfImage::Error> ApplyKernelPatch(code_patching::Patcher& patcher, C
 }
 
 void PatchElfKernel(ElfImage& elf_kernel) {
+  debugf("%s: Applying %zu patches...\n", gSymbolize->name(), elf_kernel.patch_count());
   // Apply patches to the kernel image.
   auto result = elf_kernel.ForEachPatch<CodePatchId>(ApplyKernelPatch);
   if (result.is_error()) {
@@ -56,6 +58,12 @@ void PatchElfKernel(ElfImage& elf_kernel) {
 
   // There's always the self-test patch, so there should never be none.
   ZX_ASSERT(elf_kernel.has_patches());
+}
+
+void RelocateElfKernel(ElfImage& elf_kernel) {
+  debugf("%s: Relocating ELF kernel to [%#" PRIx64 ", %#" PRIx64 ")...\n", gSymbolize->name(),
+         elf_kernel.load_address(), elf_kernel.load_address() + elf_kernel.vaddr_size());
+  elf_kernel.Relocate();
 }
 
 }  // namespace
@@ -91,26 +99,28 @@ PhysBootTimes gBootTimes;
   elf_kernel.AssertInterpMatchesBuildId(gSymbolize->name(),
                                         *gSymbolize->modules().back()->build_id());
 
+  // Use the putative eventual virtual address to relocate the kernel.
+  const uint64_t kernel_vaddr = kArchHandoffVirtualAddress;
+
   // Though we're loading an ELF kernel now, currently we are still loading an
   // old-style kernel entered in physical memory that may still use the bad old
   // boot_alloc ways, so make sure there's some excess memory free off the end
   // of the proper kernel load image.
   // TODO(mcgrathr): When boot_alloc is gone, just Load() here will do.
   Allocation loaded_elf_kernel =
-      elf_kernel.Load(ktl::nullopt, true, BootZbi::kKernelBootAllocReserve);
+      elf_kernel.Load(kernel_vaddr, true, BootZbi::kKernelBootAllocReserve);
 
   PatchElfKernel(elf_kernel);
 
-  // Use the putative eventual virtual address to relocate the kernel.
-  elf_kernel.set_load_address(KERNEL_ASPACE_BASE);
-  elf_kernel.Relocate();
+  RelocateElfKernel(elf_kernel);
 
-  // Prepare the handoff data structures.
+  // Prepare the handoff data structures.  Repurpose the storage item as a
+  // place to put the handoff payload.  The KERNEL_STORAGE payload was already
+  // decompressed elsewhere, so it's no longer in use.
+  debugf("%s: Preparing handoff data in payload at [%p, %p)\n", gSymbolize->name(),
+         kernel_storage.item()->payload.data(),
+         kernel_storage.item()->payload.data() + kernel_storage.item()->payload.size());
   HandoffPrep prep;
-
-  // Repurpose the storage item as a place to put the handoff payload.  The
-  // KERNEL_STORAGE payload was already decompressed elsewhere, so it's no
-  // longer in use.
   prep.Init(kernel_storage.item()->payload);
 
   // For now we're loading an ELF kernel in physical address mode at an
@@ -123,7 +133,18 @@ PhysBootTimes gBootTimes;
   // address mode handoff, they can either use the phys stack momentarily
   // or have asm entry code that sets up its own stack.
   elf_kernel.set_load_address(elf_kernel.physical_load_address());
+  debugf("%s: Ready to hand off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
+         gSymbolize->name(), elf_kernel.load_address(), elf_kernel.entry());
+  if (gBootOptions->phys_verbose) {
+    Allocation::GetPool().PrintMemoryRanges(gSymbolize->name());
+  }
+
   auto start_elf_kernel = [&elf_kernel](PhysHandoff* handoff) {
+#ifndef __x86_64__
+    // This runs in an identity-mapped environment, so the MMU can be safely
+    // turned off.  The physzircon kernel entry code expects the MMU to be off.
+    arch::DisableMmu();
+#endif
     elf_kernel.Handoff<void(PhysHandoff*)>(handoff);
   };
   prep.DoHandoff(uart, kernel_storage.zbi().storage(), start_elf_kernel);

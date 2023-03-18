@@ -85,3 +85,7 @@ template("kernel_elf_binary") {
     output_extension = ""
   }
 }
+
+set_defaults("kernel_elf_binary") {
+  configs = default_executable_configs
+}

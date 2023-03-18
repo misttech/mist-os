@@ -78,6 +78,8 @@ class ElfImage {
 
   bool has_patches() const { return !patches().empty(); }
 
+  size_t patch_count() const { return patches().size(); }
+
   // The template parameter must be an `enum class Id : uint32_t` type.  Calls
   // the callback as fit::result<Error>(code_patching::Patcher&, Id,
   // ktl::span<ktl::byte>, PrintPatchFunction) for each patch in the file
@@ -125,6 +127,8 @@ class ElfImage {
                   // in use no longer use the old boot_alloc code that blindly
                   // uses memory off the end of the kernel image.
                   size_t extra_vaddr_size = 0);
+
+  size_t vaddr_size() const { return load_info_.vaddr_size(); }
 
   // Returns the virtual address where the image will be loaded. Must be called
   // after Load().

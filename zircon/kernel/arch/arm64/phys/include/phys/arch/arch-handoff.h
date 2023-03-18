@@ -52,4 +52,14 @@ struct ArchPhysHandoff {
   bool motmot_power_driver = false;
 };
 
+// This must match what the kernel's page-table bootstrapping actually uses as
+// the virtual address of the kernel load image.
+// TODO(fxbug.dev/84107): Matches //zircon/kernel/arch/arm64/mmu.cc, which
+// will no longer need to define it when the ELF kernel is the only kernel.
+#if DISABLE_KASLR
+inline constexpr uint64_t kArchHandoffVirtualAddress = KERNEL_BASE;
+#else
+inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff10000000;
+#endif
+
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_

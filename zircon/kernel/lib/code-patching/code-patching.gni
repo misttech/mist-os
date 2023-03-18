@@ -52,6 +52,14 @@ import("//build/zircon/zircon_cpu.gni")
 #       extract.
 #     - Type: list(label)
 #
+#   * data_deps
+#     - Optional: This can be used to reach other targets whose metadata
+#       should travel along with the output of this code_patches() target,
+#       such as code_patching_hermetic_alternative() targets.  Any
+#       `distribution_entries` metadata (from resource() et al) in $deps
+#       is blocked from being reached via this target, but $data_deps is not.
+#     - Type: list(label)
+#
 #   * metadata, testonly, visibility
 #     - See action().
 #
@@ -76,6 +84,7 @@ template("code_patches") {
   toolchain_utils_action(main_target) {
     forward_variables_from(invoker,
                            [
+                             "data_deps",
                              "visibility",
                              "testonly",
                            ])
@@ -105,6 +114,10 @@ template("code_patches") {
 
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")
+      }
+
+      if (defined(invoker.data_deps)) {
+        distribution_entries_barrier += invoker.data_deps
       }
 
       distribution_entries += [

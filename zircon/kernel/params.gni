@@ -128,6 +128,9 @@ declare_args() {
 
   # Build a kernel with no user-space support, for development only.
   kernel_no_userabi = current_cpu == "riscv64"
+
+  # Build an ELF kernel rather than a ZBI image kernel.
+  use_elf_kernel = current_cpu == "riscv64"
 }
 
 declare_args() {

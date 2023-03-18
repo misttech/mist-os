@@ -27,6 +27,9 @@ class GlobalCacheConsistencyContext {
   void SyncRange(uintptr_t vaddr, size_t size) {}
 };
 
+// arch::DisableMmu() is a common name between a few architectures.
+inline void DisableMmu() { __asm__ volatile("csrw satp, zero" : : : "memory"); }
+
 }  // namespace arch
 
 #endif  // __ASSEMBLER__

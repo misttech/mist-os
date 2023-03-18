@@ -63,6 +63,8 @@ extern const char __code_start[];
 extern const char __code_end[];
 extern const char __rodata_start[];
 extern const char __rodata_end[];
+extern const char __relro_start[];
+extern const char __relro_end[];
 extern char __data_start[];
 extern char __data_end[];
 extern char __bss_start[];

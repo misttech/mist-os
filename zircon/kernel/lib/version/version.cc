@@ -79,7 +79,9 @@ void print_module(FILE* f, const char* build_id) {
 void print_mmap(FILE* f, uintptr_t bias, const void* begin, const void* end, const char* perm) {
   const uintptr_t start = reinterpret_cast<uintptr_t>(begin);
   const size_t size = reinterpret_cast<uintptr_t>(end) - start;
-  fprintf(f, "{{{mmap:%#lx:%#lx:load:0:%s:%#lx}}}\n", start, size, perm, start + bias);
+  if (size != 0) {
+    fprintf(f, "{{{mmap:%#lx:%#lx:load:0:%s:%#lx}}}\n", start, size, perm, start + bias);
+  }
 }
 
 }  // namespace
@@ -108,6 +110,7 @@ void PrintSymbolizerContext(FILE* f) {
   // These four mappings match the mappings printed by vm_init().
   print_mmap(f, bias, __code_start, __code_end, "rx");
   print_mmap(f, bias, __rodata_start, __rodata_end, "r");
+  print_mmap(f, bias, __relro_start, __relro_end, "r");
   print_mmap(f, bias, __data_start, __data_end, "rw");
   print_mmap(f, bias, __bss_start, _end, "rw");
 }
