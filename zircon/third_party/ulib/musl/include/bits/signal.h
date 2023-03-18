@@ -93,7 +93,8 @@ typedef struct __ucontext {
 
 #else
 
-typedef struct sigcontext {};
+typedef struct sigcontext {} mcontext_t;
+
 typedef struct __ucontext {
   unsigned long uc_flags;
   struct ucontext* uc_link;
