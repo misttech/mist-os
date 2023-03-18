@@ -42,7 +42,6 @@ arch/arm64/sysroot/include/bits/aarch64/io.h
 arch/arm64/sysroot/include/bits/aarch64/ipc.h
 arch/arm64/sysroot/include/bits/aarch64/reg.h
 arch/arm64/sysroot/include/bits/aarch64/setjmp.h
-arch/arm64/sysroot/include/bits/aarch64/signal.h
 arch/arm64/sysroot/include/bits/aarch64/stat.h
 arch/arm64/sysroot/include/bits/alltypes.h
 arch/arm64/sysroot/include/bits/endian.h
@@ -72,7 +71,6 @@ arch/arm64/sysroot/include/bits/x86_64/io.h
 arch/arm64/sysroot/include/bits/x86_64/ipc.h
 arch/arm64/sysroot/include/bits/x86_64/reg.h
 arch/arm64/sysroot/include/bits/x86_64/setjmp.h
-arch/arm64/sysroot/include/bits/x86_64/signal.h
 arch/arm64/sysroot/include/bits/x86_64/stat.h
 arch/arm64/sysroot/include/byteswap.h
 arch/arm64/sysroot/include/complex.h
