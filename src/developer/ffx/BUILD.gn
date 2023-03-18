@@ -115,6 +115,10 @@ if (is_host) {
     ]
 
     deps = [ ":ffx_bin" ]
+
+    # ffx self-test seems to be buggy, so let's at least prevent it
+    # from affecting other tests by isolating it to its own shard.
+    isolated = true
   }
 
   host_test("ffx-e2e-with-target") {
@@ -142,6 +146,10 @@ if (is_host) {
       # emu_env,
       nuc_env,
     ]
+
+    # ffx self-test seems to be buggy, so let's at least prevent it
+    # from affecting other tests by isolating it to its own shard.
+    isolated = true
   }
 
   host_test_data("test_data") {

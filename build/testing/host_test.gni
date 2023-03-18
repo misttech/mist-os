@@ -88,6 +88,7 @@ template("host_test") {
                              "environments",
                              "metadata",
                              "visibility",
+                             "isolated",
                            ])
 
     # If we have args, we put most deps on the script target,
