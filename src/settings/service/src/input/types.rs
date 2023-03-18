@@ -294,15 +294,15 @@ impl From<InputDevice> for FidlInputDevice {
         let mut result = FidlInputDevice::EMPTY;
 
         // Convert source states.
-        let source_state_map = device.source_states.clone();
         let source_states = Some(
-            source_state_map
+            device
+                .source_states
                 .keys()
                 .map(|source| {
                     let mut source_state = FidlSourceState::EMPTY;
                     source_state.source = Some((*source).into());
                     source_state.state = Some(
-                        (*source_state_map.get(source).expect("Source state map key missing"))
+                        (*device.source_states.get(source).expect("Source state map key missing"))
                             .into(),
                     );
                     source_state

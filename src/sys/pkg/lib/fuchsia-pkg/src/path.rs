@@ -111,8 +111,8 @@ mod test {
         #[test]
         fn display_from_str_round_trip(path in random_package_path()) {
             prop_assert_eq!(
-                path.clone(),
-                path.to_string().parse().unwrap()
+                &path,
+                &path.to_string().parse().unwrap()
             );
         }
     }
