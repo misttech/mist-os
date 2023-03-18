@@ -1264,8 +1264,8 @@ void Client::OnDisplaysChanged(const uint64_t* displays_added, size_t added_coun
 void Client::OnFenceFired(FenceReference* fence) {
   bool new_image_ready = false;
   for (auto& layer : layers_) {
-    for (Image::DoublyLinkedListNode& waiting_image : layer.waiting_images_) {
-      new_image_ready |= waiting_image.self->OnFenceReady(fence);
+    for (Image& waiting_image : layer.waiting_images_) {
+      new_image_ready |= waiting_image.OnFenceReady(fence);
     }
   }
   if (new_image_ready) {

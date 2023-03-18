@@ -79,7 +79,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>>,
   bool init_done = false;
 
   // A list of all images which have been sent to display driver.
-  fbl::DoublyLinkedList<Image::DoublyLinkedListNode*> images;
+  Image::DoublyLinkedList images;
 
   // The number of layers in the applied configuration which are important for vsync (i.e.
   // that have images).

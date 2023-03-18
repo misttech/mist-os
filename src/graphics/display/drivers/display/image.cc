@@ -11,6 +11,7 @@
 #include <atomic>
 #include <utility>
 
+#include <fbl/intrusive_container_utils.h>
 #include <fbl/string_printf.h>
 
 #include "src/graphics/display/drivers/display/controller.h"
@@ -36,7 +37,7 @@ Image::Image(Controller* controller, const image_t& info, inspect::Node* parent_
 Image::~Image() {
   if (!capture_image_) {
     ZX_ASSERT(!std::atomic_load(&in_use_));
-    ZX_ASSERT(!doubly_linked_list_node.InContainer());
+    ZX_ASSERT(!InDoublyLinkedList());
     controller_->ReleaseImage(this);
   } else {
     controller_->ReleaseCaptureImage(info_.handle);
@@ -56,7 +57,13 @@ void Image::InitializeInspect(inspect::Node* parent_node) {
   retiring_property_ = node_.CreateBool("retiring", false);
 }
 
-mtx_t* Image::mtx() { return controller_->mtx(); }
+mtx_t* Image::mtx() const { return controller_->mtx(); }
+
+bool Image::InDoublyLinkedList() const { return doubly_linked_list_node_state_.InContainer(); }
+
+fbl::RefPtr<Image> Image::RemoveFromDoublyLinkedList() {
+  return doubly_linked_list_node_state_.RemoveFromContainer<DefaultDoublyLinkedListTraits>();
+}
 
 void Image::PrepareFences(fbl::RefPtr<FenceReference>&& wait,
                           fbl::RefPtr<FenceReference>&& retire) {

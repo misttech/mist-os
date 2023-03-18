@@ -169,11 +169,10 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
   for (unsigned i = 0; i < removed_count; i++) {
     auto target = displays_.erase(displays_removed[i]);
     if (target) {
-      while (auto node = target->images.pop_front()) {
-        AssertMtxAliasHeld(node->self->mtx());
-        node->self->StartRetire();
-        node->self->OnRetire();
-        node->self.reset();
+      while (fbl::RefPtr<Image> image = target->images.pop_front()) {
+        AssertMtxAliasHeld(image->mtx());
+        image->StartRetire();
+        image->OnRetire();
       }
     } else {
       zxlogf(DEBUG, "Unknown display %ld removed", displays_removed[i]);
@@ -386,16 +385,12 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t display_id, z
     //   `latest_controller_config_stamp` is greater than the incoming
     //   `controller_config_stamp`) and yet to be presented.
     for (auto it = info->images.begin(); it != info->images.end();) {
-      bool should_retire = it->self->latest_controller_config_stamp() < controller_config_stamp;
+      bool should_retire = it->latest_controller_config_stamp() < controller_config_stamp;
 
       // Retire any images which are older than whatever is currently in their
       // layer.
       if (should_retire) {
-        // Image must be removed from containers before being destroyed. So we
-        // create a copy of the RefPtr to keep its lifetime.
-        fbl::RefPtr<Image> image_to_retire = it->self;
-        it->self.reset();
-        info->images.erase(it++);
+        fbl::RefPtr<Image> image_to_retire = info->images.erase(it++);
 
         AssertMtxAliasHeld(image_to_retire->mtx());
         image_to_retire->OnRetire();
@@ -589,12 +584,10 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, bool is_vc
         // Even if we're on the same display, the entry needs to be moved to the end of the
         // list to ensure that the last config->current.layer_count elements in the queue
         // are the current images.
-        if (image->doubly_linked_list_node.InContainer()) {
-          image->doubly_linked_list_node.RemoveFromContainer();
-        } else {
-          image->doubly_linked_list_node.self = image;
+        if (image->InDoublyLinkedList()) {
+          image->RemoveFromDoublyLinkedList();
         }
-        display->images.push_back(&image->doubly_linked_list_node);
+        display->images.push_back(image);
 
         config_image_queue.back().images.push_back({image->id, image->client_id()});
       }
