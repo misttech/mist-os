@@ -41,11 +41,6 @@ declare_args() {
   # to migrate from minfs to fxfs.
   use_disk_based_minfs_migration = false
 
-  # Enables the use of Fxfs' native encryption scheme, using a hardware key source when
-  # available.
-  # If set, devices not already using this scheme will be forcibly migrated, losing data.
-  use_native_fxfs_crypto = true
-
   # Use Fxfs's blob implementation
   fxfs_blob = false
 }
@@ -132,7 +127,6 @@ template("generated_fshost_config") {
       format_data_on_corruption = format_minfs_on_corruption
       nand = fshost_watch_for_nand
       use_disk_based_minfs_migration = use_disk_based_minfs_migration
-      use_native_fxfs_crypto = use_native_fxfs_crypto
 
       if (minfs_maximum_runtime_bytes != "") {
         data_max_bytes = minfs_maximum_runtime_bytes

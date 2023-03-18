@@ -176,15 +176,6 @@ fshost_integration_test("fshost_integration_tests_minfs") {
   options.data_filesystem_format = "minfs"
 }
 
-# In addition to the basic filesystem formats, there are some modifying options we want to test.
-fshost_integration_test("fshost_integration_tests_fxfs_legacy_crypto") {
-  data_filesystem_format = "fxfs"
-  data_filesystem_variant = "fxfs-legacy-crypto"
-  options = default_integration_test_options
-  options.use_native_fxfs_crypto = false
-  options.data_filesystem_format = "fxfs"
-}
-
 fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {
   data_filesystem_format = "f2fs"
   data_filesystem_variant = "f2fs-no-zxcrypt"
@@ -213,7 +204,6 @@ fuchsia_test_package("fshost_integration_tests") {
     ":fshost_integration_tests_fxfs",
     ":fshost_integration_tests_f2fs",
     ":fshost_integration_tests_minfs",
-    ":fshost_integration_tests_fxfs_legacy_crypto",
     ":fshost_integration_tests_f2fs_no_zxcrypt",
     ":fshost_integration_tests_minfs_no_zxcrypt",
   ]

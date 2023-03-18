@@ -76,18 +76,6 @@ const METADATA_KEY: Aes256Key = Aes256Key::create([
     0x8e, 0xea, 0xd8, 0x05, 0xc4, 0xc9, 0x0b, 0xa8, 0xd8, 0x85, 0x87, 0x50, 0x75, 0x40, 0x1c, 0x4c,
 ]);
 
-// Matches the hard-coded value used by fshost when use_native_fxfs_crypto is false.
-const LEGACY_DATA_KEY: Aes256Key = Aes256Key::create([
-    0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11,
-    0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-]);
-
-// Matches the hard-coded value used by fshost when use_native_fxfs_crypto is false.
-const LEGACY_METADATA_KEY: Aes256Key = Aes256Key::create([
-    0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8, 0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
-    0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8, 0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-]);
-
 fn initialize_gpt(vmo: &zx::Vmo, block_size: u64) {
     // The GPT library requires a File-like object or a slice of memory to write into. To avoid
     // unnecessary copies, we temporarily map `vmo` into the test's address space, and pass a
@@ -219,7 +207,6 @@ impl Disk {
 pub struct DataSpec {
     pub format: Option<&'static str>,
     pub zxcrypt: bool,
-    pub legacy_crypto_format: bool,
 }
 
 pub struct DiskBuilder {
@@ -239,7 +226,7 @@ impl DiskBuilder {
         DiskBuilder {
             size: DEFAULT_DISK_SIZE,
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
-            data_spec: DataSpec { format: None, zxcrypt: false, legacy_crypto_format: false },
+            data_spec: DataSpec { format: None, zxcrypt: false },
             corrupt_contents: false,
             gpt: false,
             with_account_and_virtualization: false,
@@ -472,28 +459,11 @@ impl DiskBuilder {
             return self.write_magic(block, FXFS_MAGIC, 0).await;
         }
 
-        let (data_key, metadata_key) = if self.data_spec.legacy_crypto_format {
-            (LEGACY_DATA_KEY, LEGACY_METADATA_KEY)
-        } else {
-            (DATA_KEY, METADATA_KEY)
-        };
-        let crypt_realm = create_hermetic_crypt_service(data_key, metadata_key).await;
+        let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
         let mut fxfs = Fxfs::new(data_device);
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
-        let vol = if self.data_spec.legacy_crypto_format {
-            let crypt_service = Some(
-                crypt_realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<CryptMarker>()
-                    .expect("Unable to connect to Crypt service")
-                    .into_channel()
-                    .unwrap()
-                    .into_zx_channel()
-                    .into(),
-            );
-            fs.create_volume("default", crypt_service).await.expect("create_volume failed")
-        } else {
+        let vol = {
             let vol = fs.create_volume("unencrypted", None).await.expect("create_volume failed");
             vol.bind_to_path("/unencrypted_volume").unwrap();
             // Initialize the key-bag with the static keys.
