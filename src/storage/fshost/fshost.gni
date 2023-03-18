@@ -151,7 +151,7 @@ template("fshost_component_and_config") {
   # The component
   fuchsia_component(_component_target) {
     forward_variables_from(invoker, [ "testonly" ])
-    deps = [ "//src/storage/fshost-rust" ]
+    deps = [ "//src/storage/fshost" ]
     cm_label = ":$_manifest_target"
   }
 
