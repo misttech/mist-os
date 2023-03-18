@@ -133,7 +133,7 @@ source_set("minimal_str") {
   }
 }
 
-source_set("stdstr_musl") {
+source_set("stdstr.musl") {
   deps = [
     ":minimal_str",
     "//zircon/third_party/ulib/musl:musl_internal",
@@ -142,7 +142,6 @@ source_set("stdstr_musl") {
     "strcat.c",
     "strcspn.c",
     "strdup.c",
-    "strerror_r.c",
     "strncat.c",
     "strncpy.c",
     "strpbrk.c",
@@ -178,12 +177,20 @@ source_set("stdstr_musl") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-source_set("stdstr") {
+source_set("strerror_r") {
   visibility = [ ":*" ]
-  if (use_llvm_libc_string_functions) {
-    sources = [ "strerror_r.c" ]
-  } else {
-    deps = [ ":stdstr_musl" ]
+  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+  sources = [ "strerror_r.c" ]
+  if (zircon_toolchain != false) {
+    configs -= [ "//build/config:symbol_visibility_hidden" ]
+  }
+}
+
+group("stdstr") {
+  visibility = [ ":*" ]
+  deps = [ ":strerror_r" ]
+  if (!use_llvm_libc_string_functions) {
+    deps += [ ":stdstr.musl" ]
   }
 }
 
