@@ -36,7 +36,7 @@ pub mod fuchsia_handles {
     pub use fuchsia_async::invoke_for_handle_types;
 
     macro_rules! fuchsia_handle {
-        ($x:tt, $docname:expr, $name:ident, $value:expr, Stub) => {
+        ($x:tt, $docname:expr, $name:ident, $zx_name:ident, Stub) => {
             /// Stub implementation of Zircon handle type $x.
             #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
             #[repr(transparent)]
@@ -113,10 +113,10 @@ pub mod non_fuchsia_handles {
     }
 
     macro_rules! host_handle {
-        ($x:tt, $docname:expr, $name:ident, $value:expr, Everywhere) => {
+        ($x:tt, $docname:expr, $name:ident, $zx_name:ident, Everywhere) => {
             declare_fidl_handle! {$x}
         };
-        ($x:tt, $docname:expr, $name:ident, $value:expr, $availability:ident) => {
+        ($x:tt, $docname:expr, $name:ident, $zx_name:ident, $availability:ident) => {
             declare_unsupported_fidl_handle! {$x}
         };
     }

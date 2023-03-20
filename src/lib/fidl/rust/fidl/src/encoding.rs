@@ -2312,7 +2312,7 @@ impl Decodable for EpitaphBody {
 }
 
 macro_rules! handle_encoding {
-    ($x:tt, $docname:expr, $name:ident, $value:expr, $availability:ident) => {
+    ($x:tt, $docname:expr, $name:ident, $zx_name:ident, $availability:ident) => {
         type $x = crate::handle::$x;
         handle_based_codable![$x,];
     };

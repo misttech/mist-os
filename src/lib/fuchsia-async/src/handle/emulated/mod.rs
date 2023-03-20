@@ -32,12 +32,12 @@ const INVALID_HANDLE: u32 = 0;
 
 /// The type of an object.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone)]
-pub struct ObjectType(u32);
+pub struct ObjectType(zx_types::zx_obj_type_t);
 
 macro_rules! define_object_type_constant {
-    ($x:tt, $docname:expr, $name:ident, $value:expr, $availability:ident) => {
+    ($x:tt, $docname:expr, $name:ident, $zx_name:ident, $availability:ident) => {
         #[doc = $docname]
-        pub const $name: ObjectType = ObjectType($value);
+        pub const $name: ObjectType = ObjectType(zx_types::$zx_name);
     };
 }
 
