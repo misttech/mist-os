@@ -507,7 +507,7 @@ async fn block_watcher_second_pause_fails() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(not(all(feature = "fxfs", feature = "fshost_rust")), ignore)]
+#[cfg_attr(not(feature = "fxfs"), ignore)]
 async fn shred_data_volume_when_mounted() {
     let mut builder = new_builder();
     builder.with_disk();
@@ -550,7 +550,7 @@ async fn shred_data_volume_when_mounted() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(not(all(feature = "fxfs", feature = "fshost_rust")), ignore)]
+#[cfg_attr(not(feature = "fxfs"), ignore)]
 async fn shred_data_volume_from_recovery() {
     let mut builder = new_builder();
     builder.with_disk();
