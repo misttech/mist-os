@@ -39,6 +39,7 @@ fuchsia_driver("fusb302-driver") {
   output_name = "fusb302"
   sources = [
     "fusb302-identity.cc",
+    "fusb302-sensors.cc",
     "fusb302.cc",
     "registers.cc",
     "state-machine.cc",
@@ -69,6 +70,8 @@ test("fusb302-test-bin") {
   sources = [
     "fusb302-identity-test.cc",
     "fusb302-identity.cc",
+    "fusb302-sensors-test.cc",
+    "fusb302-sensors.cc",
     "fusb302-test.cc",
     "fusb302.cc",
     "registers-test.cc",
