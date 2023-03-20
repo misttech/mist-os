@@ -49,8 +49,8 @@
 
 static const char16_t kDfv2VariableName[] = L"use_dfv2";
 
-static nbfile nbzbi;
-static nbfile nbcmdline;
+static nbfile_t nbzbi;
+static nbfile_t nbcmdline;
 
 static char cmdbuf[CMDLINE_MAX];
 void print_cmdline(void) {
@@ -58,7 +58,7 @@ void print_cmdline(void) {
   LOG("cmdline: %s", cmdbuf);
 }
 
-nbfile* netboot_get_buffer(const char* name, size_t size) {
+nbfile_t* netboot_get_buffer(const char* name, size_t size) {
   if (!strcmp(name, NB_KERNEL_FILENAME)) {
     return &nbzbi;
   }

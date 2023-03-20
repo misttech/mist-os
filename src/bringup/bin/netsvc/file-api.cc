@@ -140,7 +140,7 @@ tftp_status FileApi::Write(const void* data, size_t* length, off_t offset) {
   }
   switch (type_) {
     case NetfileType::kNetboot: {
-      nbfile* nb_file = netboot_file_;
+      nbfile_t* nb_file = netboot_file_;
       if ((static_cast<size_t>(offset) > nb_file->size) || (offset + *length) > nb_file->size) {
         return TFTP_ERR_INVALID_ARGS;
       }

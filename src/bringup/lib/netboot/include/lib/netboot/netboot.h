@@ -130,12 +130,6 @@ typedef struct nbmsg_t {
     uint8_t  data[0];
 } nbmsg;
 
-typedef struct nbfile_t {
-    uint8_t* data;
-    size_t size; // max size of buffer
-    size_t offset; // write pointer
-} nbfile;
-
 #define DEBUGLOG_PORT         33337
 #define DEBUGLOG_ACK_PORT     33338
 

@@ -19,11 +19,11 @@ char tftp_session_scratch[TFTP_BUF_SZ];
 char tftp_out_scratch[TFTP_BUF_SZ];
 
 // item being downloaded
-static nbfile* item;
+static nbfile_t* item;
 
 // TFTP file state
 typedef struct {
-  nbfile* netboot_file_data;
+  nbfile_t* netboot_file_data;
   size_t file_size;
   unsigned int progress_reported;
 } file_info_t;
@@ -204,7 +204,7 @@ static tftp_status buffer_open(const char* filename, size_t size, uint8_t sessio
 
 static tftp_status buffer_write(const void* data, size_t* len, off_t offset, void* cookie) {
   file_info_t* file_info = cookie;
-  nbfile* nb_buf_info = file_info->netboot_file_data;
+  nbfile_t* nb_buf_info = file_info->netboot_file_data;
   if (offset > nb_buf_info->size || (offset + *len) > nb_buf_info->size) {
     printf("netboot: attempt to write past end of buffer\n");
     return TFTP_ERR_INVALID_ARGS;

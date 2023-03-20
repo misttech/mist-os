@@ -10,6 +10,7 @@
 
 #include <tftp/tftp.h>
 
+#include "src/bringup/bin/netsvc/netboot.h"
 #include "src/bringup/bin/netsvc/netcp.h"
 #include "src/bringup/bin/netsvc/paver.h"
 
@@ -86,7 +87,7 @@ class FileApi : public FileApiInterface {
   std::unique_ptr<NetCopyInterface> netcp_;
 
   // Only valid when type_ == NetfileType::kNetboot.
-  nbfile* netboot_file_ = nullptr;
+  nbfile_t* netboot_file_ = nullptr;
 
   // Used when type_ == NetfileType::kPaver.
   PaverInterface& paver_;

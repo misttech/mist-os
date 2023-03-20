@@ -37,7 +37,7 @@ uint32_t last_ack_arg = 0;
 #define MAX_ADVERTISE_DATA_LEN 256
 
 struct nbfilecontainer_t {
-  nbfile file;
+  nbfile_t file;
   zx_handle_t data;  // handle to vmo that backs netbootfile.
 };
 
@@ -45,7 +45,7 @@ nbfilecontainer_t nbzbi;
 nbfilecontainer_t nbcmdline;
 
 // Pointer to the currently active transfer.
-nbfile* active;
+nbfile_t* active;
 
 namespace statecontrol = fuchsia_hardware_power_statecontrol;
 
@@ -105,7 +105,7 @@ zx_status_t nbfilecontainer_init(size_t size, nbfilecontainer_t* target) {
 
 }  // namespace
 
-nbfile* netboot_get_buffer(const char* name, size_t size) {
+nbfile_t* netboot_get_buffer(const char* name, size_t size) {
   zx_status_t st = ZX_OK;
   nbfilecontainer_t* result;
 

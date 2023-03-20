@@ -5,9 +5,13 @@
 #ifndef SRC_BRINGUP_BIN_NETSVC_NETBOOT_H_
 #define SRC_BRINGUP_BIN_NETSVC_NETBOOT_H_
 
-#include <lib/netboot/netboot.h>
-
 #include "src/bringup/bin/netsvc/inet6.h"
+
+struct nbfile_t {
+  uint8_t* data;
+  size_t size;    // max size of buffer
+  size_t offset;  // write pointer
+};
 
 void netboot_advertise(const char* nodename);
 
@@ -18,6 +22,6 @@ extern "C" void netboot_run_cmd(const char* cmd);
 
 // Ask for a buffer suitable to put the file `name` in
 // Return NULL to indicate `name` is not wanted.
-nbfile* netboot_get_buffer(const char* name, size_t size);
+nbfile_t* netboot_get_buffer(const char* name, size_t size);
 
 #endif  // SRC_BRINGUP_BIN_NETSVC_NETBOOT_H_

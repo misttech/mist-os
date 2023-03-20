@@ -5,11 +5,16 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_SRC_NETBOOT_H_
 #define SRC_FIRMWARE_GIGABOOT_SRC_NETBOOT_H_
 
-#include <lib/netboot/netboot.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS
+
+typedef struct {
+  uint8_t* data;
+  size_t size;    // max size of buffer
+  size_t offset;  // write pointer
+} nbfile_t;
 
 int netboot_init(const char* nodename, uint32_t namegen);
 
@@ -21,7 +26,7 @@ void netboot_close(void);
 
 // Ask for a buffer suitable to put the file `name` in
 // Return NULL to indicate `name` is not wanted.
-nbfile* netboot_get_buffer(const char* name, size_t size);
+nbfile_t* netboot_get_buffer(const char* name, size_t size);
 
 __END_CDECLS
 

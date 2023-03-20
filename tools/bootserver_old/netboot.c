@@ -220,7 +220,6 @@ static int xseek(xferdata* xd, size_t off) {
 
 // UDP6_MAX_PAYLOAD (ETH_MTU - ETH_HDR_LEN - IP6_HDR_LEN - UDP_HDR_LEN)
 //      1452           1514   -     14      -     40      -    8
-// nbfile is PAYLOAD_SIZE + 2 * sizeof(size_t)
 
 // Some EFI network stacks have problems with larger packets
 // 1280 is friendlier
