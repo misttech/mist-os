@@ -94,7 +94,7 @@ impl EstablishingRsna {
         sent_keys: Vec<u16>,
     ) -> Self {
         sent_keys.into_iter().for_each(|key| {
-            self.pending_key_ids.insert(key);
+            let _ = self.pending_key_ids.insert(key);
         });
         self.handshake_complete |= handshake_complete;
 
@@ -102,14 +102,10 @@ impl EstablishingRsna {
         // once transmitting frames, all meaningful progression implies the last
         // tranmsmitted frame resulted in progress.
         cancel(&mut self.rsna_retransmission_timeout);
-        if let Some(retransmission_timeout_id) = rsna_retransmission_timeout {
-            self.rsna_retransmission_timeout.replace(retransmission_timeout_id);
-        }
-
+        self.rsna_retransmission_timeout =
+            rsna_retransmission_timeout.or(self.rsna_retransmission_timeout);
         // If the AP is responsive, then reset the response timeout.
-        if let Some(response_timeout_id) = ap_responsive {
-            self.rsna_response_timeout.replace(response_timeout_id);
-        }
+        self.rsna_response_timeout = ap_responsive.or(self.rsna_response_timeout);
         self
     }
 
@@ -321,7 +317,7 @@ impl LinkState {
             Self::EstablishingRsna(state) => {
                 let (transition, mut state) = state.release_data();
                 for key_result in set_keys_conf.results {
-                    state.pending_key_ids.remove(&key_result.key_id);
+                    let _ = state.pending_key_ids.remove(&key_result.key_id);
                 }
                 match state.try_establish(bss, context) {
                     RsnaProgressed::Complete(link_up) => {

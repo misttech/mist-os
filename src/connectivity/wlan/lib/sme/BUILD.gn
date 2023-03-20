@@ -71,6 +71,8 @@ rustc_library("wlan-sme") {
     "src/serve/mod.rs",
     "src/test_utils.rs",
   ]
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 fuchsia_unittest_package("wlan-sme-tests") {

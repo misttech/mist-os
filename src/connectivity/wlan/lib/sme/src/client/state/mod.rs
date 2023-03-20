@@ -160,7 +160,7 @@ impl StateChangeContextExt for Option<StateChangeContext> {
                 StateChangeContext::Msg(inner) => *inner = msg,
             },
             None => {
-                self.replace(StateChangeContext::Msg(msg));
+                *self = Some(StateChangeContext::Msg(msg));
             }
         }
     }
@@ -218,7 +218,7 @@ impl Idle {
         context.att_id += 1;
 
         let msg = connect_cmd_inspect_summary(&cmd);
-        state_change_ctx.replace(StateChangeContext::Connect {
+        let _ = state_change_ctx.replace(StateChangeContext::Connect {
             msg,
             bssid: cmd.bss.bssid.clone(),
             ssid: cmd.bss.ssid.clone(),
@@ -483,7 +483,7 @@ impl Associated {
                 .send(ConnectTransactionEvent::OnDisconnect { info: fidl_disconnect_info });
         }
         let msg = format!("received DisassociateInd msg; reason code {:?}", ind.reason_code);
-        state_change_ctx.replace(match connected_duration {
+        let _ = state_change_ctx.replace(match connected_duration {
             Some(_) => StateChangeContext::Disconnect { msg, disconnect_source },
             None => StateChangeContext::Msg(msg),
         });
@@ -541,7 +541,7 @@ impl Associated {
             }
         }
 
-        state_change_ctx.replace(StateChangeContext::Disconnect {
+        let _ = state_change_ctx.replace(StateChangeContext::Disconnect {
             msg: format!("received DeauthenticateInd msg; reason code {:?}", ind.reason_code),
             disconnect_source,
         });
@@ -651,7 +651,7 @@ impl Associated {
     fn on_channel_switched(&mut self, info: fidl_internal::ChannelSwitchInfo) {
         self.connect_txn_sink.send(ConnectTransactionEvent::OnChannelSwitched { info });
         self.latest_ap_state.channel.primary = info.new_channel;
-        self.last_channel_switch_time.replace(now());
+        self.last_channel_switch_time = Some(now());
     }
 
     fn on_wmm_status_resp(
@@ -1118,8 +1118,9 @@ fn process_sae_updates(updates: UpdateSink, peer_sta_address: MacAddr, context: 
                     },
                 }),
             ),
+
             SecAssocUpdate::ScheduleSaeTimeout(id) => {
-                context.timer.schedule(event::SaeTimeout(id));
+                let _ = context.timer.schedule(event::SaeTimeout(id));
             }
             _ => (),
         }
@@ -1630,7 +1631,7 @@ mod tests {
         assert!(connect_txn_stream.try_next().is_err());
 
         // One key fails to set
-        state.on_mlme_event(
+        let _next_state = state.on_mlme_event(
             MlmeEvent::SetKeysConf {
                 conf: fidl_mlme::SetKeysConfirm {
                     results: vec![
@@ -2004,7 +2005,7 @@ mod tests {
         suppl_mock.set_on_rsna_response_timeout(EstablishRsnaFailureReason::RsnaResponseTimeout(
             wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string()),
         ));
-        state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        let _next_state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
 
         expect_deauth_req(&mut h.mlme_stream, bssid, fidl_ieee80211::ReasonCode::StaLeaving);
         assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
@@ -2140,7 +2141,7 @@ mod tests {
                 wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string()),
             ),
         );
-        state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        let _next_state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
 
         // Check that SME sends a deauthenticate request and fails the connection
         expect_deauth_req(&mut h.mlme_stream, bssid, fidl_ieee80211::ReasonCode::StaLeaving);
@@ -2358,7 +2359,7 @@ mod tests {
         assert_eq!(h.context.att_id, 0);
 
         let state = state.connect(connect_command_one().0, &mut h.context);
-        h.mlme_stream.try_next().expect("Expected connect req");
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
         assert_eq!(h.context.att_id, 1);
 
         let state = disconnect(state, &mut h, fidl_sme::UserDisconnectReason::WlanSmeUnitTesting);
@@ -2366,12 +2367,12 @@ mod tests {
         assert_eq!(h.context.att_id, 1);
 
         let state = state.connect(connect_command_two().0, &mut h.context);
-        h.mlme_stream.try_next().expect("Expected connect req");
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
         assert_eq!(h.context.att_id, 2);
 
         let state = state.connect(connect_command_one().0, &mut h.context);
         let _state = exchange_deauth(state, &mut h);
-        h.mlme_stream.try_next().expect("Expected connect req");
+        assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_))));
         assert_eq!(h.context.att_id, 3);
     }
 
@@ -2577,7 +2578,8 @@ mod tests {
         )));
 
         let state = link_up_state(cmd);
-        disconnect(state, &mut h, fidl_sme::UserDisconnectReason::WlanSmeUnitTesting);
+        let _next_state =
+            disconnect(state, &mut h, fidl_sme::UserDisconnectReason::WlanSmeUnitTesting);
 
         let info = assert_variant!(
             connect_txn_stream.try_next(),

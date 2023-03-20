@@ -147,7 +147,7 @@ impl PulseNode {
                 ))
             }
         }
-        self.status.replace(new_status);
+        self.status = Some(new_status);
     }
 }
 
@@ -213,7 +213,7 @@ impl ClientSmeStatusNode {
                 }
             },
             ClientSmeStatus::Connecting(_) | ClientSmeStatus::Idle => {
-                self.connected_to.take();
+                self.connected_to = None;
             }
         }
 
@@ -229,7 +229,7 @@ impl ClientSmeStatusNode {
                 }
             },
             ClientSmeStatus::Connected(_) | ClientSmeStatus::Idle => {
-                self.connecting_to.take();
+                self.connecting_to = None;
             }
         }
     }
@@ -307,7 +307,7 @@ impl ServingApInfoNode {
                 None => self.ht_cap = Some(self.node.create_bytes("ht_cap", ht_cap.bytes)),
             },
             None => {
-                self.ht_cap.take();
+                self.ht_cap = None;
             }
         }
     }
@@ -319,7 +319,7 @@ impl ServingApInfoNode {
                 None => self.vht_cap = Some(self.node.create_bytes("vht_cap", vht_cap.bytes)),
             },
             None => {
-                self.vht_cap.take();
+                self.vht_cap = None;
             }
         }
     }
@@ -340,7 +340,7 @@ impl ServingApInfoNode {
             }
             None => {
                 self.is_wmm_assoc.set(false);
-                self.wmm_param.take();
+                self.wmm_param = None;
             }
         }
     }
@@ -352,7 +352,7 @@ impl ServingApInfoNode {
                 None => self.wsc = Some(BssWscNode::new(self.node.create_child("wsc"), wsc)),
             },
             None => {
-                self.wsc.take();
+                self.wsc = None;
             }
         }
     }

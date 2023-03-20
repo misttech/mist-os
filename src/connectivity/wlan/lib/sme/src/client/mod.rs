@@ -508,8 +508,8 @@ impl ClientSme {
         let (mut timer, time_stream) = timer::create_timer();
         let inspect = Arc::new(inspect::SmeTree::new(&iface_tree_holder.node, hasher));
         iface_tree_holder.add_iface_subtree(inspect.clone());
-        timer.schedule(event::InspectPulseCheck);
-        timer.schedule(event::InspectPulsePersist);
+        let _ = timer.schedule(event::InspectPulseCheck);
+        let _ = timer.schedule(event::InspectPulsePersist);
         let mut auto_persist_last_pulse =
             AutoPersist::new((), "wlanstack-last-pulse", persistence_req_sender);
         {
@@ -764,7 +764,7 @@ impl super::Station for ClientSme {
             }
             Event::InspectPulseCheck(..) => {
                 self.context.mlme_sink.send(MlmeRequest::WmmStatusReq);
-                self.context.timer.schedule(event::InspectPulseCheck);
+                let _ = self.context.timer.schedule(event::InspectPulseCheck);
                 state
             }
             Event::InspectPulsePersist(..) => {
@@ -773,7 +773,7 @@ impl super::Station for ClientSme {
                 // is updated every second (due to SignalIndication event), we'd send a request
                 // to persistence service which'd log every second that it's queued until backoff.
                 let _guard = self.auto_persist_last_pulse.get_mut();
-                self.context.timer.schedule(event::InspectPulsePersist);
+                let _ = self.context.timer.schedule(event::InspectPulsePersist);
                 state
             }
         });
@@ -1120,28 +1120,21 @@ mod tests {
         assert!(!failure.likely_due_to_credential_rejected());
     }
 
-    #[test]
-    fn test_protection_from_authentication() {
+    #[test_case(fake_bss_description!(Open), authentication_open() => matches Ok(Protection::Open))]
+    #[test_case(fake_bss_description!(Open), authentication_wpa2_personal_passphrase() => matches Err(_))]
+    #[test_case(fake_bss_description!(Wpa2), authentication_wpa2_personal_passphrase() => matches Ok(Protection::Rsna(_)))]
+    #[test_case(fake_bss_description!(Wpa2), authentication_wpa2_personal_psk() => matches Ok(Protection::Rsna(_)))]
+    #[test_case(fake_bss_description!(Wpa2), authentication_open() => matches Err(_))]
+    fn test_protection_from_authentication(
+        bss: BssDescription,
+        authentication: fidl_security::Authentication,
+    ) -> Result<Protection, anyhow::Error> {
         let device = test_utils::fake_device_info(CLIENT_ADDR);
         let security_support = fake_security_support();
         let config = Default::default();
 
         // Open BSS with open authentication:
-        let authenticator = SecurityAuthenticator::try_from(authentication_open()).unwrap();
-        let bss = fake_bss_description!(Open);
-        let protection = Protection::try_from(SecurityContext {
-            security: &authenticator,
-            device: &device,
-            security_support: &security_support,
-            config: &config,
-            bss: &bss,
-        });
-        assert_variant!(protection, Ok(Protection::Open));
-
-        // Open BSS with WPA2 Personal and passphrase authentication:
-        let authenticator =
-            SecurityAuthenticator::try_from(authentication_wpa2_personal_passphrase()).unwrap();
-        let bss = fake_bss_description!(Open);
+        let authenticator = SecurityAuthenticator::try_from(authentication).unwrap();
         Protection::try_from(SecurityContext {
             security: &authenticator,
             device: &device,
@@ -1149,45 +1142,6 @@ mod tests {
             config: &config,
             bss: &bss,
         })
-        .expect_err("cannot associate with open network using WPA");
-
-        // RSN BSS with WPA2 Personal and passphrase authentication:
-        let authenticator =
-            SecurityAuthenticator::try_from(authentication_wpa2_personal_passphrase()).unwrap();
-        let bss = fake_bss_description!(Wpa2);
-        let protection = Protection::try_from(SecurityContext {
-            security: &authenticator,
-            device: &device,
-            security_support: &security_support,
-            config: &config,
-            bss: &bss,
-        });
-        assert_variant!(protection, Ok(Protection::Rsna(_)));
-
-        // RSN BSS with WPA2 Personal and PSK authentication:
-        let authenticator =
-            SecurityAuthenticator::try_from(authentication_wpa2_personal_psk()).unwrap();
-        let bss = fake_bss_description!(Wpa2);
-        let protection = Protection::try_from(SecurityContext {
-            security: &authenticator,
-            device: &device,
-            security_support: &security_support,
-            config: &config,
-            bss: &bss,
-        });
-        assert_variant!(protection, Ok(Protection::Rsna(_)));
-
-        // RSN BSS with open authentication:
-        let authenticator = SecurityAuthenticator::try_from(authentication_open()).unwrap();
-        let bss = fake_bss_description!(Wpa2);
-        Protection::try_from(SecurityContext {
-            security: &authenticator,
-            device: &device,
-            security_support: &security_support,
-            config: &config,
-            bss: &bss,
-        })
-        .expect_err("cannot associate with secure network using no security protocol");
     }
 
     #[test]

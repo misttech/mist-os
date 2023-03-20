@@ -290,7 +290,7 @@ impl RsnaLinkState {
             return Err(format_err!("no key frame was produced on authenticator initiation"));
         }
 
-        self.negotiation_timeout_event_id.replace(r_sta.schedule_at(
+        self.negotiation_timeout_event_id = Some(r_sta.schedule_at(
             ctx,
             zx::Time::after(zx::Duration::from_seconds(RSNA_NEGOTIATION_TIMEOUT_SECONDS)),
             ClientEvent::RsnaTimeout(RsnaTimeout::Negotiation),
@@ -301,7 +301,7 @@ impl RsnaLinkState {
     }
 
     fn reschedule_request_timeout(&mut self, r_sta: &mut RemoteClient, ctx: &mut Context) {
-        self.request_timeout_event_id.replace(r_sta.schedule_at(
+        self.request_timeout_event_id = Some(r_sta.schedule_at(
             ctx,
             zx::Time::after(zx::Duration::from_seconds(RSNA_NEGOTIATION_REQUEST_TIMEOUT_SECONDS)),
             ClientEvent::RsnaTimeout(RsnaTimeout::Request),
@@ -1129,7 +1129,7 @@ mod tests {
             State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
 
         let mut aid_map = aid::Map::default();
-        state.handle_assoc_ind(
+        let _next_state = state.handle_assoc_ind(
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
@@ -1165,7 +1165,7 @@ mod tests {
             State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
 
         let mut aid_map = aid::Map::default();
-        state.handle_assoc_ind(
+        let _next_state = state.handle_assoc_ind(
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
@@ -1197,7 +1197,7 @@ mod tests {
             State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
 
         let mut aid_map = aid::Map::default();
-        state.handle_assoc_ind(
+        let _next_state = state.handle_assoc_ind(
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
@@ -1239,7 +1239,7 @@ mod tests {
             State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
 
         let mut aid_map = aid::Map::default();
-        state.handle_assoc_ind(
+        let _next_state = state.handle_assoc_ind(
             &mut r_sta,
             &mut ctx,
             &mut aid_map,
@@ -1873,7 +1873,7 @@ mod tests {
             })
             .into();
 
-        state.handle_eapol_ind(
+        let _next_state = state.handle_eapol_ind(
             &mut r_sta,
             &mut ctx,
             &Vec::<u8>::from(test_utils::eapol_key_frame())[..],
@@ -1950,7 +1950,7 @@ mod tests {
             })
             .into();
 
-        state.handle_eapol_ind(
+        let _next_state = state.handle_eapol_ind(
             &mut r_sta,
             &mut ctx,
             &Vec::<u8>::from(test_utils::eapol_key_frame())[..],

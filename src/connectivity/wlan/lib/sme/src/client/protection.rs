@@ -558,7 +558,7 @@ mod tests {
         let bss = fake_bss_description!(Open);
         let credentials =
             wpa::Wpa1Credentials::Passphrase("password".as_bytes().try_into().unwrap());
-        Protection::try_from(SecurityContext {
+        let _ = Protection::try_from(SecurityContext {
             security: &credentials,
             device: &device,
             security_support: &security_support,
@@ -577,7 +577,7 @@ mod tests {
         // Note that there is no credentials type associated with an open authenticator, so an
         // authenticator is used here instead.
         let authenticator = SecurityAuthenticator::Open;
-        Protection::try_from(SecurityContext {
+        let _ = Protection::try_from(SecurityContext {
             security: &authenticator,
             device: &device,
             security_support: &security_support,
@@ -595,7 +595,7 @@ mod tests {
         let bss = fake_bss_description!(Wpa3);
         let credentials =
             wpa::Wpa2PersonalCredentials::Passphrase("password".as_bytes().try_into().unwrap());
-        Protection::try_from(SecurityContext {
+        let _ = Protection::try_from(SecurityContext {
             security: &credentials,
             device: &device,
             security_support: &security_support,
@@ -737,7 +737,7 @@ mod tests {
             config: &config,
             bss: &bss,
         };
-        context
+        let _ = context
             .authentication_config()
             .expect_err("created WPA3 auth config for incompatible device");
     }

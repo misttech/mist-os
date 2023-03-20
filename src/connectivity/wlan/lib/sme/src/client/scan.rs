@@ -203,7 +203,7 @@ fn maybe_insert_bss(
             *existing_bss = fidl_bss;
         }
         hash_map::Entry::Vacant(entry) => {
-            entry.insert((fidl_bss, IesMerger::new(ies)));
+            let _ = entry.insert((fidl_bss, IesMerger::new(ies)));
         }
     }
 }

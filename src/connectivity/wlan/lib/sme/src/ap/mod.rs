@@ -260,9 +260,8 @@ impl ApSme {
                 // No stop request is ongoing, so forward this stop request.
                 // The previous stop request may have timed out or failed and we are in an
                 // unclean state where we don't know whether the AP has stopped or not.
-                if stop_timeout.is_none() {
-                    stop_timeout.replace(send_stop_req(&mut ctx, stop_req.clone()));
-                }
+                stop_timeout =
+                    stop_timeout.or_else(|| Some(send_stop_req(&mut ctx, stop_req.clone())));
                 State::Stopping { ctx, stop_req, responders, stop_timeout }
             }
             State::Started { mut bss } => {
@@ -366,7 +365,7 @@ impl super::Station for ApSme {
                     }
                 }
             },
-            State::Stopping { ctx, stop_req, mut responders, mut stop_timeout } => match event {
+            State::Stopping { ctx, stop_req, mut responders, stop_timeout } => match event {
                 MlmeEvent::StopConf { resp } => match resp.result_code {
                     fidl_mlme::StopResultCode::Success
                     | fidl_mlme::StopResultCode::BssAlreadyStopped => {
@@ -379,8 +378,7 @@ impl super::Station for ApSme {
                         for responder in responders.drain(..) {
                             responder.respond(fidl_sme::StopApResultCode::InternalError);
                         }
-                        stop_timeout.take();
-                        State::Stopping { ctx, stop_req, responders, stop_timeout }
+                        State::Stopping { ctx, stop_req, responders, stop_timeout: None }
                     }
                 },
                 _ => {
@@ -479,7 +477,7 @@ impl super::Station for ApSme {
                                 for responder in responders.drain(..) {
                                     responder.respond(fidl_sme::StopApResultCode::TimedOut);
                                 }
-                                stop_timeout.take();
+                                stop_timeout = None;
                             }
                         }
                         _ => (),
@@ -697,7 +695,7 @@ impl InfraBss {
         }
 
         info!("client {:02X?} authenticated", peer_addr);
-        self.clients.insert(peer_addr, client);
+        let _ = self.clients.insert(peer_addr, client);
     }
 
     fn handle_deauth(&mut self, peer_addr: &MacAddr) {
@@ -738,7 +736,7 @@ impl InfraBss {
         );
         if !client.authenticated() {
             warn!("client {:02X?} failed to associate and was deauthenticated", peer_addr);
-            self.remove_client(&peer_addr);
+            let _ = self.remove_client(&peer_addr);
         } else if !client.associated() {
             warn!("client {:02X?} failed to associate but did not deauthenticate", peer_addr);
         } else {
@@ -781,7 +779,9 @@ impl InfraBss {
 
                 client.handle_timeout(&mut self.ctx, timed_event.id, event);
                 if !client.authenticated() {
-                    self.remove_client(&addr);
+                    if !self.remove_client(&addr) {
+                        error!("failed to remove client {:02X?} from AID map", addr);
+                    }
                     info!("client {:02X?} lost authentication", addr);
                 }
             }

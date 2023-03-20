@@ -325,7 +325,7 @@ pub struct MockSupplicantController {
 
 impl MockSupplicantController {
     pub fn set_start_failure(&self, error: anyhow::Error) {
-        self.start_failure.lock().unwrap().replace(error);
+        *self.start_failure.lock().unwrap() = Some(error);
     }
 
     pub fn is_supplicant_started(&self) -> bool {
@@ -345,11 +345,11 @@ impl MockSupplicantController {
     }
 
     pub fn set_on_rsna_response_timeout(&self, error: EstablishRsnaFailureReason) {
-        self.mock_on_rsna_response_timeout.lock().unwrap().replace(error);
+        *self.mock_on_rsna_response_timeout.lock().unwrap() = Some(error);
     }
 
     pub fn set_on_rsna_completion_timeout(&self, error: EstablishRsnaFailureReason) {
-        self.mock_on_rsna_completion_timeout.lock().unwrap().replace(error);
+        *self.mock_on_rsna_completion_timeout.lock().unwrap() = Some(error);
     }
 
     pub fn set_on_sae_handshake_ind_updates(&self, updates: UpdateSink) {
