@@ -40,13 +40,38 @@ cat > /etc/modprobe.d/machina.conf << EOF
 blacklist intel_pmc_core
 EOF
 
-# Add some modules to the initramfs. The console and GPU are useful to have
-# before the rootfs mounts in case things go off the rails.
+# To shrink the image size, we move all needed modules into the initrd and then
+# remove modules from the root filesystem.
+#
+# All modules that are needed _must_ be listed here.
 cat >> /etc/initramfs-tools/modules << EOF
+rfkill
+intel_rapl_msr
+ghash_clmulni_intel
+aesni_intel
+vmw_vsock_virtio_transport
+romfs
+evdev
+virtio_balloon
+pcspkr
+button
+fuse
+f2fs
+configfs
+virtio_rng
+ip_tables
+autofs4
+ext4
+crc32c_generic
+virtio_input
+virtio_gpu
+virtio_net
 virtio_console
 virtio_blk
-virtio_gpu
-virtio_input
+crct10dif_pclmul
+crc32_pclmul
+virtio_pci
+crc32c_intel
 EOF
 
 # Explicitly disable resume from swap. This is to ensure we never try to to
@@ -118,6 +143,13 @@ cat >> /etc/fstab << EOF
 /dev/vdb /test_utils auto ro 0 0
 /dev/vdc /guest_interaction romfs ro 0 0
 EOF
+
+# We have included all the modules we need into the initramfs, so we remove all
+# modules modules from the root filesystem.
+#
+# This saves over 300MiB on the x64 build and cuts the disk image size
+# approximately in half.
+rm -rf /lib/modules/*
 
 # Remove files cached by apt.
 apt clean
