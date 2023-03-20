@@ -15,9 +15,7 @@ use crate::fs::{
     FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString,
     MemoryDirectoryFile, NamespaceNode, SeekOrigin, SpecialNode,
 };
-use crate::lock::{
-    Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockUpgradableReadGuard, RwLockWriteGuard,
-};
+use crate::lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::*;
 use crate::mm::vmo::round_up_to_increment;
 use crate::mm::{
@@ -521,7 +519,6 @@ impl BinderProcess {
     fn handle_request_death_notification(
         self: &Arc<Self>,
         current_task: &CurrentTask,
-        binder_thread: &Arc<BinderThread>,
         handle: Handle,
         cookie: binder_uintptr_t,
     ) -> Result<(), Errno> {
@@ -544,13 +541,11 @@ impl BinderProcess {
         if let Some(owner) = proxy.owner.upgrade() {
             owner.lock().death_subscribers.push((Arc::downgrade(self), cookie));
         } else {
-            // The object is already dead. Notify immediately. However, the requesting thread
+            // The object is already dead. Notify immediately. To be noted: the requesting thread
             // cannot handle the notification, in case it is holding some mutex while processing a
-            // oneway transaction (where its transaction stack will be empty).
-            self.lock().enqueue_command_filtered(
-                |th| th.tid != binder_thread.tid,
-                Command::DeadBinder(cookie),
-            );
+            // oneway transaction (where its transaction stack will be empty). It is currently not
+            // a problem, because enqueue_command never schedule on the current thread.
+            self.lock().enqueue_command(Command::DeadBinder(cookie));
         }
         Ok(())
     }
@@ -609,19 +604,12 @@ impl BinderProcess {
 impl<'a> BinderProcessGuard<'a> {
     /// Enqueues `command` on the first available thread. If none are available, enqueues it on the
     /// process queue where it will be handled once a thread is available.
+    ///
+    /// To be noted: this will never enqueue the command on the current running thread, as it is
+    /// not currently waiting for new commands.
     pub fn enqueue_command(&mut self, command: Command) {
-        self.enqueue_command_filtered(|_| true, command)
-    }
-
-    /// Enqueues `command` on the first available thread that satisfied `filter`. If none are
-    /// available, enqueues it on the process queue where it will be handled once a thread is
-    /// available.
-    pub fn enqueue_command_filtered<F>(&mut self, filter: F, command: Command)
-    where
-        F: Fn(&BinderThreadState) -> bool,
-    {
-        if let Some(thread) = self.thread_pool.find_available_thread(filter) {
-            RwLockUpgradableReadGuard::upgrade(thread).enqueue_command(command);
+        if let Some(mut thread) = self.thread_pool.find_available_thread() {
+            thread.enqueue_command(command);
             return;
         }
         self.enqueue_process_command(command);
@@ -1013,19 +1001,9 @@ struct ThreadPool(BTreeMap<pid_t, Arc<BinderThread>>);
 impl ThreadPool {
     /// Finds the first available binder thread that is registered with the driver, is not in the
     /// middle of a transaction, and has no work to do.
-    fn find_available_thread<F>(
-        &self,
-        filter: F,
-    ) -> Option<RwLockUpgradableReadGuard<'_, BinderThreadState>>
-    where
-        F: Fn(&BinderThreadState) -> bool,
-    {
+    fn find_available_thread(&self) -> Option<RwLockWriteGuard<'_, BinderThreadState>> {
         for thread in self.0.values() {
-            let thread_state = thread.upgradable_read();
-            if !filter(&thread_state) {
-                log_trace!("thread {:?} is filtered out", thread_state.tid);
-                continue;
-            }
+            let thread_state = thread.write();
             if thread_state.is_available() {
                 return Some(thread_state);
             }
@@ -1345,11 +1323,6 @@ impl BinderThread {
     /// Acquire a reader lock to the binder thread's mutable state.
     pub fn read(&self) -> RwLockReadGuard<'_, BinderThreadState> {
         self.state.read()
-    }
-
-    /// Acquire an upgradable reader lock to the binder thread's mutable state.
-    pub fn upgradable_read(&self) -> RwLockUpgradableReadGuard<'_, BinderThreadState> {
-        self.state.upgradable_read()
     }
 
     /// Acquire a writer lock to the binder thread's mutable state.
@@ -2653,12 +2626,7 @@ impl BinderDriver {
             binder_driver_command_protocol_BC_REQUEST_DEATH_NOTIFICATION => {
                 let handle = cursor.read_object::<u32>()?.into();
                 let cookie = cursor.read_object::<binder_uintptr_t>()?;
-                binder_proc.handle_request_death_notification(
-                    current_task,
-                    binder_thread,
-                    handle,
-                    cookie,
-                )
+                binder_proc.handle_request_death_notification(current_task, handle, cookie)
             }
             binder_driver_command_protocol_BC_CLEAR_DEATH_NOTIFICATION => {
                 let handle = cursor.read_object::<u32>()?.into();
@@ -5678,12 +5646,7 @@ mod tests {
 
         // Register a death notification handler.
         client_proc
-            .handle_request_death_notification(
-                &current_task,
-                &client_thread,
-                handle,
-                DEATH_NOTIFICATION_COOKIE,
-            )
+            .handle_request_death_notification(&current_task, handle, DEATH_NOTIFICATION_COOKIE)
             .expect("request death notification");
 
         // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
@@ -5711,7 +5674,7 @@ mod tests {
         let driver = BinderDriver::new();
 
         let (owner_proc, owner_thread) = driver.create_process_and_thread(1);
-        let (client_proc, client_thread) = driver.create_process_and_thread(2);
+        let (client_proc, _client_thread) = driver.create_process_and_thread(2);
 
         // Register an object with the owner.
         let object = owner_proc.lock().find_or_register_object(
@@ -5734,12 +5697,7 @@ mod tests {
 
         // Register a death notification handler.
         client_proc
-            .handle_request_death_notification(
-                &current_task,
-                &client_thread,
-                handle,
-                DEATH_NOTIFICATION_COOKIE,
-            )
+            .handle_request_death_notification(&current_task, handle, DEATH_NOTIFICATION_COOKIE)
             .expect("request death notification");
 
         // The client thread should not have a notification, as the calling thread is not allowed
@@ -5776,12 +5734,7 @@ mod tests {
 
         // Register a death notification handler.
         client_proc
-            .handle_request_death_notification(
-                &current_task,
-                &client_thread,
-                handle,
-                death_notification_cookie,
-            )
+            .handle_request_death_notification(&current_task, handle, death_notification_cookie)
             .expect("request death notification");
 
         // Now clear the death notification handler.

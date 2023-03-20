@@ -18,8 +18,6 @@ pub type RwLock<T> = parking_lot::RwLock<T>;
 pub type RwLockReadGuard<'a, T> = parking_lot::RwLockReadGuard<'a, T>;
 #[cfg(not(any(test, debug_assertions)))]
 pub type RwLockWriteGuard<'a, T> = parking_lot::RwLockWriteGuard<'a, T>;
-#[cfg(not(any(test, debug_assertions)))]
-pub type RwLockUpgradableReadGuard<'a, T> = parking_lot::RwLockUpgradableReadGuard<'a, T>;
 
 #[cfg(any(test, debug_assertions))]
 pub type Mutex<T> = tracing_mutex::parkinglot::TracingMutex<T>;
@@ -34,6 +32,3 @@ pub type RwLock<T> = tracing_mutex::parkinglot::TracingRwLock<T>;
 pub type RwLockReadGuard<'a, T> = tracing_mutex::parkinglot::TracingRwLockReadGuard<'a, T>;
 #[cfg(any(test, debug_assertions))]
 pub type RwLockWriteGuard<'a, T> = tracing_mutex::parkinglot::TracingRwLockWriteGuard<'a, T>;
-#[cfg(any(test, debug_assertions))]
-pub type RwLockUpgradableReadGuard<'a, T> =
-    tracing_mutex::parkinglot::TracingRwLockUpgradableReadGuard<'a, T>;
