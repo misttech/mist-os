@@ -405,14 +405,17 @@ MAGMA_EXPORT magma_status_t magma_poll(
     uint64_t timeout_ns);
 
 ///
-/// \brief Initializes tracing
+/// \brief Initializes tracing. This should be called on Fuchsia; on other platforms it's not needed
+///        and will just close the given handle.
 /// \param channel An open connection to a tracing provider.
 ///
 MAGMA_EXPORT magma_status_t magma_initialize_tracing(
     magma_handle_t channel);
 
 ///
-/// \brief Initializes logging; used for debug and some exceptional error reporting.
+/// \brief Initializes logging, used for debug and some exceptional error reporting. This should be
+///        called on Fuchsia; on other platforms it's not needed and will just close the given
+///        handle.
 /// \param channel An open connection to the syslog service.
 ///
 MAGMA_EXPORT magma_status_t magma_initialize_logging(

@@ -921,9 +921,7 @@ class TestConnection {
   }
 
   void TracingInit() {
-#if !defined(__Fuchsia__)
-    GTEST_SKIP();
-#else
+#if defined(__Fuchsia__)
     zx::channel local_endpoint, server_endpoint;
     EXPECT_EQ(ZX_OK, zx::channel::create(0u, &local_endpoint, &server_endpoint));
     EXPECT_EQ(ZX_OK, fdio_service_connect("/svc/fuchsia.tracing.provider.Registry",
@@ -934,6 +932,10 @@ class TestConnection {
     if (magma::PlatformTraceProvider::Get())
       EXPECT_TRUE(magma::PlatformTraceProvider::Get()->IsInitialized());
 #endif
+
+#else
+    int handle = -1;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_tracing(handle));
 #endif
   }
 
@@ -949,19 +951,18 @@ class TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_tracing(endpoints->client.TakeChannel().release()));
     // The loop runs until RegisterProvider is received.
     loop.Run();
+#else
+    int handle = -1;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_tracing(handle));
 #endif
   }
 
   void LoggingInit() {
-#if !defined(__Fuchsia__)
-    GTEST_SKIP();
-#else
-#if !defined(MAGMA_HERMETIC)
+#if defined(__Fuchsia__) && !defined(MAGMA_HERMETIC)
     // Logging should be set up by the test fixture, so just add more logs here to help manually
     // verify that the fixture is working correctly.
     EXPECT_TRUE(magma::PlatformLogger::IsInitialized());
     MAGMA_LOG(INFO, "LoggingInit test complete");
-#endif
 #endif
   }
 
@@ -977,6 +978,9 @@ class TestConnection {
     EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_logging(endpoints->client.TakeChannel().release()));
     // The loop runs until Connect is received.
     loop.Run();
+#else
+    int handle = -1;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_logging(handle));
 #endif
   }
 
@@ -1335,6 +1339,9 @@ class Magma : public testing::Test {
     EXPECT_EQ(ZX_OK,
               fdio_service_connect("/svc/fuchsia.logger.LogSink", server_endpoint.release()));
     EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_logging(local_endpoint.release()));
+#else
+    int handle = -1;
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_initialize_logging(handle));
 #endif
   }
 };

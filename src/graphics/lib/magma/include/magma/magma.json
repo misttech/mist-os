@@ -705,7 +705,7 @@
                 "ordinal": 45,
                 "name": "magma_initialize_tracing",
                 "type": "magma_status_t",
-                "description": "Initializes tracing",
+                "description": "Initializes tracing. This should be called on Fuchsia; on other platforms it's not needed and will just close the given handle.",
                 "arguments": [
                     {
                         "name": "channel",
@@ -718,7 +718,7 @@
                 "ordinal": 51,
                 "name": "magma_initialize_logging",
                 "type": "magma_status_t",
-                "description": "Initializes logging; used for debug and some exceptional error reporting.",
+                "description": "Initializes logging, used for debug and some exceptional error reporting. This should be called on Fuchsia; on other platforms it's not needed and will just close the given handle.",
                 "arguments": [
                     {
                         "name": "channel",

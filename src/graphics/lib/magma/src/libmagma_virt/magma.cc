@@ -235,7 +235,15 @@ magma_status_t magma_buffer_set_name(magma_buffer_t buffer, const char* name) {
 }
 
 magma_status_t magma_initialize_tracing(magma_handle_t channel) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
+  int fd = channel;
+  close(fd);
+  return MAGMA_STATUS_OK;
+}
+
+magma_status_t magma_initialize_logging(magma_handle_t channel) {
+  int fd = channel;
+  close(fd);
+  return MAGMA_STATUS_OK;
 }
 
 magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
