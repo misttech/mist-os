@@ -152,7 +152,7 @@ zx::result<std::unique_ptr<Blobfs>> Blobfs::Create(async_dispatcher_t* dispatche
   auto fs = std::unique_ptr<Blobfs>(new Blobfs(
       dispatcher, std::move(device), vfs, superblock, options.writability,
       options.compression_settings, std::move(vmex_resource), options.pager_backed_cache_policy,
-      decompression_connector, options.streaming_writes, options.offline_compression));
+      decompression_connector, options.streaming_writes, options.allow_delivery_blobs));
   fs->block_info_ = block_info;
 
   auto fs_ptr = fs.get();
@@ -828,7 +828,7 @@ Blobfs::Blobfs(async_dispatcher_t* dispatcher, std::unique_ptr<BlockDevice> devi
                CompressionSettings write_compression_settings, zx::resource vmex_resource,
                std::optional<CachePolicy> pager_backed_cache_policy,
                DecompressorCreatorConnector* decompression_connector, bool use_streaming_writes,
-               bool allow_offline_compression)
+               bool allow_delivery_blobs)
     : vfs_(vfs),
       info_(*info),
       dispatcher_(dispatcher),
@@ -840,7 +840,7 @@ Blobfs::Blobfs(async_dispatcher_t* dispatcher, std::unique_ptr<BlockDevice> devi
       pager_backed_cache_policy_(pager_backed_cache_policy),
       decompression_connector_(decompression_connector),
       use_streaming_writes_(use_streaming_writes),
-      allow_offline_compression_(allow_offline_compression) {
+      allow_delivery_blobs_(allow_delivery_blobs) {
   ZX_ASSERT(vfs_);
 
   // It's easy to forget to initialize the PagedVfs in tests which will cause mysterious failures

@@ -13,54 +13,9 @@
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 #include "src/storage/blobfs/delivery_blob.h"
-#include "src/storage/blobfs/delivery_blob_private.h"
 #include "src/storage/blobfs/format.h"
 
 namespace blobfs_compress {
-namespace {
-using blobfs::DeliveryBlobHeader;
-using blobfs::DeliveryBlobType;
-using blobfs::MetadataType1;
-using chunked_compression::ChunkedCompressor;
-using chunked_compression::CompressionParams;
-
-zx::result<std::vector<uint8_t>> GenerateBlobType1(cpp20::span<const uint8_t> data) {
-  // WARNING: If we use different compression parameters here, the `compressed_file_size` in the
-  // blob info JSON file will be incorrect.
-  const CompressionParams params = blobfs::GetDefaultChunkedCompressionParams(data.size_bytes());
-  ChunkedCompressor compressor(params);
-
-  constexpr size_t kPayloadOffset = sizeof(DeliveryBlobHeader) + sizeof(MetadataType1);
-  const size_t output_limit = params.ComputeOutputSizeLimit(data.size_bytes());
-  std::vector<uint8_t> delivery_blob(kPayloadOffset + output_limit);
-
-  size_t compressed_size = 0;
-  const chunked_compression::Status status =
-      compressor.Compress(data.data(), data.size_bytes(), delivery_blob.data() + kPayloadOffset,
-                          output_limit, &compressed_size);
-  if (status != chunked_compression::kStatusOk) {
-    return zx::error(chunked_compression::ToZxStatus(status));
-  }
-
-  const bool use_compressed_result = (compressed_size < data.size_bytes());
-  const size_t payload_length = use_compressed_result ? compressed_size : data.size_bytes();
-  // Ensure the returned buffer's size reflects the actual payload length.
-  delivery_blob.resize(kPayloadOffset + payload_length);
-  // Write delivery blob header and metadata.
-  const DeliveryBlobHeader header =
-      DeliveryBlobHeader::Create(DeliveryBlobType::kType1, sizeof(MetadataType1));
-  std::memcpy(delivery_blob.data(), &header, sizeof header);
-  const MetadataType1 metadata =
-      MetadataType1::Create(header, payload_length, use_compressed_result);
-  std::memcpy(delivery_blob.data() + sizeof header, &metadata, sizeof metadata);
-  // Overwrite the payload with original data if we aren't compressing the blob.
-  if (!use_compressed_result && payload_length > 0) {
-    std::memcpy(delivery_blob.data() + kPayloadOffset, data.data(), payload_length);
-  }
-  return zx::ok(delivery_blob);
-}
-
-}  // namespace
 
 // Validate command line |options| used for compressing.
 zx_status_t ValidateCliOptions(const CompressionCliOptionStruct& options) {
@@ -105,9 +60,10 @@ zx_status_t ValidateCliOptions(const CompressionCliOptionStruct& options) {
 // temporary RAM consumption for storing compressed data due to current internal
 // compression API design.
 zx_status_t BlobfsCompress(const uint8_t* src, const size_t src_sz, uint8_t* dest_write_buf,
-                           size_t* out_compressed_size, CompressionParams params,
+                           size_t* out_compressed_size,
+                           chunked_compression::CompressionParams params,
                            const CompressionCliOptionStruct& cli_options) {
-  ChunkedCompressor compressor(params);
+  chunked_compression::ChunkedCompressor compressor(params);
 
   // Using non-compact merkle tree size by default because it's bigger than compact merkle tree.
   const size_t merkle_tree_size =
@@ -153,10 +109,10 @@ zx_status_t BlobfsCompress(const uint8_t* src, const size_t src_sz, uint8_t* des
 }
 
 zx::result<std::vector<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
-                                                      DeliveryBlobType type) {
+                                                      blobfs::DeliveryBlobType type) {
   switch (type) {
-    case DeliveryBlobType::kType1:
-      return GenerateBlobType1(data);
+    case blobfs::DeliveryBlobType::kType1:
+      return blobfs::GenerateDeliveryBlobType1(data, /*compress=*/std::nullopt);
     default:
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }

@@ -43,7 +43,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
  public:
   // Creates a writable blob. Will become readable once all data has been written and verified.
   // `blobfs` must outlive this blob.
-  Blob(Blobfs& blobfs, const digest::Digest& digest, CompressionAlgorithm data_format);
+  Blob(Blobfs& blobfs, const digest::Digest& digest, bool is_delivery_blob);
 
   // Creates a readable blob from existing data. `blobfs` must outlive this blob.
   Blob(Blobfs& blobfs, uint32_t node_index, const Inode& inode);

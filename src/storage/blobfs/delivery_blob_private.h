@@ -20,6 +20,9 @@ struct MetadataType1 {
   /// Mask of all valid flags.
   static constexpr uint32_t kValidFlagsMask = kIsCompressed;
 
+  /// Header corresponding to a Type 1 blob to simplify usage.
+  static const DeliveryBlobHeader kHeader;
+
   // Fields:
 
   /// Expected length of payload, in bytes. May be compressed or uncompressed depending on `flags`.
@@ -31,6 +34,8 @@ struct MetadataType1 {
 
   /// Check if the metadata is valid. Requires `header` for checksum validation.
   bool IsValid(const DeliveryBlobHeader& header) const;
+
+  bool IsCompressed() const { return flags & kIsCompressed; }
 
   /// Calculate the checksum over the header and this metadata.
   uint32_t Checksum(const DeliveryBlobHeader& header) const;
