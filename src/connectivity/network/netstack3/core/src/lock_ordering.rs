@@ -28,9 +28,10 @@
 //! locks, where `A < B` means `B` can be acquired with `A` held.
 //!
 //! Ideally we'd represent the lock ordering here that way too, but it doesn't
-//! work well with the blanket impls of `LockAfter`. The problem can be
-//! illustrated by this reduced example. Suppose we have a lock ordering DAG
-//! like this:
+//! work well with the blanket impls of `LockAfter` emitted by the `impl_lock_after` macro.
+//! We want to use `impl_lock_after` since it helps prevent deadlocks (see
+//! documentation for [`lock_order::relation`]). The problem can be illustrated
+//! by this reduced example. Suppose we have a lock ordering DAG like this:
 //!
 //! ```text
 //! ┌────────────────────┐
@@ -45,13 +46,13 @@
 //!```
 //!
 //! With the blanket `LockAfter` impls, we'd get this:
-//! ```
-//! impl<C: LockAfter<IpState<Ipv4>>> LockAfter<LoopbackRx> for C {}
+//! ```no_run
+//! impl<X> LockAfter<X> for DevicesState where IpState<Ipv4>>: LockAfter<X> {}
 //! // and
-//! impl<C: LockAfter<IpState<Ipv6>>> LockAfter<LoopbackRx> for C {}
+//! impl<X> LockAfter<X> for DevicesState where IpState<Ipv6>>: LockAfter<X> {}
 //! ```
 //!
-//! Since `C` could be `DevicesState`, we'd have duplicate impls of
+//! Since `X` could be `LoopbackRx`, we'd have duplicate impls of
 //! `LockAfter<LoopbackRx> for DevicesState`.
 //!
 //! To work around this, we pick a different graph for the lock ordering that
@@ -91,8 +92,9 @@
 //! we can more faithfully represent that some locks can't be held at the same
 //! time by putting them on different branches.
 //!
-//! If, in the future, someone comes up with a better way to declare these, we
-//! should be able to migrate the definitions here without affecting the usages.
+//! If, in the future, someone comes up with a better way to declare the lock
+//! ordering graph and preserve cycle rejection, we should be able to migrate
+//! the definitions here without affecting the usages.
 //!
 //! [`SyncCtx`]: crate::SyncCtx
 //! [directed acyclic graph (DAG)]: https://en.wikipedia.org/wiki/Directed_acyclic_graph

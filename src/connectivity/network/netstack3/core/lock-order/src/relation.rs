@@ -2,11 +2,98 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! Traits used to describe lock-ordering relationships.
+//!
+//! This crate defines the traits used to describe lock-ordering relationships,
+//! [`LockBefore`] and [`LockAfter`]. They are reciprocals, like [`From`] and
+//! [`Into`] in the standard library, and like `From` and `Into`, a blanket impl
+//! is provided for `LockBefore` for implementations of `LockAfter`.
+//!
+//! It's recommended that, instead of implementing `LockAfter<B> for A` on your
+//! own lock level types `A` and `B`, you use the [`impl_lock_after`] macro
+//! instead. Why? Because in addition to emitting an implementation of
+//! `LockAfter`, it also provides a blanket implementation equivalent to this:
+//!
+//! ```no_run
+//! impl <X> LockAfter<X> for B where A: LockAfter<X> {}
+//! ```
+//!
+//! The blanket implementations are useful for inferring trait implementations
+//! but have a more important purpose: they make it impossible to introduce
+//! cycles in our lock ordering graph, and that's *the* key property we want to
+//! uphold.
+//!
+//! To see how this happens, let's look at the trait implementations. Suppose
+//! we have a lock ordering graph that looks like this:
+//!
+//! ```text
+//! A -> B -> C
+//! ```
+//!
+//! Assuming we are using `impl_lock_after`, that gives us the following trait
+//! implementations:
+//!
+//! ```no_run
+//! // Graph edges
+//! impl LockAfter<A> for B {}
+//! impl LockAfter<B> for C {}
+//! // Blanket impls that get us transitivity
+//! impl<X> LockAfter<X> for B where A: LockAfter<X> {} // 1
+//! impl<X> LockAfter<X> for C where B: LockAfter<X> {} // 2
+//! ```
+//! Now suppose we added an edge `C -> A` (introducing a cycle). That would give
+//! us these two impls:
+//!
+//! ```no_run
+//! // New edge
+//! impl LockAfter<C> for A {}
+//! // New blanket impl
+//! impl<X> LockAfter<X> for A where C: LockAfter<X> {}
+//! ```
+//!
+//! The compiler will follow the blanket impls to produce implicit `LockAfter`
+//! implementations like this:
+//!
+//!   1. Our added edge satisfies the `where` clause for blanket impl 1 with
+//!      `X=C`, so the compiler infers an implicit `impl LockAfter<C> for B {}`.
+//!   2. That satisfies the conditions for blanket impl 2 (`X=C`), so now we
+//!      also have `impl LockAfter<C> for C {}`.
+//!   3. This satisfies the condition for our new blanket impl with
+//!      `X=C`; now the compiler adds an implicit `impl LockAfter<C> for A {}`.
+//!
+//! Depicted visually, the compiler combines specific and blanket impls like
+//! this:
+//!
+//! ```text
+//! ┌─────────────────────────┐┌──────────────────────────────────────────────────┐
+//! │ impl LockAfter<C> for A ││ impl<X> LockAfter<X> for B where A: LockAfter<X> │
+//! └┬────────────────────────┘└┬─────────────────────────────────────────────────┘
+//! ┌▽──────────────────────────▽┐┌──────────────────────────────────────────────────┐
+//! │ impl LockAfter<C> for B    ││ impl<X> LockAfter<X> for C where B: LockAfter<X> │
+//! └┬───────────────────────────┘└┬─────────────────────────────────────────────────┘
+//! ┌▽─────────────────────────────▽┐┌──────────────────────────────────────────────────┐                                                  │
+//! │ impl LockAfter<C> for C       ││ impl<X> LockAfter<X> for A where C: LockAfter<X> │                                                                                            │
+//! └┬──────────────────────────────┘└┬─────────────────────────────────────────────────┘
+//! ┌▽────────────────────────────────▽┐
+//! │ impl LockAfter<C> for A  (again) │
+//! └──────────────────────────────────┘
+//!
+//! ```
+//! The final implicit trait implementation has the exact same trait
+//! (`LockAfter<C>`) and type (`A`) as the explicit implementation we added with
+//! our graph edge, so the compiler detects the duplication and rejects our
+//! code. This works not just with the graph above, but with any graph that
+//! includes a cycle.
+
 /// Marker trait that indicates that `Self` can be locked after `A`.
 ///
-/// Lock types should implement this to specify that in the lock ordering
-/// graph, `A` comes before `Self`. So if `B: LockAfter<A>`, lock type `B` can
-/// be acquired after `A` but `A` cannot be acquired before `B`.
+/// This should be implemented for lock types to specify that, in the lock
+/// ordering graph, `A` comes before `Self`. So if `B: LockAfter<A>`, lock type
+/// `B` can be acquired after `A` but `A` cannot be acquired before `B`.
+///
+/// Note, though, that it's preferred to use the [`impl_lock_after`] macro
+/// instead of writing trait impls directly to avoid the possibility of lock
+/// ordering cycles.
 pub trait LockAfter<A> {}
 
 /// Marker trait that indicates that `Self` is an ancestor of `X`.
