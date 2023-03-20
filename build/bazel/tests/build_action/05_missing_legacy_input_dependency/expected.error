@@ -1,0 +1,11 @@
+BAZEL_ACTION_ERROR: Missing bazel_input_xxx() dependencies.
+
+A GN target builds one or more Bazel targets that need to access Ninja
+outputs as Bazel inputs through the @legacy_ninja_build_outputs repository.
+
+  GN target:       //build/bazel/tests/build_action/05_missing_legacy_input_dependency:test_must_fail
+  Bazel target(s): //build/bazel/tests/build_action/05_missing_legacy_input_dependency:copy_input
+
+The following are missing from the GN target's bazel_inputs dependencies:
+
+  //build/bazel/tests/build_action/01_input_resource_from_source:bazel_input

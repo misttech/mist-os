@@ -1,0 +1,15 @@
+BAZEL_ACTION_ERROR: Unknown @legacy_ninja_build_outputs input
+
+A GN target builds one or more Bazel targets that need to access Ninja
+outputs as Bazel inputs through the @legacy_ninja_build_outputs repository.
+
+  GN target:       //build/bazel/tests/build_action/06_unknown_legacy_input_dependency:test_must_fail
+  Bazel target(s): //build/bazel/tests/build_action/06_unknown_legacy_input_dependency:copy_input
+
+The Bazel target depends on an unknown input:
+
+  @legacy_ninja_build_outputs//:06_unknown_legacy_input_dependency
+
+To fix this, add the GN bazel_input_xxx() target that defines it to the global
+lists defined in //build/bazel/legacy_ninja_build_outputs.gni, and also add it
+as a bazel_inputs dependency to the GN target.

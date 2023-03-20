@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
 import("//build/config/clang/clang.gni")
@@ -202,11 +203,6 @@ template("bazel_action") {
     _bazel_inputs = invoker.bazel_inputs
   }
 
-  _inputs = []
-  foreach(label, _bazel_inputs) {
-    _inputs += [ get_label_info(label, "label_with_toolchain") ]
-  }
-
   _bazel_build_files = []
   _bazel_targets = []
   foreach(label, invoker.bazel_targets) {
@@ -216,6 +212,22 @@ template("bazel_action") {
            "`...` is not supported in bazel_targets")
     _bazel_build_files += [ "${dir}/BUILD.bazel" ]
     _bazel_targets += [ "${dir}:${name}" ]
+  }
+
+  # Generate a manifest file that references all transitive bazel_input_xxx()
+  # dependencies from _bazel_inputs, which will be passed to bazel_action.py
+  # for verification (and print a human-friendly message on error).
+  #
+  # NOTE: Place the manifest file under $target_out_dir because $target_gen_dir
+  # is cleared explicitly by the //build/bazel/tests/build_action/run_tests.py
+  # script. It also prevents these file to appear as extraneous differences.
+  _ninja_inputs_manifest = "$target_out_dir/${target_name}.ninja_inputs.json"
+  _ninja_inputs_target = "${target_name}.ninja_inputs"
+
+  generate_bazel_inputs_manifest(_ninja_inputs_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    output = _ninja_inputs_manifest
+    inputs_deps = _bazel_inputs
   }
 
   action(target_name) {
@@ -245,6 +257,8 @@ template("bazel_action") {
       "//.git/index",
     ]
 
+    inputs += [ _ninja_inputs_manifest ]
+
     depfile = "$target_gen_dir/$target_name.d"
 
     outputs = _outputs
@@ -255,12 +269,15 @@ template("bazel_action") {
              rebase_path(bazel_workspace_dir, root_build_dir),
              "--command",
              invoker.command,
-             "--inputs-manifest",
+             "--gn-target-label",
+             get_label_info(":$target_name", "label_no_toolchain"),
+             "--legacy-inputs-manifest",
              rebase_path(bazel_inputs_manifest, root_build_dir),
-             "--bazel-inputs",
-           ] + _inputs + [ "--bazel-outputs" ] + _bazel_outputs +
-           [ "--bazel-targets" ] + _bazel_targets + [ "--ninja-outputs" ] +
-           rebase_path(_outputs, root_build_dir) +
+             "--ninja-inputs-manifest",
+             rebase_path(_ninja_inputs_manifest, root_build_dir),
+             "--bazel-outputs",
+           ] + _bazel_outputs + [ "--bazel-targets" ] + _bazel_targets +
+           [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
            [
              "--fuchsia-dir",
              rebase_path("//", root_build_dir),
@@ -332,7 +349,7 @@ template("bazel_action") {
     if (!defined(deps)) {
       deps = []
     }
-    deps += _bazel_inputs
+    deps += [ ":${_ninja_inputs_target}" ]
     deps += [ "//build/bazel:generate_main_workspace($default_toolchain)" ]
 
     # Prevent concurrent bazel build actions to run, otherwise

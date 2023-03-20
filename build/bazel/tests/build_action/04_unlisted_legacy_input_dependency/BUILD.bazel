@@ -1,0 +1,12 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# See README.txt for details
+
+genrule(
+    name = "copy_input",
+    srcs = ["@legacy_ninja_build_outputs//:04_unlisted_legacy_input_dependency"],
+    outs = ["foo.out.txt"],
+    cmd = "cp $< $@",
+)

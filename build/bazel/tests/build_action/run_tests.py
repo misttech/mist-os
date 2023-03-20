@@ -8,6 +8,7 @@ outputs, including the generated depfiles."""
 import argparse
 import filecmp
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -88,12 +89,22 @@ def compare_directories(expected_dir, actual_dir):
     return success
 
 
-def find_test_names(root_test_dir):
+def find_tests(root_test_dir):
     result = []
     for entry in sorted(os.listdir(root_test_dir)):
         build_file = os.path.join(root_test_dir, entry, 'BUILD.gn')
-        if os.path.exists(build_file):
-            result.append(entry)
+        if not os.path.exists(build_file):
+            continue
+
+        # If the BUILD.gn contains a "test_must_fail" target definition,
+        # verify later that it actually fails.
+        test_must_fail = False
+        with open(build_file) as f:
+            if '"test_must_fail"' in f.read():
+                test_must_fail = True
+
+        result.append((entry, test_must_fail))
+
     return result
 
 
@@ -123,43 +134,84 @@ Ninja output dir: {build_dir}
 ''')
 
     def run_fx_command(cmd_args):
-        subprocess.run(
-            ['scripts/fx'] + cmd_args, cwd=fuchsia_dir).check_returncode()
+        cmd_args = ['scripts/fx'] + cmd_args
+        cmd_str = ' '.join(shlex.quote(c) for c in cmd_args)
+        ret = subprocess.run(
+            cmd_args, capture_output=True, text=True, cwd=fuchsia_dir)
+        return ret, cmd_str
 
     # Clear the tests' Ninja output directories
     root_test_ninja_gen_dir = os.path.join(build_dir, 'gen', root_test_dir)
     if os.path.exists(root_test_ninja_gen_dir):
         shutil.rmtree(root_test_ninja_gen_dir)
 
-    test_names = find_test_names(root_test_dir)
-    assert len(test_names) > 0, f'Cannot find tests in {root_test_dir}'
+    tests = find_tests(root_test_dir)
+    assert len(tests) > 0, f'Cannot find tests in {root_test_dir}'
 
     # Build all tests with Ninja
     # Note that `-d keepdepfile` is required to ensure that Ninja will not
     # remove the generated depfiles from the output directory (even though
     # they will still be injected into the .ninja_deps file for future
     # incremental builds).
-    build_cmd = ['build', '-d', 'keepdepfile']
-    for name in test_names:
-        build_cmd += [os.path.join(root_test_dir, name) + ':test']
-
-    run_fx_command(build_cmd)
 
     success = True
 
-    for name in test_names:
+    for name, must_fail in tests:
         # Compare the directories.
         test_subdir = os.path.join(root_test_dir, name)
         test_gen_dir = os.path.join(root_test_ninja_gen_dir, name)
         test_expected_gen_dir = os.path.join(
             fuchsia_dir, test_subdir, 'expected.gen')
 
+        target_name = 'test_must_fail' if must_fail else 'test'
+        build_cmd = [
+            'build',
+            '-d',
+            'keepdepfile',
+            os.path.join(root_test_dir, name) + ':' + target_name,
+        ]
+
         print(f'[RUNNING   ] {name}')
-        if not compare_directories(test_expected_gen_dir, test_gen_dir):
+        ret, cmd_str = run_fx_command(build_cmd)
+        cmd_success = True
+
+        if must_fail:
+            if ret.returncode == 0:
+                print(f'UNEXPECTED_SUCCESS: {cmd_str}')
+                cmd_success = False
+            else:
+                expected_error_file = os.path.join(
+                    test_subdir, 'expected.error')
+                with open(expected_error_file) as f:
+                    expected_error = f.read().format(
+                        ninja_build_dir=os.path.realpath(build_dir))
+
+                # Ninja only reports stderr command errors through its own stdout!
+                actual_error = ret.stdout
+                if expected_error not in actual_error:
+                    print('UNPEXECTED ERROR MESSAGE:')
+                    for line in actual_error.splitlines():
+                        print('   ' + line)
+                    print('EXPECTED ERROR MESSAGE:')
+                    for line in expected_error.splitlines():
+                        print('   ' + line)
+                    cmd_success = False
+                else:
+                    print('EXPECTED_FAILURE OK')
+        elif ret.returncode != 0:
+            print(
+                'ERROR_STDOUT:\n{stdout}\nERROR_STDERR:\n{stderr}\n\nWhen invoking command: {cmd_str}'
+                .format(stdout=ret.stdout, stderr=ret.stderr, cmd_str=cmd_str))
+            cmd_success = False
+        else:
+            cmd_success = compare_directories(
+                test_expected_gen_dir, test_gen_dir)
+
+        if cmd_success:
+            print(f'[   SUCCESS] {name}')
+        else:
             print(f'[    FAILED] {name}')
             success = False
-        else:
-            print(f'[   SUCCESS] {name}')
 
     if success:
         print('All good!')

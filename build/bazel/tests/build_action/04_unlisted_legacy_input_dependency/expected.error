@@ -1,0 +1,13 @@
+BAZEL_ACTION_ERROR: Unlisted bazel_input_xxx() dependencies
+
+A GN target builds one or more Bazel targets that need to access Ninja
+outputs as Bazel inputs through the @legacy_ninja_build_outputs repository.
+
+  GN target:       //build/bazel/tests/build_action/04_unlisted_legacy_input_dependency:test_must_fail
+  Bazel target(s): //build/bazel/tests/build_action/04_unlisted_legacy_input_dependency:copy_input
+
+These GN bazel_input_xxx() target dependencies are missing from global lists:
+
+  //build/bazel/tests/build_action/04_unlisted_legacy_input_dependency:bazel_input
+
+Fix: update `gn_labels_for_bazel_inputs` or `extra_gn_labels_for_bazel_inputs`.

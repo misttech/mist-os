@@ -10,12 +10,29 @@ group("build_action") {
     "02_input_from_bazel_source:test",
     "03_input_resource_directory:test",
   ]
+
+  # These targets are empty, but depending on them ensures that the
+  # test_must_fail target defined in the same BUILD.gn is added to the GN
+  # graph.
+  deps += [
+    "04_unlisted_legacy_input_dependency:test",
+    "05_missing_legacy_input_dependency:test",
+    "06_unknown_legacy_input_dependency:test",
+  ]
 }
 
 # All bazel_input_xxx() targets for the tests below this directory.
+
 group("bazel_inputs") {
   deps = [
     "01_input_resource_from_source:bazel_input",
     "03_input_resource_directory:bazel_input",
+
+    # COMMENTED OUT ON PURPOSE
+    # "04_unlisted_legacy_input_dependency:bazel_input",
+    "05_missing_legacy_input_dependency:bazel_input",
+
+    # COMMENTED OUT ON PURPOSE
+    # "06_unknown_legacy_input_dependency:bazel_input
   ]
 }
