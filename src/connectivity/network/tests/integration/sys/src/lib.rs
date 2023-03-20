@@ -156,7 +156,12 @@ async fn ns_requests_inspect_persistence<N: Netstack>(name: &str) {
         fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream,
         N,
     >(&sandbox, persist_path, name);
+    assert_persist_called::<N>(fs).await
+}
 
+async fn assert_persist_called<N: Netstack>(
+    fs: ServiceFs<ServiceObj<'_, fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream>>,
+) {
     // And expect that we'll see a connection to profile provider.
     let (tag, responder) = fs
         .flatten()
@@ -171,6 +176,77 @@ async fn ns_requests_inspect_persistence<N: Netstack>(name: &str) {
     responder
         .send(fidl_fuchsia_diagnostics_persist::PersistResult::Queued)
         .expect("failed to respond");
+}
+
+#[netstack_test]
+async fn ns_persist_counters_under_size_limit<N: Netstack>(name: &str) {
+    let persist_path = format!(
+        "{}-netstack",
+        fidl_fuchsia_diagnostics_persist::DataPersistenceMarker::PROTOCOL_NAME
+    );
+
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let (realm, fs) = create_netstack_with_mock_endpoint::<
+        fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream,
+        N,
+    >(&sandbox, persist_path, name);
+
+    assert_persist_called::<N>(fs).await;
+
+    // Load netstack's persistence configuration file.
+    const CONFIG_PATH: &str = "/pkg/data/netstack.persist";
+    let config = persistence_config::load_configuration_files_from(CONFIG_PATH)
+        .expect("load configuration files failed");
+
+    // Retrieve netstack's persisted Inspect selectors.
+    const NETSTACK_SERVICE_NAME: &str = "netstack";
+    const NETSTACK_COUNTERS_TAG: &str = "netstack-counters";
+    let tags = config.get(NETSTACK_SERVICE_NAME).expect("service not present");
+    let tag_config = tags.get(NETSTACK_COUNTERS_TAG).expect("tag not present");
+
+    // The realm moniker is needed to construct the component part of an Inspect
+    // selector.
+    let moniker = realm.get_moniker().await.expect("get moniker failed");
+    let realm_moniker = selectors::sanitize_moniker_for_selectors(&moniker);
+    const SANDBOX_MONIKER: &str = "sandbox";
+    const NETSTACK_MONIKER: &str = "netstack";
+
+    // Modify selectors to use test realm moniker.
+    let selectors = tag_config
+        .selectors
+        .iter()
+        // Raw selector strings have the schema
+        // <type>:<component>:<subtree>:<property>. Extract the subtree portion
+        // of the selector, and combine it with a test realm specific component
+        // selector.
+        .map(|v| {
+            diagnostics_reader::ComponentSelector::new(vec![
+                SANDBOX_MONIKER.to_string(),
+                realm_moniker.clone(),
+                NETSTACK_MONIKER.to_string(),
+            ])
+            .with_tree_selector(
+                v.split(":")
+                    .skip(2)
+                    .next()
+                    .expect("raw selector string does not follow schema")
+                    .to_string(),
+            )
+        });
+
+    // Retrieve the data associated with selectors from the archivist.
+    let mut archive_reader = diagnostics_reader::ArchiveReader::new();
+    let archive_reader = archive_reader.add_selectors(selectors).retry_if_empty(true);
+    let data = archive_reader
+        .snapshot_raw::<diagnostics_reader::Inspect>()
+        .await
+        .expect("snapshot raw failed");
+
+    // Assert data to be persisted obeys size constraints specified in
+    // configuration.
+    let data = data.to_string();
+    assert!(data.len() > 0);
+    assert!(data.len() <= tag_config.max_bytes);
 }
 
 #[netstack_test]
