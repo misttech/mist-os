@@ -7,8 +7,6 @@
 //! only brings traits into scope for resolving methods and constants. It does
 //! not import the trait names themselves.
 
-pub use crate::client::QueryResponseFut as _;
-
 pub use crate::endpoints::{
     ControlHandle as _, DiscoverableProtocolMarker as _, ProtocolMarker as _, Proxy as _,
     RequestStream as _, Responder as _,
