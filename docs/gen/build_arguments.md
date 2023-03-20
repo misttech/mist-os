@@ -3639,7 +3639,7 @@ Use Fxfs's blob implementation
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:45
+From //src/storage/fshost/generated_fshost_config.gni:50
 
 ### gcc_tool_dir
 
@@ -8291,6 +8291,16 @@ Use link time optimization (LTO).
 **Current value (from the default):** `false`
 
 From //build/config/lto/config.gni:7
+
+### use_native_fxfs_crypto
+
+Enables the use of Fxfs' native encryption scheme, using a hardware key source when
+available.
+If set, devices not already using this scheme will be forcibly migrated, losing data.
+
+**Current value (from the default):** `true`
+
+From //src/storage/fshost/generated_fshost_config.gni:47
 
 ### use_netstack3
 
