@@ -15,7 +15,7 @@ use crate::fs::{
     FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString,
     MemoryDirectoryFile, NamespaceNode, SeekOrigin, SpecialNode,
 };
-use crate::lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use crate::lock::{Mutex, MutexGuard, RwLock};
 use crate::logging::*;
 use crate::mm::vmo::round_up_to_increment;
 use crate::mm::{
@@ -705,7 +705,7 @@ impl<'a> BinderProcessGuard<'a> {
 
             // Tell the owning process that a remote process now has a strong reference to
             // to this object.
-            binder_thread.state.write().enqueue_command(Command::AcquireRef(object.local));
+            binder_thread.lock().enqueue_command(Command::AcquireRef(object.local));
 
             object
         }
@@ -715,7 +715,7 @@ impl<'a> BinderProcessGuard<'a> {
     fn should_request_thread(&self, thread: &Arc<BinderThread>) -> bool {
         !self.thread_requested
             && self.thread_pool.0.len() < self.max_thread_count
-            && thread.read().is_registered()
+            && thread.lock().is_registered()
             && !self.thread_pool.has_available_thread()
     }
 
@@ -741,7 +741,7 @@ impl Drop for BinderProcess {
         for command in command_queue {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
-                    sender_thread.write().enqueue_command(Command::DeadReply);
+                    sender_thread.lock().enqueue_command(Command::DeadReply);
                 }
             }
         }
@@ -1001,9 +1001,9 @@ struct ThreadPool(BTreeMap<pid_t, Arc<BinderThread>>);
 impl ThreadPool {
     /// Finds the first available binder thread that is registered with the driver, is not in the
     /// middle of a transaction, and has no work to do.
-    fn find_available_thread(&self) -> Option<RwLockWriteGuard<'_, BinderThreadState>> {
+    fn find_available_thread(&self) -> Option<MutexGuard<'_, BinderThreadState>> {
         for thread in self.0.values() {
-            let thread_state = thread.write();
+            let thread_state = thread.lock();
             if thread_state.is_available() {
                 return Some(thread_state);
             }
@@ -1012,7 +1012,7 @@ impl ThreadPool {
     }
 
     fn has_available_thread(&self) -> bool {
-        self.0.values().any(|t| t.read().is_available())
+        self.0.values().any(|t| t.lock().is_available())
     }
 }
 
@@ -1303,31 +1303,26 @@ impl HandleTable {
 struct BinderThread {
     tid: pid_t,
     /// The mutable state of the binder thread, protected by a single lock.
-    state: RwLock<BinderThreadState>,
+    state: Mutex<BinderThreadState>,
 }
 
 impl BinderThread {
     fn new(binder_proc: &BinderProcessGuard<'_>, tid: pid_t) -> Self {
-        let state = RwLock::new(BinderThreadState::new(tid, binder_proc.base));
+        let state = Mutex::new(BinderThreadState::new(tid, binder_proc.base));
         #[cfg(any(test, debug_assertions))]
         {
             // The state must be acquired after the mutable state from the `BinderProcess` and before
             // `command_queue`. `binder_proc` being a guard, the mutable state of `BinderProcess` is
             // already locked.
-            let _l1 = state.read();
+            let _l1 = state.lock();
             let _l2 = binder_proc.base.command_queue.lock();
         }
         Self { tid, state }
     }
 
-    /// Acquire a reader lock to the binder thread's mutable state.
-    pub fn read(&self) -> RwLockReadGuard<'_, BinderThreadState> {
-        self.state.read()
-    }
-
-    /// Acquire a writer lock to the binder thread's mutable state.
-    pub fn write(&self) -> RwLockWriteGuard<'_, BinderThreadState> {
-        self.state.write()
+    /// Acquire the lock to the binder thread's mutable state.
+    pub fn lock(&self) -> MutexGuard<'_, BinderThreadState> {
+        self.state.lock()
     }
 }
 
@@ -1438,7 +1433,7 @@ impl Drop for BinderThreadState {
         for command in &self.command_queue {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
-                    sender_thread.write().enqueue_command(Command::DeadReply);
+                    sender_thread.lock().enqueue_command(Command::DeadReply);
                 }
             }
         }
@@ -1448,7 +1443,7 @@ impl Drop for BinderThreadState {
         for transaction in &self.transactions {
             if let TransactionRole::Receiver(peer) = transaction {
                 if let Some(peer_thread) = peer.thread.upgrade() {
-                    peer_thread.write().enqueue_command(Command::DeadReply);
+                    peer_thread.lock().enqueue_command(Command::DeadReply);
                 }
             }
         }
@@ -2595,13 +2590,13 @@ impl BinderDriver {
             binder_driver_command_protocol_BC_ENTER_LOOPER => {
                 let mut proc_state = binder_proc.lock();
                 binder_thread
-                    .write()
+                    .lock()
                     .handle_looper_registration(&mut proc_state, RegistrationState::MAIN)
             }
             binder_driver_command_protocol_BC_REGISTER_LOOPER => {
                 let mut proc_state = binder_proc.lock();
                 binder_thread
-                    .write()
+                    .lock()
                     .handle_looper_registration(&mut proc_state, RegistrationState::REGISTERED)
             }
             binder_driver_command_protocol_BC_INCREFS
@@ -2764,7 +2759,7 @@ impl BinderDriver {
             buffers: buffers.clone(),
         };
 
-        let caller_thread = match match binder_thread.read().transactions.last() {
+        let caller_thread = match match binder_thread.lock().transactions.last() {
             Some(TransactionRole::Receiver(rx)) => rx.upgrade(),
             _ => None,
         } {
@@ -2774,7 +2769,7 @@ impl BinderDriver {
 
         let command = if data.transaction_data.flags & transaction_flags_TF_ONE_WAY != 0 {
             // The caller is not expecting a reply.
-            binder_thread.write().enqueue_command(Command::OnewayTransactionComplete);
+            binder_thread.lock().enqueue_command(Command::OnewayTransactionComplete);
 
             // Register the transaction buffer.
             target_proc.lock().active_transactions.insert(
@@ -2806,7 +2801,7 @@ impl BinderDriver {
             // Make the sender thread part of the transaction so it doesn't get scheduled to handle
             // any other transactions.
             binder_thread
-                .write()
+                .lock()
                 .transactions
                 .push(TransactionRole::Sender(WeakBinderPeer::new(binder_proc, binder_thread)));
 
@@ -2827,7 +2822,7 @@ impl BinderDriver {
 
         // Find a thread to handle the transaction, or use the process' command queue.
         if let Some(target_thread) = caller_thread {
-            target_thread.write().enqueue_command(command);
+            target_thread.lock().enqueue_command(command);
         } else {
             target_proc.lock().enqueue_command(command);
         }
@@ -2843,7 +2838,7 @@ impl BinderDriver {
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError> {
         // Find the process and thread that initiated the transaction. This reply is for them.
-        let (target_proc, target_thread) = binder_thread.write().pop_transaction_caller()?;
+        let (target_proc, target_thread) = binder_thread.lock().pop_transaction_caller()?;
 
         let target_task = self.get_target_task(current_task.kernel(), target_proc.pid)?;
 
@@ -2868,7 +2863,7 @@ impl BinderDriver {
         );
 
         // Schedule the transaction on the target process' command queue.
-        target_thread.write().enqueue_command(Command::Reply(TransactionData {
+        target_thread.lock().enqueue_command(Command::Reply(TransactionData {
             peer_pid: binder_proc.pid,
             peer_tid: binder_thread.tid,
             peer_euid: current_task.creds().euid,
@@ -2881,7 +2876,7 @@ impl BinderDriver {
         }));
 
         // Schedule the transaction complete command on the caller's command queue.
-        binder_thread.write().enqueue_command(Command::TransactionComplete);
+        binder_thread.lock().enqueue_command(Command::TransactionComplete);
 
         Ok(())
     }
@@ -2908,7 +2903,7 @@ impl BinderDriver {
 
             // THREADING: Always acquire the [`BinderThread::state`] lock before the
             // [`BinderProcess::command_queue`] lock or else it may lead to deadlock.
-            let mut thread_state = binder_thread.write();
+            let mut thread_state = binder_thread.lock();
             let mut proc_command_queue = binder_proc.command_queue.lock();
 
             // Select which command queue to read from, preferring the thread-local one.
@@ -2966,7 +2961,7 @@ impl BinderDriver {
 
             // Put this thread to sleep.
             scopeguard::defer! {
-                binder_thread.write().waiter = WaiterRef::empty();
+                binder_thread.lock().waiter = WaiterRef::empty();
                 binder_proc.command_queue.lock().waiters.cancel_wait(wait_key);
             }
             waiter.wait(current_task)?;
@@ -3306,7 +3301,7 @@ impl BinderDriver {
     ) -> WaitKey {
         // THREADING: Always acquire the [`BinderThread::state`] lock before the
         // [`BinderProcess::command_queue`] lock or else it may lead to deadlock.
-        let thread_state = binder_thread.write();
+        let thread_state = binder_thread.lock();
         let mut proc_command_queue = binder_proc.command_queue.lock();
 
         if proc_command_queue.commands.is_empty() && thread_state.command_queue.is_empty() {
@@ -3531,7 +3526,7 @@ impl TransactionError {
     /// Dispatches the error, by potentially queueing a command to `binder_thread` and/or returning
     /// an error.
     fn dispatch(self, binder_thread: &Arc<BinderThread>) -> Result<(), Errno> {
-        binder_thread.write().enqueue_command(match self {
+        binder_thread.lock().enqueue_command(match self {
             TransactionError::Malformed(err) => {
                 log_warn!(
                     "binder thread {} sent a malformed transaction: {:?}",
@@ -4719,7 +4714,7 @@ mod tests {
         // Verify that a strong acquire command is sent to the sender process (on the same thread
         // that sent the transaction).
         assert_matches!(
-            test.sender_thread.read().command_queue.front(),
+            test.sender_thread.lock().command_queue.front(),
             Some(Command::AcquireRef(BINDER_OBJECT))
         );
     }
@@ -5652,7 +5647,7 @@ mod tests {
         // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
         let fake_waiter = Waiter::new();
         {
-            let mut client_state = client_thread.write();
+            let mut client_state = client_thread.lock();
             client_state.registration = RegistrationState::MAIN;
             client_state.waiter = fake_waiter.weak();
         }
@@ -5663,7 +5658,7 @@ mod tests {
 
         // The client thread should have a notification waiting.
         assert_matches!(
-            client_thread.read().command_queue.front(),
+            client_thread.lock().command_queue.front(),
             Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
         );
     }
@@ -5755,7 +5750,7 @@ mod tests {
         // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
         let fake_waiter = Waiter::new();
         {
-            let mut client_state = client_thread.write();
+            let mut client_state = client_thread.lock();
             client_state.registration = RegistrationState::MAIN;
             client_state.waiter = fake_waiter.weak();
         }
@@ -5765,7 +5760,7 @@ mod tests {
         drop(owner_proc);
 
         // The client thread should have no notification.
-        assert!(client_thread.read().command_queue.is_empty());
+        assert!(client_thread.lock().command_queue.is_empty());
 
         // The client process should have no notification.
         assert!(client_proc.command_queue.lock().commands.is_empty());
@@ -5902,15 +5897,15 @@ mod tests {
 
         TransactionError::Malformed(errno!(EINVAL)).dispatch(&thread).expect("no error");
         assert_matches!(
-            thread.write().command_queue.pop_front(),
+            thread.lock().command_queue.pop_front(),
             Some(Command::Error(val)) if val == EINVAL.return_value() as i32
         );
 
         TransactionError::Failure.dispatch(&thread).expect("no error");
-        assert_matches!(thread.write().command_queue.pop_front(), Some(Command::FailedReply));
+        assert_matches!(thread.lock().command_queue.pop_front(), Some(Command::FailedReply));
 
         TransactionError::Dead.dispatch(&thread).expect("no error");
-        assert_matches!(thread.write().command_queue.pop_front(), Some(Command::DeadReply));
+        assert_matches!(thread.lock().command_queue.pop_front(), Some(Command::DeadReply));
     }
 
     #[fuchsia::test]
@@ -6146,7 +6141,7 @@ mod tests {
             .expect("failed to handle the transaction");
 
         // Check that there are no commands waiting for the sending thread.
-        assert!(test.sender_thread.read().command_queue.is_empty());
+        assert!(test.sender_thread.lock().command_queue.is_empty());
 
         // Check that the receiving process has a transaction scheduled.
         assert_matches!(
@@ -6160,7 +6155,7 @@ mod tests {
         drop(receiver_proc);
 
         // Check that there is a dead reply command for the sending thread.
-        assert_matches!(sender_thread.read().command_queue.front(), Some(Command::DeadReply));
+        assert_matches!(sender_thread.lock().command_queue.front(), Some(Command::DeadReply));
     }
 
     #[fuchsia::test]
@@ -6189,7 +6184,7 @@ mod tests {
             test.receiver_proc.lock().find_or_register_thread(test.receiver_proc.pid);
         let fake_waiter = Waiter::new();
         {
-            let mut thread_state = receiver_thread.write();
+            let mut thread_state = receiver_thread.lock();
             thread_state.registration = RegistrationState::MAIN;
             thread_state.waiter = fake_waiter.weak();
         }
@@ -6205,11 +6200,11 @@ mod tests {
             .expect("failed to handle the transaction");
 
         // Check that there are no commands waiting for the sending thread.
-        assert!(test.sender_thread.read().command_queue.is_empty());
+        assert!(test.sender_thread.lock().command_queue.is_empty());
 
         // Check that the receiving thread has a transaction scheduled.
         assert_matches!(
-            receiver_thread.read().command_queue.front(),
+            receiver_thread.lock().command_queue.front(),
             Some(Command::Transaction { .. })
         );
 
@@ -6220,7 +6215,7 @@ mod tests {
         drop(receiver_proc);
 
         // Check that there is a dead reply command for the sending thread.
-        assert_matches!(sender_thread.read().command_queue.front(), Some(Command::DeadReply));
+        assert_matches!(sender_thread.lock().command_queue.front(), Some(Command::DeadReply));
     }
 
     #[fuchsia::test]
@@ -6249,7 +6244,7 @@ mod tests {
             test.receiver_proc.lock().find_or_register_thread(test.receiver_proc.pid);
         let fake_waiter = Waiter::new();
         {
-            let mut thread_state = receiver_thread.write();
+            let mut thread_state = receiver_thread.lock();
             thread_state.registration = RegistrationState::MAIN;
             thread_state.waiter = fake_waiter.weak();
         }
@@ -6265,11 +6260,11 @@ mod tests {
             .expect("failed to handle the transaction");
 
         // Check that there are no commands waiting for the sending thread.
-        assert!(test.sender_thread.read().command_queue.is_empty());
+        assert!(test.sender_thread.lock().command_queue.is_empty());
 
         // Check that the receiving thread has a transaction scheduled.
         assert_matches!(
-            receiver_thread.read().command_queue.front(),
+            receiver_thread.lock().command_queue.front(),
             Some(Command::Transaction { .. })
         );
 
@@ -6285,8 +6280,8 @@ mod tests {
             .expect("read command");
 
         // The thread should now have an empty command list and an ongoing transaction.
-        assert!(receiver_thread.read().command_queue.is_empty());
-        assert!(!receiver_thread.read().transactions.is_empty());
+        assert!(receiver_thread.lock().command_queue.is_empty());
+        assert!(!receiver_thread.lock().transactions.is_empty());
 
         // Drop the receiving process and thread.
         let TranslateHandlesTestFixture { sender_thread, receiver_proc, .. } = test;
@@ -6295,7 +6290,7 @@ mod tests {
         drop(receiver_proc);
 
         // Check that there is a dead reply command for the sending thread.
-        assert_matches!(sender_thread.read().command_queue.front(), Some(Command::DeadReply));
+        assert_matches!(sender_thread.lock().command_queue.front(), Some(Command::DeadReply));
     }
 
     #[fuchsia::test]
