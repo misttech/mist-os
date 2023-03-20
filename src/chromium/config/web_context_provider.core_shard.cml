@@ -9,14 +9,6 @@
             environment: "#core-env",
         },
     ],
-    use: [
-        // TODO(crbug.com/1324624): remove once we've migrated the smart session shard to use the
-        // protocol from context_provider directly
-        {
-            protocol: "fuchsia.web.ContextProvider",
-            from: "#context_provider",
-        },
-    ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",
