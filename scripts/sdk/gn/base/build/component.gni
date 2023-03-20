@@ -47,6 +47,11 @@ declare_args() {
 #   required_uses (optional)
 #     [list of strings] The set of protocols that each child must use.
 #
+#   include_coverage_shard (optional)
+#     Whether to include the `enable_coverage_data.cml` in a merged manifest.
+#     Overrides the default based on `fuchsia_code_coverage`.
+#     Should only be used in rare exceptions that do not use CML-based routing.
+#
 #   data_deps
 #   deps
 #   testonly
@@ -58,6 +63,12 @@ template("fuchsia_component_manifest") {
 
   forward_variables_from(invoker, [ "manifest" ])
 
+  if (defined(invoker.include_coverage_shard)) {
+    include_coverage_shard = invoker.include_coverage_shard
+  } else {
+    include_coverage_shard = fuchsia_code_coverage
+  }
+
   # Determine manifest_version from the `manifest` file extension.
   _manifest_extension = get_path_info(manifest, "extension")
   assert(_manifest_extension == "cmx" || _manifest_extension == "cml",
@@ -68,7 +79,7 @@ template("fuchsia_component_manifest") {
     _manifest_version = "v2"
   }
 
-  if (fuchsia_code_coverage && _manifest_version == "v2") {
+  if (include_coverage_shard && _manifest_version == "v2") {
     merged_manifest = "${target_name}-coverage"
     manifest_file = get_path_info(manifest, "file")
 
@@ -117,7 +128,7 @@ template("fuchsia_component_manifest") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
-      if (fuchsia_code_coverage && _manifest_version == "v2") {
+      if (include_coverage_shard && _manifest_version == "v2") {
         deps += [ ":${merged_manifest}" ]
       }
     }
@@ -139,7 +150,7 @@ template("fuchsia_component_manifest") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
-      if (fuchsia_code_coverage) {
+      if (include_coverage_shard) {
         deps += [ ":${merged_manifest}" ]
       }
     }
@@ -277,6 +288,7 @@ template("fuchsia_component") {
                                "visibility",
                                "required_offers",
                                "required_uses",
+                               "include_coverage_shard",
                              ])
       if (defined(invoker.manifest_deps)) {
         if (!defined(deps)) {
