@@ -48,8 +48,10 @@ struct MutexOps {
 // '_zx_' function names for syscalls and not the regular 'zx_' names.
 
 static inline void spin() {
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__riscv_zihintpause)
   __asm__ __volatile__("pause" : : : "memory");
+#elif defined(__riscv)
+  // If -march doesn't include Zihintpause, there's nothing to do.
 #elif defined(__aarch64__)
   __atomic_thread_fence(__ATOMIC_SEQ_CST);
 #else
