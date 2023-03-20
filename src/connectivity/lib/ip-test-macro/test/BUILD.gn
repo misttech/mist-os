@@ -13,7 +13,7 @@ rustc_test("ip-test-macro_test") {
 
   deps = [
     ":fake-test-case",
-    "//src/connectivity/network/netstack3/core/ip-test-macro",
+    "//src/connectivity/lib/ip-test-macro",
     "//third_party/rust_crates:test-case",
   ]
 

@@ -104,9 +104,9 @@ lib_deps = [
 ]
 
 lib_test_deps = [
-  "ip-test-macro",
   "proptest-support",
   "teststd",
+  "//src/connectivity/lib/ip-test-macro",
   "//src/connectivity/lib/net-declare",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:itertools",
@@ -248,7 +248,6 @@ group("tests") {
     ":netstack3-core-fuzzers",
     ":netstack3-core-test-package",
     ":netstack3-core_test($host_toolchain)",
-    "ip-test-macro:tests",
     "lock-order:tests",
     "sync:tests",
   ]
