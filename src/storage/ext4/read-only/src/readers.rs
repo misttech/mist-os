@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
-use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_hardware_block::BlockMarker;
-use fidl_fuchsia_mem::Buffer;
-use remote_block_device::{Cache, RemoteBlockClientSync};
 use std::{
     convert::TryInto,
+    io::{Read, Seek, SeekFrom},
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
 use tracing::error;
+
+#[cfg(target_os = "fuchsia")]
+pub use self::fuchsia::*;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ReaderError {
@@ -42,45 +41,20 @@ impl Reader for Arc<dyn Reader> {
     }
 }
 
-pub struct VmoReader {
-    buffer: Arc<Buffer>,
+/// IoAdapter wraps any reader that supports std::io::{Read|Seek}.
+pub struct IoAdapter<T>(Mutex<T>);
+
+impl<T> IoAdapter<T> {
+    pub fn new(inner: T) -> Self {
+        Self(Mutex::new(inner))
+    }
 }
 
-impl Reader for VmoReader {
+impl<T: Read + Seek + Send + Sync> Reader for IoAdapter<T> {
     fn read(&self, offset: u64, data: &mut [u8]) -> Result<(), ReaderError> {
-        let offset_max = offset + data.len() as u64;
-        if offset_max > self.buffer.size {
-            return Err(ReaderError::OutOfBounds(offset_max, self.buffer.size));
-        }
-        match self.buffer.vmo.read(data, offset) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(ReaderError::Read(offset)),
-        }
-    }
-}
-
-impl VmoReader {
-    pub fn new(filesystem: Arc<Buffer>) -> Self {
-        VmoReader { buffer: filesystem }
-    }
-}
-
-pub struct BlockDeviceReader {
-    block_cache: Mutex<Cache>,
-}
-
-impl Reader for BlockDeviceReader {
-    fn read(&self, offset: u64, data: &mut [u8]) -> Result<(), ReaderError> {
-        self.block_cache.lock().unwrap().read_at(data, offset).map_err(|e| {
-            error!("Encountered error while reading block device: {}", e);
-            ReaderError::Read(offset)
-        })
-    }
-}
-
-impl BlockDeviceReader {
-    pub fn from_client_end(client_end: ClientEnd<BlockMarker>) -> Result<Self, Error> {
-        Ok(Self { block_cache: Mutex::new(Cache::new(RemoteBlockClientSync::new(client_end)?)?) })
+        let mut reader = self.0.lock().unwrap();
+        reader.seek(SeekFrom::Start(offset)).map_err(|_| ReaderError::Read(offset))?;
+        reader.read_exact(data).map_err(|_| ReaderError::Read(offset))
     }
 }
 
@@ -112,5 +86,63 @@ impl Reader for VecReader {
 impl VecReader {
     pub fn new(filesystem: Vec<u8>) -> Self {
         VecReader { data: filesystem }
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+mod fuchsia {
+    use {
+        super::{Reader, ReaderError},
+        anyhow::Error,
+        fidl::endpoints::ClientEnd,
+        fidl_fuchsia_hardware_block::BlockMarker,
+        fidl_fuchsia_mem::Buffer,
+        remote_block_device::{Cache, RemoteBlockClientSync},
+        std::sync::{Arc, Mutex},
+        tracing::error,
+    };
+
+    pub struct VmoReader {
+        buffer: Arc<Buffer>,
+    }
+
+    impl Reader for VmoReader {
+        fn read(&self, offset: u64, data: &mut [u8]) -> Result<(), ReaderError> {
+            let offset_max = offset + data.len() as u64;
+            if offset_max > self.buffer.size {
+                return Err(ReaderError::OutOfBounds(offset_max, self.buffer.size));
+            }
+            match self.buffer.vmo.read(data, offset) {
+                Ok(_) => Ok(()),
+                Err(_) => Err(ReaderError::Read(offset)),
+            }
+        }
+    }
+
+    impl VmoReader {
+        pub fn new(filesystem: Arc<Buffer>) -> Self {
+            VmoReader { buffer: filesystem }
+        }
+    }
+
+    pub struct BlockDeviceReader {
+        block_cache: Mutex<Cache>,
+    }
+
+    impl Reader for BlockDeviceReader {
+        fn read(&self, offset: u64, data: &mut [u8]) -> Result<(), ReaderError> {
+            self.block_cache.lock().unwrap().read_at(data, offset).map_err(|e| {
+                error!("Encountered error while reading block device: {}", e);
+                ReaderError::Read(offset)
+            })
+        }
+    }
+
+    impl BlockDeviceReader {
+        pub fn from_client_end(client_end: ClientEnd<BlockMarker>) -> Result<Self, Error> {
+            Ok(Self {
+                block_cache: Mutex::new(Cache::new(RemoteBlockClientSync::new(client_end)?)?),
+            })
+        }
     }
 }

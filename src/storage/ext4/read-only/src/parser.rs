@@ -51,9 +51,7 @@ use {
         mem::{size_of, size_of_val},
         path::{Component, Path},
         str,
-        sync::Arc,
     },
-    vfs::{directory::immutable, file::vmo::read_only, tree_builder::TreeBuilder},
     zerocopy::{byteorder::little_endian::U32 as LEU32, AsBytes, ByteSlice},
 };
 
@@ -632,7 +630,12 @@ impl<T: 'static + Reader> Parser<T> {
     }
 
     /// Returns a `Simple` filesystem as built by `TreeBuilder.build()`.
-    pub fn build_fuchsia_tree(&self) -> Result<Arc<immutable::Simple>, ParsingError> {
+    #[cfg(target_os = "fuchsia")]
+    pub fn build_fuchsia_tree(
+        &self,
+    ) -> Result<std::sync::Arc<vfs::directory::immutable::Simple>, ParsingError> {
+        use vfs::{file::vmo::read_only, tree_builder::TreeBuilder};
+
         let root_inode = self.root_inode()?;
         let mut tree = TreeBuilder::empty_dir();
 
