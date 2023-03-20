@@ -34,7 +34,7 @@
 
         // TODO(crbug.com/1280703): Remove the offers in this next block once
         // context_provider.cm is launching web_instance.cm rather than
-        // web_instance.cmx.
+        // web_instance.cmx in the "release" prebuilt.
         {
             protocol: [
                 "fuchsia.sys.Environment",
@@ -51,13 +51,13 @@
             to: "#context_provider",
             subdir: "web_engine",
         },
-
-        // Required when contexts supporting networking are requested.
         {
             directory: "root-ssl-certificates",
             from: "parent",
             to: "#context_provider",
-            availability: "optional",
+            // Required because clients may request Contexts with
+            // `ContextFeatureFlags::NETWORK`.
+            availability: "required",
         },
     ],
 }

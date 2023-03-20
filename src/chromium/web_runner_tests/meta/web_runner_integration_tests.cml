@@ -53,7 +53,7 @@
             ],
         },
         {
-            // Required for ContextFeatureFlags::NETWORK.
+            // Required for `ContextFeatureFlags::NETWORK`.
             // Get these directly from the hermetic netstack component.
             protocol: [
                 "fuchsia.net.interfaces.State",
@@ -118,10 +118,9 @@
             subdir: "web-runner-integration-test",
         },
         {
-            // Required for ContextFeatureFlags::NETWORK.
+            // Required for `ContextFeatureFlags::NETWORK`.
             directory: "root-ssl-certificates",
             from: "parent",
-            as: "root-ssl-certificates",
             to: "#realm_builder",
             availability: "required",
         },
