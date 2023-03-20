@@ -144,9 +144,6 @@ group("ui_packages") {
     deps += [
       "bin/root_presenter:virtual_keyboard_manager",
       "bin/scene_manager",
-
-      # TODO(fxbug.dev/104239): Configure presence via build flag.
-      "bin/shortcut",
     ]
   } else {
     deps += [
