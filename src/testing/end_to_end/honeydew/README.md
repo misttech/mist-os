@@ -104,10 +104,16 @@ In [19]: emu.component.search("wlanstack.cm")
 Out[19]: True
 ```
 
+#### Bluetooth affordance
+```
+In [20]: fd_1p.bluetooth.request_discovery(True)
+```
+
 ### Device object destruction
-```python
-In [20]: emu.close()
-In [21]: del emu
+```
+In [21]: emu.close()
+In [22]: del emu
+
 ```
 
 ## Contributing

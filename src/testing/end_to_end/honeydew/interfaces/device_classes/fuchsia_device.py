@@ -8,7 +8,7 @@ import abc
 from typing import Optional
 
 from honeydew import custom_types
-from honeydew.interfaces.affordances import component
+from honeydew.interfaces.affordances import component, bluetooth
 from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
 from honeydew.utils import ffx_cli, properties
 
@@ -106,6 +106,15 @@ class FuchsiaDevice(abc.ABC):
         """
 
     # List all the affordances in alphabetical order
+    @properties.Affordance
+    @abc.abstractmethod
+    def bluetooth(self) -> bluetooth.Bluetooth:
+        """Returns a bluetooth affordance object.
+
+        Returns:
+            bluetooth.Bluetooth object
+        """
+
     @properties.Affordance
     @abc.abstractmethod
     def component(self) -> component.Component:

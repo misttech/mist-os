@@ -89,7 +89,7 @@ class InitTests(unittest.TestCase):
     def test_get_all_affordances(self, mock_get_device_class):
         """Test case for honeydew.get_all_affordances()."""
         device_name = "fuchsia-emulator"
-        expected_affordances = ['component']
+        expected_affordances = ['bluetooth', 'component']
 
         self.assertEqual(
             honeydew.get_all_affordances(device_name), expected_affordances)

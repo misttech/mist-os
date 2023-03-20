@@ -14,9 +14,18 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
-}
 
+  python_host_test("bluetooth_default_test") {
+    main_source = "bluetooth_default_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+}
 group("tests") {
   testonly = true
-  public_deps = [ ":component_default_test($host_toolchain)" ]
+  public_deps = [
+    ":bluetooth_default_test($host_toolchain)",
+    ":component_default_test($host_toolchain)",
+  ]
 }

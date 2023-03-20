@@ -14,11 +14,12 @@ from http.client import RemoteDisconnected
 from typing import Any, Dict, Iterable, Optional, Type
 
 from honeydew import custom_types, errors
-from honeydew.affordances import component_default
+from honeydew.affordances import component_default, bluetooth_default
 from honeydew.interfaces.affordances import component as component_interface
+from honeydew.interfaces.affordances import bluetooth as bluetooth_interface
 from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
 from honeydew.interfaces.device_classes import (
-    component_capable_device, fuchsia_device)
+    component_capable_device, fuchsia_device, bluetooth_capable_device)
 from honeydew.interfaces.transports import sl4f
 from honeydew.utils import ffx_cli, host_utils, http_utils, properties
 
@@ -60,7 +61,8 @@ _SSH_COMMAND = \
 
 # pylint: disable=attribute-defined-outside-init, too-many-instance-attributes
 class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
-                        component_capable_device.ComponentCapableDevice):
+                        component_capable_device.ComponentCapableDevice,
+                        bluetooth_capable_device.BluetoothCapableDevice):
     """Default implementation of Fuchsia device abstract base class.
 
     This class contains methods that are supported by every device running
@@ -171,6 +173,17 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         return get_version_resp["result"]
 
     # List all the affordances in alphabetical order
+    # TODO(fxbug.dev/123944): Remove this after fxbug.dev/123944 is fixed
+    @properties.Affordance
+    def bluetooth(self) -> bluetooth_interface.Bluetooth:
+        """Returns a bluetooth affordance object.
+
+        Returns:
+            bluetooth.Bluetooth object
+        """
+        return bluetooth_default.BluetoothDefault(
+            device_name=self.name, sl4f=self)
+
     @properties.Affordance
     def component(self) -> component_interface.Component:
         """Returns a component affordance object.

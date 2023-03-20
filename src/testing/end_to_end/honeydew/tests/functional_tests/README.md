@@ -73,3 +73,12 @@ $ ffx emu stop && ffx emu start -H --net tap
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_component_default:component_default_test --e2e --output
 ```
+
+### Bluetooth tests
+``` shell
+
+$ fx set workstation_eng.x64  --with //src/testing/sl4f --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth_default:bluetooth_default_test --e2e --output
+```
+

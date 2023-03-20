@@ -5,7 +5,9 @@
 if (is_host) {
   group("tests") {
     testonly = true
-    public_deps =
-        [ "test_component_default:component_default_test($host_toolchain)" ]
+    public_deps = [
+      "test_bluetooth_default:bluetooth_default_test($host_toolchain)",
+      "test_component_default:component_default_test($host_toolchain)",
+    ]
   }
 }

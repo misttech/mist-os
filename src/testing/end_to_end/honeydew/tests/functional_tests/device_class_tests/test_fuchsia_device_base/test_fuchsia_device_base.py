@@ -8,13 +8,13 @@ import logging
 import os
 import tempfile
 
+from mobly import asserts, base_test, test_runner
 from honeydew import custom_types
 from honeydew.device_classes import fuchsia_device_base
 from honeydew.interfaces.device_classes import (
     component_capable_device, fuchsia_device)
 from honeydew.mobly_controller import \
     fuchsia_device as fuchsia_device_mobly_controller
-from mobly import asserts, base_test, test_runner
 
 _LOGGER = logging.getLogger(__name__)
 
