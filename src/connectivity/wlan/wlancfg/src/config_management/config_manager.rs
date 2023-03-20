@@ -438,7 +438,7 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                             ConnectFailure {
                                 time: fasync::Time::now(),
                                 reason: FailureReason::CredentialRejected,
-                                bssid: bssid,
+                                bssid,
                             },
                         );
                     }
@@ -448,7 +448,7 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                             ConnectFailure {
                                 time: fasync::Time::now(),
                                 reason: FailureReason::GeneralFailure,
-                                bssid: bssid,
+                                bssid,
                             },
                         );
                     }

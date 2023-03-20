@@ -187,7 +187,7 @@ mod tests {
     fn active_sme_req(ssids: Vec<&str>, channels: Vec<u8>) -> fidl_sme::ScanRequest {
         fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
             ssids: ssids.iter().map(|s| s.as_bytes().to_vec()).collect(),
-            channels: channels,
+            channels,
         })
     }
 

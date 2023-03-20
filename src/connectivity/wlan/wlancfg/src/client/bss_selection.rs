@@ -79,12 +79,7 @@ impl BssQualityData {
         channel: client_types::WlanChan,
         past_connections_list: PastConnectionList,
     ) -> Self {
-        BssQualityData {
-            signal_data: signal_data,
-            channel: channel,
-            phy_rates: (0, 0),
-            past_connections_list: past_connections_list,
-        }
+        BssQualityData { signal_data, channel, phy_rates: (0, 0), past_connections_list }
     }
 }
 

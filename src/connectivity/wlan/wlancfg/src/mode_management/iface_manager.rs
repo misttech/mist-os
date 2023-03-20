@@ -169,7 +169,7 @@ impl IfaceManagerService {
             dev_monitor_proxy,
             clients: Vec::new(),
             aps: Vec::new(),
-            saved_networks: saved_networks,
+            saved_networks,
             fsm_futures: FuturesUnordered::new(),
             network_selection_futures: FuturesUnordered::new(),
             bss_selection_futures: FuturesUnordered::new(),
@@ -270,7 +270,7 @@ impl IfaceManagerService {
         let security_support =
             features_proxy.query_security_support().await?.map_err(zx::Status::from_raw)?;
         Ok(ClientIfaceContainer {
-            iface_id: iface_id,
+            iface_id,
             sme_proxy,
             config: None,
             client_state_machine: None,
@@ -333,15 +333,13 @@ impl IfaceManagerService {
         .boxed();
 
         // Begin running and monitoring the AP state machine future.
-        let metadata = StateMachineMetadata {
-            iface_id: iface_id,
-            role: fidl_fuchsia_wlan_common::WlanMacRole::Ap,
-        };
+        let metadata =
+            StateMachineMetadata { iface_id, role: fidl_fuchsia_wlan_common::WlanMacRole::Ap };
         let fut = future_with_metadata::FutureWithMetadata::new(metadata, state_machine_fut);
         self.fsm_futures.push(fut);
 
         Ok(ApIfaceContainer {
-            iface_id: iface_id,
+            iface_id,
             config: None,
             ap_state_machine: Box::new(state_machine),
             enabled_time: None,
@@ -458,7 +456,7 @@ impl IfaceManagerService {
 
         let update = listener::ClientStateUpdate {
             state: client_types::ClientState::ConnectionsEnabled,
-            networks: networks,
+            networks,
         };
         match self
             .client_update_sender
@@ -1045,7 +1043,7 @@ async fn handle_bss_selection_results_for_connect_request(
 
                 let update = listener::ClientStateUpdate {
                     state: client_types::ClientState::ConnectionsEnabled,
-                    networks: networks,
+                    networks,
                 };
                 match iface_manager
                     .client_update_sender
@@ -1469,7 +1467,7 @@ mod tests {
         fidl::endpoints::create_proxy,
         fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
         fuchsia_async::{DurationExt, TestExecutor},
-        fuchsia_inspect::{self as inspect},
+        fuchsia_inspect as inspect,
         futures::{
             channel::mpsc,
             stream::{StreamExt, StreamFuture},
@@ -1506,7 +1504,7 @@ mod tests {
 
         client_types::ConnectSelection {
             target: client_types::ScannedCandidate {
-                network: network,
+                network,
                 credential: credential.clone(),
                 bss_description: random_fidl_bss_description!(Wpa1, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,
@@ -1587,9 +1585,9 @@ mod tests {
             client_update_receiver: client_receiver,
             ap_update_sender: ap_sender,
             ap_update_receiver: ap_receiver,
-            saved_networks: saved_networks,
+            saved_networks,
             scan_requester,
-            node: node,
+            node,
             network_selector,
             telemetry_sender,
             telemetry_receiver,
@@ -2314,7 +2312,7 @@ mod tests {
 
         let selection = client_types::ConnectSelection {
             target: client_types::ScannedCandidate {
-                network: network,
+                network,
                 credential: credential.clone(),
                 bss_description: random_fidl_bss_description!(Wpa3, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,

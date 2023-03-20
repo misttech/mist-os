@@ -134,10 +134,10 @@ pub async fn serve(
         reason: types::DisconnectReason::Startup,
     };
     let common_options = CommonStateOptions {
-        proxy: proxy,
+        proxy,
         req_stream: req_stream.fuse(),
-        update_sender: update_sender,
-        saved_networks_manager: saved_networks_manager,
+        update_sender,
+        saved_networks_manager,
         telemetry_sender,
         iface_id,
         stats_sender,
@@ -871,7 +871,7 @@ mod tests {
             common_options: CommonStateOptions {
                 proxy: sme_proxy,
                 req_stream: client_req_stream.fuse(),
-                update_sender: update_sender,
+                update_sender,
                 saved_networks_manager: saved_networks_manager.clone(),
                 telemetry_sender,
                 iface_id: 1,
@@ -1418,7 +1418,7 @@ mod tests {
         let common_options = CommonStateOptions {
             proxy: sme_proxy,
             req_stream: client_req_stream.fuse(),
-            update_sender: update_sender,
+            update_sender,
             saved_networks_manager: saved_networks_manager.clone(),
             telemetry_sender,
             iface_id: 1,
@@ -1629,7 +1629,7 @@ mod tests {
         let common_options = CommonStateOptions {
             proxy: sme_proxy,
             req_stream: client_req_stream.fuse(),
-            update_sender: update_sender,
+            update_sender,
             saved_networks_manager: saved_networks_manager.clone(),
             telemetry_sender,
             iface_id: 1,
@@ -1756,7 +1756,7 @@ mod tests {
         let common_options = CommonStateOptions {
             proxy: sme_proxy,
             req_stream: client_req_stream.fuse(),
-            update_sender: update_sender,
+            update_sender,
             saved_networks_manager: saved_networks_manager.clone(),
             telemetry_sender,
             iface_id: 1,
@@ -3357,7 +3357,7 @@ mod tests {
         let connect_req = types::ConnectSelection {
             target: types::ScannedCandidate {
                 network: types::NetworkIdentifier {
-                    ssid: ssid,
+                    ssid,
                     security_type: types::SecurityType::None,
                 },
                 credential: Credential::None,
@@ -3420,7 +3420,7 @@ mod tests {
         let connect_req = types::ConnectSelection {
             target: types::ScannedCandidate {
                 network: types::NetworkIdentifier {
-                    ssid: ssid,
+                    ssid,
                     security_type: types::SecurityType::None,
                 },
                 credential: Credential::None,
@@ -3573,7 +3573,7 @@ mod tests {
         let connect_req = types::ConnectSelection {
             target: types::ScannedCandidate {
                 network: types::NetworkIdentifier {
-                    ssid: ssid,
+                    ssid,
                     security_type: types::SecurityType::None,
                 },
                 credential: Credential::None,

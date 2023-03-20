@@ -563,7 +563,7 @@ pub struct NetworkIdentifier {
 
 impl NetworkIdentifier {
     pub fn new(ssid: client_types::Ssid, security_type: SecurityType) -> Self {
-        NetworkIdentifier { ssid: ssid, security_type }
+        NetworkIdentifier { ssid, security_type }
     }
 
     #[cfg(test)]
@@ -826,7 +826,7 @@ mod tests {
             NetworkConfig {
                 ssid: client_types::Ssid::try_from("foo").unwrap(),
                 security_type: SecurityType::None,
-                credential: credential,
+                credential,
                 has_ever_connected: false,
                 hidden_probability: PROB_HIDDEN_DEFAULT,
                 hidden_probability_stats: HiddenProbabilityStats::new(),
@@ -851,7 +851,7 @@ mod tests {
             NetworkConfig {
                 ssid: client_types::Ssid::try_from("foo").unwrap(),
                 security_type: SecurityType::Wpa2,
-                credential: credential,
+                credential,
                 has_ever_connected: false,
                 hidden_probability: PROB_HIDDEN_DEFAULT,
                 hidden_probability_stats: HiddenProbabilityStats::new(),
@@ -877,7 +877,7 @@ mod tests {
             NetworkConfig {
                 ssid: client_types::Ssid::try_from("foo").unwrap(),
                 security_type: SecurityType::Wpa2,
-                credential: credential,
+                credential,
                 has_ever_connected: false,
                 hidden_probability: PROB_HIDDEN_DEFAULT,
                 hidden_probability_stats: HiddenProbabilityStats::new(),

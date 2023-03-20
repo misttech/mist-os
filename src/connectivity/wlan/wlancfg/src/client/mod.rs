@@ -517,7 +517,7 @@ mod tests {
             FakeIfaceManager {
                 sme_proxy: proxy,
                 disconnected_ifaces: Vec::new(),
-                command_sender: command_sender,
+                command_sender,
                 wpa3_capable: true,
                 start_client_connections_succeeds: true,
                 stop_client_connections_succeeds: true,
@@ -531,7 +531,7 @@ mod tests {
             FakeIfaceManager {
                 sme_proxy: proxy,
                 disconnected_ifaces: Vec::new(),
-                command_sender: command_sender,
+                command_sender,
                 wpa3_capable: false,
                 start_client_connections_succeeds: true,
                 stop_client_connections_succeeds: true,

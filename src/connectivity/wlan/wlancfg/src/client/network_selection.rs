@@ -996,7 +996,7 @@ mod tests {
         let internal_bss = InternalBss {
             security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
             saved_network_info: InternalSavedNetworkData {
-                network_id: network_id,
+                network_id,
                 credential: Credential::None,
                 has_ever_connected: rng.gen::<bool>(),
                 recent_failures: Vec::new(),

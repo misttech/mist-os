@@ -3054,9 +3054,7 @@ mod tests {
 
         // Send a signal, which resets timing information for determining driver unresponsiveness
         let ind = fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 30 };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind, rssi_velocity: 1 });
+        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind, rssi_velocity: 1 });
 
         test_helper.advance_by(UNRESPONSIVE_FLAG_MIN_DURATION, test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -6247,7 +6245,7 @@ mod tests {
         // Send a scan fulfillment duration
         let duration = zx::Duration::from_seconds(15);
         test_helper.telemetry_sender.send(TelemetryEvent::ScanRequestFulfillmentTime {
-            duration: duration,
+            duration,
             reason: client::scan::ScanReason::ClientRequest,
         });
 

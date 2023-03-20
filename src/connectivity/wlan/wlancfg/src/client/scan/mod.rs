@@ -360,7 +360,7 @@ fn insert_bss_to_network_bss_map(
         let entry = bss_by_network
             .entry(SmeNetworkIdentifier {
                 ssid: scan_result.bss_description.ssid.clone(),
-                protection: protection,
+                protection,
             })
             .or_insert(vec![]);
         // Check if this BSSID is already in the hashmap
@@ -472,7 +472,7 @@ mod tests {
     fn active_sme_req(ssids: Vec<&str>, channels: Vec<u8>) -> fidl_sme::ScanRequest {
         fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
             ssids: ssids.iter().map(|s| s.as_bytes().to_vec()).collect(),
-            channels: channels,
+            channels,
         })
     }
 

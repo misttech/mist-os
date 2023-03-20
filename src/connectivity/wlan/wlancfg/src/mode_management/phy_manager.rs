@@ -751,7 +751,7 @@ async fn destroy_iface(
     iface_id: u16,
     telemetry_sender: &TelemetrySender,
 ) -> Result<(), PhyManagerError> {
-    let mut request = fidl_service::DestroyIfaceRequest { iface_id: iface_id };
+    let mut request = fidl_service::DestroyIfaceRequest { iface_id };
     match proxy.destroy_iface(&mut request).await {
         Ok(status) => match status {
             fuchsia_zircon::sys::ZX_OK => Ok(()),
@@ -997,7 +997,7 @@ mod tests {
                     Some(iface_id) => responder.send(
                         ZX_OK,
                         Some(&mut fidl_service::CreateIfaceResponse {
-                            iface_id: iface_id,
+                            iface_id,
                         })
                     )
                     .expect("sending fake iface id"),
@@ -1037,13 +1037,7 @@ mod tests {
         phy_assigned_id: u16,
         mac: [u8; 6],
     ) -> fidl_service::QueryIfaceResponse {
-        fidl_service::QueryIfaceResponse {
-            role: role,
-            id: id,
-            phy_id: phy_id,
-            phy_assigned_id: phy_assigned_id,
-            sta_addr: mac,
-        }
+        fidl_service::QueryIfaceResponse { role, id, phy_id, phy_assigned_id, sta_addr: mac }
     }
 
     /// Create an empty security support structure.
