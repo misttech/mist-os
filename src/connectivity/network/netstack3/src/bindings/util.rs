@@ -1062,8 +1062,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::bindings::{
-        devices, interfaces_admin::OwnedControlHandle, InterfaceEventProducer, NetstackContext,
-        DEFAULT_LOOPBACK_MTU,
+        devices, interfaces_admin::OwnedControlHandle, DeviceIdExt as _, InterfaceEventProducer,
+        NetstackContext, DEFAULT_LOOPBACK_MTU,
     };
 
     use super::*;

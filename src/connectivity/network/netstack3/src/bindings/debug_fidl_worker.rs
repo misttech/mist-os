@@ -16,7 +16,8 @@ use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use tracing::{debug, error, warn};
 
 use crate::bindings::{
-    devices::LOOPBACK_MAC, interfaces_admin, util::IntoFidl, DeviceSpecificInfo, Netstack,
+    devices::LOOPBACK_MAC, interfaces_admin, util::IntoFidl, DeviceIdExt as _, DeviceSpecificInfo,
+    Netstack,
 };
 
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single

@@ -82,6 +82,21 @@ use netstack3_core::{
     Ctx, NonSyncContext, SyncCtx, TimerId,
 };
 
+/// Extends the methods available to [`DeviceId`].
+trait DeviceIdExt {
+    /// Returns the (common) state associated with devices.
+    fn external_state(&self) -> &DeviceSpecificInfo;
+}
+
+impl DeviceIdExt for DeviceId<BindingsNonSyncCtxImpl> {
+    fn external_state(&self) -> &DeviceSpecificInfo {
+        match self {
+            DeviceId::Ethernet(d) => d.external_state(),
+            DeviceId::Loopback(d) => d.external_state(),
+        }
+    }
+}
+
 const LOOPBACK_NAME: &'static str = "lo";
 
 /// Default MTU for loopback.
@@ -275,9 +290,13 @@ impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
 }
 
 impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
-    type DeviceState = DeviceSpecificInfo;
+    type LoopbackDeviceState = DeviceSpecificInfo;
+    type EthernetDeviceState = DeviceSpecificInfo;
 
-    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self::Instant, Self::DeviceState>) {
+    fn wake_rx_task(
+        &mut self,
+        device: &LoopbackDeviceId<Self::Instant, Self::LoopbackDeviceState>,
+    ) {
         match device.external_state().deref() {
             DeviceSpecificInfo::Netdevice(_) => {
                 unreachable!("only loopback supports RX queues")
@@ -296,7 +315,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
 
     fn send_frame(
         &mut self,
-        device: &EthernetDeviceId<Self::Instant, Self::DeviceState>,
+        device: &EthernetDeviceId<Self::Instant, Self::EthernetDeviceState>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         match device.external_state().deref() {

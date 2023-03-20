@@ -47,11 +47,11 @@ use futures::{
     StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_types::{ip::AddrSubnetEither, ip::IpAddr, SpecifiedAddr};
-use netstack3_core::Ctx;
+use netstack3_core::{device::DeviceId, Ctx};
 
 use crate::bindings::{
     devices, netdevice_worker, util, util::IntoCore as _, util::TryIntoCore as _, BindingId,
-    Netstack, NetstackContext,
+    DeviceIdExt as _, Netstack, NetstackContext,
 };
 
 pub(crate) fn serve(
@@ -659,13 +659,22 @@ async fn dispatch_control_request(
 }
 
 /// Cleans up and removes the specified NetDevice interface.
+///
+/// # Panics
+///
+/// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: NetstackContext, id: BindingId) {
     let state = {
         let mut ctx = ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let core_id =
             non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
-        netstack3_core::device::remove_device(sync_ctx, non_sync_ctx, core_id)
+        match core_id {
+            DeviceId::Ethernet(id) => {
+                netstack3_core::device::remove_ethernet_device(sync_ctx, non_sync_ctx, id)
+            }
+            DeviceId::Loopback(id) => panic!("loopback device {} may not be removed", id),
+        }
     };
     let handler = match state {
         devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {

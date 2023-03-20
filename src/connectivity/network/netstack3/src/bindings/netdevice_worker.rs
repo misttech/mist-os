@@ -29,8 +29,8 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, DeviceId, Netstack,
-    NetstackContext, NonSyncContext, SyncCtx,
+    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, DeviceId, DeviceIdExt as _,
+    Netstack, NetstackContext, NonSyncContext, SyncCtx,
 };
 
 #[derive(Clone)]

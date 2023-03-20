@@ -3104,6 +3104,7 @@ mod tests {
     use alloc::vec;
     use core::{convert::TryFrom, num::NonZeroU16, time::Duration};
 
+    use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_declare::{net_subnet_v4, net_subnet_v6};
     use net_types::{
@@ -5049,7 +5050,9 @@ mod tests {
                 metric
             })]
         );
-        crate::device::remove_device(&sync_ctx, &mut non_sync_ctx, device_id);
+
+        let device_id = assert_matches!(device_id, DeviceId::Ethernet(id) => id);
+        crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, device_id);
         assert_eq!(
             take_ip_layer_events::<I>(&mut non_sync_ctx)[..],
             [IpLayerEvent::RouteRemoved(types::Entry {

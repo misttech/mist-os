@@ -34,6 +34,7 @@ use netstack3_core::{
 use crate::bindings::{
     devices::Devices,
     util::{IntoCore as _, IntoFidl as _},
+    DeviceIdExt as _,
 };
 
 const ZXSIO_SIGNAL_INCOMING: zx::Signals =

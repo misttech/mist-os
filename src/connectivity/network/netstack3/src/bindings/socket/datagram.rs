@@ -58,7 +58,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, NetstackContext, StaticCommonInfo,
+    BindingsNonSyncCtxImpl, DeviceIdExt as _, NetstackContext, StaticCommonInfo,
 };
 
 use super::{

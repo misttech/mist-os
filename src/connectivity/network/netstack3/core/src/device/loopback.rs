@@ -134,7 +134,7 @@ impl Device for LoopbackDevice {}
 
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<NonSyncCtx: NonSyncContext> DeviceIdContext<LoopbackDevice> for &'_ SyncCtx<NonSyncCtx> {
-    type DeviceId = LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState>;
+    type DeviceId = LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>;
 }
 
 impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
@@ -208,7 +208,7 @@ pub(super) fn send_ip_frame<
 >(
     sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
-    device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState>,
+    device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
     _local_addr: SpecifiedAddr<A>,
     body: S,
 ) -> Result<(), S> {
@@ -232,15 +232,16 @@ pub(super) fn send_ip_frame<
 /// Gets the MTU associated with this device.
 pub(super) fn get_mtu<NonSyncCtx: NonSyncContext, L>(
     ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
-    device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState>,
+    device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
 ) -> Mtu {
     with_loopback_state(ctx, device_id, |mut state| state.cast_with(|s| &s.link.mtu).copied())
 }
 
 impl<C: NonSyncContext>
-    ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<C::Instant, C::DeviceState>> for C
+    ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>>
+    for C
 {
-    fn wake_rx_task(&mut self, device_id: &LoopbackDeviceId<C::Instant, C::DeviceState>) {
+    fn wake_rx_task(&mut self, device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>) {
         DeviceLayerEventDispatcher::wake_rx_task(self, device_id)
     }
 }
@@ -260,7 +261,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
         F: FnOnce(&mut ReceiveQueueState<Self::Meta, Self::Buffer>) -> O,
     >(
         &mut self,
-        device_id: &LoopbackDeviceId<C::Instant, C::DeviceState>,
+        device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>,
         cb: F,
     ) -> O {
         with_loopback_state(self, device_id, |mut state| {
@@ -272,7 +273,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     fn handle_packet(
         &mut self,
         ctx: &mut C,
-        device_id: &LoopbackDeviceId<C::Instant, C::DeviceState>,
+        device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>,
         meta: IpVersion,
         buf: Buf<Vec<u8>>,
     ) {
@@ -308,7 +309,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
         F: FnOnce(&mut DequeueState<IpVersion, Buf<Vec<u8>>>, &mut Self::ReceiveQueueCtx<'_>) -> O,
     >(
         &mut self,
-        device_id: &LoopbackDeviceId<C::Instant, C::DeviceState>,
+        device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>,
         cb: F,
     ) -> O {
         with_loopback_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
@@ -320,10 +321,12 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
 }
 
 impl<C: NonSyncContext>
-    TransmitQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<C::Instant, C::DeviceState>>
-    for C
+    TransmitQueueNonSyncContext<
+        LoopbackDevice,
+        LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>,
+    > for C
 {
-    fn wake_tx_task(&mut self, device_id: &LoopbackDeviceId<C::Instant, C::DeviceState>) {
+    fn wake_tx_task(&mut self, device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>) {
         DeviceLayerEventDispatcher::wake_tx_task(self, &device_id.clone().into())
     }
 }
@@ -344,7 +347,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         F: FnOnce(&mut TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
     >(
         &mut self,
-        device_id: &LoopbackDeviceId<C::Instant, C::DeviceState>,
+        device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>,
         cb: F,
     ) -> O {
         with_loopback_state(self, device_id, |mut state| {

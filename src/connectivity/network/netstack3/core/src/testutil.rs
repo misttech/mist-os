@@ -808,7 +808,8 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
 }
 
 impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
-    type DeviceState = ();
+    type LoopbackDeviceState = ();
+    type EthernetDeviceState = ();
 
     fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeInstant, ()>) {
         self.state_mut().rx_available.push(device.clone());

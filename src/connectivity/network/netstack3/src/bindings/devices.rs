@@ -24,7 +24,7 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Netstack,
+    interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, DeviceIdExt as _, Netstack,
 };
 
 pub const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
@@ -144,7 +144,7 @@ pub(crate) fn spawn_rx_task(
     ns: &Netstack,
     device_id: &LoopbackDeviceId<
         <BindingsNonSyncCtxImpl as InstantContext>::Instant,
-        <BindingsNonSyncCtxImpl as DeviceLayerEventDispatcher>::DeviceState,
+        <BindingsNonSyncCtxImpl as DeviceLayerEventDispatcher>::LoopbackDeviceState,
     >,
 ) {
     let mut watcher = notifier.watcher();
