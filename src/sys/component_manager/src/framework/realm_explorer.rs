@@ -121,7 +121,7 @@ impl RealmExplorer {
             fsys::InstanceInfo {
                 moniker: relative_moniker.to_string(),
                 url: instance.component_url.clone(),
-                instance_id,
+                instance_id: instance_id.map(|id| id.to_string()),
                 state,
             },
             children,

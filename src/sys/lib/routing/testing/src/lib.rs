@@ -185,7 +185,7 @@ pub fn generate_storage_path(
     instance_id: Option<&ComponentInstanceId>,
 ) -> PathBuf {
     if let Some(id) = instance_id {
-        return [id].iter().collect();
+        return id.into();
     }
     let mut path = relative_moniker.path().iter();
     let mut dir_path = vec![];

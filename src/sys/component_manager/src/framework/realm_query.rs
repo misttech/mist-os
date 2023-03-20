@@ -311,7 +311,7 @@ pub async fn get_instance(
     Ok(fsys::Instance {
         moniker: Some(relative_moniker.to_string()),
         url: Some(instance.component_url.clone()),
-        instance_id,
+        instance_id: instance_id.map(|id| id.to_string()),
         resolved_info,
         ..fsys::Instance::EMPTY
     })
@@ -616,7 +616,7 @@ async fn get_fidl_instance_and_children(
         fsys::Instance {
             moniker: Some(relative_moniker.to_string()),
             url: Some(instance.component_url.clone()),
-            instance_id,
+            instance_id: instance_id.map(|id| id.to_string()),
             resolved_info,
             ..fsys::Instance::EMPTY
         },
@@ -1223,7 +1223,7 @@ mod deprecated {
         let info = fsys::InstanceInfo {
             moniker: relative_moniker.to_string(),
             url: instance.component_url.clone(),
-            instance_id,
+            instance_id: instance_id.map(|id| id.to_string()),
             state,
         };
 

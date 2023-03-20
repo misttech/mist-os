@@ -44,10 +44,14 @@ use {
     },
     lazy_static::lazy_static,
     moniker::{AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
-    routing::{component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
+    routing::{
+        component_id_index::ComponentInstanceId, component_instance::ComponentInstanceInterface,
+        mapper::NoopRouteMapper,
+    },
     std::{
         convert::{From, TryFrom},
         path::PathBuf,
+        str::FromStr,
         sync::{Arc, Weak},
     },
     tracing::{debug, error, warn},
@@ -384,12 +388,22 @@ impl StorageAdmin {
                 }
                 fsys::StorageAdminRequest::OpenComponentStorageById { id, object, responder } => {
                     let instance_id_index = component.component_id_index();
-                    if !instance_id_index.look_up_instance_id(&id) {
+                    let component_id = match ComponentInstanceId::from_str(&id) {
+                        Ok(id) => id,
+                        Err(_) => {
+                            responder.send(&mut Err(fcomponent::Error::InvalidArguments))?;
+                            continue;
+                        }
+                    };
+                    if !instance_id_index.look_up_instance_id(&component_id) {
                         responder.send(&mut Err(fcomponent::Error::ResourceNotFound))?;
                         continue;
                     }
-                    match storage::open_isolated_storage_by_id(&storage_capability_source_info, id)
-                        .await
+                    match storage::open_isolated_storage_by_id(
+                        &storage_capability_source_info,
+                        component_id,
+                    )
+                    .await
                     {
                         Ok(dir) => responder.send(
                             &mut dir

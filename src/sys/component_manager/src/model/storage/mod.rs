@@ -445,7 +445,7 @@ fn generate_moniker_based_storage_path(relative_moniker: &InstancedRelativeMonik
 ///
 /// Components which do not have an instance ID use a generate moniker-based storage path instead.
 fn generate_instance_id_based_storage_path(instance_id: &ComponentInstanceId) -> PathBuf {
-    [instance_id].iter().collect()
+    instance_id.into()
 }
 
 #[cfg(test)]
@@ -465,6 +465,7 @@ mod tests {
         rand::{self, distributions::Alphanumeric, Rng},
         std::{
             convert::{TryFrom, TryInto},
+            str::FromStr,
             sync::Arc,
         },
     };
@@ -594,7 +595,10 @@ mod tests {
         let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // open the storage directory using instance ID.
-        let instance_id = Some(component_id_index::gen_instance_id(&mut rand::thread_rng()));
+        let instance_id: ComponentInstanceId = ComponentInstanceId::from_str(
+            &component_id_index::gen_instance_id(&mut rand::thread_rng()),
+        )
+        .expect("generated instance ID could not be parsed into ComponentInstanceId");
         let mut dir = open_isolated_storage(
             &StorageCapabilitySource {
                 storage_provider: Some(Arc::clone(&b_component)),
@@ -605,7 +609,7 @@ mod tests {
             },
             false,
             relative_moniker.clone(),
-            instance_id.as_ref(),
+            Some(&instance_id),
         )
         .await
         .expect("failed to open isolated storage");
@@ -616,7 +620,7 @@ mod tests {
         // check that an instance-ID based directory was created:
         assert!(test_helpers::list_directory(&test.test_dir_proxy)
             .await
-            .contains(&instance_id.clone().unwrap()));
+            .contains(&instance_id.to_string()));
 
         // check that a moniker-based directory was NOT created:
         assert!(!test_helpers::list_directory_recursive(&test.test_dir_proxy).await.contains(
@@ -641,7 +645,7 @@ mod tests {
             },
             false,
             relative_moniker.clone(),
-            instance_id.as_ref(),
+            Some(&instance_id),
         )
         .await
         .expect("failed to open isolated storage");
@@ -849,7 +853,10 @@ mod tests {
         let dir_source_path = CapabilityPath::try_from("/data").unwrap();
         let parent_moniker = InstancedAbsoluteMoniker::try_from(vec!["c:0"]).unwrap();
         let child_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
-        let instance_id = Some(component_id_index::gen_instance_id(&mut rand::thread_rng()));
+        let instance_id = ComponentInstanceId::from_str(&component_id_index::gen_instance_id(
+            &mut rand::thread_rng(),
+        ))
+        .expect("generated ID could not be parsed into component instance ID");
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
             &StorageCapabilitySource {
@@ -861,7 +868,7 @@ mod tests {
             },
             false,
             child_moniker.clone(),
-            instance_id.as_ref(),
+            Some(&instance_id),
         )
         .await
         .expect("failed to open isolated storage");
@@ -872,7 +879,7 @@ mod tests {
         // check that an instance-ID based directory was created:
         assert!(test_helpers::list_directory(&test.test_dir_proxy)
             .await
-            .contains(&instance_id.clone().unwrap()));
+            .contains(&instance_id.to_string()));
 
         assert_eq!(test_helpers::list_directory(&dir).await, Vec::<String>::new());
         test_helpers::write_file(&dir, "file", "hippos").await;
@@ -889,7 +896,7 @@ mod tests {
             },
             false,
             child_moniker.clone(),
-            instance_id.as_ref(),
+            Some(&instance_id),
         )
         .await
         .expect("failed to delete child's isolated storage");
@@ -897,7 +904,7 @@ mod tests {
         // check that an instance-ID based directory was deleted:
         assert!(!test_helpers::list_directory(&test.test_dir_proxy)
             .await
-            .contains(&instance_id.clone().unwrap()));
+            .contains(&instance_id.to_string()));
 
         // Error -- tried to delete nonexistent storage.
         let err = delete_isolated_storage(
@@ -909,8 +916,8 @@ mod tests {
                 storage_source_moniker: parent_moniker.clone(),
             },
             false,
-            child_moniker.clone(),
-            instance_id.as_ref(),
+            child_moniker,
+            Some(&instance_id),
         )
         .await
         .expect_err("delete isolated storage not meant to succeed");

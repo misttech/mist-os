@@ -150,12 +150,14 @@ mod tests {
         maplit::hashset,
         moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         routing::{
-            component_id_index::ComponentIdIndex, component_instance::ComponentInstanceInterface,
-            config::RuntimeConfig, environment::RunnerRegistry,
+            component_id_index::{ComponentIdIndex, ComponentInstanceId},
+            component_instance::ComponentInstanceInterface,
+            config::RuntimeConfig,
+            environment::RunnerRegistry,
         },
         scrutiny_testing::fake::*,
         serde_json::json,
-        std::{collections::HashMap, convert::TryFrom},
+        std::{collections::HashMap, convert::TryFrom, str::FromStr},
         url::Url,
     };
 
@@ -539,7 +541,7 @@ mod tests {
         let root_instance = collection.component_model.get_root_instance()?;
 
         assert_eq!(
-            Some(&iid),
+            Some(&ComponentInstanceId::from_str(&iid).unwrap()),
             root_instance
                 .component_id_index()
                 .look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())

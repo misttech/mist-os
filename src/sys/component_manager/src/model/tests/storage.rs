@@ -19,10 +19,11 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMonikerBase},
-    routing::{error::RoutingError, RouteRequest},
+    routing::{component_id_index::ComponentInstanceId, error::RoutingError, RouteRequest},
     std::{
         convert::TryInto,
         path::{Path, PathBuf},
+        str::FromStr,
     },
 };
 
@@ -1200,7 +1201,10 @@ async fn storage_persistence_instance_id_path() {
         None,
         true,
         InstancedRelativeMoniker::try_from(vec!["b:0", "persistent_coll:c:0"]).unwrap(),
-        Some(&instance_id),
+        Some(
+            &ComponentInstanceId::from_str(&instance_id)
+                .expect("instance id could not be parsed into ComponentInstanceId"),
+        ),
         &test.test_dir_proxy,
     )
     .await;

@@ -1878,6 +1878,7 @@ pub mod tests {
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
             },
         },
+        ::routing::component_id_index::ComponentInstanceId,
         assert_matches::assert_matches,
         cm_rust::{
             Availability, CapabilityDecl, CapabilityPath, ChildRef, DependencyType, ExposeDecl,
@@ -2538,7 +2539,11 @@ pub mod tests {
 
         let root_realm =
             test.model.start_instance(&AbsoluteMoniker::root(), &StartReason::Root).await.unwrap();
-        assert_eq!(instance_id, root_realm.instance_id());
+        assert_eq!(
+            instance_id.map(|id| ComponentInstanceId::from_str(&id)
+                .expect("generated instance ID could not be parsed into ComponentInstanceId")),
+            root_realm.instance_id()
+        );
 
         let a_realm = test
             .model

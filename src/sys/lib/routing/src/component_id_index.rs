@@ -9,14 +9,63 @@ use {
     fidl::encoding::unpersist,
     fidl_fuchsia_component_internal as fcomponent_internal,
     moniker::{AbsoluteMoniker, MonikerError},
-    std::collections::{HashMap, HashSet},
+    std::{
+        collections::{HashMap, HashSet},
+        path::PathBuf,
+        str::FromStr,
+    },
     thiserror::Error,
 };
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub type ComponentInstanceId = String;
+pub const INSTANCE_ID_LEN: usize = 64;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ComponentInstanceId([u8; INSTANCE_ID_LEN]);
+
+#[derive(Debug)]
+pub enum ComponentInstanceIdParseError {
+    BadLength,
+}
+
+impl std::str::FromStr for ComponentInstanceId {
+    type Err = ComponentInstanceIdParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ComponentInstanceId(
+            s.as_bytes().try_into().map_err(|_| ComponentInstanceIdParseError::BadLength)?,
+        ))
+    }
+}
+
+impl std::fmt::Display for ComponentInstanceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match String::from_utf8(self.0.iter().map(|u| *u).collect()) {
+            Ok(s) => write!(f, "{}", s),
+            Err(_) => {
+                write!(f, "string conversion error, bytes: ")?;
+                for b in &self.0 {
+                    write!(f, "{}", b)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl Into<PathBuf> for &ComponentInstanceId {
+    fn into(self) -> PathBuf {
+        let copy: Vec<u8> = (*self.0.iter().map(|u| *u).collect::<Vec<u8>>()).to_vec();
+        String::from_utf8(copy).unwrap().into()
+    }
+}
+
+impl Into<PathBuf> for ComponentInstanceId {
+    fn into(self) -> PathBuf {
+        (&self).into()
+    }
+}
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Error)]
@@ -34,6 +83,8 @@ pub enum ComponentIdIndexError {
     IndexError(#[from] component_id_index::IndexError),
     #[error("invalid moniker")]
     MonikerError(#[from] MonikerError),
+    #[error("id invalid")]
+    InvalidId,
 }
 
 impl ComponentIdIndexError {
@@ -56,6 +107,7 @@ impl PartialEq for ComponentIdIndexError {
             (Self::IndexError(self_err), Self::IndexError(other_err)) => self_err.eq(other_err),
             (Self::MonikerError(self_err), Self::MonikerError(other_err)) => self_err.eq(other_err),
             (Self::IndexUnreadable { .. }, Self::IndexUnreadable { .. }) => false,
+            (Self::InvalidId, Self::InvalidId) => true,
             _ => false,
         }
     }
@@ -93,7 +145,7 @@ impl ComponentIdIndex {
 
     pub fn new_from_index(index: component_id_index::Index) -> Result<Self, ComponentIdIndexError> {
         let mut moniker_to_instance_id = HashMap::<AbsoluteMoniker, ComponentInstanceId>::new();
-        let mut all_instance_ids = HashSet::new();
+        let mut all_instance_ids = HashSet::<ComponentInstanceId>::new();
         for entry in index.instances {
             let instance_id = entry
                 .instance_id
@@ -108,10 +160,16 @@ impl ComponentIdIndex {
                     )
                 })?
                 .clone();
-
-            all_instance_ids.insert(instance_id.clone());
+            all_instance_ids.insert(
+                ComponentInstanceId::from_str(&instance_id)
+                    .map_err(|_| ComponentIdIndexError::InvalidId)?,
+            );
             if let Some(absolute_moniker) = entry.moniker {
-                moniker_to_instance_id.insert(absolute_moniker, instance_id);
+                moniker_to_instance_id.insert(
+                    absolute_moniker,
+                    ComponentInstanceId::from_str(&instance_id)
+                        .map_err(|_| ComponentIdIndexError::InvalidId)?,
+                );
             }
         }
         Ok(Self { moniker_to_instance_id, all_instance_ids })
@@ -153,8 +211,10 @@ pub mod tests {
         .unwrap();
         let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).unwrap();
         assert_eq!(
-            Some(&iid),
-            index.look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
+            Some(iid),
+            index
+                .look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
+                .map(|id| id.to_string())
         );
     }
 
@@ -172,11 +232,13 @@ pub mod tests {
         .unwrap();
         let index = ComponentIdIndex::new(index_file.path().to_str().unwrap()).unwrap();
         assert_eq!(
-            Some(&iid),
-            index.look_up_moniker(&AbsoluteMoniker::new(vec![
-                ChildMoniker::try_new("a", None).unwrap(),
-                ChildMoniker::try_new("name", Some("coll")).unwrap(),
-            ]))
+            Some(iid),
+            index
+                .look_up_moniker(&AbsoluteMoniker::new(vec![
+                    ChildMoniker::try_new("a", None).unwrap(),
+                    ChildMoniker::try_new("name", Some("coll")).unwrap(),
+                ]))
+                .map(|id| id.to_string())
         );
     }
 
@@ -194,8 +256,10 @@ pub mod tests {
         let index = ComponentIdIndex::new_from_index(inner_index)
             .expect("failed to create component id index from inner index");
         assert_eq!(
-            Some(&iid),
-            index.look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
+            Some(iid),
+            index
+                .look_up_moniker(&AbsoluteMoniker::parse_str("/a/b/c").unwrap())
+                .map(|id| id.to_string())
         );
     }
 
