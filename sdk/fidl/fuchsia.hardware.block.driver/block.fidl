@@ -71,34 +71,34 @@ const BLOCK_GUID_LEN uint32 = 16;
 /// block server.  Using a group allows multiple message to be buffered at once
 /// on a single communication channel before receiving a response.
 ///
-/// Usage of groups is identified by `BLOCKIO_GROUP_ITEM`, and is optional.
+/// Usage of groups is identified by `BLOCK_GROUP_ITEM`, and is optional.
 ///
 /// These groups may be referred to with a "groupid", in the range [0,
 /// `MAX_TXN_GROUP_COUNT`).
 ///
 /// The protocol to communicate with a single group is as follows:
 /// 1) SEND [N - 1] messages with an allocated groupid for any value of 1 <= N.
-///    The `BLOCKIO_GROUP_ITEM` flag is set for these messages.
-/// 2) SEND a final Nth message with the same groupid. The `BLOCKIO_GROUP_ITEM
-///    | BLOCKIO_GROUP_LAST` flags are set for this message.
+///    The `BLOCK_GROUP_ITEM` flag is set for these messages.
+/// 2) SEND a final Nth message with the same groupid. The `BLOCK_GROUP_ITEM
+///    | BLOCK_GROUP_LAST` flags are set for this message.
 /// 3) RECEIVE a single response from the Block I/O server after all N requests
 ///    have completed. This response is sent once all operations either complete
 ///    or a single operation fails. At this point, step (1) may begin again for
 ///    the same groupid.
 ///
-/// For `BLOCKIO_READ` and `BLOCKIO_WRITE`, N may be greater than 1. Otherwise,
+/// For `BLOCK_OP_READ` and `BLOCK_OP_WRITE`, N may be greater than 1. Otherwise,
 /// N == 1 (skipping step (1) in the protocol above).
 ///
 /// Notes:
 /// - groupids may operate on any number of vmoids at once.
 /// - If additional requests are sent on the same groupid before step (3) has
 ///   completed, then the additional request will not be processed. If
-///   `BLOCKIO_GROUP_LAST` is set, an error will be returned. Otherwise, the
+///   `BLOCK_GROUP_LAST` is set, an error will be returned. Otherwise, the
 ///   request will be silently dropped.
 /// - Messages within a group are not guaranteed to be processed in any order
 ///   relative to each other.
-/// - All requests receive responses, except for ones with `BLOCKIO_GROUP_ITEM`
-///   that do not have `BLOCKIO_GROUP_LAST` set.
+/// - All requests receive responses, except for ones with `BLOCK_GROUP_ITEM`
+///   that do not have `BLOCK_GROUP_LAST` set.
 ///
 /// For example, the following is a valid sequence of transactions:
 ///
@@ -237,7 +237,7 @@ const BLOCK_FL_PREFLUSH uint32 = 0x00002000;
 const BLOCK_GROUP_ITEM uint32 = 0x00000400;
 
 /// Only respond after this request (and all previous within group) have
-/// completed. Only valid with `BLOCKIO_GROUP_ITEM`.
+/// completed. Only valid with `BLOCK_GROUP_ITEM`.
 const BLOCK_GROUP_LAST uint32 = 0x00000800;
 const BLOCK_FLAG_MASK uint32 = 0x0000FF00;
 
