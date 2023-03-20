@@ -4,7 +4,7 @@
 
 #include "src/security/lib/zxcrypt/ddk-volume.h"
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/volume/c/banjo.h>
 #include <inttypes.h>
 #include <lib/sync/completion.h>

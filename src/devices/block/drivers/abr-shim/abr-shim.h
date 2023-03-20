@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_ABR_SHIM_ABR_SHIM_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_ABR_SHIM_ABR_SHIM_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <lib/abr/abr.h>
 #include <lib/operation/block.h>

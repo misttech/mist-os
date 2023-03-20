@@ -25,8 +25,8 @@ fuchsia_driver("ramdisk-driver") {
   ]
   deps = [
     ":ramdisk_bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp_wire",
     "//src/devices/block/lib/common",
     "//src/devices/lib/dev-operation",

@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_BLOCK_VERITY_CONFIG_H_
 
 #include <fidl/fuchsia.hardware.block.verified/cpp/wire.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <zircon/errors.h>
 
 namespace block_verity {

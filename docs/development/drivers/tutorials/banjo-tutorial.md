@@ -847,7 +847,7 @@ struct callback {
 ### The async attribute
 
 For an example of the `@async` attribute, see the
-[`fuchsia.hardware.block`](/sdk/banjo/fuchsia.hardware.block/block.fidl) `Block` protocol.
+[`fuchsia.hardware.block`](/sdk/fidl/fuchsia.hardware.block.driver/block.fidl) `Block` protocol.
 
 Within the `protocol` section, we see the `@async` attribute:
 

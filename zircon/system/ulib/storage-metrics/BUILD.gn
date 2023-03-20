@@ -16,8 +16,8 @@ zx_library("storage-metrics") {
     "//zircon/system/ulib/fbl",
   ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.storage.metrics:fuchsia.storage.metrics_cpp_wire",
     "//zircon/system/ulib/fbl",
   ]

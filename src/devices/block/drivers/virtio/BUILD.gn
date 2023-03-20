@@ -27,7 +27,7 @@ fuchsia_driver("virtio_block-driver") {
   deps = [
     ":block_lib",
     ":virtio_block_bind_header",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/bus/lib/virtio",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",
@@ -48,7 +48,7 @@ source_set("block_lib") {
   configs += [ "//build/config:all_source" ]
   sources = [ "block.cc" ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/common",
     "//src/devices/bus/lib/virtio",
     "//src/lib/ddktl",
@@ -60,7 +60,7 @@ source_set("scsi_lib") {
   configs += [ "//build/config:all_source" ]
   sources = [ "scsi.cc" ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/scsi",
     "//src/devices/bus/lib/virtio",
     "//src/lib/ddktl",

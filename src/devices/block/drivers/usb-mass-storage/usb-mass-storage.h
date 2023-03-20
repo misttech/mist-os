@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_USB_MASS_STORAGE_USB_MASS_STORAGE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_USB_MASS_STORAGE_USB_MASS_STORAGE_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>

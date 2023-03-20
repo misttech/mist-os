@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_SATA_H_
 
 #include <byteswap.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/zx/time.h>
 #include <zircon/listnode.h>

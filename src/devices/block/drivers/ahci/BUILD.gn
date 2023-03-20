@@ -52,7 +52,7 @@ test("ahci-unittest-bin") {
   ]
   deps = [
     ":shared",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",
@@ -79,7 +79,7 @@ source_set("shared") {
   ]
   deps = [
     ":ahci_bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/common",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",

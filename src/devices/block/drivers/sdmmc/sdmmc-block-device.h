@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_BLOCK_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_BLOCK_DEVICE_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/operation/block.h>

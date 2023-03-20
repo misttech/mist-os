@@ -36,7 +36,7 @@ use {
 // - when processing a request of a group fails, subsequent requests of that
 //   group will not be processed.
 //
-// Refer to sdk/banjo/fuchsia.hardware.block/block.fidl for details.
+// Refer to sdk/fidl/fuchsia.hardware.block.driver/block.fidl for details.
 //
 // FifoMessageGroup keeps track of the relevant BlockFifoResponse field for
 // a group requests. Only `status` and `count` needs to be updated.

@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_BOOTPART_BOOTPART_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_BOOTPART_BOOTPART_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <lib/ddk/metadata.h>
 

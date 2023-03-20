@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_NVME_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_NVME_NVME_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>

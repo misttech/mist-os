@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_ZXCRYPT_EXTRA_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_ZXCRYPT_EXTRA_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <zircon/listnode.h>

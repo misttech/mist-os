@@ -38,9 +38,9 @@ fuchsia_driver("sdhci-driver") {
   deps = [
     ":dma-descriptor-builder",
     ":sdhci-bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
@@ -71,10 +71,10 @@ test("sdhci-test-bin") {
   deps = [
     ":dma-descriptor-builder",
     ":sdhci-bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-bti",

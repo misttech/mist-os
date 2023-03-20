@@ -4,7 +4,7 @@
 
 #include "message.h"
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 
 #include "server.h"
 

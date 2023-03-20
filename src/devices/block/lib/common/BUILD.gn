@@ -8,7 +8,7 @@ import("//build/test.gni")
 library_headers("headers") {
   headers = [ "common.h" ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/lib/ddk",
   ]
 }

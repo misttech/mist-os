@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_NVME_NAMESPACE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_NVME_NAMESPACE_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 
 #include <ddktl/device.h>
 #include <fbl/string_printf.h>

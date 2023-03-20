@@ -4,7 +4,7 @@
 
 #include "block_device.h"
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/nand/cpp/banjo.h>
 #include <lib/fit/function.h>
 #include <lib/fzl/owned-vmo-mapper.h>

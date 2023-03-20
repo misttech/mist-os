@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.gpt.metadata/cpp/fidl.h>
-#include <fuchsia/hardware/block/c/banjo.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>

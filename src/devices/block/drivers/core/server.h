@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_CORE_SERVER_H_
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/fzl/fifo.h>
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>

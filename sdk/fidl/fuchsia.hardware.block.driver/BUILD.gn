@@ -4,7 +4,7 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.hardware.block") {
+fidl("fuchsia.hardware.block.driver") {
   sources = [ "block.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_banjo = true

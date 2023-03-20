@@ -5,7 +5,7 @@
 #include "src/devices/block/drivers/bootpart/bootpart.h"
 
 #include <assert.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>

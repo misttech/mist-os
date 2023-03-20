@@ -20,7 +20,7 @@ zx_library("scsi") {
     "disk.cc",
   ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/common",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

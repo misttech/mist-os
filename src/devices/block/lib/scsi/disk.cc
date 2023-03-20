@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/scsi/disk.h>
 #include <netinet/in.h>

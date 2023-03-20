@@ -7,7 +7,7 @@
 
 // !!! IMPORTANT !!!
 // Most of the definitions in this file need to be kept in sync with:
-// - //sdk/banjo/fuchsia.hardware.block/block.fidl;
+// - //sdk/fidl/fuchsia.hardware.block.driver/block.fidl;
 // - //src/lib/storage/block_client/rust/src/lib.rs.
 
 #include <assert.h>

@@ -6,7 +6,7 @@
 #define SRC_STORAGE_FVM_DRIVER_VPARTITION_MANAGER_H_
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/fzl/owned-vmo-mapper.h>

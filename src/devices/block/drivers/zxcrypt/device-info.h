@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_ZXCRYPT_DEVICE_INFO_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_ZXCRYPT_DEVICE_INFO_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <fuchsia/hardware/block/volume/cpp/banjo.h>
 #include <lib/ddk/device.h>

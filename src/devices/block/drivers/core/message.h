@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_CORE_MESSAGE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_CORE_MESSAGE_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/fit/function.h>
 
 #include <fbl/intrusive_double_list.h>

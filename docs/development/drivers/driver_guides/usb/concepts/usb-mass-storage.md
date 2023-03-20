@@ -14,15 +14,15 @@ such as flash drives, external hard drives, and other types of removable media
 connected through USB. The USB mass storage driver is split into two parts.
 
 * [SCSI block device](/src/devices/block/lib/scsi/disk.cc)
-Uses the [block](/sdk/banjo/fuchsia.hardware.block/block.fidl) protocol.
+Uses the [block](/sdk/fidl/fuchsia.hardware.block.driver/block.fidl) protocol.
 * [Core](/src/devices/block/drivers/usb-mass-storage/usb-mass-storage.cc) device
 Interfaces with the USB stack.
 
 ## SCSI block device
 
 The block device implements
-[BlockImplQuery](/sdk/banjo/fuchsia.hardware.block/block.fidl#95), and
-[BlockImplQueue](/sdk/banjo/fuchsia.hardware.block/block.fidl#102). It
+[BlockImplQuery](/sdk/fidl/fuchsia.hardware.block.driver/block.fidl#95), and
+[BlockImplQueue](/sdk/fidl/fuchsia.hardware.block.driver/block.fidl#102). It
 supports read, write, and flush operations. If power is lost between a write
 operation and a flush operation, changes written to a USB mass storage device may
 not be persisted to the device. The driver has no mechanism to inform drivers

@@ -4,7 +4,7 @@
 
 #include "src/devices/block/drivers/block-verity/extra.h"
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <stddef.h>

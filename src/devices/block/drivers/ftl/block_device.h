@@ -8,8 +8,8 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/badblock/c/banjo.h>
 #include <fuchsia/hardware/badblock/cpp/banjo.h>
-#include <fuchsia/hardware/block/c/banjo.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <fuchsia/hardware/nand/c/banjo.h>
 #include <lib/inspect/cpp/vmo/types.h>

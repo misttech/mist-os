@@ -4,7 +4,7 @@
 
 #include "src/devices/block/drivers/nvme/namespace.h"
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>

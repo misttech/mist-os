@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_CORE_IOBUFFER_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_CORE_IOBUFFER_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/vmo.h>
 
 #include <fbl/intrusive_wavl_tree.h>

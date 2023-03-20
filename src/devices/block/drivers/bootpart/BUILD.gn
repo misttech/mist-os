@@ -24,8 +24,8 @@ fuchsia_driver("bootpart-driver") {
   sources = [ "bootpart.cc" ]
   deps = [
     ":bootpart_bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/common",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
@@ -48,8 +48,8 @@ test("bootpart-test-bin") {
   ]
   deps = [
     ":bootpart_bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/common",
     "//src/devices/lib/driver",
     "//src/devices/testing/mock-ddk",

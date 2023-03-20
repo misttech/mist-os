@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_LIB_COMMON_INCLUDE_COMMON_H_
 #define SRC_DEVICES_BLOCK_LIB_COMMON_INCLUDE_COMMON_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <zircon/types.h>
 

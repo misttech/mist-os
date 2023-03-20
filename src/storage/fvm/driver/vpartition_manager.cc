@@ -5,7 +5,7 @@
 #include "src/storage/fvm/driver/vpartition_manager.h"
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>

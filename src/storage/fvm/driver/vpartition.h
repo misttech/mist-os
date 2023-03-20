@@ -5,7 +5,7 @@
 #ifndef SRC_STORAGE_FVM_DRIVER_VPARTITION_H_
 #define SRC_STORAGE_FVM_DRIVER_VPARTITION_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <fuchsia/hardware/block/volume/cpp/banjo.h>
 #include <lib/ddk/device.h>

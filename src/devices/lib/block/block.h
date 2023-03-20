@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_LIB_BLOCK_BLOCK_H_
 #define SRC_DEVICES_LIB_BLOCK_BLOCK_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 
 static_assert(sizeof(block_fifo_request_t) == sizeof(block_fifo_response_t),
               "FIFO messages are the same size in both directions");

@@ -34,10 +34,10 @@ fuchsia_driver("sdmmc-driver") {
   ]
   deps = [
     ":sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
@@ -90,10 +90,10 @@ test("sdmmc-test-bin") {
   ]
   deps = [
     ":sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_cpp_wire",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",

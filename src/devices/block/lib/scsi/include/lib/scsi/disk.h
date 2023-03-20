@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_H_
 #define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/scsi/controller.h>

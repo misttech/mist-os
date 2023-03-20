@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_LIB_DEV_OPERATION_INCLUDE_LIB_OPERATION_BLOCK_H_
 #define SRC_DEVICES_LIB_DEV_OPERATION_INCLUDE_LIB_OPERATION_BLOCK_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/operation/helpers/alloc_checker.h>
 #include <lib/operation/operation.h>
 

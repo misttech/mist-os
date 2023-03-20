@@ -4,8 +4,8 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_BLOCK_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_BLOCK_H_
 
-#include <fuchsia/hardware/block/c/banjo.h>
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>

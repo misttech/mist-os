@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_MBR_MBR_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_MBR_MBR_DEVICE_H_
 
-#include <fuchsia/hardware/block/cpp/banjo.h>
+#include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
 #include <inttypes.h>
 #include <lib/sync/completion.h>
