@@ -20,8 +20,7 @@ use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
     either::Either,
-    fidl::endpoints::{create_proxy, ClientEnd, ServerEnd},
-    fidl_fuchsia_device::ControllerMarker,
+    fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_hardware_block_partition::Guid,
     fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker},
     fidl_fuchsia_io as fio,
@@ -292,10 +291,7 @@ impl FilesystemLauncher {
         driver_path: &str,
     ) -> Result<(), Error> {
         tracing::info!(path = %device.path(), %driver_path, "Binding driver to device");
-        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-        let controller: ClientEnd<ControllerMarker> = device.client_end()?.into_channel().into();
-        let controller = controller.into_proxy()?;
-        controller.bind(driver_path).await?.map_err(zx::Status::from_raw)?;
+        device.controller().bind(driver_path).await?.map_err(zx::Status::from_raw)?;
         Ok(())
     }
 
@@ -326,9 +322,7 @@ impl FilesystemLauncher {
             component_type: fs_management::ComponentType::StaticChild,
             ..self.get_blobfs_config()
         };
-        let block = device.client_end()?;
-        let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)
-            .context("making filesystem instance")?
+        let fs = fs_management::filesystem::Filesystem::new(device.reopen_controller()?, config)
             .serve()
             .await
             .context("serving blobfs")?;
@@ -342,8 +336,7 @@ impl FilesystemLauncher {
         config: FSC,
         inside_zxcrypt: bool,
     ) -> Result<Filesystem, Error> {
-        let block = device.client_end()?;
-        let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)?;
+        let fs = fs_management::filesystem::Filesystem::new(device.reopen_controller()?, config);
         match self.serve_data_from(device, fs).await? {
             ServeDataStatus::Serving(filesystem) => Ok(filesystem),
             ServeDataStatus::FormatNeeded(config) => {
@@ -359,11 +352,10 @@ impl FilesystemLauncher {
                         tracing::warn!(?e, "Failed to set max partition size for data");
                     };
                 }
-                let mut new_fs =
-                    fs_management::filesystem::Filesystem::from_block_device_boxed_config(
-                        new_device.client_end()?,
-                        config,
-                    )?;
+                let mut new_fs = fs_management::filesystem::Filesystem::from_boxed_config(
+                    new_device.reopen_controller()?,
+                    config,
+                );
                 self.format_data(new_device, &mut new_fs).await
             }
         }

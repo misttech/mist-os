@@ -12,11 +12,11 @@ use {
 
 #[fuchsia::test]
 async fn blobfs_static_child() {
-    let ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
+    let mut ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
 
     let config = Blobfs { component_type: ComponentType::StaticChild, ..Default::default() };
-    let block = ramdisk.open().await.unwrap();
-    let mut blobfs = Filesystem::from_block_device(block, config).unwrap();
+    let controller = ramdisk.take_controller().unwrap();
+    let mut blobfs = Filesystem::new(controller, config);
 
     blobfs.format().await.unwrap();
     blobfs.fsck().await.unwrap();
@@ -28,11 +28,11 @@ async fn blobfs_static_child() {
 
 #[fuchsia::test]
 async fn minfs_static_child() {
-    let ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
+    let mut ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
 
     let config = Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
-    let block = ramdisk.open().await.unwrap();
-    let mut minfs = Filesystem::from_block_device(block, config).unwrap();
+    let controller = ramdisk.take_controller().unwrap();
+    let mut minfs = Filesystem::new(controller, config);
 
     minfs.format().await.unwrap();
     minfs.fsck().await.unwrap();
@@ -44,11 +44,11 @@ async fn minfs_static_child() {
 
 #[fuchsia::test]
 async fn fxfs_static_child() {
-    let ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
+    let mut ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
 
     let config = Fxfs { component_type: ComponentType::StaticChild, ..Default::default() };
-    let block = ramdisk.open().await.unwrap();
-    let mut fxfs = Filesystem::from_block_device(block, config).unwrap();
+    let controller = ramdisk.take_controller().unwrap();
+    let mut fxfs = Filesystem::new(controller, config);
 
     fxfs.format().await.unwrap();
     fxfs.fsck().await.unwrap();

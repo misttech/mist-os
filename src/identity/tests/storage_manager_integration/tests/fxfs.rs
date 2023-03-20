@@ -30,12 +30,14 @@ async fn ramdisk() -> RamdiskClient {
         .expect("Could not create ramdisk")
 }
 
+// NB: The returned RamdiskClient will have its Controller handle removed, so some functionality
+// (e.g. destroy_and_wait_for_removal) will not be supported.
 async fn make_ramdisk_and_filesystem() -> (RamdiskClient, Filesystem, ServingMultiVolumeFilesystem)
 {
-    let ramdisk = ramdisk().await;
+    let mut ramdisk = ramdisk().await;
 
-    let block = ramdisk.open().await.unwrap();
-    let mut fxfs = Filesystem::from_block_device(block, FxfsConfig::default()).unwrap();
+    let controller = ramdisk.take_controller().unwrap();
+    let mut fxfs = Filesystem::new(controller, FxfsConfig::default());
 
     fxfs.format().await.expect("failed to format fxfs");
 

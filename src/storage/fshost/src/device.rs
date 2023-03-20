@@ -7,10 +7,11 @@ pub mod constants;
 use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    fidl::endpoints::{create_endpoints, ClientEnd, Proxy as _},
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_hardware_block_volume::VolumeAndNodeProxy,
+    fidl::endpoints::create_proxy,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
+    fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
+    fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy},
+    fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy},
     fidl_fuchsia_io::OpenFlags,
     fs_management::format::{detect_disk_format, DiskFormat},
     fuchsia_component::client::connect_to_protocol_at_path,
@@ -51,8 +52,17 @@ pub trait Device: Send + Sync {
         Err(anyhow!("Unimplemented"))
     }
 
-    /// Returns a channel connected to the device.
-    fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error>;
+    /// Returns the Controller interface for the device.
+    fn controller(&self) -> &ControllerProxy;
+
+    /// Establish a new connection to the Controller interface for the device.
+    fn reopen_controller(&self) -> Result<ControllerProxy, Error>;
+
+    /// Establish a new connection to the Block interface of the device.
+    fn block_proxy(&self) -> Result<BlockProxy, Error>;
+
+    /// Establish a new connection to the Volume interface of the device.
+    fn volume_proxy(&self) -> Result<VolumeProxy, Error>;
 
     /// Returns a new Device, which is a child of this device with the specified suffix. This
     /// function will return when the device is available. This function assumes the child device
@@ -128,8 +138,20 @@ impl Device for NandDevice {
         self.block_device.resize(target_size_bytes).await
     }
 
-    fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
-        self.block_device.client_end()
+    fn controller(&self) -> &ControllerProxy {
+        self.block_device.controller()
+    }
+
+    fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
+        self.block_device.reopen_controller()
+    }
+
+    fn block_proxy(&self) -> Result<BlockProxy, Error> {
+        self.block_device.block_proxy()
+    }
+
+    fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
+        self.block_device.volume_proxy()
     }
 }
 
@@ -142,9 +164,13 @@ pub struct BlockDevice {
     // The topological path.
     topological_path: String,
 
-    // The proxy for the device.  N.B. The device might not support the volume protocol or the
-    // composed partition protocol, but it should support the block and node protocols.
-    volume_proxy: VolumeAndNodeProxy,
+    // The proxy for the device's controller, through which the Block/Volume/... protocols can be
+    // accessed (see Controller.ConnectToDeviceFidl).
+    controller_proxy: ControllerProxy,
+
+    // Cache a proxy to the device's Partition interface so we can use it internally.  (This assumes
+    // that devices speak Partition, which is currently always true).
+    partition_proxy: PartitionProxy,
 
     // Memoized fields.
     content_format: Option<DiskFormat>,
@@ -156,37 +182,37 @@ pub struct BlockDevice {
 impl BlockDevice {
     pub async fn new(path: impl ToString) -> Result<Self, Error> {
         let path = path.to_string();
-        let device_proxy = connect_to_protocol_at_path::<ControllerMarker>(&path)?;
+        let controller = connect_to_protocol_at_path::<ControllerMarker>(&path)?;
         let topological_path =
-            device_proxy.get_topological_path().await?.map_err(zx::Status::from_raw)?;
-        Ok(Self::from_proxy(
-            VolumeAndNodeProxy::new(device_proxy.into_channel().unwrap()),
-            path,
-            topological_path,
-        ))
+            controller.get_topological_path().await?.map_err(zx::Status::from_raw)?;
+        Self::from_proxy(controller, path, topological_path)
     }
 
     pub fn from_proxy(
-        volume_proxy: VolumeAndNodeProxy,
+        controller_proxy: ControllerProxy,
         path: impl ToString,
         topological_path: impl ToString,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let (partition_proxy, server) = create_proxy::<PartitionMarker>()?;
+        controller_proxy.connect_to_device_fidl(server.into_channel())?;
+        Ok(Self {
             path: path.to_string(),
             topological_path: topological_path.to_string(),
-            volume_proxy,
+            controller_proxy,
+            partition_proxy,
             content_format: None,
             partition_label: None,
             partition_type: None,
             partition_instance: None,
-        }
+        })
     }
 }
 
 #[async_trait]
 impl Device for BlockDevice {
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error> {
-        let info = self.volume_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
+        let block_proxy = self.block_proxy()?;
+        let info = block_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
         Ok(info)
     }
 
@@ -198,8 +224,7 @@ impl Device for BlockDevice {
         if let Some(format) = self.content_format {
             return Ok(format);
         }
-        let block = self.client_end()?;
-        let block = block.into_proxy()?;
+        let block = self.block_proxy()?;
         return Ok(detect_disk_format(&block).await);
     }
 
@@ -213,7 +238,7 @@ impl Device for BlockDevice {
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
         if self.partition_label.is_none() {
-            let (status, name) = self.volume_proxy.get_name().await?;
+            let (status, name) = self.partition_proxy.get_name().await?;
             zx::Status::ok(status)?;
             self.partition_label = Some(name.ok_or(anyhow!("Expected name"))?);
         }
@@ -222,7 +247,7 @@ impl Device for BlockDevice {
 
     async fn partition_type(&mut self) -> Result<&[u8; 16], Error> {
         if self.partition_type.is_none() {
-            let (status, partition_type) = self.volume_proxy.get_type_guid().await?;
+            let (status, partition_type) = self.partition_proxy.get_type_guid().await?;
             zx::Status::ok(status)?;
             self.partition_type = Some(partition_type.ok_or(anyhow!("Expected type"))?.value);
         }
@@ -232,7 +257,7 @@ impl Device for BlockDevice {
     async fn partition_instance(&mut self) -> Result<&[u8; 16], Error> {
         if self.partition_instance.is_none() {
             let (status, instance_guid) = self
-                .volume_proxy
+                .partition_proxy
                 .get_instance_guid()
                 .await
                 .context("Transport error get_instance_guid")?;
@@ -244,18 +269,28 @@ impl Device for BlockDevice {
     }
 
     async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
-        let volume_proxy = {
-            let volume: ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker> =
-                self.client_end()?.into_channel().into();
-            volume.into_proxy()?
-        };
+        let volume_proxy = self.volume_proxy()?;
         crate::volume::resize_volume(&volume_proxy, target_size_bytes, false).await
     }
 
-    fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
-        let (client, server) = create_endpoints();
-        self.volume_proxy.clone(OpenFlags::CLONE_SAME_RIGHTS, server)?;
-        Ok(client.into_channel().into())
+    fn controller(&self) -> &ControllerProxy {
+        &self.controller_proxy
+    }
+
+    fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
+        Ok(connect_to_protocol_at_path::<ControllerMarker>(&self.path)?)
+    }
+
+    fn block_proxy(&self) -> Result<BlockProxy, Error> {
+        let (proxy, server) = create_proxy::<BlockMarker>()?;
+        self.controller_proxy.connect_to_device_fidl(server.into_channel())?;
+        Ok(proxy)
+    }
+
+    fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
+        let (proxy, server) = create_proxy::<VolumeMarker>()?;
+        self.controller_proxy.connect_to_device_fidl(server.into_channel())?;
+        Ok(proxy)
     }
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {

@@ -68,16 +68,18 @@ impl FsRealmState {
                     ),
                     ..Default::default()
                 };
-                Filesystem::from_block_device(device, blobfs)?
+                Filesystem::deprecated_do_not_use_from_block_device(device, blobfs)?
             }
-            DiskFormat::F2fs => Filesystem::from_block_device(device, F2fs::default())?,
+            DiskFormat::F2fs => {
+                Filesystem::deprecated_do_not_use_from_block_device(device, F2fs::default())?
+            }
             DiskFormat::Minfs => {
                 let minfs = Minfs {
                     verbose: options.verbose.unwrap_or(false),
                     readonly: options.read_only.unwrap_or(false),
                     ..Default::default()
                 };
-                Filesystem::from_block_device(device, minfs)?
+                Filesystem::deprecated_do_not_use_from_block_device(device, minfs)?
             }
             _ => {
                 return Err(anyhow!(
@@ -132,17 +134,17 @@ async fn format(
     let mut filesystem = match name.as_ref() {
         "blobfs" => {
             let blobfs = Blobfs { verbose: options.verbose.unwrap_or(false), ..Default::default() };
-            Filesystem::from_block_device(device, blobfs)?
+            Filesystem::deprecated_do_not_use_from_block_device(device, blobfs)?
         }
-        "fxfs" => Filesystem::from_block_device(device, Fxfs::default())?,
-        "f2fs" => Filesystem::from_block_device(device, F2fs::default())?,
+        "fxfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Fxfs::default())?,
+        "f2fs" => Filesystem::deprecated_do_not_use_from_block_device(device, F2fs::default())?,
         "minfs" => {
             let minfs = Minfs {
                 verbose: options.verbose.unwrap_or(false),
                 fvm_data_slices: options.fvm_data_slices.unwrap_or(0),
                 ..Default::default()
             };
-            Filesystem::from_block_device(device, minfs)?
+            Filesystem::deprecated_do_not_use_from_block_device(device, minfs)?
         }
         _ => {
             return Err(anyhow!(
@@ -155,10 +157,10 @@ async fn format(
 
 async fn check(name: &str, device: ClientEnd<BlockMarker>) -> Result<(), Error> {
     let mut filesystem = match name.as_ref() {
-        "blobfs" => Filesystem::from_block_device(device, Blobfs::default())?,
-        "fxfs" => Filesystem::from_block_device(device, Fxfs::default())?,
-        "f2fs" => Filesystem::from_block_device(device, F2fs::default())?,
-        "minfs" => Filesystem::from_block_device(device, Minfs::default())?,
+        "blobfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Blobfs::default())?,
+        "fxfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Fxfs::default())?,
+        "f2fs" => Filesystem::deprecated_do_not_use_from_block_device(device, F2fs::default())?,
+        "minfs" => Filesystem::deprecated_do_not_use_from_block_device(device, Minfs::default())?,
         _ => {
             return Err(anyhow!(
                 "Invalid disk format: fsck only supports blobfs, fxfs, f2fs, and minfs"

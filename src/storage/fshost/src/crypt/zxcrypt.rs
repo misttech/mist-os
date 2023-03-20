@@ -8,9 +8,11 @@ use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
     device_watcher::recursive_wait_and_open,
-    fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_hardware_block::BlockMarker,
+    fidl::endpoints::Proxy as _,
+    fidl_fuchsia_device::ControllerProxy,
+    fidl_fuchsia_hardware_block::BlockProxy,
     fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy},
+    fidl_fuchsia_hardware_block_volume::VolumeProxy,
     fidl_fuchsia_io as fio,
     fs_management::format::DiskFormat,
     fuchsia_zircon as zx,
@@ -149,16 +151,24 @@ impl Device for ZxcryptDevice {
     }
 
     async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
-        let volume_proxy = {
-            let volume: ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker> =
-                self.inner_device.client_end()?.into_channel().into();
-            volume.into_proxy()?
-        };
+        let volume_proxy = self.volume_proxy()?;
         crate::volume::resize_volume(&volume_proxy, target_size_bytes, true).await
     }
 
-    fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
-        self.inner_device.client_end()
+    fn controller(&self) -> &ControllerProxy {
+        self.inner_device.controller()
+    }
+
+    fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
+        self.inner_device.reopen_controller()
+    }
+
+    fn block_proxy(&self) -> Result<BlockProxy, Error> {
+        self.inner_device.block_proxy()
+    }
+
+    fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
+        self.inner_device.volume_proxy()
     }
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {

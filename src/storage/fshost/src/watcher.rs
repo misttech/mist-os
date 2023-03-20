@@ -277,6 +277,7 @@ mod tests {
                                 );
                             });
                         }
+                        Ok(ControllerRequest::ConnectToDeviceFidl { .. }) => {}
                         Ok(controller_request) => {
                             panic!("unexpected request: {:?}", controller_request);
                         }

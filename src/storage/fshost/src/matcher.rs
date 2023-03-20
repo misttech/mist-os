@@ -443,8 +443,10 @@ mod tests {
         },
         anyhow::{anyhow, Error},
         async_trait::async_trait,
-        fidl::{encoding::Decodable as _, endpoints::ClientEnd},
-        fidl_fuchsia_hardware_block::{BlockInfo, BlockMarker, Flag},
+        fidl::encoding::Decodable as _,
+        fidl_fuchsia_device::ControllerProxy,
+        fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag},
+        fidl_fuchsia_hardware_block_volume::VolumeProxy,
         std::sync::Mutex,
     };
 
@@ -531,7 +533,16 @@ mod tests {
         async fn partition_instance(&mut self) -> Result<&[u8; 16], Error> {
             unreachable!()
         }
-        fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
+        fn controller(&self) -> &ControllerProxy {
+            unreachable!()
+        }
+        fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
+            unreachable!()
+        }
+        fn block_proxy(&self) -> Result<BlockProxy, Error> {
+            unreachable!()
+        }
+        fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
             unreachable!()
         }
         async fn get_child(&self, _suffix: &str) -> Result<Box<dyn Device>, Error> {
