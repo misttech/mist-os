@@ -146,6 +146,16 @@ EOF
 systemctl enable telnet.socket
 systemctl enable guest_interaction_daemon.service
 
+# Disable some long-running startup services to allow the guest to boot more
+# quickly.
+#
+# Long-running modules can be found with:
+#
+#   $ systemctl is-system-running --wait
+#   $ systemd-analyze blame
+systemctl disable NetworkManager-wait-online.service
+systemctl disable isc-dhcp-server.service
+
 # Mount the test utils and guest interaction daemon on start up.
 cat >> /etc/fstab << EOF
 /dev/vdb /test_utils auto ro 0 0
