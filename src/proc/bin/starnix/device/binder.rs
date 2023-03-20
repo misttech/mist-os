@@ -2668,14 +2668,13 @@ impl BinderDriver {
             }
         };
 
-        if let Err(err) = result {
-            // TODO(fxbug.dev/117639): Right now there are many errors that happen because a handle
-            // they reference is invalid. This causes libbinder to retry forever, even when the
-            // command will never succeed. This indicates that there is something wrong with our
-            // reference counting.
+        if let Err(err) = &result {
+            // TODO(fxbug.dev/117639): Right now there are many errors that happen that are due to
+            // errors in the kernel driver and not because of an issue in userspace. Until the
+            // driver is more stable, log these.
             log_error!(current_task, "binder command {:#x} failed: {:?}", command, err);
         }
-        Ok(())
+        result
     }
 
     /// Returns a task with the given pid.
