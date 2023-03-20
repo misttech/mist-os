@@ -292,7 +292,7 @@ TEST_F(WlanSoftmacDeviceTest, FillBandCapabilityListOnly5GHz) {
 
 TEST_F(WlanSoftmacDeviceTest, Query) {
   auto result = client_.buffer(test_arena_)->Query();
-  auto& info = result->value()->resp;
+  auto& info = *result->value();
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
   EXPECT_TRUE(info.has_mac_role());

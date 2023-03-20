@@ -157,7 +157,7 @@ impl ClientMlme {
     ) -> Self {
         logger::init();
 
-        let iface_mac = device.wlan_softmac_info().sta_addr;
+        let iface_mac = device.wlan_softmac_query_response().sta_addr;
         Self {
             sta: None,
             ctx: Context {
@@ -324,7 +324,7 @@ impl ClientMlme {
             Ok((req, client_capabilities)) => {
                 self.sta.replace(Client::new(
                     req,
-                    self.ctx.device.wlan_softmac_info().sta_addr,
+                    self.ctx.device.wlan_softmac_query_response().sta_addr,
                     client_capabilities,
                 ));
                 if let Some(sta) = &mut self.sta {
@@ -351,11 +351,13 @@ impl ClientMlme {
     }
 
     fn join_device(&mut self, bss: &BssDescription) -> Result<ClientCapabilities, Error> {
-        let wlan_softmac_info = self.ctx.device.wlan_softmac_info();
+        let wlan_softmac_query_response = self.ctx.device.wlan_softmac_query_response();
         let join_caps = derive_join_capabilities(
             Channel::from(bss.channel),
             bss.rates(),
-            &crate::ddk_converter::device_info_from_wlan_softmac_info(wlan_softmac_info)?,
+            &crate::ddk_converter::device_info_from_wlan_softmac_query_response(
+                wlan_softmac_query_response,
+            )?,
         )
         .map_err(|e| {
             Error::Status(
@@ -407,8 +409,10 @@ impl ClientMlme {
         &self,
         responder: fidl_mlme::MlmeQueryDeviceInfoResponder,
     ) -> Result<(), Error> {
-        let wlan_softmac_info = self.ctx.device.wlan_softmac_info();
-        let mut info = crate::ddk_converter::device_info_from_wlan_softmac_info(wlan_softmac_info)?;
+        let wlan_softmac_query_response = self.ctx.device.wlan_softmac_query_response();
+        let mut info = crate::ddk_converter::device_info_from_wlan_softmac_query_response(
+            wlan_softmac_query_response,
+        )?;
         responder.send(&mut info).map_err(|e| e.into())
     }
 
@@ -2513,8 +2517,9 @@ mod tests {
 
         assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
         let info = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(r)) => r);
-        let expected = crate::ddk_converter::device_info_from_wlan_softmac_info(m.fake_device.info)
-            .expect("Failed to convert DDK WlanSoftmacInfo");
+        let expected =
+            crate::ddk_converter::device_info_from_wlan_softmac_query_response(m.fake_device.info)
+                .expect("Failed to convert DDK WlanSoftmacQueryResponse");
         assert_eq!(info, expected);
     }
 

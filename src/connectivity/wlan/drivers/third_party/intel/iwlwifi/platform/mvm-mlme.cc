@@ -150,18 +150,18 @@ void fill_band_cap_list(const struct iwl_nvm_data* nvm_data,
 
 /////////////////////////////////////       MAC       //////////////////////////////////////////////
 
-zx_status_t mac_query(void* ctx, wlan_softmac_wire::WlanSoftmacInfo* info_out,
+zx_status_t mac_query(void* ctx, wlan_softmac_wire::WlanSoftmacQueryResponse* resp,
                       fidl::AnyArena& arena) {
-  if (ctx == nullptr || info_out == nullptr) {
+  if (ctx == nullptr || resp == nullptr) {
     IWL_ERR(mvmvif, "Empty parameter.");
     return ZX_ERR_INVALID_ARGS;
   }
 
   const auto mvmvif = reinterpret_cast<struct iwl_mvm_vif*>(ctx);
-  auto builder = wlan_softmac_wire::WlanSoftmacInfo::Builder(arena);
+  auto builder = wlan_softmac_wire::WlanSoftmacQueryResponse::Builder(arena);
 
   // The minimal set of wlan device capabilities, also stored as static array since it also back a
-  // VectorView in wlan_softmac_wire::WlanSoftmacInfo.
+  // VectorView in wlan_softmac_wire::WlanSoftmacQueryResponse.
   constexpr size_t kPhySize = 5;
 
   if (kPhySize > wlan_common_wire::kMaxSupportedPhyTypes) {
@@ -218,7 +218,7 @@ zx_status_t mac_query(void* ctx, wlan_softmac_wire::WlanSoftmacInfo* info_out,
       band_caps_buffer, band_caps_buffer + band_caps_count);
   builder.band_caps(
       fidl::VectorView<wlan_softmac_wire::WlanSoftmacBandCapability>(arena, band_caps_vec));
-  *info_out = builder.Build();
+  *resp = builder.Build();
   return ZX_OK;
 }
 

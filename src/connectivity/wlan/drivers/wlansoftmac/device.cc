@@ -145,8 +145,8 @@ zx_status_t WlanSoftmacHandle::Init() {
                               uint64_t* out_scan_id) -> zx_status_t {
         return DEVICE(device)->StartActiveScan(active_scan_args, out_scan_id);
       },
-      .get_wlan_softmac_info = [](void* device) -> wlan_softmac_info_t {
-        return DEVICE(device)->GetWlanSoftmacInfo();
+      .get_wlan_softmac_query_response = [](void* device) -> wlan_softmac_query_response_t {
+        return DEVICE(device)->GetWlanSoftmacQueryResponse();
       },
       .get_discovery_support = [](void* device) -> discovery_support_t {
         return DEVICE(device)->GetDiscoverySupport();
@@ -288,13 +288,14 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
 
   // Allocating memory for lists since banjo converts FIDL vectors into a pointer and count without
   // memory to back it.
-  wlan_softmac_info_.supported_phys_list =
-      static_cast<wlan_phy_type_t*>(calloc(fuchsia_wlan_common_MAX_SUPPORTED_PHY_TYPES,
-                                           sizeof(*wlan_softmac_info_.supported_phys_list)));
-  wlan_softmac_info_.band_caps_list = static_cast<wlan_softmac_band_capability_t*>(
-      calloc(fuchsia_wlan_common_MAX_BANDS, sizeof(*wlan_softmac_info_.band_caps_list)));
-  if ((status = ConvertWlanSoftmacInfo(result->value()->resp, &wlan_softmac_info_)) != ZX_OK) {
-    errorf("WlanSoftmacInfo conversion failed (%s)", zx_status_get_string(status));
+  wlan_softmac_query_response_.supported_phys_list = static_cast<wlan_phy_type_t*>(
+      calloc(fuchsia_wlan_common_MAX_SUPPORTED_PHY_TYPES,
+             sizeof(*wlan_softmac_query_response_.supported_phys_list)));
+  wlan_softmac_query_response_.band_caps_list = static_cast<wlan_softmac_band_capability_t*>(
+      calloc(fuchsia_wlan_common_MAX_BANDS, sizeof(*wlan_softmac_query_response_.band_caps_list)));
+  if ((status = ConvertWlanSoftmacQueryResponse(*result->value(), &wlan_softmac_query_response_)) !=
+      ZX_OK) {
+    errorf("WlanSoftmacQueryResponse conversion failed (%s)", zx_status_get_string(status));
     return status;
   }
 
@@ -368,7 +369,7 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
 
   /* End of data type conversion. */
 
-  state_->set_address(common::MacAddr(wlan_softmac_info_.sta_addr));
+  state_->set_address(common::MacAddr(wlan_softmac_query_response_.sta_addr));
 
   softmac_handle_.reset(new WlanSoftmacHandle(this));
   status = softmac_handle_->Init();
@@ -419,8 +420,8 @@ std::unique_ptr<Packet> Device::PreparePacket(const void* data, size_t length, P
 // Our Device instance is leaked deliberately during the driver bind procedure, so we
 // manually take ownership here.
 void Device::DestroySelf() {
-  free(wlan_softmac_info_.supported_phys_list);
-  free(wlan_softmac_info_.band_caps_list);
+  free(wlan_softmac_query_response_.supported_phys_list);
+  free(wlan_softmac_query_response_.band_caps_list);
   delete this;
 }
 
@@ -472,7 +473,7 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
     return ZX_ERR_INVALID_ARGS;
 
   memset(info, 0, sizeof(*info));
-  memcpy(info->mac, wlan_softmac_info_.sta_addr, ETH_MAC_SIZE);
+  memcpy(info->mac, wlan_softmac_query_response_.sta_addr, ETH_MAC_SIZE);
   info->features = ETHERNET_FEATURE_WLAN;
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -1036,7 +1037,9 @@ void Device::ScanComplete(ScanCompleteRequestView request, fdf::Arena& arena,
 
 fbl::RefPtr<DeviceState> Device::GetState() { return state_; }
 
-const wlan_softmac_info_t& Device::GetWlanSoftmacInfo() const { return wlan_softmac_info_; }
+const wlan_softmac_query_response_t& Device::GetWlanSoftmacQueryResponse() const {
+  return wlan_softmac_query_response_;
+}
 
 const discovery_support_t& Device::GetDiscoverySupport() const { return discovery_support_; }
 

@@ -21,9 +21,9 @@ namespace wlan {
 namespace wlan_common = fuchsia_wlan_common::wire;
 namespace wlan_tap = fuchsia_wlan_tap::wire;
 
-void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacInfo* mac_info,
+void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacQueryResponse* resp,
                          const wlan_tap::WlantapPhyConfig& tap_phy_config, fidl::AnyArena& arena) {
-  auto builder = wlan_softmac::WlanSoftmacInfo::Builder(arena);
+  auto builder = wlan_softmac::WlanSoftmacQueryResponse::Builder(arena);
 
   builder.sta_addr(tap_phy_config.sta_addr);
   builder.mac_role(tap_phy_config.mac_role);
@@ -70,7 +70,7 @@ void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacInfo* mac_info,
   builder.band_caps(
       fidl::VectorView<fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability>(arena, band_cap_vec));
 
-  *mac_info = builder.Build();
+  *resp = builder.Build();
 }
 
 std::string RoleToString(wlan_common::WlanMacRole role) {

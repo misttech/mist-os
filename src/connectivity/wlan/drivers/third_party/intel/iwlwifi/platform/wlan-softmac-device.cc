@@ -51,17 +51,17 @@ WlanSoftmacDevice::WlanSoftmacDevice(zx_device* parent, iwl_trans* drvdata, uint
 
 WlanSoftmacDevice::~WlanSoftmacDevice() {}
 
-// Max size of WlanSoftmacInfo.
-constexpr size_t kWlanSoftmacInfoBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacInfo,
+// Max size of WlanSoftmacQueryResponse.
+constexpr size_t kWlanSoftmacQueryResponseBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacQueryResponse,
                            fidl::MessageDirection::kSending>();
 
 void WlanSoftmacDevice::Query(fdf::Arena& arena, QueryCompleter::Sync& completer) {
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
 
-  fidl::Arena<kWlanSoftmacInfoBufferSize> table_arena;
-  fuchsia_wlan_softmac::wire::WlanSoftmacInfo softmac_info;
-  zx_status_t status = mac_query(mvmvif_, &softmac_info, table_arena);
+  fidl::Arena<kWlanSoftmacQueryResponseBufferSize> table_arena;
+  fuchsia_wlan_softmac::wire::WlanSoftmacQueryResponse resp;
+  zx_status_t status = mac_query(mvmvif_, &resp, table_arena);
 
   if (status != ZX_OK) {
     IWL_ERR(this, "%s() failed query: %s\n", __func__, zx_status_get_string(status));
@@ -69,7 +69,7 @@ void WlanSoftmacDevice::Query(fdf::Arena& arena, QueryCompleter::Sync& completer
     return;
   }
 
-  completer.buffer(arena).ReplySuccess(softmac_info);
+  completer.buffer(arena).ReplySuccess(resp);
 }
 
 void WlanSoftmacDevice::QueryDiscoverySupport(fdf::Arena& arena,

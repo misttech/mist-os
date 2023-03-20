@@ -50,7 +50,7 @@ zx_status_t phy_get_country(void* ctx, wlan_phy_country_t* out_country);
 void phy_create_iface_undo(struct iwl_trans* iwl_trans, uint16_t idx);
 
 // Mac protocol helpers
-zx_status_t mac_query(void* ctx, wlan_softmac_wire::WlanSoftmacInfo* info_out,
+zx_status_t mac_query(void* ctx, wlan_softmac_wire::WlanSoftmacQueryResponse* resp,
                       fidl::AnyArena& arena);
 void mac_query_discovery_support(wlan_common_wire::DiscoverySupport* out_resp);
 void mac_query_mac_sublayer_support(wlan_common_wire::MacSublayerSupport* out_resp);

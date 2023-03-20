@@ -98,7 +98,7 @@ class Device : public DeviceInterface,
                               uint64_t* out_scan_id) final;
   zx_status_t CancelScan(uint64_t scan_id) final;
   fbl::RefPtr<DeviceState> GetState() final;
-  const wlan_softmac_info_t& GetWlanSoftmacInfo() const final;
+  const wlan_softmac_query_response_t& GetWlanSoftmacQueryResponse() const final;
   const discovery_support_t& GetDiscoverySupport() const final;
   const mac_sublayer_support_t& GetMacSublayerSupport() const final;
   const security_support_t& GetSecuritySupport() const final;
@@ -153,7 +153,7 @@ class Device : public DeviceInterface,
   std::unique_ptr<wlan_softmac_ifc_protocol_ops_t> wlan_softmac_ifc_protocol_ops_;
   std::unique_ptr<wlan_softmac_ifc_protocol_t> wlan_softmac_ifc_protocol_;
 
-  wlan_softmac_info_t wlan_softmac_info_ = {};
+  wlan_softmac_query_response_t wlan_softmac_query_response_ = {};
   discovery_support_t discovery_support_ = {};
   mac_sublayer_support_t mac_sublayer_support_ = {};
   security_support_t security_support_ = {};

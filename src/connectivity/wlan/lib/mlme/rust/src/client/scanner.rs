@@ -176,7 +176,7 @@ impl<'a> BoundScanner<'a> {
             return Err(Error::ScanError(ScanError::MaxChannelTimeLtMin));
         }
 
-        let wlan_softmac_info = self.ctx.device.wlan_softmac_info();
+        let wlan_softmac_query_response = self.ctx.device.wlan_softmac_query_response();
         let discovery_support = self.ctx.device.discovery_support();
 
         // The else of this branch is an "MLME scan" which is implemented by calling SetChannel
@@ -185,7 +185,9 @@ impl<'a> BoundScanner<'a> {
         if discovery_support.scan_offload.supported {
             match req.scan_type {
                 fidl_mlme::ScanTypes::Passive => self.start_passive_scan(req),
-                fidl_mlme::ScanTypes::Active => self.start_active_scan(req, &wlan_softmac_info),
+                fidl_mlme::ScanTypes::Active => {
+                    self.start_active_scan(req, &wlan_softmac_query_response)
+                }
             }
             .map(|ongoing_scan| self.scanner.ongoing_scan = Some(ongoing_scan))
             .map_err(|e| {
@@ -224,7 +226,7 @@ impl<'a> BoundScanner<'a> {
     fn start_active_scan(
         &mut self,
         req: fidl_mlme::ScanRequest,
-        wlan_softmac_info: &banjo_wlan_softmac::WlanSoftmacInfo,
+        wlan_softmac_query_response: &banjo_wlan_softmac::WlanSoftmacQueryResponse,
     ) -> Result<OngoingScan, Error> {
         let ssids_list = req
             .ssid_list
@@ -249,7 +251,7 @@ impl<'a> BoundScanner<'a> {
             MAX_PROBES_PER_CHANNEL,
             ssids_list,
             mac_header,
-            wlan_softmac_info,
+            wlan_softmac_query_response,
             req.channel_list,
         )?;
 
@@ -406,14 +408,14 @@ impl<'a> BoundScanner<'a> {
 }
 
 fn band_cap_for_band(
-    wlan_softmac_info: &banjo_wlan_softmac::WlanSoftmacInfo,
+    wlan_softmac_query_response: &banjo_wlan_softmac::WlanSoftmacQueryResponse,
     band: banjo_common::WlanBand,
 ) -> Option<&banjo_wlan_softmac::WlanSoftmacBandCapability> {
     // SAFETY: softmac.fidl API guarantees these values represent a valid memory region.
     let band_caps_list = unsafe {
         std::slice::from_raw_parts(
-            wlan_softmac_info.band_caps_list,
-            wlan_softmac_info.band_caps_count,
+            wlan_softmac_query_response.band_caps_list,
+            wlan_softmac_query_response.band_caps_count,
         )
     };
     band_caps_list.iter().filter(|b| b.band == band).next()
@@ -421,10 +423,10 @@ fn band_cap_for_band(
 
 // TODO(fxbug.dev/91036): Zero should not mark a null rate.
 fn supported_rates_for_band(
-    wlan_softmac_info: &banjo_wlan_softmac::WlanSoftmacInfo,
+    wlan_softmac_query_response: &banjo_wlan_softmac::WlanSoftmacQueryResponse,
     band: banjo_common::WlanBand,
 ) -> Result<Vec<u8>, Error> {
-    let band_cap = band_cap_for_band(&wlan_softmac_info, band)
+    let band_cap = band_cap_for_band(&wlan_softmac_query_response, band)
         .ok_or(format_err!("no band found for band {:?}", band))?;
     Ok(band_cap.basic_rate_list[..band_cap.basic_rate_count as usize].to_vec())
 }
@@ -446,7 +448,7 @@ fn active_scan_args_series(
     max_probes_per_channel: u8,
     ssids_list: Vec<banjo_ieee80211::CSsid>,
     mac_header: Vec<u8>,
-    wlan_softmac_info: &banjo_wlan_softmac::WlanSoftmacInfo,
+    wlan_softmac_query_response: &banjo_wlan_softmac::WlanSoftmacQueryResponse,
     channel_list: Vec<u8>,
 ) -> Result<Vec<ActiveScanArgs>, Error> {
     // TODO(fxbug.dev/91038): The fuchsia.wlan.mlme/MLME API assumes channels numbers imply bands
@@ -469,7 +471,7 @@ fn active_scan_args_series(
     let mut active_scan_args_series = vec![];
     for cl in channel_lists {
         if !cl.channels.is_empty() {
-            let supported_rates = supported_rates_for_band(wlan_softmac_info, cl.band)?;
+            let supported_rates = supported_rates_for_band(wlan_softmac_query_response, cl.band)?;
             active_scan_args_series.push(ActiveScanArgs {
                 min_channel_time,
                 max_channel_time,

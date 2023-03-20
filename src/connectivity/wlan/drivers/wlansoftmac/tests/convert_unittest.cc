@@ -84,10 +84,10 @@ static constexpr uint8_t kFakeBanjoMacImplementationType = MAC_IMPLEMENTATION_TY
 /* Test cases*/
 
 // FIDL to banjo types tests.
-TEST(ConvertTest, ToBanjoWlanSoftmacInfo) {
-  // Build WlanSoftmacInfo
+TEST(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
+  // Build WlanSoftmacQueryResponse
   fidl::Arena arena;
-  auto builder = wlan_softmac::WlanSoftmacInfo::Builder(arena);
+  auto builder = wlan_softmac::WlanSoftmacQueryResponse::Builder(arena);
 
   fidl::Array<uint8_t, wlan_ieee80211::kMacAddrLen> sta_addr;
   memcpy(sta_addr.begin(), kFakeMacAddr, sta_addr.size());
@@ -132,10 +132,10 @@ TEST(ConvertTest, ToBanjoWlanSoftmacInfo) {
   // Conduct conversion
   wlan_phy_type_t supported_phys[wlan_common::kMaxSupportedPhyTypes];
   wlan_softmac_band_capability_t band_caps[wlan_common::kMaxBands];
-  wlan_softmac_info_t out;
+  wlan_softmac_query_response_t out;
   out.supported_phys_list = supported_phys;
   out.band_caps_list = band_caps;
-  ConvertWlanSoftmacInfo(in, &out);
+  ConvertWlanSoftmacQueryResponse(in, &out);
 
   // Verify outputs
   EXPECT_EQ(0, memcmp(out.sta_addr, kFakeMacAddr, wlan_ieee80211::kMacAddrLen));

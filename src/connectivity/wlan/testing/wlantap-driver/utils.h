@@ -19,7 +19,7 @@ namespace wlan_common = fuchsia_wlan_common::wire;
 namespace wlan {
 
 std::string RoleToString(wlan_common::WlanMacRole role);
-void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacInfo* mac_info,
+void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacQueryResponse* resp,
                          const wlan_tap::WlantapPhyConfig& tap_phy_config, fidl::AnyArena& arena);
 }  // namespace wlan
 

@@ -89,13 +89,15 @@ void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities&
   memcpy(out->bytes, in.bytes.data(), fuchsia_wlan_ieee80211::wire::kVhtCapLen);
 }
 
-zx_status_t ConvertWlanSoftmacInfo(const fuchsia_wlan_softmac::wire::WlanSoftmacInfo& in,
-                                   wlan_softmac_info_t* out) {
+zx_status_t ConvertWlanSoftmacQueryResponse(
+    const fuchsia_wlan_softmac::wire::WlanSoftmacQueryResponse& in,
+    wlan_softmac_query_response_t* out) {
   zx_status_t status;
   if (!(in.has_sta_addr() && in.has_mac_role() && in.has_supported_phys() &&
         in.has_hardware_capability() && in.has_band_caps())) {
-    errorf("WlanSoftmacInfo missing fields: %s %s %s %s %s.", in.has_sta_addr() ? "" : "sta_addr",
-           in.has_mac_role() ? "" : "mac_role", in.has_supported_phys() ? "" : "supported_phys",
+    errorf("WlanSoftmacQueryResponse missing fields: %s %s %s %s %s.",
+           in.has_sta_addr() ? "" : "sta_addr", in.has_mac_role() ? "" : "mac_role",
+           in.has_supported_phys() ? "" : "supported_phys",
            in.has_hardware_capability() ? "" : "hardware_capability",
            in.has_band_caps() ? "" : "band_caps");
     return ZX_ERR_INVALID_ARGS;

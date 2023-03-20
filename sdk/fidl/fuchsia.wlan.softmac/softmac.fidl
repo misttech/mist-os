@@ -45,7 +45,9 @@ type WlanSoftmacBandCapability = struct {
     operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
 };
 
-type WlanSoftmacInfo = table {
+/// High-level information describing the state of a running softmac.
+/// All fields in this response are required.
+type WlanSoftmacQueryResponse = table {
     /// Station address.
     1: sta_addr ieee80211.MacAddr;
 
@@ -304,9 +306,7 @@ protocol WlanSoftmac {
 
     /// Obtain information about the device and supported features
     /// Safe to call when the softmac is not started.
-    Query() -> (struct {
-        resp WlanSoftmacInfo;
-    }) error zx.status;
+    Query() -> (WlanSoftmacQueryResponse) error zx.status;
 
     /// Query the underlying device for feature support related to station
     /// discovery (e.g. scans and probes). Safe to call when the softmac is not

@@ -109,8 +109,8 @@ fn blank_wmm_ac_params() -> banjo_wlan_associnfo::WlanWmmAcParams {
     }
 }
 
-pub fn device_info_from_wlan_softmac_info(
-    info: banjo_wlan_softmac::WlanSoftmacInfo,
+pub fn device_info_from_wlan_softmac_query_response(
+    info: banjo_wlan_softmac::WlanSoftmacQueryResponse,
 ) -> Result<fidl_mlme::DeviceInfo, Error> {
     let sta_addr = info.sta_addr;
     let role = fidl_common::WlanMacRole::from_primitive(info.mac_role.0)
@@ -242,7 +242,7 @@ mod tests {
         super::*,
         crate::device::{
             fake_discovery_support, fake_mac_sublayer_support, fake_security_support,
-            fake_spectrum_management_support, fake_wlan_softmac_info,
+            fake_spectrum_management_support, fake_wlan_softmac_query_response,
         },
         banjo_fuchsia_wlan_ieee80211 as banjo_80211,
         std::convert::TryInto,
@@ -355,7 +355,8 @@ mod tests {
     fn test_convert_band_cap() {
         let mut supported_phys: Vec<banjo_common::WlanPhyType> = Vec::new();
         let mut band_caps: Vec<banjo_wlan_softmac::WlanSoftmacBandCapability> = Vec::new();
-        let _wlan_softmac_info = fake_wlan_softmac_info(&mut supported_phys, &mut band_caps);
+        let _wlan_softmac_query_response =
+            fake_wlan_softmac_query_response(&mut supported_phys, &mut band_caps);
         let band0 = convert_ddk_band_cap(&band_caps[0]).expect("failed to convert band capability");
         assert_eq!(band0.band, fidl_common::WlanBand::TwoGhz);
         assert_eq!(
@@ -371,10 +372,11 @@ mod tests {
     fn test_convert_device_info() {
         let mut supported_phys: Vec<banjo_common::WlanPhyType> = Vec::new();
         let mut band_caps: Vec<banjo_wlan_softmac::WlanSoftmacBandCapability> = Vec::new();
-        let wlan_softmac_info = fake_wlan_softmac_info(&mut supported_phys, &mut band_caps);
-        let device_info = device_info_from_wlan_softmac_info(wlan_softmac_info)
+        let wlan_softmac_query_response =
+            fake_wlan_softmac_query_response(&mut supported_phys, &mut band_caps);
+        let device_info = device_info_from_wlan_softmac_query_response(wlan_softmac_query_response)
             .expect("Failed to conver wlan-softmac info");
-        assert_eq!(device_info.sta_addr, wlan_softmac_info.sta_addr);
+        assert_eq!(device_info.sta_addr, wlan_softmac_query_response.sta_addr);
         assert_eq!(device_info.role, fidl_common::WlanMacRole::Client);
         assert_eq!(device_info.bands.len(), 2);
     }
@@ -383,9 +385,10 @@ mod tests {
     fn test_convert_device_info_unknown_role() {
         let mut supported_phys: Vec<banjo_common::WlanPhyType> = Vec::new();
         let mut band_caps: Vec<banjo_wlan_softmac::WlanSoftmacBandCapability> = Vec::new();
-        let mut wlan_softmac_info = fake_wlan_softmac_info(&mut supported_phys, &mut band_caps);
-        wlan_softmac_info.mac_role.0 = 10;
-        device_info_from_wlan_softmac_info(wlan_softmac_info)
+        let mut wlan_softmac_query_response =
+            fake_wlan_softmac_query_response(&mut supported_phys, &mut band_caps);
+        wlan_softmac_query_response.mac_role.0 = 10;
+        device_info_from_wlan_softmac_query_response(wlan_softmac_query_response)
             .expect_err("Shouldn't convert invalid mac role");
     }
 

@@ -9,7 +9,7 @@ use {
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_internal::JoinBssRequest,
     banjo_fuchsia_wlan_softmac::{
-        self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacInfo, WlanTxPacket,
+        self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacQueryResponse, WlanTxPacket,
     },
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
     ieee80211::MacAddr,
@@ -136,8 +136,8 @@ impl Device {
         self.raw_device.channel()
     }
 
-    pub fn wlan_softmac_info(&self) -> WlanSoftmacInfo {
-        self.raw_device.wlan_softmac_info()
+    pub fn wlan_softmac_query_response(&self) -> WlanSoftmacQueryResponse {
+        self.raw_device.wlan_softmac_query_response()
     }
 
     pub fn discovery_support(&self) -> banjo_common::DiscoverySupport {
@@ -410,7 +410,7 @@ pub struct DeviceInterface {
     /// Cancel ongoing scan in the driver
     cancel_scan: extern "C" fn(device: *mut c_void, scan_id: u64) -> zx::sys::zx_status_t,
     /// Get information and capabilities of this WLAN interface
-    get_wlan_softmac_info: extern "C" fn(device: *mut c_void) -> WlanSoftmacInfo,
+    get_wlan_softmac_query_response: extern "C" fn(device: *mut c_void) -> WlanSoftmacQueryResponse,
     /// Get discovery features supported by this WLAN interface
     get_discovery_support: extern "C" fn(device: *mut c_void) -> banjo_common::DiscoverySupport,
     /// Get MAC sublayer features supported by this WLAN interface
@@ -536,8 +536,8 @@ impl DeviceInterface {
         (self.get_wlan_channel)(self.device)
     }
 
-    pub fn wlan_softmac_info(&self) -> WlanSoftmacInfo {
-        (self.get_wlan_softmac_info)(self.device)
+    pub fn wlan_softmac_query_response(&self) -> WlanSoftmacQueryResponse {
+        (self.get_wlan_softmac_query_response)(self.device)
     }
 
     pub fn discovery_support(&self) -> banjo_common::DiscoverySupport {
@@ -665,7 +665,7 @@ pub mod test_utils {
         pub next_scan_id: u64,
         pub captured_passive_scan_args: Option<CapturedWlanSoftmacStartPassiveScanRequest>,
         pub captured_active_scan_args: Option<ActiveScanArgs>,
-        pub info: WlanSoftmacInfo,
+        pub info: WlanSoftmacQueryResponse,
         pub discovery_support: banjo_common::DiscoverySupport,
         pub mac_sublayer_support: banjo_common::MacSublayerSupport,
         pub security_support: banjo_common::SecuritySupport,
@@ -700,7 +700,7 @@ pub mod test_utils {
                 next_scan_id: 0,
                 captured_passive_scan_args: None,
                 captured_active_scan_args: None,
-                info: fake_wlan_softmac_info(&mut supported_phys, &mut band_caps),
+                info: fake_wlan_softmac_query_response(&mut supported_phys, &mut band_caps),
                 discovery_support: fake_discovery_support(),
                 mac_sublayer_support: fake_mac_sublayer_support(),
                 security_support: fake_security_support(),
@@ -731,7 +731,8 @@ pub mod test_utils {
             unsafe {
                 *out_sme_channel = mlme_request_stream_handle;
             }
-            device.info = fake_wlan_softmac_info(&mut device.supported_phys, &mut device.band_caps);
+            device.info =
+                fake_wlan_softmac_query_response(&mut device.supported_phys, &mut device.band_caps);
             // TODO(fxbug.dev/45464): Capture _ifc and provide a testing surface.
             zx::sys::ZX_OK
         }
@@ -875,7 +876,9 @@ pub mod test_utils {
             zx::sys::ZX_ERR_NOT_SUPPORTED
         }
 
-        pub extern "C" fn get_wlan_softmac_info(device: *mut c_void) -> WlanSoftmacInfo {
+        pub extern "C" fn get_wlan_softmac_query_response(
+            device: *mut c_void,
+        ) -> WlanSoftmacQueryResponse {
             unsafe { (*(device as *const Self)).info }
         }
 
@@ -997,7 +1000,7 @@ pub mod test_utils {
                 start_passive_scan: Self::start_passive_scan,
                 start_active_scan: Self::start_active_scan,
                 cancel_scan: Self::cancel_scan,
-                get_wlan_softmac_info: Self::get_wlan_softmac_info,
+                get_wlan_softmac_query_response: Self::get_wlan_softmac_query_response,
                 get_discovery_support: Self::get_discovery_support,
                 get_mac_sublayer_support: Self::get_mac_sublayer_support,
                 get_security_support: Self::get_security_support,
@@ -1040,13 +1043,13 @@ pub mod test_utils {
         }
     }
 
-    // Note: The WlanSoftmacInfo return structure does not have backing memory for the list of supported_phys and
+    // Note: The WlanSoftmacQueryResponse return structure does not have backing memory for the list of supported_phys and
     // band_caps that it holds. So in order to successfully construct this, we are needing to pass in a vector
     // reference to serve as the memory backing these lists.
-    pub fn fake_wlan_softmac_info(
+    pub fn fake_wlan_softmac_query_response(
         supported_phys: &mut Vec<banjo_common::WlanPhyType>,
         band_caps: &mut Vec<banjo_wlan_softmac::WlanSoftmacBandCapability>,
-    ) -> WlanSoftmacInfo {
+    ) -> WlanSoftmacQueryResponse {
         let band_caps_count = 2;
         let mut band_caps_list = [default_band_capability(); banjo_common::MAX_BANDS as usize];
         let basic_rate_list = arr!(
@@ -1096,7 +1099,7 @@ pub mod test_utils {
             banjo_common::WlanPhyType::HT,
             banjo_common::WlanPhyType::VHT,
         ];
-        // Convert to u8 for use in WlanSoftmacInfo.supported_phys_count.
+        // Convert to u8 for use in WlanSoftmacQueryResponse.supported_phys_count.
         let supported_phys_count: usize = supported_phys_list.len().try_into().unwrap();
 
         // The Banjo transport requires this array to have a
@@ -1107,7 +1110,7 @@ pub mod test_utils {
 
         *band_caps = band_caps_list.to_vec();
 
-        WlanSoftmacInfo {
+        WlanSoftmacQueryResponse {
             sta_addr: [7u8; 6],
             mac_role: banjo_common::WlanMacRole::CLIENT,
             supported_phys_list: supported_phys.as_mut_ptr(),
@@ -1398,11 +1401,11 @@ mod tests {
     }
 
     #[test]
-    fn get_wlan_softmac_info() {
+    fn get_wlan_softmac_query_response() {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
-        let info = dev.wlan_softmac_info();
+        let info = dev.wlan_softmac_query_response();
         assert_eq!(info.sta_addr, [7u8; 6]);
         assert_eq!(info.mac_role, banjo_common::WlanMacRole::CLIENT);
         assert_eq!(info.hardware_capability, 0);

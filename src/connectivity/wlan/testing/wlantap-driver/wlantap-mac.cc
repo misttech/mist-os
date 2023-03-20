@@ -84,14 +84,14 @@ struct WlantapMacImpl : WlantapMac,
 
   // WlanSoftmac protocol impl
 
-  // Large enough to back a full WlanSoftmacInfo FIDL struct.
-  static constexpr size_t kWlanSoftmacInfoBufferSize = 5120;
+  // Large enough to back a full WlanSoftmacQueryResponse FIDL struct.
+  static constexpr size_t kWlanSoftmacQueryResponseBufferSize = 5120;
 
   void Query(fdf::Arena& arena, QueryCompleter::Sync& completer) override {
-    fidl::Arena<kWlanSoftmacInfoBufferSize> table_arena;
-    wlan_softmac::WlanSoftmacInfo softmac_info;
-    ConvertTapPhyConfig(&softmac_info, *phy_config_, table_arena);
-    completer.buffer(arena).ReplySuccess(softmac_info);
+    fidl::Arena<kWlanSoftmacQueryResponseBufferSize> table_arena;
+    wlan_softmac::WlanSoftmacQueryResponse resp;
+    ConvertTapPhyConfig(&resp, *phy_config_, table_arena);
+    completer.buffer(arena).ReplySuccess(resp);
   }
 
   void QueryDiscoverySupport(fdf::Arena& arena,

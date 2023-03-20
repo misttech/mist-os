@@ -111,7 +111,7 @@ typedef struct {
   /**
    * Get information and capabilities of this WLAN interface
    */
-  wlan_softmac_info_t (*get_wlan_softmac_info)(void *device);
+  wlan_softmac_query_response_t (*get_wlan_softmac_query_response)(void *device);
   /**
    * Get discovery features supported by this WLAN interface
    */

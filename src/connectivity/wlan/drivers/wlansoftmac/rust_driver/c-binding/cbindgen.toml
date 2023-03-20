@@ -14,7 +14,7 @@ language = "C"
 
 sys_includes = [
     # Banjo types.
-    "fuchsia/wlan/softmac/c/banjo.h",   # wlan_softmac_info_t, wlan_hw_scan_config_t,
+    "fuchsia/wlan/softmac/c/banjo.h",   # wlan_softmac_query_response_t, wlan_hw_scan_config_t,
                                                  # wlan_softmac_passive_scan_args_t, wlan_rx_info_t
     "fuchsia/wlan/common/c/banjo.h",   # wlan_channel_t
     "fuchsia/wlan/internal/c/banjo.h",   # join_bss_request_t
@@ -49,7 +49,7 @@ exclude = [
     "WlanChannel",
     "WlanIndication",
     "WlanKeyConfig",
-    "WlanSoftmacInfo",
+    "WlanSoftmacQueryResponse",
     "WlanRxInfo",
     "WlanTxInfo",
     "WlanTxPacket",
@@ -80,7 +80,7 @@ exclude = [
 "WlanChannel" = "wlan_channel_t"
 "WlanSoftmacIfcProtocol" = "rust_wlan_softmac_ifc_protocol_copy_t"
 "WlanSoftmacIfcProtocolOps" = "rust_wlan_softmac_ifc_protocol_ops_copy_t"
-"WlanSoftmacInfo" = "wlan_softmac_info_t"
+"WlanSoftmacQueryResponse" = "wlan_softmac_query_response_t"
 "WlanIndication" = "wlan_indication_t"
 "WlanKeyConfiguration" = "wlan_key_configuration_t"
 "WlanRxPacket" = "wlan_rx_packet_t"

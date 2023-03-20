@@ -92,7 +92,7 @@ async fn wlansoftmac_thread(
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     startup_sender: oneshot::Sender<Result<(), anyhow::Error>>,
 ) {
-    let softmac_info = device.wlan_softmac_info();
+    let softmac_info = device.wlan_softmac_query_response();
     match softmac_info.mac_role {
         banjo_common::WlanMacRole::CLIENT => {
             info!("Running wlansoftmac with client role");
