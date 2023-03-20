@@ -266,8 +266,9 @@ impl InputPipeline {
     ) -> Self {
         let (pipeline_sender, receiver, tasks) = assembly.into_components();
 
-        // Add static property `supported_input_devices` to inspect node
+        // Add static properties to inspect node
         inspect_node.record_string("supported_input_devices", input_device_types.iter().join(", "));
+        inspect_node.record_uint("handlers_registered", tasks.len() as u64);
 
         // Add a stage that catches events which drop all the way down through the pipeline
         // and logs them.
@@ -1195,15 +1196,26 @@ mod tests {
             input_device::InputDeviceType::Touch,
             input_device::InputDeviceType::ConsumerControls,
         ];
+
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("input_pipeline");
-        let _test_input_pipeline =
-            InputPipeline::new(device_types, InputPipelineAssembly::new(), test_node);
+
+        // Create fake input handler for assembly
+        let (fake_handler_event_sender, mut _fake_handler_event_receiver) =
+            futures::channel::mpsc::channel(input_device::INPUT_EVENT_BUFFER_SIZE);
+        let fake_input_handler =
+            observe_fake_events_input_handler::ObserveFakeEventsInputHandler::new(
+                fake_handler_event_sender,
+            );
+
+        let assembly = InputPipelineAssembly::new().add_handler(fake_input_handler);
+        let _test_input_pipeline = InputPipeline::new(device_types, assembly, test_node);
         fuchsia_inspect::assert_data_tree!(inspector, root: {
             input_pipeline: {
                 supported_input_devices: "Touch, ConsumerControls",
                 devices_discovered: 0u64,
-                devices_connected: 0u64
+                devices_connected: 0u64,
+                handlers_registered: 1u64,
             }
         });
     }
