@@ -1843,14 +1843,14 @@ impl BinderObject {
 
     /// Returns whether the object has any strong reference.
     fn has_strong(&self) -> bool {
-        self.state.lock().strong_count.count() > 0
+        self.lock().strong_count.count() > 0
     }
 
     /// Returns whether the object has any reference, or is waiting for an acknowledgement from the
     /// owning process. The object cannot be removed from the object table has long as this is
     /// true.
     fn has_ref(&self) -> bool {
-        let state = self.state.lock();
+        let state = self.lock();
         state.weak_count.has_ref() || state.strong_count.has_ref()
     }
 
@@ -1858,7 +1858,7 @@ impl BinderObject {
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        if self.state.lock().strong_count.inc() {
+        if self.lock().strong_count.inc() {
             Ok(vec![RefCountAction::Acquire(self.clone())])
         } else {
             Ok(vec![])
@@ -1869,7 +1869,7 @@ impl BinderObject {
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        if self.state.lock().weak_count.inc() {
+        if self.lock().weak_count.inc() {
             Ok(vec![RefCountAction::IncRefs(self.clone())])
         } else {
             Ok(vec![])
@@ -1880,7 +1880,7 @@ impl BinderObject {
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn dec_strong(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        let mut state = self.state.lock();
+        let mut state = self.lock();
         state.strong_count.dec()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
@@ -1889,7 +1889,7 @@ impl BinderObject {
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn dec_weak(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        let mut state = self.state.lock();
+        let mut state = self.lock();
         state.weak_count.dec()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
@@ -1898,7 +1898,7 @@ impl BinderObject {
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn ack_acquire(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        let mut state = self.state.lock();
+        let mut state = self.lock();
         state.strong_count.ack()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
@@ -1907,7 +1907,7 @@ impl BinderObject {
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess`.
     fn ack_incref(self: &Arc<Self>) -> Result<Vec<RefCountAction>, Errno> {
-        let mut state = self.state.lock();
+        let mut state = self.lock();
         state.weak_count.ack()?;
         Ok(self.compute_decrease_actions(&mut state))
     }
