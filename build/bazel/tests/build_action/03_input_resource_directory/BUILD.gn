@@ -39,6 +39,10 @@ bazel_action("test") {
   command = "build"
   bazel_targets = [ ":list_directory" ]
   bazel_inputs = [ ":bazel_input" ]
-  bazel_outputs = [ "{{BAZEL_TARGET_OUT_DIR}}/files.txt" ]
-  ninja_outputs = [ "ninja.files.txt" ]
+  copy_outputs = [
+    {
+      bazel = "{{BAZEL_TARGET_OUT_DIR}}/files.txt"
+      ninja = "ninja.files.txt"
+    },
+  ]
 }

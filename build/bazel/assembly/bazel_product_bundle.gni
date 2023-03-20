@@ -79,17 +79,23 @@ template("bazel_product_bundle") {
     # Directory outputs are OK because `product_bundle.json` correctly
     # represents the freshness of all outputs.
     allow_directory_in_outputs = true
-    bazel_outputs = [
-      "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/product_bundle.json",
-      "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/system_a",
-      "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/repository",
-      "{{BAZEL_TARGET_OUT_DIR}}/pave.sh",
-    ]
-    ninja_outputs = [
-      "product_bundle/product_bundle.json",
-      "product_bundle/system_a",
-      "product_bundle/repository",
-      "pave.sh",
+    copy_outputs = [
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/product_bundle.json"
+        ninja = "product_bundle/product_bundle.json"
+      },
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/system_a"
+        ninja = "product_bundle/system_a"
+      },
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/repository"
+        ninja = "product_bundle/repository"
+      },
+      {
+        bazel = "{{BAZEL_TARGET_OUT_DIR}}/pave.sh"
+        ninja = "pave.sh"
+      },
     ]
 
     # Populate metadata when Bazel image is not used will pollute GN assembly.

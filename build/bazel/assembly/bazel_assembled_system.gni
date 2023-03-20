@@ -153,12 +153,14 @@ template("bazel_assembled_system") {
       _bazel_image_name = invoker.bazel_assembly_image_name
     }
 
-    bazel_outputs = []
-    ninja_outputs = []
+    copy_outputs = []
     foreach(_out, _assembly_outputs) {
-      bazel_outputs +=
-          [ "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/${_out}" ]
-      ninja_outputs += [ "${_bazel_image_name}/${_out}" ]
+      copy_outputs += [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/${_out}"
+          ninja = "${_bazel_image_name}/${_out}"
+        },
+      ]
     }
   }
 }

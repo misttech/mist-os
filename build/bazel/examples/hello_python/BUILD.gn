@@ -7,8 +7,12 @@ import("//build/bazel/bazel_action.gni")
 bazel_action("hello_python_bin") {
   command = "build"
   bazel_targets = [ ":bin" ]
-  bazel_outputs = [ "{{BAZEL_TARGET_OUT_DIR}}/bin" ]
-  ninja_outputs = [ "hello_python" ]
+  copy_outputs = [
+    {
+      bazel = "{{BAZEL_TARGET_OUT_DIR}}/bin"
+      ninja = "hello_python"
+    },
+  ]
 }
 
 group("hello_python") {

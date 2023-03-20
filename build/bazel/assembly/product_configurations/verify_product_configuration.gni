@@ -58,10 +58,13 @@ template("verify_product_configuration") {
     visibility = [ ":${invoker.target_name}" ]
     command = "build"
     bazel_targets = [ invoker.bazel_product_config_target ]
-
-    bazel_outputs =
-        [ "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_product_config.json" ]
-    ninja_outputs = [ _bazel_product_config_file ]
+    copy_outputs = [
+      {
+        bazel =
+            "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_product_config.json"
+        ninja = _bazel_product_config_file
+      },
+    ]
   }
 
   action(target_name) {

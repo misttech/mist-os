@@ -57,8 +57,12 @@ template("verify_images_configuration") {
     command = "build"
     bazel_targets = [ invoker.bazel_images_config_target ]
 
-    bazel_outputs = [ "{{BAZEL_TARGET_OUT_PATH}}.json" ]
-    ninja_outputs = [ _bazel_images_config_file ]
+    copy_outputs = [
+      {
+        bazel = "{{BAZEL_TARGET_OUT_PATH}}.json"
+        ninja = _bazel_images_config_file
+      },
+    ]
   }
 
   action(target_name) {

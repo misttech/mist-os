@@ -84,8 +84,12 @@ declare_args() {
   #        command = "build"
   #        bazel_targets = "//vendor/acme/proprietary/installer"
   #        bazel_inputs = [ ":acme_firmware" ]
-  #        bazel_outputs = [ "vendor/acme/proprietary/installer/installer" ]
-  #        ninja_outputs = [ "installer" ]
+  #        copy_outputs = [
+  #          {
+  #            bazel = "vendor/acme/proprietary/installer/installer"
+  #            ninja = "installer"
+  #          }
+  #        ]
   #      }
   #
   # Which requires the following, which could be in args.gn, or in a file
