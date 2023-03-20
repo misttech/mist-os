@@ -66,6 +66,8 @@ FIDL library. You can copy these commands to generate some scaffolding:
     ```sh
     mkdir {{ test_root }}
     mkdir {{ test_root }}/meta/
+    # Rust tests need an additional component to offer the subpackaged test runner.
+    touch {{ test_root }}/meta/{{ test_component_name }}_root.cml
     touch {{ test_root }}/meta/{{ test_component_name }}.cml
     touch {{ test_root }}/BUILD.gn
     touch {{ test_root }}/main.rs
@@ -133,7 +135,19 @@ to `{{ test_component_name }}.cml`:
 
   * {Rust}
 
+    This test root component includes `//sdk/ctf/meta/rust.shard.cml`, which defines the rust test runner as a subpackage. The `echo_test` component must be started in the `subpackaged-runner-env`.
+
     ```json5
+    // echo_test_root.cml
+
+    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/meta/fuchsia.examples.echo_test_root.cml" region_tag="example" adjust_indentation="auto" %}
+    ```
+
+    The test component. The test realm is offered from the test root rather than the test itself.
+
+    ```json5
+    // echo_test.cml
+
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/meta/fuchsia.examples.echo_test.cml" region_tag="example" adjust_indentation="auto" %}
     ```
 

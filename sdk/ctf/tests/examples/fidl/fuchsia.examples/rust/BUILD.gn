@@ -32,9 +32,16 @@ ctf_fuchsia_component("fuchsia.examples.echo_test_component") {
   testonly = true
 }
 
+ctf_fuchsia_component("fuchsia.examples.echo_test_root") {
+  component_name = "fuchsia.examples.echo_test_root"
+  manifest = "meta/fuchsia.examples.echo_test_root.cml"
+}
+
 ctf_fuchsia_test_package("fuchsia.examples.echo_rust_test") {
   enable_ctf_test_realms = true
   package_name = "fuchsia.examples.echo_rust_test"
-  test_components = [ ":fuchsia.examples.echo_test_component" ]
+  test_components = [ ":fuchsia.examples.echo_test_root" ]
+  subpackages = RUST_SUBPACKAGES
+  deps = [ ":fuchsia.examples.echo_test_component" ]
 }
 # [END build]

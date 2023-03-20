@@ -24,6 +24,12 @@ subject to failure due to unrelated changes in Fuchsia platform internals. We
 make exceptions for dependencies on a case-by-case basis. (e.g., internal test
 frameworks that would work just as well out of tree).
 
+
+### Tests using unstable test runners must bring their own test runner.
+
+Tests using unstable test runners, such as Rust tests, must bring their own test runner
+via subpackages. See the [CTF Contributing Guide] for details and examples.
+
 ### Test should not have flaky dependencies.
 
 Tests must not depend on things that may go away, are intermittently available
@@ -81,6 +87,7 @@ For example, a test that makes a system-wide change to set the background color
 of text should reset the color to its original value at the end of the test.
 This prevents tests from affecting one another.
 
+[CTF Contributing Guide]: /docs/development/testing/ctf/contributing_tests.md
 [CTF bug component]: https://bugs.fuchsia.dev/p/fuchsia/templates/detail?saved=1&template=Fuchsia%20Compatibility%20Test%20Suite%20%28CTS%29&ts=1627669234
 [Documentation Guide]: /docs/contribute/docs/documentation-standards.md
 [Languages]: /docs/development/languages/README.md
