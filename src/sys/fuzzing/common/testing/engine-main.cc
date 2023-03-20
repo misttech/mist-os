@@ -7,7 +7,7 @@
 
 namespace fuzzing {
 
-ZxResult<RunnerPtr> MakeFakeRunnerPtr(int argc, char** argv, ComponentContext& context) {
+ZxResult<RunnerPtr> MakeFakeRunnerPtr(ComponentContext& context) {
   return fpromise::ok(FakeRunner::MakePtr(context.executor()));
 }
 

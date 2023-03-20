@@ -58,7 +58,7 @@ executable("engine-bin") {
     "//src/lib/fxl/test:gtest_main",
     "//src/sys/fuzzing/common",
     "//src/sys/fuzzing/common/testing",
-    "//src/sys/fuzzing/realmfuzzer/engine:adapter-client",
+    "//src/sys/fuzzing/realmfuzzer/engine:engine-lib",
     "//third_party/googletest:gtest",
   ]
 }

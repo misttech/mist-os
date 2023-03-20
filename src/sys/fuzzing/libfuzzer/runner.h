@@ -35,10 +35,10 @@ class LibFuzzerRunner : public Runner {
   // Factory method.
   static RunnerPtr MakePtr(ExecutorPtr executor);
 
-  void set_cmdline(const std::vector<std::string>& cmdline) { cmdline_ = cmdline; }
   void set_verbose(bool verbose) { verbose_ = verbose; }
 
   // |Runner| methods.
+  ZxPromise<> Initialize(std::string pkg_dir, std::vector<std::string> args) override;
   __WARN_UNUSED_RESULT zx_status_t AddToCorpus(CorpusType corpus_type, Input input) override;
   std::vector<Input> GetCorpus(CorpusType corpus_type) override;
   __WARN_UNUSED_RESULT zx_status_t ParseDictionary(const Input& input) override;

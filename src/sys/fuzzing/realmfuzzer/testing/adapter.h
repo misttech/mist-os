@@ -37,7 +37,7 @@ class FakeTargetAdapter final : public TargetAdapter {
   fidl::InterfaceRequestHandler<TargetAdapter> GetHandler();
 
   // Records the command-line parameters.
-  void SetParameters(const std::vector<std::string>& parameters);
+  void SetParameters(std::vector<std::string> parameters);
 
   // FIDL methods.
   void GetParameters(GetParametersCallback callback) override;

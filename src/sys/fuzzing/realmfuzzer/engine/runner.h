@@ -44,6 +44,7 @@ class RealmFuzzerRunner final : public Runner {
   __WARN_UNUSED_RESULT zx_status_t BindCoverageDataProvider(zx::channel provider);
 
   // |Runner| method implementations.
+  ZxPromise<> Initialize(std::string pkg_dir, std::vector<std::string> args) override;
   ZxPromise<> Configure() override;
   __WARN_UNUSED_RESULT zx_status_t AddToCorpus(CorpusType corpus_type, Input input) override;
   std::vector<Input> GetCorpus(CorpusType corpus_type) override;

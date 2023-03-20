@@ -10,14 +10,8 @@
 
 namespace fuzzing {
 
-ZxResult<RunnerPtr> MakeLibFuzzerRunnerPtr(int argc, char** argv, ComponentContext& context) {
-  auto runner = LibFuzzerRunner::MakePtr(context.executor());
-  auto runner_impl = std::static_pointer_cast<LibFuzzerRunner>(runner);
-  argv = &argv[1];
-  argc -= 1;
-  std::vector<std::string> cmdline(argv, argv + argc);
-  runner_impl->set_cmdline(cmdline);
-  return fpromise::ok(std::move(runner));
+ZxResult<RunnerPtr> MakeLibFuzzerRunnerPtr(ComponentContext& context) {
+  return fpromise::ok(LibFuzzerRunner::MakePtr(context.executor()));
 }
 
 }  // namespace fuzzing

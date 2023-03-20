@@ -48,6 +48,9 @@ class Runner {
   const ExecutorPtr& executor() const { return executor_; }
   const OptionsPtr& options() const { return options_; }
 
+  // Sets up the runner using arguments from the component manifest.
+  virtual ZxPromise<> Initialize(std::string pkg_dir, std::vector<std::string> args);
+
   // Examines the options, and prepares the runner for fuzzing given their values.
   virtual ZxPromise<> Configure();
 
@@ -56,6 +59,7 @@ class Runner {
   virtual zx_status_t AddToCorpus(CorpusType corpus_type, Input input) = 0;
 
   // Returns a copy of all non-empty inputs in the corpus of the given |corpus_type|.
+  // The vector is sorted using Input's comparison operators.
   virtual std::vector<Input> GetCorpus(CorpusType corpus_type) = 0;
 
   // Parses the given |input| as an AFL-style dictionary. For format details, see
@@ -91,10 +95,18 @@ class Runner {
   // Represents a single fuzzing workflow, e.g. |TryOne|, |Minimize|, etc. It holds a pointer to
   // the object that created it, but this is safe: it cannot outlive the object it is a part of.
   // It should be used in the normal way, e.g. using |wrap_with|.
+  //
+  // Derived runners should include a `Workflow` member, and use it to wrap any returned promises
+  // that are exclusive with a fuzzing workflow, e.g. the workflows themselves and method like
+  // `Configure`. Promises that are a part of a workflow can be wrapped with the workflow's
+  // `scope()`.
+  //
   class Workflow final {
    public:
     explicit Workflow(Runner* runner) : runner_(runner) {}
     ~Workflow() = default;
+
+    Scope& scope() { return scope_; }
 
     // Use |wrap_with(workflow_)| on promises that implement a workflow's behavior to create scoped
     // actions on set up and tear down.

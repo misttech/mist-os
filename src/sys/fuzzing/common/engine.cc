@@ -13,163 +13,77 @@ namespace fuzzing {
 
 using ::fuchsia::fuzzer::FUZZ_MODE;
 
-namespace {
+Engine::Engine() : Engine(ComponentContext::Create(), "/pkg") {}
 
-// Removes the string at |offset| from |argv|, and updates |argc| and |argv| by decrementing by 1
-// and shifting other elements, respectively. Returns the removed string.
-std::string ConsumeArg(int* pargc, char*** pargv, char* arg) {
-  int argc = *pargc;
-  char** argv = *pargv;
-  auto i = 0;
-  while (i < argc && argv[i] != arg) {
-    ++i;
-  }
-  for (; i != 0; --i) {
-    argv[i] = argv[i - 1];
-  }
-  *pargv = argc > 1 ? &argv[1] : nullptr;
-  *pargc = argc > 0 ? (argc - 1) : 0;
-  return std::string(arg);
+Engine::Engine(ComponentContextPtr context, const std::string& pkg_dir)
+    : context_(std::move(context)), pkg_dir_(pkg_dir) {
+  FX_CHECK(context_);
 }
 
-}  // namespace
-
-Engine::Engine() : Engine("/pkg") {}
-
-Engine::Engine(const std::string& pkg_dir) : pkg_dir_(pkg_dir) {}
-
-zx_status_t Engine::Initialize(int* pargc, char*** pargv) {
-  url_.reset();
+zx_status_t Engine::Run(int argc, char** argv, RunnerPtr runner) {
+  FX_CHECK(runner);
   fuzzing_ = false;
-  corpus_.clear();
   dictionary_ = Input();
 
-  int argc = *pargc;
-  char** argv = *pargv;
-  for (int i = 1; i < argc; ++i) {
-    char* arg = argv[i];
-    // First, look for the fuzzing indicator. This is typically provided by `fuzz-manager`.
-    if (strcmp(arg, FUZZ_MODE) == 0) {
-      fuzzing_ = true;
-      ConsumeArg(pargc, pargv, arg);
-      continue;
-    }
-    // Escape hatch.
-    if (strcmp(arg, "--") == 0) {
-      ConsumeArg(pargc, pargv, arg);
-      break;
-    }
-
-    // Skip any remaining flags.
-    if (arg[0] == '-') {
-      continue;
-    }
-
-    // First positional argument is the fuzzer URL.
-    if (!url_) {
-      url_ = std::make_unique<component::FuchsiaPkgUrl>();
-      auto url = ConsumeArg(pargc, pargv, arg);
-      if (!url_->Parse(url)) {
-        FX_LOGS(WARNING) << "Failed to parse URL: " << url;
-        return ZX_ERR_INVALID_ARGS;
-      }
-      continue;
-    }
-
-    // Ignore remaining arguments except data files that need to be imported.
-    if (strncmp(arg, "data", 4) != 0) {
-      continue;
-    }
-    auto pathname = files::JoinPath(pkg_dir_, ConsumeArg(pargc, pargv, arg));
-
-    // A file argument is a dictionary.
-    if (files::IsFile(pathname)) {
-      if (dictionary_.size() != 0) {
-        FX_LOGS(WARNING) << "Multiple dictionaries found: " << arg;
-        return ZX_ERR_INVALID_ARGS;
-      }
-      std::vector<uint8_t> data;
-      if (!files::ReadFileToVector(pathname, &data)) {
-        FX_LOGS(WARNING) << "Failed to read dictionary '" << pathname << "': " << strerror(errno);
-        return ZX_ERR_IO;
-      }
-      dictionary_ = Input(data);
-      continue;
-    }
-
-    // Directory arguments are seed corpora.
-    if (files::IsDirectory(pathname)) {
-      std::vector<std::string> filenames;
-      if (!files::ReadDirContents(pathname, &filenames)) {
-        FX_LOGS(WARNING) << "Failed to read seed corpus '" << pathname << "': " << strerror(errno);
-        return ZX_ERR_IO;
-      }
-      for (const auto& filename : filenames) {
-        auto input_file = files::JoinPath(pathname, filename);
-        if (!files::IsFile(input_file)) {
-          continue;
-        }
-        std::vector<uint8_t> data;
-        if (!files::ReadFileToVector(input_file, &data)) {
-          FX_LOGS(WARNING) << "Failed to read input '" << input_file << "': " << strerror(errno);
-          return ZX_ERR_IO;
-        }
-        corpus_.push_back(Input(data));
-      }
-      continue;
-    }
-
-    // No other positional arguments are supported.
-    FX_LOGS(WARNING) << "Invalid package path: " << pathname;
-    return ZX_ERR_NOT_FOUND;
+  // Skip the process name.
+  std::vector<std::string> args(argv + 1, argv + argc);
+  if (auto status = Initialize(std::move(args)); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to initialize engine: " << zx_status_get_string(status);
+    return status;
   }
-  if (!url_) {
-    FX_LOGS(WARNING) << "Missing required URL.";
+  runner_ = runner;
+  return fuzzing_ ? RunFuzzer() : RunTest();
+}
+
+zx_status_t Engine::Initialize(std::vector<std::string> args) {
+  args_ = std::move(args);
+  fuzzing_ = false;
+  std::string url;
+  bool skip = false;
+  auto is_engine_flag = [this, &url, &skip](const std::string& arg) {
+    if (skip) {
+      return false;
+    }
+    if (arg == "--") {
+      skip = true;
+      return false;
+    }
+    // Look for the fuzzing indicator. This is typically provided by `fuzz-manager`.
+    if (arg == FUZZ_MODE) {
+      fuzzing_ = true;
+      return true;
+    }
+    if (arg[0] != '-' && url.empty()) {
+      url = arg;
+      return true;
+    }
+    return false;
+  };
+  args_.erase(std::remove_if(args_.begin(), args_.end(), is_engine_flag), args_.end());
+  if (url.empty()) {
+    FX_LOGS(ERROR) << "Fuzzer URL not provided by component runner";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (!url_.Parse(url)) {
+    FX_LOGS(ERROR) << "Failed to parse URL: " << url;
     return ZX_ERR_INVALID_ARGS;
   }
   return ZX_OK;
 }
 
-zx_status_t Engine::Run(ComponentContextPtr context, RunnerPtr runner) {
-  FX_CHECK(context);
-  FX_CHECK(runner);
-  if (!url_) {
-    FX_LOGS(WARNING) << "Not initialized.";
-    return ZX_ERR_BAD_STATE;
-  }
-  auto url = url_->ToString();
-  url_.reset();
-
-  if (dictionary_.size() != 0) {
-    if (auto status = runner->ParseDictionary(dictionary_); status != ZX_OK) {
-      return status;
-    }
-  }
-
-  if (fuzzing_) {
-    return RunFuzzer(std::move(context), std::move(runner), url);
-  } else {
-    return RunTest(std::move(context), std::move(runner));
-  }
+zx_status_t Engine::RunFuzzer() {
+  // No need to `wrap_with`. Everything remains in scope as long as context_->Run() is executing.
+  ControllerProviderImpl provider(runner_);
+  auto init = runner_->Initialize(pkg_dir_, args_).or_else([](zx_status_t& status) -> Result<> {
+    FX_LOGS(ERROR) << "Failed to initialize fuzzer: " << zx_status_get_string(status);
+    return fpromise::error();
+  });
+  auto serve = provider.Serve(url_.ToString(), context_->TakeChannel(0));
+  context_->ScheduleTask(init.and_then(std::move(serve)));
+  return context_->Run();
 }
 
-zx_status_t Engine::RunFuzzer(ComponentContextPtr context, RunnerPtr runner,
-                              const std::string& url) {
-  for (auto& input : corpus_) {
-    if (auto status = runner->AddToCorpus(CorpusType::SEED, std::move(input)); status != ZX_OK) {
-      return status;
-    }
-  }
-  ControllerProviderImpl provider(std::move(runner));
-  auto task = provider.Serve(url, context->TakeChannel(0));
-  context->ScheduleTask(std::move(task));
-  return context->Run();
-}
-
-zx_status_t Engine::RunTest(ComponentContextPtr context, RunnerPtr runner) {
-  corpus_.emplace_back(Input());
-  FX_LOGS(INFO) << "Testing with " << corpus_.size() << " inputs.";
-
+zx_status_t Engine::RunTest() {
   // TODO(fxbug.dev/109100): Rarely, spawned process output may be truncated. `LibFuzzerRunner`
   // needs to return `ZX_ERR_IO_INVALID` in this case. By retying several times, the probability of
   // the underlying flake failing a test drops to almost zero.
@@ -179,12 +93,15 @@ zx_status_t Engine::RunTest(ComponentContextPtr context, RunnerPtr runner) {
   // repeatedly calls |RunUntilIdle| until it has set an exit code. This allows this method to be
   // called as part of a gTest as well as by the elf_test_runner.
   zx_status_t exitcode = ZX_ERR_NEXT;
-  auto task = runner->Configure()
-                  .and_then([runner, corpus = std::move(corpus_), fut = ZxFuture<FuzzResult>(),
+  auto task = runner_->Initialize(pkg_dir_, args_)
+                  .and_then([this, fut = ZxFuture<FuzzResult>(),
                              attempts = 0U](Context& context) mutable -> ZxResult<FuzzResult> {
                     while (attempts < kFuzzerTestRetries) {
                       if (!fut) {
-                        fut = runner->TryEach(std::move(corpus));
+                        auto corpus = runner_->GetCorpus(CorpusType::SEED);
+                        corpus.emplace_back(Input());
+                        FX_LOGS(INFO) << "Testing with " << corpus.size() << " input(s).";
+                        fut = runner_->TryEach(std::move(corpus));
                       }
                       if (!fut(context)) {
                         return fpromise::pending();
@@ -207,9 +124,9 @@ zx_status_t Engine::RunTest(ComponentContextPtr context, RunnerPtr runner) {
                     auto fuzz_result = result.take_value();
                     exitcode = (fuzz_result == FuzzResult::NO_ERRORS) ? 0 : fuzz_result;
                   });
-  context->ScheduleTask(std::move(task));
+  context_->ScheduleTask(std::move(task));
   while (exitcode == ZX_ERR_NEXT) {
-    if (auto status = context->RunUntilIdle(); status != ZX_OK) {
+    if (auto status = context_->RunUntilIdle(); status != ZX_OK) {
       return status;
     }
   }

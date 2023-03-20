@@ -124,6 +124,26 @@ LibFuzzerRunner::LibFuzzerRunner(ExecutorPtr executor)
   CreateDirectory(kLiveCorpusPath);
 }
 
+ZxPromise<> LibFuzzerRunner::Initialize(std::string pkg_dir, std::vector<std::string> args) {
+  // First argument is the subprocess name.
+  if (args.empty()) {
+    return fpromise::make_promise(
+        []() -> ZxResult<> { return fpromise::error(ZX_ERR_INVALID_ARGS); });
+  }
+  auto args_begin = args.begin();
+  cmdline_.push_back(*args_begin++);
+
+  // Rearrange args before '--' so that positional args come before flags. Keep the positional args
+  // intact, and copy and erase the rest of the command line.
+  auto args_end = std::find(args_begin, args.end(), "--");
+  auto positional_end =
+      std::partition(args_begin, args_end, [](const std::string& arg) { return arg[0] != '-'; });
+  std::copy(positional_end, args.end(), std::back_inserter(cmdline_));
+  args = std::vector<std::string>(args_begin, positional_end);
+
+  return Runner::Initialize(std::move(pkg_dir), std::move(args));
+}
+
 ///////////////////////////////////////////////////////////////
 // Corpus-related methods.
 

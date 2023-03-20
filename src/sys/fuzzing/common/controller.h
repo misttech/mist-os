@@ -58,8 +58,8 @@ class ControllerImpl : public Controller {
   void Stop();
 
  private:
-  // Returns a promise to configure the runner if needed.
-  ZxPromise<> Initialize();
+  // Returns a promise to reset the saved artifact as part of starting a workflow.
+  ZxPromise<> ResetArtifact();
 
   // Sends the "done marker" for long-running workflows as described in `fuchsia.fuzzer.Controller`.
   void Finish();

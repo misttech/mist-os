@@ -10,8 +10,10 @@
 #endif
 
 // These tests do not include any intentional crashes and may be run in a normal test environment.
-// See also runner-fatal-unittest.inc.
+// See also runner-error-unittest.inc and runner-fatal-unittest.inc.
 
+TEST_F(RUNNER_TEST, InitializeCorpus) { InitializeCorpus(); }
+TEST_F(RUNNER_TEST, InitializeDictionary) { InitializeDictionary(); }
 TEST_F(RUNNER_TEST, TryOneNoError) { TryOneNoError(); }
 TEST_F(RUNNER_TEST, TryOneWithError) { TryOneWithError(); }
 TEST_F(RUNNER_TEST, TryOneWithLeak) { TryOneWithLeak(); }

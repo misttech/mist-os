@@ -51,12 +51,29 @@ class LibFuzzerRunnerTest : public RunnerTest {
     RunnerTest::SetUp();
     runner_ = LibFuzzerRunner::MakePtr(executor());
     context_ = ComponentContextForTest::Create(executor());
+
+    // LibFuzzer's "entropic energy" feature allows it to focus on inputs that provide more useful
+    // coverage; but is tricky to fake in unit testing.
+    cmdline_ = std::vector<std::string>({"bin/libfuzzer_unittest_fuzzer", "-entropic=0"});
+
     eventpair_ = std::make_unique<AsyncEventPair>(executor());
     ASSERT_EQ(test_input_vmo_.Reserve(kDefaultMaxInputSize), ZX_OK);
     ASSERT_EQ(feedback_vmo_.Mirror(&feedback_, sizeof(feedback_)), ZX_OK);
     // Convince libFuzzer that the code is instrumented.
     // See |Fuzzer::ReadAndExecuteSeedCorpora|.
     SetCoverage(Input("\n"), {{255, 255}});
+
+    FUZZING_EXPECT_OK(runner_->Initialize("ignored", GetParameters()));
+    RunUntilIdle();
+  }
+
+  std::vector<std::string> GetParameters() const override {
+    return std::vector<std::string>(cmdline_);
+  }
+
+  void SetParameters(std::vector<std::string> parameters) override {
+    cmdline_.resize(2);
+    std::copy(parameters.begin(), parameters.end(), std::back_inserter(cmdline_));
   }
 
   void Configure(const OptionsPtr& options) override {
@@ -68,11 +85,6 @@ class LibFuzzerRunnerTest : public RunnerTest {
     // See notes on LIBFUZZER_SHOW_OUTPUT above.
     auto libfuzzer_runner = std::static_pointer_cast<LibFuzzerRunner>(runner_);
     libfuzzer_runner->set_verbose(LIBFUZZER_SHOW_OUTPUT);
-
-    // LibFuzzer's "entropic energy" feature allows it to focus on inputs that provide more useful
-    // coverage; but is tricky to fake in unit testing.
-    std::vector<std::string> cmdline{"bin/libfuzzer_unittest_fuzzer", "-entropic=0"};
-    libfuzzer_runner->set_cmdline(std::move(cmdline));
   }
 
   ZxPromise<Input> GetTestInput() override {
@@ -156,20 +168,10 @@ class LibFuzzerRunnerTest : public RunnerTest {
         .wrap_with(scope_);
   }
 
-  void TearDown() override {
-    // Clear temporary files.
-    std::vector<std::string> paths;
-    if (files::ReadDirContents("/tmp", &paths)) {
-      for (const auto& path : paths) {
-        files::DeletePath(files::JoinPath("/tmp", path), /* recursive */ true);
-      }
-    }
-    RunnerTest::TearDown();
-  }
-
  private:
   RunnerPtr runner_;
   std::unique_ptr<ComponentContext> context_;
+  std::vector<std::string> cmdline_;
   std::unique_ptr<AsyncEventPair> eventpair_;
   SharedMemory test_input_vmo_;
   SharedMemory feedback_vmo_;

@@ -39,6 +39,8 @@ size_t get_prefix_len(const std::string& input) {
 
 }  // namespace
 
+const char* kFakeRunnerFlag = "--fake";
+
 RunnerPtr FakeRunner::MakePtr(ExecutorPtr executor) {
   return RunnerPtr(new FakeRunner(std::move(executor)));
 }
@@ -46,6 +48,15 @@ RunnerPtr FakeRunner::MakePtr(ExecutorPtr executor) {
 FakeRunner::FakeRunner(ExecutorPtr executor) : Runner(executor), workflow_(this) {
   seed_corpus_.emplace_back(Input());
   live_corpus_.emplace_back(Input());
+}
+
+ZxPromise<> FakeRunner::Initialize(std::string pkg_dir, std::vector<std::string> args) {
+  auto it = std::find(args.begin(), args.end(), kFakeRunnerFlag);
+  if (it != args.end()) {
+    flag_ = true;
+    args.erase(it, args.end());
+  }
+  return Runner::Initialize(std::move(pkg_dir), std::move(args));
 }
 
 zx_status_t FakeRunner::AddToCorpus(CorpusType corpus_type, Input input) {
@@ -228,6 +239,26 @@ Promise<> FakeRunner::AwaitStop() {
     consumer_ = std::move(bridge.consumer);
   }
   return consumer_.promise_or(fpromise::error());
+}
+
+void MakeCorpus(const std::string& pkg_path, std::initializer_list<const char*> inputs,
+                std::vector<Input>* out) {
+  ASSERT_TRUE(files::CreateDirectory(pkg_path)) << pkg_path;
+  out->reserve(out->size() + inputs.size());
+  for (const auto* input : inputs) {
+    auto pathname = files::JoinPath(pkg_path, input);
+    ASSERT_TRUE(files::WriteFile(pathname, input)) << pathname;
+    out->emplace_back(input);
+  }
+  std::sort(out->begin(), out->end());
+  out->erase(std::unique(out->begin(), out->end()), out->end());
+}
+
+void WriteInput(const std::string& pkg_path, Input contents) {
+  auto dirname = files::GetDirectoryName(pkg_path);
+  ASSERT_TRUE(files::CreateDirectory(dirname)) << dirname;
+  const auto* data = reinterpret_cast<const char*>(contents.data());
+  ASSERT_TRUE(files::WriteFile(pkg_path, data, contents.size())) << pkg_path;
 }
 
 }  // namespace fuzzing

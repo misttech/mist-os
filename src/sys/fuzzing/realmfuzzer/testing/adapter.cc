@@ -19,8 +19,8 @@ fidl::InterfaceRequestHandler<TargetAdapter> FakeTargetAdapter::GetHandler() {
   };
 }
 
-void FakeTargetAdapter::SetParameters(const std::vector<std::string>& parameters) {
-  parameters_ = std::vector<std::string>(parameters.begin(), parameters.end());
+void FakeTargetAdapter::SetParameters(std::vector<std::string> parameters) {
+  parameters_ = parameters;
 }
 
 void FakeTargetAdapter::GetParameters(GetParametersCallback callback) {

@@ -45,6 +45,11 @@ class RunnerTest : public AsyncTest {
 
   const OptionsPtr& options() { return options_; }
 
+  // Gets or sets the arguments supplied a component manifest, e.g. the engine's. The exact manifest
+  // represented depends on the runner.
+  virtual std::vector<std::string> GetParameters() const = 0;
+  virtual void SetParameters(std::vector<std::string> parameters) = 0;
+
   // Adds test-related |options| (e.g. PRNG seed) and configures the |runner|.
   virtual void Configure(const OptionsPtr& options);
 
@@ -91,8 +96,12 @@ class RunnerTest : public AsyncTest {
   // Sets the feedback for the next run.
   virtual ZxPromise<> SetFeedback(Coverage coverage, FuzzResult result, bool leak) = 0;
 
+  void TearDown() override;
+
   //////////////////////////////////////
   // Unit tests, organized by fuzzing workflow.
+  void InitializeCorpus();
+  void InitializeDictionary();
 
   void TryOneNoError();
   void TryOneWithError();

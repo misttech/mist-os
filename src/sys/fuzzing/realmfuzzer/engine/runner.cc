@@ -49,6 +49,20 @@ zx_status_t RealmFuzzerRunner::BindCoverageDataProvider(zx::channel provider) {
   return provider_.Bind(std::move(provider));
 }
 
+ZxPromise<> RealmFuzzerRunner::Initialize(std::string pkg_dir, std::vector<std::string> args) {
+  return adapter_.GetParameters()
+      .or_else([]() -> ZxResult<std::vector<std::string>> {
+        FX_LOGS(WARNING) << "Failed to get parameters from adapter";
+        return fpromise::error(ZX_ERR_INTERNAL);
+      })
+      .and_then([this, pkg_dir = std::move(pkg_dir),
+                 args = std::move(args)](const std::vector<std::string>& parameters) mutable {
+        std::copy(parameters.begin(), parameters.end(), std::back_inserter(args));
+        return Runner::Initialize(std::move(pkg_dir), std::move(args));
+      })
+      .wrap_with(workflow_.scope());
+}
+
 ZxPromise<> RealmFuzzerRunner::Configure() {
   return Runner::Configure()
       .and_then([this]() -> ZxResult<> {
@@ -60,13 +74,6 @@ ZxPromise<> RealmFuzzerRunner::Configure() {
           process_proxy->Configure(options());
         }
         return fpromise::ok();
-      })
-      .and_then(adapter_.GetParameters().or_else([] {
-        FX_LOGS(WARNING) << "Failed to load seed corpora.";
-        return fpromise::error(ZX_ERR_CANCELED);
-      }))
-      .and_then([this](const std::vector<std::string>& parameters) {
-        return AsZxResult(seed_corpus_->Load(adapter_.GetSeedCorpusDirectories(parameters)));
       })
       .wrap_with(workflow_);
 }

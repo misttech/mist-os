@@ -111,7 +111,6 @@ test("unittests-bin") {
     "controller-unittest.cc",
     "corpus-reader-client-unittest.cc",
     "dictionary-unittest.cc",
-    "engine-unittest.cc",
     "input-unittest.cc",
     "monitor-clients-unittest.cc",
     "options-unittest.cc",
@@ -129,7 +128,10 @@ test("error-unittests-bin") {
   output_name = "fuzzing_common_error_unittests"
   visibility = [ ":*" ]
   testonly = true
-  sources = [ "child-process-unittest.cc" ]
+  sources = [
+    "child-process-unittest.cc",
+    "engine-unittest.cc",
+  ]
   deps = [
     ":common",
     "testing",

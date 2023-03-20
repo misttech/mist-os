@@ -6,7 +6,11 @@
 
 #include <zircon/status.h>
 
+#include "src/lib/files/directory.h"
+#include "src/lib/files/file.h"
+#include "src/lib/files/path.h"
 #include "src/sys/fuzzing/common/testing/monitor.h"
+#include "src/sys/fuzzing/common/testing/runner.h"
 
 namespace fuzzing {
 
@@ -115,7 +119,94 @@ void RunnerTest::RunUntil(Promise<> promise, RunCallback run, Input input) {
   RunUntilIdle();
 }
 
+void RunnerTest::TearDown() {
+  // Clear temporary files.
+  std::vector<std::string> paths;
+  if (files::ReadDirContents("/tmp", &paths)) {
+    for (const auto& path : paths) {
+      files::DeletePath(files::JoinPath("/tmp", path), /* recursive */ true);
+    }
+  }
+  AsyncTest::TearDown();
+}
+
 // Unit tests.
+
+void RunnerTest::InitializeCorpus() {
+  constexpr const char* kPkgDir = "/tmp/initialize-corpus-test";
+  auto runner = this->runner();
+
+  // Only "data/..." directories are considered corpora.
+  auto pkg_path = files::JoinPath(kPkgDir, "non-data/corpus");
+  ASSERT_TRUE(files::CreateDirectory(pkg_path));
+  SetParameters({"non-data/corpus"});
+  FUZZING_EXPECT_ERROR(runner->Initialize(kPkgDir, GetParameters()), ZX_ERR_INVALID_ARGS);
+  RunUntilIdle();
+
+  // Directory must exist.
+  SetParameters({"data/invalid-corpus"});
+  FUZZING_EXPECT_ERROR(runner->Initialize(kPkgDir, GetParameters()), ZX_ERR_NOT_FOUND);
+  RunUntilIdle();
+
+  // Directory contents are added.
+  pkg_path = files::JoinPath(kPkgDir, "data/corpus1");
+  std::vector<Input> expected;
+  ASSERT_NO_FATAL_FAILURE(MakeCorpus(pkg_path, {"foo", "bar"}, &expected));
+  SetParameters({"data/corpus1"});
+  FUZZING_EXPECT_OK(runner->Initialize(kPkgDir, GetParameters()));
+  RunUntilIdle();
+  auto actual = runner->GetCorpus(CorpusType::SEED);
+  std::sort(actual.begin(), actual.end());
+  EXPECT_EQ(actual, expected);
+
+  // Multiple corpora can be added.
+  pkg_path = files::JoinPath(kPkgDir, "data/corpus2");
+  ASSERT_NO_FATAL_FAILURE(MakeCorpus(pkg_path, {"baz", "qux", "quux"}, &expected));
+  SetParameters({"data/corpus1", "data/corpus2"});
+  FUZZING_EXPECT_OK(runner->Initialize(kPkgDir, GetParameters()));
+  RunUntilIdle();
+  actual = runner->GetCorpus(CorpusType::SEED);
+  std::sort(actual.begin(), actual.end());
+  EXPECT_EQ(actual, expected);
+}
+
+void RunnerTest::InitializeDictionary() {
+  constexpr const char* kPkgDir = "/tmp/initialize-dictionary-test";
+  auto runner = this->runner();
+
+  // Only "data/..." files are considered dictionaries.
+  auto pkg_path = files::JoinPath(kPkgDir, "non-data/some-file");
+  ASSERT_NO_FATAL_FAILURE(WriteInput(pkg_path, FakeRunner::valid_dictionary()));
+  SetParameters({"non-data/some-file"});
+  FUZZING_EXPECT_ERROR(runner->Initialize(kPkgDir, GetParameters()), ZX_ERR_INVALID_ARGS);
+  RunUntilIdle();
+
+  // File must exist.
+  SetParameters({"data/invalid-dictionary"});
+  FUZZING_EXPECT_ERROR(runner->Initialize(kPkgDir, GetParameters()), ZX_ERR_NOT_FOUND);
+  RunUntilIdle();
+
+  // Dictionary must have a valid format.
+  pkg_path = files::JoinPath(kPkgDir, "data/invalid-dictionary");
+  ASSERT_NO_FATAL_FAILURE(WriteInput(pkg_path, FakeRunner::invalid_dictionary()));
+  FUZZING_EXPECT_ERROR(runner->Initialize(kPkgDir, GetParameters()), ZX_ERR_INVALID_ARGS);
+  RunUntilIdle();
+
+  // Valid.
+  pkg_path = files::JoinPath(kPkgDir, "data/dictionary1");
+  ASSERT_NO_FATAL_FAILURE(WriteInput(pkg_path, FakeRunner::valid_dictionary()));
+  SetParameters({"data/dictionary1"});
+  FUZZING_EXPECT_OK(runner->Initialize(kPkgDir, GetParameters()));
+  RunUntilIdle();
+  EXPECT_EQ(runner->GetDictionaryAsInput(), FakeRunner::valid_dictionary());
+
+  // At most one dictionary is supported.
+  pkg_path = files::JoinPath(kPkgDir, "data/dictionary2");
+  ASSERT_NO_FATAL_FAILURE(WriteInput(pkg_path, FakeRunner::valid_dictionary()));
+  SetParameters({"data/dictionary1", "data/dictionary2"});
+  FUZZING_EXPECT_ERROR(runner->Initialize(kPkgDir, GetParameters()), ZX_ERR_INVALID_ARGS);
+  RunUntilIdle();
+}
 
 void RunnerTest::FuzzUntilError() {
   auto runner = this->runner();

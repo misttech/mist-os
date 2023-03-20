@@ -4,10 +4,6 @@
 
 #include "src/sys/fuzzing/common/engine.h"
 
-#include <lib/syslog/cpp/macros.h>
-
-#include <limits>
-
 #include <gtest/gtest.h>
 
 #include "src/lib/files/directory.h"
@@ -17,272 +13,181 @@
 #include "src/sys/fuzzing/common/testing/component-context.h"
 #include "src/sys/fuzzing/common/testing/registrar.h"
 #include "src/sys/fuzzing/common/testing/runner.h"
-#include "testing/fidl/async_loop_for_test.h"
 
 namespace fuzzing {
 
 // Test fixtures
 
-// |FakeCmdline| constructs |argc|/|argv| with vaguely RAII semantics. These fields should only be
-// used with functions that normally handle arguments from |main|. There are plenty of ways to abuse
-// |argv| and corrupt memory. Don't do that.
-struct FakeCmdline final {
-  int argc = 0;
-  char** argv = nullptr;
+const char* kTestEngineBin = "/pkg/bin/test-engine";
 
-  bool SetArgs(const std::initializer_list<const char*>& cmdline_args) {
-    if (cmdline_args.size() >= std::numeric_limits<int>::max()) {
-      return false;
-    }
-    argc = static_cast<int>(cmdline_args.size() + 1);
-    args.clear();
-    args.reserve(argc);
-    owned.clear();
-    owned.reserve(argc);
-    Add("/test/engine");
-    for (const char* arg : cmdline_args) {
-      Add(arg);
-    }
-    argv = &args[0];
-    return true;
+using ::fuchsia::fuzzer::FUZZ_MODE;
+
+class TestEngine final : public Engine {
+ public:
+  static TestEngine Create(const std::string& pkg_dir) {
+    auto context = ComponentContextForTest::Create();
+    auto registrar = std::make_unique<FakeRegistrar>(context->executor());
+    auto* context_for_test = static_cast<ComponentContextForTest*>(context.get());
+    context_for_test->PutChannel(0, registrar->NewBinding().TakeChannel());
+    return TestEngine(std::move(context), std::move(registrar), pkg_dir);
   }
 
-  std::string GetArgs() const {
-    if (argc < 2) {
-      return std::string();
+  using Engine::args;
+  using Engine::fuzzing;
+  using Engine::Initialize;
+  using Engine::url;
+
+  const ExecutorPtr& executor() const { return context().executor(); }
+
+  // Converts `args` to `argc`/`argv` before invoking `Engine::Run`.
+  zx_status_t Run(const std::vector<std::string>& args, RunnerPtr runner) {
+    auto argc = args.size() + 1;
+    std::vector<char*> argv;
+    argv.reserve(argc);
+    argv.push_back(const_cast<char*>(kTestEngineBin));
+    for (const auto& arg : args) {
+      argv.push_back(const_cast<char*>(arg.c_str()));
     }
-    std::ostringstream oss;
-    for (int i = 1; i < argc; ++i) {
-      oss << " " << argv[i];
-    }
-    return oss.str().substr(1);
+    return Engine::Run(static_cast<int>(argc), argv.data(), std::move(runner));
   }
 
  private:
-  void Add(const char* s) {
-    std::string arg(s);
-    owned.emplace_back(std::move(arg));
-    args.push_back(const_cast<char*>(owned.back().c_str()));
-  }
+  TestEngine(ComponentContextPtr context, std::unique_ptr<FakeRegistrar> registrar,
+             const std::string& pkg_dir)
+      : Engine(std::move(context), pkg_dir), registrar_(std::move(registrar)) {}
 
-  std::vector<char*> args;
-  std::vector<std::string> owned;
+  std::unique_ptr<FakeRegistrar> registrar_;
 };
 
-// Writes |contents| to a file at |pathname|, creating any intermediary directories in the
-// process.
-void WriteInput(const std::string& pathname, Input contents) {
-  auto dirname = files::GetDirectoryName(pathname);
-  ASSERT_TRUE(files::CreateDirectory(dirname));
-  const auto* data = reinterpret_cast<const char*>(contents.data());
-  ASSERT_TRUE(files::WriteFile(pathname, data, contents.size()));
-}
-
-// For each input in |inputs|, creates a file under |dirname| with name and contents matching that
-// input, and adds a corresponding |Input| to the sorted set returned via |out|.
-void MakeCorpus(const char* dirname, const std::initializer_list<const char*>& inputs,
-                std::vector<Input>* out) {
-  ASSERT_TRUE(files::CreateDirectory(dirname));
-  out->reserve(out->size() + inputs.size());
-  for (const auto* input : inputs) {
-    auto pathname = files::JoinPath(dirname, input);
-    ASSERT_TRUE(files::WriteFile(pathname, input));
-    out->emplace_back(input);
-  }
-  std::sort(out->begin(), out->end());
-}
-
-// Returns a sorted copy of the given |inputs|, minus any empty inputs.
-std::vector<Input> SortInputs(const std::vector<Input>& inputs) {
-  std::vector<Input> sorted;
-  sorted.reserve(inputs.size());
-  for (const auto& input : inputs) {
-    if (input.size() != 0) {
-      sorted.emplace_back(input.Duplicate());
+class EngineTest : public ::testing::Test {
+ protected:
+  void TearDown() override {
+    // Clear temporary files.
+    std::vector<std::string> paths;
+    if (files::ReadDirContents("/tmp", &paths)) {
+      for (const auto& path : paths) {
+        files::DeletePath(files::JoinPath("/tmp", path), /* recursive */ true);
+      }
     }
+    ::testing::Test::TearDown();
   }
-  std::sort(sorted.begin(), sorted.end());
-  return sorted;
-}
+};
 
 // Unit tests
 
-TEST(EngineTest, InitializeUrl) {
-  Engine engine;
-  FakeCmdline cmdline;
+TEST_F(EngineTest, InitializeUrl) {
+  auto engine = TestEngine::Create("/tmp/initialize-url-test");
 
   // URL is required.
-  ASSERT_TRUE(cmdline.SetArgs({}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_ERR_INVALID_ARGS);
+  std::vector<std::string> args;
+  EXPECT_EQ(engine.Initialize(std::move(args)), ZX_ERR_INVALID_ARGS);
 
   // Other arguments are optional.
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
+  args = std::vector<std::string>({kFakeFuzzerUrl});
+  EXPECT_EQ(engine.Initialize(std::move(args)), ZX_OK);
   EXPECT_EQ(engine.url(), kFakeFuzzerUrl);
   EXPECT_FALSE(engine.fuzzing());
-  EXPECT_TRUE(engine.corpus().empty());
-  EXPECT_EQ(engine.dictionary().size(), 0U);
-  EXPECT_EQ(cmdline.GetArgs(), "");
+  EXPECT_TRUE(engine.args().empty());
 }
 
-TEST(EngineTest, InitializeFlags) {
-  Engine engine;
-  FakeCmdline cmdline;
+TEST_F(EngineTest, InitializeFlags) {
+  auto engine = TestEngine::Create("/tmp/initialize-flags-test");
 
   // `fuchsia.fuzzer.FUZZ_MODE` flag.
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "--fuzz"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
+  std::vector<std::string> args({kFakeFuzzerUrl, FUZZ_MODE});
+  EXPECT_EQ(engine.Initialize(std::move(args)), ZX_OK);
   EXPECT_TRUE(engine.fuzzing());
-  EXPECT_EQ(cmdline.GetArgs(), "");
+  EXPECT_TRUE(engine.args().empty());
 
   // Other flags are passed through.
-  ASSERT_TRUE(cmdline.SetArgs({"-libfuzzer=flag", kFakeFuzzerUrl, "--other"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
+  args = std::vector<std::string>({"-libfuzzer=flag", kFakeFuzzerUrl, "--other"});
+  EXPECT_EQ(engine.Initialize(std::move(args)), ZX_OK);
   EXPECT_FALSE(engine.fuzzing());
-  EXPECT_EQ(cmdline.GetArgs(), "-libfuzzer=flag --other");
+  EXPECT_EQ(engine.args(), std::vector<std::string>({"-libfuzzer=flag", "--other"}));
 
   // Order is flexible.
-  ASSERT_TRUE(cmdline.SetArgs({"--fuzz", kFakeFuzzerUrl, "-libfuzzer=flag"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
+  args = std::vector<std::string>({FUZZ_MODE, kFakeFuzzerUrl, "-libfuzzer=flag"});
+  EXPECT_EQ(engine.Initialize(std::move(args)), ZX_OK);
   EXPECT_TRUE(engine.fuzzing());
-  EXPECT_EQ(cmdline.GetArgs(), "-libfuzzer=flag");
+  EXPECT_EQ(engine.args(), std::vector<std::string>({"-libfuzzer=flag"}));
 
   // '--' preserves following arguments.
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "--", "-libfuzzer=flag", "--", "--fuzz"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
+  args = std::vector<std::string>({kFakeFuzzerUrl, "--", "-libfuzzer=flag", "--", FUZZ_MODE});
+  EXPECT_EQ(engine.Initialize(std::move(args)), ZX_OK);
   EXPECT_FALSE(engine.fuzzing());
-  EXPECT_EQ(cmdline.GetArgs(), "-libfuzzer=flag -- --fuzz");
+  EXPECT_EQ(engine.args(), std::vector<std::string>({"--", "-libfuzzer=flag", "--", FUZZ_MODE}));
 }
 
-TEST(EngineTest, InitializeCorpus) {
-  Engine engine("/tmp/corpus");
-  FakeCmdline cmdline;
-  std::vector<Input> corpus;
+TEST_F(EngineTest, RunFuzzer) {
+  constexpr const char* kPkgDir = "/tmp/run-fuzzer-test";
+  auto engine = TestEngine::Create(kPkgDir);
+  std::vector<std::string> args({
+      kFakeFuzzerUrl,
+      "data/corpus1",
+      "data/corpus2",
+      "data/dictionary",
+      FUZZ_MODE,
+      kFakeRunnerFlag,
+  });
+  std::vector<Input> expected;
 
-  // Only "data/..." directories are considered corpora.
-  ASSERT_TRUE(files::CreateDirectory("/tmp/corpus/non-data/corpus"));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "non-data/corpus"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_TRUE(engine.corpus().empty());
-  EXPECT_EQ(cmdline.GetArgs(), "non-data/corpus");
+  auto pkg_path = files::JoinPath(kPkgDir, args[1]);
+  ASSERT_NO_FATAL_FAILURE(MakeCorpus(pkg_path, {"foo", "bar"}, &expected));
 
-  // Directory must exist.
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "data/invalid-corpus"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_ERR_NOT_FOUND);
+  pkg_path = files::JoinPath(kPkgDir, args[2]);
+  ASSERT_NO_FATAL_FAILURE(MakeCorpus(pkg_path, {"baz", "qux", "quux"}, &expected));
 
-  // Directory contents are added.
-  ASSERT_NO_FATAL_FAILURE(MakeCorpus("/tmp/corpus/data/corpus1", {"foo", "bar"}, &corpus));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "data/corpus1"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_EQ(SortInputs(engine.corpus()), corpus);
-  EXPECT_EQ(cmdline.GetArgs(), "");
+  pkg_path = files::JoinPath(kPkgDir, args[3]);
+  ASSERT_NO_FATAL_FAILURE(WriteInput(pkg_path, FakeRunner::valid_dictionary()));
 
-  // Multiple corpora can be added.
-  ASSERT_NO_FATAL_FAILURE(MakeCorpus("/tmp/corpus/data/corpus2", {"baz", "qux", "quux"}, &corpus));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "data/corpus1", "data/corpus2"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_EQ(SortInputs(engine.corpus()), corpus);
-  EXPECT_EQ(cmdline.GetArgs(), "");
-}
-
-TEST(EngineTest, InitializeDictionary) {
-  Engine engine("/tmp/dictionary");
-  FakeCmdline cmdline;
-
-  // Only "data/..." files are considered corpora.
-  ASSERT_NO_FATAL_FAILURE(
-      WriteInput("/tmp/dictionary/non-data/some-file", FakeRunner::valid_dictionary()));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "non-data/some-file"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_EQ(engine.dictionary(), Input());
-  EXPECT_EQ(cmdline.GetArgs(), "non-data/some-file");
-
-  // File must exist.
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "data/invalid-dictionary"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_ERR_NOT_FOUND);
-
-  // Valid.
-  ASSERT_NO_FATAL_FAILURE(
-      WriteInput("/tmp/dictionary/data/dictionary1", FakeRunner::valid_dictionary()));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "data/dictionary1"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_EQ(engine.dictionary(), FakeRunner::valid_dictionary());
-  EXPECT_EQ(cmdline.GetArgs(), "");
-
-  // At most one dictionary is supported.
-  ASSERT_NO_FATAL_FAILURE(
-      WriteInput("/tmp/dictionary/data/dictionary2", FakeRunner::valid_dictionary()));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "data/dictionary1", "data/dictionary2"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_ERR_INVALID_ARGS);
-}
-
-TEST(EngineTest, RunUninitialized) {
-  Engine engine;
-  FakeCmdline cmdline;
-  auto context = ComponentContextForTest::Create();
-  auto runner = FakeRunner::MakePtr(context->executor());
-
-  // Initialize must be called first.
-  EXPECT_EQ(engine.Run(std::move(context), runner), ZX_ERR_BAD_STATE);
-}
-
-TEST(EngineTest, RunInvalidDictionary) {
-  Engine engine("/tmp/invalid");
-  FakeCmdline cmdline;
-  auto context = ComponentContextForTest::Create();
-  auto runner = FakeRunner::MakePtr(context->executor());
-
-  // Dictionary is parsed when running.
-  ASSERT_NO_FATAL_FAILURE(
-      WriteInput("/tmp/invalid/data/dictionary", FakeRunner::invalid_dictionary()));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "data/dictionary"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_EQ(engine.Run(std::move(context), runner), ZX_ERR_INVALID_ARGS);
-}
-
-TEST(EngineTest, RunFuzzer) {
-  Engine engine("/tmp/fuzzer");
-  FakeCmdline cmdline;
-  std::vector<Input> corpus;
-
-  auto context = ComponentContextForTest::Create();
-  FakeRegistrar registrar(context->executor());
-  auto* context_for_test = static_cast<ComponentContextForTest*>(context.get());
-  context_for_test->PutChannel(0, registrar.NewBinding().TakeChannel());
-  auto runner = FakeRunner::MakePtr(context->executor());
+  auto runner = FakeRunner::MakePtr(engine.executor());
   auto fake_runner = std::static_pointer_cast<FakeRunner>(runner);
+  EXPECT_EQ(engine.Run(args, runner), ZX_OK);
+  EXPECT_EQ(engine.url(), kFakeFuzzerUrl);
+  EXPECT_TRUE(engine.fuzzing());
+  EXPECT_TRUE(fake_runner->has_flag());
 
-  ASSERT_NO_FATAL_FAILURE(MakeCorpus("/tmp/fuzzer/data/corpus1", {"foo", "bar"}, &corpus));
-  ASSERT_NO_FATAL_FAILURE(MakeCorpus("/tmp/fuzzer/data/corpus2", {"baz", "qux", "quux"}, &corpus));
-  ASSERT_NO_FATAL_FAILURE(
-      WriteInput("/tmp/fuzzer/data/dictionary", FakeRunner::valid_dictionary()));
-  ASSERT_TRUE(
-      cmdline.SetArgs({kFakeFuzzerUrl, "--fuzz", "-libfuzzer=flag", "data/corpus1", "data/corpus2",
-                       "data/dictionary", "--", "data/invalid-dictionary"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_EQ(engine.Run(std::move(context), runner), ZX_OK);
-  EXPECT_EQ(cmdline.GetArgs(), "-libfuzzer=flag data/invalid-dictionary");
-  EXPECT_EQ(SortInputs(runner->GetCorpus(CorpusType::SEED)), corpus);
+  // `Runner::GetCorpus` returns sorted inputs.
+  EXPECT_EQ(runner->GetCorpus(CorpusType::SEED), expected);
 }
 
-TEST(EngineTest, RunTest) {
-  Engine engine("/tmp/test");
-  FakeCmdline cmdline;
-  std::vector<Input> corpus;
+TEST_F(EngineTest, RunTest) {
+  constexpr const char* kPkgDir = "/tmp/run-test-test";
+  auto engine = TestEngine::Create(kPkgDir);
+  std::vector<std::string> args({
+      kFakeFuzzerUrl,
+      "data/corpus1",
+      "data/corpus2",
+      "data/dictionary",
+      kFakeRunnerFlag,
+  });
+  std::vector<Input> expected;
 
-  auto context = ComponentContextForTest::Create();
-  auto runner = FakeRunner::MakePtr(context->executor());
+  auto pkg_path = files::JoinPath(kPkgDir, args[1]);
+  ASSERT_NO_FATAL_FAILURE(MakeCorpus(pkg_path, {"foo", "bar"}, &expected));
+
+  pkg_path = files::JoinPath(kPkgDir, args[2]);
+  ASSERT_NO_FATAL_FAILURE(MakeCorpus(pkg_path, {"baz", "qux", "quux"}, &expected));
+
+  pkg_path = files::JoinPath(kPkgDir, args[3]);
+  ASSERT_NO_FATAL_FAILURE(WriteInput(pkg_path, FakeRunner::valid_dictionary()));
+
+  auto runner = FakeRunner::MakePtr(engine.executor());
   auto fake_runner = std::static_pointer_cast<FakeRunner>(runner);
+  EXPECT_EQ(engine.Run(args, runner), ZX_OK);
+  EXPECT_EQ(engine.url(), kFakeFuzzerUrl);
+  EXPECT_FALSE(engine.fuzzing());
+  EXPECT_TRUE(fake_runner->has_flag());
 
-  ASSERT_NO_FATAL_FAILURE(MakeCorpus("/tmp/test/data/corpus1", {"foo", "bar"}, &corpus));
-  ASSERT_NO_FATAL_FAILURE(MakeCorpus("/tmp/test/data/corpus2", {"baz", "qux", "quux"}, &corpus));
-  ASSERT_NO_FATAL_FAILURE(WriteInput("/tmp/test/data/dictionary", FakeRunner::valid_dictionary()));
-  ASSERT_TRUE(cmdline.SetArgs({kFakeFuzzerUrl, "-libfuzzer=flag", "data/corpus1", "data/corpus2",
-                               "data/dictionary", "--", "data/invalid-dictionary"}));
-  EXPECT_EQ(engine.Initialize(&cmdline.argc, &cmdline.argv), ZX_OK);
-  EXPECT_EQ(engine.Run(std::move(context), runner), ZX_OK);
-  EXPECT_EQ(cmdline.GetArgs(), "-libfuzzer=flag data/invalid-dictionary");
-  EXPECT_EQ(SortInputs(fake_runner->get_inputs()), corpus);
+  // `FakeRunner::get_inputs` does not sort the inputs it returns.
+  std::vector<Input> actual;
+  for (const auto& input : fake_runner->get_inputs()) {
+    if (input.size() != 0) {
+      actual.push_back(input.Duplicate());
+    }
+  }
+  std::sort(actual.begin(), actual.end());
+  EXPECT_EQ(actual, expected);
 }
 
 }  // namespace fuzzing

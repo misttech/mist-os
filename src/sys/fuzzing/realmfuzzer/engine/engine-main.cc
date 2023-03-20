@@ -7,7 +7,7 @@
 
 namespace fuzzing {
 
-ZxResult<RunnerPtr> MakeRealmFuzzerRunnerPtr(int argc, char** argv, ComponentContext& context) {
+ZxResult<RunnerPtr> MakeRealmFuzzerRunnerPtr(ComponentContext& context) {
   auto runner = RealmFuzzerRunner::MakePtr(context.executor());
   auto runner_impl = std::static_pointer_cast<RealmFuzzerRunner>(runner);
   runner_impl->SetTargetAdapterHandler(context.MakeRequestHandler<TargetAdapter>());

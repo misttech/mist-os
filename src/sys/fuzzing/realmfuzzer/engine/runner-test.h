@@ -37,10 +37,9 @@ class RealmFuzzerRunnerTest : public RunnerTest {
 
   const RunnerPtr& runner() const override { return runner_; }
 
-  // FakeTargetAdapter methods.
-  void SetAdapterParameters(const std::vector<std::string>& parameters);
-
   // RunnerTest methods.
+  std::vector<std::string> GetParameters() const override;
+  void SetParameters(std::vector<std::string> parameters) override;
   ZxPromise<Input> GetTestInput() override;
   ZxPromise<> SetFeedback(Coverage coverage, FuzzResult fuzz_result, bool leak) override;
 

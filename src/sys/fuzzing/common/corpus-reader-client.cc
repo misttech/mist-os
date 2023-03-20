@@ -56,6 +56,10 @@ ZxPromise<> CorpusReaderClient::Send(std::vector<Input>&& inputs) {
                     }
                   })
                   .then([callback = ZxBind<>(std::move(outer.completer))](ZxResult<>& result) {
+                    if (result.is_error()) {
+                      FX_LOGS(WARNING)
+                          << "Failed to send corpus: " << zx_status_get_string(result.error());
+                    }
                     callback(result);
                   })
                   .wrap_with(scope_);

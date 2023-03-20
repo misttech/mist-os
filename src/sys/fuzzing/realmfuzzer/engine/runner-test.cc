@@ -30,10 +30,20 @@ void RealmFuzzerRunnerTest::SetUp() {
   EXPECT_EQ(runner_impl->BindCoverageDataProvider(provider.TakeChannel()), ZX_OK);
 
   eventpair_ = std::make_unique<AsyncEventPair>(executor());
+
+  FUZZING_EXPECT_OK(runner_->Initialize("ignored", GetParameters()));
+  RunUntilIdle();
 }
 
-void RealmFuzzerRunnerTest::SetAdapterParameters(const std::vector<std::string>& parameters) {
-  target_adapter_->SetParameters(parameters);
+std::vector<std::string> RealmFuzzerRunnerTest::GetParameters() const {
+  // Unlike libFuzzer, realmFuzzer doesn't have any special command line arguments that the runner
+  // needs to process in `Initialize`. The common arguments are retrieved asynchronously from the
+  // target adapter, so this method can simply return an empty list.
+  return std::vector<std::string>();
+}
+
+void RealmFuzzerRunnerTest::SetParameters(std::vector<std::string> parameters) {
+  target_adapter_->SetParameters(std::move(parameters));
 }
 
 ZxPromise<Input> RealmFuzzerRunnerTest::GetTestInput() {

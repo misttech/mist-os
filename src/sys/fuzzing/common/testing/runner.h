@@ -31,6 +31,7 @@ class FakeRunner final : public Runner {
   static Input valid_dictionary() { return Input("key1=\"value\"\n"); }
   static Input invalid_dictionary() { return Input("invalid"); }
 
+  bool has_flag() const { return flag_; }
   const std::vector<Input>& get_inputs() const { return inputs_; }
 
   void set_error(zx_status_t error) { error_ = error; }
@@ -47,6 +48,7 @@ class FakeRunner final : public Runner {
   // |Runner| methods. Since this runner does not have a "real" fuzzer engine, these use the
   // object's local variables to simulate the responses for the various `fuchsia.fuzzer.Controller`
   // methods, e.g. |TryOne| returns whatever was passed to |set_result|.
+  ZxPromise<> Initialize(std::string pkg_dir, std::vector<std::string> args) override;
   __WARN_UNUSED_RESULT zx_status_t AddToCorpus(CorpusType corpus_type, Input input) override;
   std::vector<Input> GetCorpus(CorpusType corpus_type) override;
   __WARN_UNUSED_RESULT zx_status_t ParseDictionary(const Input& input) override;
@@ -68,6 +70,7 @@ class FakeRunner final : public Runner {
   explicit FakeRunner(ExecutorPtr executor);
   ZxPromise<Artifact> Run();
 
+  bool flag_ = false;
   zx_status_t error_ = ZX_OK;
   std::vector<Input> inputs_;
   FuzzResult result_ = FuzzResult::NO_ERRORS;
@@ -82,6 +85,28 @@ class FakeRunner final : public Runner {
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(FakeRunner);
 };
+
+// Makes a packaged seed corpus suitable for testing.
+
+// Creates a directory at `pkg_path`. For each input in `inputs`, creates a file under `pkg_path`
+// with name and contents matching that input, and adds a corresponding `Input` to `out`. The
+// returned inputs are guaranteed to be sorted and unique. This should be called as part of a test
+// using `ASSERT_NO_FATAL_FAILURES`, e.g.
+//
+//  std::vector<Input> corpus;
+//  ASSERT_NO_FATAL_FAILURE(MakeCorpus("/tmp/my-test/corpus", {"foo", "bar"}, &corpus));
+//
+void MakeCorpus(const std::string& pkg_path, std::initializer_list<const char*> inputs,
+                std::vector<Input>* out);
+
+// Makes a packaged input file suitable for testing.
+//
+// Writes `contents` to a file at `pkg_path`, creating any intermediary directories in the
+// process. This should be called as part of a test using `ASSERT_NO_FATAL_FAILURES`, e.g.
+//
+//  ASSERT_NO_FATAL_FAILURE(WriteInput("/tmp/my-test/dictionary", Input("key=\"val\")));
+//
+void WriteInput(const std::string& pkg_path, Input contents);
 
 }  // namespace fuzzing
 
