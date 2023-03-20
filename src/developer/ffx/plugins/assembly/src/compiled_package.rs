@@ -2,19 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_components::ComponentBuilder;
 use assembly_config_schema::assembly_config::{CompiledPackageDefinition, MainPackageDefinition};
 use assembly_tool::Tool;
+use assembly_util::InsertAllUniqueExt;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct CompiledPackageBuilder {
     name: String,
-    component_shards: BTreeMap<String, Vec<Utf8PathBuf>>,
+    component_shards: BTreeMap<String, BTreeSet<Utf8PathBuf>>,
     main_definition: Option<MainPackageDefinition>,
     main_bundle_dir: Utf8PathBuf,
 }
@@ -60,15 +61,20 @@ impl CompiledPackageBuilder {
             }
             CompiledPackageDefinition::Additional(def) => {
                 for (component_name, component_shards) in def.component_shards.clone() {
-                    let mut component_shards = component_shards
-                        .into_iter()
-                        .map(|path| bundle_dir.as_ref().join(path))
-                        .collect();
-
                     self.component_shards
                         .entry(component_name.clone())
                         .or_default()
-                        .append(&mut component_shards);
+                        .try_insert_all_unique(
+                            component_shards.into_iter().map(|path| bundle_dir.as_ref().join(path)),
+                        )
+                        .map_err(|shard| {
+                            anyhow!(
+                                "Duplicate component shard found for {}/meta/{}.cm: {}",
+                                &self.name,
+                                &component_name,
+                                shard
+                            )
+                        })?;
                 }
             }
         }
@@ -114,13 +120,12 @@ impl CompiledPackageBuilder {
                 format!("Adding cml for component: '{component_name}' to package: '{}'", &self.name)
             })?;
 
-            let default = Vec::default();
-            let cml_shards = self.component_shards.get(component_name).unwrap_or(&default);
-
-            for cml_shard in cml_shards {
-                component_builder.add_shard(cml_shard.as_path()).with_context(|| {
-                    format!("Adding shard for: '{component_name}' to package '{}'", &self.name)
-                })?;
+            if let Some(cml_shards) = self.component_shards.get(component_name) {
+                for cml_shard in cml_shards {
+                    component_builder.add_shard(cml_shard.as_path()).with_context(|| {
+                        format!("Adding shard for: '{component_name}' to package '{}'", &self.name)
+                    })?;
+                }
             }
 
             let component_manifest_path = component_builder
@@ -208,7 +213,7 @@ mod tests {
                 name: "foo".into(),
                 component_shards: BTreeMap::from([(
                     "component2".into(),
-                    vec![outdir.join("shard1")]
+                    BTreeSet::from([outdir.join("shard1")])
                 )]),
                 main_bundle_dir: outdir.into(),
                 main_definition: Some(MainPackageDefinition {
