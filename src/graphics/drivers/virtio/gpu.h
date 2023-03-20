@@ -44,8 +44,6 @@ class GpuDevice : public Device,
 
   const virtio_gpu_resp_display_info::virtio_gpu_display_one* pmode() const { return &pmode_; }
 
-  void Flush();
-
   const char* tag() const override { return "virtio-gpu"; }
 
   struct BufferInfo {
@@ -159,8 +157,6 @@ class GpuDevice : public Device,
   void virtio_gpu_flusher();
   thrd_t flush_thread_ = {};
   fbl::Mutex flush_lock_;
-  cnd_t flush_cond_ = {};
-  bool flush_pending_ = false;
 
   display_controller_interface_protocol_t dc_intf_ = {};
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;

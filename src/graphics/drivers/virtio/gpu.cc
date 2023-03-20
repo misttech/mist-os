@@ -307,8 +307,6 @@ void GpuDevice::DisplayControllerImplApplyConfiguration(const display_config_t**
     latest_fb_ = reinterpret_cast<imported_image_t*>(handle);
     latest_config_stamp_ = *config_stamp;
   }
-
-  Flush();
 }
 
 zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysmem_handle) {
@@ -384,7 +382,6 @@ GpuDevice::GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backe
     : virtio::Device(bus_device, std::move(bti), std::move(backend)), DeviceType(bus_device) {
   sem_init(&request_sem_, 0, 1);
   sem_init(&response_sem_, 0, 0);
-  cnd_init(&flush_cond_);
 }
 
 GpuDevice::~GpuDevice() {
@@ -393,7 +390,6 @@ GpuDevice::~GpuDevice() {
   // TODO: clean up allocated physical memory
   sem_destroy(&request_sem_);
   sem_destroy(&response_sem_);
-  cnd_destroy(&flush_cond_);
 }
 
 template <typename RequestType, typename ResponseType>
@@ -590,12 +586,6 @@ zx_status_t GpuDevice::transfer_to_host_2d(uint32_t resource_id, uint32_t width,
   virtio_gpu_ctrl_hdr* res;
   send_command_response(&req, &res);
   return to_zx_status(res->type);
-}
-
-void GpuDevice::Flush() {
-  fbl::AutoLock al(&flush_lock_);
-  flush_pending_ = true;
-  cnd_signal(&flush_cond_);
 }
 
 void GpuDevice::virtio_gpu_flusher() {
