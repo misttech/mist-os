@@ -27,8 +27,6 @@ rustc_library("version-history-shared") {
     ":*",
     "//src/lib/versioning/version-history/rust:*",
     "//src/lib/versioning/version-history/rust/proc-macro:*",
-    "//src/sys/pkg/lib/version-history/rust:*",
-    "//src/sys/pkg/lib/version-history/rust/proc-macro:*",
   ]
 }
 
