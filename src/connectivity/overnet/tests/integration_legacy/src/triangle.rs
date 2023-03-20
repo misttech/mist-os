@@ -90,6 +90,7 @@ async fn full_transfer(run: usize) -> Result<(), Error> {
 }
 
 #[fuchsia::test]
+#[ignore = "Flaky in legacy. Fixed by CSO."]
 async fn forwarded_twice_to_separate_nodes(run: usize) -> Result<(), Error> {
     let mut node_id_gen = NodeIdGenerator::new("forwarded_twice_to_separate_nodes", run);
     // Five nodes connected in a line: A - B - C - D - E
@@ -124,6 +125,7 @@ async fn forwarded_twice_to_separate_nodes(run: usize) -> Result<(), Error> {
 }
 
 #[fuchsia::test]
+#[ignore = "Flaky in legacy. Fixed by CSO."]
 async fn forwarded_twice_full_transfer(run: usize) -> Result<(), Error> {
     let mut node_id_gen = NodeIdGenerator::new("forwarded_twice_full_transfer", run);
     // Four nodes connected in a line: A - B - C - D
