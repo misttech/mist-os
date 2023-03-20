@@ -106,7 +106,7 @@ this step.
 In your second terminal:
 
 ```posix-terminal
-fx serve
+ffx repository server start
 ```
 
 Lastly we need to enable experimental test coverage support:
