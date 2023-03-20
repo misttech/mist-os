@@ -57,7 +57,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "class/cpu-ctrl/000",
       "sys/platform/03:03:26/aml-power-impl-composite/power-impl/composite-pd-armcore/power-0/aml-cpu/s905d2-arm-a53",
       // LED.
-      "class/light/000",
+      "sys/platform/05:00:1c/aml_light",
       // RAM (DDR) control.
       "sys/platform/05:03:24/ram",
 

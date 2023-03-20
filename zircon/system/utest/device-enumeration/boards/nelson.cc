@@ -81,7 +81,6 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
 
       // Amber LED.
       "sys/platform/05:00:1c/aml_light",
-      "class/light/000",
 
       "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi-1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
 
