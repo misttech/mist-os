@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
@@ -22,8 +23,7 @@ namespace gpio {
 
 class GpioDevice;
 using GpioDeviceType =
-    ddk::Device<GpioDevice, ddk::Messageable<fuchsia_hardware_gpio::Device>::Mixin,
-                ddk::Unbindable>;
+    ddk::Device<GpioDevice, ddk::Messageable<fuchsia_hardware_gpio::Gpio>::Mixin, ddk::Unbindable>;
 
 static_assert(GPIO_PULL_DOWN ==
                   static_cast<uint32_t>(fuchsia_hardware_gpio::wire::GpioFlags::kPullDown),
@@ -38,14 +38,14 @@ static_assert(GPIO_PULL_MASK ==
                   static_cast<uint32_t>(fuchsia_hardware_gpio::wire::GpioFlags::kPullMask),
               "ConfigIn PULL_MASK flag doesn't match.");
 
-class GpioDevice : public GpioDeviceType,
-                   public ddk::GpioProtocol<GpioDevice, ddk::base_protocol>,
-                   public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
+class GpioDevice : public GpioDeviceType, public ddk::GpioProtocol<GpioDevice, ddk::base_protocol> {
  public:
   GpioDevice(zx_device_t* parent, gpio_impl_protocol_t* gpio, uint32_t pin, std::string_view name)
       : GpioDeviceType(parent), gpio_(gpio), pin_(pin), name_(name) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
+
+  zx_status_t InitAddDevice();
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -64,8 +64,6 @@ class GpioDevice : public GpioDeviceType,
   zx_status_t GpioGetDriveStrength(uint64_t* ds_ua);
 
   // FIDL
-
-  void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
 
   void GetPin(GetPinCompleter::Sync& completer) override { completer.ReplySuccess(pin_); }
   void GetName(GetNameCompleter::Sync& completer) override {
@@ -169,6 +167,10 @@ class GpioDevice : public GpioDeviceType,
     fidl::ServerBindingRef<fuchsia_hardware_gpio::Gpio> binding;
     std::optional<ddk::UnbindTxn> unbind_txn;
   };
+
+  std::optional<component::OutgoingDirectory> outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
+
   std::optional<Binding> binding_;
   fbl::Mutex lock_;
 };

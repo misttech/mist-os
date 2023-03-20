@@ -35,5 +35,6 @@ DDK_FIDL_PROTOCOL_DEF(POWER_SENSOR,    16, "fuchsia.hardware.power.sensor.Servic
 DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
 DDK_FIDL_PROTOCOL_DEF(REGISTERS,       18, "fuchsia.hardware.registers.Service")
 DDK_FIDL_PROTOCOL_DEF(TEE,             19, "fuchsia.hardware.tee.Service")
+DDK_FIDL_PROTOCOL_DEF(GPIO,            20, "fuchsia.hardware.gpio.Service")
 #undef DDK_FIDL_PROTOCOL_DEF
 #endif

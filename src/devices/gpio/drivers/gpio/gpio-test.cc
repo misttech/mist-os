@@ -9,11 +9,13 @@
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/fdf/env.h>
 #include <lib/fidl-async/cpp/bind.h>
 
 #include <ddk/metadata/gpio.h>
 #include <fbl/alloc_checker.h>
 
+#include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace gpio {
@@ -44,6 +46,11 @@ class FakeGpio : public GpioDevice {
 class GpioTest : public zxtest::Test {
  public:
   void SetUp() override {
+    fdf_env_reset();
+    ASSERT_OK(fdf_env_start());
+
+    ASSERT_EQ(ZX_OK, driver_dispatcher_.StartAsDefault({}, "driver-test-loop").status_value());
+
     gpio_ = FakeGpio::Create(gpio_impl_.GetProto());
     ASSERT_NOT_NULL(gpio_);
     loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
@@ -57,6 +64,9 @@ class GpioTest : public zxtest::Test {
   void TearDown() override {
     gpio_impl_.VerifyAndClear();
 
+    zx::result result = driver_dispatcher_.Stop();
+    EXPECT_EQ(ZX_OK, result.status_value());
+
     loop_->Shutdown();
   }
 
@@ -65,6 +75,8 @@ class GpioTest : public zxtest::Test {
   ddk::MockGpioImpl gpio_impl_;
   std::unique_ptr<async::Loop> loop_;
   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> client_;
+
+  fdf::TestSynchronizedDispatcher driver_dispatcher_;
 };
 
 TEST_F(GpioTest, TestFidlAll) {
@@ -192,7 +204,7 @@ TEST_F(GpioTest, ValidateGpioNameGeneration) {
 #undef GEN_GPIO1
 }
 
-TEST(GpioTest, Init) {
+TEST_F(GpioTest, Init) {
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),
@@ -297,7 +309,7 @@ TEST(GpioTest, Init) {
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
 }
 
-TEST(GpioTest, InitErrorHandling) {
+TEST_F(GpioTest, InitErrorHandling) {
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
       DECL_GPIO_PIN(2),

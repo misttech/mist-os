@@ -5,7 +5,7 @@
 #include "gpioutil.h"
 
 #include <dirent.h>
-#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <stdio.h>
@@ -103,23 +103,14 @@ zx::result<> ListGpios() {
 
   for (auto const& dir_entry : std::filesystem::directory_iterator(dev_class_dir)) {
     const char* gpio_path = dir_entry.path().c_str();
-    zx::result device = component::Connect<fuchsia_hardware_gpio::Device>(gpio_path);
-    if (device.is_error()) {
-      fprintf(stderr, "Failed to connect to %s: %s\n", gpio_path, device.status_string());
-      return device.take_error();
+    zx::result client_end = component::Connect<fuchsia_hardware_gpio::Gpio>(gpio_path);
+    if (client_end.is_error()) {
+      fprintf(stderr, "Could not connect to client from %s: %s\n", gpio_path,
+              client_end.status_string());
+      return client_end.take_error();
     }
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_gpio::Gpio>();
-    if (endpoints.is_error()) {
-      fprintf(stderr, "Failed to create endpoints: %s\n", endpoints.status_string());
-      return endpoints.take_error();
-    }
-    auto& [gpio, server] = endpoints.value();
-    const fidl::Status status = fidl::WireCall(device.value())->OpenSession(std::move(server));
-    if (!status.ok()) {
-      fprintf(stderr, "Failed to open session on %s: %s\n", gpio_path, status.status_string());
-      return zx::error(status.status());
-    }
-    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(gpio));
+
+    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
     const fidl::WireResult result_pin = client->GetPin();
     if (!result_pin.ok()) {
       fprintf(stderr, "Could not get pin from %s: %s\n", gpio_path, result_pin.status_string());
@@ -160,23 +151,16 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
 
   for (auto const& dir_entry : std::filesystem::directory_iterator(dev_class_dir)) {
     const char* gpio_path = dir_entry.path().c_str();
-    zx::result device = component::Connect<fuchsia_hardware_gpio::Device>(gpio_path);
-    if (device.is_error()) {
-      fprintf(stderr, "Failed to connect to %s: %s\n", gpio_path, device.status_string());
-      return device.take_error();
+
+    zx::result client_end = component::Connect<fuchsia_hardware_gpio::Gpio>(gpio_path);
+    if (client_end.is_error()) {
+      fprintf(stderr, "Could not connect to client from %s: %s\n", gpio_path,
+              client_end.status_string());
+      return client_end.take_error();
     }
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_gpio::Gpio>();
-    if (endpoints.is_error()) {
-      fprintf(stderr, "Failed to create endpoints: %s\n", endpoints.status_string());
-      return endpoints.take_error();
-    }
-    auto& [gpio, server] = endpoints.value();
-    const fidl::Status status = fidl::WireCall(device.value())->OpenSession(std::move(server));
-    if (!status.ok()) {
-      fprintf(stderr, "Failed to open session on %s: %s\n", gpio_path, status.status_string());
-      return zx::error(status.status());
-    }
-    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(gpio));
+
+    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
+
     const fidl::WireResult result_name = client->GetName();
     if (!result_name.ok()) {
       fprintf(stderr, "Could not get name from %s: %s\n", gpio_path, result_name.status_string());
