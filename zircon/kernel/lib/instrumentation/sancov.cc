@@ -92,8 +92,8 @@ void InitSancov(uint level) {
   status = gSancovCountsVmo.Init(ktl::move(vmo), 0, DataSize(), "sancov-pc-counts-table");
   ZX_ASSERT(status == ZX_OK);
 
-  gSancovPcTable = reinterpret_cast<uint64_t*>(gSancovPcVmo.base());
-  gSancovPcCounts = reinterpret_cast<uint64_t*>(gSancovCountsVmo.base());
+  gSancovPcTable = reinterpret_cast<uint64_t*>(gSancovPcVmo.base_locking());
+  gSancovPcCounts = reinterpret_cast<uint64_t*>(gSancovCountsVmo.base_locking());
 
   gSancovPcTable[0] = kMagic64;
   gSancovPcCounts[0] = kCountsMagic;

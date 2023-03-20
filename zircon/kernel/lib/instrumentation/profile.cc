@@ -51,8 +51,8 @@ InstrumentationDataVmo LlvmProfdataVmo() {
     status = mapped_vmo.Init(vmo, 0, profdata.size_bytes(), "llvm-profdata-setup");
     ZX_ASSERT(status == ZX_OK);
     ktl::span<ktl::byte> mapped_data{
-        reinterpret_cast<ktl::byte*>(mapped_vmo.base()),
-        mapped_vmo.size(),
+        reinterpret_cast<ktl::byte*>(mapped_vmo.base_locking()),
+        mapped_vmo.size_locking(),
     };
     profdata.WriteFixedData(mapped_data);
   }
@@ -66,7 +66,7 @@ InstrumentationDataVmo LlvmProfdataVmo() {
   ZX_ASSERT(status == ZX_OK);
   ktl::span<ktl::byte> counters{
       reinterpret_cast<ktl::byte*>(profdata.counters_offset() - map_offset +
-                                   gProfdataCounters.base()),
+                                   gProfdataCounters.base_locking()),
       profdata.counters_size_bytes(),
   };
 
