@@ -5,13 +5,16 @@
 // DO NOT EDIT.
 // Generated from FIDL library `zither.multifile` by zither, a Fuchsia platform tool.
 
-#![allow(dead_code)]
-
 // This crate takes an unconditional dependency on the bitflags crate.
 // This declaration satisfies any unused-crate-dependencies error that would
 // otherwise arise in cases where this crate goes unused.
 use bitflags as _;
 
 mod a;
+pub use a::*;
+
 mod b;
+pub use b::*;
+
 mod c;
+pub use c::*;
