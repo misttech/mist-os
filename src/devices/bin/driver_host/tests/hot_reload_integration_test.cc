@@ -6,7 +6,7 @@
 #include <fidl/fuchsia.device.restarttest/cpp/wire.h>
 #include <fidl/fuchsia.device.test/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <fuchsia/driver/development/cpp/fidl.h>
+#include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
@@ -31,25 +31,31 @@ constexpr std::string_view kTestDriverRestartUrl =
 constexpr std::string_view kChildDriverRestartUrl =
     "fuchsia-boot:///#meta/driver-host-test-child-driver.cm";
 
-void SetupEnvironment(board_test::DeviceEntry dev, driver_integration_test::IsolatedDevmgr* devmgr,
-                      fuchsia::driver::development::DriverDevelopmentSyncPtr* development_) {
+zx::result<fidl::WireSyncClient<fuchsia_driver_development::DriverDevelopment>> SetupEnvironment(
+    board_test::DeviceEntry dev, driver_integration_test::IsolatedDevmgr* devmgr) {
   driver_integration_test::IsolatedDevmgr::Args args;
   args.device_list.push_back(dev);
 
-  ASSERT_OK(IsolatedDevmgr::Create(&args, devmgr));
+  if (zx_status_t status = IsolatedDevmgr::Create(&args, devmgr); status != ZX_OK) {
+    return zx::error(status);
+  }
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_development::DriverDevelopment>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
 
-  zx::channel local, remote;
-  ASSERT_EQ(zx::channel::create(0, &local, &remote), ZX_OK);
-  ASSERT_EQ(ZX_OK, devmgr->Connect(fuchsia::driver::development::DriverDevelopment::Name_,
-                                   std::move(remote)));
-
-  development_->Bind(std::move(local));
+  if (zx_status_t status = devmgr->Connect(
+          fidl::DiscoverableProtocolName<fuchsia_driver_development::DriverDevelopment>,
+          endpoints->server.TakeChannel());
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(fidl::WireSyncClient(std::move(endpoints->client)));
 }
 
 // Test restarting a driver host containing only one driver.
 TEST(HotReloadIntegrationTest, DISABLED_TestRestartOneDriver) {
   driver_integration_test::IsolatedDevmgr devmgr;
-  fuchsia::driver::development::DriverDevelopmentSyncPtr development_;
 
   // Test device to add to devmgr.
   board_test::DeviceEntry dev = {};
@@ -61,7 +67,8 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartOneDriver) {
   dev.did = 0;
 
   // Setup the environment for testing.
-  SetupEnvironment(dev, &devmgr, &development_);
+  zx::result development = SetupEnvironment(dev, &devmgr);
+  ASSERT_OK(development);
 
   uint64_t pid_before;
   {
@@ -86,10 +93,10 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartOneDriver) {
   ASSERT_OK(device_watcher::DirWatcher::Create(fd.get(), &watcher));
 
   // Restart the driver host of the test driver.
-  fuchsia::driver::development::DriverDevelopment_RestartDriverHosts_Result result;
-  auto resp = development_->RestartDriverHosts(std::string(kDriverRestartUrl), &result);
-  ASSERT_OK(resp);
-  ASSERT_EQ(result.response().count, 1);
+  fidl::WireResult response =
+      development.value()->RestartDriverHosts(fidl::StringView::FromExternal(kDriverRestartUrl));
+  ASSERT_OK(response);
+  ASSERT_EQ(response->value()->count, 1);
 
   // Make sure device has shut so that it isnt opened before it is restarted.
   ASSERT_OK(watcher->WaitForRemoval("driver-host-restart-driver", zx::duration::infinite()));
@@ -115,7 +122,6 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartOneDriver) {
 // the parent.
 TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversParent) {
   driver_integration_test::IsolatedDevmgr devmgr;
-  fuchsia::driver::development::DriverDevelopmentSyncPtr development_;
 
   // Test device to add to devmgr.
   board_test::DeviceEntry dev = {};
@@ -129,7 +135,8 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversParent) {
   dev.did = 0;
 
   // Setup the environment for testing.
-  SetupEnvironment(dev, &devmgr, &development_);
+  zx::result development = SetupEnvironment(dev, &devmgr);
+  ASSERT_OK(development);
 
   zx::channel chan_child;
 
@@ -161,9 +168,9 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversParent) {
   ASSERT_OK(device_watcher::DirWatcher::Create(fd_watcher.get(), &watcher));
 
   // Restart the driver host of the parent driver.
-  fuchsia::driver::development::DriverDevelopment_RestartDriverHosts_Result result;
-  auto resp = development_->RestartDriverHosts(kTestDriverRestartUrl.data(), &result);
-  ASSERT_OK(resp);
+  fidl::WireResult response = development.value()->RestartDriverHosts(
+      fidl::StringView::FromExternal(kTestDriverRestartUrl));
+  ASSERT_OK(response);
 
   // Make sure device has shut so that it isn't opened before it is restarted.
   // Child is a subdirectory of this so if the parent is gone so must the child.
@@ -198,7 +205,6 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversParent) {
 // the child.
 TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversChild) {
   driver_integration_test::IsolatedDevmgr devmgr;
-  fuchsia::driver::development::DriverDevelopmentSyncPtr development_;
 
   // Test device to add to devmgr.
   board_test::DeviceEntry dev = {};
@@ -212,7 +218,8 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversChild) {
   dev.did = 0;
 
   // Setup the environment for testing.
-  SetupEnvironment(dev, &devmgr, &development_);
+  zx::result development = SetupEnvironment(dev, &devmgr);
+  ASSERT_OK(development);
 
   // Open parent.
   zx::result parent_channel = device_watcher::RecursiveWaitForFile(
@@ -239,9 +246,9 @@ TEST(HotReloadIntegrationTest, DISABLED_TestRestartTwoDriversChild) {
                zx_status_get_string(parent_before->error_value()));
 
   // Restart the driver host of the child driver.
-  fuchsia::driver::development::DriverDevelopment_RestartDriverHosts_Result result;
-  auto resp = development_->RestartDriverHosts(kChildDriverRestartUrl.data(), &result);
-  ASSERT_OK(resp);
+  fidl::WireResult response = development.value()->RestartDriverHosts(
+      fidl::StringView::FromExternal(kChildDriverRestartUrl));
+  ASSERT_OK(response);
 
   // Make sure device has shut so that it isn't opened before it is restarted.
   // Child is a subdirectory of this so if the parent is gone so must the child.

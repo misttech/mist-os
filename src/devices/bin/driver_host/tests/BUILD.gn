@@ -109,7 +109,7 @@ test("integration_tests") {
   deps = [
     ":fuchsia.device.restarttest_cpp_wire",
     "//sdk/fidl/fuchsia.device.test:fuchsia.device.test_cpp_wire",
-    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_hlcpp",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp_wire",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
