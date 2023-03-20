@@ -154,6 +154,8 @@ func DescribeType(desc zither.TypeDescriptor) string {
 		return fidlgen.ToUpperCamelCase(fidlgen.MustReadName(desc.Type).DeclarationName())
 	case zither.TypeKindArray:
 		return fmt.Sprintf("[%d]", *desc.ElementCount) + DescribeType(*desc.ElementType)
+	case zither.TypeKindStringArray:
+		return fmt.Sprintf("[%d]byte", *desc.ElementCount)
 	case zither.TypeKindPointer:
 		return "*" + DescribeType(*desc.ElementType)
 	case zither.TypeKindVoidPointer:

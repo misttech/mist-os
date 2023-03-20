@@ -29,3 +29,9 @@ type StructWithPointers = struct {
     @embedded_alias("zither.experimental.zx.types/Uint8Alias")
     aliasptr experimental_pointer<Uint8Alias>;
 };
+
+
+type StructWithStringArrays = struct {
+    str string_array<10>;
+    strs array<string_array<6>, 4>;
+};

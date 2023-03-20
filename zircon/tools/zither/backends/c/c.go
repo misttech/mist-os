@@ -213,6 +213,8 @@ func DescribeType(desc zither.TypeDescriptor) TypeInfo {
 		info := DescribeType(*desc.ElementType)
 		info.ArrayCounts = append(info.ArrayCounts, *desc.ElementCount)
 		return info
+	case zither.TypeKindStringArray:
+		return TypeInfo{Type: "char", ArrayCounts: []int{*desc.ElementCount}}
 	case zither.TypeKindPointer:
 		info := DescribeType(*desc.ElementType)
 		info.Type += "*"

@@ -32,3 +32,9 @@ pub struct StructWithPointers {
     pub voidptr: *const u8,
     pub aliasptr: *const Uint8Alias,
 }
+
+#[repr(C)]
+pub struct StructWithStringArrays {
+    pub str: [u8; 10],
+    pub strs: [[u8; 6]; 4],
+}

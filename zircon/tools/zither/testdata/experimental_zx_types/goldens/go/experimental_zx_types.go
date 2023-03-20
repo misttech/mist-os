@@ -35,3 +35,8 @@ type StructWithPointers struct {
 	Voidptr  unsafe.Pointer
 	Aliasptr *Uint8Alias
 }
+
+type StructWithStringArrays struct {
+	Str  [10]byte
+	Strs [4][6]byte
+}

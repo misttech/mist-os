@@ -41,6 +41,11 @@ typedef struct {
   zither_experimental_zx_types_uint8_alias_t* aliasptr;
 } zither_experimental_zx_types_struct_with_pointers_t;
 
+typedef struct {
+  char str[10];
+  char strs[6][4];
+} zither_experimental_zx_types_struct_with_string_arrays_t;
+
 #if defined(__cplusplus)
 }
 #endif

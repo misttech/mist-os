@@ -431,15 +431,16 @@ func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder) ([]FileSummar
 type TypeKind string
 
 const (
-	TypeKindBool    TypeKind = "bool"
-	TypeKindInteger TypeKind = "integer"
-	TypeKindSize    TypeKind = "size"
-	TypeKindString  TypeKind = "string"
-	TypeKindEnum    TypeKind = "enum"
-	TypeKindBits    TypeKind = "bits"
-	TypeKindArray   TypeKind = "array"
-	TypeKindStruct  TypeKind = "struct"
-	TypeKindAlias   TypeKind = "alias" // Not a type per se, but conveniently regarded as such.
+	TypeKindBool        TypeKind = "bool"
+	TypeKindInteger     TypeKind = "integer"
+	TypeKindSize        TypeKind = "size"
+	TypeKindString      TypeKind = "string"
+	TypeKindEnum        TypeKind = "enum"
+	TypeKindBits        TypeKind = "bits"
+	TypeKindArray       TypeKind = "array"
+	TypeKindStringArray TypeKind = "string_array"
+	TypeKindStruct      TypeKind = "struct"
+	TypeKindAlias       TypeKind = "alias" // Not a type per se, but conveniently regarded as such.
 
 	// TODO(fxbug.dev/110021): These kinds exist only for the sake of the
 	// interim, v2 form of FIDL library zx.
@@ -755,6 +756,9 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 			return nil, nil
 		}
 		desc.ElementType = nested
+	case fidlgen.StringArray:
+		desc.Kind = TypeKindStringArray
+		desc.ElementCount = typ.GetElementCount()
 	case fidlgen.ZxExperimentalPointerType, fidlgen.VectorType:
 		if typ.GetKind() == fidlgen.ZxExperimentalPointerType {
 			desc.Kind = TypeKindPointer

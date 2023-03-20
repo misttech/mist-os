@@ -228,6 +228,8 @@ func DescribeType(desc zither.TypeDescriptor, style CaseStyle) string {
 		return casify(fidlgen.MustReadName(desc.Type).DeclarationName())
 	case zither.TypeKindArray:
 		return fmt.Sprintf("[%s; %d]", DescribeType(*desc.ElementType, style), *desc.ElementCount)
+	case zither.TypeKindStringArray:
+		return fmt.Sprintf("[u8; %d]", *desc.ElementCount)
 	case zither.TypeKindPointer, zither.TypeKindVoidPointer:
 		mutability := "const"
 		if desc.ElementType.Mutable {
