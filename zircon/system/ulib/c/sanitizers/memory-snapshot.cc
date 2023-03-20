@@ -410,6 +410,9 @@ class MemorySnapshot {
 #if defined(__aarch64__)
   static constexpr auto kSpReg = &zx_thread_state_general_regs_t::sp;
   static constexpr auto kThreadReg = &zx_thread_state_general_regs_t::tpidr;
+#elif defined(__riscv)
+  static constexpr auto kSpReg = &zx_thread_state_general_regs_t::sp;
+  static constexpr auto kThreadReg = &zx_thread_state_general_regs_t::tp;
 #elif defined(__x86_64__)
   static constexpr auto kSpReg = &zx_thread_state_general_regs_t::rsp;
   static constexpr auto kThreadReg = &zx_thread_state_general_regs_t::fs_base;
@@ -549,6 +552,38 @@ auto CurrentThreadRegs() {
   regs.sp = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
   __asm__("mrs %0, nzcv" : "=r"(regs.cpsr));
   __asm__("mrs %0, tpidr_el0" : "=r"(regs.tpidr));
+#elif defined(__riscv)
+  regs.pc = regs.ra = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
+  regs.sp = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  regs.s0 = regs.sp;  // s0 is fp.
+  __asm__ volatile("sd gp, %0" : "=m"(regs.gp));
+  regs.tp = reinterpret_cast<uintptr_t>(__builtin_thread_pointer());
+  __asm__ volatile("sd t0, %0" : "=m"(regs.t0));
+  __asm__ volatile("sd t1, %0" : "=m"(regs.t1));
+  __asm__ volatile("sd t2, %0" : "=m"(regs.t2));
+  __asm__ volatile("sd s1, %0" : "=m"(regs.s1));
+  __asm__ volatile("sd a0, %0" : "=m"(regs.a0));
+  __asm__ volatile("sd a1, %0" : "=m"(regs.a1));
+  __asm__ volatile("sd a2, %0" : "=m"(regs.a2));
+  __asm__ volatile("sd a3, %0" : "=m"(regs.a3));
+  __asm__ volatile("sd a4, %0" : "=m"(regs.a4));
+  __asm__ volatile("sd a5, %0" : "=m"(regs.a5));
+  __asm__ volatile("sd a6, %0" : "=m"(regs.a6));
+  __asm__ volatile("sd a7, %0" : "=m"(regs.a7));
+  __asm__ volatile("sd s2, %0" : "=m"(regs.s2));
+  __asm__ volatile("sd s3, %0" : "=m"(regs.s3));
+  __asm__ volatile("sd s4, %0" : "=m"(regs.s4));
+  __asm__ volatile("sd s5, %0" : "=m"(regs.s5));
+  __asm__ volatile("sd s6, %0" : "=m"(regs.s6));
+  __asm__ volatile("sd s7, %0" : "=m"(regs.s7));
+  __asm__ volatile("sd s8, %0" : "=m"(regs.s8));
+  __asm__ volatile("sd s9, %0" : "=m"(regs.s9));
+  __asm__ volatile("sd s10, %0" : "=m"(regs.s10));
+  __asm__ volatile("sd s11, %0" : "=m"(regs.s11));
+  __asm__ volatile("sd t3, %0" : "=m"(regs.t3));
+  __asm__ volatile("sd t4, %0" : "=m"(regs.t4));
+  __asm__ volatile("sd t5, %0" : "=m"(regs.t5));
+  __asm__ volatile("sd t6, %0" : "=m"(regs.t6));
 #elif defined(__x86_64__)
   __asm__ volatile("mov %%rax, %0" : "=m"(regs.rax));
   __asm__ volatile("mov %%rbx, %0" : "=m"(regs.rbx));
