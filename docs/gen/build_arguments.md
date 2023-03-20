@@ -299,7 +299,7 @@ Suppress Bazel non-error output
 
 **Current value (from the default):** `true`
 
-From //build/bazel/bazel_action.gni:12
+From //build/bazel/bazel_action.gni:13
 
 ### bless_goldens
 
