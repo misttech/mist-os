@@ -103,12 +103,12 @@ impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
 
 /// Device specific iformation.
 #[derive(Debug)]
-pub enum DeviceSpecificInfo {
-    Netdevice(NetdeviceInfo),
-    Loopback(LoopbackInfo),
+pub enum DeviceSpecificInfo<'a> {
+    Netdevice(&'a NetdeviceInfo),
+    Loopback(&'a LoopbackInfo),
 }
 
-impl DeviceSpecificInfo {
+impl DeviceSpecificInfo<'_> {
     pub fn static_common_info(&self) -> &StaticCommonInfo {
         match self {
             Self::Netdevice(i) => &i.static_common_info,
@@ -251,11 +251,5 @@ impl NetdeviceInfo {
     pub fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
         let mut dynamic = self.dynamic.write().unwrap();
         cb(dynamic.deref_mut())
-    }
-}
-
-impl From<NetdeviceInfo> for DeviceSpecificInfo {
-    fn from(i: NetdeviceInfo) -> Self {
-        Self::Netdevice(i)
     }
 }

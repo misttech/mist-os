@@ -2444,8 +2444,8 @@ where
         let index = TryIntoFidlWithContext::<u64>::try_into_fidl_with_ctx(device, &non_sync_ctx)
             .map_err(IntoErrno::into_errno)?;
         Ok(non_sync_ctx.devices.get_core_id(index).map(|core_id| {
-            let StaticCommonInfo { binding_id: _, name } =
-                core_id.external_state().static_common_info();
+            let state = core_id.external_state();
+            let StaticCommonInfo { binding_id: _, name } = state.static_common_info();
             name.to_string()
         }))
     }

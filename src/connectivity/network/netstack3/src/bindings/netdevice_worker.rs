@@ -29,8 +29,8 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, DeviceId, DeviceIdExt as _,
-    Netstack, NetstackContext, NonSyncContext, SyncCtx,
+    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, DeviceId, Netstack,
+    NetstackContext, NonSyncContext, SyncCtx,
 };
 
 #[derive(Clone)]
@@ -284,7 +284,7 @@ impl DeviceHandler {
                 let binding_id = non_sync_ctx.devices.alloc_new_id();
 
                 let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
-                devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
+                devices::NetdeviceInfo {
                     handler: PortHandler {
                         id: binding_id,
                         port_id: port,
@@ -312,11 +312,21 @@ impl DeviceHandler {
                     }
                     .into(),
                     static_common_info: devices::StaticCommonInfo { binding_id, name },
-                })
+                }
                 .into()
             },
-        )
-        .into();
+        );
+
+        let devices::NetdeviceInfo {
+            static_common_info: devices::StaticCommonInfo { binding_id, .. },
+            handler: _,
+            mac: _,
+            dynamic: _,
+        } = core_id.external_state();
+        let binding_id = *binding_id;
+        let core_id = core_id.into();
+        add_initial_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
+
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
@@ -343,25 +353,11 @@ impl DeviceHandler {
                 };
             },
         );
+
+        non_sync_ctx.devices.add_device(binding_id, core_id.clone());
         state_entry.insert(core_id.downgrade());
 
-        match core_id.external_state() {
-            devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
-                static_common_info: devices::StaticCommonInfo { binding_id, .. },
-                handler: _,
-                mac: _,
-                dynamic: _,
-            }) => {
-                non_sync_ctx.devices.add_device(*binding_id, core_id.clone());
-
-                add_initial_routes(sync_ctx, non_sync_ctx, &core_id)
-                    .expect("failed to add default routes");
-
-                Ok((*binding_id, status_stream))
-            }
-            // TODO(https://fxbug.dev/123461): Make this more type-safe.
-            e => unreachable!("added netdev device but got external_state={:?}", e),
-        }
+        Ok((binding_id, status_stream))
     }
 }
 

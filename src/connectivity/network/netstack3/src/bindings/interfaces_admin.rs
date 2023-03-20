@@ -664,7 +664,7 @@ async fn dispatch_control_request(
 ///
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: NetstackContext, id: BindingId) {
-    let state = {
+    let devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ } = {
         let mut ctx = ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
         let core_id =
@@ -676,17 +676,7 @@ async fn remove_interface(ctx: NetstackContext, id: BindingId) {
             DeviceId::Loopback(id) => panic!("loopback device {} may not be removed", id),
         }
     };
-    let handler = match state {
-        devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
-            handler,
-            mac: _,
-            static_common_info: _,
-            dynamic: _,
-        }) => handler,
-        i @ devices::DeviceSpecificInfo::Loopback(_) => {
-            unreachable!("unexpected device info {:?} for interface {}", i, id)
-        }
-    };
+
     handler.uninstall().await.unwrap_or_else(|e| {
         log::warn!("error uninstalling netdevice handler for interface {}: {:?}", id, e)
     })
@@ -1292,7 +1282,7 @@ mod tests {
                 DEFAULT_LOOPBACK_MTU,
                 || {
                     const LOOPBACK_NAME: &'static str = "lo";
-                    devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
+                    devices::LoopbackInfo {
                         static_common_info: devices::StaticCommonInfo {
                             binding_id,
                             name: LOOPBACK_NAME.to_string(),
@@ -1306,7 +1296,7 @@ mod tests {
                         }
                         .into(),
                         rx_notifier: Default::default(),
-                    })
+                    }
                 },
             )
             .expect("failed to add loopback to core");

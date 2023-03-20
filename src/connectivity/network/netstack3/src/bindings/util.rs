@@ -1103,7 +1103,7 @@ mod tests {
                     || {
                         const LOOPBACK_NAME: &'static str = "lo";
 
-                        devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
+                        devices::LoopbackInfo {
                             static_common_info: devices::StaticCommonInfo {
                                 binding_id: binding,
                                 name: LOOPBACK_NAME.to_string(),
@@ -1117,7 +1117,7 @@ mod tests {
                             }
                             .into(),
                             rx_notifier: Default::default(),
-                        })
+                        }
                     },
                 )
                 .expect("failed to add loopback to core")

@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom as _;
 use std::future::Future;
 use std::num::NonZeroU16;
-use std::ops::{Deref as _, DerefMut as _};
+use std::ops::DerefMut as _;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -50,7 +50,7 @@ use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
     BindingId, DeviceSpecificInfo, Devices, DynamicCommonInfo, DynamicNetdeviceInfo, LoopbackInfo,
-    StaticCommonInfo,
+    NetdeviceInfo, StaticCommonInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
@@ -84,15 +84,15 @@ use netstack3_core::{
 
 /// Extends the methods available to [`DeviceId`].
 trait DeviceIdExt {
-    /// Returns the (common) state associated with devices.
-    fn external_state(&self) -> &DeviceSpecificInfo;
+    /// Returns the state associated with devices.
+    fn external_state(&self) -> DeviceSpecificInfo<'_>;
 }
 
 impl DeviceIdExt for DeviceId<BindingsNonSyncCtxImpl> {
-    fn external_state(&self) -> &DeviceSpecificInfo {
+    fn external_state(&self) -> DeviceSpecificInfo<'_> {
         match self {
-            DeviceId::Ethernet(d) => d.external_state(),
-            DeviceId::Loopback(d) => d.external_state(),
+            DeviceId::Ethernet(d) => DeviceSpecificInfo::Netdevice(d.external_state()),
+            DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
         }
     }
 }
@@ -290,23 +290,16 @@ impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
 }
 
 impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
-    type LoopbackDeviceState = DeviceSpecificInfo;
-    type EthernetDeviceState = DeviceSpecificInfo;
+    type LoopbackDeviceState = LoopbackInfo;
+    type EthernetDeviceState = NetdeviceInfo;
 
     fn wake_rx_task(
         &mut self,
         device: &LoopbackDeviceId<Self::Instant, Self::LoopbackDeviceState>,
     ) {
-        match device.external_state().deref() {
-            DeviceSpecificInfo::Netdevice(_) => {
-                unreachable!("only loopback supports RX queues")
-            }
-            DeviceSpecificInfo::Loopback(LoopbackInfo {
-                static_common_info: _,
-                dynamic_common_info: _,
-                rx_notifier,
-            }) => rx_notifier.schedule(),
-        }
+        let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
+            device.external_state();
+        rx_notifier.schedule()
     }
 
     fn wake_tx_task(&mut self, device: &DeviceId<BindingsNonSyncCtxImpl>) {
@@ -318,30 +311,25 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
         device: &EthernetDeviceId<Self::Instant, Self::EthernetDeviceState>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        match device.external_state().deref() {
-            DeviceSpecificInfo::Netdevice(i) => {
-                let enabled = i.with_dynamic_info(
-                    |DynamicNetdeviceInfo {
-                         phy_up,
-                         common_info:
-                             DynamicCommonInfo {
-                                 admin_enabled,
-                                 mtu: _,
-                                 events: _,
-                                 control_hook: _,
-                                 addresses: _,
-                             },
-                     }| { *admin_enabled && *phy_up },
-                );
-                if enabled {
-                    i.handler.send(frame.as_ref()).unwrap_or_else(|e| {
-                        log::warn!("failed to send frame to {:?}: {:?}", i.handler, e)
-                    })
-                }
-            }
-            DeviceSpecificInfo::Loopback(LoopbackInfo { .. }) => {
-                unreachable!("loopback must not send packets out of the node")
-            }
+        let state = device.external_state();
+        let enabled = state.with_dynamic_info(
+            |DynamicNetdeviceInfo {
+                 phy_up,
+                 common_info:
+                     DynamicCommonInfo {
+                         admin_enabled,
+                         mtu: _,
+                         events: _,
+                         control_hook: _,
+                         addresses: _,
+                     },
+             }| { *admin_enabled && *phy_up },
+        );
+
+        if enabled {
+            state.handler.send(frame.as_ref()).unwrap_or_else(|e| {
+                log::warn!("failed to send frame to {:?}: {:?}", state.handler, e)
+            })
         }
 
         Ok(())
@@ -788,7 +776,7 @@ impl Netstack {
                     .notify(InterfaceUpdate::OnlineChanged(true))
                     .expect("interfaces worker not running");
 
-                DeviceSpecificInfo::Loopback(LoopbackInfo {
+                LoopbackInfo {
                     static_common_info: StaticCommonInfo {
                         binding_id,
                         name: LOOPBACK_NAME.to_string(),
@@ -802,24 +790,18 @@ impl Netstack {
                     }
                     .into(),
                     rx_notifier: loopback_rx_notifier,
-                })
-                .into()
+                }
             },
         )
         .expect("error adding loopback device");
 
-        let binding_id = match loopback.external_state() {
-            DeviceSpecificInfo::Loopback(LoopbackInfo {
-                static_common_info: StaticCommonInfo { binding_id, name: _ },
-                dynamic_common_info: _,
-                rx_notifier,
-            }) => {
-                crate::bindings::devices::spawn_rx_task(rx_notifier, self, &loopback);
-                *binding_id
-            }
-            // TODO(https://fxbug.dev/123461): Make this more type-safe.
-            e => unreachable!("added loopback device but got external_state={:?}", e),
-        };
+        let LoopbackInfo {
+            static_common_info: StaticCommonInfo { binding_id, name: _ },
+            dynamic_common_info: _,
+            rx_notifier,
+        } = loopback.external_state();
+        crate::bindings::devices::spawn_rx_task(rx_notifier, self, &loopback);
+        let binding_id = *binding_id;
         let loopback: DeviceId<_> = loopback.into();
         devices.add_device(binding_id, loopback.clone());
 
