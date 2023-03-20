@@ -78,7 +78,7 @@ pub struct Isolate {
 impl Isolate {
     /// Creates a new isolated environment for ffx to run in, including a
     /// user level configuration that isolates the ascendd socket into a temporary
-    /// directory. If $FUCHSIA_TEST_OUTDIR is set, then it is used as the log
+    /// directory. If $FUCHSIA_TEST_OUTDIR is set, then it is used to specify the log
     /// directory. The isolated environment is torn down when the Isolate is
     /// dropped, which will attempt to terminate any running daemon and then
     /// remove all isolate files.
@@ -101,7 +101,19 @@ impl Isolate {
         };
 
         let log_dir = if let Ok(d) = std::env::var("FUCHSIA_TEST_OUTDIR") {
-            PathBuf::from(d)
+            // If this is the daemon, and we use the same dir as the parent,
+            // the two daemons will race to write the same file. So instead let's
+            // always try to create a subdir when in the infra environment.
+            // To do so, we take the tail of the tmpdir (which Path calls
+            // file_name() even when actually a directory), and add it
+            // to the end of FUCHSIA_TEST_OUTDIR, to give the new subdirectory.
+            // Because the tail of the tmpdir includes the "name", we'll be able
+            // to associate the log directory with the isolated test.
+            let mut pb = PathBuf::from(d);
+            if let Some(tmptail) = tmpdir.path().file_name() {
+                pb.push(tmptail);
+            }
+            pb
         } else {
             tmpdir.path().join("log")
         };
