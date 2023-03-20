@@ -4,6 +4,7 @@
 
 use {
     super::{format_sources, get_policy, unseal_sources, KeyConsumer},
+    crate::service::SHRED_DATA_VOLUME_MARKER_FILE,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::Proxy,
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
@@ -22,6 +23,16 @@ use {
         sync::atomic::{AtomicU64, Ordering},
     },
 };
+
+const LEGACY_DATA_KEY: Aes256Key = Aes256Key::create([
+    0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11,
+    0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+]);
+
+const LEGACY_METADATA_KEY: Aes256Key = Aes256Key::create([
+    0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8, 0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+    0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8, 0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
+]);
 
 async fn unwrap_or_create_keys(
     mut keybag: KeyBagManager,
@@ -72,13 +83,19 @@ async fn unwrap_or_create_keys(
     Err(last_err)
 }
 
+pub enum UnlockResult<'a> {
+    Ok((CryptService, String, &'a mut ServingVolume)),
+    /// The volume contained a marker file indicated it needs to be reformatted.
+    Reset,
+}
+
 // Unwraps the data volume in `fs`.  Any failures should be treated as fatal and the filesystem
 // should be reformatted and re-initialized.
 // Returns the name of the data volume as well as a reference to it.
 pub async fn unlock_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
+) -> Result<UnlockResult<'a>, Error> {
     unlock_or_init_data_volume(fs, config, false).await
 }
 
@@ -88,42 +105,66 @@ pub async fn init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
 ) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
-    unlock_or_init_data_volume(fs, config, true).await
+    unlock_or_init_data_volume(fs, config, true).await.map(|r| match r {
+        UnlockResult::Ok(r) => r,
+        UnlockResult::Reset => unreachable!(),
+    })
 }
 
 async fn unlock_or_init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
     create: bool,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
-    // Open up the unencrypted volume so that we can access the key-bag for data.
-    let root_vol = if create {
-        fs.create_volume("unencrypted", None).await.context("Failed to create unencrypted")?
-    } else {
-        if config.check_filesystems {
-            fs.check_volume("unencrypted", None).await.context("Failed to verify unencrypted")?;
-        }
-        fs.open_volume("unencrypted", None).await.context("Failed to open unencrypted")?
-    };
-    root_vol.bind_to_path("/unencrypted_volume")?;
-    if create {
-        std::fs::create_dir("/unencrypted_volume/keys").map_err(|e| anyhow!(e))?;
+) -> Result<UnlockResult<'a>, Error> {
+    let mut use_native_fxfs_crypto = config.use_native_fxfs_crypto;
+    let has_native_layout = !fs.has_volume("default").await?;
+    if !create && (has_native_layout != use_native_fxfs_crypto) {
+        tracing::warn!("Overriding use_native_fxfs_crypto due to detected different layout");
+        use_native_fxfs_crypto = !use_native_fxfs_crypto;
     }
-    let keybag = KeyBagManager::open(Path::new("/unencrypted_volume/keys/fxfs-data"))
-        .map_err(|e| anyhow!(e))?;
 
-    let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, create).await?;
+    let (crypt_service, data_volume_name) = if use_native_fxfs_crypto {
+        // Open up the unencrypted volume so that we can access the key-bag for data.
+        let root_vol = if create {
+            fs.create_volume("unencrypted", None).await.context("Failed to create unencrypted")?
+        } else {
+            if config.check_filesystems {
+                fs.check_volume("unencrypted", None)
+                    .await
+                    .context("Failed to verify unencrypted")?;
+            }
+            fs.open_volume("unencrypted", None).await.context("Failed to open unencrypted")?
+        };
+        root_vol.bind_to_path("/unencrypted_volume")?;
+        if create {
+            std::fs::create_dir("/unencrypted_volume/keys").map_err(|e| anyhow!(e))?;
+        }
+        let keybag = KeyBagManager::open(Path::new("/unencrypted_volume/keys/fxfs-data"))
+            .map_err(|e| anyhow!(e))?;
 
-    // Make sure we unbind the path we used, in case another fxfs instance goes through unlock
-    // or init. This needs to be after we are done using the keybag, as it keeps using the path
-    // in it's operations.
-    // TODO(fxbug.dev/122966): when keybag takes a proxy instead of a path, we don't need to
-    // worry about managing the namespace binding and can remove this.
-    root_vol.unbind_path();
+        let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, create).await?;
 
-    let crypt_service = CryptService::new(data_unwrapped, metadata_unwrapped)
-        .await
-        .context("init_crypt_service")?;
+        // Make sure we unbind the path we used, in case another fxfs instance goes through unlock
+        // or init. This needs to be after we are done using the keybag, as it keeps using the path
+        // in it's operations.
+        // TODO(fxbug.dev/122966): when keybag takes a proxy instead of a path, we don't need to
+        // worry about managing the namespace binding and can remove this.
+        root_vol.unbind_path();
+        (
+            CryptService::new(data_unwrapped, metadata_unwrapped)
+                .await
+                .context("init_crypt_service (2)")?,
+            "data".to_string(),
+        )
+    } else {
+        (
+            CryptService::new(LEGACY_DATA_KEY, LEGACY_METADATA_KEY)
+                .await
+                .context("init_crypt_service")?,
+            "default".to_string(),
+        )
+    };
+
     let crypt_proxy = Some(
         connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
             .expect("Unable to connect to Crypt service")
@@ -134,10 +175,12 @@ async fn unlock_or_init_data_volume<'a>(
     );
 
     let volume = if create {
-        fs.create_volume("data", crypt_proxy).await.context("Failed to create data")?
+        fs.create_volume(&data_volume_name, crypt_proxy).await.context("Failed to create data")?
     } else {
         let crypt_proxy = if config.check_filesystems {
-            fs.check_volume("data", crypt_proxy).await.context("Failed to verify data")?;
+            fs.check_volume(&data_volume_name, crypt_proxy)
+                .await
+                .context(format!("Failed to verify {}", data_volume_name))?;
             Some(
                 connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
                     .expect("Unable to connect to Crypt service")
@@ -149,10 +192,17 @@ async fn unlock_or_init_data_volume<'a>(
         } else {
             crypt_proxy
         };
-        fs.open_volume("data", crypt_proxy).await.context("Failed to open data")?
+        let volume =
+            fs.open_volume(&data_volume_name, crypt_proxy).await.context("Failed to open data")?;
+        if fuchsia_fs::directory::dir_contains(volume.root(), SHRED_DATA_VOLUME_MARKER_FILE).await?
+        {
+            // Return an error and it should cause the volume to be reformatted.
+            return Ok(UnlockResult::Reset);
+        }
+        volume
     };
 
-    Ok((crypt_service, "data".to_string(), volume))
+    Ok(UnlockResult::Ok((crypt_service, data_volume_name, volume)))
 }
 
 static FXFS_CRYPT_COLLECTION_NAME: &str = "fxfs-crypt";

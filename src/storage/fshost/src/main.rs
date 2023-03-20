@@ -81,6 +81,7 @@ async fn main() -> Result<(), Error> {
                     config.clone(),
                     ramdisk_path.clone(),
                     env.launcher(),
+                    env.data_root()?,
                     watcher.clone()
                 ),
             fshost::BlockWatcherMarker::PROTOCOL_NAME =>
