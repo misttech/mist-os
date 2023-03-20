@@ -214,7 +214,7 @@ var handleSubtypes = map[fidlgen.HandleSubtype]string{
 	fidlgen.HandleSubtypeStream:       "zx_stream",
 	fidlgen.HandleSubtypeSuspendToken: "zx_suspendtoken",
 	fidlgen.HandleSubtypeThread:       "zx_thread",
-	fidlgen.HandleSubtypeTime:         "zx_timer",
+	fidlgen.HandleSubtypeTimer:        "zx_timer",
 	fidlgen.HandleSubtypeVcpu:         "zx_vcpu",
 	fidlgen.HandleSubtypeVmar:         "zx_vmar",
 	fidlgen.HandleSubtypeVmo:          "zx_vmo",

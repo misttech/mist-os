@@ -129,7 +129,8 @@ TEST(TypesTests, GoodHandleSubtype) {
   static_assert(types::HandleSubtype::kIommu ==
                 static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_IOMMU));
   static_assert(types::HandleSubtype::kJob == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_JOB));
-  static_assert(types::HandleSubtype::kLog == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_LOG));
+  static_assert(types::HandleSubtype::kDebugLog ==
+                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_DEBUGLOG));
   static_assert(types::HandleSubtype::kPager ==
                 static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_PAGER));
   static_assert(types::HandleSubtype::kPciDevice ==

@@ -77,7 +77,7 @@ var handleSubtypeConsts = map[fidlgen.HandleSubtype]string{
 	fidlgen.HandleSubtypeStream:       "STREAM",
 	fidlgen.HandleSubtypeSuspendToken: "SUSPEND_TOKEN",
 	fidlgen.HandleSubtypeThread:       "THREAD",
-	fidlgen.HandleSubtypeTime:         "TIMER",
+	fidlgen.HandleSubtypeTimer:        "TIMER",
 	fidlgen.HandleSubtypeVcpu:         "VCPU",
 	fidlgen.HandleSubtypeVmar:         "VMAR",
 	fidlgen.HandleSubtypeVmo:          "VMO",

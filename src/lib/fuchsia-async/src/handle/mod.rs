@@ -30,7 +30,7 @@ macro_rules! invoke_for_handle_types {
         $x! {Vmo, "Vmo", VMO, 3, FuchsiaOnly}
         $x! {Channel, "Channel", CHANNEL, 4, Everywhere}
         $x! {Event, "Event", EVENT, 5, Everywhere}
-        $x! {Port, "Port", PORT, 6,  FuchsiaOnly}
+        $x! {Port, "Port", PORT, 6, FuchsiaOnly}
         $x! {Interrupt, "Interrupt", INTERRUPT, 7, FuchsiaOnly}
         $x! {DebugLog, "Debug Log", DEBUGLOG, 9, FuchsiaOnly}
         $x! {Socket, "Socket", SOCKET, 10, Everywhere}
@@ -52,5 +52,6 @@ macro_rules! invoke_for_handle_types {
         $x! {Clock, "Clock", CLOCK, 27, FuchsiaOnly}
         $x! {Stream, "Stream", STREAM, 11, FuchsiaOnly}
         $x! {Msi, "MSI", MSI, 28, Stub}
+        $x! {PciDevice, "PCI Device", PCI_DEVICE, 29, Stub}
     };
 }

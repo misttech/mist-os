@@ -327,7 +327,7 @@ const (
 	HandleSubtypeStream       HandleSubtype = "stream"
 	HandleSubtypeSuspendToken HandleSubtype = "suspendtoken"
 	HandleSubtypeThread       HandleSubtype = "thread"
-	HandleSubtypeTime         HandleSubtype = "timer"
+	HandleSubtypeTimer        HandleSubtype = "timer"
 	HandleSubtypeVcpu         HandleSubtype = "vcpu"
 	HandleSubtypeVmar         HandleSubtype = "vmar"
 	HandleSubtypeVmo          HandleSubtype = "vmo"
@@ -428,7 +428,7 @@ func ObjectTypeFromHandleSubtype(val HandleSubtype) ObjectType {
 		return ObjectTypeSuspendToken
 	case HandleSubtypeThread:
 		return ObjectTypeThread
-	case HandleSubtypeTime:
+	case HandleSubtypeTimer:
 		return ObjectTypeTimer
 	case HandleSubtypeVcpu:
 		return ObjectTypeVcpu

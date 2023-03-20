@@ -70,7 +70,7 @@ std::string NameHandleSubtype(types::HandleSubtype subtype) {
       return "iommu";
     case types::HandleSubtype::kJob:
       return "job";
-    case types::HandleSubtype::kLog:
+    case types::HandleSubtype::kDebugLog:
       return "debuglog";
     case types::HandleSubtype::kMsi:
       return "msi";
@@ -194,7 +194,7 @@ std::string NameHandleZXObjType(types::HandleSubtype subtype) {
       return "ZX_OBJ_TYPE_IOMMU";
     case types::HandleSubtype::kJob:
       return "ZX_OBJ_TYPE_JOB";
-    case types::HandleSubtype::kLog:
+    case types::HandleSubtype::kDebugLog:
       return "ZX_OBJ_TYPE_LOG";
     case types::HandleSubtype::kMsi:
       return "ZX_OBJ_TYPE_MSI";
