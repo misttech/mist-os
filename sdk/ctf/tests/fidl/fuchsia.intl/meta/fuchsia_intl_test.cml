@@ -1,0 +1,33 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/ctf/meta/rust.shard.cml",
+        "//sdk/ctf/meta/test.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "intl_services_system_test",
+            url: "#meta/intl_services_system_test.cm",
+            environment: "#subpackaged-runner-env",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.intl.PropertyProvider",
+                "fuchsia.settings.Intl",
+            ],
+            from: "parent",
+            to: "#intl_services_system_test",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#intl_services_system_test",
+        },
+    ],
+}
