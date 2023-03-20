@@ -378,16 +378,19 @@ From //build/images/filesystem_limits.gni:15
 
 ### blobfs_enable_delivery_blobs
 
-Enable writing delivery blobs as described by RFC 0207.  **NOTE:** This feature is still under
-development and should be considered **experimental**.
+Enable delivery blob support by default when mounting Blobfs. Delivery blobs can still be
+enabled via the `allow_delivery_blobs` mount option (e.g. for unit tests).
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:23
+From //src/storage/blobfs/BUILD.gn:11
 
 ### blobfs_enable_streaming_writes
 
-Enable streaming writes by default when mounting Blobfs.
+Enable streaming writes by default when mounting Blobfs. Streaming writes can still be enabled
+by setting the `streaming_writes` option when mounting Blobfs (e.g. for unit tests).
+
+Streaming writes are only supported when writing delivery blobs or when compression is disabled.
 
 **Current value (from the default):** `false`
 
@@ -415,14 +418,13 @@ From //src/storage/bin/blobfs/BUILD.gn:11
 
 ### blobfs_page_in_metrics_recording
 
-Set this to true when configuring gn args to enable blobfs page-in
-metrics recording.
-This will also increase the inspect VMO size for blobfs to 2 MiB,
-to accommodate the large number of metrics entries.
+Set this to true when configuring gn args to enable blobfs page-in metrics recording. This will
+also increase the inspect VMO size for blobfs to 2 MiB, to accommodate the large number of
+metrics entries.
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:23
+From //src/storage/blobfs/BUILD.gn:22
 
 ### blobfs_product_maximum_bytes
 
@@ -1297,14 +1299,6 @@ From //sdk/ctf/build/internal/ctf_version.gni:16
 ### current_os
 
 **Current value (from the default):** `""`
-
-### cursor_pointer_path
-
-Path to file to use for pointer
-
-**Current value (from the default):** `"//src/session/bin/cursor/data/pointer.riv"`
-
-From //src/session/bin/cursor/cursor_args.gni:7
 
 ### custom_signing_script
 
@@ -3034,8 +3028,12 @@ Consider the following example from a fictitious
        command = "build"
        bazel_targets = "//vendor/acme/proprietary/installer"
        bazel_inputs = [ ":acme_firmware" ]
-       bazel_outputs = [ "vendor/acme/proprietary/installer/installer" ]
-       ninja_outputs = [ "installer" ]
+       copy_outputs = [
+         {
+           bazel = "vendor/acme/proprietary/installer/installer"
+           ninja = "installer"
+         }
+       ]
      }
 
 Which requires the following, which could be in args.gn, or in a file
@@ -3052,7 +3050,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:102
+From //build/bazel/legacy_ninja_build_outputs.gni:106
 
 ### extra_package_labels
 
