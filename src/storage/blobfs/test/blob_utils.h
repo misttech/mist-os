@@ -21,7 +21,7 @@ namespace blobfs {
 
 using BlobSrcFunction = std::function<void(uint8_t* data, size_t length)>;
 
-// An in-memory representation of an uncompressed blob.
+// An in-memory representation of a blob.
 struct BlobInfo {
   char path[PATH_MAX] = {0};
   std::unique_ptr<uint8_t[]> data;
@@ -32,9 +32,6 @@ struct BlobInfo {
       return false;
     return memcmp(data.get(), in_data, in_size) == 0;
   }
-
-  // Return the Merkle root associated with this object (i.e. the last component of `path`).
-  std::string GetMerkleRoot() const;
 };
 
 template <typename T, typename U>

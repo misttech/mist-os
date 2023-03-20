@@ -14,7 +14,6 @@
 #include <zircon/syscalls.h>
 
 #include <algorithm>
-#include <filesystem>
 #include <limits>
 #include <memory>
 
@@ -70,12 +69,9 @@ void RandomFill(uint8_t* data, size_t length) {
 std::unique_ptr<BlobInfo> GenerateBlob(const BlobSrcFunction& data_generator,
                                        const std::string& mount_path, size_t data_size) {
   std::unique_ptr<BlobInfo> info(new BlobInfo);
-  info->data = nullptr;
+  info->data.reset(new uint8_t[data_size]);
+  data_generator(info->data.get(), data_size);
   info->size_data = data_size;
-  if (data_size > 0) {
-    info->data.reset(new uint8_t[data_size]);
-    data_generator(info->data.get(), data_size);
-  }
 
   auto merkle_tree = CreateMerkleTree(info->data.get(), data_size, /*use_compact_format=*/true);
   // Ensure we include a path separator if mount_path is specified and does not include one.
@@ -171,7 +167,5 @@ std::unique_ptr<MerkleTreeInfo> CreateMerkleTree(const uint8_t* data, uint64_t d
   merkle_tree_info->root = merkle_tree_root;
   return merkle_tree_info;
 }
-
-std::string BlobInfo::GetMerkleRoot() const { return std::filesystem::path(path).filename(); }
 
 }  // namespace blobfs

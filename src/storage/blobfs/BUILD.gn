@@ -6,20 +6,19 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 
 declare_args() {
-  # Enable delivery blob support by default when mounting Blobfs. Delivery blobs can still be
-  # enabled via the `allow_delivery_blobs` mount option (e.g. for unit tests).
-  blobfs_enable_delivery_blobs = false
+  # Set this to true when configuring gn args to enable blobfs page-in
+  # metrics recording.
+  # This will also increase the inspect VMO size for blobfs to 2 MiB,
+  # to accommodate the large number of metrics entries.
+  blobfs_page_in_metrics_recording = false
 
   # Enable streaming writes by default when mounting Blobfs. Streaming writes can still be enabled
   # by setting the `streaming_writes` option when mounting Blobfs (e.g. for unit tests).
-  #
-  # Streaming writes are only supported when writing delivery blobs or when compression is disabled.
   blobfs_enable_streaming_writes = false
 
-  # Set this to true when configuring gn args to enable blobfs page-in metrics recording. This will
-  # also increase the inspect VMO size for blobfs to 2 MiB, to accommodate the large number of
-  # metrics entries.
-  blobfs_page_in_metrics_recording = false
+  # Enable offline compression support by default when mounting Blobfs. Offline compression can
+  # still be enabled by setting the `offline_compression` option (e.g. for unit tests).
+  blobfs_enable_offline_compression = false
 }
 
 static_library("blobfs") {
@@ -228,8 +227,8 @@ static_library("blobfs") {
     defines = [ "BLOBFS_STREAMING_WRITES_ENABLED_DEFAULT" ]
   }
 
-  if (blobfs_enable_delivery_blobs) {
-    defines = [ "BLOBFS_DELIVERY_BLOBS_ENABLED_DEFAULT" ]
+  if (blobfs_enable_offline_compression) {
+    defines = [ "BLOBFS_OFFLINE_COMPRESSION_ENABLED_DEFAULT" ]
   }
 }
 
