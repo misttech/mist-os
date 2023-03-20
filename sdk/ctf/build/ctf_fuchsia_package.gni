@@ -42,3 +42,53 @@ template("ctf_fuchsia_package") {
     deps += [ ":$write_file_target" ]
   }
 }
+
+# Creates a FAR archive from a ctf_fuchsia_package_archive target.
+#
+# Parameters
+#   package
+#     The fuchsia_package target to archive. This must be declared in the same file.
+#     Type: label
+#
+#   package_name
+#     The name of the fuchsia_package to archive.
+#     This is also used as the archive name.
+#     Type: string
+template("ctf_fuchsia_package_archive") {
+  assert(defined(invoker.package),
+         "you must specify a package target to archive")
+  assert(defined(invoker.package_name),
+         "you must specify the name of the package to archive")
+
+  archive_name = invoker.package_name
+
+  archive_target = "${target_name}_archive"
+  fuchsia_package_archive(archive_target) {
+    testonly = true
+    package = invoker.package
+    archive_name = archive_name
+  }
+
+  copy_target = "${target_name}_copy"
+  copy(copy_target) {
+    testonly = true
+    sources = get_target_outputs(":$archive_target")
+    outputs = [ "$root_out_dir/cts/{{source_file_part}}" ]
+    deps = [ ":$archive_target" ]
+  }
+
+  group(target_name) {
+    testonly = true
+    deps = [ ":$copy_target" ]
+    metadata = {
+      _ctf_artifacts = get_target_outputs(":$copy_target")
+      ctf_artifacts = rebase_path(_ctf_artifacts, root_out_dir)
+      package_archives = [
+        {
+          archive_name = archive_name
+          package_name = invoker.package_name
+        },
+      ]
+    }
+  }
+}

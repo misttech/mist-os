@@ -18,6 +18,7 @@ group("ctf") {
   testonly = true
   deps = [
     ":host_test_manifest",
+    ":package_archive_manifest",
     ":test_manifest",
     ":tests",
     ":verify_idk_deps",
@@ -33,6 +34,19 @@ group("tests") {
   ]
 }
 
+generated_file("package_archive_manifest") {
+  testonly = true
+  outputs = [ "$root_out_dir/cts/package_archives.json" ]
+  output_conversion = "json"
+  data_keys = [ "package_archives" ]
+  walk_keys = [ "ctf_barrier" ]
+  deps = [ "tests" ]
+  metadata = {
+    ctf_artifacts = rebase_path(outputs, root_build_dir)
+  }
+}
+
+# TODO(123593): Delete this and use :package_archive_manifest instead.
 generated_file("test_manifest") {
   testonly = true
   outputs = [ "$root_out_dir/cts/test_manifest.json" ]
