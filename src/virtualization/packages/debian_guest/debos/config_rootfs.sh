@@ -79,6 +79,14 @@ EOF
 # swap partition anyways.
 echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume
 
+# Reduce the number of mouldes in initramfs to make it smaller.
+#
+# By default `modules=most` is used here, which pulls in a large number of
+# modules for things like USB, filesystems, networking, etc. We have
+# enuemrated the list of modules we want to keep and this tells
+# update-initramfs to include _only_ those modules.
+echo "MODULES=list" > /etc/initramfs-tools/conf.d/modules
+
 update-initramfs -u
 
 # Enable automatic login for serial getty, most importantly on hvc0. This
