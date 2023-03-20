@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        config::{ServiceName, Tag, TagConfig},
-        constants, file_handler,
-    },
+    crate::{constants, file_handler},
     anyhow::Error,
     fidl_fuchsia_diagnostics_persist::{
         DataPersistenceRequest, DataPersistenceRequestStream, PersistResult,
@@ -17,6 +14,7 @@ use {
     futures::{channel::mpsc, SinkExt, StreamExt},
     inspect_fetcher::InspectFetcher,
     parking_lot::Mutex,
+    persistence_config::{ServiceName, Tag, TagConfig},
     serde_json::{self, json, map::Entry, Map, Value},
     std::{collections::HashMap, sync::Arc},
     thiserror::Error,

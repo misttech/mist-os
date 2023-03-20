@@ -4,14 +4,12 @@
 
 //! `diagnostics-persistence` component persists Inspect VMOs and serves them at the next boot.
 
-mod config;
 mod constants;
 mod file_handler;
 mod inspect_server;
 mod persist_server;
 
 use {
-    crate::config::Config,
     anyhow::{bail, Error},
     argh::FromArgs,
     fuchsia_async as fasync,
@@ -21,6 +19,7 @@ use {
     futures::{future::join, FutureExt, StreamExt},
     persist_server::PersistServer,
     persistence_component_config::Config as ComponentConfig,
+    persistence_config::Config,
     tracing::*,
 };
 
@@ -49,7 +48,8 @@ macro_rules! on_error {
 
 pub async fn main(_args: CommandLine) -> Result<(), Error> {
     info!("Starting Diagnostics Persistence Service service");
-    let config = on_error!(config::load_configuration_files(), "Error loading configs: {}")?;
+    let config =
+        on_error!(persistence_config::load_configuration_files(), "Error loading configs: {}")?;
     let inspector = component::inspector();
     let component_config = ComponentConfig::take_from_startup_handle();
     component_config.record_inspect(inspector.root());

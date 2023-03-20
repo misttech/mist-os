@@ -1,9 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-use core::ops::Deref;
-use std::{borrow::Borrow, fmt::Display};
+use std::{borrow::Borrow, collections::HashMap, fmt::Display, ops::Deref};
 
 use {
     anyhow::{bail, Error},
@@ -11,17 +9,16 @@ use {
     lazy_static::lazy_static,
     regex::Regex,
     serde_derive::Deserialize,
-    std::collections::HashMap,
 };
 
 /// The outer map is service_name; the inner is tag.
-pub(crate) type Config = HashMap<ServiceName, HashMap<Tag, TagConfig>>;
+pub type Config = HashMap<ServiceName, HashMap<Tag, TagConfig>>;
 
 /// Schema for config-file entries. Each config file is a JSON array of these.
 #[derive(Deserialize, Default, Debug, PartialEq)]
 #[cfg_attr(test, derive(Clone))]
 #[serde(deny_unknown_fields)]
-pub struct TaggedPersist {
+struct TaggedPersist {
     /// The Inspect data defined here will be published under this tag.
     /// Tags must not be duplicated within a service, even between files.
     /// Tags must conform to /[a-z][a-z-]*/.
@@ -64,7 +61,7 @@ pub struct Tag(String);
 pub struct ServiceName(String);
 
 /// A regular expression corresponding to a valid tag or service name.
-pub const NAME_PATTERN: &'static str = r"^[a-z][a-z-]*$";
+const NAME_PATTERN: &'static str = r"^[a-z][a-z-]*$";
 
 lazy_static! {
     static ref NAME_VALIDATOR: Regex = Regex::new(NAME_PATTERN).unwrap();
@@ -139,7 +136,7 @@ impl Display for ServiceName {
 
 const CONFIG_GLOB: &str = "/config/data/*.persist";
 
-pub fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Error> {
+fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Error> {
     let items = serde_json5::from_str::<Vec<TaggedPersist>>(config_text)?;
     for item in items.into_iter() {
         let TaggedPersist { tag, service_name, selectors, max_bytes, min_seconds_between_fetch } =
@@ -158,8 +155,12 @@ pub fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Er
 }
 
 pub fn load_configuration_files() -> Result<Config, Error> {
+    load_configuration_files_from(CONFIG_GLOB)
+}
+
+pub fn load_configuration_files_from(path: &str) -> Result<Config, Error> {
     let mut config = HashMap::new();
-    for file_path in glob(CONFIG_GLOB)? {
+    for file_path in glob(path)? {
         try_insert_items(&mut config, &std::fs::read_to_string(file_path?)?)?;
     }
     Ok(config)
