@@ -4264,7 +4264,7 @@ void VmCowPages::InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) {
         // Nothing to update for the page as we're not actually marking it Dirty.
         return ZX_ERR_NEXT;
       },
-      [this](uint64_t start, uint64_t end) {
+      [this](uint64_t start, uint64_t end, bool unused) {
         // Resolve any DIRTY requests in this contiguous range.
         page_source_->OnPagesDirtied(start, end - start);
         return ZX_ERR_NEXT;
@@ -5107,7 +5107,7 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
         UpdateDirtyStateLocked(page, off, DirtyState::Dirty);
         return ZX_ERR_NEXT;
       },
-      [this](uint64_t start, uint64_t end) {
+      [this](uint64_t start, uint64_t end, bool unused) {
         page_source_->OnPagesDirtied(start, end - start);
         return ZX_ERR_NEXT;
       },
@@ -5207,7 +5207,7 @@ zx_status_t VmCowPages::EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len
           DEBUG_ASSERT(page->object.get_page_offset() == off);
           return ZX_ERR_NEXT;
         },
-        [&dirty_range_fn](uint64_t start, uint64_t end) {
+        [&dirty_range_fn](uint64_t start, uint64_t end, bool unused) {
           return dirty_range_fn(start, end - start, /*range_is_zero=*/false);
         },
         start_offset, end);

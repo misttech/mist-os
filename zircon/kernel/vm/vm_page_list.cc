@@ -195,6 +195,88 @@ bool VmPageList::HasNoPageOrRef() const {
   return no_pages;
 }
 
+ktl::pair<const VmPageOrMarker*, uint64_t> VmPageList::FindIntervalStartForEnd(
+    uint64_t end_offset) const {
+  // Find the node that would contain the end offset.
+  uint64_t node_offset = offset_to_node_offset(end_offset, list_skew_);
+  auto pln = list_.find(node_offset);
+  DEBUG_ASSERT(pln.IsValid());
+  size_t node_index = offset_to_node_index(end_offset, list_skew_);
+  DEBUG_ASSERT(pln->Lookup(node_index).IsIntervalEnd());
+
+  // The only populated slots in an interval are the start and the end. So the interval start will
+  // either be in the same node as the interval end, or the previous populated node to the left.
+  //
+  // TODO(fxbug.dev/122842): Consider a reverse node iterator and clean up all call sites in
+  // VmPageList that walk a node in reverse.
+  size_t index = node_index;
+  while (index > 0) {
+    index--;
+    auto slot = &pln->Lookup(index);
+    if (!slot->IsEmpty()) {
+      DEBUG_ASSERT(slot->IsIntervalStart());
+      return {slot, pln->offset() + index * PAGE_SIZE - list_skew_};
+    }
+  }
+
+  // We could not find the start in the same node. Check the previous one.
+  pln--;
+  for (index = VmPageListNode::kPageFanOut - 1; index >= 0; index--) {
+    auto slot = &pln->Lookup(index);
+    if (!slot->IsEmpty()) {
+      DEBUG_ASSERT(slot->IsIntervalStart());
+      return {slot, pln->offset() + index * PAGE_SIZE - list_skew_};
+    }
+  }
+
+  // Should not reach here.
+  ASSERT(false);
+  return {nullptr, UINT64_MAX};
+}
+
+ktl::pair<const VmPageOrMarker*, uint64_t> VmPageList::FindIntervalEndForStart(
+    uint64_t start_offset) const {
+  // Find the node that would contain the start offset.
+  uint64_t node_offset = offset_to_node_offset(start_offset, list_skew_);
+  auto pln = list_.find(node_offset);
+  DEBUG_ASSERT(pln.IsValid());
+  size_t node_index = offset_to_node_index(start_offset, list_skew_);
+  DEBUG_ASSERT(pln->Lookup(node_index).IsIntervalStart());
+
+  // The only populated slots in an interval are the start and the end. So the interval end will
+  // either be in the same node as the interval start, or the next populated node to the right.
+  const VmPageOrMarker* end = nullptr;
+  uint64_t end_offset = 0;
+  if (node_index < VmPageListNode::kPageFanOut - 1) {
+    pln->ForEveryPageInRange<const VmPageOrMarker*>(
+        [&end, &end_offset](const VmPageOrMarker* p, uint64_t off) {
+          DEBUG_ASSERT(p->IsIntervalEnd());
+          end = p;
+          end_offset = off;
+          return ZX_ERR_STOP;
+        },
+        (node_index + 1) * PAGE_SIZE + pln->offset(), pln->end_offset(), list_skew_);
+
+    if (end) {
+      return {end, end_offset};
+    }
+  }
+
+  // We could not find the end in the same node. Check the next one.
+  pln++;
+  pln->ForEveryPage<const VmPageOrMarker*>(
+      [&end, &end_offset](const VmPageOrMarker* p, uint64_t off) {
+        DEBUG_ASSERT(p->IsIntervalEnd());
+        end = p;
+        end_offset = off;
+        return ZX_ERR_STOP;
+      },
+      list_skew_);
+
+  ASSERT(end);
+  return {end, end_offset};
+}
+
 ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(uint64_t offset,
                                                                               bool split_interval) {
   // Find the node that would contain this offset.

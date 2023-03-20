@@ -580,6 +580,8 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
   static zx_status_t ForEveryPageInRange(S self, F func, uint64_t start_offset, uint64_t end_offset,
                                          uint64_t skew) {
     // Assert that the requested range is sensible and falls within our nodes actual offset range.
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
     DEBUG_ASSERT(end_offset >= start_offset);
     DEBUG_ASSERT(start_offset >= self->obj_offset_);
     DEBUG_ASSERT(end_offset <= self->end_offset());
@@ -703,9 +705,16 @@ class VmPageList final {
                                                             start_offset, end_offset);
   }
 
-  // walk the page tree, calling |per_page_func| on every page/marker that fulfills (returns true)
-  // the |compare_func|. Also call |contiguous_run_func| on every contiguous range of such
-  // pages/markers encountered.
+  // walk the page tree, calling |per_page_func| on every page/marker/interval that fulfills
+  // (returns true) the |compare_func|. Also call |contiguous_run_func| on every contiguous range of
+  // such pages/markers/intervals encountered, whose signature is:
+  // zx_status_t contiguous_run_func(uint64_t start, uint64_t end, bool is_interval)
+  //
+  // Intervals are treated as distinct contiguous runs, i.e. they won't be merged into a contiguous
+  // run of pages/markers for invocation of |contiguous_run_func|. For intervals,
+  // |contiguous_run_func| will be called with |is_interval| set to true; for other page types it
+  // will be false. Additionally, the entire interval should fulfill |compare_func| for
+  // |contiguous_run_func| to be called on the portion that falls in [start_offset, end_offset).
   template <typename COMPARE_FUNC, typename PAGE_FUNC, typename CONTIGUOUS_RUN_FUNC>
   zx_status_t ForEveryPageAndContiguousRunInRange(COMPARE_FUNC compare_func,
                                                   PAGE_FUNC per_page_func,
@@ -1057,6 +1066,11 @@ class VmPageList final {
     return ZX_OK;
   }
 
+  // Internal helpers to return the start (or end) of an interval given the end (or start) along
+  // with the corresponding offset.
+  ktl::pair<const VmPageOrMarker*, uint64_t> FindIntervalStartForEnd(uint64_t end_offset) const;
+  ktl::pair<const VmPageOrMarker*, uint64_t> FindIntervalEndForStart(uint64_t start_offset) const;
+
   template <typename PTR_TYPE, typename S, typename COMPARE_FUNC, typename PAGE_FUNC,
             typename CONTIGUOUS_RUN_FUNC>
   static zx_status_t ForEveryPageAndContiguousRunInRange(S self, COMPARE_FUNC compare_func,
@@ -1064,15 +1078,118 @@ class VmPageList final {
                                                          CONTIGUOUS_RUN_FUNC contiguous_run_func,
                                                          uint64_t start_offset,
                                                          uint64_t end_offset) {
+    if (start_offset == end_offset) {
+      return ZX_OK;
+    }
+
     // Track contiguous range of pages fulfilling compare_func.
     uint64_t contiguous_run_start = start_offset;
     uint64_t contiguous_run_len = 0;
 
+    // Tracks whether we enter the ForEveryPageAndGap traversal at all.
+    bool found_page_or_gap = false;
+    // Tracks information if we encounter an interval start, to be used when we encounter the
+    // corresponding end.
+    struct {
+      uint64_t interval_start_offset;
+      bool start_compare_status;
+      bool started_interval;
+    } interval_tracker = {.started_interval = false};
+
     zx_status_t status = ForEveryPageAndGapInRange<PTR_TYPE>(
         self,
-        [&](const VmPageOrMarker* p, uint64_t off) {
+        [&](auto* p, uint64_t off) {
+          found_page_or_gap = true;
           zx_status_t st = ZX_ERR_NEXT;
-          if (compare_func(p, off)) {
+          const bool compare_result = compare_func(p, off);
+
+          // Handle interval types first.
+          if (p->IsInterval()) {
+            // If we are going to start an interval, end any contiguous run being tracked, and call
+            // contiguous_run_func on it. This is because intervals are treated as contiguous ranges
+            // distinct from pages or markers. Do this before per_page_func because we don't want to
+            // have processed extra pages if contiguous_run_func on the range prior would have
+            // failed. Also do this irrespective of whether this interval passes the compare_func or
+            // not, since we are processing pages prior to the interval.
+            if (p->IsIntervalStart() || p->IsIntervalSlot()) {
+              if (contiguous_run_len > 0) {
+                st = contiguous_run_func(contiguous_run_start,
+                                         contiguous_run_start + contiguous_run_len,
+                                         /*is_interval=*/false);
+                // Reset contiguous range tracking.
+                contiguous_run_len = 0;
+                if (st != ZX_ERR_NEXT) {
+                  return st;
+                }
+              }
+            }
+            DEBUG_ASSERT(contiguous_run_len == 0);
+
+            // Run the per-page function on the interval sentinel first. Then proceed to the more
+            // complicated logic for the contiguous function.
+            if (compare_result) {
+              st = per_page_func(p, off);
+              if (st != ZX_ERR_NEXT && st != ZX_ERR_STOP) {
+                return st;
+              }
+            }
+
+            // A slot is a contiguous run of a single page.
+            if (p->IsIntervalSlot()) {
+              // We should not have been already tracking an interval.
+              DEBUG_ASSERT(!interval_tracker.started_interval);
+              if (compare_result) {
+                return contiguous_run_func(off, off + PAGE_SIZE, /*is_interval=*/true);
+              }
+              return ZX_ERR_NEXT;
+            }
+
+            if (p->IsIntervalStart()) {
+              // Start tracking a new run. We should not have been already tracking an interval.
+              DEBUG_ASSERT(!interval_tracker.started_interval);
+              interval_tracker.started_interval = true;
+              interval_tracker.interval_start_offset = off;
+              // Stash the comparison result for the interval start.
+              interval_tracker.start_compare_status = compare_result;
+              return ZX_ERR_NEXT;
+            }
+
+            DEBUG_ASSERT(p->IsIntervalEnd());
+            // If the interval end does not pass the check, there is nothing more to be done.
+            if (!compare_result) {
+              interval_tracker.started_interval = false;
+              return ZX_ERR_NEXT;
+            }
+
+            // If this is the end of an interval, call contiguous_run_func on the interval if the
+            // compare_func passes for *both* the start and the end, and proceed.
+            // It is possible that we don't have the interval start if we started the traversal
+            // partway inside an interval. Find the start and evaluate compare_func on it.
+            if (!interval_tracker.started_interval) {
+              auto [start, interval_start_offset] = self->FindIntervalStartForEnd(off);
+              DEBUG_ASSERT(start);
+              DEBUG_ASSERT(start->IsIntervalStart());
+              DEBUG_ASSERT(interval_start_offset < start_offset);
+              interval_tracker.started_interval = true;
+              interval_tracker.start_compare_status = compare_func(start, interval_start_offset);
+              // Pretend that the interval begins at start_offset since we're not considering the
+              // range before it.
+              interval_tracker.interval_start_offset = start_offset;
+            }
+            DEBUG_ASSERT(interval_tracker.started_interval);
+            interval_tracker.started_interval = false;
+            if (interval_tracker.start_compare_status) {
+              return contiguous_run_func(interval_tracker.interval_start_offset, off + PAGE_SIZE,
+                                         /*is_interval=*/true);
+            }
+            return ZX_ERR_NEXT;
+          }
+
+          // Handle any non-interval types.
+          DEBUG_ASSERT(!p->IsInterval());
+          DEBUG_ASSERT(!interval_tracker.started_interval);
+
+          if (compare_result) {
             st = per_page_func(p, off);
             // Return any errors early before considering this page for contiguous_run_func.
             if (st != ZX_ERR_NEXT && st != ZX_ERR_STOP) {
@@ -1080,7 +1197,8 @@ class VmPageList final {
               // before the failing offset.
               if (contiguous_run_len > 0) {
                 zx_status_t prev_range_status = contiguous_run_func(
-                    contiguous_run_start, contiguous_run_start + contiguous_run_len);
+                    contiguous_run_start, contiguous_run_start + contiguous_run_len,
+                    /*is_interval=*/false);
                 contiguous_run_len = 0;
                 // If there was an error encountered, surface that instead of st, as it occurred on
                 // a range prior to this offset.
@@ -1090,7 +1208,8 @@ class VmPageList final {
               }
               return st;
             }
-            // Start tracking a new range first if no range is being tracked yet.
+
+            // Start tracking a contiguous run if none was being tracked.
             if (contiguous_run_len == 0) {
               contiguous_run_start = off;
             }
@@ -1104,8 +1223,9 @@ class VmPageList final {
           // fulfill compare_func. Invoke contiguous_run_func on the range so far and start tracking
           // a new one skipping over this page.
           if (contiguous_run_len > 0) {
-            st = contiguous_run_func(contiguous_run_start,
-                                     contiguous_run_start + contiguous_run_len);
+            st =
+                contiguous_run_func(contiguous_run_start, contiguous_run_start + contiguous_run_len,
+                                    /*is_interval=*/false);
             // Reset contiguous_run_len to zero to track a new range later if required.
             // Do this irrespective of the return status to ensure we don't erroneously have a
             // remaining range to process below after exiting the traversal.
@@ -1114,13 +1234,17 @@ class VmPageList final {
           return st;
         },
         [&](uint64_t start, uint64_t end) {
+          found_page_or_gap = true;
+          // We should not encounter any gaps in the midst of an interval we were tracking.
+          DEBUG_ASSERT(!interval_tracker.started_interval);
           zx_status_t st = ZX_ERR_NEXT;
           // We were already tracking a contiguous range when we encountered this gap. Invoke
           // contiguous_run_func on the range so far and start tracking a new one skipping over this
           // gap.
           if (contiguous_run_len > 0) {
-            st = contiguous_run_func(contiguous_run_start,
-                                     contiguous_run_start + contiguous_run_len);
+            st =
+                contiguous_run_func(contiguous_run_start, contiguous_run_start + contiguous_run_len,
+                                    /*is_interval=*/false);
             // Reset contiguous_run_len to zero to track a new range later if required.
             // Do this irrespective of the return status to ensure we don't erroneously have a
             // remaining range to process below after exiting the traversal.
@@ -1134,11 +1258,61 @@ class VmPageList final {
       return status;
     }
 
-    // Process the last contiguous range if there is one.
+    // If we did not execute either the per-page or per-gap function, we could only have been inside
+    // an interval. In that case, we need to find both the start and the end of this interval and
+    // evaluate compare_func on them.
+    if (!found_page_or_gap) {
+      DEBUG_ASSERT(self->IsOffsetInInterval(start_offset));
+      DEBUG_ASSERT(self->IsOffsetInInterval(end_offset - PAGE_SIZE));
+
+      uint64_t interval_end_offset = UINT64_MAX;
+      bool end_compare_status = false;
+      status = ForEveryPageInRange<PTR_TYPE>(
+          self,
+          [&](auto* p, uint64_t off) {
+            // The first populated slot should be an interval end.
+            DEBUG_ASSERT(p->IsIntervalEnd());
+            interval_end_offset = off;
+            end_compare_status = compare_func(p, off);
+            return ZX_ERR_STOP;
+          },
+          end_offset, VmPageList::MAX_SIZE);
+      DEBUG_ASSERT(status == ZX_OK);
+
+      if (end_compare_status) {
+        auto [start, interval_start_offset] = self->FindIntervalStartForEnd(interval_end_offset);
+        DEBUG_ASSERT(start);
+        DEBUG_ASSERT(start->IsIntervalStart());
+        DEBUG_ASSERT(interval_start_offset < start_offset);
+        if (compare_func(start, interval_start_offset)) {
+          status = contiguous_run_func(start_offset, end_offset, /*is_interval=*/true);
+          if (status != ZX_ERR_NEXT && status != ZX_ERR_STOP) {
+            return status;
+          }
+        }
+      }
+      return ZX_OK;
+    }
+
+    // Process the last contiguous range if there is one, or an interval that we started tracking
+    // but did not end.
     if (contiguous_run_len > 0) {
-      status = contiguous_run_func(contiguous_run_start, contiguous_run_start + contiguous_run_len);
+      status = contiguous_run_func(contiguous_run_start, contiguous_run_start + contiguous_run_len,
+                                   /*is_interval=*/false);
       if (status != ZX_ERR_NEXT && status != ZX_ERR_STOP) {
         return status;
+      }
+    } else if (interval_tracker.started_interval && interval_tracker.start_compare_status) {
+      auto [end, interval_end_offset] =
+          self->FindIntervalEndForStart(interval_tracker.interval_start_offset);
+      DEBUG_ASSERT(end);
+      DEBUG_ASSERT(end->IsIntervalEnd());
+      if (compare_func(end, interval_end_offset)) {
+        status = contiguous_run_func(interval_tracker.interval_start_offset, end_offset,
+                                     /*is_interval=*/true);
+        if (status != ZX_ERR_NEXT && status != ZX_ERR_STOP) {
+          return status;
+        }
       }
     }
 

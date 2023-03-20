@@ -861,7 +861,10 @@ static bool vmpl_contiguous_run_test() {
   zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
       [](const VmPageOrMarker* p, uint64_t off) { return true; },
       [](const VmPageOrMarker* p, uint64_t off) { return ZX_ERR_NEXT; },
-      [&range_offsets, &index](uint64_t start, uint64_t end) {
+      [&range_offsets, &index](uint64_t start, uint64_t end, bool is_interval) {
+        if (is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
         range_offsets[index++] = start;
         range_offsets[index++] = end;
         return ZX_ERR_NEXT;
@@ -912,7 +915,10 @@ static bool vmpl_contiguous_run_compare_test() {
         page_visited[off / PAGE_SIZE] = true;
         return ZX_ERR_NEXT;
       },
-      [&range_offsets, &index](uint64_t start, uint64_t end) {
+      [&range_offsets, &index](uint64_t start, uint64_t end, bool is_interval) {
+        if (is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
         range_offsets[index++] = start;
         range_offsets[index++] = end;
         return ZX_ERR_NEXT;
@@ -965,7 +971,10 @@ static bool vmpl_contiguous_traversal_end_test() {
         // should be included in the contiguous range. Traversal will stop *after* this page.
         return (off / PAGE_SIZE < 1) ? ZX_ERR_NEXT : ZX_ERR_STOP;
       },
-      [&range_offsets, &index](uint64_t start, uint64_t end) {
+      [&range_offsets, &index](uint64_t start, uint64_t end, bool is_interval) {
+        if (is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
         range_offsets[index++] = start;
         range_offsets[index++] = end;
         return ZX_ERR_NEXT;
@@ -998,7 +1007,10 @@ static bool vmpl_contiguous_traversal_end_test() {
         page_visited[off / PAGE_SIZE] = true;
         return ZX_ERR_NEXT;
       },
-      [&range_offsets, &index](uint64_t start, uint64_t end) {
+      [&range_offsets, &index](uint64_t start, uint64_t end, bool is_interval) {
+        if (is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
         range_offsets[index++] = start;
         range_offsets[index++] = end;
         // End traversal after the first range.
@@ -1053,7 +1065,10 @@ static bool vmpl_contiguous_traversal_error_test() {
         // Only page 0 returns success.
         return (off / PAGE_SIZE < 1) ? ZX_ERR_NEXT : ZX_ERR_BAD_STATE;
       },
-      [&range_offsets, &index](uint64_t start, uint64_t end) {
+      [&range_offsets, &index](uint64_t start, uint64_t end, bool is_interval) {
+        if (is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
         range_offsets[index++] = start;
         range_offsets[index++] = end;
         return ZX_ERR_NEXT;
@@ -1088,7 +1103,10 @@ static bool vmpl_contiguous_traversal_error_test() {
         page_visited[off / PAGE_SIZE] = true;
         return ZX_ERR_NEXT;
       },
-      [&range_offsets, &index](uint64_t start, uint64_t end) {
+      [&range_offsets, &index](uint64_t start, uint64_t end, bool is_interval) {
+        if (is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
         range_offsets[index++] = start;
         range_offsets[index++] = end;
         // Error after the first range.
@@ -1944,6 +1962,246 @@ static bool vmpl_interval_replace_slot_test() {
   END_TEST;
 }
 
+static bool vmpl_interval_contig_full_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t expected_start = 1, expected_end = 2 * VmPageListNode::kPageFanOut;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut;
+  ASSERT_GT(size, expected_end);
+  ASSERT_OK(list.AddZeroInterval(expected_start * PAGE_SIZE, (expected_end + 1) * PAGE_SIZE,
+                                 VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size * PAGE_SIZE));
+
+  constexpr uint64_t expected_pages[2] = {expected_start, expected_end};
+  constexpr uint64_t expected_contig[2] = {expected_start, expected_end + 1};
+  uint64_t pages[2];
+  uint64_t contig[2];
+  uint64_t page_index = 0, contig_index = 0;
+  zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) { return true; },
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (!(p->IsIntervalStart() || p->IsIntervalEnd())) {
+          return ZX_ERR_BAD_STATE;
+        }
+        if (p->IsIntervalStart()) {
+          if (page_index % 2 == 1) {
+            return ZX_ERR_BAD_STATE;
+          }
+        } else if (p->IsIntervalEnd()) {
+          if (page_index % 2 == 0) {
+            return ZX_ERR_BAD_STATE;
+          }
+        }
+        pages[page_index++] = off;
+        return ZX_ERR_NEXT;
+      },
+      [&](uint64_t begin, uint64_t end, bool is_interval) {
+        if (!is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
+        contig[contig_index++] = begin;
+        contig[contig_index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      0, size * PAGE_SIZE);
+  EXPECT_OK(status);
+
+  EXPECT_EQ(2u, page_index);
+  for (size_t i = 0; i < page_index; i++) {
+    EXPECT_EQ(expected_pages[i] * PAGE_SIZE, pages[i]);
+  }
+
+  EXPECT_EQ(2u, contig_index);
+  for (size_t i = 0; i < contig_index; i++) {
+    EXPECT_EQ(expected_contig[i] * PAGE_SIZE, contig[i]);
+  }
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_interval_contig_partial_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t expected_start = 1, expected_end = 2 * VmPageListNode::kPageFanOut;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut;
+  ASSERT_GT(size, expected_end);
+  ASSERT_OK(list.AddZeroInterval(expected_start * PAGE_SIZE, (expected_end + 1) * PAGE_SIZE,
+                                 VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size * PAGE_SIZE));
+
+  uint64_t page;
+  uint64_t contig[2];
+  uint64_t contig_index = 0;
+  // Start the traversal partway into the interval.
+  zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) { return true; },
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (!p->IsIntervalEnd()) {
+          return ZX_ERR_BAD_STATE;
+        }
+        page = off;
+        return ZX_ERR_NEXT;
+      },
+      [&](uint64_t begin, uint64_t end, bool is_interval) {
+        if (!is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
+        contig[contig_index++] = begin;
+        contig[contig_index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      (expected_start + 1) * PAGE_SIZE, size * PAGE_SIZE);
+  EXPECT_OK(status);
+
+  // Should only have visited the end.
+  uint64_t expected_page = expected_end;
+  uint64_t expected_contig[2] = {expected_start + 1, expected_end + 1};
+  EXPECT_EQ(expected_page * PAGE_SIZE, page);
+  EXPECT_EQ(2u, contig_index);
+  for (size_t i = 0; i < contig_index; i++) {
+    EXPECT_EQ(expected_contig[i] * PAGE_SIZE, contig[i]);
+  }
+
+  contig_index = 0;
+  // End the traversal partway into the interval.
+  status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) { return true; },
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (!p->IsIntervalStart()) {
+          return ZX_ERR_BAD_STATE;
+        }
+        page = off;
+        return ZX_ERR_NEXT;
+      },
+      [&](uint64_t begin, uint64_t end, bool is_interval) {
+        if (!is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
+        contig[contig_index++] = begin;
+        contig[contig_index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      0, (expected_end - 1) * PAGE_SIZE);
+  EXPECT_OK(status);
+
+  // Should only have visited the start.
+  expected_page = expected_start;
+  expected_contig[0] = expected_start;
+  expected_contig[1] = expected_end - 1;
+  EXPECT_EQ(expected_page * PAGE_SIZE, page);
+  EXPECT_EQ(2u, contig_index);
+  for (size_t i = 0; i < contig_index; i++) {
+    EXPECT_EQ(expected_contig[i] * PAGE_SIZE, contig[i]);
+  }
+
+  contig_index = 0;
+  // Start and end the traversal partway into the interval.
+  status = list.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) { return true; },
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        // Should not visit any slot.
+        return ZX_ERR_BAD_STATE;
+      },
+      [&](uint64_t begin, uint64_t end, bool is_interval) {
+        if (!is_interval) {
+          return ZX_ERR_BAD_STATE;
+        }
+        contig[contig_index++] = begin;
+        contig[contig_index++] = end;
+        return ZX_ERR_NEXT;
+      },
+      (expected_start + 1) * PAGE_SIZE, (expected_end - 1) * PAGE_SIZE);
+  EXPECT_OK(status);
+
+  // Should have seen the requested contiguous range, even though neither the start nor the end was
+  // visited.
+  expected_contig[0] = expected_start + 1;
+  expected_contig[1] = expected_end - 1;
+  EXPECT_EQ(2u, contig_index);
+  for (size_t i = 0; i < contig_index; i++) {
+    EXPECT_EQ(expected_contig[i] * PAGE_SIZE, contig[i]);
+  }
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+  END_TEST;
+}
+
+static bool vmpl_interval_contig_compare_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t expected_start = 1, expected_end = 2 * VmPageListNode::kPageFanOut;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut;
+  ASSERT_GT(size, expected_end);
+  ASSERT_OK(list.AddZeroInterval(expected_start * PAGE_SIZE, (expected_end + 1) * PAGE_SIZE,
+                                 VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size * PAGE_SIZE));
+
+  uint64_t page;
+  // Start the traversal partway into the interval.
+  zx_status_t status = list.ForEveryPageAndContiguousRunInRange(
+      // Interval start evaluates to false.
+      [](const VmPageOrMarker* p, uint64_t off) { return !p->IsIntervalStart(); },
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (!p->IsIntervalEnd()) {
+          return ZX_ERR_BAD_STATE;
+        }
+        page = off;
+        return ZX_ERR_NEXT;
+      },
+      [&](uint64_t begin, uint64_t end, bool is_interval) {
+        // The start does not fulfill the condition, so we should not find a valid contiguous run.
+        return ZX_ERR_INVALID_ARGS;
+      },
+      (expected_start + 1) * PAGE_SIZE, size * PAGE_SIZE);
+  EXPECT_OK(status);
+
+  // Should only have visited the end.
+  uint64_t expected_page = expected_end;
+  EXPECT_EQ(expected_page * PAGE_SIZE, page);
+
+  // End the traversal partway into the interval.
+  status = list.ForEveryPageAndContiguousRunInRange(
+      // Interval end evaluates to false.
+      [](const VmPageOrMarker* p, uint64_t off) { return !p->IsIntervalEnd(); },
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (!p->IsIntervalStart()) {
+          return ZX_ERR_BAD_STATE;
+        }
+        page = off;
+        return ZX_ERR_NEXT;
+      },
+      [&](uint64_t begin, uint64_t end, bool is_interval) {
+        // The end does not fulfill the condition, so we should not find a valid contiguous run.
+        return ZX_ERR_INVALID_ARGS;
+      },
+      0, (expected_end - 1) * PAGE_SIZE);
+  EXPECT_OK(status);
+
+  // Should only have visited the start.
+  expected_page = expected_start;
+  EXPECT_EQ(expected_page * PAGE_SIZE, page);
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vm_page_list_tests)
 VM_UNITTEST(vmpl_add_remove_page_test)
 VM_UNITTEST(vmpl_basic_marker_test)
@@ -1979,6 +2237,9 @@ VM_UNITTEST(vmpl_interval_add_page_slots_test)
 VM_UNITTEST(vmpl_interval_add_page_start_test)
 VM_UNITTEST(vmpl_interval_add_page_end_test)
 VM_UNITTEST(vmpl_interval_replace_slot_test)
+VM_UNITTEST(vmpl_interval_contig_full_test)
+VM_UNITTEST(vmpl_interval_contig_partial_test)
+VM_UNITTEST(vmpl_interval_contig_compare_test)
 UNITTEST_END_TESTCASE(vm_page_list_tests, "vmpl", "VmPageList tests")
 
 }  // namespace vm_unittest
