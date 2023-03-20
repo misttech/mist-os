@@ -121,7 +121,6 @@ test("integration_tests") {
     "//src/lib/fxl",
     "//src/lib/storage/vfs/cpp:test_support",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -164,7 +163,6 @@ test("driver_host_test") {
     "//src/lib/fxl",
     "//src/lib/storage/vfs/cpp:test_support",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }

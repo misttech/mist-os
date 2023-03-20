@@ -9,7 +9,6 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/driver.h>
-#include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/defer.h>
 
 #include <fbl/auto_lock.h>
