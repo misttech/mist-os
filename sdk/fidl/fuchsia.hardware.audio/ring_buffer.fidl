@@ -101,9 +101,8 @@ type RingBufferProperties = table {
     //
     // # Deprecation
     //
-    // Not needed anymore since the functionality is available via `WatchDelayInfo` below.
-    // Should match `DelayInfo` `internal_delay` equivalent until it's removed.
-    @available(deprecated=9)
+    // Not needed anymore since the functionality is available via `driver_transfer_bytes` below.
+    @available(deprecated=9, removed=HEAD)
     2: fifo_depth uint32;
 
     /// When set to true, indicates that the ring buffer runs in a different cache coherency domain,

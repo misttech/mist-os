@@ -276,7 +276,7 @@ zx_status_t AudioDeviceStream::SetFormat(uint32_t frames_per_second, uint16_t ch
     printf("get properties failed with error %s\n", result1.status_string());
     return ZX_ERR_BAD_STATE;
   }
-  fifo_depth_ = result1.value().properties.fifo_depth();
+  fifo_depth_ = result1.value().properties.driver_transfer_bytes();
   if (result1.value().properties.has_external_delay()) {
     external_delay_nsec_ = result1.value().properties.external_delay();
   }

@@ -108,6 +108,8 @@ void AdminTest::RequestRingBufferProperties() {
   // This field is required.
   EXPECT_TRUE(ring_buffer_props_->has_needs_cache_flush_or_invalidate());
 
+  // TODO(fxbug.dev/123475): After BT adds support, mandate a non-zero driver_transfer_bytes.
+
   if (ring_buffer_props_->has_turn_on_delay()) {
     // As a zx::duration, a negative value is theoretically possible, but this is disallowed.
     EXPECT_GE(ring_buffer_props_->turn_on_delay(), 0);
@@ -265,40 +267,6 @@ void AdminTest::ValidateInternalDelay() {
   EXPECT_GE(delay_info_->internal_delay(), 0ll)
       << "WatchDelayInfo `internal_delay` (" << delay_info_->internal_delay()
       << ") cannot be negative";
-}
-
-// As of SDK version 9, `RingBufferProperties.fifo_depth` is deprecated; it is replaced by the new
-// `DelayInfo.internal_delay`. If fifo_depth is present, it must be an equivalent duration.
-// TODO(fxbug.dev/116898): eliminate this method once fifo_depth is entirely removed.
-void AdminTest::ExpectInternalDelayMatchesFifoDepth() {
-  ASSERT_TRUE(ring_buffer_props_.has_value())
-      << "Internal test error: called before receiving RingBuffer/GetProperties response";
-  ASSERT_TRUE(delay_info_.has_value())
-      << "Internal test error: called before receiving RingBuffer/WatchDelayInfo response";
-
-  if (ring_buffer_props_->has_fifo_depth()) {
-    const auto kOneFrameInNs = (ZX_SEC(1) + pcm_format().frame_rate - 1) / pcm_format().frame_rate;
-
-    // nsec = bytes * nsec/sec * sec/frame * frames/byte
-    int64_t fifo_delay_ns =
-        ring_buffer_props_->fifo_depth() * ZX_SEC(1) / pcm_format().frame_rate / frame_size_;
-
-    // A driver's byte->duration calculation can vary, depending on how they floor/round/ceiling.
-    // Further, FIFO depth may not align perfectly with frame size.
-    // Thus, we allow internal delays to exceed a size-based calculation by nearly a frame duration.
-
-    std::ostringstream oss;
-    oss << "WatchDelayInfo `internal_delay` (" << delay_info_->internal_delay()
-        << ") must equal (or exceed by less than a frame) GetProperties `fifo_depth` ("
-        << fifo_delay_ns << ").  fifo_depth " << ring_buffer_props_->fifo_depth() << ", frame_size "
-        << frame_size_ << ", frame_rate " << pcm_format().frame_rate
-        << " (1 frame = " << kOneFrameInNs << " nsec)";
-    EXPECT_GE(delay_info_->internal_delay(), fifo_delay_ns) << oss.str();
-    EXPECT_LT(delay_info_->internal_delay(), fifo_delay_ns + kOneFrameInNs) << oss.str();
-
-    return;
-  }
-  // Otherwise we Pass; "fifo_depth not specified" is valid and expected.
 }
 
 // We've already validated that we received an overall response.
@@ -494,17 +462,6 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   WaitForError();
 });
 
-// If a driver states RingBufferProperties.fifo_depth, it must match DelayInfo.internal_delay.
-// TODO(fxbug.dev/116898): eliminate this case once fifo_depth is entirely removed.
-DEFINE_ADMIN_TEST_CLASS(GetDelayInfoInternalDelayMatchesFifoDepth, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
-
-  WatchDelayAndExpectUpdate();
-  ExpectInternalDelayMatchesFifoDepth();
-});
-
 // If a driver states RingBufferProperties.external_delay, then DelayInfo.external_delay must exist
 // and match. If only DelayInfo (not RingBufferProperties) specifies it, the case passes.
 // If neither includes it, the test case is skipped; this is how we treat other "cannot test this
@@ -602,7 +559,6 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(StopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(StopWhileStoppedIsPermitted, device_entry);
 
-    REGISTER_ADMIN_TEST(GetDelayInfoInternalDelayMatchesFifoDepth, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoExternalDelayMatchesRingBufferProps, device_entry);
 
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);

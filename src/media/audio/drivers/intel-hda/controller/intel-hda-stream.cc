@@ -294,7 +294,6 @@ void IntelHDAStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   fbl::AutoLock channel_lock(&channel_lock_);
   fidl::Arena allocator;
   audio_fidl::wire::RingBufferProperties properties(allocator);
-  properties.set_fifo_depth(driver_transfer_bytes_);
   properties.set_driver_transfer_bytes(driver_transfer_bytes_);
   // Report this properly based on the codec path delay.
   properties.set_external_delay(allocator, 0).set_needs_cache_flush_or_invalidate(true);

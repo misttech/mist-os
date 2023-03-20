@@ -685,10 +685,9 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
   auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.external_delay(), 0);
-  // We don't know what the reported fifo_depth (the minimum required lead time)
+  // We don't know what the reported driver_transfer_bytes (the minimum required lead time)
   // is going to be as it will depend on hardware details, but we do know that
   // it will need to be greater than 0.
-  ASSERT_GT(result.value().properties.fifo_depth(), 0);
   ASSERT_GT(result.value().properties.driver_transfer_bytes(), 0);
   ASSERT_EQ(result.value().properties.needs_cache_flush_or_invalidate(), true);
 
@@ -896,10 +895,9 @@ TEST_F(UsbAudioTest, Unplug) {
   auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
   ASSERT_OK(result.status());
   ASSERT_EQ(result.value().properties.external_delay(), 0);
-  // We don't know what the reported fifo_depth (the minimum required lead time)
+  // We don't know what the reported driver_transfer_bytes (the minimum required lead time)
   // is going to be as it will depend on hardware details, but we do know that
   // it will need to be greater than 0.
-  ASSERT_GT(result.value().properties.fifo_depth(), 0);
   ASSERT_GT(result.value().properties.driver_transfer_bytes(), 0);
   ASSERT_EQ(result.value().properties.needs_cache_flush_or_invalidate(), true);
 

@@ -718,8 +718,7 @@ void SimpleAudioStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ScopedToken t(domain_token());
   fidl::Arena allocator;
   audio_fidl::wire::RingBufferProperties ring_buffer_properties(allocator);
-  ring_buffer_properties.set_fifo_depth(driver_transfer_bytes_)
-      .set_driver_transfer_bytes(driver_transfer_bytes_)
+  ring_buffer_properties.set_driver_transfer_bytes(driver_transfer_bytes_)
       .set_external_delay(allocator, external_delay_nsec_)
       .set_needs_cache_flush_or_invalidate(true)
       .set_turn_on_delay(allocator, turn_on_delay_nsec_);

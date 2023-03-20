@@ -750,7 +750,6 @@ void UsbAudioStream::GetProperties(StreamChannel::GetPropertiesCompleter::Sync& 
 void UsbAudioStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   fidl::Arena allocator;
   audio_fidl::wire::RingBufferProperties ring_buffer_properties(allocator);
-  ring_buffer_properties.set_fifo_depth(fifo_bytes_);
   ring_buffer_properties.set_driver_transfer_bytes(fifo_bytes_);
   // TODO(johngro): Report the actual external delay.
   ring_buffer_properties.set_external_delay(allocator, 0);
