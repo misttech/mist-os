@@ -45,6 +45,11 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
     return node_binding_.has_value();
   }
 
+  std::vector<fuchsia_driver_framework::NodeProperty> GetProperties() const {
+    std::lock_guard guard(checker_);
+    return properties_;
+  }
+
   async_dispatcher_t* dispatcher() const { return dispatcher_; }
 
  private:
@@ -54,6 +59,7 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
 
   void SetParent(TestNode* parent,
                  fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller);
+  void SetProperties(std::vector<fuchsia_driver_framework::NodeProperty> properties);
 
   void RemoveFromParent();
 
@@ -65,6 +71,7 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
       __TA_GUARDED(checker_);
 
   async_dispatcher_t* dispatcher_;
+  std::vector<fuchsia_driver_framework::NodeProperty> properties_ __TA_GUARDED(checker_);
   std::string name_ __TA_GUARDED(checker_);
   std::optional<std::reference_wrapper<TestNode>> parent_ __TA_GUARDED(checker_);
   ChildrenMap children_ __TA_GUARDED(checker_);

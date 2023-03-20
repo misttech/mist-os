@@ -102,6 +102,9 @@ void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& co
     return;
   }
   TestNode& node = it->second;
+  if (request->args.has_properties()) {
+    node.SetProperties(fidl::ToNatural(request->args.properties()).value());
+  }
   node.SetParent(this, std::move(request->controller));
   if (request->node) {
     zx::result result = node.Serve(std::move(request->node));
@@ -117,6 +120,11 @@ void TestNode::SetParent(TestNode* parent,
   parent_ = *parent;
   controller_binding_.emplace(dispatcher_, std::move(controller), this,
                               fidl::kIgnoreBindingClosure);
+}
+
+void TestNode::SetProperties(std::vector<fuchsia_driver_framework::NodeProperty> properties) {
+  std::lock_guard guard(checker_);
+  properties_ = std::move(properties);
 }
 
 void TestNode::RemoveFromParent() {

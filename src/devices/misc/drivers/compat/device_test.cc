@@ -10,6 +10,7 @@
 #include <fidl/test.placeholders/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/symbols.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/transaction.h>
 
@@ -27,108 +28,6 @@ using namespace fuchsia_driver_framework;
 }
 namespace fio = fuchsia_io;
 namespace frunner = fuchsia_component_runner;
-
-namespace {
-
-// Simple Echo implementation used to test FIDL functionality.
-class EchoImpl : public fidl::WireServer<test_placeholders::Echo>, public fs::Service {
- public:
-  explicit EchoImpl(async_dispatcher_t* dispatcher)
-      : fs::Service([dispatcher, this](fidl::ServerEnd<test_placeholders::Echo> server) {
-          fidl::BindServer(dispatcher, std::move(server), this);
-          return ZX_OK;
-        }) {}
-  void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
-    completer.Reply(request->value);
-  }
-};
-
-class TestController : public fidl::testing::WireTestBase<fdf::NodeController> {
- public:
-  static TestController* Create(async_dispatcher_t* dispatcher,
-                                fidl::ServerEnd<fdf::NodeController> server) {
-    auto controller = std::make_unique<TestController>();
-    TestController* p = controller.get();
-    fidl::BindServer(dispatcher, std::move(server), controller.get(),
-                     [controller = std::move(controller)](
-                         TestController*, fidl::UnbindInfo,
-                         fidl::ServerEnd<fdf::NodeController>) mutable { controller.reset(); });
-    return p;
-  }
-
-  void Remove(RemoveCompleter::Sync& completer) override { completer.Close(ZX_OK); }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: Controller::%s\n", name.data());
-  }
-};
-
-class TestNode : public fidl::testing::WireTestBase<fdf::Node> {
- public:
-  explicit TestNode(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-  void Clear() {
-    controllers_.clear();
-    nodes_.clear();
-  }
-
-  void SetAddChildHook(std::function<void(AddChildRequestView& rv)> func) {
-    add_child_hook_.emplace(std::move(func));
-  }
-
-  bool HasChildren() { return !nodes_.empty(); }
-
- private:
-  void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override {
-    if (add_child_hook_) {
-      add_child_hook_.value()(request);
-    }
-    controllers_.push_back(TestController::Create(dispatcher_, std::move(request->controller)));
-    nodes_.push_back(std::move(request->node));
-    completer.ReplySuccess();
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: Node::%s\n", name.data());
-  }
-
-  std::optional<std::function<void(AddChildRequestView& rv)>> add_child_hook_;
-  std::vector<TestController*> controllers_;
-  std::vector<fidl::ServerEnd<fdf::Node>> nodes_;
-  async_dispatcher_t* dispatcher_;
-};
-
-std::optional<fdf::wire::NodePropertyValue> GetProperty(fdf::wire::NodeAddArgs& args,
-                                                        fdf::wire::NodePropertyKey key) {
-  if (!args.has_properties()) {
-    return std::nullopt;
-  }
-
-  std::optional<fdf::wire::NodePropertyValue> ret;
-
-  for (auto& prop : args.properties()) {
-    if (prop.key.Which() != key.Which() || prop.key.has_invalid_tag()) {
-      continue;
-    }
-
-    if (key.is_int_value() && prop.key.int_value() != key.int_value()) {
-      continue;
-    }
-    if (key.is_string_value()) {
-      std::string_view prop_view{prop.key.string_value().data(), prop.key.string_value().size()};
-      std::string_view key_view{key.string_value().data(), key.string_value().size()};
-      if (prop_view != key_view) {
-        continue;
-      }
-    }
-
-    // We found a match. Keep iterating though, because the last property in the list of
-    // properties takes precedence.
-    ret = prop.value;
-  }
-  return ret;
-}
-
-}  // namespace
 
 class DeviceTest : public gtest::TestLoopFixture {
  public:
@@ -148,14 +47,6 @@ class DeviceTest : public gtest::TestLoopFixture {
  protected:
   fdf::Logger* logger() { return logger_.get(); }
 
-  std::pair<std::unique_ptr<TestNode>, fidl::ClientEnd<fdf::Node>> CreateTestNode() {
-    auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-    auto node = std::make_unique<TestNode>(dispatcher());
-
-    fidl::BindServer(dispatcher(), std::move(endpoints->server), node.get());
-    return std::make_pair(std::move(node), std::move(endpoints->client));
-  }
-
  private:
   zx::result<fdf::Namespace> CreateNamespace(fidl::ClientEnd<fio::Directory> client_end) {
     fidl::Arena arena;
@@ -171,42 +62,35 @@ class DeviceTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(DeviceTest, ConstructDevice) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device device(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  device.Bind({std::move(endpoints->client), dispatcher()});
+  device.Bind({std::move(node_client.value()), dispatcher()});
 
   // Test basic functions on the device.
   EXPECT_EQ(reinterpret_cast<uintptr_t>(&device), reinterpret_cast<uintptr_t>(device.ZxDevice()));
   EXPECT_STREQ("compat-device", device.Name());
   EXPECT_FALSE(device.HasChildren());
 
-  // Create a node to test device unbind.
-  TestNode node(dispatcher());
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &node,
-                   [](auto, fidl::UnbindInfo info, auto) {
-                     EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
-                   });
   device.Unbind();
-
   ASSERT_TRUE(RunLoopUntilIdle());
 }
 
 TEST_F(DeviceTest, AddChildDevice) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.Bind({std::move(node_client.value()), dispatcher()});
 
   // Add a child device.
   device_add_args_t args{.name = "child"};
@@ -222,17 +106,15 @@ TEST_F(DeviceTest, AddChildDevice) {
 }
 
 TEST_F(DeviceTest, RemoveChildren) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.Bind({std::move(node_client.value()), dispatcher()});
   parent.InitReply(ZX_OK);
   ASSERT_TRUE(RunLoopUntilIdle());
 
@@ -269,25 +151,15 @@ TEST_F(DeviceTest, RemoveChildren) {
 }
 
 TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  parent.Bind({std::move(endpoints->client), dispatcher()});
-
-  bool ran = false;
-  node.SetAddChildHook([&ran](TestNode::AddChildRequestView& rv) {
-    ran = true;
-    auto& prop = rv->args.properties()[0];
-    ASSERT_EQ(prop.key.int_value(), (uint32_t)BIND_PROTOCOL);
-    ASSERT_EQ(prop.value.int_value(), ZX_PROTOCOL_I2C);
-  });
+  parent.Bind({std::move(node_client.value()), dispatcher()});
 
   // Add a child device.
   zx_device_prop_t prop{.id = BIND_PROTOCOL, .value = ZX_PROTOCOL_I2C};
@@ -302,46 +174,26 @@ TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
   EXPECT_TRUE(parent.HasChildren());
 
   ASSERT_TRUE(RunLoopUntilIdle());
-  ASSERT_TRUE(ran);
+
+  // Check the child was added with the right properties.
+  ASSERT_EQ(node.children().count("child"), 1ul);
+  const fdf_testing::TestNode& child_node = node.children().at("child");
+  std::vector properties = child_node.GetProperties();
+  ASSERT_EQ(1ul, properties.size());
+  ASSERT_EQ(properties[0].key().int_value().value(), static_cast<uint32_t>(BIND_PROTOCOL));
+  ASSERT_EQ(properties[0].value().int_value().value(), static_cast<uint32_t>(ZX_PROTOCOL_I2C));
 }
 
 TEST_F(DeviceTest, AddChildWithStringProps) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  parent.Bind({std::move(endpoints->client), dispatcher()});
-
-  bool ran = false;
-  node.SetAddChildHook([&ran](TestNode::AddChildRequestView& rv) {
-    ran = true;
-    auto& prop = rv->args.properties()[0];
-    ASSERT_EQ(strncmp(prop.key.string_value().data(), "hello", prop.key.string_value().size()), 0);
-    ASSERT_EQ(prop.value.int_value(), 1u);
-
-    prop = rv->args.properties()[1];
-    ASSERT_EQ(strncmp(prop.key.string_value().data(), "another", prop.key.string_value().size()),
-              0);
-    ASSERT_EQ(prop.value.bool_value(), true);
-
-    prop = rv->args.properties()[2];
-    ASSERT_EQ(strncmp(prop.key.string_value().data(), "key", prop.key.string_value().size()), 0);
-    ASSERT_EQ(strncmp(prop.value.string_value().data(), "value", prop.value.string_value().size()),
-              0);
-
-    prop = rv->args.properties()[3];
-    ASSERT_EQ(strncmp(prop.key.string_value().data(), "enum_key", prop.key.string_value().size()),
-              0);
-    ASSERT_EQ(
-        strncmp(prop.value.string_value().data(), "enum_value", prop.value.string_value().size()),
-        0);
-  });
+  parent.Bind({std::move(node_client.value()), dispatcher()});
 
   // Add a child device.
   zx_device_str_prop_t props[4] = {
@@ -374,21 +226,31 @@ TEST_F(DeviceTest, AddChildWithStringProps) {
   EXPECT_TRUE(parent.HasChildren());
 
   ASSERT_TRUE(RunLoopUntilIdle());
-  ASSERT_TRUE(ran);
+  // Check the child was added with the right properties.
+  ASSERT_EQ(node.children().count("child"), 1ul);
+  const fdf_testing::TestNode& child_node = node.children().at("child");
+  std::vector properties = child_node.GetProperties();
+  ASSERT_EQ(5ul, properties.size());
+  ASSERT_EQ(properties[0].key().string_value().value(), "hello");
+  ASSERT_EQ(properties[0].value().int_value().value(), 1u);
+  ASSERT_EQ(properties[1].key().string_value().value(), "another");
+  ASSERT_EQ(properties[1].value().bool_value().value(), true);
+  ASSERT_EQ(properties[2].key().string_value().value(), "key");
+  ASSERT_EQ(properties[2].value().string_value().value(), "value");
+  ASSERT_EQ(properties[3].key().string_value().value(), "enum_key");
+  ASSERT_EQ(properties[3].value().string_value().value(), "enum_value");
 }
 
 TEST_F(DeviceTest, AddChildDeviceWithInit) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t parent_ops{};
   compat::Device parent(compat::kDefaultDevice, &parent_ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.Bind({std::move(node_client.value()), dispatcher()});
 
   // Add a child device.
   bool child_ctx = false;
@@ -428,17 +290,15 @@ TEST_F(DeviceTest, AddChildDeviceWithInit) {
 }
 
 TEST_F(DeviceTest, ParentInitFails) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t parent_ops{};
   compat::Device parent(compat::kDefaultDevice, &parent_ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.Bind({std::move(node_client.value()), dispatcher()});
   parent.InitReply(ZX_OK);
 
   // Add child one.
@@ -480,17 +340,15 @@ TEST_F(DeviceTest, ParentInitFails) {
 }
 
 TEST_F(DeviceTest, AddAndRemoveChildDevice) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a node.
-  TestNode node(dispatcher());
-  auto binding = fidl::BindServer(dispatcher(), std::move(endpoints->server), &node);
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  parent.Bind({std::move(endpoints->client), dispatcher()});
+  parent.Bind({std::move(node_client.value()), dispatcher()});
   parent.InitReply(ZX_OK);
 
   // Add a child device.
@@ -770,35 +628,15 @@ TEST_F(DeviceTest, SetAndGetMinDriverLogSeverity) {
 }
 
 TEST_F(DeviceTest, TestBind) {
-  auto [node, node_client] = CreateTestNode();
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
 
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device device(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  device.Bind({std::move(node_client), dispatcher()});
-
-  size_t add_count = 0;
-  node->SetAddChildHook([&add_count](TestNode::AddChildRequestView& request) {
-    const char* key = "fuchsia.compat.LIBNAME";
-    fidl::StringView view = fidl::StringView::FromExternal(key);
-    auto object = fidl::ObjectView<fidl::StringView>::FromExternal(&view);
-
-    if (!add_count) {
-      // Check prop is not set.
-      ASSERT_EQ(std::nullopt,
-                GetProperty(request->args, fdf::wire::NodePropertyKey::WithStringValue(object)));
-    } else {
-      // Check prop is set.
-      auto prop = GetProperty(request->args, fdf::wire::NodePropertyKey::WithStringValue(object));
-      ASSERT_NE(std::nullopt, prop);
-      ASSERT_TRUE(prop->is_string_value());
-      std::string_view value{prop->string_value().data(), prop->string_value().size()};
-      ASSERT_EQ("gpt.so", value);
-    }
-
-    add_count++;
-  });
+  device.Bind({std::move(node_client.value()), dispatcher()});
 
   zx_device_t* second_device;
   device_add_args_t args{
@@ -828,27 +666,36 @@ TEST_F(DeviceTest, TestBind) {
   ASSERT_TRUE(test_loop().RunUntilIdle());
   ASSERT_TRUE(callback_called);
   ASSERT_FALSE(static_cast<devfs_fidl::DeviceInterface*>(second_device)->IsUnbound());
+
+  ASSERT_EQ(node.children().count("second-device"), 1ul);
+  const fdf_testing::TestNode& child_node = node.children().at("second-device");
+  std::vector properties = child_node.GetProperties();
+  ASSERT_EQ(2ul, properties.size());
+  ASSERT_EQ(properties[1].key().string_value().value(), "fuchsia.compat.LIBNAME");
+  ASSERT_EQ(properties[1].value().string_value().value(), "gpt.so");
 }
 
 TEST_F(DeviceTest, TestBindAlreadyBound) {
-  auto [node, node_client] = CreateTestNode();
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
+
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device device(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  device.Bind({std::move(node_client), dispatcher()});
+  device.Bind({std::move(node_client.value()), dispatcher()});
 
   zx_device_t* second_device;
   device_add_args_t args{
       .name = "second-device",
   };
   device.Add(&args, &second_device);
-  auto [node2, node2_client] = CreateTestNode();
-  second_device->Bind({std::move(node2_client), dispatcher()});
 
   // create another device.
   zx_device_t* third_device;
   second_device->Add(&args, &third_device);
+  ASSERT_EQ(ZX_OK, second_device->CreateNode());
 
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
@@ -873,34 +720,15 @@ TEST_F(DeviceTest, TestBindAlreadyBound) {
 }
 
 TEST_F(DeviceTest, TestRebind) {
-  auto [node, node_client] = CreateTestNode();
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
+
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device device(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  device.Bind({std::move(node_client), dispatcher()});
-
-  size_t add_count = 0;
-  node->SetAddChildHook([&add_count](TestNode::AddChildRequestView& request) {
-    const char* key = "fuchsia.compat.LIBNAME";
-    fidl::StringView view = fidl::StringView::FromExternal(key);
-    auto object = fidl::ObjectView<fidl::StringView>::FromExternal(&view);
-
-    if (!add_count) {
-      // Check prop is not set.
-      ASSERT_EQ(std::nullopt,
-                GetProperty(request->args, fdf::wire::NodePropertyKey::WithStringValue(object)));
-    } else {
-      // Check prop is set.
-      auto prop = GetProperty(request->args, fdf::wire::NodePropertyKey::WithStringValue(object));
-      ASSERT_NE(std::nullopt, prop);
-      ASSERT_TRUE(prop->is_string_value());
-      std::string_view value{prop->string_value().data(), prop->string_value().size()};
-      ASSERT_EQ("gpt.so", value);
-    }
-
-    add_count++;
-  });
+  device.Bind({std::move(node_client.value()), dispatcher()});
 
   zx_device_t* second_device;
   device_add_args_t args{
@@ -930,18 +758,24 @@ TEST_F(DeviceTest, TestRebind) {
 
   ASSERT_TRUE(test_loop().RunUntilIdle());
   ASSERT_TRUE(got_reply);
+
+  const fdf_testing::TestNode& child_node = node.children().at("second-device");
+  std::vector properties = child_node.GetProperties();
+  ASSERT_EQ(2ul, properties.size());
+  ASSERT_EQ(properties[1].key().string_value().value(), "fuchsia.compat.LIBNAME");
+  ASSERT_EQ(properties[1].value().string_value().value(), "gpt.so");
 }
 
 TEST_F(DeviceTest, DeviceRebind) {
-  auto [node, node_client] = CreateTestNode();
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
+
   // Create a device.
   zx_protocol_device_t ops{};
   compat::Device device(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
                         dispatcher());
-  device.Bind({std::move(node_client), dispatcher()});
-
-  size_t add_count = 0;
-  node->SetAddChildHook([&add_count](TestNode::AddChildRequestView& request) { add_count++; });
+  device.Bind({std::move(node_client.value()), dispatcher()});
 
   zx_device_t* second_device;
   device_add_args_t args{
@@ -955,7 +789,13 @@ TEST_F(DeviceTest, DeviceRebind) {
         ASSERT_TRUE(status.is_ok()) << zx_status_get_string(status.error());
       }));
   ASSERT_TRUE(test_loop().RunUntilIdle());
-  ASSERT_EQ(add_count, 2u);
+
+  ASSERT_EQ(node.children().count("second-device"), 1ul);
+  const fdf_testing::TestNode& child_node = node.children().at("second-device");
+  std::vector properties = child_node.GetProperties();
+  ASSERT_EQ(2ul, properties.size());
+  ASSERT_EQ(properties[1].key().string_value().value(), "fuchsia.compat.LIBNAME");
+  ASSERT_EQ(properties[1].value().string_value().value(), "");
 }
 
 TEST_F(DeviceTest, CreateNodeProperties) {
