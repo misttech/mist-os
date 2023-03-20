@@ -10,20 +10,20 @@
     max_frequency_error_ppm: 30,
 
     // httpsdate-time is the default non-test timesource.
-    primary_time_source_url: "fuchsia-pkg://fuchsia.com/httpsdate-time-source#meta/httpsdate_time_source.cm",
+    primary_time_source_url: "fuchsia-pkg://fuchsia.com/httpsdate-time-source-pull#meta/httpsdate_time_source.cm",
 
     // The URL of the component to start as monitor time source. If unset, no
     // monitor time source is started.
-    monitor_time_source_url: "fuchsia-pkg://fuchsia.com/httpsdate-time-source-pull#meta/httpsdate_time_source.cm",
+    monitor_time_source_url: "fuchsia-pkg://fuchsia.com/httpsdate-time-source#meta/httpsdate_time_source.cm",
 
     // Default value is 1Hz, i.e. one million parts per million.
     initial_frequency_ppm: 1000000,
 
     // Don't use monitor track by default.
-    monitor_uses_pull: true,
+    monitor_uses_pull: false,
 
     // Don't use pull by default.
-    primary_uses_pull: false,
+    primary_uses_pull: true,
 
     // Wait for 5 minutes between successive pull samples.
     back_off_time_between_pull_samples_sec: 300,
