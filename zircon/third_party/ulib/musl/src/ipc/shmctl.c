@@ -3,7 +3,7 @@
 
 #include "ipc.h"
 
-int shmctl(int id, int cmd, struct shmid_ds* buf) {
+int shmctl(int id, int cmd, void* buf) {
   errno = ENOSYS;
   return -1;
 }

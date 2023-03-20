@@ -3,7 +3,7 @@
 
 #include "ipc.h"
 
-int msgctl(int q, int cmd, struct msqid_ds* buf) {
+int msgctl(int q, int cmd, void* buf) {
   errno = ENOSYS;
   return -1;
 }

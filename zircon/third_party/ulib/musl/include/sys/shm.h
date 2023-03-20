@@ -21,8 +21,6 @@ extern "C" {
 #define __swap_successes swap_successes
 #endif
 
-#include <bits/shm.h>
-
 #define SHM_R 0400
 #define SHM_W 0200
 
@@ -43,7 +41,7 @@ extern "C" {
 typedef unsigned long shmatt_t;
 
 void* shmat(int, const void*, int);
-int shmctl(int, int, struct shmid_ds*);
+int shmctl(int, int, void*);
 int shmdt(const void*);
 int shmget(key_t, size_t, int);
 

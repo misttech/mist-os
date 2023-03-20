@@ -28,8 +28,6 @@ extern "C" {
 
 #include <endian.h>
 
-#include <bits/sem.h>
-
 #define _SEM_SEMUN_UNDEFINED 1
 
 #define SEM_STAT 18

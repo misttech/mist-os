@@ -18,8 +18,6 @@ extern "C" {
 typedef unsigned long msgqnum_t;
 typedef unsigned long msglen_t;
 
-#include <bits/msg.h>
-
 #define __msg_cbytes msg_cbytes
 
 #define MSG_NOERROR 010000
@@ -33,7 +31,7 @@ struct msginfo {
   unsigned short msgseg;
 };
 
-int msgctl(int, int, struct msqid_ds*);
+int msgctl(int, int, void*);
 int msgget(key_t, int);
 ssize_t msgrcv(int, void*, size_t, long, int);
 int msgsnd(int, const void*, size_t, int);
