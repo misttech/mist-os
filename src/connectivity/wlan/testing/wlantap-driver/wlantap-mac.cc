@@ -196,9 +196,9 @@ struct WlantapMacImpl : WlantapMac,
     completer.buffer(arena).ReplySuccess(builder.Build());
   }
 
-  void SetKey(SetKeyRequestView request, fdf::Arena& arena,
-              SetKeyCompleter::Sync& completer) override {
-    listener_->WlantapMacSetKey(request->key_config);
+  void InstallKey(InstallKeyRequestView request, fdf::Arena& arena,
+                  InstallKeyCompleter::Sync& completer) override {
+    listener_->WlantapMacSetKey(*request);
     completer.buffer(arena).ReplySuccess();
   }
 

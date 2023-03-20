@@ -415,10 +415,13 @@ protocol WlanSoftmac {
         packet WlanTxPacket;
     }) -> () error zx.status;
 
-    /// Specify a key for frame protection.
-    SetKey(struct {
-        key_config WlanKeyConfiguration;
-    }) -> () error zx.status;
+    /// Install a key for encryption when transmitting or receiving protected
+    /// frames.
+    ///
+    /// Common errors include:
+    ///   ZX_ERR_INVALID_ARGS: The given config does not specify a valid key.
+    ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given cipher.
+    InstallKey(WlanKeyConfiguration) -> () error zx.status;
 
     /// Notifies MAC and PHY parameters negotiated through a successful association
     ConfigureAssoc(struct {

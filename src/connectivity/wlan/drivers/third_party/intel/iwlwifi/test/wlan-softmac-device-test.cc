@@ -603,9 +603,9 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t SetKey(const fuchsia_wlan_softmac::wire::WlanKeyConfiguration* key_config) {
+  zx_status_t InstallKey(const fuchsia_wlan_softmac::wire::WlanKeyConfiguration* key_config) {
     IWL_INFO(nullptr, "Calling set_key");
-    auto result = client_.buffer(test_arena_)->SetKey(*key_config);
+    auto result = client_.buffer(test_arena_)->InstallKey(*key_config);
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();
@@ -1271,7 +1271,7 @@ TEST_F(MacInterfaceTest, StartActiveScanTest) {
 
 // Check to ensure keys are set during assoc and deleted after disassoc
 // for now use open network
-TEST_F(MacInterfaceTest, SetKeysTest) {
+TEST_F(MacInterfaceTest, InstallKeysTest) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
   struct iwl_mvm_sta* mvm_sta = mvmvif_->mvm->fw_id_to_mac_id[mvmvif_->ap_sta_id];
@@ -1300,7 +1300,7 @@ TEST_F(MacInterfaceTest, SetKeysTest) {
     builder.rsc(0);
     builder.cipher_oui(cipher_oui);
     auto key_config = builder.Build();
-    ASSERT_OK(SetKey(&key_config));
+    ASSERT_OK(InstallKey(&key_config));
     // Expect bit 0 to be set.
     ASSERT_EQ(*mvm->fw_key_table, 0x1);
   }
@@ -1316,7 +1316,7 @@ TEST_F(MacInterfaceTest, SetKeysTest) {
     builder.cipher_oui(cipher_oui);
 
     auto key_config = builder.Build();
-    ASSERT_OK(SetKey(&key_config));
+    ASSERT_OK(InstallKey(&key_config));
     // Expect bit 1 to be set as well.
     ASSERT_EQ(*mvm->fw_key_table, 0x3);
   }
@@ -1330,7 +1330,7 @@ TEST_F(MacInterfaceTest, SetKeysTest) {
 }
 
 // Check that we can sucessfully set some key configurations required for supported functionality.
-TEST_F(MacInterfaceTest, SetKeysSupportConfigs) {
+TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
   ASSERT_OK(ConfigureAssoc(&kAssocCtx));
@@ -1353,7 +1353,7 @@ TEST_F(MacInterfaceTest, SetKeysSupportConfigs) {
     builder.key_idx(0);
     builder.rsc(0);
     auto key_config = builder.Build();
-    ASSERT_OK(SetKey(&key_config));
+    ASSERT_OK(InstallKey(&key_config));
   }
 
   {
@@ -1368,14 +1368,14 @@ TEST_F(MacInterfaceTest, SetKeysSupportConfigs) {
     builder.key_idx(4);
     builder.rsc(0);
     auto key_config = builder.Build();
-    ASSERT_OK(SetKey(&key_config));
+    ASSERT_OK(InstallKey(&key_config));
   }
 
   ASSERT_OK(ClearAssoc());
 }
 
 // Test setting TKIP. Mainly for group key (backward-compatible for many APs).
-TEST_F(MacInterfaceTest, SetKeysTKIP) {
+TEST_F(MacInterfaceTest, InstallKeysTKIP) {
   constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
@@ -1398,7 +1398,7 @@ TEST_F(MacInterfaceTest, SetKeysTKIP) {
     builder.key_idx(0);
     builder.rsc(0);
     auto key_config = builder.Build();
-    ASSERT_OK(SetKey(&key_config));
+    ASSERT_OK(InstallKey(&key_config));
   }
 
   {
@@ -1412,7 +1412,7 @@ TEST_F(MacInterfaceTest, SetKeysTKIP) {
     builder.key_idx(1);
     builder.rsc(0);
     auto key_config = builder.Build();
-    ASSERT_OK(SetKey(&key_config));
+    ASSERT_OK(InstallKey(&key_config));
   }
 
   ASSERT_OK(ClearAssoc());

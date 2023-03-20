@@ -89,7 +89,7 @@ class Device : public DeviceInterface,
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t EnableBeaconing(wlan_beacon_configuration_t* beacon_config) final;
   zx_status_t ConfigureBeaconing(std::unique_ptr<Packet> beacon) final;
-  zx_status_t SetKey(wlan_key_configuration_t* key_config) final;
+  zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
   zx_status_t ConfigureAssoc(wlan_assoc_ctx_t* assoc_ctx) final;
   zx_status_t ClearAssoc(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) final;
   zx_status_t StartPassiveScan(const wlan_softmac_start_passive_scan_request_t* passive_scan_args,

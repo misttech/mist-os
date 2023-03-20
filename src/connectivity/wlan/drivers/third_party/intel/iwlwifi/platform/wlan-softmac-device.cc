@@ -305,17 +305,17 @@ void WlanSoftmacDevice::ConfigureBeaconing(ConfigureBeaconingRequestView request
   completer.buffer(arena).ReplySuccess();
 }
 
-void WlanSoftmacDevice::SetKey(SetKeyRequestView request, fdf::Arena& arena,
-                               SetKeyCompleter::Sync& completer) {
+void WlanSoftmacDevice::InstallKey(InstallKeyRequestView request, fdf::Arena& arena,
+                                   InstallKeyCompleter::Sync& completer) {
   if (ap_mvm_sta_ == nullptr) {
     IWL_ERR(this, "%s() Ap sta does not exist.\n", __func__);
     completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
-  zx_status_t status = ap_mvm_sta_->SetKey(&request->key_config);
+  zx_status_t status = ap_mvm_sta_->InstallKey(request);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed SetKey: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "%s() failed InstallKey: %s\n", __func__, zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }

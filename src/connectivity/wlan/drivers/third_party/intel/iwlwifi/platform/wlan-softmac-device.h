@@ -54,7 +54,8 @@ class WlanSoftmacDevice
                        EnableBeaconingCompleter::Sync& completer);
   void ConfigureBeaconing(ConfigureBeaconingRequestView request, fdf::Arena& arena,
                           ConfigureBeaconingCompleter::Sync& completer);
-  void SetKey(SetKeyRequestView request, fdf::Arena& arena, SetKeyCompleter::Sync& completer);
+  void InstallKey(InstallKeyRequestView request, fdf::Arena& arena,
+                  InstallKeyCompleter::Sync& completer);
   void ConfigureAssoc(ConfigureAssocRequestView request, fdf::Arena& arena,
                       ConfigureAssocCompleter::Sync& completer);
   void ClearAssoc(ClearAssocRequestView request, fdf::Arena& arena,

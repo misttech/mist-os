@@ -107,7 +107,7 @@ zx_status_t MvmSta::Create(struct iwl_mvm_vif* iwl_mvm_vif, const uint8_t bssid[
   return status;
 }
 
-zx_status_t MvmSta::SetKey(const fuchsia_wlan_softmac::wire::WlanKeyConfiguration* key_config) {
+zx_status_t MvmSta::InstallKey(const fuchsia_wlan_softmac::wire::WlanKeyConfiguration* key_config) {
   zx_status_t status = ZX_OK;
   struct iwl_mvm* const mvm = iwl_mvm_sta_->mvmvif->mvm;
 

@@ -133,7 +133,7 @@ zx_status_t WlanSoftmacHandle::Init() {
         return DEVICE(device)->SetChannel(channel);
       },
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
-        return DEVICE(device)->SetKey(key);
+        return DEVICE(device)->InstallKey(key);
       },
       .start_passive_scan = [](void* device,
                                const wlan_softmac_start_passive_scan_request_t* passive_scan_args,
@@ -824,7 +824,7 @@ zx_status_t Device::ConfigureBeaconing(std::unique_ptr<Packet> beacon) {
   return ZX_OK;
 }
 
-zx_status_t Device::SetKey(wlan_key_configuration_t* key_config) {
+zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
@@ -839,13 +839,13 @@ zx_status_t Device::SetKey(wlan_key_configuration_t* key_config) {
     return status;
   }
 
-  auto result = client_.sync().buffer(*std::move(arena))->SetKey(fidl_key_config);
+  auto result = client_.sync().buffer(*std::move(arena))->InstallKey(fidl_key_config);
   if (!result.ok()) {
-    errorf("SetKey failed (FIDL error %s)", result.status_string());
+    errorf("InstallKey failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("SetKey failed (status %s)", zx_status_get_string(result->error_value()));
+    errorf("InstallKey failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
