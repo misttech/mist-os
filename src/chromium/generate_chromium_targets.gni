@@ -326,13 +326,7 @@ if (is_host) {
           package = "web_runner_integration_tests"
         },
       ]
-      deps = [
-        ":web_engine",
-
-        # web_engine_integration_tests needs the following packages (it's a
-        # non-hermetic test), which aren't otherwise included.
-        "//src/session/bin/cursor",
-      ]
+      deps = [ ":web_engine" ]
     }
 
     prebuilt_test_manifest("chromium_cast_runner_tests") {
