@@ -448,7 +448,7 @@ pub fn sys_chroot(current_task: &CurrentTask, user_path: UserCString) -> Result<
         return error!(ENOTDIR);
     }
 
-    current_task.fs().chroot(name);
+    current_task.fs().chroot(current_task, name)?;
     Ok(())
 }
 

@@ -89,9 +89,11 @@ impl FsContext {
     }
 
     /// Change the root.
-    pub fn chroot(&self, name: NamespaceNode) {
+    pub fn chroot(&self, current_task: &CurrentTask, name: NamespaceNode) -> Result<(), Errno> {
+        name.entry.node.check_access(current_task, Access::EXEC)?;
         let mut state = self.state.write();
         state.root = name;
+        Ok(())
     }
 
     pub fn apply_umask(&self, mode: FileMode) -> FileMode {

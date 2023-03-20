@@ -1304,9 +1304,6 @@
 
                 // Causes some other wait tests to fail.
                 "WaitTest.TraceeWALL",
-
-                // Causes the other chroot tests to fail.
-                "ChrootTest.PermissionDenied",
             ],
         },
     ],
