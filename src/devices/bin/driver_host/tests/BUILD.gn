@@ -99,21 +99,15 @@ fuchsia_driver_component("driver-host-restart-driver") {
   manifest = "meta/driver-host-restart-driver.cml"
 }
 
-test("driver_host_test") {
+test("integration_tests") {
+  output_name = "driver_host_integration_tests"
   sources = [
-    "core_test.cc",
-    "device_api_test.cc",
-    "device_controller_connection_test.cc",
     "device_controller_integration_test.cc",
-    "driver_host_test.cc",
     "hot_reload_integration_test.cc",
-    "inspect_test.cc",
-    "proxy_iostate_test.cc",
   ]
 
   deps = [
     ":fuchsia.device.restarttest_cpp_wire",
-    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_wire",
     "//sdk/fidl/fuchsia.device.test:fuchsia.device.test_cpp_wire",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_hlcpp",
     "//sdk/lib/async_patterns/testing/cpp",
@@ -130,6 +124,53 @@ test("driver_host_test") {
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zxtest",
   ]
+}
+
+fuchsia_unittest_component("driver_host_integration_tests") {
+  # The test itself
+  deps = [ ":integration_tests" ]
+
+  # Driver components the test depends on
+  deps += [
+    ":driver-host-test-child-driver",
+    ":driver-host-test-driver",
+    ":unit-test-fail",
+    ":unit-test-pass",
+    "//src/devices/board/drivers/integration-test",
+    "//src/devices/bus/drivers/platform",
+    "//src/devices/misc/drivers/test",
+    "//src/devices/misc/drivers/test-parent",
+  ]
+}
+
+test("driver_host_test") {
+  sources = [
+    "core_test.cc",
+    "device_api_test.cc",
+    "device_controller_connection_test.cc",
+    "driver_host_test.cc",
+    "inspect_test.cc",
+    "proxy_iostate_test.cc",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_wire",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//sdk/lib/sys/cpp",
+    "//src/devices/bin/driver_host:common",
+    "//src/lib/fxl",
+    "//src/lib/storage/vfs/cpp:test_support",
+    "//zircon/system/ulib/fdio-caller",
+    "//zircon/system/ulib/fidl-async:fidl-async-cpp",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_component("driver_host_unittests") {
+  deps = [ ":driver_host_test" ]
 }
 
 driver_bind_rules("unit-test-fail-bind") {
@@ -180,18 +221,10 @@ fuchsia_driver_component("unit-test-pass") {
   manifest = "meta/unit-test-pass.cml"
 }
 
-fuchsia_unittest_package("driver-host-tests") {
-  deps = [
-    ":driver-host-restart-driver",
-    ":driver-host-test-child-driver",
-    ":driver-host-test-driver",
-    ":driver_host_test",
-    ":unit-test-fail",
-    ":unit-test-pass",
-    "//src/devices/board/drivers/integration-test",
-    "//src/devices/bus/drivers/platform",
-    "//src/devices/misc/drivers/test",
-    "//src/devices/misc/drivers/test-parent",
+fuchsia_test_package("driver-host-tests") {
+  test_components = [
+    ":driver_host_unittests",
+    ":driver_host_integration_tests",
   ]
 
   test_specs = {
