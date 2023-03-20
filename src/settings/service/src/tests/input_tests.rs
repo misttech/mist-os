@@ -692,6 +692,7 @@ async fn test_bringup_without_input_registry() {
 
 // Test that cloning works.
 #[fuchsia::test]
+#[allow(clippy::redundant_clone)]
 fn test_input_info_copy() {
     let input_info = create_default_input_info();
     let copy_input_info = input_info.clone();
