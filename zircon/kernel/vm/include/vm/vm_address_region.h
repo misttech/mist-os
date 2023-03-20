@@ -150,7 +150,7 @@ class VmAddressRegionOrMapping
   Lock<CriticalMutex>* lock() const TA_RET_CAP(aspace_->lock()) { return aspace_->lock(); }
   Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(aspace_->lock()) { return aspace_->lock_ref(); }
 
-  bool is_in_range(vaddr_t base, size_t size) const {
+  bool is_in_range_locked(vaddr_t base, size_t size) const TA_REQ(lock()) {
     const size_t offset = base - base_;
     return base >= base_ && offset < size_ && size_ - offset >= size;
   }
@@ -611,6 +611,12 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   VmAddressRegion(VmAddressRegion& parent, vaddr_t base, size_t size, uint32_t vmar_flags,
                   const char* name);
 
+  // Lock not required as base & size values won't change in region.
+  bool is_in_range(vaddr_t base, size_t size) const TA_NO_THREAD_SAFETY_ANALYSIS {
+    const size_t offset = base - base_;
+    return base >= base_ && offset < size_ && size_ - offset >= size;
+  }
+
  protected:
   friend class VmAspace;
   friend void vm_init_preheap_vmars();
@@ -950,7 +956,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
       vaddr_t base, size_t size,
       fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_len, uint mmu_flags)>&&
           func) const TA_REQ(aspace_->lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
-    DEBUG_ASSERT(is_in_range(base, size));
+    DEBUG_ASSERT(is_in_range_locked(base, size));
     return ProtectRangesLocked().EnumerateProtectionRanges(base_, size_, base, size,
                                                            ktl::move(func));
   }

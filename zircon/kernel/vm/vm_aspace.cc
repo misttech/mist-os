@@ -555,9 +555,14 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
       DEBUG_ASSERT(!aspace_destroyed_);
       // First check if we're faulting on the same mapping as last time to short-circuit the vmar
       // walk.
-      if (likely(last_fault_ && last_fault_->is_in_range(va, 1))) {
+      if (likely(last_fault_)) {
         AssertHeld(last_fault_->lock_ref());
-        status = last_fault_->PageFault(va, flags, &page_request);
+        if (last_fault_->is_in_range_locked(va, 1)) {
+          status = last_fault_->PageFault(va, flags, &page_request);
+        } else {
+          AssertHeld(root_vmar_->lock_ref());
+          status = root_vmar_->PageFault(va, flags, &page_request);
+        }
       } else {
         AssertHeld(root_vmar_->lock_ref());
         status = root_vmar_->PageFault(va, flags, &page_request);

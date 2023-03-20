@@ -632,7 +632,7 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
       return ZX_ERR_BAD_STATE;
     }
     // We should only have been called if we were at least partially in range.
-    DEBUG_ASSERT(mapping->is_in_range(expected, 1));
+    DEBUG_ASSERT(mapping->is_in_range_locked(expected, 1));
     const size_t mapping_offset = expected - mapping->base_locked();
     const size_t vmo_offset = mapping->object_offset_locked() + mapping_offset;
 

@@ -152,7 +152,7 @@ zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flag
     return ZX_ERR_BAD_STATE;
   }
 
-  if (size == 0 || !is_in_range(base, size)) {
+  if (size == 0 || !is_in_range_locked(base, size)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -258,7 +258,7 @@ zx_status_t VmMapping::Unmap(vaddr_t base, size_t size) {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (size == 0 || !is_in_range(base, size)) {
+  if (size == 0 || !is_in_range_locked(base, size)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -636,7 +636,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
   LTRACEF("region %p, offset %#zx, size %#zx, commit %d\n", this, offset, len, commit);
 
   DEBUG_ASSERT(object_);
-  if (!IS_PAGE_ALIGNED(offset) || !is_in_range(base_ + offset, len)) {
+  if (!IS_PAGE_ALIGNED(offset) || !is_in_range_locked(base_ + offset, len)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -825,7 +825,7 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
       ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
-  DEBUG_ASSERT(is_in_range(va, 1));
+  DEBUG_ASSERT(is_in_range_locked(va, 1));
 
   va = ROUNDDOWN(va, PAGE_SIZE);
   uint64_t vmo_offset = va - base_ + object_offset_locked();
