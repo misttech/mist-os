@@ -67,8 +67,7 @@ mod tests {
         },
         device::{
             add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress,
-            testutil::receive_frame_or_panic, DeviceId, DeviceIdInner, EthernetDeviceId,
-            FrameDestination, Mtu,
+            testutil::receive_frame_or_panic, DeviceId, EthernetDeviceId, FrameDestination, Mtu,
         },
         ip::{
             device::{
@@ -149,9 +148,9 @@ mod tests {
             id: DeviceId<crate::testutil::FakeNonSyncCtx>,
         ) -> Result<EthernetDeviceId<FakeInstant, ()>, DeviceId<crate::testutil::FakeNonSyncCtx>>
         {
-            match id.inner() {
-                DeviceIdInner::Ethernet(id) => Ok(id.clone()),
-                DeviceIdInner::Loopback(_) => Err(id),
+            match id {
+                DeviceId::Ethernet(id) => Ok(id.clone()),
+                DeviceId::Loopback(_) => Err(id),
             }
         }
     }

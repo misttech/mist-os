@@ -38,9 +38,15 @@ use crate::{
     Instant, NonSyncContext, SyncCtx,
 };
 
+/// A weak device ID identifying a loopback device.
+///
+/// This device ID is like [`WeakDeviceId`] but specifically for loopback
+/// devices.
+///
+/// [`WeakDeviceId`]: crate::device::WeakDeviceId
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
-pub(crate) struct LoopbackWeakDeviceId<I: Instant, S>(
+pub struct LoopbackWeakDeviceId<I: Instant, S>(
     pub(super) WeakRc<IpLinkDeviceState<I, S, LoopbackDeviceState>>,
 );
 
@@ -59,9 +65,14 @@ impl<I: Instant, S> PartialEq<LoopbackDeviceId<I, S>> for LoopbackWeakDeviceId<I
 
 impl<I: Instant, S> Eq for LoopbackWeakDeviceId<I, S> {}
 
+/// A strong device ID identifying a loopback device.
+///
+/// This device ID is like [`DeviceId`] but specifically for loopback devices.
+///
+/// [`DeviceId`]: crate::device::DeviceId
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
-pub(crate) struct LoopbackDeviceId<I: Instant, S>(
+pub struct LoopbackDeviceId<I: Instant, S>(
     pub(super) StrongRc<IpLinkDeviceState<I, S, LoopbackDeviceState>>,
 );
 
