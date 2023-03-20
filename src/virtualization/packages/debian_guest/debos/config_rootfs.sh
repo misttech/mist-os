@@ -144,6 +144,16 @@ cat >> /etc/fstab << EOF
 /dev/vdc /guest_interaction romfs ro 0 0
 EOF
 
+# Remove apt-list files (~75MiB).
+rm -r /var/cache/apt
+rm -r /var/lib/apt/lists/*
+# Remove locale files (~44MiB)
+rm -rf /usr/share/locale/*
+# Remove docs (~22MiB)
+rm -rf /usr/share/doc/*
+# Remove manpages (~9MiB)
+rm -rf /usr/share/man/*
+
 # We have included all the modules we need into the initramfs, so we remove all
 # modules modules from the root filesystem.
 #
