@@ -211,12 +211,17 @@ impl BlobDirectory {
                     }
                     Some(data) => {
                         let metadata: BlobMetadata = bincode::deserialize_from(&*data)?;
-                        let mut builder = MerkleTreeBuilder::new();
-                        for hash in metadata.hashes {
-                            builder.push_data_hash(hash.into());
-                        }
-                        let tree = builder.finish();
-                        ensure!(tree.root() == hash, FxfsError::Inconsistent);
+                        let tree = if metadata.hashes.is_empty() {
+                            MerkleTree::from_levels(vec![vec![hash]])
+                        } else {
+                            let mut builder = MerkleTreeBuilder::new();
+                            for hash in metadata.hashes {
+                                builder.push_data_hash(hash.into());
+                            }
+                            let tree = builder.finish();
+                            ensure!(tree.root() == hash, FxfsError::Inconsistent);
+                            tree
+                        };
                         (tree, metadata.compressed_offsets, metadata.uncompressed_size)
                     }
                 };
@@ -484,7 +489,6 @@ impl Drop for FxBlob {
 impl FxBlob {
     async fn read_uncached(&self, range: Range<u64>) -> Result<buffer::Buffer<'_>, Error> {
         let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize);
-        let mut offset = range.start;
         // TODO(fxbug.dev/122125): zero the tail
         let read = if self.compressed_offsets.is_empty() {
             self.handle.read(range.start, buffer.as_mut()).await?
@@ -526,12 +530,14 @@ impl FxBlob {
         // TODO(fxbug.dev/122055): This should be offloaded to the kernel at which point we can
         // delete this.
         let hashes = &self.merkle_tree.as_ref()[0];
-        for b in buffer.as_slice()[..read].chunks(BLOCK_SIZE as usize) {
+        let mut offset = range.start as usize;
+        let bs = BLOCK_SIZE as usize;
+        for b in buffer.as_slice()[..read].chunks(bs) {
             ensure!(
-                hash_block(b, offset as usize) == hashes[(offset / BLOCK_SIZE) as usize],
+                hash_block(b, offset) == hashes[offset / bs],
                 anyhow!(FxfsError::Inconsistent).context("Hash mismatch")
             );
-            offset += BLOCK_SIZE;
+            offset += bs;
         }
         Ok(buffer)
     }
@@ -846,6 +852,56 @@ impl FxUnsealedBlob {
         });
         file
     }
+
+    async fn complete(&self, size: u64, tree: MerkleTree) -> Result<(), Error> {
+        self.handle.flush().await?;
+        // Write the Merkle tree if it has more than a single hash.
+        if tree.as_ref().len() > 1 {
+            let mut hashes = Vec::new();
+            for hash in &tree.as_ref()[0] {
+                hashes.push(**hash);
+            }
+            let mut serialized = Vec::new();
+            let metadata =
+                BlobMetadata { hashes, compressed_offsets: Vec::new(), uncompressed_size: size };
+            bincode::serialize_into(&mut serialized, &metadata).unwrap();
+            // TODO(fxbug.dev/122125): Is this the best place to store merkle tree data?
+            // (Inline attribute, prepended to data, ..?)
+            self.handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized).await?;
+        }
+
+        // We've finished writing the blob, so promote this blob.
+        let volume = self.handle.owner();
+        let store = self.handle.store();
+
+        let dir = volume
+            .cache()
+            .get(store.root_directory_object_id())
+            .unwrap()
+            .into_any()
+            .downcast::<BlobDirectory>()
+            .unwrap_or_else(|_| panic!("Expected blob directory"));
+
+        let keys = [LockKey::object(store.store_object_id(), dir.object_id())];
+        let mut transaction = store.filesystem().new_transaction(&keys, Options::default()).await?;
+
+        let object_id = self.handle.object_id();
+        store.remove_from_graveyard(&mut transaction, object_id);
+
+        let name = format!("{}", self.hash);
+        directory::replace_child_with_object(
+            &mut transaction,
+            Some((object_id, ObjectDescriptor::File)),
+            (dir.directory.directory(), &name),
+            0,
+            Timestamp::now(),
+        )
+        .await?;
+
+        let parent = self.parent().unwrap();
+        transaction.commit_with_callback(|_| parent.did_add(&name)).await?;
+        Ok(())
+    }
 }
 
 // Note the asymmetry in read/write paths. Blobs are written compressed and read decompressed.
@@ -933,6 +989,14 @@ impl File for FxUnsealedBlob {
     }
 
     async fn truncate(&self, length: u64) -> Result<(), Status> {
+        if length == 0 {
+            // TODO(fxbug.dev/122125): There could be races when truncating concurrently.
+            let tree = self.inner.lock().unwrap().merkle_builder.take().unwrap().finish();
+            if tree.root() != self.hash {
+                return Err(Status::IO_DATA_INTEGRITY);
+            }
+            return self.complete(0, tree).await.map_err(map_to_status);
+        }
         // TODO(fxbug.dev/122125): This needs some locks.
         // TODO(fxbug.dev/122125): What if truncate has already been called.
         let mut transaction = self.handle.new_transaction().await.map_err(map_to_status)?;
@@ -1085,67 +1149,7 @@ impl FileIo for FxUnsealedBlob {
         }
 
         if let Some(tree) = tree {
-            self.handle.flush().await.map_err(map_to_status)?;
-
-            // Write the Merkle tree.
-            if size > BLOCK_SIZE {
-                let mut hashes = Vec::new();
-                for hash in &tree.as_ref()[0] {
-                    hashes.push(**hash);
-                }
-                let mut serialized = Vec::new();
-                let metadata = BlobMetadata {
-                    hashes,
-                    compressed_offsets: Vec::new(),
-                    uncompressed_size: size,
-                };
-                bincode::serialize_into(&mut serialized, &metadata).unwrap();
-                // TODO(fxbug.dev/122125): Is this the best place to store merkle tree data?
-                // (Inline attribute, prepended to data, ..?)
-                self.handle
-                    .write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized)
-                    .await
-                    .map_err(map_to_status)?;
-            }
-
-            // We've finished writing the blob, so promote this blob.
-            let volume = self.handle.owner();
-            let store = self.handle.store();
-
-            let dir = volume
-                .cache()
-                .get(store.root_directory_object_id())
-                .unwrap()
-                .into_any()
-                .downcast::<BlobDirectory>()
-                .unwrap_or_else(|_| panic!("Expected blob directory"));
-
-            let keys = [LockKey::object(store.store_object_id(), dir.object_id())];
-            let mut transaction = store
-                .filesystem()
-                .new_transaction(&keys, Options::default())
-                .await
-                .map_err(map_to_status)?;
-
-            let object_id = self.handle.object_id();
-            store.remove_from_graveyard(&mut transaction, object_id);
-
-            let name = format!("{}", self.hash);
-            directory::replace_child_with_object(
-                &mut transaction,
-                Some((object_id, ObjectDescriptor::File)),
-                (dir.directory.directory(), &name),
-                0,
-                Timestamp::now(),
-            )
-            .await
-            .map_err(map_to_status)?;
-
-            let parent = self.parent().unwrap();
-            transaction
-                .commit_with_callback(|_| parent.did_add(&name))
-                .await
-                .map_err(map_to_status)?;
+            self.complete(size, tree).await.map_err(map_to_status)?;
         }
 
         Ok(content.len() as u64)
@@ -1319,6 +1323,17 @@ mod tests {
     }
 
     #[fasync::run(10, test)]
+    async fn test_empty_blob() {
+        let fixture = Fixture::new().await;
+
+        let data = vec![];
+        let hash = fixture.write_blob(&data).await;
+        assert_eq!(fixture.read_blob(&format!("{}", hash)).await, data);
+
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
     async fn test_large_blob() {
         let fixture = Fixture::new().await;
 
@@ -1435,14 +1450,16 @@ mod tests {
             Some(Ok(WatchMessage { event: WatchEvent::IDLE, .. }))
         );
 
-        let data = [0xab; 2];
-        let hash;
-        let filename;
-        {
+        let data = vec![vec![0xab; 2], vec![0xcd; 65_536]];
+        let mut hashes = vec![];
+        let mut filenames = vec![];
+        for datum in data {
             let mut builder = MerkleTreeBuilder::new();
-            builder.write(&data);
-            hash = builder.finish().root();
-            filename = PathBuf::from(format!("{}", hash));
+            builder.write(&datum);
+            let hash = builder.finish().root();
+            let filename = PathBuf::from(format!("{}", hash));
+            hashes.push(hash.clone());
+            filenames.push(filename.clone());
 
             let blob = open_file_checked(
                 &fixture.root_proxy,
@@ -1452,14 +1469,17 @@ mod tests {
                 &format!("{}", hash),
             )
             .await;
-            blob.resize(data.len() as u64)
+            blob.resize(datum.len() as u64)
                 .await
                 .expect("FIDL call failed")
                 .expect("truncate failed");
-            assert_eq!(
-                blob.write(&data[..1]).await.expect("FIDL call failed").expect("write failed"),
-                1u64
-            );
+            let len = datum.len();
+            for chunk in datum[..len - 1].chunks(fio::MAX_TRANSFER_SIZE as usize) {
+                assert_eq!(
+                    blob.write(chunk).await.expect("FIDL call failed").expect("write failed"),
+                    chunk.len() as u64
+                );
+            }
             // Before the blob is finished writing, we shouldn't see any watch events for it.
             assert_matches!(
                 watcher.next().on_timeout(500.millis().after_now(), || None).await,
@@ -1467,25 +1487,68 @@ mod tests {
             );
 
             assert_eq!(
-                blob.write(&data[1..]).await.expect("FIDL call failed").expect("write failed"),
+                blob.write(&datum[len - 1..])
+                    .await
+                    .expect("FIDL call failed")
+                    .expect("write failed"),
                 1u64
             );
             assert_eq!(
                 watcher.next().await,
-                Some(Ok(WatchMessage { event: WatchEvent::ADD_FILE, filename: filename.clone() }))
+                Some(Ok(WatchMessage { event: WatchEvent::ADD_FILE, filename }))
             );
         }
 
+        for (hash, filename) in hashes.iter().zip(filenames) {
+            fixture
+                .root_proxy
+                .unlink(&format!("{}", hash), fio::UnlinkOptions::EMPTY)
+                .await
+                .expect("FIDL call failed")
+                .expect("unlink failed");
+            assert_eq!(
+                watcher.next().await,
+                Some(Ok(WatchMessage { event: WatchEvent::REMOVE_FILE, filename }))
+            );
+        }
+
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_rename_fails() {
+        let fixture = Fixture::new().await;
+
+        let data = vec![];
+        let hash = fixture.write_blob(&data).await;
+
+        let (status, token) = fixture.root_proxy.get_token().await.expect("FIDL failed");
+        zx::Status::ok(status).unwrap();
         fixture
             .root_proxy
-            .unlink(&format!("{}", hash), fio::UnlinkOptions::EMPTY)
+            .rename(&format!("{}", hash), token.unwrap().into(), "foo")
             .await
-            .expect("FIDL call failed")
-            .expect("unlink failed");
-        assert_eq!(
-            watcher.next().await,
-            Some(Ok(WatchMessage { event: WatchEvent::REMOVE_FILE, filename }))
-        );
+            .expect("FIDL failed")
+            .expect_err("rename should fail");
+
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_link_fails() {
+        let fixture = Fixture::new().await;
+
+        let data = vec![];
+        let hash = fixture.write_blob(&data).await;
+
+        let (status, token) = fixture.root_proxy.get_token().await.expect("FIDL failed");
+        zx::Status::ok(status).unwrap();
+        let status = fixture
+            .root_proxy
+            .link(&format!("{}", hash), token.unwrap().into(), "foo")
+            .await
+            .expect("FIDL failed");
+        assert_eq!(zx::Status::from_raw(status), zx::Status::NOT_SUPPORTED);
 
         fixture.close().await;
     }
