@@ -16,6 +16,7 @@
         fallback: "false",
     },
     use: [
+        { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.scheduler.ProfileProvider" },
     ],
 }
