@@ -1476,7 +1476,8 @@ mod tests {
             sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
-        );
+        )
+        .into();
 
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
@@ -1602,7 +1603,8 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         let ll_addr = local_mac.to_ipv6_link_local();
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.gmp_enabled = true;
@@ -1839,7 +1841,8 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.dad_transmits = NonZeroU8::new(1);
 

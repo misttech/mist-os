@@ -747,7 +747,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
         meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-        DeviceLayerEventDispatcher::send_frame(ctx, &device_id.clone().into(), buf).map_err(
+        DeviceLayerEventDispatcher::send_frame(ctx, device_id, buf).map_err(
             |DeviceSendFrameError::DeviceNotReady(buf)| {
                 DeviceSendFrameError::DeviceNotReady((meta, buf))
             },
@@ -1593,7 +1593,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
 
         let mut bytes = match I::VERSION {
             IpVersion::V4 => dns_request_v4::ETHERNET_FRAME,
@@ -1640,7 +1641,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
 
         let expected_sent = if enable {
             crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -1703,7 +1705,8 @@ mod tests {
             &mut sync_ctx,
             FAKE_CONFIG_V4.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
     }
 
@@ -1949,7 +1952,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
@@ -2061,7 +2065,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
@@ -2227,7 +2232,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let multicast_addr = I::get_multicast_addr(3);
@@ -2276,7 +2282,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let multicast_addr = I::get_multicast_addr(3);
@@ -2302,7 +2309,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let ip1 = SpecifiedAddr::new(Ipv6Addr::new([0, 0, 0, 1, 0, 0, 0, 1])).unwrap();
@@ -2422,7 +2430,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
 
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
         // Verify that there is a single assigned address.

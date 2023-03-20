@@ -605,7 +605,8 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::ip::device::update_ipv6_configuration(
             &mut &*sync_ctx,
             non_sync_ctx,

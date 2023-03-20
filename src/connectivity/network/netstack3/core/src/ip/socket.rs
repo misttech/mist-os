@@ -1516,7 +1516,8 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let loopback_device_id =
             crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(u16::MAX as u32))
-                .expect("create the loopback interface");
+                .expect("create the loopback interface")
+                .into();
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1683,7 +1684,8 @@ mod tests {
 
         let loopback_device_id =
             crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(u16::MAX as u32))
-                .expect("create the loopback interface");
+                .expect("create the loopback interface")
+                .into();
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,

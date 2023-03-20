@@ -64,7 +64,10 @@ use netstack3_core::{
     add_ip_addr_subnet,
     context::{CounterContext, EventContext, InstantContext, RngContext, TimerContext},
     data_structures::id_map::IdMap,
-    device::{DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError},
+    device::{
+        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError,
+        EthernetDeviceId,
+    },
     error::NetstackError,
     handle_timer,
     ip::{
@@ -274,7 +277,7 @@ impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
 impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
     type DeviceState = DeviceSpecificInfo;
 
-    fn wake_rx_task(&mut self, device: &DeviceId<BindingsNonSyncCtxImpl>) {
+    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self::Instant, Self::DeviceState>) {
         match device.external_state().deref() {
             DeviceSpecificInfo::Netdevice(_) => {
                 unreachable!("only loopback supports RX queues")
@@ -293,7 +296,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
 
     fn send_frame(
         &mut self,
-        device: &DeviceId<BindingsNonSyncCtxImpl>,
+        device: &EthernetDeviceId<Self::Instant, Self::DeviceState>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         match device.external_state().deref() {
@@ -798,6 +801,7 @@ impl Netstack {
             // TODO(https://fxbug.dev/123461): Make this more type-safe.
             e => unreachable!("added loopback device but got external_state={:?}", e),
         };
+        let loopback: DeviceId<_> = loopback.into();
         devices.add_device(binding_id, loopback.clone());
 
         // Don't need DAD and IGMP/MLD on loopback.

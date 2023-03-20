@@ -4426,7 +4426,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -4517,7 +4518,8 @@ mod tests {
             &mut sync_ctx,
             cfg.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let ip: Ipv6Addr = cfg.local_mac.to_ipv6_link_local().addr().get();
@@ -4656,7 +4658,8 @@ mod tests {
                 &mut sync_ctx,
                 local_mac,
                 IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            );
+            )
+            .into();
             crate::ip::device::update_ipv6_configuration(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
@@ -4898,7 +4901,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, mut device_ids) = builder.build();
         let mut sync_ctx = &sync_ctx;
         let loopback_id =
-            crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap();
+            crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap().into();
         crate::device::testutil::enable_device(sync_ctx, &mut non_sync_ctx, &loopback_id);
         crate::add_ip_addr_subnet(
             sync_ctx,
@@ -4950,11 +4953,12 @@ mod tests {
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(crate::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
-        let device_id = crate::device::add_ethernet_device(
+        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
             &sync_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
-        );
+        )
+        .into();
         let addable_metric = AddableMetric::ExplicitMetric(RawMetric(0));
         let metric = Metric::ExplicitMetric(RawMetric(0));
 

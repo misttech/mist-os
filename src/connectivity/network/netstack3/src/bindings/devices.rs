@@ -16,7 +16,10 @@ use net_types::{
     SpecifiedAddr, UnicastAddr,
 };
 use netstack3_core::{
-    device::{handle_queued_rx_packets, DeviceId},
+    context::InstantContext,
+    device::{
+        handle_queued_rx_packets, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
+    },
     Ctx,
 };
 
@@ -139,7 +142,10 @@ impl DeviceSpecificInfo {
 pub(crate) fn spawn_rx_task(
     notifier: &NeedsDataNotifier,
     ns: &Netstack,
-    device_id: &DeviceId<BindingsNonSyncCtxImpl>,
+    device_id: &LoopbackDeviceId<
+        <BindingsNonSyncCtxImpl as InstantContext>::Instant,
+        <BindingsNonSyncCtxImpl as DeviceLayerEventDispatcher>::DeviceState,
+    >,
 ) {
     let mut watcher = notifier.watcher();
     let device_id = device_id.downgrade();

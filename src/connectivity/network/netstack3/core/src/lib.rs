@@ -576,7 +576,8 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let ip: IpAddr = I::get_other_ip_address(1).get().into();
@@ -677,11 +678,12 @@ mod tests {
         );
 
         // Then, add a route to the gateway, and try again, expecting success.
-        let device_id = crate::device::add_ethernet_device(
+        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
             &sync_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
-        );
+        )
+        .into();
         assert_eq!(
             crate::add_route(
                 &mut sync_ctx,

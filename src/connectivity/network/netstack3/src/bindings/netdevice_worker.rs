@@ -315,7 +315,8 @@ impl DeviceHandler {
                 })
                 .into()
             },
-        );
+        )
+        .into();
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];

@@ -7,7 +7,7 @@
 pub(crate) mod arp;
 pub mod ethernet;
 pub(crate) mod link;
-pub(crate) mod loopback;
+pub mod loopback;
 pub(crate) mod ndp;
 pub mod queue;
 mod state;
@@ -990,6 +990,15 @@ impl<I: Instant, S> PartialEq<EthernetDeviceId<I, S>> for EthernetWeakDeviceId<I
 
 impl<I: Instant, S> Eq for EthernetWeakDeviceId<I, S> {}
 
+impl<I: Instant, S> EthernetWeakDeviceId<I, S> {
+    /// Attempts to upgrade the ID to an [`EthernetDeviceId`], failing if the
+    /// device no longer exists.
+    fn upgrade(&self) -> Option<EthernetDeviceId<I, S>> {
+        let Self(id, rc) = self;
+        rc.upgrade().map(|rc| EthernetDeviceId(*id, rc))
+    }
+}
+
 /// A strong device ID identifying an ethernet device.
 ///
 /// This device ID is like [`DeviceId`] but specifically for ethernet devices.
@@ -1026,6 +1035,19 @@ impl<I: Instant, S> Display for EthernetDeviceId<I, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let EthernetDeviceId(id, _ptr) = self;
         write!(f, "Ethernet({})", id)
+    }
+}
+
+impl<I: Instant, S> EthernetDeviceId<I, S> {
+    /// Returns a reference to the external state for the device.
+    pub fn external_state(&self) -> &S {
+        let Self(_id, rc) = self;
+        &rc.external_state
+    }
+
+    pub(crate) fn downgrade(&self) -> EthernetWeakDeviceId<I, S> {
+        let Self(id, rc) = self;
+        EthernetWeakDeviceId(*id, StrongRc::downgrade(rc))
     }
 }
 
@@ -1137,12 +1159,8 @@ impl<C: DeviceLayerEventDispatcher> WeakDeviceId<C> {
     /// Attempts to upgrade the ID.
     pub fn upgrade(&self) -> Option<DeviceId<C>> {
         match self {
-            WeakDeviceId::Ethernet(EthernetWeakDeviceId(id, ptr)) => {
-                ptr.upgrade().map(|ptr| DeviceId::Ethernet(EthernetDeviceId(*id, ptr)))
-            }
-            WeakDeviceId::Loopback(LoopbackWeakDeviceId(ptr)) => {
-                ptr.upgrade().map(|ptr| DeviceId::Loopback(LoopbackDeviceId(ptr)))
-            }
+            WeakDeviceId::Ethernet(id) => id.upgrade().map(Into::into),
+            WeakDeviceId::Loopback(id) => id.upgrade().map(Into::into),
         }
     }
 }
@@ -1222,20 +1240,16 @@ impl<C: DeviceLayerEventDispatcher> DeviceId<C> {
     /// Returns a reference to the external state for the device.
     pub fn external_state(&self) -> &C::DeviceState {
         match self {
-            DeviceId::Ethernet(EthernetDeviceId(_id, ptr)) => &ptr.external_state,
-            DeviceId::Loopback(LoopbackDeviceId(ptr)) => &ptr.external_state,
+            DeviceId::Ethernet(id) => id.external_state(),
+            DeviceId::Loopback(id) => id.external_state(),
         }
     }
 
     /// Downgrade to a [`WeakDeviceId`].
     pub fn downgrade(&self) -> WeakDeviceId<C> {
         match self {
-            DeviceId::Ethernet(EthernetDeviceId(id, ptr)) => {
-                WeakDeviceId::Ethernet(EthernetWeakDeviceId(*id, StrongRc::downgrade(ptr)))
-            }
-            DeviceId::Loopback(LoopbackDeviceId(ptr)) => {
-                WeakDeviceId::Loopback(LoopbackWeakDeviceId(StrongRc::downgrade(ptr)))
-            }
+            DeviceId::Ethernet(id) => id.downgrade().into(),
+            DeviceId::Loopback(id) => id.downgrade().into(),
         }
     }
 
@@ -1422,7 +1436,7 @@ impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
         mac: UnicastAddr<Mac>,
         max_frame_size: ethernet::MaxFrameSize,
         external_state: F,
-    ) -> DeviceId<C> {
+    ) -> EthernetDeviceId<C::Instant, C::DeviceState> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
         let ptr = PrimaryRc::new(IpLinkDeviceState::new(
@@ -1441,7 +1455,7 @@ impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
         &self,
         mtu: Mtu,
         external_state: F,
-    ) -> Result<DeviceId<C>, ExistsError> {
+    ) -> Result<LoopbackDeviceId<C::Instant, C::DeviceState>, ExistsError> {
         let Devices { ethernet: _, loopback } = &mut *self.devices.write();
 
         if let Some(_) = loopback {
@@ -1459,7 +1473,7 @@ impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
 
         debug!("added loopback device");
 
-        Ok(LoopbackDeviceId(id).into())
+        Ok(LoopbackDeviceId(id))
     }
 }
 
@@ -1476,7 +1490,7 @@ pub trait DeviceLayerEventDispatcher: InstantContext + Sized {
     /// Implementations must make sure that [`handle_queued_rx_packets`] is
     /// scheduled to be called as soon as possible so that enqueued RX frames
     /// are promptly handled.
-    fn wake_rx_task(&mut self, device: &DeviceId<Self>);
+    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<Self::Instant, Self::DeviceState>);
 
     /// Signals to the dispatcher that TX frames are available and ready to be
     /// sent by [`transmit_queued_tx_frames`].
@@ -1494,7 +1508,7 @@ pub trait DeviceLayerEventDispatcher: InstantContext + Sized {
     /// reported as success.
     fn send_frame(
         &mut self,
-        device: &DeviceId<Self>,
+        device: &EthernetDeviceId<Self::Instant, Self::DeviceState>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>>;
 }
@@ -1550,20 +1564,13 @@ pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
 pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx>,
+    device: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState>,
 ) {
-    match device {
-        DeviceId::Ethernet(id) => {
-            panic!("ethernet device {} does not support RX queues", id)
-        }
-        DeviceId::Loopback(id) => {
-            ReceiveQueueHandler::<LoopbackDevice, _>::handle_queued_rx_packets(
-                &mut Locked::new(sync_ctx),
-                ctx,
-                id,
-            )
-        }
-    }
+    ReceiveQueueHandler::<LoopbackDevice, _>::handle_queued_rx_packets(
+        &mut Locked::new(sync_ctx),
+        ctx,
+        device,
+    )
 }
 
 /// Remove a device from the device layer.
@@ -1619,7 +1626,7 @@ pub fn add_ethernet_device_with_state<
     mac: UnicastAddr<Mac>,
     max_frame_size: ethernet::MaxFrameSize,
     external_state: F,
-) -> DeviceId<NonSyncCtx> {
+) -> EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState> {
     sync_ctx.state.device.add_ethernet_device(mac, max_frame_size, external_state)
 }
 
@@ -1628,7 +1635,7 @@ pub fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
     max_frame_size: ethernet::MaxFrameSize,
-) -> DeviceId<NonSyncCtx>
+) -> EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState>
 where
     NonSyncCtx::DeviceState: Default,
 {
@@ -1647,7 +1654,8 @@ pub fn add_loopback_device_with_state<
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
     external_state: F,
-) -> Result<DeviceId<NonSyncCtx>, crate::error::ExistsError> {
+) -> Result<LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState>, crate::error::ExistsError>
+{
     sync_ctx.state.device.add_loopback_device(mtu, external_state)
 }
 
@@ -1659,7 +1667,7 @@ pub fn add_loopback_device_with_state<
 pub fn add_loopback_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
-) -> Result<DeviceId<NonSyncCtx>, crate::error::ExistsError>
+) -> Result<LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::DeviceState>, crate::error::ExistsError>
 where
     NonSyncCtx::DeviceState: Default,
 {
@@ -1667,6 +1675,8 @@ where
 }
 
 /// Receive a device layer frame from the network.
+// TODO(https://fxbug.dev/123461): Take an `EthernetDeviceId` instead of
+// `DeviceId`.
 pub fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
@@ -1931,7 +1941,7 @@ mod tests {
     use super::*;
     use crate::{
         testutil::{
-            FakeEventDispatcherConfig, FakeNonSyncCtx, FakeSyncCtx, TestIpExt as _, FAKE_CONFIG_V4,
+            FakeEventDispatcherConfig, FakeSyncCtx, TestIpExt as _, FAKE_CONFIG_V4,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx,
@@ -1970,8 +1980,10 @@ mod tests {
         }
         check(&mut sync_ctx, &[][..]);
 
-        let loopback_device = crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
-            .expect("error adding loopback device");
+        let loopback_device: DeviceId<_> =
+            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
+                .expect("error adding loopback device")
+                .into();
         check(&mut sync_ctx, &[loopback_device.clone()][..]);
 
         let FakeEventDispatcherConfig {
@@ -1985,7 +1997,8 @@ mod tests {
             &mut sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::MIN,
-        );
+        )
+        .into();
         check(&mut sync_ctx, &[ethernet_device, loopback_device][..]);
     }
 
@@ -1993,12 +2006,12 @@ mod tests {
     fn test_no_default_routes() {
         let Ctx { mut sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
 
-        let _loopback_device: DeviceId<FakeNonSyncCtx> =
+        let _loopback_device: LoopbackDeviceId<_, _> =
             crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
                 .expect("error adding loopback device");
 
         assert_eq!(crate::ip::get_all_routes(&sync_ctx), []);
-        let _ethernet_device: DeviceId<FakeNonSyncCtx> = crate::device::add_ethernet_device(
+        let _ethernet_device: EthernetDeviceId<_, _> = crate::device::add_ethernet_device(
             &mut sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::MIN,
@@ -2014,7 +2027,8 @@ mod tests {
             &mut sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
-        );
+        )
+        .into();
 
         // Enable the device, turning on a bunch of features that install
         // timers.
@@ -2052,13 +2066,15 @@ mod tests {
             Ipv6::FAKE_CONFIG.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         )
+        .into()
     }
 
     fn add_loopback(
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
     ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
-        let device = crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap();
+        let device =
+            crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap().into();
         crate::device::add_ip_addr_subnet(
             sync_ctx,
             non_sync_ctx,
@@ -2071,7 +2087,7 @@ mod tests {
     }
 
     fn check_transmitted_ethernet(
-        non_sync_ctx: &crate::testutil::FakeNonSyncCtx,
+        non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
         _device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         count: usize,
     ) {
@@ -2079,16 +2095,20 @@ mod tests {
     }
 
     fn check_transmitted_loopback(
-        non_sync_ctx: &crate::testutil::FakeNonSyncCtx,
+        non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
         device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         count: usize,
     ) {
         // Loopback frames leave the stack; outgoing frames land in
         // its RX queue.
+        let rx_available = core::mem::take(&mut non_sync_ctx.state_mut().rx_available);
         if count == 0 {
-            assert_eq!(non_sync_ctx.state().rx_available, <[DeviceId::<_>; 0]>::default());
+            assert_eq!(rx_available, <[LoopbackDeviceId::<_, _>; 0]>::default());
         } else {
-            assert_eq!(non_sync_ctx.state().rx_available, [device_id.clone()]);
+            assert_eq!(
+                rx_available.into_iter().map(DeviceId::Loopback).collect::<Vec<_>>(),
+                [device_id.clone()]
+            );
         }
     }
 
@@ -2102,7 +2122,7 @@ mod tests {
             &mut crate::testutil::FakeNonSyncCtx,
         ) -> DeviceId<crate::testutil::FakeNonSyncCtx>,
         check_transmitted: fn(
-            &crate::testutil::FakeNonSyncCtx,
+            &mut crate::testutil::FakeNonSyncCtx,
             &DeviceId<crate::testutil::FakeNonSyncCtx>,
             usize,
         ),
@@ -2134,7 +2154,7 @@ mod tests {
         );
 
         if with_tx_queue {
-            check_transmitted(&non_sync_ctx, &device, 0);
+            check_transmitted(&mut non_sync_ctx, &device, 0);
             assert_eq!(
                 core::mem::take(&mut non_sync_ctx.state_mut().tx_available),
                 [device.clone()]
@@ -2143,7 +2163,7 @@ mod tests {
                 .unwrap();
         }
 
-        check_transmitted(&non_sync_ctx, &device, 1);
+        check_transmitted(&mut non_sync_ctx, &device, 1);
         assert_eq!(non_sync_ctx.state_mut().tx_available, <[DeviceId::<_>; 0]>::default());
     }
 }

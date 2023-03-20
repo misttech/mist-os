@@ -65,6 +65,15 @@ impl<I: Instant, S> PartialEq<LoopbackDeviceId<I, S>> for LoopbackWeakDeviceId<I
 
 impl<I: Instant, S> Eq for LoopbackWeakDeviceId<I, S> {}
 
+impl<I: Instant, S> LoopbackWeakDeviceId<I, S> {
+    /// Attempts to upgrade the ID to a [`LoopbackDeviceId`], failing if the
+    /// device no longer exists.
+    pub fn upgrade(&self) -> Option<LoopbackDeviceId<I, S>> {
+        let Self(rc) = self;
+        rc.upgrade().map(LoopbackDeviceId)
+    }
+}
+
 /// A strong device ID identifying a loopback device.
 ///
 /// This device ID is like [`DeviceId`] but specifically for loopback devices.
@@ -101,6 +110,20 @@ impl<I: Instant, S> Debug for LoopbackDeviceId<I, S> {
 impl<I: Instant, S> Display for LoopbackDeviceId<I, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Loopback")
+    }
+}
+
+impl<I: Instant, S> LoopbackDeviceId<I, S> {
+    /// Returns a reference to the external state for the device.
+    pub fn external_state(&self) -> &S {
+        let Self(rc) = self;
+        &rc.external_state
+    }
+
+    /// Returns a weak loopback device ID.
+    pub fn downgrade(&self) -> LoopbackWeakDeviceId<I, S> {
+        let Self(rc) = self;
+        LoopbackWeakDeviceId(StrongRc::downgrade(rc))
     }
 }
 
@@ -217,8 +240,8 @@ pub(super) fn get_mtu<NonSyncCtx: NonSyncContext, L>(
 impl<C: NonSyncContext>
     ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<C::Instant, C::DeviceState>> for C
 {
-    fn wake_rx_task(&mut self, device_id: LoopbackDeviceId<C::Instant, C::DeviceState>) {
-        DeviceLayerEventDispatcher::wake_rx_task(self, &device_id.into())
+    fn wake_rx_task(&mut self, device_id: &LoopbackDeviceId<C::Instant, C::DeviceState>) {
+        DeviceLayerEventDispatcher::wake_rx_task(self, device_id)
     }
 }
 
@@ -401,7 +424,8 @@ mod tests {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
         let device = crate::device::add_loopback_device(&mut sync_ctx, MTU)
-            .expect("error adding loopback device");
+            .expect("error adding loopback device")
+            .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         assert_eq!(crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut sync_ctx, &device), MTU);

@@ -1121,6 +1121,7 @@ mod tests {
                     },
                 )
                 .expect("failed to add loopback to core")
+                .into()
             };
 
             Self { binding, core, _netstack: ctx }

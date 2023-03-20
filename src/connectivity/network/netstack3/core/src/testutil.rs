@@ -26,7 +26,10 @@ use crate::{
         testutil::{FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, InstantAndData},
         EventContext, InstantContext, RngContext, TimerContext,
     },
-    device::{ethernet, DeviceId, DeviceLayerEventDispatcher, DeviceSendFrameError, WeakDeviceId},
+    device::{
+        ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
+        DeviceSendFrameError, EthernetDeviceId, WeakDeviceId,
+    },
     ip::{
         device::{dad::DadEvent, route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
@@ -105,7 +108,7 @@ pub(crate) mod benchmarks {
 pub(crate) struct FakeNonSyncCtxState {
     icmpv4_replies: HashMap<IcmpConnId<Ipv4>, Vec<(u16, Vec<u8>)>>,
     icmpv6_replies: HashMap<IcmpConnId<Ipv6>, Vec<(u16, Vec<u8>)>>,
-    pub(crate) rx_available: Vec<DeviceId<FakeNonSyncCtx>>,
+    pub(crate) rx_available: Vec<LoopbackDeviceId<FakeInstant, ()>>,
     pub(crate) tx_available: Vec<DeviceId<FakeNonSyncCtx>>,
 }
 
@@ -644,7 +647,8 @@ impl FakeEventDispatcherBuilder {
                     sync_ctx,
                     mac,
                     IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-                );
+                )
+                .into();
                 crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &id);
                 match ip_subnet {
                     Some((IpAddr::V4(ip), SubnetEither::V4(subnet))) => {
@@ -806,7 +810,7 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
 impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
     type DeviceState = ();
 
-    fn wake_rx_task(&mut self, device: &DeviceId<FakeNonSyncCtx>) {
+    fn wake_rx_task(&mut self, device: &LoopbackDeviceId<FakeInstant, ()>) {
         self.state_mut().rx_available.push(device.clone());
     }
 
@@ -816,10 +820,10 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
 
     fn send_frame(
         &mut self,
-        device: &DeviceId<FakeNonSyncCtx>,
+        device: &EthernetDeviceId<FakeInstant, ()>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        self.frame_ctx_mut().push(device.downgrade(), frame.into_inner());
+        self.frame_ctx_mut().push(device.downgrade().into(), frame.into_inner());
         Ok(())
     }
 }

@@ -1301,7 +1301,7 @@ mod tests {
                 },
             )
             .expect("failed to add loopback to core");
-            non_sync_ctx.devices.add_device(binding_id, core_id);
+            non_sync_ctx.devices.add_device(binding_id, core_id.into());
             binding_id
         };
 

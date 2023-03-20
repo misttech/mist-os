@@ -29,7 +29,7 @@ pub(crate) struct ReceiveQueueState<Meta, Buffer> {
 /// The non-synchonized context for the receive queue.
 pub(crate) trait ReceiveQueueNonSyncContext<D: Device, DeviceId> {
     /// Wakes up RX task.
-    fn wake_rx_task(&mut self, device_id: DeviceId);
+    fn wake_rx_task(&mut self, device_id: &DeviceId);
 }
 
 #[derive(Derivative)]
@@ -145,7 +145,7 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDeque
                 }
 
                 match ret {
-                    DequeueResult::MorePacketsStillQueued => ctx.wake_rx_task(device_id.clone()),
+                    DequeueResult::MorePacketsStillQueued => ctx.wake_rx_task(device_id),
                     DequeueResult::NoMorePacketsLeft => {
                         // There are no more packets left after the batch we
                         // just handled. When the next RX packet gets enqueued,
@@ -169,7 +169,7 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueue
     ) -> Result<(), ReceiveQueueFullError<(Self::Meta, SC::Buffer)>> {
         self.with_receive_queue_mut(device_id, |ReceiveQueueState { queue }| {
             queue.queue_rx_packet(meta, body).map(|res| match res {
-                EnqueueResult::QueueWasPreviouslyEmpty => ctx.wake_rx_task(device_id.clone()),
+                EnqueueResult::QueueWasPreviouslyEmpty => ctx.wake_rx_task(device_id),
                 EnqueueResult::QueuePreviouslyHadPackets => {
                     // We have already woken up the RX task when the queue was
                     // previously empty so there is no need to do it again.
@@ -210,8 +210,8 @@ mod tests {
     type FakeNonSyncCtxImpl = FakeNonSyncCtx<(), (), FakeRxQueueNonSyncCtxState>;
 
     impl ReceiveQueueNonSyncContext<FakeLinkDevice, FakeLinkDeviceId> for FakeNonSyncCtxImpl {
-        fn wake_rx_task(&mut self, device_id: FakeLinkDeviceId) {
-            self.state_mut().woken_rx_tasks.push(device_id)
+        fn wake_rx_task(&mut self, device_id: &FakeLinkDeviceId) {
+            self.state_mut().woken_rx_tasks.push(device_id.clone())
         }
     }
 

@@ -430,6 +430,7 @@ mod tests {
             testutil::{FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
+        device::DeviceId,
         ip::{
             device::Ipv6DeviceTimerId,
             gmp::{
@@ -1172,11 +1173,12 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
         let mut sync_ctx = &sync_ctx;
-        let device_id = crate::device::add_ethernet_device(
+        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        );
+        )
+        .into();
 
         let now = non_sync_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
