@@ -82,7 +82,7 @@ class UserMemory {
   // Changes the mapping permissions to be a Read-Only Executable mapping.
   zx_status_t MakeRX() {
     return mapping_->Protect(
-        mapping_->base(), mapping_->size(),
+        mapping_->base_locking(), mapping_->size_locking(),
         ARCH_MMU_FLAG_PERM_USER | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_EXECUTE);
   }
 

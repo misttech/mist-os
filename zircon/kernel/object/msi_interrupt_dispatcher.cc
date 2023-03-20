@@ -124,7 +124,7 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
     disp = fbl::AdoptRef<MsiInterruptDispatcher>(new (&ac) MsixDispatcherImpl(
         ktl::move(alloc), base_irq_id, msi_id, ktl::move(mapping), vmo_offset, register_int_fn));
   } else {
-    auto* cap = reinterpret_cast<MsiCapability*>(mapping->base() + vmo_offset);
+    auto* cap = reinterpret_cast<MsiCapability*>(mapping->base_locking() + vmo_offset);
     if (cap->id != kMsiCapabilityId) {
       return ZX_ERR_INVALID_ARGS;
     }
