@@ -790,7 +790,7 @@ struct TransactionBuffers {
 struct SharedMemoryAllocation<'a> {
     data_buffer: SharedBuffer<'a, u8>,
     offsets_buffer: SharedBuffer<'a, binder_uintptr_t>,
-    scather_gather_buffer: SharedBuffer<'a, u8>,
+    scatter_gather_buffer: SharedBuffer<'a, u8>,
     security_context_buffer: Option<SharedBuffer<'a, u8>>,
 }
 
@@ -913,7 +913,7 @@ impl SharedMemory {
                     base_offset + data_cap,
                     offsets_length,
                 ),
-                scather_gather_buffer: SharedBuffer::new_unchecked(
+                scatter_gather_buffer: SharedBuffer::new_unchecked(
                     self,
                     base_offset + data_cap + offsets_length,
                     sg_buffers_length,
@@ -3027,7 +3027,7 @@ impl BinderDriver {
             target_proc,
             allocations.offsets_buffer.as_bytes(),
             allocations.data_buffer.as_mut_bytes(),
-            &mut allocations.scather_gather_buffer,
+            &mut allocations.scatter_gather_buffer,
         )?;
 
         Ok((allocations.into(), transient_transaction_state))
@@ -3951,7 +3951,7 @@ mod tests {
             UserBuffer { address: BASE_ADDR + 8usize, length: OFFSETS_LEN }
         );
         assert_eq!(
-            allocations.scather_gather_buffer.user_buffer(),
+            allocations.scatter_gather_buffer.user_buffer(),
             UserBuffer { address: BASE_ADDR + 8usize + OFFSETS_LEN, length: BUFFERS_LEN }
         );
         assert_eq!(
@@ -3963,7 +3963,7 @@ mod tests {
         );
         assert_eq!(allocations.data_buffer.as_bytes().len(), DATA_LEN);
         assert_eq!(allocations.offsets_buffer.as_bytes().len(), OFFSETS_COUNT);
-        assert_eq!(allocations.scather_gather_buffer.as_bytes().len(), BUFFERS_LEN);
+        assert_eq!(allocations.scatter_gather_buffer.as_bytes().len(), BUFFERS_LEN);
         assert_eq!(
             allocations
                 .security_context_buffer
@@ -4032,7 +4032,7 @@ mod tests {
             UserBuffer { address: BASE_ADDR + BUF1_DATA_LEN, length: BUF1_OFFSETS_LEN }
         );
         assert_eq!(
-            allocations.scather_gather_buffer.user_buffer(),
+            allocations.scatter_gather_buffer.user_buffer(),
             UserBuffer {
                 address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN,
                 length: BUF1_BUFFERS_LEN
@@ -4681,7 +4681,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -4763,7 +4763,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -4833,7 +4833,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -4928,7 +4928,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -5445,7 +5445,7 @@ mod tests {
                 &test.receiver_proc,
                 &[0 as binder_uintptr_t],
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect_err("translate handles unexpectedly succeeded");
 
@@ -5477,7 +5477,7 @@ mod tests {
                 &test.receiver_proc,
                 &[0 as binder_uintptr_t],
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect_err("translate handles unexpectedly succeeded");
 
@@ -5522,7 +5522,7 @@ mod tests {
                     std::mem::size_of::<flat_binder_object>() as binder_uintptr_t,
                 ],
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect_err("translate handles unexpectedly succeeded");
 
@@ -5800,7 +5800,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles");
 
@@ -5874,7 +5874,7 @@ mod tests {
                 &test.receiver_proc,
                 &offsets,
                 &mut transaction_data,
-                &mut allocations.scather_gather_buffer,
+                &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles");
 
