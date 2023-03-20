@@ -17,6 +17,7 @@ namespace usb_xhci {
 // unless stated otherwise.
 
 constexpr static uint16_t kPrimaryInterrupter = 0;
+constexpr static uint32_t k64KiB = (1u << 16);
 
 // section 3.2.7
 struct TRB {
@@ -224,10 +225,23 @@ struct Isoch : TRB {
   // Number of packets remaining in this TD
   // See section 4.10.2.4
   DEF_SUBFIELD(status, 21, 17, SIZE);
+  // SIZE can at max be 31 and anything above it must be set to 31.
+  // See section 4.11.2.4
+  constexpr auto& set_SIZE(size_t size) {
+    ZX_ASSERT_MSG(size <= UINT32_MAX, "size: %lu", size);
+    uint32_t size_u32 = static_cast<uint32_t>(size);
+    set_SIZE(size_u32 > 31 ? 31u : size_u32);
+    return *this;
+  }
   // Transfer Last Burst Packet count (number of packets in the last burst)
   // Refer to section 4.11.2.3 for more information
   DEF_SUBFIELD(control, 19, 16, TLBPC);
   DEF_SUBFIELD(status, 16, 0, LENGTH);
+  constexpr auto& set_LENGTH(size_t len) {
+    ZX_ASSERT_MSG(len <= k64KiB, "len: %lu", len);
+    set_LENGTH(static_cast<uint32_t>(len));
+    return *this;
+  }
   // Block event interrupt -- inserts an event into the event ring
   // but does not assert the interrupt line.
   DEF_SUBBIT(control, 9, BEI);
@@ -253,7 +267,20 @@ struct Normal : TRB {
   // Number of packets remaining in this TD
   // See section 4.10.2.4
   DEF_SUBFIELD(status, 21, 17, SIZE);
+  // SIZE can at max be 31 and anything above it must be set to 31.
+  // See section 4.11.2.4
+  constexpr auto& set_SIZE(size_t size) {
+    ZX_ASSERT_MSG(size <= UINT32_MAX, "size: %lu", size);
+    uint32_t size_u32 = static_cast<uint32_t>(size);
+    set_SIZE(size_u32 > 31 ? 31u : size_u32);
+    return *this;
+  }
   DEF_SUBFIELD(status, 16, 0, LENGTH);
+  constexpr auto& set_LENGTH(size_t len) {
+    ZX_ASSERT_MSG(len <= k64KiB, "len: %lu", len);
+    set_LENGTH(static_cast<uint32_t>(len));
+    return *this;
+  }
   // Block event interrupt -- inserts an event into the event ring
   // but does not assert the interrupt line.
   DEF_SUBBIT(control, 9, BEI);
@@ -299,7 +326,20 @@ struct ControlData : TRB {
   // Number of packets remaining in this TD
   // See section 4.10.2.4
   DEF_SUBFIELD(status, 21, 17, SIZE);
+  // SIZE can at max be 31 and anything above it must be set to 31.
+  // See section 4.11.2.4
+  constexpr auto& set_SIZE(size_t size) {
+    ZX_ASSERT_MSG(size <= UINT32_MAX, "size: %lu", size);
+    uint32_t size_u32 = static_cast<uint32_t>(size);
+    set_SIZE(size_u32 > 31 ? 31u : size_u32);
+    return *this;
+  }
   DEF_SUBFIELD(status, 16, 0, LENGTH);
+  constexpr auto& set_LENGTH(size_t len) {
+    ZX_ASSERT_MSG(len <= k64KiB, "len: %lu", len);
+    set_LENGTH(static_cast<uint32_t>(len));
+    return *this;
+  }
   // 0 == OUT, 1 == IN
   DEF_SUBBIT(control, 16, DIRECTION);
   // Immediate data instead of ptr

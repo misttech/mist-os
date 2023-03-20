@@ -785,7 +785,7 @@ void UsbXhci::StartNormalTransaction(UsbRequestState* state, uint8_t interrupter
   }
   size_t pending_len = state->context->request->request()->header.length;
   uint32_t total_len = 0;
-  for (auto [paddr, len] : state->context->request->phys_iter(0)) {
+  for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
     if (len > pending_len) {
       len = pending_len;
     }
@@ -839,7 +839,7 @@ void UsbXhci::ContinueNormalTransaction(UsbRequestState* state) {
   }
   if (state->first_trb) {
     TRB* current = state->info.trbs.data();
-    for (auto [paddr, len] : state->context->request->phys_iter(0)) {
+    for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
       if (!len) {
         break;
       }
@@ -874,6 +874,7 @@ void UsbXhci::ContinueNormalTransaction(UsbRequestState* state) {
         if (last_burst_packet_count) {
           last_burst_packet_count--;
         }
+
         data->set_CHAIN(next != nullptr)
             .set_SIA(state->context->request->request()->header.frame == 0)
             .set_TLBPC(last_burst_packet_count)
@@ -881,8 +882,8 @@ void UsbXhci::ContinueNormalTransaction(UsbRequestState* state) {
                 static_cast<uint32_t>(state->context->request->request()->header.frame % 2048))
             .set_TBC(burst_count)
             .set_INTERRUPTER(state->interrupter)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(packet_count)
             .set_NO_SNOOP(!has_coherent_cache_)
             .set_IOC(next == nullptr)
             .set_ISP(true);
@@ -891,8 +892,8 @@ void UsbXhci::ContinueNormalTransaction(UsbRequestState* state) {
         Normal* data = reinterpret_cast<Normal*>(current);
         data->set_CHAIN(next != nullptr)
             .set_INTERRUPTER(state->interrupter)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(state->packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(state->packet_count)
             .set_NO_SNOOP(!has_coherent_cache_)
             .set_IOC(next == nullptr)
             .set_ISP(true);
@@ -1126,7 +1127,7 @@ void UsbXhci::ControlRequestAllocationPhase(UsbRequestState* state) {
       return;
     }
     TRB* current_trb = nullptr;
-    for (auto [paddr, len] : state->context->request->phys_iter(0)) {
+    for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
       if (!len) {
         break;
       }
@@ -1177,7 +1178,7 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
   // Data stage
   if (state->first_trb) {
     TRB* current = state->first_trb;
-    for (auto [paddr, len] : state->context->request->phys_iter(0)) {
+    for (auto [paddr, len] : state->context->request->phys_iter(k64KiB)) {
       if (!len) {
         break;
       }
@@ -1196,8 +1197,8 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
             .set_DIRECTION(
                 (state->context->request->request()->setup.bm_request_type & USB_DIR_IN) != 0)
             .set_INTERRUPTER(0)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(state->packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(state->packet_count)
             .set_ISP(true)
             .set_NO_SNOOP(!has_coherent_cache_);
       } else {
@@ -1205,8 +1206,8 @@ void UsbXhci::ControlRequestDataPhase(UsbRequestState* state) {
         Normal* data = reinterpret_cast<Normal*>(current);
         data->set_CHAIN(next != nullptr)
             .set_INTERRUPTER(0)
-            .set_LENGTH(static_cast<uint16_t>(len))
-            .set_SIZE(static_cast<uint32_t>(state->packet_count))
+            .set_LENGTH(len)
+            .set_SIZE(state->packet_count)
             .set_ISP(true)
             .set_NO_SNOOP(!has_coherent_cache_);
       }
