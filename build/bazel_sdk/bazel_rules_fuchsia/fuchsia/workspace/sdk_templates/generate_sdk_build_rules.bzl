@@ -113,7 +113,7 @@ def _generate_bind_library_build_rules(ctx, meta, relative_dir, build_file, proc
 # buildifier: disable=unused-variable
 def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     files = []
-    for ifs_file in meta["ifs_files"]:
+    for ifs_file in meta.get("ifs_files", []):
         files.append("pkg/sysroot/" + ifs_file)
     arch_list = process_context.constants.target_cpus
     for arch in arch_list:
