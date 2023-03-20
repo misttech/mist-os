@@ -76,6 +76,10 @@ pub struct SoftPcm {
     /// If an input, this is the amount of space we reserve for audio frames.
     packet_frames: usize,
 
+    /// The size of a frame.
+    /// Used to report the driver transfer size.
+    frame_bytes: usize,
+
     /// The currently set format, in frames per second, audio sample format, and channels.
     current_format: Option<(u32, AudioSampleFormat, u16)>,
 
@@ -216,6 +220,7 @@ impl SoftPcm {
             clock_domain,
             supported_formats,
             packet_frames,
+            frame_bytes: (pcm_format.bits_per_sample / 8) as usize,
             current_format: None,
             ring_buffer_stream: Default::default(),
             frame_vmo: Arc::new(Mutex::new(frame_vmo::FrameVmo::new()?)),
@@ -393,7 +398,9 @@ impl SoftPcm {
             RingBufferRequest::GetProperties { responder } => {
                 let prop = RingBufferProperties {
                     needs_cache_flush_or_invalidate: Some(false),
-                    fifo_depth: (!self.is_output).then_some(self.packet_frames as u32),
+                    // TODO(fxbug.dev/123475): Adds driver_transfer_bytes for output streams.
+                    driver_transfer_bytes: (!self.is_output)
+                        .then_some((self.packet_frames * self.frame_bytes) as u32),
                     ..RingBufferProperties::EMPTY
                 };
                 responder.send(prop)?;
