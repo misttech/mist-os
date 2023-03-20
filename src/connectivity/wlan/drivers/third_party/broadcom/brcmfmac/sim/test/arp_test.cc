@@ -64,7 +64,6 @@ void VerifyNonArpFrame(const std::vector<uint8_t>& frame) {
 
 struct GenericIfc : public SimInterface {
   void OnAssocInd(const wlan_fullmac_assoc_ind_t* ind) override;
-  void OnDataRecv(const void* frame, size_t frame_size, uint32_t flags) override;
   void OnStartConf(const wlan_fullmac_start_confirm_t* resp) override;
   void OnStopConf(const wlan_fullmac_stop_confirm_t* resp) override;
 
@@ -102,11 +101,6 @@ class ArpTest : public SimTest {
 void GenericIfc::OnAssocInd(const wlan_fullmac_assoc_ind_t* ind) {
   ASSERT_EQ(std::memcmp(ind->peer_sta_address, kTheirMac.byte, ETH_ALEN), 0);
   assoc_ind_recv_ = true;
-}
-
-void GenericIfc::OnDataRecv(const void* frame, size_t size, uint32_t flags) {
-  // Should not be called
-  FAIL();
 }
 
 void GenericIfc::OnStartConf(const wlan_fullmac_start_confirm_t* resp) {

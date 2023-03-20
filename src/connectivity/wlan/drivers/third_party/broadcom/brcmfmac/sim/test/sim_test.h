@@ -105,7 +105,6 @@ class SimInterface {
   virtual void OnEapolInd(const wlan_fullmac_eapol_indication_t* ind) {}
   virtual void OnWmmStatusResp(const zx_status_t status, const wlan_wmm_parameters_t* resp) {}
   virtual void OnRelayCapturedFrame(const wlan_fullmac_captured_frame_result_t* result) {}
-  virtual void OnDataRecv(const void* data, size_t data_size, uint32_t flags) {}
 
   // Query an interface
   void Query(wlan_fullmac_query_info_t* out_info);

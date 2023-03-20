@@ -572,12 +572,6 @@ zx_status_t WlanInterface::WlanFullmacImplSetMulticastPromisc(bool enable) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void WlanInterface::WlanFullmacImplDataQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                                               ethernet_impl_queue_tx_callback completion_cb,
-                                               void* cookie) {
-  ZX_PANIC("DataQueueTx should not ever be called, we're using netdevice");
-}
-
 void WlanInterface::WlanFullmacImplSaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {
   if (resp == nullptr) {
     NXPF_ERR("Invalid response parameter");

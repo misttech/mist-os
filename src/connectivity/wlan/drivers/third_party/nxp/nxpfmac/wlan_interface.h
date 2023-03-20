@@ -90,8 +90,6 @@ class WlanInterface : public WlanInterfaceDeviceType,
                                          wlan_fullmac_start_capture_frames_resp_t* resp);
   void WlanFullmacImplStopCaptureFrames();
   zx_status_t WlanFullmacImplSetMulticastPromisc(bool enable);
-  void WlanFullmacImplDataQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                                  ethernet_impl_queue_tx_callback completion_cb, void* cookie);
   void WlanFullmacImplSaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp);
   void WlanFullmacImplSaeFrameTx(const wlan_fullmac_sae_frame_t* frame);
   void WlanFullmacImplWmmStatusReq();

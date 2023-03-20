@@ -142,12 +142,6 @@ wlan_fullmac_impl_protocol_ops_t wlan_interface_proto_ops = {
         [](void* ctx, bool enable) {
           return static_cast<WlanInterface*>(ctx)->SetMulticastPromisc(enable);
         },
-    .data_queue_tx =
-        [](void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
-           ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-          return static_cast<WlanInterface*>(ctx)->DataQueueTx(options, netbuf, completion_cb,
-                                                               cookie);
-        },
     .on_link_state_changed =
         [](void* ctx, bool online) {
           static_cast<WlanInterface*>(ctx)->OnLinkStateChanged(online);
@@ -460,11 +454,6 @@ zx_status_t WlanInterface::SetMulticastPromisc(bool enable) {
     return ZX_ERR_BAD_STATE;
   }
   return brcmf_if_set_multicast_promisc(wdev_->netdev, enable);
-}
-
-void WlanInterface::DataQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                                ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-  ZX_PANIC("DataQueueTx should not ever be called, we're using netdevice");
 }
 
 void WlanInterface::SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {

@@ -619,8 +619,6 @@ void brcmf_if_start_capture_frames(net_device* ndev,
                                    wlan_fullmac_start_capture_frames_resp_t* resp);
 void brcmf_if_stop_capture_frames(net_device* ndev);
 zx_status_t brcmf_if_set_multicast_promisc(net_device* ndev, bool enable);
-void brcmf_if_data_queue_tx(net_device* ndev, uint32_t options, ethernet_netbuf_t* netbuf,
-                            ethernet_impl_queue_tx_callback completion_cb, void* cookie);
 zx_status_t brcmf_if_sae_handshake_resp(net_device* ndev,
                                         const wlan_fullmac_sae_handshake_resp_t* resp);
 zx_status_t brcmf_if_sae_frame_tx(net_device* ndev, const wlan_fullmac_sae_frame_t* frame);

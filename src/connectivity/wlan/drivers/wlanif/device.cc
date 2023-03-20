@@ -101,12 +101,6 @@ zx_status_t Device::Bind() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (wlan_fullmac_impl_.ops->data_queue_tx) {
-    lwarn(
-        "driver implements data_queue_tx while indicating a GND data plane, data_queue_tx "
-        "will not be called.");
-  }
-
   mlme_ = std::make_unique<FullmacMlme>(this);
   ZX_DEBUG_ASSERT(mlme_ != nullptr);
   mlme_->Init();

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.wlan.fullmac;
 
-using fuchsia.hardware.ethernet;
 using fuchsia.hardware.wlan.associnfo;
 using fuchsia.wlan.common;
 using fuchsia.wlan.internal;
@@ -663,13 +662,6 @@ protocol WlanFullmacImplIfc {
         status zx.status;
         wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
     }) -> ();
-
-    // Data operations
-    DataRecv(struct {
-        @buffer
-        data vector<uint8>:MAX;
-        flags uint32;
-    }) -> ();
 };
 
 @transport("Banjo")
@@ -771,17 +763,6 @@ protocol WlanFullmacImpl {
         status zx.status;
     });
 
-    // Data operations
-    @async
-    DataQueueTx(struct {
-        options uint32;
-        @in_out
-        netbuf fuchsia.hardware.ethernet.EthernetNetbuf;
-    }) -> (struct {
-        status zx.status;
-        @mutable
-        netbuf fuchsia.hardware.ethernet.EthernetNetbuf;
-    });
 
     // Notify the interface whether it's online or offline. For client interfaces the online status
     // changes based on such things as being associated/disassociated with an AP. For encrypted

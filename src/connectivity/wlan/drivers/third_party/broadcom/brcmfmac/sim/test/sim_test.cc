@@ -90,10 +90,6 @@ wlan_fullmac_impl_ifc_protocol_ops_t SimInterface::default_sme_dispatch_tbl_ = {
         [](void* ctx, const wlan_fullmac_captured_frame_result_t* result) {
           static_cast<SimInterface*>(ctx)->OnRelayCapturedFrame(result);
         },
-    .data_recv =
-        [](void* ctx, const uint8_t* data, size_t data_size, uint32_t flags) {
-          static_cast<SimInterface*>(ctx)->OnDataRecv(data, data_size, flags);
-        },
 };
 
 zx_status_t SimInterface::Init(std::shared_ptr<simulation::Environment> env, wlan_mac_role_t role) {

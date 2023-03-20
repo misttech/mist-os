@@ -117,19 +117,6 @@ struct BindTestFixture : public ::gtest::TestLoopFixture {
   fuchsia::wlan::sme::GenericSmePtr generic_sme_;
 };
 
-TEST_F(BindTestFixture, GndDataPlaneCanBind) {
-  ASSERT_EQ(device_->Bind(), ZX_OK);
-
-  // The device added should NOT support the ethernet impl protocol
-  auto children = parent_->children();
-  ASSERT_EQ(children.size(), 1u);
-  ethernet_impl_protocol_t eth_impl_proto;
-  EXPECT_NE(device_get_protocol(children.front().get(), ZX_PROTOCOL_ETHERNET_IMPL, &eth_impl_proto),
-            ZX_OK);
-
-  device_->Unbind();
-}
-
 TEST_F(BindTestFixture, EthDataPlaneNotSupported) {
   proto_ops_.query_mac_sublayer_support = [](void* ctx, mac_sublayer_support_t* resp) {
     resp->device.mac_implementation_type = MAC_IMPLEMENTATION_TYPE_FULLMAC;
