@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::reader::{CommandReader, ShellReader},
-    crate::shell::Shell,
-    anyhow::Result,
-    ffx_core::ffx_plugin,
-    ffx_fuzz_args::{FuzzCommand, Session},
-    fidl_fuchsia_developer_remotecontrol as rcs,
-    fuchsia_fuzzctl::{StdioSink, Writer},
-};
+use crate::reader::{CommandReader, ShellReader};
+use crate::shell::Shell;
+use anyhow::Result;
+use ffx_fuzz_args::{FuzzCommand, Session};
+use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_developer_remotecontrol as rcs;
+use fuchsia_fuzzctl::{StdioSink, Writer};
 
 mod autocomplete;
 mod fuzzer;
@@ -28,9 +26,26 @@ mod shell;
 /// This plugin uses a number of async futures which may safely run concurrently, but not in
 /// parallel. This assumption is fulfilled by `ffx` itself: See //src/developer/ffx/src/main.rs,
 /// in which `main` has an attribute of `#[fuchsia_async::run_singlethreaded]`.
-///
-#[ffx_plugin("fuzzing")]
-pub async fn fuzz(rc: rcs::RemoteControlProxy, command: FuzzCommand) -> Result<()> {
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("fuzzing"))]
+pub struct FuzzTool {
+    remote_control: rcs::RemoteControlProxy,
+    #[command]
+    cmd: FuzzCommand,
+}
+
+fho::embedded_plugin!(FuzzTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for FuzzTool {
+    type Writer = SimpleWriter;
+
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        fuzz(self.remote_control, self.cmd).await.map_err(Into::into)
+    }
+}
+
+async fn fuzz(rc: rcs::RemoteControlProxy, command: FuzzCommand) -> Result<()> {
     let session = command.as_session();
     let (is_tty, muted, use_colors) = match session {
         Session::Interactive(_) => (true, false, true),

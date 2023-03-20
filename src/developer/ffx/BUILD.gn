@@ -52,7 +52,6 @@ if (is_host) {
       "//src/connectivity/network/net-cli/ffx:ffx_net",
       "//src/developer/ffx/plugins/cts:ffx_cts",
       "//src/developer/ffx/plugins/doctor:ffx_doctor",
-      "//src/developer/ffx/plugins/fuzz:ffx_fuzz",
       "//src/developer/ffx/plugins/process_explorer:ffx_process_explorer",
       "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
       "//src/developer/ffx/plugins/test:ffx_test",
