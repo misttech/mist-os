@@ -85,11 +85,6 @@ fuchsia_component("stash2_v2") {
   manifest = "meta/stash2.cml"
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 fuchsia_package("pkg") {
   package_name = "stash"
   deps = [

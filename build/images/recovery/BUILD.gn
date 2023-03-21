@@ -82,37 +82,15 @@ if (is_fuchsia) {
   # bootstrap
   # TODO(122863) Remove use of transitional labels
   core_realm_aib_pkgs = [
-    # The required SWD stack artifacts to enable packages in an FVM.
-    "//src/sys/pkg/bin/pkg-cache:for_transition",
-    "//src/sys/pkg/bin/pkg-resolver:for_transition",
-
-    # This is a required dependency of pkg-cache
-    "//src/sys/pkg/bin/system-update-committer:for_transition",
-
-    # Build-Information Service
-    "//src/developer/build_info:for_transition",
-
     # Other
     "//src/devices/sysmem/bin/sysmem_connector:for_transition",
   ]
-  core_realm_aib_shards = [ "//src/developer/build_info:build_info_core_shard" ]
+  core_realm_aib_shards = []
   core_realm_network_aib_pkgs = [
-    # Hardware Information
-    "//src/hwinfo:for_transition",
-
     # Newtorking itself
     "//src/connectivity/network:for_transition",
-    "//src/connectivity/network:netstack",
     "//src/connectivity/wlan/wlancfg:for_transition",
     "//src/security/bin/root_ssl_certificates:for_transition",
-
-    # System Time
-    "//src/sys/time/timekeeper:for_transition",
-    "//src/sys/time/httpsdate_time_source:for_transition",
-    "//src/sys/time/httpsdate_time_source:pull_for_transition",
-
-    # Other
-    "//src/sys/stash:for_transition",
   ]
   core_realm_network_aib_shards = [
     "//src/connectivity/wlan/wlancfg:wlancfg-core-shard",

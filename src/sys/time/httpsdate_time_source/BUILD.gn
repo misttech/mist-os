@@ -88,11 +88,6 @@ fuchsia_unittest_package("httpsdate-time-source-tests") {
   }
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 fuchsia_package("httpsdate-time-source") {
   deps = [
     ":httpsdate-config-values",
@@ -103,11 +98,6 @@ fuchsia_package("httpsdate-time-source") {
 fuchsia_structured_config_values("httpsdate-config-values-pull-api") {
   cm_label = ":manifest"
   values_source = "config/values-pull.json5"
-}
-
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("pull_for_transition") {
 }
 
 fuchsia_package("httpsdate-time-source-pull") {

@@ -8,7 +8,6 @@
 import("//products/common/core.gni")
 
 core_realm_shards += [
-  "//src/developer/build_info:build_info_core_shard",
   "//src/developer/memory/monitor:memory_monitor_core_shard",
   "//src/identity/bin/account:account-core-shard",
   "//src/intl/intl_services:intl_services_shard",

@@ -136,11 +136,6 @@ group("production-component-and-config") {
   ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 fuchsia_package("pkg-resolver") {
   deps = [ ":production-component-and-config" ]
 }

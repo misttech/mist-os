@@ -106,11 +106,6 @@ group("timekeeper_pkg_for_transition") {
   public_deps = [ ":timekeeper" ]
 }
 
-# Enabling a soft-transition, remove when complete
-# TODO(122864) Remove transitional labels
-group("for_transition") {
-}
-
 fuchsia_package("timekeeper") {
   deps = [
     ":service",
