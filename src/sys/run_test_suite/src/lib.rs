@@ -9,6 +9,7 @@ pub mod diagnostics;
 mod outcome;
 pub mod output;
 mod params;
+mod realm;
 mod run;
 mod running_suite;
 mod stream_util;
@@ -18,5 +19,6 @@ pub use {
     connector::{RunBuilderConnector, SingleRunConnector},
     outcome::{ConnectionError, Outcome, RunTestSuiteError, UnexpectedEventError},
     params::{RunParams, TestParams, TimeoutBehavior},
+    realm::parse_provided_realm,
     run::{create_reporter, run_tests_and_get_outcome, DirectoryReporterOptions},
 };

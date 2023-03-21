@@ -4,7 +4,7 @@
 
 use {
     diagnostics_data::Severity, fidl_fuchsia_diagnostics::LogInterestSelector,
-    fidl_fuchsia_test_manager as ftest_manager, test_list::TestTag,
+    fidl_fuchsia_test_manager as ftest_manager, std::sync::Arc, test_list::TestTag,
 };
 
 /// Parameters that specify how a single test suite should be executed.
@@ -12,6 +12,9 @@ use {
 pub struct TestParams {
     /// Test URL.
     pub test_url: String,
+
+    /// Provided test realm.
+    pub realm: Arc<Option<crate::realm::Realm>>,
 
     /// Test timeout. Must be more than zero.
     pub timeout_seconds: Option<std::num::NonZeroU32>,

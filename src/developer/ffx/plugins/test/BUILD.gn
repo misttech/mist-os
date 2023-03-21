@@ -14,6 +14,7 @@ ffx_plugin("ffx_test") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/testing:lib",
+    "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/testing/test_list",
     "//src/sys/run_test_suite:lib",
@@ -28,6 +29,7 @@ ffx_plugin("ffx_test") {
 
   test_deps = [
     "//src/lib/diagnostics/data/rust",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:tempfile",
   ]
 

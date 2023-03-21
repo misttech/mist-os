@@ -11,6 +11,7 @@ rustc_test("tests_bin") {
   name = "run_test_suite_integration_tests"
 
   deps = [
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/data/rust",
@@ -41,9 +42,12 @@ fuchsia_unittest_package("run_test_suite_integration_tests") {
   deps = [
     ":tests_bin",
     "test_data",
+    "//examples/components/routing/rust/echo_server:echo_server_cmp",
     "//examples/tests/rust:custom_artifact_user_cmp",
     "//src/sys/test_manager:test_manager_cmp",
+    "//src/sys/test_manager/tests:test_realm",
     "//src/sys/test_manager/tests/test_data",
+    "//src/sys/test_manager/tests/test_data:echo_test_client",
   ]
 
   # There's expected error logs that happen due to races given that the logging component just

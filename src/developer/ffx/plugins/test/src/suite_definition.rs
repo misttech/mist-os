@@ -49,6 +49,7 @@ fn maybe_convert_test_list_entry_to_test_params(entry: TestListEntry) -> Result<
 
             Ok(TestParams {
                 test_url: component_url,
+                realm: None.into(),
                 test_args,
                 timeout_seconds,
                 test_filters,

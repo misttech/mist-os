@@ -23,6 +23,7 @@ rustc_library("moniker") {
     "//src/sys/lib/elf_runner/*",
     "//src/sys/lib/moniker/*",
     "//src/sys/lib/routing/*",
+    "//src/sys/run_test_suite/*",
     "//src/sys/test_manager/*",
     "//src/sys/tools/debug-dash-launcher/*",
     "//src/testing/sl4f/*",

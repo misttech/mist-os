@@ -6,6 +6,7 @@ use {
     argh::FromArgs,
     diagnostics_data::Severity,
     fidl_fuchsia_diagnostics::LogInterestSelector,
+    fidl_fuchsia_sys2 as fsys,
     fidl_fuchsia_test_manager::{LogsIteratorOption, RunBuilderMarker},
 };
 
@@ -26,6 +27,11 @@ struct Args {
     /// example: --test-filter glob1 --test-filter glob2.
     #[argh(option)]
     test_filter: Vec<String>,
+
+    /// the realm to run the test in. This field is optional and takes the form:
+    /// /path/to/realm:test_collection.
+    #[argh(option)]
+    realm: Option<String>,
 
     /// whether to also run tests that have been marked disabled/ignored by the test author.
     #[argh(switch)]
@@ -89,6 +95,9 @@ fn log_interest_selector_or_severity(input: &str) -> Result<LogInterestSelector,
     selectors::parse_log_interest_selector_or_severity(input).map_err(|s| s.to_string())
 }
 
+const REALM_QUERY_PATH: &str = "/svc/fuchsia.sys2.RealmQuery.root";
+const LIFECYCLE_CONTROLLER_PATH: &str = "/svc/fuchsia.sys2.LifecycleController.root";
+
 #[fuchsia::main]
 async fn main() {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
@@ -98,6 +107,7 @@ async fn main() {
         timeout,
         test_url,
         test_filter,
+        realm,
         also_run_disabled_tests,
         continue_on_timeout,
         stop_after_failures,
@@ -117,6 +127,29 @@ async fn main() {
 
     if filter_ansi {
         println!("Note: Filtering out ANSI escape sequences.");
+    }
+
+    let mut provided_realm = None;
+    if let Some(realm) = realm {
+        let lifecycle_controller = fuchsia_component::client::connect_to_protocol_at_path::<
+            fsys::LifecycleControllerMarker,
+        >(LIFECYCLE_CONTROLLER_PATH)
+        .expect("connecting to LifecycleController");
+        let realm_query = fuchsia_component::client::connect_to_protocol_at_path::<
+            fsys::RealmQueryMarker,
+        >(REALM_QUERY_PATH)
+        .expect("connecting to RealmQuery");
+        match run_test_suite_lib::parse_provided_realm(&lifecycle_controller, &realm_query, &realm)
+            .await
+        {
+            Ok(r) => {
+                provided_realm = Some(r);
+            }
+            Err(e) => {
+                println!("Error parsing realm '{}': {:?}", realm, e);
+                std::process::exit(1);
+            }
+        }
     }
 
     let test_filters = if test_filter.len() == 0 { None } else { Some(test_filter) };
@@ -175,6 +208,7 @@ async fn main() {
         vec![
             run_test_suite_lib::TestParams {
                 test_url,
+                realm: provided_realm.into(),
                 timeout_seconds: timeout.and_then(std::num::NonZeroU32::new),
                 test_filters,
                 also_run_disabled_tests,

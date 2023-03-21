@@ -5,9 +5,11 @@
 use assert_matches::assert_matches;
 use diagnostics_data::Severity;
 use diagnostics_reader::{ArchiveReader, Inspect};
+use fidl_fuchsia_sys2 as fsys;
 use fidl_fuchsia_test_manager::{
     LaunchError, LogsIteratorOption, RunBuilderMarker, RunBuilderProxy,
 };
+use fuchsia_component::client::connect_to_protocol;
 use regex::Regex;
 use run_test_suite_lib::{output, Outcome, RunTestSuiteError, TestParams};
 use std::convert::TryInto;
@@ -21,6 +23,9 @@ use test_output_directory::{
     testing::{ExpectedDirectory, ExpectedSuite, ExpectedTestCase, ExpectedTestRun},
 };
 use test_util::assert_geq;
+
+const PROVIDED_HERMETIC_REALM: &str = "/provided_test_realm:hermetic_test_coll";
+const PROVIDED_ECHO_REALM: &str = "/provided_test_realm:echo_test_coll";
 
 /// split and sort output as output can come in any order.
 /// `output` is of type vec<u8> and `expected_output` is a string.
@@ -56,6 +61,29 @@ fn sanitize_log_for_comparison(log: impl AsRef<str>) -> String {
 fn new_test_params(test_url: &str) -> TestParams {
     TestParams {
         test_url: test_url.to_string(),
+        realm: None.into(),
+        timeout_seconds: None,
+        test_filters: None,
+        also_run_disabled_tests: false,
+        parallel: None,
+        test_args: vec![],
+        max_severity_logs: None,
+        tags: vec![TestTag { key: "internal".to_string(), value: "true".to_string() }],
+    }
+}
+
+async fn new_test_params_with_realm(test_url: &str, realm_str: &str) -> TestParams {
+    let lifecycle_controller = connect_to_protocol::<fsys::LifecycleControllerMarker>()
+        .expect("connecting to LifecycleController");
+    let realm_query =
+        connect_to_protocol::<fsys::RealmQueryMarker>().expect("connecting to LifecycleController");
+    let realm =
+        run_test_suite_lib::parse_provided_realm(&lifecycle_controller, &realm_query, realm_str)
+            .await
+            .unwrap();
+    TestParams {
+        test_url: test_url.to_string(),
+        realm: Some(realm).into(),
         timeout_seconds: None,
         test_filters: None,
         also_run_disabled_tests: false,
@@ -140,8 +168,7 @@ async fn run_test_once(
     let run_reporter = run_test_suite_lib::output::RunReporter::new(reporter);
     Ok(run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params],
         new_run_params(),
@@ -166,8 +193,7 @@ impl ChunkedRunConnector {
 #[async_trait::async_trait]
 impl run_test_suite_lib::RunBuilderConnector for ChunkedRunConnector {
     async fn connect(&self) -> Result<RunBuilderProxy, run_test_suite_lib::ConnectionError> {
-        Ok(fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-            .expect("connecting to RunBuilderProxy"))
+        Ok(connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"))
     }
 
     fn batch_size(&self) -> usize {
@@ -231,47 +257,116 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/no-onfinished-af
     );
 }
 
+#[test_case(false ; "")]
+#[test_case(true ; "in_provided_realm")]
+#[fuchsia::test]
+async fn launch_and_test_passing_v2_test(in_provided_realm: bool) {
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm";
+    let (test_params, subcase) = match in_provided_realm {
+        true => (
+            new_test_params_with_realm(test_url, PROVIDED_HERMETIC_REALM).await,
+            "test_logging_component_in_provided_realm",
+        ),
+        false => (new_test_params(test_url), "test_logging_component"),
+    };
+    let case1log = "log1 for Example.Test1\nlog2 for Example.Test1\nlog3 for Example.Test1\n";
+    let case2log = "log1 for Example.Test2\nlog2 for Example.Test2\nlog3 for Example.Test2\n";
+    let case3log = "log1 for Example.Test3\nlog2 for Example.Test3\nlog3 for Example.Test3\n";
+
+    let expected_output = format!(
+        "Running test '{}'
+[RUNNING]	Example.Test1
+{}[PASSED]	Example.Test1
+[RUNNING]	Example.Test2
+{}[PASSED]	Example.Test2
+[RUNNING]	Example.Test3
+{}[PASSED]	Example.Test3
+
+3 out of 3 tests passed...
+{} completed with result: PASSED
+",
+        test_url, case1log, case2log, case3log, test_url
+    );
+
+    run_with_reporter(
+        subcase,
+        |reporter: TestMuxMuxReporter, output: TestOutputView, output_dir: tempfile::TempDir| async move {
+            let reporter = output::RunReporter::new(reporter);
+            let outcome = run_test_suite_lib::run_tests_and_get_outcome(
+                run_test_suite_lib::SingleRunConnector::new(
+                    connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
+                ),
+                vec![test_params],
+                new_run_params(),
+                reporter,
+                futures::future::pending(),
+            )
+            .await;
+
+            assert_output!(output.lock().as_ref(), expected_output);
+
+            assert_eq!(outcome, Outcome::Passed);
+
+            directory::testing::assert_run_result(
+                output_dir.path(),
+                &ExpectedTestRun::new(directory::Outcome::Passed)
+                    .with_suite(
+                        ExpectedSuite::new(test_url, directory::Outcome::Passed)
+                        .with_tag(TestTag::new("internal", "true"))
+                        .with_artifact(directory::ArtifactType::Syslog, "syslog.txt".into(), "")
+                        .with_case(ExpectedTestCase::new("Example.Test1", directory::Outcome::Passed)
+                        .with_artifact(
+                            directory::ArtifactType::Stdout,
+                            "stdout.txt".into(),
+                            case1log,
+                        ))
+                        .with_case(ExpectedTestCase::new("Example.Test2", directory::Outcome::Passed)
+                        .with_artifact(
+                            directory::ArtifactType::Stdout,
+                            "stdout.txt".into(),
+                            case2log,
+                        ))
+                        .with_case(
+                            ExpectedTestCase::new("Example.Test3", directory::Outcome::Passed)
+                            .with_artifact(
+                                directory::ArtifactType::Stdout,
+                                "stdout.txt".into(),
+                                case3log,
+                            ),
+                        )
+                    )
+            );
+        }
+    ).await;
+}
+
 #[fixture::fixture(run_with_reporter)]
 #[fuchsia::test]
-async fn launch_and_test_passing_v2_test(
+async fn launch_and_test_echo_test_in_provided_realm(
     reporter: TestMuxMuxReporter,
     output: TestOutputView,
     output_dir: tempfile::TempDir,
 ) {
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_client.cm";
     let reporter = output::RunReporter::new(reporter);
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                    .expect("connecting to RunBuilderProxy")
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        vec![new_test_params(
-            "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm",
-        )],
+        vec![new_test_params_with_realm(test_url, PROVIDED_ECHO_REALM).await],
         new_run_params(),
         reporter,
         futures::future::pending(),
     )
     .await;
+    let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_client.cm'
+[RUNNING]	EchoTest
+[PASSED]	EchoTest
 
-    let expected_output = "Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm'
-[RUNNING]	Example.Test1
-log1 for Example.Test1
-log2 for Example.Test1
-log3 for Example.Test1
-[PASSED]	Example.Test1
-[RUNNING]	Example.Test2
-log1 for Example.Test2
-log2 for Example.Test2
-log3 for Example.Test2
-[PASSED]	Example.Test2
-[RUNNING]	Example.Test3
-log1 for Example.Test3
-log2 for Example.Test3
-log3 for Example.Test3
-[PASSED]	Example.Test3
-
-3 out of 3 tests passed...
-fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm completed with result: PASSED
+1 out of 1 tests passed...
+fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_client.cm completed with result: PASSED
 ";
     assert_output!(output.lock().as_ref(), expected_output);
 
@@ -282,28 +377,12 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-exa
         &ExpectedTestRun::new(directory::Outcome::Passed)
             .with_suite(
                 ExpectedSuite::new(
-                    "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm",
+                    "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_client.cm",
                     directory::Outcome::Passed,
                 )
                 .with_tag(TestTag::new("internal", "true"))
                 .with_artifact(directory::ArtifactType::Syslog, "syslog.txt".into(), "")
-                .with_case(ExpectedTestCase::new("Example.Test1", directory::Outcome::Passed).with_artifact(
-                    directory::ArtifactType::Stdout,
-                    "stdout.txt".into(),
-                    "log1 for Example.Test1\nlog2 for Example.Test1\nlog3 for Example.Test1\n",
-                ))
-                .with_case(ExpectedTestCase::new("Example.Test2", directory::Outcome::Passed).with_artifact(
-                    directory::ArtifactType::Stdout,
-                    "stdout.txt".into(),
-                    "log1 for Example.Test2\nlog2 for Example.Test2\nlog3 for Example.Test2\n",
-                ))
-                .with_case(
-                    ExpectedTestCase::new("Example.Test3", directory::Outcome::Passed).with_artifact(
-                        directory::ArtifactType::Stdout,
-                        "stdout.txt".into(),
-                        "log1 for Example.Test3\nlog2 for Example.Test3\nlog3 for Example.Test3\n",
-                    ),
-                )
+                .with_case(ExpectedTestCase::new("EchoTest", directory::Outcome::Passed))
             )
     );
 }
@@ -324,7 +403,7 @@ async fn experimental_parallel_execution_integ_test(
     run_params.experimental_parallel_execution = Some(8);
     let _outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
+            connect_to_protocol::<RunBuilderMarker>()
                     .expect("connecting to RunBuilderProxy")
         ),
         vec![new_test_params(
@@ -376,8 +455,7 @@ async fn launch_and_test_stderr_test(
     let reporter = output::RunReporter::new(reporter);
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/test-with-stderr.cm",
@@ -460,23 +538,32 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/test-with-stderr
     );
 }
 
-#[test_case(usize::MAX ; "one_chunk")]
-#[test_case(5 ; "two_chunk")]
-#[test_case(3 ; "three_chunk")]
+#[test_case(usize::MAX, false ; "one_chunk")]
+#[test_case(5, false ; "two_chunk")]
+#[test_case(3, false ; "three_chunk")]
+#[test_case(usize::MAX, true ; "one_chunk_in_provided_realm")]
+#[test_case(5, true ; "two_chunk_in_provided_realm")]
+#[test_case(3, true ; "three_chunk_in_provided_realm")]
 #[fuchsia::test]
-async fn launch_and_test_passing_v2_test_multiple_times(test_chunk_size: usize) {
+async fn launch_and_test_passing_v2_test_multiple_times(
+    test_chunk_size: usize,
+    in_provided_realm: bool,
+) {
     let (reporter, _output, output_dir) = create_shell_and_dir_reporter();
     let reporter = output::RunReporter::new(reporter);
-
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm";
+    let test_params = match in_provided_realm {
+        true => new_test_params_with_realm(test_url, PROVIDED_HERMETIC_REALM).await,
+        false => new_test_params(test_url),
+    };
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         ChunkedRunConnector::new(test_chunk_size),
-            vec![new_test_params(
-                "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm",
-                ); 10],
-                new_run_params(),
-            reporter,
-            futures::future::pending(),
-        )
+        vec![test_params; 10],
+        new_run_params(),
+        reporter,
+        futures::future::pending(),
+    )
     .await;
     assert_eq!(outcome, Outcome::Passed);
 
@@ -512,7 +599,7 @@ async fn launch_and_test_multiple_passing_tests(
     let reporter = output::RunReporter::new(reporter);
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
+            connect_to_protocol::<RunBuilderMarker>()
                     .expect("connecting to RunBuilderProxy")
         ),
             vec![new_test_params(
@@ -741,8 +828,7 @@ async fn launch_and_test_logspam_test(iterator_option: LogsIteratorOption) {
     run_params.log_protocol = Some(iterator_option);
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logspam_test.cm",
@@ -1331,27 +1417,54 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_realm.
     assert_eq!(outcome, Outcome::Passed);
 }
 
-#[test_case("batch", LogsIteratorOption::BatchIterator ; "batch")]
-#[test_case("archive", LogsIteratorOption::ArchiveIterator ; "archive")]
+#[test_case("batch", LogsIteratorOption::BatchIterator, false ; "batch")]
+#[test_case("archive", LogsIteratorOption::ArchiveIterator, false ; "archive")]
+#[test_case("batch_in_provided_realm", LogsIteratorOption::BatchIterator, true ; "batch_in_provided_realm")]
+#[test_case("archive_in_provided_realm", LogsIteratorOption::ArchiveIterator, true ; "archive_in_provided_realm")]
 #[fuchsia::test]
-async fn test_logging_component(subcase: &'static str, iterator_option: LogsIteratorOption) {
+async fn test_logging_component(
+    subcase: &'static str,
+    iterator_option: LogsIteratorOption,
+    in_provided_realm: bool,
+) {
+    let test_url =
+        "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm";
+    let mut test_params = match in_provided_realm {
+        false => new_test_params(test_url),
+        true => new_test_params_with_realm(test_url, PROVIDED_HERMETIC_REALM).await,
+    };
+    test_params.timeout_seconds = std::num::NonZeroU32::new(600);
+    let expected_logs =
+        "[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] DEBUG: Logging initialized
+[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] DEBUG: my debug message
+[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] INFO: my info message
+[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] WARN: my warn message
+";
+
+    let expected_output = format!(
+        "Running test '{}'
+[RUNNING]	log_and_exit
+{}[PASSED]	log_and_exit
+
+1 out of 1 tests passed...
+{} completed with result: PASSED
+",
+        test_url, expected_logs, test_url
+    );
+
     run_with_reporter(
         &format!("test_logging_component_{}", subcase),
         |reporter: TestMuxMuxReporter, output: TestOutputView, output_dir: tempfile::TempDir| async move {
-            let mut test_params = new_test_params(
-                "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm",
-            );
-            test_params.timeout_seconds = std::num::NonZeroU32::new(600);
-    let run_params = run_test_suite_lib::RunParams {
-        log_protocol: Some(iterator_option),
-        min_severity_logs: vec![
-            selectors::parse_log_interest_selector_or_severity("DEBUG").unwrap()
-        ],
-        ..new_run_params()
-    };
+            let run_params = run_test_suite_lib::RunParams {
+                log_protocol: Some(iterator_option),
+                min_severity_logs: vec![
+                    selectors::parse_log_interest_selector_or_severity("DEBUG").unwrap()
+                ],
+                ..new_run_params()
+            };
             let outcome = run_test_suite_lib::run_tests_and_get_outcome(
                 run_test_suite_lib::SingleRunConnector::new(
-                    fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
+                    connect_to_protocol::<RunBuilderMarker>()
                             .expect("connecting to RunBuilderProxy")
                 ),
                 vec![test_params],
@@ -1361,20 +1474,6 @@ async fn test_logging_component(subcase: &'static str, iterator_option: LogsIter
             )
             .await;
 
-            let expected_logs =
-                "[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] DEBUG: Logging initialized
-[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] DEBUG: my debug message
-[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] INFO: my info message
-[TIMESTAMP][PID][TID][<root>][log_and_exit,logging_test] WARN: my warn message
-";
-
-            let expected_output = format!("Running test 'fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm'
-[RUNNING]	log_and_exit
-{}[PASSED]	log_and_exit
-
-1 out of 1 tests passed...
-fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm completed with result: PASSED
-", expected_logs);
             assert_output!(output.lock().as_slice(), expected_output.as_str());
             assert_eq!(outcome, Outcome::Passed);
 
@@ -1382,7 +1481,7 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm 
                 output_dir.path(),
                 &ExpectedTestRun::new(directory::Outcome::Passed).with_suite(
                     ExpectedSuite::new(
-                        "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm",
+                        test_url,
                         directory::Outcome::Passed,
                     )
                     .with_tag(TestTag::new("internal", "true"))
@@ -1425,7 +1524,7 @@ async fn test_logging_component_min_severity(
     };
         let outcome = run_test_suite_lib::run_tests_and_get_outcome(
             run_test_suite_lib::SingleRunConnector::new(
-                fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
+                connect_to_protocol::<RunBuilderMarker>()
                         .expect("connecting to RunBuilderProxy")
             ),
             vec![test_params],
@@ -1474,7 +1573,7 @@ async fn test_per_component_min_severity(
     };
         let outcome = run_test_suite_lib::run_tests_and_get_outcome(
             run_test_suite_lib::SingleRunConnector::new(
-                fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
+                connect_to_protocol::<RunBuilderMarker>()
                         .expect("connecting to RunBuilderProxy")
             ),
             vec![test_params],
@@ -1545,8 +1644,7 @@ async fn test_stdout_and_log_filter_ansi(
 
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params],
         run_params,
@@ -1602,8 +1700,7 @@ async fn test_max_severity(max_severity: Severity, iterator_option: LogsIterator
     run_params.log_protocol = Some(iterator_option);
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params],
         run_params,
@@ -1692,8 +1789,7 @@ async fn test_stdout_to_directory(
 
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params],
         new_run_params(),
@@ -1756,8 +1852,7 @@ async fn test_syslog_to_directory(
 
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params],
         new_run_params(),
@@ -1812,8 +1907,7 @@ async fn test_custom_artifacts_to_directory(
 
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params],
         new_run_params(),
@@ -1866,8 +1960,7 @@ async fn test_terminate_signal(
 
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params],
         new_run_params(),
@@ -1917,8 +2010,7 @@ async fn test_terminate_signal_multiple_suites(
 
     let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params; 10],
         new_run_params(),
@@ -1986,8 +2078,7 @@ async fn test_collect_stream_artifacts_from_hung_test(
 
     let run_fut = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-                .expect("connecting to RunBuilderProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![new_test_params(SUITE_NAME)],
         new_run_params(),

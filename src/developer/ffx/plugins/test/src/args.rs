@@ -94,6 +94,11 @@ pub struct RunCommand {
     #[argh(option)]
     pub test_filter: Vec<String>,
 
+    /// the realm to run the test in. This field is optional and takes the form:
+    /// /path/to/realm:test_collection.
+    #[argh(option)]
+    pub realm: Option<String>,
+
     /// also execute test cases that have been disabled by the test author.
     #[argh(switch)]
     pub run_disabled: bool,

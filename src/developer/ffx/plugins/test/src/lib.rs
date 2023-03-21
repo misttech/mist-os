@@ -147,7 +147,9 @@ async fn run_test<W: 'static + Write + Send + Sync>(
         min_severity_logs: min_log_severity,
         show_full_moniker: cmd.show_full_moniker_in_logs,
     };
-    let test_definitions = test_params_from_args(cmd, experiments.json_input.enabled)?;
+
+    let test_definitions =
+        test_params_from_args(&remote_control, cmd, experiments.json_input.enabled).await?;
 
     let (cancel_sender, cancel_receiver) = futures::channel::oneshot::channel::<()>();
     let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
@@ -200,7 +202,8 @@ async fn run_test<W: 'static + Write + Send + Sync>(
 /// Generate TestParams from |cmd|.
 /// |stdin_handle_fn| is a function that generates a handle to stdin and is a parameter to enable
 /// testing.
-fn test_params_from_args(
+async fn test_params_from_args(
+    remote_control: &fremotecontrol::RemoteControlProxy,
     cmd: RunCommand,
     json_input_experiment_enabled: bool,
 ) -> Result<impl ExactSizeIterator<Item = run_test_suite_lib::TestParams> + Debug, FfxError> {
@@ -235,8 +238,35 @@ fn test_params_from_args(
                 }
             };
 
+            let mut provided_realm = None;
+            if let Some(realm_str) = &cmd.realm {
+                let lifecycle_controller =
+                    ffx_component::rcs::connect_to_lifecycle_controller(&remote_control)
+                        .await
+                        .map_err(|e| {
+                            ffx_error!(
+                                "Parsing realm: Cannot connect to lifecycle controller: {}",
+                                e
+                            )
+                        })?;
+                let realm_query =
+                    ffx_component::rcs::connect_to_realm_query(&remote_control).await.map_err(
+                        |e| ffx_error!("Parsing realm: Cannot connect to realm query: {}", e),
+                    )?;
+                provided_realm = Some(
+                    run_test_suite_lib::parse_provided_realm(
+                        &lifecycle_controller,
+                        &realm_query,
+                        &realm_str,
+                    )
+                    .await
+                    .map_err(|e| ffx_error!("Error parsing realm '{}': {}", realm_str, e))?,
+                );
+            }
+
             let test_params = run_test_suite_lib::TestParams {
                 test_url,
+                realm: provided_realm.into(),
                 timeout_seconds: cmd.timeout.and_then(std::num::NonZeroU32::new),
                 test_filters: if cmd.test_filter.len() == 0 { None } else { Some(cmd.test_filter) },
                 max_severity_logs: cmd.max_severity_logs,
@@ -344,8 +374,8 @@ mod test {
         static ref INVALID_INPUT: Vec<u8> = vec![1u8; 64];
     }
 
-    #[test]
-    fn test_get_test_params() {
+    #[fuchsia::test]
+    async fn test_get_test_params() {
         let dir = tempfile::tempdir().expect("Create temp dir");
         std::fs::write(dir.path().join("test_defs.json"), &*VALID_FILE_INPUT).expect("write file");
 
@@ -356,6 +386,7 @@ mod test {
                     test_args: vec!["my-test-url".to_string()],
                     test_file: None,
                     test_filter: vec![],
+                    realm: None,
                     run_disabled: false,
                     filter_ansi: false,
                     parallel: None,
@@ -371,6 +402,7 @@ mod test {
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
+                    realm: None.into(),
                     timeout_seconds: None,
                     test_filters: None,
                     also_run_disabled_tests: false,
@@ -386,6 +418,7 @@ mod test {
                     test_args: vec!["my-test-url".to_string()],
                     test_file: None,
                     test_filter: vec![],
+                    realm: None,
                     run_disabled: false,
                     filter_ansi: false,
                     parallel: None,
@@ -402,6 +435,7 @@ mod test {
                 vec![
                     run_test_suite_lib::TestParams {
                         test_url: "my-test-url".to_string(),
+                        realm: None.into(),
                         timeout_seconds: None,
                         test_filters: None,
                         also_run_disabled_tests: false,
@@ -419,6 +453,7 @@ mod test {
                     test_args: vec!["my-test-url".to_string(), "--".to_string(), "arg".to_string()],
                     test_file: None,
                     test_filter: vec!["filter".to_string()],
+                    realm: None,
                     run_disabled: true,
                     filter_ansi: false,
                     parallel: Some(20),
@@ -434,6 +469,7 @@ mod test {
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
+                    realm: None.into(),
                     timeout_seconds: Some(NonZeroU32::new(10).unwrap()),
                     test_filters: Some(vec!["filter".to_string()]),
                     also_run_disabled_tests: true,
@@ -451,6 +487,7 @@ mod test {
                         dir.path().join("test_defs.json").to_str().unwrap().to_string(),
                     ),
                     test_filter: vec![],
+                    realm: None,
                     run_disabled: false,
                     filter_ansi: false,
                     parallel: None,
@@ -467,6 +504,7 @@ mod test {
                 vec![
                     run_test_suite_lib::TestParams {
                         test_url: "file-test-url-1".to_string(),
+                        realm: None.into(),
                         timeout_seconds: None,
                         test_filters: None,
                         also_run_disabled_tests: false,
@@ -477,6 +515,7 @@ mod test {
                     },
                     run_test_suite_lib::TestParams {
                         test_url: "file-test-url-2".to_string(),
+                        realm: None.into(),
                         timeout_seconds: Some(NonZeroU32::new(60).unwrap()),
                         test_filters: None,
                         also_run_disabled_tests: false,
@@ -487,6 +526,7 @@ mod test {
                     },
                     run_test_suite_lib::TestParams {
                         test_url: "file-test-url-3".to_string(),
+                        realm: None.into(),
                         timeout_seconds: None,
                         test_filters: Some(vec!["Unit".to_string()]),
                         also_run_disabled_tests: true,
@@ -501,9 +541,10 @@ mod test {
                 ],
             ),
         ];
-
+        let (remote_control, _server_end) =
+            create_proxy::<fremotecontrol::RemoteControlMarker>().unwrap();
         for (run_command, expected_test_params) in cases.into_iter() {
-            let result = test_params_from_args(run_command.clone(), true);
+            let result = test_params_from_args(&remote_control, run_command.clone(), true).await;
             assert!(
                 result.is_ok(),
                 "Error getting test params from {:?}: {:?}",
@@ -514,19 +555,23 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_get_test_params_count() {
+    #[fuchsia::test]
+    async fn test_get_test_params_count() {
         // Regression test for https://fxbug.dev/111145: using an extremely
         // large test count should result in a modest memory allocation. If
         // that wasn't the case, this test would fail.
         const COUNT: u32 = u32::MAX;
+        let (remote_control, _server_end) =
+            create_proxy::<fremotecontrol::RemoteControlMarker>().unwrap();
         let params = test_params_from_args(
+            &remote_control,
             RunCommand {
                 test_args: vec!["my-test-url".to_string()],
                 count: Some(COUNT),
                 timeout: None,
                 test_file: None,
                 test_filter: vec![],
+                realm: None,
                 run_disabled: false,
                 filter_ansi: false,
                 parallel: None,
@@ -541,12 +586,13 @@ mod test {
             },
             true,
         )
+        .await
         .expect("should succeed");
         assert_eq!(params.len(), usize::try_from(COUNT).unwrap());
     }
 
-    #[test]
-    fn test_get_test_params_invalid_args() {
+    #[fuchsia::test]
+    async fn test_get_test_params_invalid_args() {
         let dir = tempfile::tempdir().expect("Create temp dir");
         std::fs::write(dir.path().join(VALID_INPUT_FILENAME), &*VALID_FILE_INPUT)
             .expect("write file");
@@ -560,6 +606,7 @@ mod test {
                     test_args: vec![],
                     test_file: None,
                     test_filter: vec![],
+                    realm: None,
                     run_disabled: false,
                     filter_ansi: false,
                     parallel: None,
@@ -583,6 +630,7 @@ mod test {
                         dir.path().join(VALID_INPUT_FILENAME).to_str().unwrap().to_string(),
                     ),
                     test_filter: vec![],
+                    realm: None,
                     run_disabled: false,
                     filter_ansi: false,
                     parallel: None,
@@ -606,6 +654,7 @@ mod test {
                         dir.path().join(INVALID_INPUT_FILENAME).to_str().unwrap().to_string(),
                     ),
                     test_filter: vec![],
+                    realm: None,
                     run_disabled: false,
                     filter_ansi: false,
                     parallel: None,
@@ -621,9 +670,10 @@ mod test {
                 },
             ),
         ];
-
+        let (remote_control, _server_end) =
+            create_proxy::<fremotecontrol::RemoteControlMarker>().unwrap();
         for (case_name, invalid_run_command) in cases.into_iter() {
-            let result = test_params_from_args(invalid_run_command, true);
+            let result = test_params_from_args(&remote_control, invalid_run_command, true).await;
             assert!(
                 result.is_err(),
                 "Getting test params for case '{}' unexpectedly succeeded",
