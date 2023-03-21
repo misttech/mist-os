@@ -3019,7 +3019,7 @@ impl BinderDriver {
 
         // Translate any handles/fds from the source process' handle table to the target process'
         // handle table.
-        let transient_transaction_state = self.translate_handles(
+        let transient_transaction_state = self.translate_objects(
             source_resource_accessor,
             source_proc,
             source_thread,
@@ -3040,11 +3040,17 @@ impl BinderDriver {
     /// process' handle table. Conversely, a handle being sent to the process that owns the
     /// underlying binder object should receive the actual pointers to the object.
     ///
+    /// When a binder buffer object is sent from one process to another, the buffer described by the
+    /// buffer object must be copied into the receiver's address space.
+    ///
+    /// When a binder file descriptor object is sent from one process to another, the file
+    /// descriptor must be `dup`-ed into the receiver's FD table.
+    ///
     /// Returns [`TransientTransactionState`], which contains the handles in the target process'
     /// handle table for which temporary strong references were acquired, along with duped FDs. This
     /// object takes care of releasing these resources when dropped, due to an error or a
     /// `BC_FREE_BUFFER` command.
-    fn translate_handles<'a>(
+    fn translate_objects<'a>(
         &self,
         source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &Arc<BinderProcess>,
@@ -4673,7 +4679,7 @@ mod tests {
 
         let transaction_state = test
             .driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -4755,7 +4761,7 @@ mod tests {
         }));
 
         test.driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -4825,7 +4831,7 @@ mod tests {
 
         let transaction_state = test
             .driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -4920,7 +4926,7 @@ mod tests {
 
         let transaction_state = test
             .driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -5437,7 +5443,7 @@ mod tests {
 
         let transaction_ref_error = test
             .driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -5469,7 +5475,7 @@ mod tests {
 
         let transaction_ref_error = test
             .driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -5511,7 +5517,7 @@ mod tests {
         }));
 
         test.driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -5792,7 +5798,7 @@ mod tests {
 
         let transient_transaction_state = test
             .driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
@@ -5866,7 +5872,7 @@ mod tests {
 
         let transaction_state = test
             .driver
-            .translate_handles(
+            .translate_objects(
                 &test.sender_task,
                 &test.sender_proc,
                 &test.sender_thread,
