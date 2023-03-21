@@ -389,8 +389,8 @@ def _fuchsia_product_bundle_impl(ctx):
 
     # Gather all the arguments to pass to ffx.
     ffx_invocation = [
-        "$ORIG_DIR/$FFX",
-        "--config \"product.experimental=true,sdk.root=$ORIG_DIR/$SDK_ROOT\"",
+        "$FFX",
+        "--config \"product.experimental=true,sdk.root=$SDK_ROOT\"",
         "--isolate-dir $FFX_ISOLATE_DIR",
         "product",
         "create",
@@ -398,9 +398,9 @@ def _fuchsia_product_bundle_impl(ctx):
         product_name,
         "--product-version",
         product_version,
-        "--partitions $ORIG_DIR/$PARTITIONS_PATH",
-        "--system-a $ORIG_DIR/$SYSTEM_A_MANIFEST",
-        "--out-dir $ORIG_DIR/$OUTDIR",
+        "--partitions $PARTITIONS_PATH",
+        "--system-a $SYSTEM_A_MANIFEST",
+        "--out-dir $OUTDIR",
     ]
 
     # Gather the environment variables needed in the script.
@@ -409,7 +409,6 @@ def _fuchsia_product_bundle_impl(ctx):
         "OUTDIR": pb_out_dir.path,
         "PARTITIONS_PATH": partitions_configuration.path,
         "SYSTEM_A_MANIFEST": system_a_out.path + "/images.json",
-        "ARTIFACTS_BASE_PATH": ctx.attr.artifacts_base_path,
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
     }
@@ -430,7 +429,7 @@ def _fuchsia_product_bundle_impl(ctx):
     # If recovery is supplied, add it to the product bundle.
     if ctx.attr.recovery != None:
         system_r_out = ctx.attr.recovery[FuchsiaProductImageInfo].images_out
-        ffx_invocation.append("--system-r $ORIG_DIR/$SYSTEM_R_MANIFEST")
+        ffx_invocation.append("--system-r $SYSTEM_R_MANIFEST")
         env["SYSTEM_R_MANIFEST"] = system_r_out.path + "/images.json"
         inputs.extend(ctx.files.recovery)
 
@@ -439,7 +438,7 @@ def _fuchsia_product_bundle_impl(ctx):
         if ctx.attr.repository_keys == None:
             fail("Repository keys must be supplied in order to build an update package")
         ffx_invocation.extend([
-            "--update-package-version-file $ORIG_DIR/$UPDATE_VERSION_FILE",
+            "--update-package-version-file $UPDATE_VERSION_FILE",
             "--update-package-epoch $UPDATE_EPOCH",
         ])
         env["UPDATE_VERSION_FILE"] = ctx.file.update_version_file.path
@@ -448,20 +447,18 @@ def _fuchsia_product_bundle_impl(ctx):
 
     # If a repository is supplied, add it to the product bundle.
     if ctx.attr.repository_keys != None:
-        ffx_invocation.append("--tuf-keys $ORIG_DIR/$REPOKEYS")
+        ffx_invocation.append("--tuf-keys $REPOKEYS")
         env["REPOKEYS"] = ctx.attr.repository_keys[FuchsiaRepositoryKeysInfo].dir
         inputs += ctx.files.repository_keys
     script_lines = [
         "set -e",
-        "ORIG_DIR=$(pwd)",
-        "cd $ARTIFACTS_BASE_PATH",
         "mkdir -p $FFX_ISOLATE_DIR",
         " ".join(ffx_invocation),
     ]
     if ctx.attr.repository_keys != None:
-        script_lines.append("cp -r $ORIG_DIR/$REPOKEYS $ORIG_DIR/$OUTDIR")
+        script_lines.append("cp -r $REPOKEYS $OUTDIR")
 
-    script_lines.append("cp $ORIG_DIR/$BOOTSERVER $ORIG_DIR/$OUTDIR")
+    script_lines.append("cp $BOOTSERVER $OUTDIR")
     env["BOOTSERVER"] = fuchsia_toolchain.bootserver.path
     inputs.append(fuchsia_toolchain.bootserver)
 
@@ -473,7 +470,7 @@ def _fuchsia_product_bundle_impl(ctx):
         env = env,
         progress_message = "Creating product bundle for %s" % ctx.label.name,
     )
-    deps = [pb_out_dir]
+    deps = [pb_out_dir] + ctx.files.partitions_config + ctx.files.product_image
 
     # Scrutiny Validation
     if ctx.attr.product_image_scrutiny_config:
@@ -529,10 +526,6 @@ fuchsia_product_bundle = rule(
         "recovery": attr.label(
             doc = "fuchsia_product_image target to put in slot R",
             providers = [FuchsiaProductImageInfo],
-        ),
-        "artifacts_base_path": attr.string(
-            doc = "Artifacts base directories that items in config files are relative to.",
-            default = ".",
         ),
         "repository_keys": attr.label(
             doc = "A fuchsia_repository_keys target, must be specified when update_version_file is specified",
