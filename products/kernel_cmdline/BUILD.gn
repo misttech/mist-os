@@ -8,6 +8,16 @@ kernel_cmdline("kernel.bypass-debuglog--true") {
   args = [ "kernel.bypass-debuglog=true" ]
 }
 
+# TODO(fxbug.dev/89182): Remove when migration is complete.
+kernel_cmdline("kernel.experimental.serial_migration--true") {
+  args = [ "kernel.experimental.serial_migration=true" ]
+}
+
+# TODO(fxbug.dev/89182): Remove when migration is complete.
+kernel_cmdline("kernel.debug_uart_poll--true") {
+  args = [ "kernel.debug_uart_poll=true" ]
+}
+
 kernel_cmdline("kernel.enable-serial-syscalls--output-only") {
   args = []
   deps = [ "//build/validate:non_production_tag" ]
