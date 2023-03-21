@@ -589,4 +589,50 @@ TEST(StaticVectorTest, Clear) {
   }
 }
 
+struct NotDefaultConstructible {
+  int value;
+
+  constexpr explicit NotDefaultConstructible(int value) : value(value) {}
+
+  NotDefaultConstructible(const NotDefaultConstructible&) = default;
+  NotDefaultConstructible& operator=(const NotDefaultConstructible&) = default;
+  ~NotDefaultConstructible() = default;
+
+  // In C++20, comparison can be defaulted.
+  constexpr bool operator==(const NotDefaultConstructible& rhs) const { return value == rhs.value; }
+  constexpr bool operator!=(const NotDefaultConstructible& rhs) const { return value != rhs.value; }
+};
+
+TEST(StaticVectorTest, ClearNonDefaultConstructible) {
+  fbl::static_vector<NotDefaultConstructible, kSize> v;
+  v.push_back(NotDefaultConstructible(0));
+  v.push_back(NotDefaultConstructible(1));
+  v.push_back(NotDefaultConstructible(2));
+  v.push_back(NotDefaultConstructible(3));
+  v.push_back(NotDefaultConstructible(4));
+
+  v.clear();
+  EXPECT_EQ(v.size(), 0);
+}
+
+TEST(StaticVectorTest, ClearNonDefaultConstructibleIdempotent) {
+  fbl::static_vector<NotDefaultConstructible, kSize> v;
+
+  v.clear();
+  EXPECT_EQ(v.size(), 0);
+}
+
+TEST(StaticVectorTest, PopNonDefaultConstructible) {
+  fbl::static_vector<NotDefaultConstructible, kSize> v = {
+      NotDefaultConstructible(0),
+      NotDefaultConstructible(1),
+      NotDefaultConstructible(2),
+  };
+
+  v.pop_back();
+  ASSERT_EQ(v.size(), 2);
+  EXPECT_EQ(v[0].value, 0);
+  EXPECT_EQ(v[1].value, 1);
+}
+
 }  // namespace

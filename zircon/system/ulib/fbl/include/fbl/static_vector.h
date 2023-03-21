@@ -252,6 +252,9 @@ class static_vector : private internal::static_vector_storage_t<T, N> {
 
   // Resize the vector to the give size. If the vector shrinks, the erased items
   // are destructed. If the vector grows, the new items are default constructed.
+  //
+  // resize() does not compile with non-default-constructible types, because
+  // growing the vector requires the ability to default-construct elements.
   constexpr void resize(size_type new_size) {
     ZX_DEBUG_ASSERT(new_size <= N);
 
@@ -315,10 +318,20 @@ class static_vector : private internal::static_vector_storage_t<T, N> {
 
   constexpr void pop_back() {
     ZX_DEBUG_ASSERT(size() > 0);
-    resize(size() - 1);
+
+    // This is an inlined version of resize(size() - 1). We don't want to call
+    // resize() because it does not compile for non-default-constructible
+    // objects.
+    destroy_at(size() - 1);
+    set_size(size() - 1);
   }
 
-  constexpr void clear() noexcept { resize(0); }
+  constexpr void clear() noexcept {
+    // This is an inlined version of resize(0). We don't want to call resize(),
+    // because it does not compile for non-default-constructible objects.
+    destroy_range(0, size());
+    set_size(0);
+  }
 
  private:
   using base_type::construct_at;
