@@ -5,6 +5,7 @@
 #![cfg(test)]
 
 use anyhow::Context as _;
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
@@ -12,6 +13,7 @@ use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
+use net_types::ip::IpVersion;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netstack_testing_common::Result;
 use netstack_testing_common::{
@@ -328,7 +330,81 @@ async fn test_add_remove_interface<N: Netstack>(name: &str) {
         |if_map| (!if_map.contains_key(&id)).then_some(()),
     )
     .await
+    .expect("observe interface deletion");
+}
+
+/// Tests that adding/removing a default route causes an interface changed event.
+#[netstack_test]
+async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    // Add an interface and watch for its addition.
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let iface = device.into_interface_in_realm(&realm).await.expect("add device");
+    let id = iface.id();
+    iface.set_link_up(true).await.expect("bring device up");
+    assert!(iface.control().enable().await.expect("send enable").expect("enable interface"));
+    let interface_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
+        .expect("get interface event stream");
+    futures::pin_mut!(event_stream);
+    let mut if_map = HashMap::new();
+    fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
+        if_map.contains_key(&id).then_some(())
+    })
+    .await
     .expect("observe interface addition");
+
+    // Ip generic helper function to check for the presence of a default route.
+    let has_default_route = |properties: &fnet_interfaces_ext::Properties| match I::VERSION {
+        IpVersion::V4 => properties.has_default_ipv4_route,
+        IpVersion::V6 => properties.has_default_ipv6_route,
+    };
+
+    // Add the default route and watch for its addition.
+    let stack =
+        realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
+    let route = match I::VERSION {
+        IpVersion::V4 => fidl_subnet!("0.0.0.0/0"),
+        IpVersion::V6 => fidl_subnet!("::/0"),
+    };
+    stack
+        .add_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+            subnet: route.clone(),
+            device_id: id,
+            next_hop: None,
+            metric: 0,
+        })
+        .await
+        .squash_result()
+        .expect("add default route");
+
+    fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
+        if_map.get(&id).map(|properties| has_default_route(properties).then_some(())).flatten()
+    })
+    .await
+    .expect("observe default route addition");
+
+    // Remove the default route and watch for its removal.
+    stack
+        .del_forwarding_entry(&mut fnet_stack::ForwardingEntry {
+            subnet: route,
+            device_id: id,
+            next_hop: None,
+            metric: 0,
+        })
+        .await
+        .squash_result()
+        .expect("remove default route");
+
+    fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
+        if_map.get(&id).map(|properties| (!has_default_route(properties)).then_some(())).flatten()
+    })
+    .await
+    .expect("observe default route removal");
 }
 
 /// Tests that if a device closes (is removed from the system), the
