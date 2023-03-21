@@ -111,9 +111,9 @@ type CoreErrorCode = strict enum {
 };
 
 type ServiceError = struct {
-    domain string;
-    code string;
-    message string:optional;
+    domain string:MAX;
+    code string:MAX;
+    message string:<MAX, optional>;
 };
 
 type ErrorValue = flexible union {

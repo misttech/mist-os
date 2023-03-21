@@ -5,11 +5,11 @@ library fuchsia.firebase.messaging;
 
 type Application = struct {
     /// Full package name of the application.
-    name string;
+    name string:MAX;
     /// Sender ID associated with the firebase project.
-    sender string;
+    sender string:MAX;
     /// Application-defined string.
-    version string;
+    version string:MAX;
 };
 
 /// Connectivity events to sign up for.
@@ -43,7 +43,7 @@ type Message = table {
     ///
     /// For upstream messages, `PROJECT_ID@gcm.googleapis.com` or the more general
     /// IID format are accepted.
-    1: to string;
+    1: to string:MAX;
 
     /// The metadata, including all original key/value pairs. Includes some of
     /// the HTTP headers used when sending the message. `gcm`, `google` and
@@ -58,23 +58,23 @@ type Message = table {
     /// message ID and other elements will be used for storage. The ID must be
     /// unique for each topic subscription - using the same ID may result in
     /// overriding the original message or duplicate delivery.
-    4: id string;
+    4: id string:MAX;
 };
 
 type DownstreamMessage = table {
     1: message Message;
 
     /// Authenticated ID of the sender. This is a project number in most cases.
-    2: from string;
+    2: from string:MAX;
 
     /// The collapse key used for collapsible messages.
-    3: collapse_key string;
+    3: collapse_key string:MAX;
 
     /// Equivalent with a content-type.
     /// Special types:
     /// "ack" and "nack" are used for flow control and error handling.
     /// "control" is used for connection control.
-    4: type string;
+    4: type string:MAX;
 
     /// Priority level. If absent, indicates normal priority (i.e.
     /// Priority.NORMAL).
