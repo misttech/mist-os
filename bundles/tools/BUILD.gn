@@ -21,7 +21,6 @@ group("tools") {
     "//src/developer/fastboot",
     "//src/developer/ffx:ffx_tool",
     "//src/developer/ffx:runtime",
-    "//src/developer/memory/mem",
     "//src/devices/bundles:tools",
     "//src/devices/lib/bind",
     "//src/diagnostics/archivist:archivist-without-attribution",

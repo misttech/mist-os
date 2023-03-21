@@ -62,7 +62,6 @@ config_data_for_pkg_allowlist = [
   "lowpan-ot-driver",
   "mdns",
   "media_unittests",
-  "mem",
   "memory_monitor",
   "metrics-logger",
   "mouse-input-test",

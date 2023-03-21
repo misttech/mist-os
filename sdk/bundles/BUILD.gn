@@ -19,7 +19,6 @@ group("core-tools") {
     "//bundles/packages/prod:tracing",
     "//src/connectivity:tools",
     "//src/dart",
-    "//src/developer/memory/mem",
     "//src/graphics/lib/magma:magma-tools",
     "//src/recovery/factory_reset:tools",
     "//src/sys/pkg/bin/pm:host",

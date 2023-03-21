@@ -37,7 +37,6 @@ group("all") {
     "//src/connectivity/telephony/drivers",
     "//src/connectivity/wlan:packages",
     "//src/connectivity/wlan:tools",
-    "//src/developer/memory/mem",
     "//src/fonts",
     "//src/power:battery",
     "//src/zircon/bin/hwstress",
