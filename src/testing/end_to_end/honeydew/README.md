@@ -6,6 +6,10 @@ provides Host-(Fuchsia)Target interaction.
 Supported host operating systems:
 * Linux
 
+Assumptions:
+* FFX CLI is present on the host and is included in `$PATH` environmental
+  variable.
+
 [TOC]
 
 ## Usage
@@ -120,6 +124,10 @@ In [22]: del emu
 One of the primary goal while designing HoneyDew was to make it easy to
 contribute for anyone working on Host-(Fuchsia)Target interactions.
 
+HoneyDew is meant to be the one stop solution for any Host-(Fuchsia)Target
+interactions. We can only make this possible when more people contribute to
+HoneyDew and add more and more interactions that others can also benefit.
+
 Here are some of the pointers that you can use while contributing to HoneyDew:
 * HoneyDew is currently supported only on Linux. So please use a Linux machine
   for the development and testing of HoneyDew
@@ -149,6 +157,7 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 * At least one of the [HoneyDew OWNERS] should be added for the CL review
   * Please run any impacted functional tests locally and share the test output
     with the CL reviewers
+  * Please share `pylint` and `mypy` output with the CL reviewers
 
 [HoneyDew OWNERS]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/OWNERS
 
