@@ -1151,7 +1151,11 @@ impl Controller {
                     // TODO(https://github.com/rust-lang/rust/issues/86442): once
                     // std::io::ErrorKind::HostUnreachable is stable, we should use that instead.
                     match e.raw_os_error() {
-                        Some(libc::EHOSTUNREACH) => fntr::Error::AddressUnreachable,
+                        // TODO(https://fxbug.dev/100939): Return ENETUNREACH when no route found in
+                        // Netstack2.
+                        Some(libc::EHOSTUNREACH) | Some(libc::ENETUNREACH) => {
+                            fntr::Error::AddressUnreachable
+                        }
                         Some(_) | None => {
                             error!("error while sending udp datagram to {:?}: {:?}", target, e);
                             fntr::Error::Internal

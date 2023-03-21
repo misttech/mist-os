@@ -85,4 +85,19 @@ TEST_F(NoNetworkTest, NonBlockingConnectNetV6) {
   ASSERT_EQ(close(connfd), 0) << strerror(errno);
 }
 
+TEST_F(NoNetworkTest, SendToNetV4) {
+  int fd;
+  ASSERT_TRUE(fd = socket(AF_INET, SOCK_DGRAM, 0)) << strerror(errno);
+  struct sockaddr_in addr;
+  addr.sin_family = AF_INET;
+  // unroutable (documentation-only) address
+  inet_pton(AF_INET, "203.0.113.1", &addr.sin_addr);
+  addr.sin_port = htons(10000);
+  char bytes[1];
+  EXPECT_EQ(
+      sendto(fd, bytes, sizeof(bytes), 0, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)),
+      -1);
+  EXPECT_EQ(errno, ENETUNREACH) << strerror(errno);
+}
+
 }  // namespace

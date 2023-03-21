@@ -234,7 +234,7 @@ netstack2_syncudp_tests = [
   },
   {
     label = bsdsocket_label
-    expect_include_dep = ":socket_test_includes"
+    expects = true
   },
   {
     label = if_nameindex_label
@@ -279,6 +279,7 @@ foreach(test, netstack2_syncudp_tests) {
 netstack2_fastudp_tests = [
   {
     label = bsdsocket_label
+    expects = true
   },
   {
     label = dgramsocket_label

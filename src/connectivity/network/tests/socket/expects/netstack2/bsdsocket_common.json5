@@ -12,8 +12,8 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO (https://fxbug.dev/123365): Return ENODEV instead of EINVAL.
-                "LocalhostTest.IpAddMembershipInvalidIface",
+                // TODO (https://fxbug.dev/100939): Return ENETUNREACH instead of EHOSTUNREACH.
+                "NoNetworkTest.SendToNet*",
             ],
         },
     ],
