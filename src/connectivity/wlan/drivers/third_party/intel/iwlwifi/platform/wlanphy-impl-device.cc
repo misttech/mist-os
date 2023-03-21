@@ -57,8 +57,7 @@ void WlanPhyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
   zx_status_t status =
       phy_get_supported_mac_roles(drvdata(), supported_mac_roles_list, &supported_mac_roles_count);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed get supported mac roles: %s\n", __func__,
-            zx_status_get_string(status));
+    IWL_ERR(this, "failed get supported mac roles: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -87,8 +86,8 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   zx_status_t status = ZX_OK;
 
   if (!request->has_role() || !request->has_mlme_channel()) {
-    IWL_ERR(this, "%s() missing info in request role(%u), channel(%u)\n", __func__,
-            request->has_role(), request->has_mlme_channel());
+    IWL_ERR(this, "missing info in request role(%u), channel(%u)", request->has_role(),
+            request->has_mlme_channel());
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -114,7 +113,7 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
 
   create_iface_req.mlme_channel = request->mlme_channel().release();
   if ((status = phy_create_iface(drvdata(), &create_iface_req, &out_iface_id)) != ZX_OK) {
-    IWL_ERR(this, "%s() failed phy create: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed phy create: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -154,14 +153,14 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
                                            .set_runtime_service_offers(offers)
                                            .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed mac device add: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed mac device add: %s", zx_status_get_string(status));
     phy_create_iface_undo(drvdata(), out_iface_id);
     completer.buffer(arena).ReplyError(status);
     return;
   }
   wlan_softmac_device.release();
 
-  IWL_INFO(this, "%s() created iface %u\n", __func__, out_iface_id);
+  IWL_INFO(this, "created iface %u", out_iface_id);
 
   fidl::Arena fidl_arena;
   auto builder = phyimpl_fidl::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
@@ -172,16 +171,16 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
 void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
                                      DestroyIfaceCompleter::Sync& completer) {
   if (!request->has_iface_id()) {
-    IWL_ERR(this, "%s() invoked without valid iface id\n", __func__);
+    IWL_ERR(this, "invoked without valid iface id");
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  IWL_INFO(this, "%s() for iface %u\n", __func__, request->iface_id());
+  IWL_INFO(this, "destroying iface %u", request->iface_id());
   zx_status_t status = phy_destroy_iface(drvdata(), request->iface_id());
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
-    IWL_ERR(this, "%s() failed destroy iface: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed destroy iface: %s", zx_status_get_string(status));
     return;
   }
 
@@ -193,7 +192,7 @@ void WlanPhyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& ar
   wlan_phy_country_t country;
 
   if (!request->is_alpha2()) {
-    IWL_ERR(this, "%s() only alpha2 format is supported\n", __func__);
+    IWL_ERR(this, "only alpha2 format is supported");
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -201,7 +200,7 @@ void WlanPhyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& ar
   memcpy(&country.alpha2[0], request->alpha2().data(), WLANPHY_ALPHA2_LEN);
   zx_status_t status = phy_set_country(drvdata(), &country);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed set country: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed set country: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -222,7 +221,7 @@ void WlanPhyImplDevice::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync&
   zx_status_t status = phy_get_country(drvdata(), &country);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
-    IWL_ERR(this, "%s() failed get country: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed get country: %s", zx_status_get_string(status));
     return;
   }
 

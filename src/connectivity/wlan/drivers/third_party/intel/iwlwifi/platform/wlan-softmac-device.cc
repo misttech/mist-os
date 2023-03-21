@@ -64,7 +64,7 @@ void WlanSoftmacDevice::Query(fdf::Arena& arena, QueryCompleter::Sync& completer
   zx_status_t status = mac_query(mvmvif_, &resp, table_arena);
 
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed query: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed query: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -113,7 +113,7 @@ void WlanSoftmacDevice::Start(StartRequestView request, fdf::Arena& arena,
 
   zx_status_t status = mac_start(mvmvif_, this, (zx_handle_t*)(&out_mlme_channel));
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed mac start: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed mac start: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
 
     return;
@@ -137,7 +137,7 @@ void WlanSoftmacDevice::QueueTx(QueueTxRequestView request, fdf::Arena& arena,
   iwl_stats_inc(IWL_STATS_CNT_DATA_FROM_MLME);
   // Delayed transmission is never used right now.
   if (ap_mvm_sta_ == nullptr) {
-    IWL_ERR(this, "%s() No ap_sta is found.\n", __func__);
+    IWL_ERR(this, "No ap_sta is found.");
     completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
@@ -180,7 +180,7 @@ void WlanSoftmacDevice::QueueTx(QueueTxRequestView request, fdf::Arena& arena,
   auto lock = std::lock_guard(mvmvif_->mvm->mutex);
   status = iwl_mvm_mac_tx(mvmvif_, ap_mvm_sta_->iwl_mvm_sta(), &mac_packet);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed mac tx: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed mac tx: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -217,7 +217,7 @@ void WlanSoftmacDevice::SetChannel(SetChannelRequestView request, fdf::Arena& ar
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
 
   if (!IsValidChannel(&request->channel())) {
-    IWL_WARN(this, "%s() Invalid channel.\n", __func__);
+    IWL_WARN(this, "Invalid channel.");
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
@@ -232,7 +232,7 @@ void WlanSoftmacDevice::SetChannel(SetChannelRequestView request, fdf::Arena& ar
 
   status = mac_set_channel(mvmvif_, &channel);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed mac set channel: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed mac set channel: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -283,7 +283,7 @@ void WlanSoftmacDevice::EnableBeaconing(EnableBeaconingRequestView request, fdf:
   zx_status_t status = mac_enable_beaconing(mvmvif_, &request->beacon_config);
   if (status != ZX_OK) {
     // Expected for now since this is not supported yet in iwlwifi driver.
-    IWL_ERR(this, "%s() failed mac enable beaconing: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed mac enable beaconing: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -297,7 +297,7 @@ void WlanSoftmacDevice::ConfigureBeaconing(ConfigureBeaconingRequestView request
   zx_status_t status = mac_configure_beacon(mvmvif_, &request->packet);
   if (status != ZX_OK) {
     // Expected for now since this is not supported yet in iwlwifi driver.
-    IWL_ERR(this, "%s() failed mac configure beacon: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed mac configure beacon: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -308,14 +308,14 @@ void WlanSoftmacDevice::ConfigureBeaconing(ConfigureBeaconingRequestView request
 void WlanSoftmacDevice::InstallKey(InstallKeyRequestView request, fdf::Arena& arena,
                                    InstallKeyCompleter::Sync& completer) {
   if (ap_mvm_sta_ == nullptr) {
-    IWL_ERR(this, "%s() Ap sta does not exist.\n", __func__);
+    IWL_ERR(this, "Ap sta does not exist.");
     completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
   zx_status_t status = ap_mvm_sta_->InstallKey(request);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed InstallKey: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed InstallKey: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -326,14 +326,14 @@ void WlanSoftmacDevice::InstallKey(InstallKeyRequestView request, fdf::Arena& ar
 void WlanSoftmacDevice::ConfigureAssoc(ConfigureAssocRequestView request, fdf::Arena& arena,
                                        ConfigureAssocCompleter::Sync& completer) {
   if (ap_mvm_sta_ == nullptr) {
-    IWL_ERR(this, "%s() Ap sta does not exist.\n", __func__);
+    IWL_ERR(this, "Ap sta does not exist.");
     completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
   zx_status_t status = mac_configure_assoc(mvmvif_, &request->assoc_ctx);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed mac configure assoc: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed mac configure assoc: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -346,7 +346,7 @@ void WlanSoftmacDevice::ClearAssoc(ClearAssocRequestView request, fdf::Arena& ar
   zx_status_t status = ZX_OK;
 
   if (ap_mvm_sta_ == nullptr) {
-    IWL_ERR(this, "%s() Ap sta does not exist.\n", __func__);
+    IWL_ERR(this, "Ap sta does not exist.");
     completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
@@ -358,7 +358,7 @@ void WlanSoftmacDevice::ClearAssoc(ClearAssocRequestView request, fdf::Arena& ar
   ap_mvm_sta_.reset();
 
   if ((status = mac_clear_assoc(mvmvif_, request->peer_addr.data())) != ZX_OK) {
-    IWL_ERR(this, "%s() failed clear assoc: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed clear assoc: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -372,7 +372,7 @@ void WlanSoftmacDevice::StartPassiveScan(StartPassiveScanRequestView request, fd
   uint64_t out_scan_id;
   zx_status_t status = mac_start_passive_scan(mvmvif_, request, &out_scan_id);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed start passive scan: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed start passive scan: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -390,7 +390,7 @@ void WlanSoftmacDevice::StartActiveScan(StartActiveScanRequestView request, fdf:
   uint64_t out_scan_id;
   zx_status_t status = mac_start_active_scan(mvmvif_, request, &out_scan_id);
   if (status != ZX_OK) {
-    IWL_ERR(this, "%s() failed start active scan: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed start active scan: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -412,7 +412,7 @@ void WlanSoftmacDevice::CancelScan(CancelScanRequestView request, fdf::Arena& ar
 void WlanSoftmacDevice::UpdateWmmParameters(UpdateWmmParametersRequestView request,
                                             fdf::Arena& arena,
                                             UpdateWmmParametersCompleter::Sync& completer) {
-  IWL_ERR(this, "%s() needs porting\n", __func__);
+  IWL_ERR(this, "needs porting");
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
@@ -489,14 +489,12 @@ zx_status_t WlanSoftmacDevice::ServeWlanSoftmacProtocol(
   fuchsia_wlan_softmac::Service::InstanceHandler handler({.wlan_softmac = std::move(protocol)});
   auto status = outgoing_dir_.AddService<fuchsia_wlan_softmac::Service>(std::move(handler));
   if (status.is_error()) {
-    IWL_ERR(this, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
-            status.status_string());
+    IWL_ERR(this, "Failed to add service to outgoing directory: %s", status.status_string());
     return status.error_value();
   }
   auto result = outgoing_dir_.Serve(std::move(server_end));
   if (result.is_error()) {
-    IWL_ERR(this, "%s(): Failed to serve outgoing directory: %s\n", __func__,
-            result.status_string());
+    IWL_ERR(this, "Failed to serve outgoing directory: %s", result.status_string());
     return result.error_value();
   }
 

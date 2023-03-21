@@ -44,8 +44,7 @@ zx_status_t PcieDevice::Create(zx_device_t* parent_device) {
                                    .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
                                    .set_inspect_vmo(device->driver_inspector_->DuplicateVmo()))) !=
       ZX_OK) {
-    IWL_ERR(device->drvdata(), "%s() failed device add: %s", __func__,
-            zx_status_get_string(status));
+    IWL_ERR(device->drvdata(), "failed device add: %s", zx_status_get_string(status));
     return status;
   }
 

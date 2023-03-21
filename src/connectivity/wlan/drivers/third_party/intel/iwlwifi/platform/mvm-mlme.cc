@@ -661,7 +661,7 @@ zx_status_t mac_init(void* ctx, struct iwl_trans* drvdata, zx_device_t* zxdev, u
   zx_status_t status = phy_start_iface(drvdata, zxdev, idx);
   if (status != ZX_OK) {
     // Freeing of resources allocated in phy_create_iface() will happen in mac_release().
-    IWL_ERR(this, "%s() failed phy start: %s\n", __func__, zx_status_get_string(status));
+    IWL_ERR(this, "failed phy start: %s", zx_status_get_string(status));
   }
   return status;
 }
