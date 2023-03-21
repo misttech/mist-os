@@ -255,3 +255,85 @@ TEST(Task, BrkShrinkAfterFork) {
   // Restore the old brk.
   ASSERT_NE(SBRK_ERROR, sbrk(-brk_increment));
 }
+
+#define MAX_PAGE_ALIGNMENT (1 << 21)
+
+volatile int g_global_variable_data = 15;
+
+// Unless the split between the data and bss sections happens to be page-aligned, initial part
+// of the bss section will be in the same page as the last part of the data section.
+// By aligning g_global_variable_bss to a value bigger than the page size, we prevent it from
+// ending up in this shared page
+alignas(MAX_PAGE_ALIGNMENT) volatile int g_global_variable_bss = 0;
+
+TEST(Task, ChildCantModifyParent) {
+  ASSERT_GT(MAX_PAGE_ALIGNMENT, getpagesize());
+
+  ForkHelper helper;
+
+  g_global_variable_data = 1;
+  g_global_variable_bss = 10;
+  volatile int local_variable = 100;
+  volatile int* heap_variable = new volatile int();
+  *heap_variable = 1000;
+
+  ASSERT_EQ(g_global_variable_data, 1);
+  ASSERT_EQ(g_global_variable_bss, 10);
+  ASSERT_EQ(local_variable, 100);
+  ASSERT_EQ(*heap_variable, 1000);
+
+  helper.RunInForkedProcess([&] {
+    g_global_variable_data = 2;
+    g_global_variable_bss = 20;
+    local_variable = 200;
+    *heap_variable = 2000;
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+
+  EXPECT_EQ(g_global_variable_data, 1);
+  EXPECT_EQ(g_global_variable_bss, 10);
+  EXPECT_EQ(local_variable, 100);
+  EXPECT_EQ(*heap_variable, 1000);
+  delete heap_variable;
+}
+
+TEST(Task, ParentCantModifyChild) {
+  ASSERT_GT(MAX_PAGE_ALIGNMENT, getpagesize());
+
+  ForkHelper helper;
+
+  g_global_variable_data = 1;
+  g_global_variable_bss = 10;
+  volatile int local_variable = 100;
+  volatile int* heap_variable = new volatile int();
+  *heap_variable = 1000;
+
+  ASSERT_EQ(g_global_variable_data, 1);
+  ASSERT_EQ(g_global_variable_bss, 10);
+  ASSERT_EQ(local_variable, 100);
+  ASSERT_EQ(*heap_variable, 1000);
+
+  SignalMaskHelper signal_helper = SignalMaskHelper();
+  signal_helper.blockSignal(SIGUSR1);
+
+  pid_t child_pid = helper.RunInForkedProcess([&] {
+    signal_helper.waitForSignal(SIGUSR1);
+
+    EXPECT_EQ(g_global_variable_data, 1);
+    EXPECT_EQ(g_global_variable_bss, 10);
+    EXPECT_EQ(local_variable, 100);
+    EXPECT_EQ(*heap_variable, 1000);
+  });
+
+  g_global_variable_data = 2;
+  g_global_variable_bss = 20;
+  local_variable = 200;
+  *heap_variable = 2000;
+
+  ASSERT_EQ(kill(child_pid, SIGUSR1), 0);
+
+  ASSERT_TRUE(helper.WaitForChildren());
+  signal_helper.restoreSigmask();
+
+  delete heap_variable;
+}
