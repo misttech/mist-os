@@ -763,9 +763,19 @@ common --experimental_enable_bzlmod
             'crosstool_template.BUILD'),
     ]
 
+    # When submodules are enabled, .git would be a file instead of a directory.
+    googletest_dir = os.path.join(
+        fuchsia_dir, 'third_party', 'googletest', 'src')
+    googletest_git = os.path.join(googletest_dir, '.git')
+    if os.path.isfile(googletest_git):
+      with open(googletest_git) as f:
+        googletest_git_subm_dir = f.readlines()[0].split()[1]
+      googletest_git_dir = os.path.join(googletest_dir, googletest_git_subm_dir)
+    else:
+      googletest_git_dir = googletest_git
     googletest_content_files = [
         os.path.join(
-            fuchsia_dir, 'third_party', 'googletest', 'src', '.git', 'HEAD'),
+            googletest_git_dir, 'HEAD'),
         os.path.join(
             fuchsia_dir, 'build', 'bazel', 'patches', 'googletest',
             'fuchsia-support.bundle'),
