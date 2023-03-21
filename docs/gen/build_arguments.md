@@ -1299,14 +1299,6 @@ From //sdk/ctf/build/internal/ctf_version.gni:16
 
 **Current value (from the default):** `""`
 
-### cursor_pointer_path
-
-Path to file to use for pointer
-
-**Current value (from the default):** `"//src/session/bin/cursor/data/pointer.riv"`
-
-From //src/session/bin/cursor/cursor_args.gni:7
-
 ### custom_signing_script
 
 If non-empty, the given script will be invoked to produce a signed ZBI
@@ -3035,8 +3027,12 @@ Consider the following example from a fictitious
        command = "build"
        bazel_targets = "//vendor/acme/proprietary/installer"
        bazel_inputs = [ ":acme_firmware" ]
-       bazel_outputs = [ "vendor/acme/proprietary/installer/installer" ]
-       ninja_outputs = [ "installer" ]
+       copy_outputs = [
+         {
+           bazel = "vendor/acme/proprietary/installer/installer"
+           ninja = "installer"
+         }
+       ]
      }
 
 Which requires the following, which could be in args.gn, or in a file
@@ -3053,7 +3049,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:102
+From //build/bazel/legacy_ninja_build_outputs.gni:106
 
 ### extra_package_labels
 
@@ -6003,7 +5999,7 @@ available.
 
 **Current value (from the default):** `"executable"`
 
-From //third_party/pigweed/src/pw_build/cc_executable.gni:33
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:31
 
 ### pw_build_EXECUTABLE_TARGET_TYPE_FILE
 
@@ -6014,7 +6010,7 @@ If pw_build_EXECUTABLE_TARGET_TYPE is not the default of `executable`, this
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_build/cc_executable.gni:39
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:37
 
 ### pw_build_LINK_DEPS
 
@@ -6031,7 +6027,7 @@ From //.gn:74
 
 **Overridden from the default:** `[]`
 
-From //third_party/pigweed/src/pw_build/cc_library.gni:33
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
@@ -6039,7 +6035,7 @@ From //.gn:74
 
 **Overridden from the default:** `[]`
 
-From //third_party/pigweed/src/pw_build/cc_library.gni:33
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
 
 ### pw_build_PIP_CONSTRAINTS
 
