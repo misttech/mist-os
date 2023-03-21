@@ -115,6 +115,37 @@ impl Vmo {
         }
     }
 
+    /// Same as read, but reads into memory that might not be initialized.  The memory can be
+    /// assumed as initialized upon success.  There will be no short reads.
+    pub fn read_uninit(
+        &self,
+        data: &mut [std::mem::MaybeUninit<u8>],
+        offset: u64,
+    ) -> Result<(), Status> {
+        unsafe {
+            let status = sys::zx_vmo_read(
+                self.raw_handle(),
+                data.as_mut_ptr() as *mut _,
+                offset,
+                data.len(),
+            );
+            ok(status)
+        }
+    }
+
+    /// Same as read, but returns a Vec.
+    pub fn read_to_vec(&self, offset: u64, length: u64) -> Result<Vec<u8>, Status> {
+        let len = length.try_into().map_err(|_| Status::INVALID_ARGS)?;
+        let mut buffer = Vec::with_capacity(len);
+        self.read_uninit(buffer.spare_capacity_mut(), offset)?;
+        unsafe {
+            // SAFETY: since read_uninit succeeded we know that we can consider the buffer
+            // initialized.
+            buffer.set_len(len);
+        }
+        Ok(buffer)
+    }
+
     /// Write to a virtual memory object.
     ///
     /// Wraps the `zx_vmo_write` syscall.
@@ -380,6 +411,8 @@ mod tests {
         // Read one byte into the vmo.
         assert!(vmo.read(&mut vec1, 1).is_ok());
         assert_eq!(b"b123f", &vec1[0..5]);
+
+        assert_eq!(&vmo.read_to_vec(0, 6).expect("read_to_vec failed"), b"ab123f");
     }
 
     #[test]
