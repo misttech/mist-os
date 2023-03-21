@@ -403,7 +403,7 @@ ssize_t UsbInterface::Write(const void *_data, size_t len) {
   int n;
 
   if (handle_->ep_out == 0 || handle_->desc == -1) {
-    return -1;
+    return EINVAL;
   }
 
   do {
@@ -418,7 +418,7 @@ ssize_t UsbInterface::Write(const void *_data, size_t len) {
     n = ioctl(handle_->desc, USBDEVFS_BULK, &bulk);
     if (n != xfer) {
       DBG("ERROR: n = %d, errno = %d (%s)\n", n, errno, strerror(errno));
-      return -1;
+      return -errno;
     }
 
     count += xfer;
@@ -436,7 +436,7 @@ ssize_t UsbInterface::Read(void *_data, size_t len) {
   int n, retry;
 
   if (handle_->ep_in == 0 || handle_->desc == -1) {
-    return -1;
+    return -EINVAL;
   }
 
   while (len > 0) {
@@ -456,7 +456,7 @@ ssize_t UsbInterface::Read(void *_data, size_t len) {
       if (n < 0) {
         DBG1("ERROR: n = %d, errno = %d (%s)\n", n, errno, strerror(errno));
         if (++retry > MAX_RETRIES)
-          return -1;
+          return -errno;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
       }
     } while (n < 0);
