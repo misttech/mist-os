@@ -5,9 +5,10 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_INFLIGHT_LIST_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_INFLIGHT_LIST_H_
 
+#include <lib/magma/magma.h>
+
 #include <deque>
 
-#include "magma/magma.h"
 #include "magma_util/dlog.h"
 #include "magma_util/macros.h"
 #include "magma_util/status.h"

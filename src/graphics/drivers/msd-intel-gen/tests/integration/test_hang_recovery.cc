@@ -5,6 +5,7 @@
 #define MAGMA_DLOG_ENABLE 1
 
 #include <lib/fdio/directory.h>
+#include <lib/magma/magma.h>
 #include <lib/zx/channel.h>
 
 #include <thread>
@@ -14,7 +15,6 @@
 #include "helper/inflight_list.h"
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
-#include "magma/magma.h"
 #include "magma_intel_gen_defs.h"
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"

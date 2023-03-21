@@ -5,9 +5,8 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MAGMA_MAP_CPU_H_
 #define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_MAGMA_MAP_CPU_H_
 
+#include <lib/magma/magma.h>
 #include <stddef.h>
-
-#include <magma/magma.h>
 
 namespace magma {
 

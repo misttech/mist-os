@@ -5,10 +5,10 @@
 #include "zircon_connection.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/magma/magma_common_defs.h>
 
 #include <optional>
 
-#include "magma/magma_common_defs.h"
 #include "platform_trace.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 

@@ -4,13 +4,13 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/image-format/image_format.h>
+#include <lib/magma/magma_common_defs.h>
 #include <lib/zx/channel.h>
 
 #include <limits>
 #include <unordered_set>
 #include <vector>
 
-#include "magma/magma_common_defs.h"
 #include "magma_util/short_macros.h"
 #include "platform_sysmem_connection.h"
 #include "platform_thread.h"

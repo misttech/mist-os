@@ -5,11 +5,10 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <lib/magma/magma_common_defs.h>
 #include <stdint.h>
 
 #include <functional>
-
-#include "magma/magma_common_defs.h"
 
 using gpu_addr_t = uint64_t;
 using mali_pte_t = uint64_t;

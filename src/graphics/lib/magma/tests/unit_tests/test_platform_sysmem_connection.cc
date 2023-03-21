@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 #include <lib/fdio/directory.h>
+#include <lib/magma/magma_sysmem.h>
 #include <lib/zx/channel.h>
 
 #include <array>
 
 #include <gtest/gtest.h>
 
-#include "magma/magma_sysmem.h"
 #include "platform_handle.h"
 #include "platform_sysmem_connection.h"
 

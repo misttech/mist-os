@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/magma.h>
 #include <magma_intel_gen_defs.h>
 
 #include <vector>
@@ -11,7 +12,6 @@
 #include "helper/inflight_list.h"
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
-#include "magma/magma.h"
 
 namespace {
 

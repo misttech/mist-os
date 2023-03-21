@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <lib/magma/magma.h>
 #include <lib/zx/channel.h>
 
 #include <shared_mutex>
@@ -11,7 +12,6 @@
 #include <gtest/gtest.h>
 
 #include "helper/test_device_helper.h"
-#include "magma/magma.h"
 #include "magma_util/short_macros.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 

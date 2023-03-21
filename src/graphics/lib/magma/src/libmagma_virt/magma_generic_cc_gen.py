@@ -42,7 +42,7 @@ def codegen_warning():
 # Includes lists.
 def includes():
     ret = ''
-    ret += '#include "magma/magma.h"\n'
+    ret += '#include <lib/magma/magma.h>\n'
     ret += '#include "src/graphics/lib/magma/include/virtio/virtio_magma.h"\n'
     ret += '#include "src/graphics/lib/magma/src/libmagma_virt/virtmagma_util.h"\n'
     return ret
@@ -185,7 +185,8 @@ def generate_wrap(export):
         if type == 'magma_connection_t*':
             ret += '    *' + name + ' = virtmagma_connection_t::Create(*' + name + ', dup(file_descriptor))->Wrap();\n'
         if type == 'magma_buffer_t*' or type == 'magma_semaphore_t*' or type == 'magma_perf_count_pool_t*':
-            ret += '    *' + name + ' = virt' + type[:-1] + '::Create(*' + name + ', _connection)->Wrap();\n'
+            ret += '    *' + name + ' = virt' + type[:
+                                                     -1] + '::Create(*' + name + ', _connection)->Wrap();\n'
             needs_connection = True
         if type == 'magma_device_t*':
             ret += '    *' + name + ' = virtmagma_device_t::Create(*' + name + ', file_descriptor)->Wrap();\n'
@@ -222,7 +223,8 @@ def generate_export(export, gen_debug_prints):
 
     ret += '    if (!success)\n'
     ret += '        ' + err + ';\n'
-    ret += '    if (response.hdr.type != VIRTIO_MAGMA_RESP_' + name.upper() + ')\n'
+    ret += '    if (response.hdr.type != VIRTIO_MAGMA_RESP_' + name.upper(
+    ) + ')\n'
     ret += '        ' + err + ';\n'
     ret += generate_copy_out(outputs, export['type'])
     ret += wrap_code

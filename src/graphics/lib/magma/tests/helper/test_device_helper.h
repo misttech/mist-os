@@ -8,13 +8,12 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/magma/magma.h>
 #include <lib/zx/channel.h>
 
 #include <filesystem>
 
 #include <gtest/gtest.h>
-
-#include "magma/magma.h"
 
 namespace magma {
 class TestDeviceBase {

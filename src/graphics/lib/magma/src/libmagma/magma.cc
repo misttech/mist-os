@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "magma/magma.h"
+#include <lib/magma/magma.h>
+#include <lib/magma/magma_common_defs.h>
 
 #include <atomic>
 #include <chrono>
 #include <map>
 
-#include "magma/magma_common_defs.h"
 #include "magma_util/macros.h"
 #include "magma_util/short_macros.h"
 #include "platform_connection_client.h"

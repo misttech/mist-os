@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
+#include <lib/magma/magma_common_defs.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,6 @@
 #include <gtest/gtest.h>
 
 #include "helper/test_device_helper.h"
-#include "magma/magma_common_defs.h"
 #include "src/graphics/tests/common/utils.h"
 #include "src/graphics/tests/common/vulkan_context.h"
 

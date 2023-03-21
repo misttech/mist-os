@@ -11,7 +11,8 @@
 #include <zircon/syscalls.h>
 #endif
 
-#include "magma/magma.h"
+#include <lib/magma/magma.h>
+
 #include "test_magma.h"
 
 __attribute__((format(printf, 3, 4))) static inline bool printf_return_false(const char* file,

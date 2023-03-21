@@ -5,9 +5,10 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_CONNECTION_CLIENT_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_CONNECTION_CLIENT_H_
 
+#include <lib/magma/magma.h>
+
 #include <memory>
 
-#include "magma/magma.h"
 #include "magma_util/macros.h"
 #include "magma_util/status.h"
 #include "platform_buffer.h"

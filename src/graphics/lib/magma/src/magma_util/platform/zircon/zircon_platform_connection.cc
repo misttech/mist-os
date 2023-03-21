@@ -4,9 +4,10 @@
 
 #include "zircon_platform_connection.h"
 
+#include <lib/magma/magma_common_defs.h>
+
 #include <optional>
 
-#include "magma/magma_common_defs.h"
 #include "zircon_platform_status.h"
 
 namespace {

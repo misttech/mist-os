@@ -5,11 +5,12 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_CONNECTION_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_CONNECTION_H_
 
+#include <lib/magma/magma.h>
+
 #include <atomic>
 #include <memory>
 #include <vector>
 
-#include "magma/magma.h"
 #include "magma_util/macros.h"
 #include "magma_util/status.h"
 #include "msd_defs.h"

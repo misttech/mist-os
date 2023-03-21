@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/magma.h>
+#include <lib/magma/magma_sysmem.h>
+
 #include <unordered_map>
 
-#include "magma/magma.h"
-#include "magma/magma_sysmem.h"
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
 #include "platform_buffer.h"

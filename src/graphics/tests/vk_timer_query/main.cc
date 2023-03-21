@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/fdio/unsafe.h>
+#include <lib/magma/magma.h>
 #include <lib/zx/vmo.h>
 
 #include <thread>
@@ -11,7 +12,6 @@
 
 #include "../vkreadback/vkreadback.h"
 #include "helper/test_device_helper.h"
-#include "magma/magma.h"
 #include "magma_vendor_queries.h"
 #include "src/lib/fxl/test/test_settings.h"
 

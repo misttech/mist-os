@@ -47,7 +47,6 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   -I $(scripts/fx get-build-dir)/linux_x64/gen/src/graphics/lib/magma/include \
   -I src/graphics/lib/magma/src \
   -I src/graphics/lib/magma/include \
-  -I sdk/lib/magma_client/include/lib \
   -I sdk/lib/magma_client/include
 
 # TODO: Figure out how to get bindgen to derive AsBytes and FromBytes.

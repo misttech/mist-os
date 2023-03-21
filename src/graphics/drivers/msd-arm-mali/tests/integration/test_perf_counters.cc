@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
+#include <lib/magma/magma.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <poll.h>
@@ -11,7 +12,6 @@
 
 #include "helper/magma_map_cpu.h"
 #include "helper/test_device_helper.h"
-#include "magma/magma.h"
 #include "magma_arm_mali_types.h"
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"

@@ -4,9 +4,10 @@
 
 #include "zircon_platform_connection_client.h"
 
+#include <lib/magma/magma_common_defs.h>
+
 #include <vector>
 
-#include "magma/magma_common_defs.h"
 #include "magma_util/dlog.h"
 #include "platform_connection_client.h"
 #include "zircon_platform_handle.h"

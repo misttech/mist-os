@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_INCLUDE_MAGMA_VSI_VIP_TYPES_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_VSI_VIP_INCLUDE_MAGMA_VSI_VIP_TYPES_H_
 
-#include <cstdint>
+#include <lib/magma/magma_common_defs.h>
 
-#include "magma/magma_common_defs.h"
+#include <cstdint>
 
 enum VsiVipCompressionOption : uint8_t {
   kVsiVipCompressionOptionNone = 0x0,

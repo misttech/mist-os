@@ -9,9 +9,10 @@
 #include <lib/zx/vmo.h>
 #endif
 
+#include <lib/magma/magma_common_defs.h>
+
 #include <memory>
 
-#include "magma/magma_common_defs.h"
 #include "magma_util/dlog.h"
 #include "magma_util/macros.h"
 #include "magma_util/status.h"

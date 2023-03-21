@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_INCLUDE_MAGMA_ARM_MALI_TYPES_H_
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_INCLUDE_MAGMA_ARM_MALI_TYPES_H_
 
-#include <cstdint>
+#include <lib/magma/magma_common_defs.h>
 
-#include "magma/magma_common_defs.h"
+#include <cstdint>
 
 #define MAGMA_VENDOR_VERSION_ARM 1
 

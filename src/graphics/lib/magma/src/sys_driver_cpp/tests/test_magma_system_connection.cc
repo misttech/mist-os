@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/magma/magma.h>
+
 #include <utility>
 
 #include <gtest/gtest.h>
 
-#include "magma/magma.h"
 #include "magma_util/short_macros.h"
 #include "mock/mock_msd_cc.h"
 #include "sys_driver_cpp/magma_system_connection.h"

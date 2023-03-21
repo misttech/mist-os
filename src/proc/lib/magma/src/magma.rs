@@ -716,11 +716,11 @@ extern "C" {
         -> magma_status_t;
 }
 extern "C" {
-    #[doc = "\n \\brief Initializes tracing\n \\param channel An open connection to a tracing provider.\n"]
+    #[doc = "\n \\brief Initializes tracing. This should be called on Fuchsia; on other platforms it's not needed\n        and will just close the given handle.\n \\param channel An open connection to a tracing provider.\n"]
     pub fn magma_initialize_tracing(channel: magma_handle_t) -> magma_status_t;
 }
 extern "C" {
-    #[doc = "\n \\brief Initializes logging; used for debug and some exceptional error reporting.\n \\param channel An open connection to the syslog service.\n"]
+    #[doc = "\n \\brief Initializes logging, used for debug and some exceptional error reporting. This should be\n        called on Fuchsia; on other platforms it's not needed and will just close the given\n        handle.\n \\param channel An open connection to the syslog service.\n"]
     pub fn magma_initialize_logging(channel: magma_handle_t) -> magma_status_t;
 }
 extern "C" {

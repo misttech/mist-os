@@ -5,9 +5,8 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_DEFS_H_
 #define SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_DEFS_H_
 
+#include <lib/magma/magma_common_defs.h>
 #include <stdint.h>
-
-#include "magma/magma_common_defs.h"
 
 #define MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD 1
 // Designed so that msd_notification_t fits in a page

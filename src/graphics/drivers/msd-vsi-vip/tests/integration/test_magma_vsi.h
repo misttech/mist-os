@@ -8,12 +8,12 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <lib/fdio/directory.h>
+#include <lib/magma/magma.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/object.h>
 #include <limits.h>
 
 #include <gtest/gtest.h>
-#include <magma/magma.h>
 
 #include "magma_vsi_vip_devices.h"
 

@@ -5,10 +5,11 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_SYSMEM_CONNECTION_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_SYSMEM_CONNECTION_H_
 
+#include <lib/magma/magma.h>
+#include <lib/magma/magma_sysmem.h>
+
 #include <memory>
 
-#include "magma/magma.h"
-#include "magma/magma_sysmem.h"
 #include "magma_util/status.h"
 #include "platform_buffer.h"
 

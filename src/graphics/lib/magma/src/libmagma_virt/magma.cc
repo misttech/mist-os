@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "magma/magma.h"
-
 #include <assert.h>
+#include <lib/magma/magma.h>
 #include <pthread.h>
 #include <sys/mman.h>
 
