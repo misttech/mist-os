@@ -10,6 +10,7 @@ pub mod diagnostics_config;
 pub mod driver_framework_config;
 pub mod example_config;
 pub mod graphics_config;
+pub mod icu_config;
 pub mod identity_config;
 pub mod input_config;
 pub mod starnix_config;
@@ -88,6 +89,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the virtualization area.
     #[serde(default)]
     pub virtualization: virtualization_config::PlatformVirtualizationConfig,
+
+    /// Platform configuration options for ICU library choice.
+    #[serde(default)]
+    pub icu: icu_config::ICUConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     ///
