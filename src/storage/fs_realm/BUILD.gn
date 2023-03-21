@@ -41,11 +41,6 @@ rustc_binary("bin") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("core_shard_for_transition") {
-  public_deps = [ ":fs_realm_core_shard" ]
-}
-
-core_shard("fs_realm_core_shard") {
-  shard_file = "meta/fs_realm.core_shard.cml"
 }
 
 fuchsia_component("component") {
@@ -57,7 +52,6 @@ fuchsia_component("component") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("for_transition") {
-  public_deps = [ ":fs_realm" ]
 }
 
 fuchsia_package("fs_realm") {
