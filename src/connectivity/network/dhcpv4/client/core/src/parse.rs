@@ -14,7 +14,7 @@ use todo_unused::todo_unused;
 
 #[todo_unused("https://fxbug.dev/81593")]
 #[derive(thiserror::Error, Debug)]
-enum ParseError {
+pub(crate) enum ParseError {
     #[error("parsing IPv4 packet")]
     Ipv4(packet_formats::error::IpParseError<net_types::ip::Ipv4>),
     #[error("IPv4 packet protocol was not UDP")]
@@ -32,7 +32,7 @@ enum ParseError {
 /// expect to parse a packet with link-layer headers; the buffer may only
 /// include bytes for the IP layer and above.
 /// NOTE: does not handle IP fragmentation.
-fn parse_dhcp_message_from_ip_packet(
+pub(crate) fn parse_dhcp_message_from_ip_packet(
     mut bytes: &[u8],
     expected_dst_port: NonZeroU16,
 ) -> Result<dhcp_protocol::Message, ParseError> {
@@ -66,14 +66,16 @@ const DEFAULT_TTL: u8 = 64;
 #[todo_unused("https://fxbug.dev/81593")]
 /// Serializes a DHCP message to the bytes of an IP packet. Includes IP header
 /// but not link-layer headers.
-fn serialize_dhcp_message_to_ip_packet(
+pub(crate) fn serialize_dhcp_message_to_ip_packet(
     message: dhcp_protocol::Message,
-    src_ip: net_types::ip::Ipv4Addr,
+    src_ip: impl Into<net_types::ip::Ipv4Addr>,
     src_port: NonZeroU16,
-    dst_ip: net_types::ip::Ipv4Addr,
+    dst_ip: impl Into<net_types::ip::Ipv4Addr>,
     dst_port: NonZeroU16,
 ) -> impl AsRef<[u8]> {
     let message = message.serialize();
+    let src_ip = src_ip.into();
+    let dst_ip = dst_ip.into();
 
     let udp_builder =
         packet_formats::udp::UdpPacketBuilder::new(src_ip, dst_ip, Some(src_port), dst_port);
@@ -137,9 +139,9 @@ mod test {
         };
         let packet = serialize_dhcp_message_to_ip_packet(
             make_message(),
-            Ipv4Addr::UNSPECIFIED.into(),
+            Ipv4Addr::UNSPECIFIED,
             CLIENT_PORT,
-            Ipv4Addr::BROADCAST.into(),
+            Ipv4Addr::BROADCAST,
             SERVER_PORT,
         );
         let parsed_message = parse_dhcp_message_from_ip_packet(packet.as_ref(), SERVER_PORT);
