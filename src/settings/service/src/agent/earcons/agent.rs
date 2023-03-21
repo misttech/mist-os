@@ -13,7 +13,6 @@ use crate::service;
 use crate::service_context::{ExternalServiceProxy, ServiceContext};
 use fidl_fuchsia_media_sounds::PlayerProxy;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_err, fx_log_info};
 use futures::lock::Mutex;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -60,7 +59,7 @@ impl Agent {
                 let _ = client.reply(Payload::Complete(agent.handle(invocation).await).into());
             }
 
-            fx_log_info!("Earcons agent done processing requests");
+            tracing::info!("Earcons agent done processing requests");
         })
         .detach();
     }
@@ -87,7 +86,7 @@ impl Agent {
             // For now, report back as an error to prevent issues on
             // platforms that don't support the handler's dependencies.
             // TODO(fxbug.dev/61341): Handle with config
-            fx_log_err!("Could not set up VolumeChangeHandler: {:?}", e);
+            tracing::error!("Could not set up VolumeChangeHandler: {:?}", e);
         }
 
         if BluetoothHandler::create(
@@ -101,7 +100,7 @@ impl Agent {
             // For now, report back as an error to prevent issues on
             // platforms that don't support the handler's dependencies.
             // TODO(fxbug.dev/61341): Handle with config
-            fx_log_err!("Could not set up BluetoothHandler");
+            tracing::error!("Could not set up BluetoothHandler");
         }
 
         Ok(())

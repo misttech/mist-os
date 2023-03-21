@@ -7,7 +7,6 @@ use std::collections::{HashMap, HashSet};
 use crate::trace;
 use anyhow::Error;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_warn};
 use fuchsia_trace as ftrace;
 use futures::StreamExt;
 
@@ -160,7 +159,7 @@ impl VolumeChangeHandler {
         let last_user_volume = self.last_user_volumes.get(&stream_type);
 
         // Logging for debugging volume changes.
-        fx_log_debug!(
+        tracing::debug!(
             "[earcons_agent] New {:?} user volume: {:?}, Last {:?} user volume: {:?}",
             stream_type,
             new_user_volume,
@@ -194,7 +193,9 @@ impl VolumeChangeHandler {
                     Audience::Address(service::Address::Handler(SettingType::Audio)),
                 );
                 if let Err(e) = receptor.next_payload().await {
-                    fx_log_err!("Failed to play sound after waiting for message response: {e:?}");
+                    tracing::error!(
+                        "Failed to play sound after waiting for message response: {e:?}"
+                    );
                 } else {
                     self.play_volume_sound(new_user_volume);
                 }
@@ -279,7 +280,7 @@ impl VolumeChangeHandler {
                     Ok(())
                 };
                 if let Err(e) = play_sound_result {
-                    fx_log_warn!("Failed to play sound: {:?}", e);
+                    tracing::warn!("Failed to play sound: {:?}", e);
                 }
             }
         })
