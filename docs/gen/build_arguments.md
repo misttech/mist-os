@@ -3635,7 +3635,7 @@ Use Fxfs's blob implementation
 
 **Current value (from the default):** `false`
 
-From //src/storage/fshost/generated_fshost_config.gni:50
+From //src/storage/fshost/generated_fshost_config.gni:45
 
 ### gcc_tool_dir
 
@@ -3976,7 +3976,7 @@ Some Fuchsia builds use a different value here.
 
 **Current value (from the default):** `"//third_party/icu/default"`
 
-From //src/lib/icu/config.gni:8
+From //build/icu/config.gni:8
 
 ### icu_tzres_path
 
@@ -7370,7 +7370,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"3LWhdfNUtA1UczJE7Q-UfQYSYAX-_HZQdH1RXwbEAS0C"`
+**Current value (from the default):** `"5-xRQw1e9K9D6ql9rQ9dn9ahyVQ__V_w-ypg6ovEBwcC"`
 
 From //build/rust/config.gni:32
 
@@ -8288,16 +8288,6 @@ Use link time optimization (LTO).
 
 From //build/config/lto/config.gni:7
 
-### use_native_fxfs_crypto
-
-Enables the use of Fxfs' native encryption scheme, using a hardware key source when
-available.
-If set, devices not already using this scheme will be forcibly migrated, losing data.
-
-**Current value (from the default):** `true`
-
-From //src/storage/fshost/generated_fshost_config.gni:47
-
 ### use_netstack3
 
 DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR NETSTACK DEVELOPER USE ONLY
@@ -8731,7 +8721,7 @@ From //build/images/args.gni:110
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:137
+From //build/config/fuchsia/BUILD.gn:138
 
 ### zircon_b_partition
 
