@@ -9,8 +9,6 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdint.h>
 
-#include <optional>
-
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 
@@ -21,18 +19,9 @@ namespace radar {
 // Thread-safe utility class for keeping track of registered VMOs, their VMARs, and lock states.
 class VmoManager {
  public:
-  struct RegisteredVmo {
-    uint32_t vmo_id;
-    cpp20::span<uint8_t> vmo_data;
-  };
-
   explicit VmoManager(size_t minimum_vmo_size);
 
   ~VmoManager();
-
-  // Gets the next unlocked VMO, or an empty std::optional if no VMOs are unlocked.
-  // TODO(bradenkell): Remove this method once all clients have been switched to the method below.
-  std::optional<RegisteredVmo> GetUnlockedVmo();
 
   // Gets the next unlocked VMO, locks it, writes the provided data to it, and returns the VMO ID.
   // Returns an error if no VMOs are unlocked or if `data` is too large.

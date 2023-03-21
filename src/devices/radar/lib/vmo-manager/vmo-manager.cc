@@ -26,19 +26,6 @@ VmoManager::~VmoManager() {
   unlocked_vmos_.clear();
 }
 
-std::optional<VmoManager::RegisteredVmo> VmoManager::GetUnlockedVmo() {
-  fbl::AutoLock lock(&lock_);
-
-  // Take a VMO from the front of the unlocked list and move it to the back of the locked list.
-  VmoMeta* vmo = unlocked_vmos_.pop_front();
-  if (vmo == nullptr) {
-    return std::optional<RegisteredVmo>();
-  }
-
-  locked_vmos_.push_back(vmo);
-  return std::optional<RegisteredVmo>({.vmo_id = vmo->vmo_id, .vmo_data = vmo->vmo_data});
-}
-
 fit::result<StatusCode, uint32_t> VmoManager::WriteUnlockedVmoAndGetId(
     const cpp20::span<const uint8_t> data) {
   fbl::AutoLock lock(&lock_);
