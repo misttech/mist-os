@@ -161,7 +161,6 @@ arch/x64/sysroot/include/sys/select.h
 arch/x64/sysroot/include/sys/sem.h
 arch/x64/sysroot/include/sys/shm.h
 arch/x64/sysroot/include/sys/signal.h
-arch/x64/sysroot/include/sys/signalfd.h
 arch/x64/sysroot/include/sys/socket.h
 arch/x64/sysroot/include/sys/stat.h
 arch/x64/sysroot/include/sys/statfs.h

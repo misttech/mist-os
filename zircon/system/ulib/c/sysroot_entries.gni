@@ -238,7 +238,6 @@ sysroot_uninstrumented_libc_entries = [
         "sys/sem.h",
         "sys/shm.h",
         "sys/signal.h",
-        "sys/signalfd.h",
         "sys/socket.h",
         "sys/stat.h",
         "sys/statfs.h",
