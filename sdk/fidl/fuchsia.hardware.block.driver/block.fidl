@@ -35,8 +35,6 @@ type BlockInfo = struct {
         /// The device provides fua support.
         FUA_SUPPORT = 0x00000010;
     };
-
-    reserved uint32;
 };
 
 type BlockStats = struct {
@@ -140,12 +138,10 @@ type BlockFifoResponse = struct {
     reqid Reqid;
     /// Only valid if transmitted in request.
     group Groupid;
-    reserved0 Vmoid;
+    padding_to_satisfy_zerocopy uint16;
     /// The number of messages in the transaction completed by the block server.
     count uint32;
-    reserved1 uint64;
-    reserved2 uint64;
-    reserved3 uint64;
+    padding_to_match_request_size_and_alignment array<uint64, 3>;
 };
 
 /// `BLOCK_OP_READ`, `BLOCK_OP_WRITE`

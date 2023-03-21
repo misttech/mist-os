@@ -164,7 +164,7 @@ class GptDeviceTest : public zxtest::Test {
 TEST_F(GptDeviceTest, DeviceTooSmall) {
   Init();
 
-  const block_info_t info = {20, 512, BLOCK_MAX_TRANSFER_UNBOUNDED, 0, 0};
+  const block_info_t info = {20, 512, BLOCK_MAX_TRANSFER_UNBOUNDED, 0};
   SetInfo(&info);
 
   ASSERT_EQ(ZX_ERR_NO_SPACE, Bind(nullptr, fake_parent_.get()));

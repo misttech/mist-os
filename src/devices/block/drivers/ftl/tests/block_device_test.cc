@@ -232,7 +232,7 @@ TEST(BlockDeviceTest, Query) {
   device.BlockImplQuery(&info, &operation_size);
 
   constexpr block_info_t kInfo = {kNumPages, kPageSize, BLOCK_MAX_TRANSFER_UNBOUNDED,
-                                  BLOCK_FLAG_TRIM_SUPPORT, 0};
+                                  BLOCK_FLAG_TRIM_SUPPORT};
 
   ASSERT_BYTES_EQ(&info, &kInfo, sizeof(info));
   ASSERT_GT(operation_size, sizeof(block_op_t));

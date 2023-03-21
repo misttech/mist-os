@@ -27,7 +27,7 @@ namespace {
 
 constexpr uint32_t kBlockSz = 512;
 constexpr uint32_t kBlockCnt = 20;
-const block_info_t kInfo = {kBlockCnt, kBlockSz, BLOCK_MAX_TRANSFER_UNBOUNDED, 0, 0};
+const block_info_t kInfo = {kBlockCnt, kBlockSz, BLOCK_MAX_TRANSFER_UNBOUNDED, 0};
 
 class FakeBlockDevice : public ddk::BlockProtocol<FakeBlockDevice> {
  public:

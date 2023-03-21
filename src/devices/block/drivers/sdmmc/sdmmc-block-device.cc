@@ -116,7 +116,6 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
       .block_size = block_info_.block_size,
       .max_transfer_size = block_info_.max_transfer_size,
       .flags = block_info_.flags,
-      .reserved = 0,
   };
 
   if (!is_sd_ && boot_size > 0 && boot_enabled) {
