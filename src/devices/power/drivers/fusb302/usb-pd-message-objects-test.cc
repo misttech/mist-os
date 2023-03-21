@@ -17,6 +17,10 @@ static_assert(std::is_trivially_destructible_v<FixedPowerSupplyData>);
 static_assert(std::is_trivially_destructible_v<VariablePowerSupplyData>);
 static_assert(std::is_trivially_destructible_v<BatteryPowerSupplyData>);
 
+static_assert(std::is_trivially_destructible_v<PowerRequestData>);
+static_assert(std::is_trivially_destructible_v<FixedVariableSupplyPowerRequestData>);
+static_assert(std::is_trivially_destructible_v<BatteryPowerRequestData>);
+
 TEST(FixedPowerSupplyDataTest, VoltageMv) {
   {
     FixedPowerSupplyData fixed_power_supply;
@@ -188,6 +192,94 @@ TEST(BatteryPowerSupplyDataTest, MaximumPowerMw) {
     battery_power_supply.set_maximum_power_mw(255'750);
     EXPECT_EQ(1'023, battery_power_supply.maximum_power_250mw());
     EXPECT_EQ(255'750, battery_power_supply.maximum_power_mw());
+  }
+}
+
+TEST(FixedVariableSupplyPowerRequestDataTest, CreateForPosition) {
+  FixedVariableSupplyPowerRequestData request_data1 =
+      FixedVariableSupplyPowerRequestData::CreateForPosition(1);
+  EXPECT_EQ(1, request_data1.related_power_data_object_position());
+
+  FixedVariableSupplyPowerRequestData request_data7 =
+      FixedVariableSupplyPowerRequestData::CreateForPosition(7);
+  EXPECT_EQ(7, request_data7.related_power_data_object_position());
+}
+
+TEST(FixedVariableSupplyPowerRequestDataTest, OperatingCurrentMa) {
+  {
+    FixedVariableSupplyPowerRequestData request_data =
+        FixedVariableSupplyPowerRequestData::CreateForPosition(1);
+    request_data.set_operating_current_ma(10);
+    EXPECT_EQ(1, request_data.operating_current_10ma());
+    EXPECT_EQ(10, request_data.operating_current_ma());
+  }
+  {
+    FixedVariableSupplyPowerRequestData request_data =
+        FixedVariableSupplyPowerRequestData::CreateForPosition(1);
+    request_data.set_operating_current_ma(10'230);
+    EXPECT_EQ(1'023, request_data.operating_current_10ma());
+    EXPECT_EQ(10'230, request_data.operating_current_ma());
+  }
+}
+
+TEST(FixedVariableSupplyPowerRequestDataTest, LimitCurrentMa) {
+  {
+    FixedVariableSupplyPowerRequestData request_data =
+        FixedVariableSupplyPowerRequestData::CreateForPosition(1);
+    request_data.set_limit_current_ma(10);
+    EXPECT_EQ(1, request_data.limit_current_10ma());
+    EXPECT_EQ(10, request_data.limit_current_ma());
+  }
+  {
+    FixedVariableSupplyPowerRequestData request_data =
+        FixedVariableSupplyPowerRequestData::CreateForPosition(1);
+    request_data.set_limit_current_ma(10'230);
+    EXPECT_EQ(1'023, request_data.limit_current_10ma());
+    EXPECT_EQ(10'230, request_data.limit_current_ma());
+  }
+}
+
+TEST(FixedVariableSupplyPowerRequestDataTest, PixelPhoneToLaptopPort) {
+  FixedVariableSupplyPowerRequestData request_data(0x1304b12c);
+
+  EXPECT_EQ(3'000, request_data.operating_current_ma());
+  EXPECT_EQ(3'000, request_data.limit_current_ma());
+  EXPECT_EQ(1u, request_data.related_power_data_object_position());
+  EXPECT_EQ(false, request_data.supports_power_give_back());
+  EXPECT_EQ(false, request_data.capability_mismatch());
+  EXPECT_EQ(true, request_data.supports_usb_communications());
+  EXPECT_EQ(true, request_data.prefers_waiving_usb_suspend());
+  EXPECT_EQ(false, request_data.supports_unchunked_extended_messages());
+  EXPECT_EQ(false, request_data.supports_extended_power_range());
+}
+
+TEST(BatteryPowerRequestDataTest, OperatingPowerMw) {
+  {
+    BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
+    request_data.set_operating_power_mw(250);
+    EXPECT_EQ(1, request_data.operating_power_250mw());
+    EXPECT_EQ(250, request_data.operating_power_mw());
+  }
+  {
+    BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
+    request_data.set_operating_power_mw(255'750);
+    EXPECT_EQ(1'023, request_data.operating_power_250mw());
+    EXPECT_EQ(255'750, request_data.operating_power_mw());
+  }
+}
+
+TEST(BatteryPowerRequestDataTest, LimitPowerMw) {
+  {
+    BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
+    request_data.set_limit_power_mw(250);
+    EXPECT_EQ(1, request_data.limit_power_250mw());
+    EXPECT_EQ(250, request_data.limit_power_mw());
+  }
+  {
+    BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
+    request_data.set_limit_power_mw(255'750);
+    EXPECT_EQ(1'023, request_data.limit_power_250mw());
+    EXPECT_EQ(255'750, request_data.limit_power_mw());
   }
 }
 

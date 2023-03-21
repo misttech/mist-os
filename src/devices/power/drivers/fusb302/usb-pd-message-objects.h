@@ -370,6 +370,283 @@ class BatteryPowerSupplyData {
   DEF_ENUM_SUBFIELD(bits_, PowerSupplyType, 31, 30, supply_type);
 };
 
+// Fields common to all RDO (power Request Data Object) types.
+//
+// Conceptually, the RDO in the USB PD spec is a sum type (like std::variant).
+// Values have 32 bits. The type discriminant is conveyed indirectly by the top
+// 4 bits, which must be combined with out-of-band information. Concretely, the
+// top 4 bits point to a PDO (Power Data Object) in a different message, and the
+// PDO's type determines the RDO type.
+//
+// usbpd3.1 6.4.2 "Request Message" defines the high-level representation and
+// the formats for all subtypes. Subsections define field semantics.
+class PowerRequestData {
+ protected:
+  // Needed for the following to compile.
+  uint32_t bits_;
+
+ public:
+  // The position of the related PDO (Power Data Object) in a related message.
+  //
+  // Each RDO is based on a PDO in a message that lists power Source
+  // capabilities. The PDO subtype determines the RDO's subtype, and PDO fields
+  // set limits on the RDO fields. For example, an RDO based on a Fixed Supply
+  // PDO may not request more current than is advertised in the PDO.
+  //
+  // This field uses 1-based indexing, and the value 0 is reserved.
+  DEF_SUBFIELD(bits_, 31, 28, related_power_data_object_position);
+
+  // True if the Sink can honor GotoMin messages.
+  //
+  // If true, the Sink must react to GotoMin messages by reducing its power
+  // consumption to the minimum stated in the request object.
+  DEF_SUBBIT(bits_, 27, supports_power_give_back);
+
+  // True if the requested power is not sufficient for all the Sink's features.
+  //
+  // Sinks are required to submit a power Request even when the Source's
+  // capabilities are not sufficient for full operation. In that case, the Sink
+  // must request enough power for a subset of its features. The subset could be
+  // "do nothing" or "flash an LED indicating insufficient power".
+  //
+  // Sources may also alert the user when this bit is set. For example, some
+  // operating systems show insufficient power warnings.
+  DEF_SUBBIT(bits_, 26, capability_mismatch);
+
+  // Indicates if the Sink can communicate over a USB data channel.
+  //
+  // The data channels are D+/- introduced in usb2.0 and SS Tx/Rx introduced in
+  // usb3.0.
+  DEF_SUBBIT(bits_, 25, supports_usb_communications);
+
+  // If true, the Sink is asking the Source to waive USB Suspend requirements.
+  //
+  // This hint is meaningful when the related PDO (Power Data Object) has the
+  // `requires_usb_suspend` bit set. The Source may react to the hint by making
+  // a new offer (via a new Source_Capabilities message) that includes the same
+  // PDO without the `requires_usb_suspend` bit set.
+  //
+  // Setting this bit is not sufficient for the Sink to ignore USB Suspend
+  // requirements. The Sink is only free to disregard USB Suspend if it
+  // establishes a PD Contract based on a PDO without the `requires_usb_suspend`
+  // bit.
+  DEF_SUBBIT(bits_, 24, prefers_waiving_usb_suspend);
+
+  // True iff the Port can receive messages with more than 26 data bytes.
+  //
+  // If true, the underlying BMC PHY must be designed to receive and transmit
+  // extended messages up to 260-bytes.
+  DEF_SUBBIT(bits_, 23, supports_unchunked_extended_messages);
+
+  // True iff the Sink supports EPR (Extended Power Range) operation.
+  DEF_SUBBIT(bits_, 22, supports_extended_power_range);
+
+  // Used to decode the fields common to all RDOs.
+  explicit PowerRequestData(uint32_t bits) : bits_(bits) {
+    ZX_DEBUG_ASSERT(related_power_data_object_position() != 0);
+  }
+
+  // Value type, copying is allowed.
+  PowerRequestData(const PowerRequestData&) = default;
+  PowerRequestData& operator=(const PowerRequestData&) = default;
+
+  // Trivially destructible.
+  ~PowerRequestData() = default;
+
+  // Support explicit casting to uint32_t.
+  explicit operator uint32_t() const { return bits_; }
+
+ protected:
+  // Distinguishes constructors that take a PDO position.
+  struct PositionTag {};
+
+  // Instance with all fields except for PDO position set to zero.
+  //
+  // This is most likely an invalid RDO. At a minimum, power consumption must be
+  // set before use in a PD message.
+  explicit PowerRequestData(int32_t related_power_data_object_position, PositionTag) {
+    ZX_DEBUG_ASSERT(related_power_data_object_position > 0);
+    set_related_power_data_object_position(related_power_data_object_position);
+  }
+};
+
+// RDO based on a fixed or variable power supply PDO.
+//
+// See `PowerRequestData` for a general description of the RDO (power
+// Request Data Object) representation.
+//
+// See `PowerData` for a general description of the PDO (Power Data Object)
+// representation, `FixedPowerSupplyData` for fixed power supply PDOs, and
+// `VariablePowerSupplyData` for variable power supply PDOs.
+//
+// usbpd3.1 6.4.2 "Request Message", Tables 6-21 "Fixed and Variable Request
+// Data Object" and 6-22 "Fixed and Variable Request Data Object with GiveBack
+// Support"
+class FixedVariableSupplyPowerRequestData : public PowerRequestData {
+ public:
+  // The Sink's (estimated) current consumption, in multiples of 10 mA.
+  DEF_SUBFIELD(bits_, 19, 10, operating_current_10ma);
+
+  // The Sink's maximum or minimum current consumption, in multiples of 10 mA.
+  DEF_SUBFIELD(bits_, 9, 0, limit_current_10ma);
+
+  // The Sink's (estimated) current consumption, in mA (milliamps).
+  //
+  // The Source uses this estimate to manage its power reserve, and power
+  // distribution across multiple ports.
+  //
+  // The Sink is expected to send a new Request message when its estimated
+  // current consumption changes.
+  //
+  // This field must be at most `maximum_current_ma()` in the related
+  // FixedPowerSupplyData or VariablePowerSupplyData object.
+  int32_t operating_current_ma() const {
+    // The multiplication will not overflow (causing UB) because
+    // `operating_current_10ma` is a 10-bit field. The maximum product is
+    // 10,240.
+    return static_cast<int32_t>(static_cast<int32_t>(operating_current_10ma()) * 10);
+  }
+  FixedVariableSupplyPowerRequestData& set_operating_current_ma(int32_t current_ma) {
+    return set_operating_current_10ma(current_ma / 10);
+  }
+
+  // The Sink's maximum or minimum current consumption, in mA (milliamps).
+  //
+  // If `supports_power_give_back` is true, this is the Sink's minimum operating
+  // current, which can be requested via a GotoMin message.
+  //
+  // If `supports_power_give_back` is false, this is the maximum amount of
+  // current that the Sink may ever consume. `operating_current_ma()` must be
+  // below this value.
+  //
+  // If `capabilities_mismatch` is true, this field may exceed
+  // `maximum_current_ma()` in the related FixedPowerSupplyData or
+  // VariablePowerSupplyData object. If `capabilities_mismatch` is false, this
+  // field must be at most `maximum_current_ma()`.
+  int32_t limit_current_ma() const {
+    // The multiplication will not overflow (causing UB) because
+    // `limit_current_10ma` is a 10-bit field. The maximum product is 10,240.
+    return static_cast<int32_t>(static_cast<int32_t>(limit_current_10ma()) * 10);
+  }
+  FixedVariableSupplyPowerRequestData& set_limit_current_ma(int32_t current_ma) {
+    return set_limit_current_10ma(current_ma / 10);
+  }
+
+  static FixedVariableSupplyPowerRequestData CreateForPosition(
+      int32_t related_power_data_object_position) {
+    return FixedVariableSupplyPowerRequestData(related_power_data_object_position, PositionTag{});
+  }
+
+  explicit FixedVariableSupplyPowerRequestData(uint32_t bits) : PowerRequestData(bits) {}
+  explicit FixedVariableSupplyPowerRequestData(PowerRequestData request_data)
+      : PowerRequestData(static_cast<uint32_t>(request_data)) {}
+
+  // Instance with all fields except for PDO position set to zero.
+  //
+  // This is most likely an invalid RDO. At a minimum, power consumption must be
+  // set before use in a PD message.
+  explicit FixedVariableSupplyPowerRequestData(int32_t related_power_data_object_position,
+                                               PositionTag)
+      : PowerRequestData(related_power_data_object_position, PositionTag{}) {}
+
+  // Value type, copying is allowed.
+  FixedVariableSupplyPowerRequestData(const FixedVariableSupplyPowerRequestData&) = default;
+  FixedVariableSupplyPowerRequestData& operator=(const FixedVariableSupplyPowerRequestData&) =
+      default;
+
+  // In C++20, equality comparison can be defaulted.
+  bool operator==(const FixedVariableSupplyPowerRequestData& other) const {
+    return bits_ == other.bits_;
+  }
+  bool operator!=(const FixedVariableSupplyPowerRequestData& other) const {
+    return bits_ != other.bits_;
+  }
+};
+
+// RDO based on a battery power supply PDO.
+//
+// See `PowerRequestData` for a general description of the RDO (power
+// Request Data Object) representation.
+//
+// See `PowerData` for a general description of the PDO (Power Data Object)
+// representation, and `BatteryPowerSupplyData` for battery power supply PDOs.
+//
+// usbpd3.1 6.4.2 "Request Message", Tables 6-23 "Battery Request Data Object"
+// and 6-24 "Battery Request Data Object with GiveBack Support"
+class BatteryPowerRequestData : public PowerRequestData {
+ public:
+  // The Sink's (estimated) power consumption, in multiples of 250 mW.
+  DEF_SUBFIELD(bits_, 19, 10, operating_power_250mw);
+
+  // The Sink's maximum or minimum power consumption, in multiples of 250 mW.
+  DEF_SUBFIELD(bits_, 9, 0, limit_power_250mw);
+
+  // The Sink's (estimated) power consumption, in mW (millwatts).
+  //
+  // The Source uses this estimate to manage its power reserve, and power
+  // distribution across multiple ports.
+  //
+  // The Sink is expected to send a new Request message when its estimated
+  // current consumption changes.
+  //
+  // This field must be at most `maximum_power_mw()` in the related
+  // BatteryPowerSupplyData object.
+  int32_t operating_power_mw() const {
+    // The multiplication will not overflow (causing UB) because
+    // `operating_power_250mw` is a 10-bit field. The maximum product is
+    // 255,750.
+    return static_cast<int32_t>(static_cast<int32_t>(operating_power_250mw()) * 250);
+  }
+  BatteryPowerRequestData& set_operating_power_mw(int32_t power_mw) {
+    return set_operating_power_250mw(power_mw / 250);
+  }
+
+  // The Sink's maximum or minimum power consumption, in mW (milliwatts).
+  //
+  // If `supports_power_give_back` is true, this is the Sink's minimum operating
+  // power, which can be requested via a GotoMin message.
+  //
+  // If `supports_power_give_back` is false, this is the maximum amount of power
+  // that the Sink may ever consume. `operating_power_mw()` must be below this
+  // value.
+  //
+  // If `capabilities_mismatch` is true, this field may exceed
+  // `maximum_power_mw()` in the related BatteryPowerSupplyData object. If
+  // `capabilities_mismatch` is false, this field must be at most
+  // `maximum_power_mw()`.
+  int32_t limit_power_mw() const {
+    // The multiplication will not overflow (causing UB) because
+    // `limit_power_250mw` is a 10-bit field. The maximum product is 255,750.
+    return static_cast<int32_t>(static_cast<int32_t>(limit_power_250mw()) * 250);
+  }
+  BatteryPowerRequestData& set_limit_power_mw(int32_t power_mw) {
+    return set_limit_power_250mw(power_mw / 250);
+  }
+
+  static BatteryPowerRequestData CreateForPosition(int32_t related_power_data_object_position) {
+    return BatteryPowerRequestData(related_power_data_object_position, PositionTag{});
+  }
+
+  explicit BatteryPowerRequestData(uint32_t bits) : PowerRequestData(bits) {}
+  explicit BatteryPowerRequestData(PowerRequestData request_data)
+      : PowerRequestData(static_cast<uint32_t>(request_data)) {}
+
+  // Instance with all fields except for PDO position set to zero.
+  //
+  // This is most likely an invalid RDO. At a minimum, power consumption must be
+  // set before use in a PD message.
+  explicit BatteryPowerRequestData(int32_t related_power_data_object_position, PositionTag)
+      : PowerRequestData(related_power_data_object_position, PositionTag{}) {}
+
+  // Value type, copying is allowed.
+  BatteryPowerRequestData(const BatteryPowerRequestData&) = default;
+  BatteryPowerRequestData& operator=(const BatteryPowerRequestData&) = default;
+
+  // In C++20, equality comparison can be defaulted.
+  bool operator==(const BatteryPowerRequestData& other) const { return bits_ == other.bits_; }
+  bool operator!=(const BatteryPowerRequestData& other) const { return bits_ != other.bits_; }
+};
+
 }  // namespace usb_pd
 
 #endif  // SRC_DEVICES_POWER_DRIVERS_FUSB302_USB_PD_MESSAGE_OBJECTS_H_
