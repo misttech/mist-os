@@ -11,7 +11,6 @@ use fidl_fuchsia_settings::{
     AudioMarker, AudioRequest, AudioSetResponder, AudioSetResult, AudioSettings,
     AudioStreamSettingSource, AudioStreamSettings, AudioWatchResponder, Volume,
 };
-use fuchsia_syslog::{fx_log_err, fx_log_warn};
 use fuchsia_zircon as zx;
 
 use fidl_fuchsia_media::AudioRenderUsage;
@@ -82,7 +81,7 @@ impl TryFrom<AudioRequest> for Job {
                         Ok(request::Work::new(SettingType::Audio, request, responder).into())
                     }
                     Err(err) => {
-                        fx_log_err!(
+                        tracing::error!(
                             "{}: Failed to process request: {:?}",
                             AudioMarker::DEBUG_NAME,
                             err
@@ -123,7 +122,7 @@ impl TryFrom<AudioRequest> for Job {
                 ))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", item);
+                tracing::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }
