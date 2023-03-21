@@ -31,6 +31,35 @@ type RouteReport = table {
     /// Describes the error that occurred from routing this capability.
     /// This field is not present if routing succeeded.
     3: error RouteError;
+
+    /// The absolute moniker of the source component.
+    @available(added=12)
+    4: source_moniker string:MAX;
+};
+
+/// A capability in a target component to route to the source.
+@available(added=12)
+type RouteTarget = struct {
+    /// The name of the capability (this is not the path).
+    name fuchsia.component.name;
+    /// Whether the capability is a `use`d by the component or `expose`d
+    /// from it.
+    decl_type DeclType;
+};
+
+/// Errors for RouteValidator
+@available(added=12)
+type RouteValidatorError = flexible enum {
+    /// An unexpected error occurred.
+    INTERNAL = 1;
+    /// At least one argument had an invalid format.
+    INVALID_ARGUMENTS = 2;
+    /// The component instance was not found.
+    INSTANCE_NOT_FOUND = 3;
+    /// The component instance was not resolved.
+    INSTANCE_NOT_RESOLVED = 4;
+    /// The capability declaration was not found.
+    CAPABILITY_NOT_FOUND = 5;
 };
 
 @discoverable
@@ -47,4 +76,25 @@ protocol RouteValidator {
     }) -> (struct {
         reports vector<RouteReport>:MAX;
     }) error fuchsia.component.Error;
+
+    /// Routes a component's used or exposed capabilities, and returns
+    /// information about them.
+    ///
+    /// This method only supports routing namespace capabilities (protocols,
+    /// directories, services, and storage).
+    ///
+    /// Errors:
+    /// * INVALID_ARGUMENTS: The given moniker or name is not valid, or `name`
+    ///   is not a namespace capability.
+    /// * INSTANCE_NOT_FOUND: No instance was found matching the given moniker.
+    /// * RESOURCE_NOT_FOUND: No capability was found matching one of the given names.
+    @available(added=12)
+    Route(struct {
+        /// The target component with the capability to route.
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        /// The target capabilites to route (i.e., uses or exposes)
+        targets vector<RouteTarget>:MAX;
+    }) -> (struct {
+        reports vector<RouteReport>:MAX;
+    }) error RouteValidatorError;
 };

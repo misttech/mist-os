@@ -124,10 +124,15 @@ mod test {
         let (route_validator, mut stream) =
             create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
         fuchsia_async::Task::local(async move {
-            let fsys::RouteValidatorRequest::Validate { moniker, responder, .. } =
-                stream.try_next().await.unwrap().unwrap();
-            assert_eq!(expected_moniker, moniker);
-            responder.send(&mut Ok(reports)).unwrap();
+            match stream.try_next().await.unwrap().unwrap() {
+                fsys::RouteValidatorRequest::Validate { moniker, responder, .. } => {
+                    assert_eq!(expected_moniker, moniker);
+                    responder.send(&mut Ok(reports)).unwrap();
+                }
+                fsys::RouteValidatorRequest::Route { .. } => {
+                    panic!("unexpected Route request");
+                }
+            }
         })
         .detach();
         route_validator

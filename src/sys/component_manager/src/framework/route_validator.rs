@@ -10,10 +10,7 @@ use {
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
-            routing::{
-                request_for_namespace_capability_expose, request_for_namespace_capability_use,
-                route,
-            },
+            routing::{self, RouteRequest, RouteSource, RoutingError},
         },
     },
     async_trait::async_trait,
@@ -23,10 +20,11 @@ use {
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    futures::StreamExt,
+    futures::{future::join_all, lock::Mutex, TryStreamExt},
     lazy_static::lazy_static,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMoniker},
+    moniker::{
+        AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, RelativeMoniker, RelativeMonikerBase,
+    },
     std::{
         convert::TryFrom,
         path::PathBuf,
@@ -84,10 +82,12 @@ impl RouteValidator {
     async fn validate(
         self: &Arc<Self>,
         scope_moniker: &AbsoluteMoniker,
-        moniker_str: String,
+        relative_moniker_str: &str,
     ) -> Result<Vec<fsys::RouteReport>, fcomponent::Error> {
         // Construct the complete moniker using the scope moniker and the relative moniker string.
-        let moniker = join_monikers(scope_moniker, &moniker_str)?;
+        let relative_moniker = RelativeMoniker::try_from(relative_moniker_str)
+            .map_err(|_| fcomponent::Error::InvalidArguments)?;
+        let moniker = scope_moniker.descendant(&relative_moniker);
 
         let instance =
             self.model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
@@ -116,27 +116,160 @@ impl RouteValidator {
         Ok(reports)
     }
 
+    async fn route(
+        &self,
+        scope_moniker: &AbsoluteMoniker,
+        relative_moniker_str: &str,
+        targets: Vec<fsys::RouteTarget>,
+    ) -> Result<Vec<fsys::RouteReport>, fsys::RouteValidatorError> {
+        // Construct the complete moniker using the scope moniker and the relative moniker string.
+        let relative_moniker = RelativeMoniker::try_from(relative_moniker_str)
+            .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
+        let moniker = scope_moniker.descendant(&relative_moniker);
+
+        let instance =
+            self.model.find(&moniker).await.ok_or(fsys::RouteValidatorError::InstanceNotFound)?;
+        let state = instance.lock_state().await;
+        let resolved = match *state {
+            InstanceState::Resolved(ref r) => r,
+            // TODO(fxbug.dev/102026): The error is that the instance is not currently
+            // resolved. Use a better error here, when one exists.
+            _ => return Err(fsys::RouteValidatorError::InstanceNotResolved),
+        };
+
+        let route_requests: Result<Vec<_>, fsys::RouteValidatorError> = targets
+            .into_iter()
+            .map(|target| match target.decl_type {
+                fsys::DeclType::Use => {
+                    let use_ = resolved
+                        .decl()
+                        .uses
+                        .iter()
+                        .find(|u| u.source_name().str() == &target.name)
+                        .ok_or(fsys::RouteValidatorError::CapabilityNotFound)?;
+                    let request = routing::request_for_namespace_capability_use(use_.clone())
+                        .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
+                    Ok((target, request))
+                }
+                fsys::DeclType::Expose => {
+                    let expose = resolved
+                        .decl()
+                        .exposes
+                        .iter()
+                        .find(|e| e.target_name().str() == &target.name)
+                        .ok_or(fsys::RouteValidatorError::CapabilityNotFound)?;
+                    let request = routing::request_for_namespace_capability_expose(expose.clone())
+                        .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
+                    Ok((target, request))
+                }
+                fsys::DeclTypeUnknown!() => {
+                    return Err(fsys::RouteValidatorError::InvalidArguments);
+                }
+            })
+            .collect();
+        let route_requests = route_requests?;
+        drop(state);
+
+        let route_futs = route_requests.into_iter().map(|pair| async {
+            let (target, request) = pair;
+
+            let capability = Some(target.name.into());
+            let decl_type = Some(target.decl_type);
+            match Self::route_instance(scope_moniker, request, &instance).await {
+                Ok(info) => {
+                    let source_moniker = info;
+                    fsys::RouteReport {
+                        capability,
+                        decl_type,
+                        error: None,
+                        source_moniker: Some(source_moniker),
+                        ..fsys::RouteReport::EMPTY
+                    }
+                }
+                Err(e) => {
+                    let error = Some(fsys::RouteError {
+                        summary: Some(e.to_string()),
+                        ..fsys::RouteError::EMPTY
+                    });
+                    fsys::RouteReport { capability, decl_type, error, ..fsys::RouteReport::EMPTY }
+                }
+            }
+        });
+        Ok(join_all(route_futs).await)
+    }
+
     /// Serve the fuchsia.sys2.RouteValidator protocol for a given scope on a given stream
     async fn serve(
         self: Arc<Self>,
         scope_moniker: AbsoluteMoniker,
         mut stream: fsys::RouteValidatorRequestStream,
     ) {
-        loop {
-            let fsys::RouteValidatorRequest::Validate { moniker, responder } =
-                match stream.next().await {
-                    Some(Ok(request)) => request,
-                    Some(Err(e)) => {
-                        warn!(error = %e, "Could not get next RouteValidator request");
-                        break;
+        let res: Result<(), fidl::Error> = async move {
+            while let Some(request) = stream.try_next().await? {
+                match request {
+                    fsys::RouteValidatorRequest::Validate { moniker, responder } => {
+                        let mut result = self.validate(&scope_moniker, &moniker).await;
+                        if let Err(e) = responder.send(&mut result) {
+                            warn!(error = %e, "RouteValidator failed to send Validate response");
+                        }
                     }
-                    None => break,
-                };
+                    fsys::RouteValidatorRequest::Route { moniker, targets, responder } => {
+                        let mut result = self.route(&scope_moniker, &moniker, targets).await;
+                        if let Err(e) = responder.send(&mut result) {
+                            warn!(error = %e, "RouteValidator failed to send Route response");
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
+        .await;
+        if let Err(e) = &res {
+            warn!(error = %e, "RouteValidator server failed");
+        }
+    }
 
-            let mut result = self.validate(&scope_moniker, moniker).await;
-            if let Err(e) = responder.send(&mut result) {
-                warn!(error = %e, "RouteValidator failed to respond to Validate call");
-                break;
+    /// Routes `request` from component `target` to the source.
+    ///
+    /// Returns information to populate in `fuchsia.sys2.RouteReport`.
+    async fn route_instance(
+        scope_moniker: &AbsoluteMoniker,
+        request: RouteRequest,
+        target: &Arc<ComponentInstance>,
+    ) -> Result<String, RoutingError> {
+        let source = routing::route(request, target).await?;
+        let source = match source {
+            RouteSource::Directory(s, _) => s,
+            RouteSource::Event(s) => s,
+            RouteSource::EventStream(s) => s,
+            RouteSource::Protocol(s) => s,
+            RouteSource::Resolver(s) => s,
+            RouteSource::Runner(s) => s,
+            RouteSource::Service(s) => s,
+            RouteSource::Storage(s) => s,
+            RouteSource::StorageBackingDirectory(s) => {
+                let moniker = match s.storage_provider {
+                    Some(s) => ExtendedMoniker::ComponentInstance(s.abs_moniker.clone()),
+                    None => ExtendedMoniker::ComponentManager,
+                };
+                return Ok(Self::extended_moniker_to_str(scope_moniker, moniker));
+            }
+        };
+        let moniker = Self::extended_moniker_to_str(
+            scope_moniker,
+            source.source_instance().extended_moniker(),
+        );
+        Ok(moniker)
+    }
+
+    fn extended_moniker_to_str(scope_moniker: &AbsoluteMoniker, m: ExtendedMoniker) -> String {
+        match m {
+            ExtendedMoniker::ComponentManager => m.to_string(),
+            ExtendedMoniker::ComponentInstance(m) => {
+                match RelativeMoniker::scope_down(scope_moniker, &m) {
+                    Ok(r) => r.to_string(),
+                    Err(_) => "<above scope>".to_string(),
+                }
             }
         }
     }
@@ -205,18 +338,6 @@ impl CapabilityProvider for RouteValidatorCapabilityProvider {
     }
 }
 
-/// Takes the scoped component's moniker and a relative moniker string and join them into an
-/// absolute moniker.
-fn join_monikers(
-    scope_moniker: &AbsoluteMoniker,
-    relative_moniker_str: &str,
-) -> Result<AbsoluteMoniker, fcomponent::Error> {
-    let relative_moniker = RelativeMoniker::try_from(relative_moniker_str)
-        .map_err(|_| fcomponent::Error::InvalidArguments)?;
-    let abs_moniker = scope_moniker.descendant(&relative_moniker);
-    Ok(abs_moniker)
-}
-
 async fn validate_uses(
     uses: Vec<UseDecl>,
     instance: &Arc<ComponentInstance>,
@@ -225,8 +346,8 @@ async fn validate_uses(
     for use_ in uses {
         let capability = Some(use_.source_name().to_string());
         let decl_type = Some(fsys::DeclType::Use);
-        if let Ok(route_request) = request_for_namespace_capability_use(use_) {
-            let error = if let Err(e) = route(route_request, &instance).await {
+        if let Ok(route_request) = routing::request_for_namespace_capability_use(use_) {
+            let error = if let Err(e) = routing::route(route_request, &instance).await {
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
             } else {
                 None
@@ -251,8 +372,8 @@ async fn validate_exposes(
     for expose in exposes {
         let capability = Some(expose.target_name().to_string());
         let decl_type = Some(fsys::DeclType::Expose);
-        if let Ok(route_request) = request_for_namespace_capability_expose(expose) {
-            let error = if let Err(e) = route(route_request, instance).await {
+        if let Ok(route_request) = routing::request_for_namespace_capability_expose(expose) {
+            let error = if let Err(e) = routing::route(route_request, instance).await {
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
             } else {
                 None
@@ -274,9 +395,10 @@ mod tests {
     use {
         super::*,
         crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
+        assert_matches::assert_matches,
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
-        fidl::endpoints::create_proxy_and_stream,
+        fidl::endpoints,
         fuchsia_async as fasync,
     };
 
@@ -287,7 +409,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn all_routes_success() {
+    async fn validate() {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "fuchsia.component.Realm".into(),
@@ -347,16 +469,16 @@ mod tests {
         let TestModelResult { model, builtin_environment, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        let route_validator = {
+        let validator_server = {
             let env = builtin_environment.lock().await;
             env.route_validator.clone().unwrap()
         };
 
-        let (validator, validator_request_stream) =
-            create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+        let (validator, request_stream) =
+            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
 
         let _validator_task = fasync::Task::local(async move {
-            route_validator.serve(AbsoluteMoniker::root(), validator_request_stream).await
+            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
         });
 
         model.start().await;
@@ -376,19 +498,40 @@ mod tests {
         assert_eq!(results.len(), 3);
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "foo.bar");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Use);
-        assert!(report.error.is_none());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: None,
+                error: None,
+                ..
+            } if s == "foo.bar"
+        );
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "foo.bar");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Expose);
-        assert!(report.error.is_none());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: None,
+                error: None,
+                ..
+            } if s == "foo.bar"
+        );
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "fuchsia.component.Realm");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Use);
-        assert!(report.error.is_none());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: None,
+                error: None,
+                ..
+            } if s == "fuchsia.component.Realm"
+        );
 
         // This validation should have caused `my_child` to be resolved
         let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
@@ -399,13 +542,20 @@ mod tests {
         assert_eq!(results.len(), 1);
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "foo.bar");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Expose);
-        assert!(report.error.is_none());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: None,
+                error: None,
+                ..
+            } if s == "foo.bar"
+        );
     }
 
     #[fuchsia::test]
-    async fn all_routes_fail() {
+    async fn validate_error() {
         let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
             source_name: "a".into(),
@@ -455,16 +605,16 @@ mod tests {
         let TestModelResult { model, builtin_environment, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        let route_validator = {
+        let validator_server = {
             let env = builtin_environment.lock().await;
             env.route_validator.clone().unwrap()
         };
 
         let (validator, validator_request_stream) =
-            create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
 
         let _validator_task = fasync::Task::local(async move {
-            route_validator.serve(AbsoluteMoniker::root(), validator_request_stream).await
+            validator_server.serve(AbsoluteMoniker::root(), validator_request_stream).await
         });
 
         model.start().await;
@@ -483,27 +633,323 @@ mod tests {
         });
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "a");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Use);
-        assert!(report.error.is_some());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "a"
+        );
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "b");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Use);
-        assert!(report.error.is_some());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "b"
+        );
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "c");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Expose);
-        assert!(report.error.is_some());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "c"
+        );
 
         let report = results.remove(0);
-        assert_eq!(report.capability.unwrap(), "d");
-        assert_eq!(report.decl_type.unwrap(), fsys::DeclType::Expose);
-        assert!(report.error.is_some());
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "d"
+        );
 
         // This validation should have caused `my_child` to be resolved
         let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
+    }
+
+    #[fuchsia::test]
+    async fn route() {
+        let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
+            source: UseSource::Framework,
+            source_name: "fuchsia.component.Realm".into(),
+            target_path: CapabilityPath::try_from("/svc/fuchsia.component.Realm").unwrap(),
+            dependency_type: DependencyType::Strong,
+            availability: Availability::Required,
+        });
+
+        let use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
+            source: UseSource::Child("my_child".into()),
+            source_name: "biz.buz".into(),
+            target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
+            dependency_type: DependencyType::Strong,
+            availability: Availability::Required,
+        });
+
+        let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
+            source: ExposeSource::Child("my_child".into()),
+            source_name: "biz.buz".into(),
+            target: ExposeTarget::Parent,
+            target_name: "foo.bar".into(),
+            availability: cm_rust::Availability::Required,
+        });
+
+        let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
+            source: ExposeSource::Self_,
+            source_name: "biz.buz".into(),
+            target: ExposeTarget::Parent,
+            target_name: "biz.buz".into(),
+            availability: cm_rust::Availability::Required,
+        });
+
+        let capability_decl = ProtocolDecl {
+            name: "biz.buz".into(),
+            source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
+        };
+
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .use_(use_from_framework_decl)
+                    .use_(use_from_child_decl)
+                    .expose(expose_from_child_decl)
+                    .add_lazy_child("my_child")
+                    .build(),
+            ),
+            (
+                "my_child",
+                ComponentDeclBuilder::new()
+                    .protocol(capability_decl)
+                    .expose(expose_from_self_decl)
+                    .build(),
+            ),
+        ];
+
+        let TestModelResult { model, builtin_environment, .. } =
+            TestEnvironmentBuilder::new().set_components(components).build().await;
+
+        let validator_server = {
+            let env = builtin_environment.lock().await;
+            env.route_validator.clone().unwrap()
+        };
+        let (validator, request_stream) =
+            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+        let _validator_task = fasync::Task::local(async move {
+            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+        });
+
+        model.start().await;
+
+        // Validate the root
+        let mut targets = vec![
+            fsys::RouteTarget { name: "biz.buz".into(), decl_type: fsys::DeclType::Use },
+            fsys::RouteTarget { name: "foo.bar".into(), decl_type: fsys::DeclType::Expose },
+            fsys::RouteTarget {
+                name: "fuchsia.component.Realm".into(),
+                decl_type: fsys::DeclType::Use,
+            },
+        ];
+        let mut results = validator.route(".", &mut targets.iter_mut()).await.unwrap().unwrap();
+
+        assert_eq!(results.len(), 3);
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "biz.buz" && m == "./my_child"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "foo.bar" && m == "./my_child"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "fuchsia.component.Realm" && m == "."
+        );
+
+        // Validate `my_child`
+        let mut targets =
+            vec![fsys::RouteTarget { name: "biz.buz".into(), decl_type: fsys::DeclType::Expose }];
+        let mut results =
+            validator.route("./my_child", &mut targets.iter_mut()).await.unwrap().unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "biz.buz" && m == "./my_child"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn route_error() {
+        let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
+            source: UseSource::Child("my_child".to_string()),
+            source_name: "a".into(),
+            target_path: CapabilityPath::try_from("/svc/a").unwrap(),
+            dependency_type: DependencyType::Strong,
+            availability: Availability::Required,
+        });
+
+        let invalid_source_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
+            source: UseSource::Child("bad_child".to_string()),
+            source_name: "b".into(),
+            target_path: CapabilityPath::try_from("/svc/b").unwrap(),
+            dependency_type: DependencyType::Strong,
+            availability: Availability::Required,
+        });
+
+        let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
+            source: ExposeSource::Child("my_child".to_string()),
+            source_name: "c".into(),
+            target: ExposeTarget::Parent,
+            target_name: "c".into(),
+            availability: cm_rust::Availability::Required,
+        });
+
+        let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
+            source: ExposeSource::Child("bad_child".to_string()),
+            source_name: "d".into(),
+            target: ExposeTarget::Parent,
+            target_name: "d".into(),
+            availability: cm_rust::Availability::Required,
+        });
+
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .use_(invalid_source_name_use_from_child_decl)
+                    .use_(invalid_source_use_from_child_decl)
+                    .expose(invalid_source_name_expose_from_child_decl)
+                    .expose(invalid_source_expose_from_child_decl)
+                    .add_lazy_child("my_child")
+                    .build(),
+            ),
+            ("my_child", ComponentDeclBuilder::new().build()),
+        ];
+
+        let TestModelResult { model, builtin_environment, .. } =
+            TestEnvironmentBuilder::new().set_components(components).build().await;
+
+        let validator_server = {
+            let env = builtin_environment.lock().await;
+            env.route_validator.clone().unwrap()
+        };
+        let (validator, request_stream) =
+            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+        let _validator_task = fasync::Task::local(async move {
+            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+        });
+
+        model.start().await;
+
+        // `my_child` should not be resolved right now
+        let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        assert!(instance.is_none());
+
+        let mut targets = vec![
+            fsys::RouteTarget { name: "a".into(), decl_type: fsys::DeclType::Use },
+            fsys::RouteTarget { name: "b".into(), decl_type: fsys::DeclType::Use },
+            fsys::RouteTarget { name: "c".into(), decl_type: fsys::DeclType::Expose },
+            fsys::RouteTarget { name: "d".into(), decl_type: fsys::DeclType::Expose },
+        ];
+        let mut results = validator.route(".", &mut targets.iter_mut()).await.unwrap().unwrap();
+        assert_eq!(results.len(), 4);
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "a"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "b"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "c"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Expose),
+                source_moniker: None,
+                error: Some(_),
+                ..
+            } if s == "d"
+        );
     }
 }

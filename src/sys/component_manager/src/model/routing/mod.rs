@@ -88,7 +88,7 @@ pub(super) async fn route_and_open_capability(
 pub async fn route(
     route_request: RouteRequest,
     target: &Arc<ComponentInstance>,
-) -> Result<(), RoutingError> {
+) -> Result<RouteSource, RoutingError> {
     match route_request {
         RouteRequest::UseStorage(use_storage_decl) => {
             route_storage_and_backing_directory(
@@ -97,13 +97,10 @@ pub async fn route(
                 &mut NoopRouteMapper,
                 &mut NoopRouteMapper,
             )
-            .await?;
+            .await
         }
-        _ => {
-            route_capability(route_request, target, &mut NoopRouteMapper).await?;
-        }
+        _ => route_capability(route_request, target, &mut NoopRouteMapper).await,
     }
-    Ok(())
 }
 
 /// Routes a capability from `target` to its source, starting from a `use_decl`.
