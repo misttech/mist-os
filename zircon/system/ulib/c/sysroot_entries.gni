@@ -162,7 +162,6 @@ sysroot_uninstrumented_libc_entries = [
         "fcntl.h",
         "features.h",
         "fenv.h",
-        "fmtmsg.h",
         "fnmatch.h",
         "getopt.h",
         "glob.h",

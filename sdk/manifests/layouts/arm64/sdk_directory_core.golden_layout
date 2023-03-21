@@ -85,7 +85,6 @@ arch/arm64/sysroot/include/errno.h
 arch/arm64/sysroot/include/fcntl.h
 arch/arm64/sysroot/include/features.h
 arch/arm64/sysroot/include/fenv.h
-arch/arm64/sysroot/include/fmtmsg.h
 arch/arm64/sysroot/include/fnmatch.h
 arch/arm64/sysroot/include/getopt.h
 arch/arm64/sysroot/include/glob.h
