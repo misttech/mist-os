@@ -73,6 +73,7 @@ fuchsia_unittest_package("debug-dash-launcher-unittests") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("for_transition") {
+  public_deps = [ ":debug-dash-launcher" ]
 }
 
 fuchsia_package("debug-dash-launcher") {
@@ -99,6 +100,7 @@ group("tests") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("core_shard_for_transition") {
+  public_deps = [ ":core-shard" ]
 }
 
 core_shard("core-shard") {
