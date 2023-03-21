@@ -932,23 +932,46 @@ fn check_mldv1_report(
     true
 }
 
+fn check_mld_report(
+    mld_version: Option<fnet_interfaces_admin::MldVersion>,
+    netstack_version: NetstackVersion,
+    dst_ip: net_types_ip::Ipv6Addr,
+    mld: MldPacket<&[u8]>,
+    expected_group: MulticastAddr<net_types_ip::Ipv6Addr>,
+) -> bool {
+    match mld_version {
+        Some(version) => match version {
+            fnet_interfaces_admin::MldVersion::V1 => {
+                check_mldv1_report(dst_ip, mld, expected_group)
+            }
+            fnet_interfaces_admin::MldVersion::V2 => {
+                check_mldv2_report(dst_ip, mld, expected_group)
+            }
+            _ => panic!("unknown MLD version {:?}", version),
+        },
+        None => match netstack_version {
+            NetstackVersion::Netstack2 => check_mldv2_report(dst_ip, mld, expected_group),
+            NetstackVersion::Netstack3 => check_mldv1_report(dst_ip, mld, expected_group),
+            v @ NetstackVersion::Netstack2WithFastUdp | v @ NetstackVersion::ProdNetstack2 => {
+                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
+            }
+        },
+    }
+}
+
 #[netstack_test]
-#[test_case(fnet_interfaces_admin::MldVersion::V1, check_mldv1_report)]
-#[test_case(fnet_interfaces_admin::MldVersion::V2, check_mldv2_report)]
+#[test_case(Some(fnet_interfaces_admin::MldVersion::V1); "mldv1")]
+#[test_case(Some(fnet_interfaces_admin::MldVersion::V2); "mldv2")]
+#[test_case(None; "default")]
 async fn sends_mld_reports<N: Netstack>(
     name: &str,
-    mld_version: fnet_interfaces_admin::MldVersion,
-    check_mld_report: fn(
-        net_types_ip::Ipv6Addr,
-        MldPacket<&[u8]>,
-        MulticastAddr<net_types_ip::Ipv6Addr>,
-    ) -> bool,
+    mld_version: Option<fnet_interfaces_admin::MldVersion>,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
     let (_network, _realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up networking");
 
-    {
+    if let Some(mld_version) = mld_version {
         let gen_config = |mld_version| fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
                 mld: Some(fnet_interfaces_admin::MldConfiguration {
@@ -998,20 +1021,37 @@ async fn sends_mld_reports<N: Netstack>(
             } => assert_eq!(got, mld_version)
         );
     }
-
-    // Add an address so we join the address's solicited node multicast group.
-    let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-        &iface,
-        net::Subnet {
+    let _address_state_provider = {
+        let subnet = net::Subnet {
             addr: net::IpAddress::Ipv6(net::Ipv6Address {
                 addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
             }),
             prefix_len: 64,
-        },
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
-    )
-    .await
-    .expect("add subnet address and route");
+        };
+
+        // While Netstack3 installs a link-local subnet route when an interface is
+        // added, Netstack2 installs it only when an interface is enabled. Add the
+        // forwarding entry for Netstack2 only to compensate for this behavioral difference.
+        // TODO(https://fxbug.dev/123440): Unify behavior for adding a link-local
+        // subnet route between NS2/NS3.
+        if N::VERSION == NetstackVersion::Netstack3 {
+            interfaces::add_address_wait_assigned(
+                &iface.control(),
+                subnet,
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            )
+            .await
+            .expect("add_address_wait_assigned failed")
+        } else {
+            interfaces::add_subnet_address_and_route_wait_assigned(
+                &iface,
+                subnet,
+                fidl_fuchsia_net_interfaces_admin::AddressParameters::EMPTY,
+            )
+            .await
+            .expect("add subnet address and route")
+        }
+    };
     let snmc = ipv6_consts::LINK_LOCAL_ADDR.to_solicited_node_address();
 
     let stream = fake_ep
@@ -1065,7 +1105,7 @@ async fn sends_mld_reports<N: Netstack>(
                 //   link-local IPv6 Source Address, an IPv6 Hop Limit of 1, ...
                 assert_eq!(ttl, 1, "MLD messages must have a hop limit of 1");
 
-                Ok(check_mld_report(dst_ip, mld, snmc).then_some(()))
+                Ok(check_mld_report(mld_version, N::VERSION, dst_ip, mld, snmc).then_some(()))
             }
         });
     futures::pin_mut!(stream);

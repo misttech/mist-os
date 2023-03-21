@@ -13,7 +13,9 @@ use net_declare::{net_ip_v4, std_ip_v4};
 use net_types::{ip as net_types_ip, MulticastAddress as _};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
-    interfaces, realms::Netstack, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    interfaces,
+    realms::{Netstack, NetstackVersion},
+    setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
@@ -114,14 +116,44 @@ fn check_igmpv3_report(
     true
 }
 
+fn check_igmp_report(
+    igmp_version: Option<fnet_interfaces_admin::IgmpVersion>,
+    netstack_version: NetstackVersion,
+    dst_ip: net_types_ip::Ipv4Addr,
+    payload: &[u8],
+    expected_group: net_types_ip::Ipv4Addr,
+) -> bool {
+    match igmp_version {
+        Some(version) => match version {
+            fnet_interfaces_admin::IgmpVersion::V1 => {
+                check_igmpv1_report(dst_ip, payload, expected_group)
+            }
+            fnet_interfaces_admin::IgmpVersion::V2 => {
+                check_igmpv2_report(dst_ip, payload, expected_group)
+            }
+            fnet_interfaces_admin::IgmpVersion::V3 => {
+                check_igmpv3_report(dst_ip, payload, expected_group)
+            }
+            _ => panic!("unknown IGMP version {:?}", version),
+        },
+        None => match netstack_version {
+            NetstackVersion::Netstack2 => check_igmpv3_report(dst_ip, payload, expected_group),
+            NetstackVersion::Netstack3 => check_igmpv2_report(dst_ip, payload, expected_group),
+            v @ NetstackVersion::Netstack2WithFastUdp | v @ NetstackVersion::ProdNetstack2 => {
+                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
+            }
+        },
+    }
+}
+
 #[netstack_test]
-#[test_case(fnet_interfaces_admin::IgmpVersion::V1, check_igmpv1_report)]
-#[test_case(fnet_interfaces_admin::IgmpVersion::V2, check_igmpv2_report)]
-#[test_case(fnet_interfaces_admin::IgmpVersion::V3, check_igmpv3_report)]
+#[test_case(Some(fnet_interfaces_admin::IgmpVersion::V1); "igmpv1")]
+#[test_case(Some(fnet_interfaces_admin::IgmpVersion::V2); "igmpv2")]
+#[test_case(Some(fnet_interfaces_admin::IgmpVersion::V3); "igmpv3")]
+#[test_case(None; "default")]
 async fn sends_igmp_reports<N: Netstack>(
     name: &str,
-    igmp_version: fnet_interfaces_admin::IgmpVersion,
-    check_igmp_report: fn(net_types_ip::Ipv4Addr, &[u8], net_types_ip::Ipv4Addr) -> bool,
+    igmp_version: Option<fnet_interfaces_admin::IgmpVersion>,
 ) {
     const INTERFACE_ADDR: std::net::Ipv4Addr = std_ip_v4!("192.168.0.1");
     const MULTICAST_ADDR: std::net::Ipv4Addr = std_ip_v4!("224.1.2.3");
@@ -130,7 +162,7 @@ async fn sends_igmp_reports<N: Netstack>(
     let (_network, realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
-    {
+    if let Some(igmp_version) = igmp_version {
         let gen_config = |igmp_version| fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
                 igmp: Some(fnet_interfaces_admin::IgmpConfiguration {
@@ -228,11 +260,15 @@ async fn sends_igmp_reports<N: Netstack>(
                     return None;
                 }
 
-                assert_eq!(
-                    src_ip,
-                    net_types_ip::Ipv4Addr::new(INTERFACE_ADDR.octets()),
-                    "IGMP messages must be sent from an address assigned to the NIC",
-                );
+                // TODO(https://fxbug.dev/98534): Don't send IGMP reports before a local address
+                // is assigned.
+                if N::VERSION != NetstackVersion::Netstack3 {
+                    assert_eq!(
+                        src_ip,
+                        net_types_ip::Ipv4Addr::new(INTERFACE_ADDR.octets()),
+                        "IGMP messages must be sent from an address assigned to the NIC",
+                    );
+                }
 
                 // As per RFC 2236 section 2,
                 //
@@ -240,7 +276,14 @@ async fn sends_igmp_reports<N: Netstack>(
                 //   IP TTL 1, ...
                 assert_eq!(ttl, 1, "IGMP messages must have a TTL of 1");
 
-                check_igmp_report(dst_ip, payload, net_types_ip_multicast_addr).then_some(())
+                check_igmp_report(
+                    igmp_version,
+                    N::VERSION,
+                    dst_ip,
+                    payload,
+                    net_types_ip_multicast_addr,
+                )
+                .then_some(())
             }
         },
     );

@@ -19,5 +19,11 @@
                 "slaac_with_privacy_extensions_ns3::router",
             ],
         },
+        {
+            type: "expect_pass",
+            matchers: [
+                "sends_mld_reports_ns3::default",
+            ],
+        },
     ],
 }

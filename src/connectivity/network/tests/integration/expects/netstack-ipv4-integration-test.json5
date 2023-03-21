@@ -15,5 +15,11 @@
                 "sends_igmp_reports_ns3*",
             ],
         },
+        {
+            type: "expect_pass",
+            matchers: [
+                "sends_igmp_reports_ns3::default",
+            ],
+        },
     ],
 }

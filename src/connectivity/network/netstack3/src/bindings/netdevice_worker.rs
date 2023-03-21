@@ -349,8 +349,16 @@ impl DeviceHandler {
                             TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
                         ),
                     },
-                    ip_config: IpDeviceConfiguration { ip_enabled: false, gmp_enabled: false },
+                    ip_config: IpDeviceConfiguration { ip_enabled: false, gmp_enabled: true },
                 };
+            },
+        );
+        netstack3_core::device::update_ipv4_configuration(
+            sync_ctx,
+            non_sync_ctx,
+            &core_id,
+            |config| {
+                config.ip_config.gmp_enabled = true;
             },
         );
 
