@@ -214,16 +214,14 @@ assembly_input_bundle("core_realm") {
     {
       name = "core"
       component_shards = {
-        core = [
-          # TODO:  These shards should be folded into the `core.cml` file itself
-          # as they are never omitted from that file.
+        # All paths must be rebased since this is passed directly to the AIB
+        # config.
 
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
-          rebase_path(
-              "//src/developer/build_info/meta/build_info.core_shard.cml",
-              root_build_dir),
-        ]
+        # TODO:  These shards should be folded into the `core.cml` file itself
+        # as they are never omitted from that file.
+        core = rebase_path(
+                [ "//src/developer/build_info/meta/build_info.core_shard.cml" ],
+                root_build_dir)
       }
     },
   ]
@@ -286,15 +284,14 @@ assembly_input_bundle("core_realm_eng") {
     {
       name = "core"
       component_shards = {
-        core = [
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
-          rebase_path(
-              "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
-              root_build_dir),
-          rebase_path("//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
-                      root_build_dir),
-        ]
+        # All paths must be rebased since this is passed directly to the AIB
+        # config.
+        core = rebase_path(
+                [
+                  "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
+                  "//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
+                ],
+                root_build_dir)
       }
     },
   ]
@@ -403,48 +400,35 @@ assembly_input_bundle("common_minimal") {
     {
       name = "core"
       component_shards = {
-        core = [
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
-          rebase_path(
-              "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
-              root_build_dir),
-          rebase_path(
-              "//src/diagnostics/kcounter/meta/diagnostics-kcounter.core_shard.cml",
-              root_build_dir),
-          rebase_path(
-              "//src/diagnostics/log-stats/meta/log-stats.core_shard.cml",
-              root_build_dir),
-          rebase_path("//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
-                      root_build_dir),
-          rebase_path(
-              "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
-              root_build_dir),
+        # All paths must be rebased since this is passed directly to the AIB
+        # config.
+        core = rebase_path(
+                [
+                  "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
+                  "//src/diagnostics/kcounter/meta/diagnostics-kcounter.core_shard.cml",
+                  "//src/diagnostics/log-stats/meta/log-stats.core_shard.cml",
+                  "//src/diagnostics/realm/meta/diagnostics.core_shard.cml",
+                  "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
+                  "//src/diagnostics/sampler/meta/sampler.core_shard.cml",
+                  "//src/connectivity/network/meta/persistence.core_shard.cml",
 
-          rebase_path("//src/diagnostics/sampler/meta/sampler.core_shard.cml",
-                      root_build_dir),
-          rebase_path(
-              "//src/connectivity/network/meta/persistence.core_shard.cml",
-              root_build_dir),
-
-          # TODO(fxbug.dev/112433): The trace manager core shard should only
-          # appear in eng builds, however, many components do not properly
-          # declare their route dependencies on it as optional causing scrutiny
-          # to fail route checking. Once the all of the component routes are
-          # properly declared optional, this shard should be removed from here
-          # and added in "common_minimal_eng" instead.
-          rebase_path(
-              "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
-              root_build_dir),
-        ]
+                  # TODO(fxbug.dev/112433): The trace manager core shard should only
+                  # appear in eng builds, however, many components do not properly
+                  # declare their route dependencies on it as optional causing scrutiny
+                  # to fail route checking. Once the all of the component routes are
+                  # properly declared optional, this shard should be removed from here
+                  # and added in "common_minimal_eng" instead.
+                  "//src/performance/trace_manager/meta/trace_manager.core_shard.cml",
+                ],
+                root_build_dir)
       }
     },
     {
       name = "diagnostics"
       components = {
         diagnostics =
-            [ rebase_path("//src/diagnostics/realm/meta/diagnostics_realm.cml",
-                          root_build_dir) ]
+            rebase_path("//src/diagnostics/realm/meta/diagnostics_realm.cml",
+                        root_build_dir)
       }
     },
   ]
@@ -467,17 +451,17 @@ assembly_input_bundle("common_minimal_userdebug") {
     {
       name = "diagnostics"
       component_shards = {
-        diagnostics = [ rebase_path(
-                "//src/diagnostics/detect/meta/detect.realm_shard.cml",
-                root_build_dir) ]
+        diagnostics = rebase_path(
+                [ "//src/diagnostics/detect/meta/detect.realm_shard.cml" ],
+                root_build_dir)
       }
     },
     {
       name = "core"
       component_shards = {
-        core =
-            [ rebase_path("//src/diagnostics/detect/meta/detect.core_shard.cml",
-                          root_build_dir) ]
+        core = rebase_path(
+                [ "//src/diagnostics/detect/meta/detect.core_shard.cml" ],
+                root_build_dir)
       }
     },
   ]
@@ -506,9 +490,9 @@ assembly_input_bundle("starnix_support") {
     {
       name = "core"
       component_shards = {
-        core = [ rebase_path(
-                "//src/proc/bin/manager/meta/starnix_manager.core_shard.cml",
-                root_build_dir) ]
+        core = rebase_path(
+                [ "//src/proc/bin/manager/meta/starnix_manager.core_shard.cml" ],
+                root_build_dir)
       }
     },
   ]
@@ -547,21 +531,14 @@ assembly_input_bundle("virtualization_support") {
     {
       name = "core"
       component_shards = {
-        core = [ rebase_path(
-                "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
-                root_build_dir) ]
-
-        core += [
-          rebase_path(
-              "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
-              root_build_dir),
-          rebase_path(
-              "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",
-              root_build_dir),
-          rebase_path(
-              "//src/virtualization/bin/guest_manager/meta/zircon_guest_manager.core_shard.cml",
-              root_build_dir),
-        ]
+        core = rebase_path(
+                [
+                  "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
+                  "//src/virtualization/bin/guest_manager/meta/debian_guest_manager.core_shard.cml",
+                  "//src/virtualization/bin/guest_manager/meta/termina_guest_manager.core_shard.cml",
+                  "//src/virtualization/bin/guest_manager/meta/zircon_guest_manager.core_shard.cml",
+                ],
+                root_build_dir)
       }
     },
   ]
@@ -679,12 +656,12 @@ assembly_input_bundle("example_assembly_bundle") {
 
       # Test that multiple components work
       components = {
-        bar = [ rebase_path(
+        bar = rebase_path(
                 "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
-                root_build_dir) ]
-        baz = [ rebase_path(
+                root_build_dir)
+        baz = rebase_path(
                 "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
-                root_build_dir) ]
+                root_build_dir)
       }
     },
 
@@ -693,13 +670,11 @@ assembly_input_bundle("example_assembly_bundle") {
     {
       name = "core"
       component_shards = {
-        core = [
-          # All paths must be rebased since this is passed directly to the AIB
-          # config.
-          rebase_path(
-              "//src/tests/assembly/assemble_image/compiled_package/meta/test.core_shard.cml",
-              root_build_dir),
-        ]
+        # All paths must be rebased since this is passed directly to the AIB
+        # config.
+        core = rebase_path(
+                [ "//src/tests/assembly/assemble_image/compiled_package/meta/test.core_shard.cml" ],
+                root_build_dir)
       }
     },
   ]

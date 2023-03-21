@@ -164,8 +164,9 @@ class MakeLegacyConfig(unittest.TestCase):
                 base_driver_components_files_list=[driver_component_file],
                 shell_commands=shell_commands_file,
                 core_realm_shards=[
-                    os.path.join(SOURCE_DIR, "core/realm.cml"),
-                    os.path.join(SOURCE_DIR, "core/realm/shard.cml")
+                    os.path.join(SOURCE_DIR, "core/core.cml"),
+                    os.path.join(SOURCE_DIR, "core/realm/shard1.cml"),
+                    os.path.join(SOURCE_DIR, "core/realm/shard2.cml")
                 ],
                 core_realm_includes=[
                     FileEntry(
@@ -214,7 +215,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     CompiledPackageMainDefinition(
                         name="core",
                         components={
-                            "core": "compiled_packages/core/core/realm.cml"
+                            "core": "compiled_packages/core/core/core.cml"
                         },
                         contents=set(
                             [
@@ -228,7 +229,12 @@ class MakeLegacyConfig(unittest.TestCase):
                     CompiledPackageAdditionalShards(
                         name="core",
                         component_shards={
-                            "core": ["compiled_packages/core/core/shard.cml"]
+                            "core":
+                                set(
+                                    [
+                                        "compiled_packages/core/core/shard1.cml",
+                                        "compiled_packages/core/core/shard2.cml",
+                                    ])
                         })
                 ])
 
@@ -318,8 +324,10 @@ class MakeLegacyConfig(unittest.TestCase):
                         'source/system_b/internal/path/file_b_2',
                         'source/system_b/internal/path/file_b_3',
                         'source/kernel.bin', 'source/some/file',
-                        'source/another/file', 'source/core/realm.cml',
-                        'source/core/realm/shard.cml', 'source/src/include.cml',
+                        'source/another/file', 'source/core/core.cml',
+                        'source/core/realm/shard1.cml',
+                        'source/core/realm/shard2.cml',
+                        'source/src/include.cml',
                         'source/some/core/package/file'
                     ]))
 
@@ -434,13 +442,17 @@ class MakeLegacyConfig(unittest.TestCase):
                             destination=
                             'outdir/compiled_packages/include/src/include.cml'),
                         FileEntry(
-                            source='source/core/realm.cml',
+                            source='source/core/core.cml',
                             destination=
-                            'outdir/compiled_packages/core/core/realm.cml'),
+                            'outdir/compiled_packages/core/core/core.cml'),
                         FileEntry(
-                            source='source/core/realm/shard.cml',
+                            source='source/core/realm/shard1.cml',
                             destination=
-                            'outdir/compiled_packages/core/core/shard.cml'),
+                            'outdir/compiled_packages/core/core/shard1.cml'),
+                        FileEntry(
+                            source='source/core/realm/shard2.cml',
+                            destination=
+                            'outdir/compiled_packages/core/core/shard2.cml'),
                         FileEntry(
                             source='source/some/core/package/file',
                             destination=
@@ -481,8 +493,9 @@ class MakeLegacyConfig(unittest.TestCase):
                     'blobs/fd0891d15ce65d7682f7437e441e917b8ed4bde4db07a11dc100104f25056051',
                     'bootfs/another/file',
                     'bootfs/some/file',
-                    'compiled_packages/core/core/realm.cml',
-                    'compiled_packages/core/core/shard.cml',
+                    'compiled_packages/core/core/core.cml',
+                    'compiled_packages/core/core/shard1.cml',
+                    'compiled_packages/core/core/shard2.cml',
                     'compiled_packages/core/files/core/package/file/destination',
                     'compiled_packages/include/src/include.cml',
                     'kernel/kernel.bin',

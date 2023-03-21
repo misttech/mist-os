@@ -13,7 +13,7 @@ import logging
 from assembly.assembly_input_bundle import CompiledPackageAdditionalShards, CompiledPackageMainDefinition
 from depfile import DepFile
 from assembly import AssemblyInputBundle, AIBCreator, DriverDetails, FilePath, PackageManifest, FileEntry
-from serialization.serialization import instance_from_dict, json_load
+from serialization.serialization import instance_from_dict, json_dumps, json_load
 logger = logging.getLogger()
 
 
@@ -163,12 +163,9 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
                 instance_from_dict(
                     CompiledPackageAdditionalShards, package_def))
         else:
-            aib_creator.component_shards[package_def["name"]] = package_def.get(
-                "components", dict())
-            aib_creator.component_includes[
-                package_def["name"]] = package_def.get("includes", dict())
-            aib_creator.compiled_package_contents[
-                package_def["name"]] = package_def.get("contents", dict())
+            main_def = instance_from_dict(
+                CompiledPackageMainDefinition, package_def)
+            aib_creator.compiled_packages.append(main_def)
 
 
 def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):

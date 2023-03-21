@@ -18,7 +18,7 @@ import json
 from typing import Any, Dict, List, ItemsView, Optional, Set, TextIO, Tuple, Union
 
 import serialization
-from serialization import json_dump, json_load, serialize_json
+from serialization import json_dump, json_dumps, json_load, serialize_json
 
 from .image_assembly_config import ImageAssemblyConfig, KernelInfo
 from .common import FileEntry, FilePath, fast_copy, fast_copy_makedirs
@@ -82,7 +82,7 @@ class CompiledPackageAdditionalShards:
     # Name of the package
     name: str = field()
     # Additional component shards
-    component_shards: Dict[str, List[FilePath]] = field(default_factory=dict)
+    component_shards: Dict[str, Set[FilePath]] = field(default_factory=dict)
 
 
 @dataclass
@@ -380,23 +380,11 @@ class AIBCreator:
         # which subpackages have already been copied.
         self.subpackages: Set[Merkle] = set()
 
-        # A dict mapping package name to dicts mapping component names to
-        # the component shards used to build them, which describes the
-        # components to build for each compiled package
-        self.component_shards: Dict[PackageName,
-                                    Dict[ComponentName,
-                                         ComponentShards]] = dict()
+        # A list of CompiledPackageMainDefinitions from either a parsed json GN
+        # scope, or directly set by the legacy AIB creator.
+        self.compiled_packages: List[CompiledPackageMainDefinition] = list()
 
-        # A set containing all the core realm shards included by the core
-        # package cml. These need to be placed in an include directory for
-        # the cml compiler in the AIB containing the core package definition.
-        # TODO(fxbug.dev/117397): Handle multiple packages properly
-        self.component_includes: Dict[PackageName, FileEntryList] = dict()
-
-        # A set of file entries to include in compiled packages
-        self.compiled_package_contents: Dict[PackageName,
-                                             FileEntryList] = dict()
-
+        # Additional component cml shards to include in package's components
         self.compiled_package_shards: List[CompiledPackageAdditionalShards] = []
 
     def build(self) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
@@ -515,68 +503,65 @@ class AIBCreator:
             local_kernel_dst_path = os.path.join(self.outdir, kernel_dst_path)
             deps.add(fast_copy_makedirs(kernel_src_path, local_kernel_dst_path))
 
-        if self.component_shards:
-            for package_name in self.component_shards.keys():
-                components = {}
-                for component_name in self.component_shards[package_name].keys(
-                ):
-                    component_files, component_deps = self._copy_component_shards(
-                        self.component_shards[package_name][component_name],
-                        package_name=package_name,
-                        component_name=component_name)
+        for package in self.compiled_packages:
+            copied_component_cmls = {}
+            for component_name, cml_file in package.components.items():
+                copied_cml, component_deps = self._copy_component_shard(
+                    cml_file,
+                    package_name=package.name,
+                    component_name=component_name)
+                copied_component_cmls[component_name] = copied_cml
 
-                    deps.update(component_deps)
+                deps.update(component_deps)
 
-                    components[component_name] = component_files
+            # This assumes that package.includes has actually been passed to the
+            # AIB creator as Set[FileEntry] instead of a Set[FilePath].  This is
+            # not ideal, but it allows the reuse of the MainPackageDefinition
+            # type without any other changes.
+            #
+            # The FileEntries are only needed because of the SDK include paths
+            # used by some component shards.
+            #
+            # TODO(): Remove the use of the 'include' statement in component shards
+            # compiled by assembly, for all included cml files that aren't in the
+            # SDK itself (these can be found via a separate path to the SDK's set
+            # of cml include files).  These files should either be incorporated
+            # into the body of the component shards in the AIB, or added to the
+            # AIBs as another shard for the same component.
+            #
+            # Once that's complete, this whole mechanism can be removed.
+            #
+            copied_includes, component_includes_deps = self._copy_component_includes(
+                package.includes)
+            deps.update(component_includes_deps)
 
-                component_includes, component_includes_deps = self._copy_component_includes(
-                    self.component_includes[package_name])
-                deps.update(component_includes_deps)
+            # Copy the package contents entries
+            (copied_package_files, package_deps) = self._copy_file_entries(
+                package.contents,
+                os.path.join("compiled_packages", package.name, "files"))
 
-                # Copy the package contents entries
-                (package_files, package_deps) = self._copy_file_entries(
-                    self.compiled_package_contents[package_name],
-                    os.path.join("compiled_packages", package_name, "files"))
+            copied_definition = CompiledPackageMainDefinition(
+                name=package.name,
+                components=copied_component_cmls,
+                includes=copied_includes,
+                contents=set(copied_package_files))
+            result.packages_to_compile.append(copied_definition)
 
-                result.packages_to_compile.append(
-                    CompiledPackageMainDefinition(
-                        name=package_name,
-                        components={
-                            component_name: components[component_name][0]
-                            for component_name in components.keys()
-                        },
-                        includes=component_includes,
-                        contents=set(package_files)))
-                result.packages_to_compile.append(
-                    CompiledPackageAdditionalShards(
-                        name=package_name,
-                        component_shards={
-                            component_name: components[component_name][1:]
-                            for component_name in components.keys()
-                        }))
+            deps.update(package_deps)
 
-                deps.update(package_deps)
+        for package in self.compiled_package_shards:
+            copied_component_shards = {}
+            for name, shards in package.component_shards.items():
+                copied_shards, component_deps = self._copy_component_shards(
+                    shards, package_name=package.name, component_name=name)
 
-        if self.compiled_package_shards:
-            for package_shards in self.compiled_package_shards:
-                component_shards = {}
-                for component_name in package_shards.component_shards.keys():
-                    component_files, component_deps = self._copy_component_shards(
-                        package_shards.component_shards[component_name],
-                        package_name=package_shards.name,
-                        component_name=component_name)
+                deps.update(component_deps)
+                copied_component_shards[name] = set(copied_shards)
 
-                    deps.update(component_deps)
-
-                    component_shards[component_name] = component_files
-
-                result.packages_to_compile.append(
-                    CompiledPackageAdditionalShards(
-                        name=package_shards.name,
-                        component_shards={
-                            component_name: component_shards[component_name]
-                            for component_name in component_shards.keys()
-                        }))
+            result.packages_to_compile.append(
+                CompiledPackageAdditionalShards(
+                    name=package.name,
+                    component_shards=copied_component_shards))
 
         # Copy the config_data entries into the out-of-tree layout
         (config_data, config_data_deps) = self._copy_config_data_entries()
@@ -846,8 +831,8 @@ class AIBCreator:
         return (blob_paths, deps)
 
     def _copy_component_includes(
-            self,
-            component_includes: FileEntrySet) -> Tuple[Set[FilePath], DepSet]:
+        self, component_includes: Union[FileEntrySet, FileEntryList]
+    ) -> Tuple[Set[FilePath], DepSet]:
         deps: DepSet = set()
         shard_include_paths: Set[FilePath] = set()
         for entry in component_includes:
@@ -862,28 +847,41 @@ class AIBCreator:
 
         return shard_include_paths, deps
 
+    def _copy_component_shard(
+            self, component_shard: FilePath, package_name: str,
+            component_name: str) -> Tuple[FilePath, DepSet]:
+        deps: DepSet = set()
+        # The shard is copied to a path based on the name of the package, the
+        # name of the component, and the filename of the shard:
+        # f"compiled_packages/{package_name}/{component_name}/{filename}"
+        #
+        bundle_destination = os.path.join(
+            "compiled_packages", package_name, component_name,
+            os.path.basename(component_shard))
+
+        # The copy destination is the above path, with the bundle's outdir.
+        copy_destination = os.path.join(self.outdir, bundle_destination)
+
+        # Hardlink the file from the source to the destination
+        deps.add(fast_copy_makedirs(component_shard, copy_destination))
+        return bundle_destination, deps
+
     def _copy_component_shards(
-            self, component_shards: ComponentShards, package_name: str,
+            self, component_shards: Union[ComponentShards,
+                                          List[FilePath]], package_name: str,
             component_name: str) -> Tuple[List[FilePath], DepSet]:
         shard_file_paths: List[FilePath] = list()
         deps: DepSet = set()
         for shard in component_shards:
-            # Copy the file to a destination based on its path in the source
-            # tree. Make sure any directory traversal characters are replaced
-            # and it's a valid filename.
-            bundle_destination = os.path.join(
-                "compiled_packages", package_name, component_name,
-                os.path.basename(shard))
-            copy_destination = os.path.join(self.outdir, bundle_destination)
-
-            # Hardlink the file from the source to the destination
-            deps.add(fast_copy_makedirs(shard, copy_destination))
-            shard_file_paths.append(bundle_destination)
-
+            destination, copy_deps = self._copy_component_shard(
+                shard, package_name, component_name)
+            deps.update(copy_deps)
+            shard_file_paths.append(destination)
         return shard_file_paths, deps
 
-    def _copy_file_entries(self, entries: FileEntrySet,
-                           subdirectory: str) -> Tuple[FileEntryList, DepSet]:
+    def _copy_file_entries(
+            self, entries: Union[FileEntrySet, FileEntryList],
+            subdirectory: str) -> Tuple[FileEntryList, DepSet]:
         results: FileEntryList = []
         deps: DepSet = set()
 
