@@ -169,8 +169,9 @@ zx_status_t AudioOutput::PlayToCompletion(AudioSource& source) {
 
   if (res == ZX_OK) {
     // We have already let the DMA engine catch up, but we still need to
-    // wait for the fifo to play out.  For now, just hard code this as
-    // 30uSec.
+    // wait for the driver transfer bytes to play out.
+    // For now, just hard code this as 30 msec, which equates to a driver_transfer_bytes_
+    // of about 5760, at 48kHz stereo 16-bit.
     //
     // TODO: base this on the start time and the number of frames queued
     // instead of just making a number up.

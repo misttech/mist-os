@@ -270,13 +270,14 @@ zx_status_t AudioDeviceStream::SetFormat(uint32_t frames_per_second, uint16_t ch
   }
   rb_ch_ = std::move(local);
 
-  // Stash the FIFO depth, in case users need to know it.
+  // Stash the driver transfer bytes.
+  // We'll need to include this value later in RingBufferProperties.
   auto result1 = fidl::WireCall(rb_ch_)->GetProperties();
   if (result1.status() != ZX_OK) {
     printf("get properties failed with error %s\n", result1.status_string());
     return ZX_ERR_BAD_STATE;
   }
-  fifo_depth_ = result1.value().properties.driver_transfer_bytes();
+  driver_transfer_bytes_ = result1.value().properties.driver_transfer_bytes();
   if (result1.value().properties.has_external_delay()) {
     external_delay_nsec_ = result1.value().properties.external_delay();
   }

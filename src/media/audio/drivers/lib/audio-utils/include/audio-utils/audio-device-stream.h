@@ -68,7 +68,7 @@ class AudioDeviceStream {
   uint32_t sample_size() const { return sample_size_; }
   uint32_t channel_cnt() const { return channel_cnt_; }
   uint32_t frame_sz() const { return frame_sz_; }
-  uint32_t fifo_depth() const { return fifo_depth_; }
+  uint32_t driver_transfer_bytes() const { return driver_transfer_bytes_; }
   uint32_t ring_buffer_bytes() const { return rb_sz_; }
   void* ring_buffer() const { return rb_virt_; }
   int64_t start_time() const { return start_time_; }
@@ -98,7 +98,7 @@ class AudioDeviceStream {
   uint8_t channel_size_ = 0;
   uint32_t channel_cnt_ = 0;
   uint32_t frame_sz_ = 0;
-  uint32_t fifo_depth_ = 0;
+  uint32_t driver_transfer_bytes_ = 0;
   uint32_t rb_sz_ = 0;
   void* rb_virt_ = nullptr;
   bool muted_ = false;

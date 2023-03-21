@@ -66,16 +66,18 @@ zx_status_t AudioInput::RecordPrepare(AudioSink& sink) {
     return res;
   }
 
-  // Make sure we have a ring buffer size at least a FIFO depth + 2 x desired wake up period,
-  // rounded up to a page size.
+  // Make sure our ring buffer size is at least one transfer (rounded up
+  // to the frame), plus approximately twice the desired wake up period.
+  // We should transfer the data as rapidly as possible, but if needed we
+  // have as much as as an additional driver_transfer duration to do it.
+  uint32_t driver_transfer_frames = (driver_transfer_bytes_ + frame_sz_ - 1) / frame_sz_;
   uint64_t ring_bytes_64 =
-      fifo_depth_ +
+      driver_transfer_frames * frame_sz_ +
       (zx_duration_mul_int64(2 * kDesiredWakeupPeriod.get(), frame_rate_) / ZX_SEC(1)) * frame_sz_;
   if (ring_bytes_64 > std::numeric_limits<uint32_t>::max()) {
     printf("Invalid frame rate %u\n", frame_rate_);
     return res;
   }
-  ring_bytes_64 = fbl::round_up(ring_bytes_64, static_cast<uint64_t>(PAGE_SIZE));
 
   uint32_t ring_bytes = static_cast<uint32_t>(ring_bytes_64);
   uint32_t ring_frames = ring_bytes / frame_sz_;
@@ -107,9 +109,10 @@ zx_status_t AudioInput::RecordToCompletion(AudioSink& sink, Duration duration) {
   uint32_t produced = 0;  // Estimated total bytes produced.
 
   // A transformation from time to bytes captured safe to read.
-  // We initialize next_wake_time to a FIFO from stat_time_ to make sure we are behind the HW.
+  // We initialize next_wake_time to a transfer size from start_time_ to make sure we are behind the
+  // HW.
   auto mono_to_safe_read_bytes = affine::Transform{static_cast<int64_t>(start_time_),
-                                                   -static_cast<int64_t>(fifo_depth_),
+                                                   -static_cast<int64_t>(driver_transfer_bytes_),
                                                    {frame_rate_ * frame_sz_, zx::sec(1).get()}};
   auto next_wake_time = zx::time(mono_to_safe_read_bytes.ApplyInverse(0));
 
@@ -117,11 +120,11 @@ zx_status_t AudioInput::RecordToCompletion(AudioSink& sink, Duration duration) {
   while ((loop && std::get<LoopingDoneCallback>(duration)()) ||
          (!loop && consumed < bytes_expected)) {
     // Set next wake to either (the larger):
-    // - At least a FIFO depth away.
+    // - At least a transfer size away.
     // - The desired wakeup period.
-    auto a_fifo_away = mono_to_safe_read_bytes.ApplyInverse(
-        mono_to_safe_read_bytes.Apply(zx::clock::get_monotonic().get()) + fifo_depth_);
-    next_wake_time = std::max(zx::time(a_fifo_away), next_wake_time + kDesiredWakeupPeriod);
+    auto a_transfer_away = mono_to_safe_read_bytes.ApplyInverse(
+        mono_to_safe_read_bytes.Apply(zx::clock::get_monotonic().get()) + driver_transfer_bytes_);
+    next_wake_time = std::max(zx::time(a_transfer_away), next_wake_time + kDesiredWakeupPeriod);
     if (next_wake_time > zx::clock::get_monotonic()) {
       zx::nanosleep(next_wake_time);
     }
