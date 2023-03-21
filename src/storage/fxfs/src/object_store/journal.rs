@@ -972,7 +972,7 @@ impl Journal {
             handle.owner(),
             handle.object_id(),
             journal_handle_options(),
-            handle.store().crypt().as_ref().map(Arc::as_ref),
+            handle.store().crypt(),
         )
         .await?;
 

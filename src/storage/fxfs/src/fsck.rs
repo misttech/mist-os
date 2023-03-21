@@ -381,7 +381,7 @@ impl<'a> Fsck<'a> {
                 &root_store,
                 store_id,
                 layer_file_object_id,
-                crypt.as_deref(),
+                crypt.clone(),
             )
             .await?;
         }
@@ -398,7 +398,7 @@ impl<'a> Fsck<'a> {
         root_store: &Arc<ObjectStore>,
         store_object_id: u64,
         layer_file_object_id: u64,
-        crypt: Option<&dyn Crypt>,
+        crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<(), Error> {
         let layer_file = self.assert(
             ObjectStore::open_object(

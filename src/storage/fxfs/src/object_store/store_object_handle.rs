@@ -31,11 +31,13 @@ use {
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
+    async_utils::event::Event,
     futures::{
         stream::{FuturesOrdered, FuturesUnordered},
         try_join, TryStreamExt,
     },
-    fxfs_crypto::{UnwrappedKeys, XtsCipherSet},
+    fxfs_crypto::{Crypt, UnwrappedKeys, WrappedKeys, XtsCipherSet},
+    once_cell::sync::OnceCell,
     std::{
         cmp::min,
         ops::{Bound, Range},
@@ -53,7 +55,7 @@ pub struct StoreObjectHandle<S: AsRef<ObjectStore> + Send + Sync + 'static> {
     pub(super) attribute_id: u64,
     pub(super) options: HandleOptions,
     pub(super) trace: AtomicBool,
-    keys: Option<XtsCipherSet>,
+    keys: Option<KeyUnwrapper>,
     content_size: AtomicU64,
 }
 
@@ -61,7 +63,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
     pub fn new(
         owner: Arc<S>,
         object_id: u64,
-        keys: Option<UnwrappedKeys>,
+        keys: Option<KeyUnwrapper>,
         attribute_id: u64,
         size: u64,
         options: HandleOptions,
@@ -70,7 +72,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
         Self {
             owner,
             object_id,
-            keys: keys.as_ref().map(XtsCipherSet::new),
+            keys,
             attribute_id,
             options,
             trace: AtomicBool::new(trace),
@@ -187,7 +189,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
 
         if let Some(keys) = &self.keys {
             // TODO(https://fxbug.dev/92975): Support key_id != 0.
-            keys.encrypt(range.start, 0, transfer_buf_ref.as_mut_slice())?;
+            keys.keys().await?.encrypt(range.start, 0, transfer_buf_ref.as_mut_slice())?;
         }
 
         self.write_aligned(
@@ -476,7 +478,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
                 let l = r.end - r.start;
                 let (head, tail) = slice.split_at_mut(l as usize);
                 // TODO(https://fxbug.dev/92975): Support key_id != 0.
-                keys.encrypt(r.start, 0, head)?;
+                keys.keys().await?.encrypt(r.start, 0, head)?;
                 slice = tail;
             }
         }
@@ -1259,7 +1261,7 @@ impl<S: AsRef<ObjectStore> + Send + Sync + 'static> StoreObjectHandle<S> {
     ) -> Result<(), Error> {
         self.store().device.read(device_offset, buffer.reborrow()).await?;
         if let Some(keys) = &self.keys {
-            keys.decrypt(file_offset, key_id, buffer.as_mut_slice())?;
+            keys.keys().await?.decrypt(file_offset, key_id, buffer.as_mut_slice())?;
         }
         Ok(())
     }
@@ -1634,6 +1636,62 @@ impl<'a, S: AsRef<ObjectStore> + Send + Sync + 'static> WriteBytes for DirectWri
 #[must_use]
 pub struct NeedsTrim(pub bool);
 
+/// Unwraps keys in a background task.
+pub struct KeyUnwrapper {
+    inner: Arc<KeyUnwrapperInner>,
+}
+
+struct KeyUnwrapperInner {
+    // Both `event` and `keys` have 2 possible states for a total of 4 possible states:
+    //   - `event` is not signalled and `keys` is set: constructed from `new_from_unwrapped`.
+    //   - `event` is not signalled and `keys` is not set: keys are still being unwrapped.
+    //   - `event` is signalled and `keys` is set: keys are unwrapped.
+    //   - `event` is signalled and `keys` is not set: unwrapping the keys failed.
+    event: Event,
+    keys: OnceCell<XtsCipherSet>,
+}
+
+impl KeyUnwrapper {
+    /// Creates an instance with the keys already unwrapped. No background task is spawned.
+    pub fn new_from_unwrapped(keys: UnwrappedKeys) -> Self {
+        let once = OnceCell::new();
+        once.get_or_init(|| XtsCipherSet::new(&keys));
+        Self { inner: Arc::new(KeyUnwrapperInner { event: Event::new(), keys: once }) }
+    }
+
+    /// Spawns a task to unwrap `keys` in the background.
+    pub fn new_from_wrapped(object_id: u64, crypt: Arc<dyn Crypt>, keys: WrappedKeys) -> Self {
+        let inner = Arc::new(KeyUnwrapperInner { event: Event::new(), keys: OnceCell::new() });
+        let inner2 = inner.clone();
+        fuchsia_async::Task::spawn(async move {
+            match crypt.unwrap_keys(&keys, object_id).await {
+                Ok(keys) => {
+                    inner2.keys.get_or_init(|| XtsCipherSet::new(&keys));
+                }
+                Err(e) => {
+                    error!(error=?e, oid=object_id, "Failed to unwrap keys");
+                }
+            }
+            inner2.event.signal();
+        })
+        .detach();
+        Self { inner }
+    }
+
+    async fn keys(&self) -> Result<&XtsCipherSet, Error> {
+        match self.inner.keys.get() {
+            Some(keys) => Ok(keys),
+            None => {
+                // If the keys are not already unwrapped then wait for the event to be signalled. If
+                // the event is signalled and the keys still aren't present then the unwrapping
+                // failed.
+                self.inner.event.wait().await;
+                self.inner.keys.get().ok_or_else(|| anyhow!("Failed to unwrap keys"))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -1651,6 +1709,7 @@ mod tests {
                 allocator::Allocator,
                 directory::replace_child,
                 object_record::{ObjectKey, ObjectValue, Timestamp},
+                store_object_handle::KeyUnwrapper,
                 transaction::{Mutation, Options, TransactionHandler},
                 volume::root_volume,
                 Directory, HandleOptions, LockKey, ObjectStore, StoreObjectHandle,
@@ -1658,10 +1717,18 @@ mod tests {
             },
             round::{round_down, round_up},
         },
+        anyhow::{anyhow, Error},
         assert_matches::assert_matches,
+        async_trait::async_trait,
         fuchsia_async as fasync,
-        futures::{channel::oneshot::channel, join, FutureExt},
-        fxfs_crypto::Crypt,
+        futures::{
+            channel::oneshot::{channel, Receiver},
+            join, FutureExt,
+        },
+        fxfs_crypto::{
+            Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys, KEY_SIZE,
+            WRAPPED_KEY_SIZE,
+        },
         fxfs_insecure_crypto::InsecureCrypt,
         rand::Rng,
         std::{
@@ -3097,5 +3164,113 @@ mod tests {
         assert_eq!(&data[..], &rdata[..]);
 
         assert_eq!(object.read_attr(21).await.expect("read_attr failed"), None);
+    }
+
+    #[fuchsia::test]
+    async fn test_key_unwrapper_new_from_unwrapped() {
+        let keys = KeyUnwrapper::new_from_unwrapped(vec![(0, UnwrappedKey::new([0; KEY_SIZE]))]);
+        keys.keys().await.expect("keys should be unwrapped");
+    }
+
+    struct TestCrypt {
+        receiver: Mutex<Option<Receiver<Result<UnwrappedKey, Error>>>>,
+    }
+
+    impl TestCrypt {
+        fn new(receiver: Receiver<Result<UnwrappedKey, Error>>) -> Self {
+            Self { receiver: Mutex::new(Some(receiver)) }
+        }
+    }
+
+    #[async_trait]
+    impl Crypt for TestCrypt {
+        async fn create_key(
+            &self,
+            _owner: u64,
+            _purpose: KeyPurpose,
+        ) -> Result<(WrappedKey, UnwrappedKey), Error> {
+            unimplemented!("Not used in tests");
+        }
+
+        async fn unwrap_key(
+            &self,
+            _wrapped_key: &WrappedKey,
+            _owner: u64,
+        ) -> Result<UnwrappedKey, Error> {
+            let receiver =
+                self.receiver.lock().unwrap().take().expect("Only 1 key can be unwrapped");
+            receiver.await.unwrap()
+        }
+    }
+
+    // The host's TestExecutor doesn't support run_until_stalled.
+    #[cfg(target_os = "fuchsia")]
+    #[fuchsia::test]
+    fn test_key_unwrapper_new_from_wrapped_wait_for_unwrap() {
+        let mut executor = fasync::TestExecutor::new();
+        let wrapped_keys = WrappedKeys(vec![(
+            0,
+            WrappedKey {
+                wrapping_key_id: 0x1234567812345678,
+                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
+            },
+        )]);
+        let (sender, receiver) = channel();
+        let crypt = Arc::new(TestCrypt::new(receiver));
+        let keys = KeyUnwrapper::new_from_wrapped(0, crypt, wrapped_keys);
+
+        let key_fut = keys.keys();
+        futures::pin_mut!(key_fut);
+        // Run the future until it's stalled waiting for the keys to be unwrapped.
+        assert!(executor.run_until_stalled(&mut key_fut).is_pending());
+
+        // Supply the unwrapped keys.
+        sender
+            .send(Ok(UnwrappedKey::new([0; KEY_SIZE])))
+            .unwrap_or_else(|_| panic!("Failed to send unwrapped keys"));
+
+        // The keys should now be available.
+        let unwrapped_keys = executor.run_until_stalled(&mut key_fut);
+        assert!(matches!(unwrapped_keys, std::task::Poll::Ready(Ok(_))));
+    }
+
+    #[fuchsia::test]
+    async fn test_key_unwrapper_new_from_wrapped_keys_already_unwrapped() {
+        let wrapped_keys = WrappedKeys(vec![(
+            0,
+            WrappedKey {
+                wrapping_key_id: 0x1234567812345678,
+                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
+            },
+        )]);
+        let (sender, receiver) = channel();
+        sender
+            .send(Ok(UnwrappedKey::new([0; KEY_SIZE])))
+            .unwrap_or_else(|_| panic!("Failed to send unwrapped keys"));
+        let crypt = Arc::new(TestCrypt::new(receiver));
+        let keys = KeyUnwrapper::new_from_wrapped(0, crypt, wrapped_keys);
+
+        // The keys may not be unwrapped yet in the first call but they will be in the second.
+        keys.keys().await.unwrap();
+        keys.keys().await.unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_key_unwrapper_new_from_wrapped_unwrap_failed() {
+        let wrapped_keys = WrappedKeys(vec![(
+            0,
+            WrappedKey {
+                wrapping_key_id: 0x1234567812345678,
+                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
+            },
+        )]);
+        let (sender, receiver) = channel();
+        sender
+            .send(Err(anyhow!("Unwrap failed")))
+            .unwrap_or_else(|_| panic!("Failed to send unwrap failure"));
+        let crypt = Arc::new(TestCrypt::new(receiver));
+        let keys = KeyUnwrapper::new_from_wrapped(0, crypt, wrapped_keys);
+
+        keys.keys().await.map(|_| ()).expect_err("Unwrapping should have failed");
     }
 }

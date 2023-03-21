@@ -198,7 +198,7 @@ impl BlobDirectory {
                     volume,
                     object_id,
                     HandleOptions::default(),
-                    volume.store().crypt().as_deref(),
+                    volume.store().crypt(),
                 )
                 .await?;
                 let (tree, compressed_offsets, uncompressed_size) = match object

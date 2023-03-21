@@ -190,7 +190,7 @@ impl FxVolume {
                             self,
                             object_id,
                             HandleOptions::default(),
-                            self.store().crypt().as_deref(),
+                            self.store().crypt(),
                         )
                         .await?,
                     ) as Arc<dyn FxNode>,

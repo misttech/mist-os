@@ -45,6 +45,7 @@ use {
             allocator::SimpleAllocator,
             graveyard::Graveyard,
             journal::{JournalCheckpoint, JournaledTransaction},
+            store_object_handle::KeyUnwrapper,
             transaction::{
                 AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation, Options,
                 Transaction, UpdateMutationsKey,
@@ -801,18 +802,18 @@ impl ObjectStore {
         owner: &Arc<S>,
         object_id: u64,
         options: HandleOptions,
-        mut crypt: Option<&dyn Crypt>,
+        mut crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<StoreObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         let store_crypt = store.crypt();
         if crypt.is_none() {
-            crypt = store_crypt.as_deref();
+            crypt = store_crypt;
         }
         let keys = if let Some(crypt) = crypt {
             match store.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::NotFound)? {
-                Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => Some(
-                    crypt.unwrap_keys(&keys, object_id).await.context("Failed to unwrap keys")?,
-                ),
+                Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => {
+                    Some(KeyUnwrapper::new_from_wrapped(object_id, crypt, keys))
+                }
                 _ => {
                     bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys"))
                 }
@@ -897,7 +898,7 @@ impl ObjectStore {
         Ok(StoreObjectHandle::new(
             owner.clone(),
             object_id,
-            unwrapped_keys,
+            unwrapped_keys.map(KeyUnwrapper::new_from_unwrapped),
             DEFAULT_DATA_ATTRIBUTE_ID,
             0,
             options,
@@ -1342,16 +1343,21 @@ impl ObjectStore {
     async fn open_layers(
         &self,
         object_ids: impl std::iter::IntoIterator<Item = u64>,
-        crypt: Option<&dyn Crypt>,
+        crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<Vec<CachingObjectHandle<ObjectStore>>, Error> {
         let parent_store = self.parent_store.as_ref().unwrap();
         let mut handles = Vec::new();
         let mut sizes = Vec::new();
         for object_id in object_ids {
             let handle = CachingObjectHandle::new(
-                ObjectStore::open_object(&parent_store, object_id, HandleOptions::default(), crypt)
-                    .await
-                    .context(format!("Failed to open layer file {}", object_id))?,
+                ObjectStore::open_object(
+                    &parent_store,
+                    object_id,
+                    HandleOptions::default(),
+                    crypt.clone(),
+                )
+                .await
+                .context(format!("Failed to open layer file {}", object_id))?,
             );
             sizes.push(handle.get_size());
             handles.push(handle);
@@ -1398,7 +1404,7 @@ impl ObjectStore {
 
         self.tree
             .append_layers(
-                self.open_layers(store_info.layers.iter().cloned(), Some(crypt.as_ref()))
+                self.open_layers(store_info.layers.iter().cloned(), Some(crypt.clone()))
                     .await?
                     .into(),
             )
@@ -2144,7 +2150,7 @@ mod tests {
             &store.parent_store.as_ref().unwrap(),
             object_id,
             HandleOptions::default(),
-            store.crypt().as_deref(),
+            store.crypt(),
         )
         .await
         {
