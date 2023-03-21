@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.radar/cpp/wire.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
+#include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdint.h>
@@ -25,40 +26,42 @@ class VmoManager {
     cpp20::span<uint8_t> vmo_data;
   };
 
-  explicit VmoManager(size_t minimum_vmo_size)
-      : minimum_vmo_size_(minimum_vmo_size),
-        registered_vmos_(vmo_store::Options{
-            .map = {{
-                .vm_option = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
-                .vmar = nullptr,
-            }},
-            .pin = {},
-        }) {}
+  explicit VmoManager(size_t minimum_vmo_size);
 
-  ~VmoManager() {
-    // These must be manually cleared before destruction to avoid triggering an assert.
-    locked_vmos_.clear();
-    unlocked_vmos_.clear();
-  }
+  ~VmoManager();
 
-  // Get the next unlocked VMO, or an empty std::optional if no VMOs are unlocked.
+  // Gets the next unlocked VMO, or an empty std::optional if no VMOs are unlocked.
+  // TODO(bradenkell): Remove this method once all clients have been switched to the method below.
   std::optional<RegisteredVmo> GetUnlockedVmo();
 
-  // Unlock the VMO corresponding to vmo_id.
+  // Gets the next unlocked VMO, locks it, writes the provided data to it, and returns the VMO ID.
+  // Returns an error if no VMOs are unlocked or if `data` is too large.
+  fit::result<fuchsia_hardware_radar::StatusCode, uint32_t> WriteUnlockedVmoAndGetId(
+      cpp20::span<const uint8_t> data);
+
+  // Unlocks the VMO corresponding to `vmo_id`.
   void UnlockVmo(uint32_t vmo_id);
 
-  // Register the given VMOs.
-  fuchsia_hardware_radar::wire::StatusCode RegisterVmos(fidl::VectorView<uint32_t> vmo_ids,
-                                                        fidl::VectorView<zx::vmo> vmos);
+  // Registers the given VMOs. The manager is reset to its state from before this call if any of the
+  // VMOs could not be registered.
+  fuchsia_hardware_radar::StatusCode RegisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
+                                                  fidl::VectorView<zx::vmo> vmos);
+  fuchsia_hardware_radar::StatusCode RegisterVmos(fidl::VectorView<uint32_t> vmo_ids,
+                                                  fidl::VectorView<zx::vmo> vmos);
+  fit::result<fuchsia_hardware_radar::StatusCode> RegisterVmos(const std::vector<uint32_t>& vmo_ids,
+                                                               std::vector<zx::vmo> vmos);
 
-  // Unregister and return the VMOs corresponding to vmo_ids.
-  fuchsia_hardware_radar::wire::StatusCode UnregisterVmos(fidl::VectorView<uint32_t> vmo_ids,
-                                                          fidl::VectorView<zx::vmo> out_vmos);
+  // Unregisters and returns the VMOs corresponding to `vmo_ids`. If any of the VMOs could not be
+  // unregistered, `out_vmos` is not populated, and the state of the manager is not changed.
+  fuchsia_hardware_radar::StatusCode UnregisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
+                                                    fidl::VectorView<zx::vmo> out_vmos);
+  fuchsia_hardware_radar::StatusCode UnregisterVmos(fidl::VectorView<uint32_t> vmo_ids,
+                                                    fidl::VectorView<zx::vmo> out_vmos);
+  fit::result<fuchsia_hardware_radar::StatusCode, std::vector<zx::vmo>> UnregisterVmos(
+      const std::vector<uint32_t>& vmo_ids);
 
  private:
-  static constexpr fbl::NodeOptions kNodeOptions = fbl::NodeOptions::AllowMove;
-
-  struct VmoMeta : public fbl::DoublyLinkedListable<VmoMeta*, kNodeOptions> {
+  struct VmoMeta : public fbl::DoublyLinkedListable<VmoMeta*, fbl::NodeOptions::AllowMove> {
     VmoMeta() : fbl::DoublyLinkedListable<VmoMeta*, kNodeOptions>() {}
     uint32_t vmo_id;
     cpp20::span<uint8_t> vmo_data;

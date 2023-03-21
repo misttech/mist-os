@@ -9,6 +9,7 @@ source_set("vmo-manager") {
   sources = [ "vmo-manager.cc" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp_wire",
+    "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/fbl",
