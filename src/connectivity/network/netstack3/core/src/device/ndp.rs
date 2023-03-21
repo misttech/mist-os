@@ -61,13 +61,15 @@ mod tests {
         },
         context::{
             testutil::{
-                handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _, StepResult,
+                handle_timer_helper_with_sc_ref, FakeInstant, FakeNetwork, FakeNetworkLinks,
+                FakeTimerCtxExt as _, StepResult,
             },
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
             add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress,
-            testutil::receive_frame_or_panic, DeviceId, EthernetDeviceId, FrameDestination, Mtu,
+            testutil::receive_frame_or_panic, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
+            FrameDestination, Mtu,
         },
         ip::{
             device::{
@@ -155,28 +157,46 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_address_resolution() {
-        set_logger_for_test();
+    fn setup_net() -> (
+        FakeNetwork<
+            &'static str,
+            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            crate::testutil::FakeCtx,
+            impl FakeNetworkLinks<
+                EthernetWeakDeviceId<FakeInstant, ()>,
+                DeviceId<crate::testutil::FakeNonSyncCtx>,
+                &'static str,
+            >,
+        >,
+        EthernetDeviceId<FakeInstant, ()>,
+        DeviceId<crate::testutil::FakeNonSyncCtx>,
+    ) {
         let mut local = FakeEventDispatcherBuilder::default();
         let local_dev_idx = local.add_device(local_mac());
         let mut remote = FakeEventDispatcherBuilder::default();
         let remote_dev_idx = remote.add_device(remote_mac());
         let (local, local_device_ids) = local.build();
         let (remote, remote_device_ids) = remote.build();
-        let local_device_id = &local_device_ids[local_dev_idx];
-        let remote_device_id = &remote_device_ids[remote_dev_idx];
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
+
+        let local_eth_device_id = local_device_ids[local_dev_idx].clone();
+        let remote_device_id: DeviceId<_> = remote_device_ids[remote_dev_idx].clone().into();
+        let net = crate::context::testutil::new_legacy_simple_fake_network(
             "local",
             local,
-            local_device_id.clone(),
+            local_eth_device_id.clone().into(),
             "remote",
             remote,
             remote_device_id.clone(),
         );
-        let local_device_id = local_device_id.clone();
-        let remote_device_id = remote_device_id.clone();
-        core::mem::drop((local_device_ids, remote_device_ids));
+
+        (net, local_eth_device_id, remote_device_id)
+    }
+
+    #[test]
+    fn test_address_resolution() {
+        set_logger_for_test();
+        let (mut net, local_eth_device_id, remote_device_id) = setup_net();
+        let local_device_id = local_eth_device_id.into();
 
         // Let's try to ping the remote device from the local device:
         let req = IcmpEchoRequest::new(0, 0);
@@ -375,28 +395,8 @@ mod tests {
         // it cannot use the address because someone else has already taken that
         // address.
         set_logger_for_test();
-        let mut local = FakeEventDispatcherBuilder::default();
-        let local_dev_idx = local.add_device(local_mac());
-        let mut remote = FakeEventDispatcherBuilder::default();
-        let remote_dev_idx = remote.add_device(remote_mac());
-        let (local, local_device_ids) = local.build();
-        let (remote, remote_device_ids) = remote.build();
-        let local_device_id = &local_device_ids[local_dev_idx];
-        let remote_device_id = &remote_device_ids[remote_dev_idx];
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
-            "local",
-            local,
-            local_device_id.clone(),
-            "remote",
-            remote,
-            remote_device_id.clone(),
-        );
-        // Make sure the (strongly referenced) device IDs are dropped before
-        // `net`.
-        let local_device_id = local_device_id.clone();
-        let remote_device_id = remote_device_id.clone();
-        let local_eth_device_id = local_device_id.clone().try_into().expect("expected ethernet ID");
-        core::mem::drop((local_device_ids, remote_device_ids));
+        let (mut net, local_eth_device_id, remote_device_id) = setup_net();
+        let local_device_id = local_eth_device_id.clone().into();
 
         // Enable DAD.
         let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
@@ -566,28 +566,8 @@ mod tests {
         // Test if the implementation is correct when we have more than 1 NS
         // packets to send.
         set_logger_for_test();
-        let mut local = FakeEventDispatcherBuilder::default();
-        let local_dev_idx = local.add_device(local_mac());
-        let mut remote = FakeEventDispatcherBuilder::default();
-        let remote_dev_idx = remote.add_device(remote_mac());
-        let (local, local_device_ids) = local.build();
-        let (remote, remote_device_ids) = remote.build();
-        let local_device_id = &local_device_ids[local_dev_idx];
-        let remote_device_id = &remote_device_ids[remote_dev_idx];
-        let mut net = crate::context::testutil::new_legacy_simple_fake_network(
-            "local",
-            local,
-            local_device_id.clone(),
-            "remote",
-            remote,
-            remote_device_id.clone(),
-        );
-        // Make sure the (strongly referenced) device IDs are dropped before
-        // `net`.
-        let local_device_id = local_device_id.clone();
-        let remote_device_id = remote_device_id.clone();
-        let local_eth_device_id = local_device_id.clone().try_into().expect("expected ethernet ID");
-        core::mem::drop((local_device_ids, remote_device_ids));
+        let (mut net, local_eth_device_id, remote_device_id) = setup_net();
+        let local_device_id = local_eth_device_id.clone().into();
 
         let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
             ipv6_config.ip_config.ip_enabled = true;
@@ -939,7 +919,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let mut sync_ctx = &sync_ctx;
-        let device_id = &device_ids[0];
+        let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         let icmpv6_packet_buf = OptionSequenceBuilder::new(options.iter())
             .into_serializer()
@@ -1001,7 +981,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let mut sync_ctx = &sync_ctx;
-        let device_id = &device_ids[0];
+        let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Test receiving NDP RA where source IP is not a link local address
         // (should not receive).
@@ -1094,7 +1074,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(Ipv6::FAKE_CONFIG).build();
         let mut sync_ctx = &sync_ctx;
-        let device_id = &device_ids[0];
+        let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Set hop limit to 100.
         inner_test(&mut sync_ctx, &mut non_sync_ctx, &device_id, 100, 0);

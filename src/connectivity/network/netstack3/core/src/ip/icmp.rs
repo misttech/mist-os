@@ -3000,7 +3000,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
-        device::FrameDestination,
+        device::{DeviceId, FrameDestination},
         ip::{
             device::{
                 route_discovery::Ipv6DiscoveredRoute,
@@ -3141,21 +3141,21 @@ mod tests {
             I::FAKE_CONFIG.into_builder().build_with_modifications(modify_stack_state_builder);
         let mut sync_ctx = &sync_ctx;
 
-        let device = &device_ids[0];
-        set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, device, true)
+        let device: DeviceId<_> = device_ids[0].clone().into();
+        set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         match I::VERSION {
             IpVersion::V4 => receive_ipv4_packet(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                device,
+                &device,
                 FrameDestination::Unicast,
                 buffer,
             ),
             IpVersion::V6 => receive_ipv6_packet(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                device,
+                &device,
                 FrameDestination::Unicast,
                 buffer,
             ),
@@ -3722,10 +3722,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             LOCAL_CTX_NAME,
             local,
-            local_device_ids[0].clone(),
+            local_device_ids[0].clone().into(),
             REMOTE_CTX_NAME,
             remote,
-            remove_device_ids[0].clone(),
+            remove_device_ids[0].clone().into(),
         );
         core::mem::drop((local_device_ids, remove_device_ids));
 

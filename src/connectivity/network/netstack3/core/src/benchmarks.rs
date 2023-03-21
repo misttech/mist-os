@@ -31,7 +31,7 @@ use packet_formats::{
 };
 
 use crate::{
-    device::receive_frame,
+    device::{receive_frame, DeviceId},
     testutil::{
         benchmarks::{black_box, Bencher},
         FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
@@ -54,11 +54,11 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
         FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
             .build_with(StackStateBuilder::default());
     let mut sync_ctx = &sync_ctx;
-    let device = &idx_to_device_id[0];
+    let device: DeviceId<_> = idx_to_device_id[0].clone().into();
     crate::ip::device::set_routing_enabled::<_, _, Ipv4>(
         &mut sync_ctx,
         &mut non_sync_ctx,
-        device,
+        &device,
         true,
     )
     .expect("error setting routing enabled");
@@ -108,7 +108,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
             receive_frame(
                 black_box(&mut sync_ctx),
                 black_box(&mut non_sync_ctx),
-                black_box(device),
+                black_box(&device),
                 black_box(Buf::new(&mut buf[..], range.clone())),
             )
             .expect("error receiving frame"),

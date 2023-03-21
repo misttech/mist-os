@@ -1529,7 +1529,7 @@ mod tests {
 
         let local_device = match device_type {
             DeviceType::Unspecified => None,
-            DeviceType::LocalDevice => Some(device_ids[0].clone()),
+            DeviceType::LocalDevice => Some(device_ids[0].clone().into()),
             DeviceType::OtherDevice => Some(loopback_device_id.clone()),
         };
 
@@ -1647,7 +1647,7 @@ mod tests {
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
-        let device_id = &device_ids[device_idx];
+        let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
         let mut sync_ctx = &sync_ctx;
         crate::device::add_ip_addr_subnet(
             &mut sync_ctx,
@@ -1770,7 +1770,6 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(cfg.clone()).build();
         let mut sync_ctx = &sync_ctx;
-        let device_id = &device_ids[0];
         // Create a normal, routable socket.
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
             &mut sync_ctx,
@@ -1830,8 +1829,7 @@ mod tests {
             packet_count += 1;
             assert_eq!(non_sync_ctx.frames_sent().len(), packet_count);
             let (dev, frame) = &non_sync_ctx.frames_sent()[packet_count - 1];
-            let device_id = assert_matches!(device_id, DeviceId::Ethernet(id) => id);
-            assert_eq!(dev, device_id);
+            assert_eq!(dev, &device_ids[0]);
             check_frame(&frame, packet_count);
         };
         check_sent_frame(&non_sync_ctx);
@@ -1920,7 +1918,7 @@ mod tests {
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
-        let device_id = &device_ids[device_idx];
+        let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
         let mut sync_ctx = &sync_ctx;
         crate::device::add_ip_addr_subnet(
             &mut sync_ctx,
@@ -2041,7 +2039,9 @@ mod tests {
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
-        let device_id = &device_ids[device_idx];
+        let eth_device_id = device_ids[device_idx].clone();
+        core::mem::drop(device_ids);
+        let device_id: DeviceId<_> = eth_device_id.clone().into();
         let mut sync_ctx = &sync_ctx;
         crate::device::add_ip_addr_subnet(
             &mut sync_ctx,
@@ -2074,16 +2074,14 @@ mod tests {
 
         let expected = if remove_device {
             // Don't keep any strong device IDs to the device before removing.
-            let device_id = device_id.clone();
-            core::mem::drop(device_ids);
-            let device_id = assert_matches!(device_id, DeviceId::Ethernet(id) => id);
-            crate::device::remove_ethernet_device(&mut sync_ctx, &mut non_sync_ctx, device_id);
+            core::mem::drop(device_id);
+            crate::device::remove_ethernet_device(&mut sync_ctx, &mut non_sync_ctx, eth_device_id);
             Err(MmsError::NoDevice(IpSockRouteError::Unroutable(
                 IpSockUnroutableError::NoRouteToRemoteAddr,
             )))
         } else {
             Ok(Mms::from_mtu::<I>(
-                IpDeviceContext::<I, _>::get_mtu(&mut sync_ctx, device_id),
+                IpDeviceContext::<I, _>::get_mtu(&mut sync_ctx, &device_id),
                 0, /* no ip options/ext hdrs used */
             )
             .unwrap())

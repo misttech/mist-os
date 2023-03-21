@@ -1784,7 +1784,7 @@ mod tests {
         let device_builder_id = 0;
         add_arp_or_ndp_table_entry(&mut builder, device_builder_id, src_ip.get(), src_mac);
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
-        let device = &device_ids[device_builder_id];
+        let device: DeviceId<_> = device_ids[device_builder_id].clone().into();
         let mut sync_ctx = &sync_ctx;
 
         // Should not be a router (default).
@@ -1878,7 +1878,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let mut sync_ctx = &sync_ctx;
-        let device = &device_ids[0];
+        let device = device_ids[0].clone().into();
         let other_mac = Mac::new([13, 14, 15, 16, 17, 18]);
 
         let buf = Buf::new(Vec::new(), ..)

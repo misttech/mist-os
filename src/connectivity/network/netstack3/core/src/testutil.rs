@@ -608,7 +608,7 @@ impl FakeEventDispatcherBuilder {
     }
 
     /// Builds a `Ctx` from the present configuration with a default dispatcher.
-    pub(crate) fn build(self) -> (FakeCtx, Vec<DeviceId<FakeNonSyncCtx>>) {
+    pub(crate) fn build(self) -> (FakeCtx, Vec<EthernetDeviceId<FakeInstant, ()>>) {
         self.build_with_modifications(|_| {})
     }
 
@@ -618,7 +618,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn build_with_modifications<F: FnOnce(&mut StackStateBuilder)>(
         self,
         f: F,
-    ) -> (FakeCtx, Vec<DeviceId<FakeNonSyncCtx>>) {
+    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeInstant, ()>>) {
         let mut stack_builder = StackStateBuilder::default();
         f(&mut stack_builder);
         self.build_with(stack_builder)
@@ -629,7 +629,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn build_with(
         self,
         state_builder: StackStateBuilder,
-    ) -> (FakeCtx, Vec<DeviceId<FakeNonSyncCtx>>) {
+    ) -> (FakeCtx, Vec<EthernetDeviceId<FakeInstant, ()>>) {
         let mut ctx = Ctx::new_with_builder(state_builder);
         let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
 
@@ -643,12 +643,12 @@ impl FakeEventDispatcherBuilder {
         let idx_to_device_id: Vec<_> = devices
             .into_iter()
             .map(|(mac, ip_subnet)| {
-                let id = crate::device::add_ethernet_device(
+                let eth_id = crate::device::add_ethernet_device(
                     sync_ctx,
                     mac,
                     IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-                )
-                .into();
+                );
+                let id = eth_id.clone().into();
                 crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &id);
                 match ip_subnet {
                     Some((IpAddr::V4(ip), SubnetEither::V4(subnet))) => {
@@ -664,18 +664,30 @@ impl FakeEventDispatcherBuilder {
                     None => {}
                     _ => unreachable!(),
                 }
-                id
+                eth_id
             })
             .collect();
         for (idx, ip, mac) in arp_table_entries {
             let device = &idx_to_device_id[idx];
-            crate::device::insert_static_arp_table_entry(sync_ctx, non_sync_ctx, device, ip, mac)
-                .expect("error inserting static ARP entry");
+            crate::device::insert_static_arp_table_entry(
+                sync_ctx,
+                non_sync_ctx,
+                &device.clone().into(),
+                ip,
+                mac,
+            )
+            .expect("error inserting static ARP entry");
         }
         for (idx, ip, mac) in ndp_table_entries {
             let device = &idx_to_device_id[idx];
-            crate::device::insert_ndp_table_entry(sync_ctx, non_sync_ctx, device, ip, mac.get())
-                .expect("error inserting static NDP entry");
+            crate::device::insert_ndp_table_entry(
+                sync_ctx,
+                non_sync_ctx,
+                &device.clone().into(),
+                ip,
+                mac.get(),
+            )
+            .expect("error inserting static NDP entry");
         }
         for (subnet, idx) in device_routes {
             let device = &idx_to_device_id[idx];
@@ -684,7 +696,7 @@ impl FakeEventDispatcherBuilder {
                 non_sync_ctx,
                 AddableEntryEither::without_gateway(
                     subnet,
-                    device.clone(),
+                    device.clone().into(),
                     AddableMetric::ExplicitMetric(RawMetric(0)),
                 ),
             )
@@ -1034,10 +1046,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             "alice",
             alice_ctx,
-            alice_device_ids[0].clone(),
+            alice_device_ids[0].clone().into(),
             "bob",
             bob_ctx,
-            bob_device_ids[0].clone(),
+            bob_device_ids[0].clone().into(),
         );
         core::mem::drop((alice_device_ids, bob_device_ids));
 
@@ -1085,10 +1097,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             1,
             ctx_1,
-            device_ids_1[0].clone(),
+            device_ids_1[0].clone().into(),
             2,
             ctx_2,
-            device_ids_2[0].clone(),
+            device_ids_2[0].clone().into(),
         );
         core::mem::drop((device_ids_1, device_ids_2));
 
@@ -1161,10 +1173,10 @@ mod tests {
         let mut net = crate::context::testutil::new_legacy_simple_fake_network(
             1,
             ctx_1,
-            device_ids_1[0].clone(),
+            device_ids_1[0].clone().into(),
             2,
             ctx_2,
-            device_ids_2[0].clone(),
+            device_ids_2[0].clone().into(),
         );
         core::mem::drop((device_ids_1, device_ids_2));
 
@@ -1201,8 +1213,8 @@ mod tests {
         let latency = Duration::from_millis(5);
         let (alice_ctx, alice_device_ids) = FAKE_CONFIG_V4.into_builder().build();
         let (bob_ctx, bob_device_ids) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let alice_device_id = alice_device_ids[0].clone();
-        let bob_device_id = bob_device_ids[0].clone();
+        let alice_device_id: DeviceId<_> = alice_device_ids[0].clone().into();
+        let bob_device_id: DeviceId<_> = bob_device_ids[0].clone().into();
         core::mem::drop((alice_device_ids, bob_device_ids));
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx)],
@@ -1376,9 +1388,9 @@ mod tests {
         let (alice_ctx, alice_device_ids) = alice.build();
         let (bob_ctx, bob_device_ids) = bob.build();
         let (calvin_ctx, calvin_device_ids) = calvin.build();
-        let alice_device_id = alice_device_ids[alice_device_idx].clone();
-        let bob_device_id = bob_device_ids[bob_device_idx].clone();
-        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
+        let alice_device_id: DeviceId<_> = alice_device_ids[alice_device_idx].clone().into();
+        let bob_device_id: DeviceId<_> = bob_device_ids[bob_device_idx].clone().into();
+        let calvin_device_id: DeviceId<_> = calvin_device_ids[calvin_device_idx].clone().into();
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
             move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeInstant, ()>| match net {
@@ -1391,9 +1403,9 @@ mod tests {
                 _ => unreachable!(),
             },
         );
-        let alice_device_id = alice_device_ids[alice_device_idx].clone();
-        let bob_device_id = bob_device_ids[bob_device_idx].clone();
-        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
+        let alice_device_id = alice_device_ids[alice_device_idx].clone().into();
+        let bob_device_id = bob_device_ids[bob_device_idx].clone().into();
+        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone().into();
         core::mem::drop((alice_device_ids, bob_device_ids, calvin_device_ids));
 
         net.collect_frames();

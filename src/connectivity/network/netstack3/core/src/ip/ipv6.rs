@@ -213,6 +213,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        device::DeviceId,
         testutil::{FakeEventDispatcherBuilder, FAKE_CONFIG_V6},
         Ctx,
     };
@@ -230,7 +231,7 @@ mod tests {
             10,
             IpProto::Tcp.into(),
         );
-        let device_id = &device_ids[0];
+        let device_id: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Unicast;
         let mut buffer =
             Buf::new(vec![1, 2, 3, 4, 5], ..).encapsulate(builder).serialize_vec_outer().unwrap();
