@@ -54,9 +54,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("fvm_slice_size", 8388608)?;
             // LINT.ThenChange(//build/images/fvm.gni)
 
-            fshost_config_builder
-                .field("data_filesystem_format", "fxfs")?
-                .field("use_native_fxfs_crypto", true)?;
+            fshost_config_builder.field("data_filesystem_format", "fxfs")?;
         }
 
         Ok(())

@@ -6,7 +6,7 @@ use {
     crate::{
         boot_args::BootArgs,
         crypt::{
-            fxfs::{self, CryptService, UnlockResult},
+            fxfs::{self, CryptService},
             zxcrypt::{UnsealOutcome, ZxcryptDevice},
         },
         device::{
@@ -19,7 +19,6 @@ use {
     },
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    either::Either,
     fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_hardware_block_partition::Guid,
     fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker},
@@ -401,27 +400,20 @@ impl FilesystemLauncher {
             }
         }
 
-        // Wrap the serving in an async block so we can use ?.
+        // Wrap the serving in an async block so we can catch all errors.
         let serve_fut = async {
             match format {
                 DiskFormat::Fxfs => {
                     let mut serving_fs = fs.serve_multi_volume().await?;
-                    match fxfs::unlock_data_volume(&mut serving_fs, &self.config).await? {
-                        UnlockResult::Ok((crypt_service, volume_name, _)) => Ok(Either::Left(
-                            Filesystem::ServingMultiVolume(crypt_service, serving_fs, volume_name),
-                        )),
-                        UnlockResult::Reset => Ok(Either::Right(())),
-                    }
+                    let (crypt_service, volume_name, _) =
+                        fxfs::unlock_data_volume(&mut serving_fs, &self.config).await?;
+                    Ok(Filesystem::ServingMultiVolume(crypt_service, serving_fs, volume_name))
                 }
-                _ => Ok(Either::Left(Filesystem::Serving(fs.serve().await?))),
+                _ => Ok(Filesystem::Serving(fs.serve().await?)),
             }
         };
         match serve_fut.await {
-            Ok(Either::Left(fs)) => Ok(ServeDataStatus::Serving(fs)),
-            Ok(Either::Right(())) => {
-                tracing::info!("Detected marker file, shredding volume. Expect data loss...");
-                Ok(ServeDataStatus::FormatNeeded(fs.into_config()))
-            }
+            Ok(fs) => Ok(ServeDataStatus::Serving(fs)),
             Err(error) => {
                 self.report_corruption(format, &error);
                 if self.config.format_data_on_corruption {

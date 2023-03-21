@@ -17,7 +17,7 @@ use {
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
     fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
-    fidl_fuchsia_io::{self as fio, DirectoryMarker, OpenFlags},
+    fidl_fuchsia_io::{DirectoryMarker, OpenFlags},
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fs_management::{
         filesystem,
@@ -57,7 +57,6 @@ impl FshostShutdownResponder {
 const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(10);
 const DATA_PARTITION_LABEL: &str = "data";
 const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
-pub const SHRED_DATA_VOLUME_MARKER_FILE: &str = "shred_data_volume";
 const KEY_BAG_FILE: &str = "/main_fxfs_unencrypted_volume/keys/fxfs-data";
 
 fn data_partition_names() -> Vec<String> {
@@ -311,31 +310,14 @@ async fn write_data_file(
 async fn shred_data_volume(
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
-    data_root: &fio::DirectoryProxy,
 ) -> Result<(), zx::Status> {
     if config.data_filesystem_format != "fxfs" {
         return Err(zx::Status::NOT_SUPPORTED);
     }
     // If we expect Fxfs to be live, just erase the key bag.
     if config.data && !config.fvm_ramdisk {
-        if config.use_native_fxfs_crypto {
-            std::fs::remove_file(KEY_BAG_FILE)?;
-            debug_log("Erased key bag");
-        } else {
-            // If we're using legacy crypto (which we will until we can switch to hardware backed
-            // keys), all we can do is store a file so that the volume gets wiped on next boot.
-            fuchsia_fs::directory::open_file(
-                data_root,
-                SHRED_DATA_VOLUME_MARKER_FILE,
-                fio::OpenFlags::CREATE,
-            )
-            .await
-            .map_err(|error| {
-                tracing::warn!(?error, "Unable to create shred_data_volume marker file");
-                zx::Status::INTERNAL
-            })?;
-            debug_log("Wrote shred_data_volume marker file");
-        }
+        std::fs::remove_file(KEY_BAG_FILE)?;
+        debug_log("Erased key bag");
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
         let partition_path =
@@ -367,14 +349,12 @@ pub fn fshost_admin(
     config: Arc<fshost_config::Config>,
     ramdisk_prefix: Option<String>,
     launcher: Arc<FilesystemLauncher>,
-    data_root: fio::DirectoryProxy,
     pauser: watcher::Watcher,
 ) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::AdminRequestStream| {
         let config = config.clone();
         let ramdisk_prefix = ramdisk_prefix.clone();
         let launcher = launcher.clone();
-        let data_root = fuchsia_fs::directory::clone_no_describe(&data_root, None).unwrap();
         let pauser = pauser.clone();
         async move {
             while let Some(request) = stream.next().await {
@@ -462,19 +442,17 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         tracing::info!("admin shred data volume called");
-                        let mut res =
-                            match shred_data_volume(&config, ramdisk_prefix.clone(), &data_root)
-                                .await
-                            {
-                                Ok(()) => Ok(()),
-                                Err(e) => {
-                                    debug_log(&format!(
-                                        "admin service: shred_data_volume failed: {:?}",
-                                        e
-                                    ));
-                                    Err(zx::Status::INTERNAL.into_raw())
-                                }
-                            };
+                        let mut res = match shred_data_volume(&config, ramdisk_prefix.clone()).await
+                        {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                debug_log(&format!(
+                                    "admin service: shred_data_volume failed: {:?}",
+                                    e
+                                ));
+                                Err(zx::Status::INTERNAL.into_raw())
+                            }
+                        };
                         responder.send(&mut res).unwrap_or_else(|e| {
                             tracing::error!(
                                 "failed to send ShredDataVolume response. error: {:?}",

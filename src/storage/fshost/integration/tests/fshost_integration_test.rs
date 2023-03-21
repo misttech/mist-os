@@ -73,11 +73,7 @@ fn data_fs_zxcrypt() -> bool {
 }
 
 fn data_fs_spec() -> DataSpec {
-    DataSpec {
-        format: Some(data_fs_name()),
-        zxcrypt: data_fs_zxcrypt(),
-        legacy_crypto_format: DATA_FILESYSTEM_VARIANT == "fxfs-legacy-crypto",
-    }
+    DataSpec { format: Some(data_fs_name()), zxcrypt: data_fs_zxcrypt() }
 }
 
 #[fuchsia::test]
@@ -193,20 +189,6 @@ async fn data_formatted_with_small_initial_volume_big_target() {
 
     fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-async fn data_mounted_legacy_crypto_format() {
-    let mut builder = new_builder();
-    // fshost should be able to handle the data partition using legacy crypto no matter what it's
-    // configured for.
-    builder.with_disk().format_data(DataSpec { legacy_crypto_format: true, ..data_fs_spec() });
-    let fixture = builder.build().await;
-
-    fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.check_test_data_file().await;
 
     fixture.tear_down().await;
 }
