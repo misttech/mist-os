@@ -9,6 +9,7 @@ use std::cell::RefCell;
 mod allocations_table;
 mod profiler;
 mod recursion_guard;
+mod resources_table;
 
 // Do not include the hooks in the tests' executable, to avoid instrumenting the test framework.
 #[cfg(not(test))]

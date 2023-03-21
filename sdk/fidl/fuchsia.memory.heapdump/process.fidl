@@ -22,6 +22,7 @@ protocol Registry {
     RegisterV1(resource struct {
         process zx.handle:<PROCESS, zx.RIGHTS_BASIC | zx.RIGHTS_IO | zx.rights.GET_PROPERTY>;
         allocations_vmo zx.handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
+        resources_vmo zx.handle:<VMO, VMO_MAP_READONLY_RIGHTS>;
         snapshot_sink server_end:SnapshotSinkV1;
     });
 };

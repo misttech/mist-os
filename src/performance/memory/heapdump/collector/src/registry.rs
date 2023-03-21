@@ -102,10 +102,12 @@ impl Registry {
             fheapdump_process::RegistryRequest::RegisterV1 {
                 process,
                 allocations_vmo,
+                resources_vmo,
                 snapshot_sink,
                 ..
             } => {
-                let process = ProcessV1::new(process, allocations_vmo, snapshot_sink)?;
+                let process =
+                    ProcessV1::new(process, allocations_vmo, resources_vmo, snapshot_sink)?;
                 Arc::new(process)
             }
         };
@@ -244,6 +246,8 @@ mod tests {
     // A FakeSnapshot contains a single allocation with these values:
     const FAKE_ALLOCATION_ADDRESS: u64 = 1234;
     const FAKE_ALLOCATION_SIZE: u64 = 8;
+    const FAKE_ALLOCATION_STACK_TRACE: [u64; 6] = [11111, 22222, 33333, 22222, 44444, 55555];
+    const FAKE_ALLOCATION_STACK_TRACE_KEY: u64 = 9876;
 
     #[async_trait]
     impl Snapshot for FakeSnapshot {
@@ -252,13 +256,19 @@ mod tests {
             dest: fheapdump_client::SnapshotReceiverProxy,
         ) -> Result<(), anyhow::Error> {
             let fut = dest.batch(
-                &mut [fheapdump_client::SnapshotElement::Allocation(
-                    fheapdump_client::Allocation {
+                &mut [
+                    fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
                         address: Some(FAKE_ALLOCATION_ADDRESS),
                         size: Some(FAKE_ALLOCATION_SIZE),
+                        stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
                         ..fheapdump_client::Allocation::EMPTY
-                    },
-                )]
+                    }),
+                    fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
+                        stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
+                        program_addresses: Some(FAKE_ALLOCATION_STACK_TRACE.to_vec()),
+                        ..fheapdump_client::StackTrace::EMPTY
+                    }),
+                ]
                 .iter_mut(),
             );
             fut.await?;
@@ -280,6 +290,7 @@ mod tests {
             let allocation =
                 received_snapshot.allocations.remove(&FAKE_ALLOCATION_ADDRESS).unwrap();
             assert_eq!(allocation.size, FAKE_ALLOCATION_SIZE);
+            assert_eq!(allocation.stack_trace.program_addresses, FAKE_ALLOCATION_STACK_TRACE);
 
             assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         }

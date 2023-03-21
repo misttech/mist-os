@@ -82,7 +82,6 @@ impl MemoryMappedVmo {
     /// Returns a reference to a slice of elements in the VMO.
     ///
     /// This method validates the alignment and the bounds against the VMO size.
-    #[cfg(test)] // TODO(fdurso): To be removed once features that call it are implemented.
     pub fn get_slice<'a, T: MemoryMappable>(
         &'a self,
         byte_offset: usize,
@@ -106,7 +105,6 @@ impl MemoryMappedVmo {
     /// Returns a mutable reference to a slice of elements in the VMO.
     ///
     /// This method validates the alignment and the bounds against the VMO size.
-    #[cfg(test)] // TODO(fdurso): To be removed once features that call it are implemented.
     pub fn get_slice_mut<'a, T: MemoryMappable>(
         &'a mut self,
         byte_offset: usize,

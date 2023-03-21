@@ -21,6 +21,9 @@ pub enum Error {
     #[error("SnapshotReceiver stream contains multiple {} elements with the same unique ID",
         .element_type)]
     ConflictingElement { element_type: &'static str },
+    #[error("SnapshotReceiver stream contains a cross-reference to a non-existing {} element",
+        .element_type)]
+    InvalidCrossReference { element_type: &'static str },
     #[error("Zircon error: {}", .0)]
     ZxError(#[from] fuchsia_zircon_status::Status),
     #[error("FIDL error: {}", .0)]

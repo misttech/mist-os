@@ -101,6 +101,9 @@ mod tests {
         result
     }
 
+    const FAKE_STACK_TRACE_ADDRESSES: [u64; 3] = [11111, 22222, 33333];
+    const FAKE_STACK_TRACE_KEY: u64 = 1234;
+
     #[test_case(hashmap! {} ; "empty")]
     #[test_case(hashmap! { 1234 => 5678 } ; "only one")]
     #[test_case(generate_one_million_allocations_hashmap() ; "one million")]
@@ -110,14 +113,24 @@ mod tests {
             create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
-        // Transmit a snapshot with the given `allocations`.
-        let mut streamer = Streamer::new(receiver_proxy);
+        // Transmit a snapshot with the given `allocations`, all referencing a common stack trace.
+        let mut streamer = Streamer::new(receiver_proxy)
+            .push_element(fheapdump_client::SnapshotElement::StackTrace(
+                fheapdump_client::StackTrace {
+                    stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
+                    program_addresses: Some(FAKE_STACK_TRACE_ADDRESSES.to_vec()),
+                    ..fheapdump_client::StackTrace::EMPTY
+                },
+            ))
+            .await
+            .unwrap();
         for (address, size) in &allocations {
             streamer = streamer
                 .push_element(fheapdump_client::SnapshotElement::Allocation(
                     fheapdump_client::Allocation {
                         address: Some(*address),
                         size: Some(*size),
+                        stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
                         ..fheapdump_client::Allocation::EMPTY
                     },
                 ))
@@ -132,6 +145,7 @@ mod tests {
         for (address, size) in &allocations {
             let allocation = received_snapshot.allocations.remove(address).unwrap();
             assert_eq!(allocation.size, *size);
+            assert_eq!(allocation.stack_trace.program_addresses, FAKE_STACK_TRACE_ADDRESSES);
         }
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
     }

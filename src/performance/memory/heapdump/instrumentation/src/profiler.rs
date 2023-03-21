@@ -8,6 +8,7 @@ use fuchsia_zircon as zx;
 use std::sync::Mutex;
 
 use crate::allocations_table::AllocationsTable;
+use crate::resources_table::ResourcesTable;
 use crate::{
     heapdump_global_stats as HeapdumpGlobalStats,
     heapdump_thread_local_stats as HeapdumpThreadLocalStats,
@@ -25,6 +26,7 @@ pub struct Profiler {
 #[derive(Default)]
 struct ProfilerInner {
     allocations_table: AllocationsTable,
+    resources_table: ResourcesTable,
     global_stats: HeapdumpGlobalStats,
     snapshot_sink_server: Option<ServerEnd<fheapdump_process::SnapshotSinkV1Marker>>,
 }
@@ -51,17 +53,25 @@ impl Profiler {
             .duplicate(zx::Rights::SAME_RIGHTS)
             .expect("failed to duplicate process handle");
 
-        let (snapshot_sink_server, allocations_table_dup) = {
+        let (snapshot_sink_server, allocations_table_dup, resources_table_dup) = {
             let mut inner = self.inner.lock().unwrap();
-            (inner.snapshot_sink_server.take(), inner.allocations_table.share_vmo())
+            (
+                inner.snapshot_sink_server.take(),
+                inner.allocations_table.share_vmo(),
+                inner.resources_table.share_vmo(),
+            )
         };
         let snapshot_sink_server = snapshot_sink_server.expect("bind called more than once");
 
         let registry_proxy = fheapdump_process::RegistrySynchronousProxy::new(registry_channel);
 
         // Ignore result.
-        let _ =
-            registry_proxy.register_v1(process_dup, allocations_table_dup, snapshot_sink_server);
+        let _ = registry_proxy.register_v1(
+            process_dup,
+            allocations_table_dup,
+            resources_table_dup,
+            snapshot_sink_server,
+        );
     }
 }
 
@@ -70,9 +80,16 @@ impl Profiler {
         self.inner.lock().unwrap().global_stats
     }
 
-    pub fn record_allocation(&self, thread_data: &mut PerThreadData, address: u64, size: u64) {
+    pub fn record_allocation(
+        &self,
+        thread_data: &mut PerThreadData,
+        address: u64,
+        size: u64,
+        compressed_stack_trace: &[u8],
+    ) {
         let mut inner = self.inner.lock().unwrap();
-        inner.allocations_table.record_allocation(address, size);
+        let stack_trace_key = inner.resources_table.intern_stack_trace(compressed_stack_trace);
+        inner.allocations_table.record_allocation(address, size, stack_trace_key);
 
         inner.global_stats.total_allocated_bytes += size;
         thread_data.local_stats.total_allocated_bytes += size;

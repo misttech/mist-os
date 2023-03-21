@@ -37,11 +37,31 @@ type Allocation = table {
 
     /// Block size, in bytes.
     2: size uint64;
+
+    /// The stack trace of the allocation site.
+    3: stack_trace_key uint64;
+};
+
+/// A stack trace.
+///
+/// In order to avoid exceeding the channel's maximum message size, stack traces can be split in
+/// multiple chunks. Receivers should be prepared to handle multiple StackTrace elements with the
+/// same key and reassemble them by concatenating their program addresses.
+type StackTrace = table {
+    /// A number that uniquely identifies this stack trace within the parent snapshot.
+    1: stack_trace_key uint64;
+
+    /// The program counters corresponding to stack each frame.
+    ///
+    /// Entries are listed in reverse call order: the first entry refers to the leaf frame, and the
+    /// last entry refers to the frame at the root of the call stack.
+    2: program_addresses vector<uint64>:MAX;
 };
 
 /// An element that is part of a snapshot.
 type SnapshotElement = flexible union {
     1: allocation Allocation;
+    2: stack_trace StackTrace;
 };
 
 /// Protocol to transmit a snapshot as a stream of elements.

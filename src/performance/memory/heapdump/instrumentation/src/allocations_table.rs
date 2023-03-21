@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
-use vmo_types::allocations_table_v1::AllocationsTableWriter;
+use vmo_types::allocations_table_v1::{AllocationsTableWriter, ResourceKey};
 
 /// We cap the size of our backing VMO at 2 GiB, then preallocate it and map it entirely.
 /// Actual memory for each page will only be committed when we first write to that page.
@@ -35,8 +35,9 @@ impl AllocationsTable {
         self.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed to share allocations VMO")
     }
 
-    pub fn record_allocation(&mut self, address: u64, size: u64) {
-        let inserted = self.writer.insert_allocation(address, size).expect("out of space");
+    pub fn record_allocation(&mut self, address: u64, size: u64, stack_trace_key: ResourceKey) {
+        let inserted =
+            self.writer.insert_allocation(address, size, stack_trace_key).expect("out of space");
         assert!(inserted, "Block 0x{:x} was already allocated", address);
     }
 

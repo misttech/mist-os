@@ -7,6 +7,8 @@ use thiserror::Error;
 
 pub mod allocations_table_v1;
 mod memory_mapped_vmo;
+pub mod resources_table_v1;
+pub mod stack_trace_compression;
 
 #[derive(Debug, Eq, Error, PartialEq)]
 pub enum Error {

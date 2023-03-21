@@ -8,7 +8,11 @@ use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_zircon::{self as zx, AsHandleRef, Koid};
 use futures::{lock::Mutex, StreamExt};
-use vmo_types::allocations_table_v1::AllocationsTableReader;
+use std::{collections::HashSet, sync::Arc};
+use vmo_types::{
+    allocations_table_v1::AllocationsTableReader, resources_table_v1::ResourcesTableReader,
+    stack_trace_compression,
+};
 
 use crate::process::{Process, Snapshot};
 
@@ -20,6 +24,7 @@ fn get_process_name(process: &zx::Process) -> Result<String, anyhow::Error> {
 ///
 /// In particular, version 1 of the protocol implies the usage of:
 /// - `allocations_table_v1` for the `allocations_vmo`
+/// - `resources_table_v1` for the `resources_vmo`
 // TODO(fdurso): Remove this allow(dead_code) once the features that use all these fields are
 // implemented.
 #[allow(dead_code)]
@@ -28,6 +33,7 @@ pub struct ProcessV1 {
     name: String,
     process: zx::Process,
     allocations_vmo: zx::Vmo,
+    resources_vmo: Arc<zx::Vmo>,
     snapshot_stream: Mutex<fheapdump_process::SnapshotSinkV1RequestStream>,
 }
 
@@ -35,6 +41,7 @@ impl ProcessV1 {
     pub fn new(
         process: zx::Process,
         allocations_vmo: zx::Vmo,
+        resources_vmo: zx::Vmo,
         snapshot_sink: ServerEnd<fheapdump_process::SnapshotSinkV1Marker>,
     ) -> Result<ProcessV1, anyhow::Error> {
         let name = get_process_name(&process)?;
@@ -44,6 +51,7 @@ impl ProcessV1 {
             koid,
             process,
             allocations_vmo,
+            resources_vmo: Arc::new(resources_vmo),
             snapshot_stream: Mutex::new(snapshot_sink.into_stream()?),
         })
     }
@@ -73,18 +81,19 @@ impl Process for ProcessV1 {
     fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error> {
         let size = self.allocations_vmo.get_size()?;
         let snapshot = self.allocations_vmo.create_child(zx::VmoChildOptions::SNAPSHOT, 0, size)?;
-        Ok(Box::new(SnapshotV1::new(snapshot)))
+        Ok(Box::new(SnapshotV1::new(snapshot, self.resources_vmo.clone())))
     }
 }
 
 /// A snapshot of a V1 process.
 pub struct SnapshotV1 {
     allocations_vmo: zx::Vmo,
+    resources_vmo: Arc<zx::Vmo>,
 }
 
 impl SnapshotV1 {
-    pub fn new(allocations_vmo: zx::Vmo) -> SnapshotV1 {
-        SnapshotV1 { allocations_vmo }
+    pub fn new(allocations_vmo: zx::Vmo, resources_vmo: Arc<zx::Vmo>) -> SnapshotV1 {
+        SnapshotV1 { allocations_vmo, resources_vmo }
     }
 }
 
@@ -96,18 +105,44 @@ impl Snapshot for SnapshotV1 {
     ) -> Result<(), anyhow::Error> {
         let mut streamer = heapdump_snapshot::Streamer::new(dest);
         let allocations_table = AllocationsTableReader::new(&self.allocations_vmo)?;
+        let resources_table = ResourcesTableReader::new(&self.resources_vmo)?;
 
+        let mut stack_trace_keys = HashSet::new();
         for block in allocations_table.iter() {
             let block = block?;
+            stack_trace_keys.insert(block.stack_trace_key);
+
             streamer = streamer
                 .push_element(fheapdump_client::SnapshotElement::Allocation(
                     fheapdump_client::Allocation {
                         address: Some(block.address),
                         size: Some(block.size),
+                        stack_trace_key: Some(block.stack_trace_key.into_raw() as u64),
                         ..fheapdump_client::Allocation::EMPTY
                     },
                 ))
                 .await?;
+        }
+
+        for stack_trace_key in stack_trace_keys {
+            let compressed_stack_trace =
+                resources_table.get_compressed_stack_trace(stack_trace_key)?;
+            let uncompressed_stack_trace =
+                stack_trace_compression::uncompress(compressed_stack_trace);
+
+            // Split long stack traces in chunks so that they can be paginated.
+            const MAX_ENTRIES_PER_CHUNK: usize = 32;
+            for chunk in uncompressed_stack_trace.chunks(MAX_ENTRIES_PER_CHUNK) {
+                streamer = streamer
+                    .push_element(fheapdump_client::SnapshotElement::StackTrace(
+                        fheapdump_client::StackTrace {
+                            stack_trace_key: Some(stack_trace_key.into_raw() as u64),
+                            program_addresses: Some(chunk.to_vec()),
+                            ..fheapdump_client::StackTrace::EMPTY
+                        },
+                    ))
+                    .await?;
+            }
         }
 
         Ok(streamer.end_of_stream().await?)
@@ -120,11 +155,15 @@ mod tests {
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fuchsia_async as fasync;
     use futures::pin_mut;
-    use vmo_types::allocations_table_v1::AllocationsTableWriter;
+    use vmo_types::{
+        allocations_table_v1::AllocationsTableWriter, resources_table_v1::ResourcesTableWriter,
+        stack_trace_compression,
+    };
 
     use crate::registry::Registry;
 
-    /// Creates an empty allocation VMO and ties it to the current process in the given registry.
+    /// Creates empty allocation and resource VMOs and ties them to the current process in the given
+    /// registry.
     ///
     /// By reusing the current process, instead of creating a new one, we avoid requiring the
     /// ZX_POL_NEW_PROCESS capability.
@@ -133,11 +172,14 @@ mod tests {
         fheapdump_process::SnapshotSinkV1Proxy,
         Koid,
         AllocationsTableWriter,
+        ResourcesTableWriter,
     ) {
-        // Create and initialize the VMO.
+        // Create and initialize the VMOs.
         const VMO_SIZE: u64 = 1 << 31;
         let allocations_vmo = zx::Vmo::create(VMO_SIZE).unwrap();
         let allocations_writer = AllocationsTableWriter::new(&allocations_vmo).unwrap();
+        let resources_vmo = zx::Vmo::create(VMO_SIZE).unwrap();
+        let resources_writer = ResourcesTableWriter::new(&resources_vmo).unwrap();
 
         let process = fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).unwrap();
         let koid = process.get_koid().unwrap();
@@ -147,9 +189,11 @@ mod tests {
             create_proxy_and_stream::<fheapdump_process::RegistryMarker>().unwrap();
         let (snapshot_proxy, snapshot_server) =
             create_proxy::<fheapdump_process::SnapshotSinkV1Marker>().unwrap();
-        registry_proxy.register_v1(process, allocations_vmo, snapshot_server).unwrap();
+        registry_proxy
+            .register_v1(process, allocations_vmo, resources_vmo, snapshot_server)
+            .unwrap();
 
-        (registry_stream, snapshot_proxy, koid, allocations_writer)
+        (registry_stream, snapshot_proxy, koid, allocations_writer, resources_writer)
     }
 
     #[test]
@@ -158,7 +202,7 @@ mod tests {
         let registry = Registry::new();
 
         // Setup fake process.
-        let (registry_stream, snapshot_sink, koid, _) = setup_fake_process_from_self();
+        let (registry_stream, snapshot_sink, koid, _, _) = setup_fake_process_from_self();
         let name = get_process_name(&fuchsia_runtime::process_self()).unwrap();
 
         // Register it.
@@ -177,13 +221,26 @@ mod tests {
         assert_eq!(ex.run_singlethreaded(registry.list_processes()), []);
     }
 
+    // Generate a very long stack trace to verify that the pagination mechanism works.
+    fn generate_fake_long_stack_trace() -> Vec<u64> {
+        // Ideally we would like to test with a stack trace whose uncompressed size is bigger than
+        // ZX_CHANNEL_MAX_MSG_BYTES. However, given that stack trace compression has not been
+        // implemented yet, ResourcesTableWriter will refuse to insert such stack traces.
+        // This is the longest possible stack trace length that ResourcesTableWriter can store right
+        // now.
+        // TODO(fxbug.dev/123360): Raise this number to its maximum value when compression is
+        // implemented.
+        const NUM_FRAMES: usize = (u16::MAX as usize) / std::mem::size_of::<u64>();
+        (0..NUM_FRAMES as u64).collect()
+    }
+
     #[test]
     fn test_take_live_snapshot() {
         let mut ex = fasync::TestExecutor::new();
         let registry = std::rc::Rc::new(Registry::new());
 
         // Setup fake process.
-        let (registry_stream, _snapshot_sink, koid, mut allocations_writer) =
+        let (registry_stream, _snapshot_sink, koid, mut allocations_writer, mut resources_writer) =
             setup_fake_process_from_self();
 
         // Register it.
@@ -195,7 +252,13 @@ mod tests {
         let foobar = Box::pin(b"foobar");
         let foobar_address = foobar.as_ptr() as u64;
         let foobar_size = foobar.len() as u64;
-        allocations_writer.insert_allocation(foobar_address, foobar_size).unwrap();
+        let foobar_stack_trace = generate_fake_long_stack_trace();
+        let (foobar_stack_trace_key, _) = resources_writer
+            .intern_compressed_stack_trace(&stack_trace_compression::compress(&foobar_stack_trace))
+            .unwrap();
+        allocations_writer
+            .insert_allocation(foobar_address, foobar_size, foobar_stack_trace_key)
+            .unwrap();
 
         // Take a live snapshot.
         let mut received_snapshot = ex.run_singlethreaded(async {
@@ -214,6 +277,7 @@ mod tests {
         // Verify that it contains our test allocation.
         let foobar_allocation = received_snapshot.allocations.remove(&foobar_address).unwrap();
         assert_eq!(foobar_allocation.size, foobar_size);
+        assert_eq!(foobar_allocation.stack_trace.program_addresses, foobar_stack_trace);
 
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
     }

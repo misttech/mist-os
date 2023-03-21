@@ -24,6 +24,7 @@ rustc_staticlib("core") {
     "src/lib.rs",
     "src/profiler.rs",
     "src/recursion_guard.rs",
+    "src/resources_table.rs",
   ]
 
   deps = [

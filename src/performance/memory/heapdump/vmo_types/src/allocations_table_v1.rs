@@ -11,6 +11,7 @@ use std::sync::atomic::{
 };
 
 use crate::memory_mapped_vmo::{MemoryMappable, MemoryMappedVmo};
+pub use crate::resources_table_v1::ResourceKey;
 
 type NodeIndex = u32;
 type AtomicNodeIndex = AtomicU32;
@@ -28,6 +29,7 @@ pub struct Node {
     next: AtomicNodeIndex,
     pub address: u64,
     pub size: u64,
+    pub stack_trace_key: ResourceKey,
 }
 
 // SAFETY: Our accessor functions never access this type's memory non-atomically.
@@ -122,7 +124,12 @@ impl AllocationsTableWriter {
     }
 
     /// Inserts a new entry in the hash table.
-    pub fn insert_allocation(&mut self, address: u64, size: u64) -> Result<bool, crate::Error> {
+    pub fn insert_allocation(
+        &mut self,
+        address: u64,
+        size: u64,
+        stack_trace_key: ResourceKey,
+    ) -> Result<bool, crate::Error> {
         let bucket_index = Self::compute_bucket_index(address);
         let old_head = self.bucket_head_at(bucket_index).load(Relaxed);
 
@@ -138,7 +145,8 @@ impl AllocationsTableWriter {
 
         // Insert a new entry at the head of the list.
         let new_index = self.pop_free_node()?;
-        *self.node_at(new_index) = Node { address, size, next: AtomicNodeIndex::new(old_head) };
+        *self.node_at(new_index) =
+            Node { address, size, stack_trace_key, next: AtomicNodeIndex::new(old_head) };
         self.bucket_head_at(bucket_index).store(new_index, SeqCst);
         Ok(true)
     }
@@ -258,6 +266,10 @@ mod tests {
     // Ensure we allocate enough nodes to store all the blocks the tests need plus some buffer.
     const NUM_NODES: usize = NUM_ITERATIONS + 100;
 
+    // Placeholder values used in the tests below:
+    const STACK_TRACE_RESOURCE_KEY_1: ResourceKey = ResourceKey::from_raw(0x1212);
+    const STACK_TRACE_RESOURCE_KEY_2: ResourceKey = ResourceKey::from_raw(0x3434);
+
     struct TestStorage {
         vmo: zx::Vmo,
     }
@@ -286,10 +298,10 @@ mod tests {
         let storage = TestStorage::new(NUM_NODES);
         let mut writer = storage.create_writer();
 
-        let result = writer.insert_allocation(0x1234, 0x5678);
+        let result = writer.insert_allocation(0x1234, 0x5678, STACK_TRACE_RESOURCE_KEY_1);
         assert_eq!(result, Ok(true));
 
-        let result = writer.insert_allocation(0x1234, 0x5678);
+        let result = writer.insert_allocation(0x1234, 0x5678, STACK_TRACE_RESOURCE_KEY_1);
         assert_eq!(result, Ok(false));
     }
 
@@ -298,7 +310,7 @@ mod tests {
         let storage = TestStorage::new(NUM_NODES);
         let mut writer = storage.create_writer();
 
-        let result = writer.insert_allocation(0x1234, 0x5678);
+        let result = writer.insert_allocation(0x1234, 0x5678, STACK_TRACE_RESOURCE_KEY_1);
         assert_eq!(result, Ok(true));
 
         let result = writer.erase_allocation(0x1234);
@@ -315,18 +327,18 @@ mod tests {
 
         // Test that inserting up to `NUM_NODES` works.
         for i in 0..NUM_NODES {
-            let result = writer.insert_allocation(i as u64, 1);
+            let result = writer.insert_allocation(i as u64, 1, STACK_TRACE_RESOURCE_KEY_1);
             assert_eq!(result, Ok(true));
         }
 
         // Test that inserting an extra node fails.
-        let result = writer.insert_allocation(NUM_NODES as u64, 1);
+        let result = writer.insert_allocation(NUM_NODES as u64, 1, STACK_TRACE_RESOURCE_KEY_1);
         assert_eq!(result, Err(crate::Error::OutOfSpace));
 
         // Test that removing an element and then inserting again succeeds.
         let result = writer.erase_allocation(0);
         assert_eq!(result, Some(1));
-        let result = writer.insert_allocation(NUM_NODES as u64, 1);
+        let result = writer.insert_allocation(NUM_NODES as u64, 1, STACK_TRACE_RESOURCE_KEY_1);
         assert_eq!(result, Ok(true));
     }
 
@@ -336,7 +348,7 @@ mod tests {
         let mut writer = storage.create_writer();
 
         for i in 0..NUM_ITERATIONS {
-            let result = writer.insert_allocation(i as u64, 1);
+            let result = writer.insert_allocation(i as u64, 1, STACK_TRACE_RESOURCE_KEY_1);
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
 
             let result = writer.erase_allocation(i as u64);
@@ -350,7 +362,7 @@ mod tests {
         let mut writer = storage.create_writer();
 
         for i in 0..NUM_ITERATIONS {
-            let result = writer.insert_allocation(i as u64, 1);
+            let result = writer.insert_allocation(i as u64, 1, STACK_TRACE_RESOURCE_KEY_1);
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
         }
         for i in 0..NUM_ITERATIONS {
@@ -365,7 +377,7 @@ mod tests {
         let mut writer = storage.create_writer();
 
         for i in 0..NUM_ITERATIONS {
-            let result = writer.insert_allocation(i as u64, 1);
+            let result = writer.insert_allocation(i as u64, 1, STACK_TRACE_RESOURCE_KEY_1);
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
         }
         for i in (0..NUM_ITERATIONS).rev() {
@@ -394,19 +406,21 @@ mod tests {
         let mut writer = storage.create_writer();
         let mut expected_map = HashMap::new();
         for i in 0..NUM_ITERATIONS as u64 {
-            let result = writer.insert_allocation(i, 1);
+            let stack_trace_key =
+                if i % 2 == 0 { STACK_TRACE_RESOURCE_KEY_1 } else { STACK_TRACE_RESOURCE_KEY_2 };
+            let result = writer.insert_allocation(i, 1, stack_trace_key);
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
 
-            expected_map.insert(i, 1);
+            expected_map.insert(i, (1, stack_trace_key));
         }
 
         // Read it back and verify.
         let reader = storage.create_reader();
         let mut actual_map = HashMap::new();
         for node in reader.iter() {
-            let Node { address, size, .. } = node.unwrap();
+            let Node { address, size, stack_trace_key, .. } = node.unwrap();
             assert!(
-                actual_map.insert(*address, *size).is_none(),
+                actual_map.insert(*address, (*size, *stack_trace_key)).is_none(),
                 "address 0x{:x} was read more than once",
                 address
             );
@@ -437,8 +451,12 @@ mod tests {
         // Initialize the hash table and insert a node with a bad next pointer.
         let mut writer = storage.create_writer();
         writer.bucket_head_at(NUM_BUCKETS / 2).store(0, SeqCst);
-        *writer.node_at(0) =
-            Node { next: AtomicNodeIndex::new(NODE_INVALID - 1), address: 0x1234, size: 0x5678 };
+        *writer.node_at(0) = Node {
+            next: AtomicNodeIndex::new(NODE_INVALID - 1),
+            address: 0x1234,
+            size: 0x5678,
+            stack_trace_key: STACK_TRACE_RESOURCE_KEY_1,
+        };
 
         // Try to read it back and verify that the iterator returns an error.
         let reader = storage.create_reader();
