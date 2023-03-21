@@ -68,6 +68,10 @@ class FakeProvider : public provider::Provider {
   void MarkStopped();
   void MarkTerminated();
 
+  // Helper to move the provider to a start where it does not respond to fidl calls
+  void MarkUnresponsive();
+  void MarkResponsive();
+
   // Raw state advancement.
   // This should only be called under exceptional circumstances, e.g., to
   // test the handling of broken providers.
@@ -129,6 +133,8 @@ class FakeProvider : public provider::Provider {
   int start_count_ = 0;
   int stop_count_ = 0;
   int terminate_count_ = 0;
+
+  bool responsive_ = true;
 };
 
 using FakeProviderBinding = fidl::Binding<provider::Provider, std::unique_ptr<FakeProvider>>;

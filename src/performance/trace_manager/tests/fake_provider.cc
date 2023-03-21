@@ -24,6 +24,9 @@ std::string FakeProvider::PrettyName() const {
 void FakeProvider::Initialize(provider::ProviderConfig config) {
   FX_VLOGS(2) << PrettyName() << ": Received Initialize message";
   ++initialize_count_;
+  if (!responsive_) {
+    return;
+  }
 
   if (state_ != State::kReady) {
     FX_VLOGS(2) << "Can't initialize, state is " << state_;
@@ -55,6 +58,9 @@ void FakeProvider::Initialize(provider::ProviderConfig config) {
 void FakeProvider::Start(provider::StartOptions options) {
   FX_VLOGS(2) << PrettyName() << ": Received Start message";
   ++start_count_;
+  if (!responsive_) {
+    return;
+  }
 
   if (state_ == State::kInitialized || state_ == State::kStopped) {
     AdvanceToState(State::kStarting);
@@ -81,6 +87,9 @@ void FakeProvider::Start(provider::StartOptions options) {
 void FakeProvider::Stop() {
   FX_VLOGS(2) << PrettyName() << ": Received Stop message";
   ++stop_count_;
+  if (!responsive_) {
+    return;
+  }
 
   switch (state_) {
     case State::kInitialized:
@@ -98,6 +107,9 @@ void FakeProvider::Stop() {
 void FakeProvider::Terminate() {
   FX_VLOGS(2) << PrettyName() << ": Received Terminate message";
   ++terminate_count_;
+  if (!responsive_) {
+    return;
+  }
 
   switch (state_) {
     case State::kReady:
@@ -114,6 +126,9 @@ void FakeProvider::Terminate() {
 
 // fidl
 void FakeProvider::GetKnownCategories(FakeProvider::GetKnownCategoriesCallback callback) {
+  if (!responsive_) {
+    return;
+  }
   callback(known_categories_);
 }
 
@@ -130,6 +145,15 @@ void FakeProvider::MarkStopped() {
 void FakeProvider::MarkTerminated() {
   FX_DCHECK(state_ == State::kTerminating) << state_;
   AdvanceToState(State::kTerminated);
+}
+
+void FakeProvider::MarkUnresponsive() {
+  FX_DCHECK(responsive_ == true) << responsive_;
+  responsive_ = false;
+}
+void FakeProvider::MarkResponsive() {
+  FX_DCHECK(responsive_ == false) << responsive_;
+  responsive_ = true;
 }
 
 void FakeProvider::AdvanceToState(State state) {

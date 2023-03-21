@@ -61,6 +61,9 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   static constexpr zx_koid_t kProvider2Pid = 1235;
   static constexpr char kProvider2Name[] = "test-provider2";
 
+  static constexpr zx_koid_t kProvider3Pid = 1236;
+  static constexpr char kProvider3Name[] = "test-provider3";
+
   static controller::TraceConfig GetDefaultTraceConfig();
   static controller::StartOptions GetDefaultStartOptions();
   static controller::StopOptions GetDefaultStopOptions();

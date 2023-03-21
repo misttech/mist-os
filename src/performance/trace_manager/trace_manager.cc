@@ -310,6 +310,36 @@ void TraceManager::GetProviders(GetProvidersCallback callback) {
   callback(std::move(provider_info));
 }
 
+// Allows multiple callers to race to call the same callback.
+// The first caller will successfully have their value forwarded to the callback, and each
+// subsequent call will be dropped. This allows a callback to race against a timeout to call a
+// completer.
+//
+// The CompleterMerger is internally reference counted so that it may be passed by value as a
+// callback to multiple callers
+template <typename T>
+class CompleterMerger {
+ public:
+  explicit CompleterMerger(fit::function<void(T)> completer)
+      : state_(std::make_shared<State>(std::move(completer))) {}
+
+  void operator()(T&& categories) const {
+    bool expected = false;
+    if (state_->called_.compare_exchange_weak(expected, true)) {
+      state_->completer_(std::forward<T>(categories));
+    }
+  }
+
+ private:
+  struct State {
+    explicit State(fit::function<void(T)> completer)
+        : called_(false), completer_(std::move(completer)) {}
+    std::atomic<bool> called_;
+    fit::function<void(T)> completer_;
+  };
+  std::shared_ptr<State> state_;
+};
+
 // fidl
 void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
   FX_VLOGS(2) << "GetKnownCategories";
@@ -318,10 +348,14 @@ void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
     known_categories.insert({.name = name, .description = description});
   }
   std::vector<fpromise::promise<KnownCategoryVector>> promises;
+  fpromise::promise<> timeout = executor_.MakeDelayedPromise(zx::sec(1));
   for (const auto& provider : providers_) {
     fpromise::bridge<KnownCategoryVector> bridge;
-    provider.provider->GetKnownCategories(bridge.completer.bind());
     promises.push_back(bridge.consumer.promise());
+
+    CompleterMerger<KnownCategoryVector> merger{bridge.completer.bind()};
+    provider.provider->GetKnownCategories(merger);
+    timeout = fpromise::promise<>{timeout.and_then([merger = merger]() mutable { merger({}); })};
   }
   auto joined_promise =
       fpromise::join_promise_vector(std::move(promises))
@@ -339,6 +373,7 @@ void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
               });
 
   executor_.schedule_task(std::move(joined_promise));
+  executor_.schedule_task(std::move(timeout));
 }
 
 void TraceManager::WatchAlert(WatchAlertCallback cb) {

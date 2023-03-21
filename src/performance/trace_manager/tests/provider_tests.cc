@@ -169,5 +169,64 @@ TEST_F(TraceManagerTest, GetKnownCategories) {
   }
 }
 
+TEST_F(TraceManagerTest, GetKnownCategoriesTimeout) {
+  ConnectToControllerService();
+
+  FakeProvider* provider1;
+  ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider1));
+  EXPECT_EQ(fake_provider_bindings().size(), 1u);
+  provider1->SetKnownCategories({
+      {.name = "foo"},
+      {.name = "bar"},
+      {.name = "provider1_category", .description = "description1"},
+  });
+
+  FakeProvider* provider2;
+  ASSERT_TRUE(AddFakeProvider(kProvider2Pid, kProvider2Name, &provider2));
+  EXPECT_EQ(fake_provider_bindings().size(), 2u);
+  provider2->SetKnownCategories({
+      {.name = "foo"},
+      {.name = "bar"},
+      {.name = "provider2_category", .description = "description2"},
+  });
+
+  FakeProvider* provider3;
+  ASSERT_TRUE(AddFakeProvider(kProvider3Pid, kProvider3Name, &provider3));
+  EXPECT_EQ(fake_provider_bindings().size(), 3u);
+  provider2->SetKnownCategories({
+      {.name = "foo"},
+      {.name = "bar"},
+      {.name = "provider3_category", .description = "description3"},
+  });
+
+  // Provider registrations come in on a different channel than
+  // |GetProviders()|. Make sure the providers are registered before we try
+  // to fetch a list of them.
+  RunLoopUntilIdle();
+
+  FX_VLOGS(2) << "Providers registered";
+
+  provider2->MarkUnresponsive();
+  provider3->MarkUnresponsive();
+  std::vector<fuchsia::tracing::KnownCategory> known_categories;
+  controller()->GetKnownCategories(
+      [&known_categories](std::vector<fuchsia::tracing::KnownCategory> in_known_categories) {
+        known_categories = std::move(in_known_categories);
+      });
+  RunLoopFor(zx::sec(2));
+
+  std::vector<fuchsia::tracing::KnownCategory> expected_categories = {
+      {.name = "provider1_category", .description = "description1"},
+      {.name = "bar"},
+      {.name = "foo"},
+      {.name = "test", .description = "Test category"},
+  };
+  ASSERT_EQ(expected_categories.size(), known_categories.size());
+  for (size_t i = 0; i < expected_categories.size(); ++i) {
+    EXPECT_EQ(expected_categories[i].name, known_categories[i].name);
+    EXPECT_EQ(expected_categories[i].description, known_categories[i].description);
+  }
+}
+
 }  // namespace test
 }  // namespace tracing
