@@ -30,26 +30,26 @@ zx::result<fdf::ClientEnd<typename ServiceMember::ProtocolType>> DriverTransport
                 "ServiceMember must use DriverTransport. Double check the FIDL protocol.");
 
   zx::channel client_token, server_token;
-  auto status = zx::channel::create(0, &client_token, &server_token);
-  if (status != ZX_OK) {
+  if (zx_status_t status = zx::channel::create(0, &client_token, &server_token); status != ZX_OK) {
     return zx::error(status);
   }
 
-  status = fdio_open_at(
-      svc_dir.handle()->get(), component::MakeServiceMemberPath<ServiceMember>(instance).c_str(),
-      static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable), server_token.release());
-
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          fdio_service_connect_at(svc_dir.handle()->get(),
+                                  component::MakeServiceMemberPath<ServiceMember>(instance).c_str(),
+                                  server_token.release());
+      status != ZX_OK) {
     return zx::error(status);
   }
 
-  auto endpoints = fdf::CreateEndpoints<typename ServiceMember::ProtocolType>();
+  zx::result endpoints = fdf::CreateEndpoints<typename ServiceMember::ProtocolType>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
 
-  status = fdf::ProtocolConnect(std::move(client_token), std::move(endpoints->server.TakeHandle()));
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          fdf::ProtocolConnect(std::move(client_token), std::move(endpoints->server.TakeHandle()));
+      status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok(std::move(endpoints->client));
@@ -65,21 +65,21 @@ zx::result<> DriverTransportConnect(fidl::UnownedClientEnd<fuchsia_io::Directory
                 "ServiceMember must use DriverTransport. Double check the FIDL protocol.");
 
   zx::channel client_token, server_token;
-  auto status = zx::channel::create(0, &client_token, &server_token);
-  if (status != ZX_OK) {
+  if (zx_status_t status = zx::channel::create(0, &client_token, &server_token); status != ZX_OK) {
     return zx::error(status);
   }
 
-  status = fdio_open_at(
-      svc_dir.handle()->get(), component::MakeServiceMemberPath<ServiceMember>(instance).c_str(),
-      static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable), server_token.release());
-
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          fdio_service_connect_at(svc_dir.handle()->get(),
+                                  component::MakeServiceMemberPath<ServiceMember>(instance).c_str(),
+                                  server_token.release());
+      status != ZX_OK) {
     return zx::error(status);
   }
 
-  status = fdf::ProtocolConnect(std::move(client_token), std::move(server_end.TakeHandle()));
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          fdf::ProtocolConnect(std::move(client_token), std::move(server_end.TakeHandle()));
+      status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok();

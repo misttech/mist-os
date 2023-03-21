@@ -353,11 +353,9 @@ int RunDfv1(driver_manager_config::Config dm_config,
                   }
                   auto& [client, server] = endpoints.value();
 
-                  if (const zx_status_t status = fdio_open_at(
-                          devfs_client.channel().get(), "class/usb-device",
-                          static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                                fuchsia_io::wire::OpenFlags::kRightWritable),
-                          server.TakeChannel().release());
+                  if (const zx_status_t status =
+                          fdio_service_connect_at(devfs_client.channel().get(), "class/usb-device",
+                                                  server.TakeChannel().release());
                       status != ZX_OK) {
                     return zx::error(status);
                   }

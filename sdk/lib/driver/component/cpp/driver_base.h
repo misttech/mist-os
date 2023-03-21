@@ -73,23 +73,7 @@ extern bool logger_wait_for_initial_interest;
 class DriverBase {
  public:
   DriverBase(std::string_view name, DriverStartArgs start_args,
-             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : name_(name),
-        start_args_(std::move(start_args)),
-        driver_dispatcher_(std::move(driver_dispatcher)),
-        dispatcher_(driver_dispatcher_->async_dispatcher()),
-        driver_context_(driver_dispatcher_->get()) {
-    auto ns = std::move(start_args_.incoming());
-    ZX_ASSERT(ns.has_value());
-    Namespace incoming = Namespace::Create(ns.value()).value();
-    logger_ = Logger::Create(incoming, dispatcher_, name_, FUCHSIA_LOG_INFO,
-                             logger_wait_for_initial_interest)
-                  .value();
-
-    auto outgoing_request = std::move(start_args_.outgoing_dir());
-    ZX_ASSERT(outgoing_request.has_value());
-    driver_context_.InitializeAndServe(std::move(incoming), std::move(outgoing_request.value()));
-  }
+             fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   DriverBase(const DriverBase&) = delete;
   DriverBase& operator=(const DriverBase&) = delete;
