@@ -65,6 +65,18 @@ impl<I: Instant, S> PartialEq<LoopbackDeviceId<I, S>> for LoopbackWeakDeviceId<I
 
 impl<I: Instant, S> Eq for LoopbackWeakDeviceId<I, S> {}
 
+impl<I: Instant, S> Debug for LoopbackWeakDeviceId<I, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+impl<I: Instant, S> Display for LoopbackWeakDeviceId<I, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Weak Loopback")
+    }
+}
+
 impl<I: Instant, S> LoopbackWeakDeviceId<I, S> {
     /// Attempts to upgrade the ID to a [`LoopbackDeviceId`], failing if the
     /// device no longer exists.

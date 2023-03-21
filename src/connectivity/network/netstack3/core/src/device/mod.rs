@@ -1021,6 +1021,19 @@ impl<I: Instant, S> PartialEq<EthernetDeviceId<I, S>> for EthernetWeakDeviceId<I
 
 impl<I: Instant, S> Eq for EthernetWeakDeviceId<I, S> {}
 
+impl<I: Instant, S> Debug for EthernetWeakDeviceId<I, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+impl<I: Instant, S> Display for EthernetWeakDeviceId<I, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self(id, _ptr) = self;
+        write!(f, "Weak Ethernet({id})")
+    }
+}
+
 impl<I: Instant, S> EthernetWeakDeviceId<I, S> {
     /// Attempts to upgrade the ID to an [`EthernetDeviceId`], failing if the
     /// device no longer exists.
@@ -1064,8 +1077,8 @@ impl<I: Instant, S> Debug for EthernetDeviceId<I, S> {
 
 impl<I: Instant, S> Display for EthernetDeviceId<I, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let EthernetDeviceId(id, _ptr) = self;
-        write!(f, "Ethernet({})", id)
+        let Self(id, _ptr) = self;
+        write!(f, "Ethernet({id})")
     }
 }
 
@@ -1213,10 +1226,8 @@ impl<C: DeviceLayerEventDispatcher> WeakIpDeviceId for WeakDeviceId<C> {
 impl<C: DeviceLayerEventDispatcher> Display for WeakDeviceId<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            WeakDeviceId::Ethernet(EthernetWeakDeviceId(id, _ptr)) => {
-                write!(f, "Weak Ethernet({})", id)
-            }
-            WeakDeviceId::Loopback(LoopbackWeakDeviceId(_)) => write!(f, "Weak Loopback"),
+            WeakDeviceId::Ethernet(id) => Display::fmt(id, f),
+            WeakDeviceId::Loopback(id) => Display::fmt(id, f),
         }
     }
 }

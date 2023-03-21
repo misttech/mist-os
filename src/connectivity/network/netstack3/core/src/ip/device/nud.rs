@@ -1259,12 +1259,12 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let device_id = crate::device::add_ethernet_device(
+        let eth_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        )
-        .into();
+        );
+        let device_id = eth_device_id.clone().into();
         crate::ip::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1343,7 +1343,7 @@ mod tests {
         assert_matches!(
             &non_sync_ctx.take_frames()[..],
             [(got_device_id, got_frame)] => {
-                assert_eq!(got_device_id, &device_id);
+                assert_eq!(got_device_id, &eth_device_id);
 
                 let (src_mac, dst_mac, got_src_ip, got_dst_ip, ttl, message, code) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
                     Ipv6,
@@ -1396,7 +1396,7 @@ mod tests {
         assert_matches!(
             &non_sync_ctx.take_frames()[..],
             [(got_device_id, got_frame)] => {
-                assert_eq!(got_device_id, &device_id);
+                assert_eq!(got_device_id, &eth_device_id);
 
                 let (payload, src_mac, dst_mac, ether_type) = parse_ethernet_frame(got_frame)
                     .unwrap();

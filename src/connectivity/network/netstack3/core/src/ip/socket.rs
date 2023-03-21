@@ -1830,6 +1830,7 @@ mod tests {
             packet_count += 1;
             assert_eq!(non_sync_ctx.frames_sent().len(), packet_count);
             let (dev, frame) = &non_sync_ctx.frames_sent()[packet_count - 1];
+            let device_id = assert_matches!(device_id, DeviceId::Ethernet(id) => id);
             assert_eq!(dev, device_id);
             check_frame(&frame, packet_count);
         };

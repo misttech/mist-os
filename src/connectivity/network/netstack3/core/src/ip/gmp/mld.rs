@@ -1173,12 +1173,12 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
         let mut sync_ctx = &sync_ctx;
-        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
+        let eth_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        )
-        .into();
+        );
+        let device_id: DeviceId<_> = eth_device_id.clone().into();
 
         let now = non_sync_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
@@ -1218,7 +1218,7 @@ mod tests {
             assert_matches::assert_matches!(
                 &non_sync_ctx.take_frames()[..],
                 [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &device_id);
+                    assert_eq!(egress_device, &eth_device_id);
                     let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
                         parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
                             Ipv6,
@@ -1249,7 +1249,7 @@ mod tests {
             assert_matches::assert_matches!(
                 &non_sync_ctx.take_frames()[..],
                 [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &device_id);
+                    assert_eq!(egress_device, &eth_device_id);
                     let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
                         parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
                             Ipv6,

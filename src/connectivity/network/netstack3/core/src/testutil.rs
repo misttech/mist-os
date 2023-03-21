@@ -28,7 +28,7 @@ use crate::{
     },
     device::{
         ethernet, loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher,
-        DeviceSendFrameError, EthernetDeviceId, WeakDeviceId,
+        DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
     },
     ip::{
         device::{dad::DadEvent, route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
@@ -238,11 +238,11 @@ impl NonSyncContext for FakeNonSyncCtx {
 }
 
 impl FakeNonSyncCtx {
-    pub(crate) fn take_frames(&mut self) -> Vec<(WeakDeviceId<FakeNonSyncCtx>, Vec<u8>)> {
+    pub(crate) fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeInstant, ()>, Vec<u8>)> {
         self.frame_ctx_mut().take_frames()
     }
 
-    pub(crate) fn frames_sent(&self) -> &[(WeakDeviceId<FakeNonSyncCtx>, Vec<u8>)] {
+    pub(crate) fn frames_sent(&self) -> &[(EthernetWeakDeviceId<FakeInstant, ()>, Vec<u8>)] {
         self.frame_ctx().frames()
     }
 }
@@ -712,8 +712,8 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     }
 }
 
-impl AsMut<FakeFrameCtx<WeakDeviceId<FakeNonSyncCtx>>> for FakeCtx {
-    fn as_mut(&mut self) -> &mut FakeFrameCtx<WeakDeviceId<FakeNonSyncCtx>> {
+impl AsMut<FakeFrameCtx<EthernetWeakDeviceId<FakeInstant, ()>>> for FakeCtx {
+    fn as_mut(&mut self) -> &mut FakeFrameCtx<EthernetWeakDeviceId<FakeInstant, ()>> {
         self.non_sync_ctx.frame_ctx_mut()
     }
 }
@@ -732,7 +732,7 @@ impl AsMut<FakeTimerCtx<TimerId<FakeNonSyncCtx>>> for FakeCtx {
 
 impl FakeNetworkContext for FakeCtx {
     type TimerId = TimerId<FakeNonSyncCtx>;
-    type SendMeta = WeakDeviceId<FakeNonSyncCtx>;
+    type SendMeta = EthernetWeakDeviceId<FakeInstant, ()>;
 }
 
 pub(crate) trait TestutilIpExt: Ip {
@@ -824,7 +824,7 @@ impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
         device: &EthernetDeviceId<FakeInstant, ()>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        self.frame_ctx_mut().push(device.downgrade().into(), frame.into_inner());
+        self.frame_ctx_mut().push(device.downgrade(), frame.into_inner());
         Ok(())
     }
 }
@@ -1206,7 +1206,7 @@ mod tests {
         core::mem::drop((alice_device_ids, bob_device_ids));
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx)],
-            move |net: &'static str, _device_id: WeakDeviceId<FakeNonSyncCtx>| {
+            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeInstant, ()>| {
                 if net == "alice" {
                     vec![("bob", bob_device_id.clone(), Some(latency))]
                 } else {
@@ -1270,7 +1270,11 @@ mod tests {
 
         fn assert_full_state<
             'a,
-            L: FakeNetworkLinks<WeakDeviceId<FakeNonSyncCtx>, DeviceId<FakeNonSyncCtx>, &'a str>,
+            L: FakeNetworkLinks<
+                EthernetWeakDeviceId<FakeInstant, ()>,
+                DeviceId<FakeNonSyncCtx>,
+                &'a str,
+            >,
         >(
             net: &mut FakeNetwork<&'a str, DeviceId<FakeNonSyncCtx>, FakeCtx, L>,
             alice_nop: usize,
@@ -1377,7 +1381,7 @@ mod tests {
         let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
-            move |net: &'static str, _device_id: WeakDeviceId<FakeNonSyncCtx>| match net {
+            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeInstant, ()>| match net {
                 "alice" => vec![
                     ("bob", bob_device_id.clone(), None),
                     ("calvin", calvin_device_id.clone(), None),

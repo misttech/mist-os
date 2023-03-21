@@ -1248,12 +1248,12 @@ mod tests {
         let crate::testutil::FakeCtx { sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(StackStateBuilder::default());
         let mut sync_ctx = &sync_ctx;
-        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
+        let eth_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
-        )
-        .into();
+        );
+        let device_id: DeviceId<_> = eth_device_id.clone().into();
         crate::ip::device::add_ipv4_addr_subnet(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1294,7 +1294,7 @@ mod tests {
             assert_matches::assert_matches!(
                 &non_sync_ctx.take_frames()[..],
                 [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &device_id);
+                    assert_eq!(egress_device, &eth_device_id);
                     let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
                         parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
                     assert_eq!(src_mac, local_mac.get());
@@ -1317,7 +1317,7 @@ mod tests {
             assert_matches::assert_matches!(
                 &non_sync_ctx.take_frames()[..],
                 [(egress_device, frame)] => {
-                    assert_eq!(egress_device, &device_id);
+                    assert_eq!(egress_device, &eth_device_id);
                     let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
                         parse_ip_packet_in_ethernet_frame::<Ipv4>(frame).unwrap();
                     assert_eq!(src_mac, local_mac.get());

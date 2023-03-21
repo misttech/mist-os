@@ -311,7 +311,7 @@ pub(crate) mod testutil {
     use super::*;
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-        device::{DeviceId, WeakDeviceId},
+        device::{DeviceId, EthernetWeakDeviceId},
         testutil::FakeCryptoRng,
         Instant,
     };
@@ -982,7 +982,7 @@ pub(crate) mod testutil {
         rng: FakeCryptoRng<XorShiftRng>,
         timers: FakeTimerCtx<TimerId>,
         events: FakeEventCtx<Event>,
-        frames: FakeFrameCtx<WeakDeviceId<crate::testutil::FakeNonSyncCtx>>,
+        frames: FakeFrameCtx<EthernetWeakDeviceId<FakeInstant, ()>>,
         counters: FakeCounterCtx,
         state: State,
     }
@@ -1023,15 +1023,13 @@ pub(crate) mod testutil {
             self.events.take()
         }
 
-        pub(crate) fn frame_ctx(
-            &self,
-        ) -> &FakeFrameCtx<WeakDeviceId<crate::testutil::FakeNonSyncCtx>> {
+        pub(crate) fn frame_ctx(&self) -> &FakeFrameCtx<EthernetWeakDeviceId<FakeInstant, ()>> {
             &self.frames
         }
 
         pub(crate) fn frame_ctx_mut(
             &mut self,
-        ) -> &mut FakeFrameCtx<WeakDeviceId<crate::testutil::FakeNonSyncCtx>> {
+        ) -> &mut FakeFrameCtx<EthernetWeakDeviceId<FakeInstant, ()>> {
             &mut self.frames
         }
 
@@ -1656,7 +1654,7 @@ pub(crate) mod testutil {
     where
         CtxId: Eq + Hash + Copy + Debug,
         Links: FakeNetworkLinks<
-            WeakDeviceId<crate::testutil::FakeNonSyncCtx>,
+            EthernetWeakDeviceId<FakeInstant, ()>,
             DeviceId<crate::testutil::FakeNonSyncCtx>,
             CtxId,
         >,
@@ -1745,22 +1743,19 @@ pub(crate) mod testutil {
         DeviceId<crate::testutil::FakeNonSyncCtx>,
         crate::testutil::FakeCtx,
         impl FakeNetworkLinks<
-            WeakDeviceId<crate::testutil::FakeNonSyncCtx>,
+            EthernetWeakDeviceId<FakeInstant, ()>,
             DeviceId<crate::testutil::FakeNonSyncCtx>,
             CtxId,
         >,
     > {
         let contexts = vec![(a_id, a), (b_id, b)].into_iter();
-        FakeNetwork::new(
-            contexts,
-            move |net, _device_id: WeakDeviceId<crate::testutil::FakeNonSyncCtx>| {
-                if net == a_id {
-                    vec![(b_id, b_device_id.clone(), None)]
-                } else {
-                    vec![(a_id, a_device_id.clone(), None)]
-                }
-            },
-        )
+        FakeNetwork::new(contexts, move |net, _device_id: EthernetWeakDeviceId<FakeInstant, ()>| {
+            if net == a_id {
+                vec![(b_id, b_device_id.clone(), None)]
+            } else {
+                vec![(a_id, a_device_id.clone(), None)]
+            }
+        })
     }
 
     mod tests {
