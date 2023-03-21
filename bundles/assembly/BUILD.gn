@@ -481,9 +481,9 @@ assembly_input_bundle("common_minimal_userdebug") {
 # valid build-types: all
 #
 assembly_input_bundle("starnix_support") {
-  base_packages = [ "//src/proc/bin/manager:starnix_package" ]
+  cache_packages = [ "//src/proc/bin/manager:starnix_package" ]
   if (target_cpu == "x64") {
-    base_packages += [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    cache_packages += [ "//src/proc/bin/starnix:starnix_kernel_package" ]
   }
   compiled_packages = [
     {
