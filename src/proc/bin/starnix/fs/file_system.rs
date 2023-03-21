@@ -12,7 +12,7 @@ use super::*;
 use crate::auth::FsCred;
 use crate::lock::Mutex;
 use crate::task::Kernel;
-use crate::types::*;
+use crate::types::{as_any::AsAny, *};
 
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
@@ -176,10 +176,10 @@ impl FileSystem {
         mode: FileMode,
         owner: FsCred,
     ) -> FsNodeHandle {
-        if let Some(label) = self.selinux_context.get() {
-            let _ = ops.set_xattr(b"security.selinux", label, XattrOp::Create);
-        }
         let node = FsNode::new_uncached(ops, self, id, mode, owner);
+        if let Some(label) = self.selinux_context.get() {
+            let _ = node.ops().set_xattr(&node, b"security.selinux", label, XattrOp::Create);
+        }
         self.nodes.lock().insert(node.inode_num, Arc::downgrade(&node));
         node
     }
@@ -261,10 +261,15 @@ impl FileSystem {
             self.entries.lock().remove(&(Arc::as_ptr(entry) as usize));
         }
     }
+
+    /// Returns the `FileSystem`'s `FileSystemOps` as a `&T`, or `None` if the downcast fails.
+    pub fn downcast_ops<T: 'static>(&self) -> Option<&T> {
+        self.ops.as_ref().as_any().downcast_ref()
+    }
 }
 
 /// The filesystem-implementation-specific data for FileSystem.
-pub trait FileSystemOps: Send + Sync + 'static {
+pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     /// Return information about this filesystem.
     ///
     /// A typical implementation looks like this:

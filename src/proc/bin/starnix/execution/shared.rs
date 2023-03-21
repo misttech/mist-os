@@ -18,7 +18,7 @@ use std::sync::Arc;
 use zerocopy::AsBytes;
 
 use crate::fs::ext4::ExtFilesystem;
-use crate::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
+use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
 use crate::fs::*;
 use crate::logging::log_trace;
 use crate::mm::{DesiredAddress, MappingOptions, PAGE_SIZE};
@@ -358,6 +358,7 @@ pub fn create_filesystem_from_spec<'a>(
     // common code that also handles the mount() system call.
     let fs = match fs_type {
         "bind" => Bind(task.lookup_path_from_root(fs_src.as_bytes())?),
+        "remote_bundle" => Fs(RemoteBundle::new_fs(task.kernel(), pkg, rights, fs_src)?),
         "remotefs" => Fs(create_remotefs_filesystem(task.kernel(), pkg, rights, fs_src)?),
         "ext4" => {
             let vmo =

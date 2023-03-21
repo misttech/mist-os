@@ -275,20 +275,26 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 
     /// Get an extended attribute on the node.
-    fn get_xattr(&self, _name: &FsStr) -> Result<FsString, Errno> {
+    fn get_xattr(&self, _node: &FsNode, _name: &FsStr) -> Result<FsString, Errno> {
         error!(ENOTSUP)
     }
 
     /// Set an extended attribute on the node.
-    fn set_xattr(&self, _name: &FsStr, _value: &FsStr, _op: XattrOp) -> Result<(), Errno> {
+    fn set_xattr(
+        &self,
+        _node: &FsNode,
+        _name: &FsStr,
+        _value: &FsStr,
+        _op: XattrOp,
+    ) -> Result<(), Errno> {
         error!(ENOTSUP)
     }
 
-    fn remove_xattr(&self, _name: &FsStr) -> Result<(), Errno> {
+    fn remove_xattr(&self, _node: &FsNode, _name: &FsStr) -> Result<(), Errno> {
         error!(ENOTSUP)
     }
 
-    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
+    fn list_xattrs(&self, _node: &FsNode) -> Result<Vec<FsString>, Errno> {
         error!(ENOTSUP)
     }
 }
@@ -366,6 +372,7 @@ macro_rules! fs_node_impl_xattr_delegate {
     ($self:ident, $delegate:expr) => {
         fn get_xattr(
             &$self,
+            _node: &FsNode,
             name: &crate::fs::FsStr,
         ) -> Result<FsString, crate::types::Errno> {
             $delegate.get_xattr(name)
@@ -373,6 +380,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn set_xattr(
             &$self,
+            _node: &FsNode,
             name: &crate::fs::FsStr,
             value: &crate::fs::FsStr,
             op: crate::fs::XattrOp,
@@ -382,6 +390,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn remove_xattr(
             &$self,
+            _node: &FsNode,
             name: &crate::fs::FsStr,
         ) -> Result<(), crate::types::Errno> {
             $delegate.remove_xattr(name)
@@ -389,6 +398,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn list_xattrs(
             &$self,
+            _node: &FsNode,
         ) -> Result<Vec<crate::fs::FsString>, crate::types::Errno> {
             $delegate.list_xattrs()
         }
@@ -481,7 +491,7 @@ impl FsNode {
         self.fs = Arc::downgrade(fs);
     }
 
-    fn ops(&self) -> &dyn FsNodeOps {
+    pub fn ops(&self) -> &dyn FsNodeOps {
         self.ops.as_ref()
     }
 
@@ -944,7 +954,7 @@ impl FsNode {
     pub fn get_xattr(&self, current_task: &CurrentTask, name: &FsStr) -> Result<FsString, Errno> {
         self.check_access(current_task, Access::READ)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
-        self.ops().get_xattr(name)
+        self.ops().get_xattr(self, name)
     }
 
     pub fn set_xattr(
@@ -956,19 +966,19 @@ impl FsNode {
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(name, value, op)
+        self.ops().set_xattr(self, name, value, op)
     }
 
     pub fn remove_xattr(&self, current_task: &CurrentTask, name: &FsStr) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().remove_xattr(name)
+        self.ops().remove_xattr(self, name)
     }
 
     pub fn list_xattrs(&self, current_task: &CurrentTask) -> Result<Vec<FsString>, Errno> {
         Ok(self
             .ops()
-            .list_xattrs()?
+            .list_xattrs(self)?
             .into_iter()
             .filter(|name| {
                 self.check_trusted_attribute_access(current_task, name, || errno!(EPERM)).is_ok()

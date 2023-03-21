@@ -104,7 +104,7 @@ pub fn create_fuchsia_pipe(
     new_remote_file(current_task.kernel(), socket.into(), flags)
 }
 
-fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
+pub fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     /// st_blksize is measured in units of 512 bytes.
     const BYTES_PER_BLOCK: blksize_t = 512;
 
@@ -495,7 +495,7 @@ impl FileOps for RemoteDirectoryObject {
     }
 }
 
-struct RemoteFileObject {
+pub struct RemoteFileObject {
     /// The underlying Zircon I/O object.
     zxio: Arc<Zxio>,
 }

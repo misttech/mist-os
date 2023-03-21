@@ -97,6 +97,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/proc/lib/linux_uapi",
     "//src/proc/lib/magma",
     "//src/proc/lib/syncio",
+    "//src/storage/ext4:ext4_metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
@@ -136,6 +137,7 @@ rustc_binary("starnix_kernel_bin") {
 
   test_deps = [
     "//src/lib/fuchsia-fs",
+    "//src/storage/ext4:test_img",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:tracing-mutex",
@@ -204,6 +206,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/fs_node.rs",
     "fs/fuchsia/mod.rs",
     "fs/fuchsia/remote.rs",
+    "fs/fuchsia/remote_bundle.rs",
     "fs/fuchsia/syslog.rs",
     "fs/fuchsia/timer.rs",
     "fs/inotify.rs",

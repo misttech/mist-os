@@ -9,10 +9,12 @@ use crate::task::CurrentTask;
 use crate::types::*;
 
 mod remote;
+mod remote_bundle;
 mod syslog;
 mod timer;
 
 pub use remote::*;
+pub use remote_bundle::RemoteBundle;
 pub use syslog::*;
 pub use timer::*;
 
