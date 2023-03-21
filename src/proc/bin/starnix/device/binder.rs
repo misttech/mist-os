@@ -135,9 +135,9 @@ impl FileOps for BinderConnection {
         }
     }
 
-    fn cancel_wait(&self, current_task: &CurrentTask, _waiter: &Waiter, key: WaitKey) {
+    fn cancel_wait(&self, current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
         if let Ok(proc) = self.proc(current_task) {
-            self.driver.cancel_wait(&proc, key)
+            self.driver.cancel_wait(&proc, waiter, key)
         }
     }
 
@@ -2961,7 +2961,7 @@ impl BinderDriver {
             // Put this thread to sleep.
             scopeguard::defer! {
                 binder_thread.lock().waiter = WaiterRef::empty();
-                binder_proc.command_queue.lock().waiters.cancel_wait(wait_key);
+                binder_proc.command_queue.lock().waiters.cancel_wait(&waiter, wait_key);
             }
             waiter.wait(current_task)?;
         }
@@ -3316,8 +3316,8 @@ impl BinderDriver {
         }
     }
 
-    fn cancel_wait(&self, binder_proc: &Arc<BinderProcess>, key: WaitKey) {
-        binder_proc.command_queue.lock().waiters.cancel_wait(key);
+    fn cancel_wait(&self, binder_proc: &Arc<BinderProcess>, waiter: &Waiter, key: WaitKey) {
+        binder_proc.command_queue.lock().waiters.cancel_wait(waiter, key);
     }
 }
 

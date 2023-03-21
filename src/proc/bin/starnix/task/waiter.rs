@@ -458,11 +458,11 @@ impl WaitQueue {
         woken
     }
 
-    pub fn cancel_wait(&mut self, key: WaitKey) -> bool {
+    pub fn cancel_wait(&mut self, waiter: &Waiter, key: WaitKey) -> bool {
         let mut cancelled = false;
         // TODO(steveaustin) Maybe make waiters a map to avoid linear search
         self.waiters.retain(|entry| {
-            if entry.key == key {
+            if entry.waiter.0.as_ptr() == Arc::as_ptr(&waiter.0) && entry.key == key {
                 cancelled = true;
                 false
             } else {
@@ -582,6 +582,32 @@ mod tests {
                 assert_eq!(1, final_count);
             }
         }
+    }
+
+    #[::fuchsia::test]
+    fn single_waiter_multiple_waits_cancel_one_waiter_still_notified() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mut wait_queue = WaitQueue::default();
+        let waiter = Waiter::new();
+        let wk1 = wait_queue.wait_async(&waiter);
+        let _wk2 = wait_queue.wait_async(&waiter);
+        assert!(wait_queue.cancel_wait(&waiter, wk1));
+        wait_queue.notify_all();
+        assert!(waiter.wait_until(&current_task, zx::Time::ZERO).is_ok());
+    }
+
+    #[::fuchsia::test]
+    fn multiple_waiters_cancel_one_other_still_notified() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mut wait_queue = WaitQueue::default();
+        let waiter1 = Waiter::new();
+        let waiter2 = Waiter::new();
+        let wk1 = wait_queue.wait_async(&waiter1);
+        let _wk2 = wait_queue.wait_async(&waiter2);
+        assert!(wait_queue.cancel_wait(&waiter1, wk1));
+        wait_queue.notify_all();
+        assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_err());
+        assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_ok());
     }
 
     #[::fuchsia::test]

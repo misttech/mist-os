@@ -222,8 +222,8 @@ impl NetlinkSocketInner {
         self.waiters.wait_async_mask(waiter, events.bits(), handler)
     }
 
-    fn cancel_wait(&mut self, key: WaitKey) {
-        self.waiters.cancel_wait(key);
+    fn cancel_wait(&mut self, waiter: &Waiter, key: WaitKey) {
+        self.waiters.cancel_wait(waiter, key);
     }
 
     fn query_events(&self) -> FdEvents {
@@ -456,10 +456,10 @@ impl SocketOps for BaseNetlinkSocket {
         &self,
         _socket: &Socket,
         _current_task: &CurrentTask,
-        _waiter: &Waiter,
+        waiter: &Waiter,
         key: WaitKey,
     ) {
-        self.lock().cancel_wait(key);
+        self.lock().cancel_wait(waiter, key);
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
@@ -630,10 +630,10 @@ impl SocketOps for UEventNetlinkSocket {
         &self,
         _socket: &Socket,
         _current_task: &CurrentTask,
-        _waiter: &Waiter,
+        waiter: &Waiter,
         key: WaitKey,
     ) {
-        self.lock().cancel_wait(key);
+        self.lock().cancel_wait(waiter, key);
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {

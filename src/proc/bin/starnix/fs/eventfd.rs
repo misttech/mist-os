@@ -137,8 +137,8 @@ impl FileOps for EventFdFileObject {
         self.inner.lock().wait_queue.wait_async_mask(waiter, events.bits(), handler)
     }
 
-    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, key: WaitKey) {
-        self.inner.lock().wait_queue.cancel_wait(key);
+    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
+        self.inner.lock().wait_queue.cancel_wait(waiter, key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

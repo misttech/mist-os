@@ -110,8 +110,8 @@ impl FileOps for SignalFd {
         task_state.signals.signal_wait.wait_async_mask(waiter, events.bits(), handler)
     }
 
-    fn cancel_wait(&self, current_task: &CurrentTask, _waiter: &Waiter, key: WaitKey) {
-        current_task.write().signals.signal_wait.cancel_wait(key);
+    fn cancel_wait(&self, current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
+        current_task.write().signals.signal_wait.cancel_wait(waiter, key);
     }
 
     fn query_events(&self, current_task: &CurrentTask) -> FdEvents {

@@ -233,7 +233,7 @@ impl SocketOps for VsockSocket {
         match &inner.state {
             VsockSocketState::Connected(file) => file.cancel_wait(current_task, waiter, key),
             _ => {
-                inner.waiters.cancel_wait(key);
+                inner.waiters.cancel_wait(waiter, key);
             }
         };
     }

@@ -180,8 +180,8 @@ impl Terminal {
     }
 
     /// `cancel_wait` implementation of the main side of the terminal.
-    pub fn main_cancel_wait(self: &Arc<Self>, key: WaitKey) -> bool {
-        self.write().main_cancel_wait(key)
+    pub fn main_cancel_wait(self: &Arc<Self>, waiter: &Waiter, key: WaitKey) -> bool {
+        self.write().main_cancel_wait(waiter, key)
     }
 
     /// `query_events` implementation of the main side of the terminal.
@@ -232,8 +232,8 @@ impl Terminal {
     }
 
     /// `cancel_wait` implementation of the replica side of the terminal.
-    pub fn replica_cancel_wait(self: &Arc<Self>, key: WaitKey) -> bool {
-        self.write().replica_cancel_wait(key)
+    pub fn replica_cancel_wait(self: &Arc<Self>, waiter: &Waiter, key: WaitKey) -> bool {
+        self.write().replica_cancel_wait(waiter, key)
     }
 
     /// `query_events` implementation of the replica side of the terminal.
@@ -417,8 +417,8 @@ impl TerminalMutableState<Base = Terminal> {
     }
 
     /// `cancel_wait` implementation of the main side of the terminal.
-    fn main_cancel_wait(&mut self, key: WaitKey) -> bool {
-        self.main_wait_queue.cancel_wait(key)
+    fn main_cancel_wait(&mut self, waiter: &Waiter, key: WaitKey) -> bool {
+        self.main_wait_queue.cancel_wait(waiter, key)
     }
 
     /// `query_events` implementation of the main side of the terminal.
@@ -480,8 +480,8 @@ impl TerminalMutableState<Base = Terminal> {
     }
 
     /// `cancel_wait` implementation of the replica side of the terminal.
-    fn replica_cancel_wait(&mut self, key: WaitKey) -> bool {
-        self.replica_wait_queue.cancel_wait(key)
+    fn replica_cancel_wait(&mut self, waiter: &Waiter, key: WaitKey) -> bool {
+        self.replica_wait_queue.cancel_wait(waiter, key)
     }
 
     /// `query_events` implementation of the replica side of the terminal.

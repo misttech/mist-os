@@ -533,11 +533,11 @@ impl SocketOps for UnixSocket {
         &self,
         _socket: &Socket,
         _current_task: &CurrentTask,
-        _waiter: &Waiter,
+        waiter: &Waiter,
         key: WaitKey,
     ) {
         let mut inner = self.lock();
-        inner.waiters.cancel_wait(key);
+        inner.waiters.cancel_wait(waiter, key);
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {

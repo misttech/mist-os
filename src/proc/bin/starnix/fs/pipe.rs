@@ -342,8 +342,8 @@ impl FileOps for PipeFileObject {
         self.pipe.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
     }
 
-    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, key: WaitKey) {
-        self.pipe.lock().waiters.cancel_wait(key);
+    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
+        self.pipe.lock().waiters.cancel_wait(waiter, key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
