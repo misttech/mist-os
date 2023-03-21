@@ -152,11 +152,11 @@ pub fn dispatch_signal_handler(
     }
     .ok_or(errno!(EINVAL))?;
 
-    stack_pointer -= SIG_STACK_SIZE as u64;
+    stack_pointer = stack_pointer.checked_sub(SIG_STACK_SIZE as u64).ok_or(errno!(EINVAL))?;
     stack_pointer = misalign_stack_pointer(stack_pointer);
 
     // Write the signal stack frame at the updated stack pointer.
-    task.mm.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes()).unwrap();
+    task.mm.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;
 
     signal_state.set_mask(action.sa_mask);
 

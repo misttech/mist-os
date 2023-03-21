@@ -27,6 +27,7 @@ constexpr int kHandlerOnSigaltStack = 1;
 constexpr int kHandlerOnMainStack = 2;
 constexpr int kRaisedSIGSEGV = 3;
 constexpr int kExitTestFailure = 4;
+constexpr int kExitTestSuccess = 5;
 
 void overflow_handler(int sig) {
   stack_t current_altstack;
@@ -66,6 +67,16 @@ int setup_overflow_altstack(void *alt_stack) {
   return 0;
 }
 
+int setup_sigaltstack_at(uintptr_t base, size_t size) {
+  stack_t ss = {
+      .ss_sp = reinterpret_cast<void *>(base),
+      .ss_flags = 0,
+      .ss_size = size,
+  };
+
+  return sigaltstack(&ss, NULL);
+}
+
 // Helper function for setting up a sig altstack.
 void *setup_sigaltstack(size_t size) {
   void *altstack =
@@ -74,12 +85,7 @@ void *setup_sigaltstack(size_t size) {
     exit(kExitTestFailure);
   }
 
-  stack_t ss = {
-      .ss_sp = altstack,
-      .ss_size = size,
-  };
-
-  if (sigaltstack(&ss, NULL)) {
+  if (setup_sigaltstack_at(reinterpret_cast<uintptr_t>(altstack), size)) {
     exit(kExitTestFailure);
   }
 
@@ -391,6 +397,97 @@ TEST(SignalHandlingDeathTest, SIGSEGVWithHanderFailsCausesSIGSEGV) {
         raise_with_stack(SIGUSR1, 0x0);
       }(),
       testing::KilledBySignal(SIGSEGV), "");
+}
+
+TEST(SignalHandlingDeathTest, SignalStackUnmappedDeliversSIGSEGV) {
+  constexpr size_t kStackSize = 0x20000;
+  void *temp_stack = mmap(NULL, kStackSize, PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_STACK, -1, 0);
+  ASSERT_NE(MAP_FAILED, temp_stack);
+
+  // Set the stack ptr to the end of the allocated region.
+  uint64_t stack_addr = reinterpret_cast<uint64_t>(temp_stack) + kStackSize;
+
+  auto test_func = [](uint64_t stack_addr) {
+    // Set up a handler for SIGUSR1
+    struct sigaction sa = {};
+    sa.sa_handler = [](int) { exit(kExitTestSuccess); };
+
+    if (sigaction(SIGUSR1, &sa, 0)) {
+      exit(kExitTestFailure);
+    }
+
+    raise_with_stack(SIGUSR1, stack_addr);
+  };
+
+  EXPECT_EXIT(test_func(stack_addr), testing::ExitedWithCode(kExitTestSuccess), "");
+
+  // Non-writable stack.
+  ASSERT_EQ(0, mprotect(temp_stack, kStackSize, PROT_READ));
+
+  EXPECT_EXIT(test_func(stack_addr), testing::KilledBySignal(SIGSEGV), "");
+
+  // Non-readable stack.
+  ASSERT_EQ(0, mprotect(temp_stack, kStackSize, PROT_NONE));
+  EXPECT_EXIT(test_func(stack_addr), testing::KilledBySignal(SIGSEGV), "");
+
+  ASSERT_EQ(0, munmap(temp_stack, kStackSize));
+}
+
+TEST(SignalHandlingDeathTest, SignalAltStackUnmappedDeliversSIGSEGV) {
+  constexpr size_t kStackSize = 0x20000;
+  void *temp_stack = mmap(NULL, kStackSize, PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_STACK, -1, 0);
+  ASSERT_NE(MAP_FAILED, temp_stack);
+
+  auto test_func = [&]() {
+    if (setup_sigaltstack_at(reinterpret_cast<uintptr_t>(temp_stack), kStackSize)) {
+      exit(kExitTestFailure);
+    }
+
+    struct sigaction sa = {};
+    sa.sa_handler = [](int) { exit(kExitTestSuccess); };
+    sa.sa_flags = SA_ONSTACK;
+
+    if (sigaction(SIGUSR1, &sa, 0)) {
+      exit(kExitTestFailure);
+    }
+
+    raise(SIGUSR1);
+  };
+
+  EXPECT_EXIT(test_func(), testing::ExitedWithCode(kExitTestSuccess), "");
+
+  // Non-writable stack.
+  ASSERT_EQ(0, mprotect(temp_stack, kStackSize, PROT_READ));
+  EXPECT_EXIT(test_func(), testing::KilledBySignal(SIGSEGV), "");
+
+  // Non-readable stack.
+  ASSERT_EQ(0, mprotect(temp_stack, kStackSize, PROT_NONE));
+  EXPECT_EXIT(test_func(), testing::KilledBySignal(SIGSEGV), "");
+  ASSERT_EQ(0, munmap(temp_stack, kStackSize));
+}
+
+TEST(SignalHandlingDeathTest, SignalStackErrorsDeliversSIGSEGV) {
+  constexpr size_t kRedzoneSize = 128;
+  std::vector<uint64_t> stack_addrs = {0x0, kRedzoneSize, kRedzoneSize + 1, UINT64_MAX,
+                                       UINT64_MAX - 1};
+  for (const auto stack_addr : stack_addrs) {
+    EXPECT_EXIT(
+        [stack_addr]() {
+          // Set up a handler for SIGUSR1
+          // Should not get called.
+          struct sigaction sa = {};
+          sa.sa_handler = [](int) { exit(kExitTestSuccess); };
+
+          if (sigaction(SIGUSR1, &sa, 0)) {
+            exit(kExitTestFailure);
+          }
+
+          raise_with_stack(SIGUSR1, stack_addr);
+        }(),
+        testing::KilledBySignal(SIGSEGV), "");
+  }
 }
 
 }  // namespace
