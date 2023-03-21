@@ -71,37 +71,39 @@ List the device paths of all lights.
 
 ## Examples
 
+All examples for node "123" (to check available nodes type `ls /dev/class/light`).
+
 ### View the brightness of a light
 
 ```none {:.devsite-disable-click-to-copy}
-$ lights-cli /dev/class/light/000 print AMBER_LED
+$ lights-cli /dev/class/light/123 print AMBER_LED
 Value of AMBER_LED: Brightness 1.000000
 ```
 ### View the brightness and color of a light
 
 ```none {:.devsite-disable-click-to-copy}
-$ lights-cli /dev/class/light/000 print 1
+$ lights-cli /dev/class/light/123 print 1
 Value of lp50xx-led-1: Brightness 0.745098 RGB 0.235294 0.176471 0.164706
 ```
 
 ### Set the brightness of a light
 
 ```none {:.devsite-disable-click-to-copy}
-$ lights-cli /dev/class/light/000 set AMBER_LED 0.5
+$ lights-cli /dev/class/light/123 set AMBER_LED 0.5
 # This command exits silently.
 ```
 
 ### Set a light to display the color purple
 
 ```none {:.devsite-disable-click-to-copy}
-$ lights-cli /dev/class/light/000 set 5 0.5 0 0.5
+$ lights-cli /dev/class/light/123 set 5 0.5 0 0.5
 # This command exits silently.
 ```
 
 ### View the total light count and each light's brightness and capabilities
 
 ```none {:.devsite-disable-click-to-copy}
-$ lights-cli /dev/class/light/000 summary
+$ lights-cli /dev/class/light/123 summary
 Total 1 lights
 Value of AMBER_LED: Brightness 0.500000
     Capabilities: Brightness
@@ -111,7 +113,7 @@ Value of AMBER_LED: Brightness 0.500000
 
 ```none {:.devsite-disable-click-to-copy}
 $ lights-cli list
-/dev/class/light/000
+/dev/class/light/123
 ```
 
 ## Notes
