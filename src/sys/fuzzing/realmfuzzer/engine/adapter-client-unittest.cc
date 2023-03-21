@@ -42,35 +42,6 @@ TEST_F(TargetAdapterClientTest, GetParameters) {
   RunUntilIdle();
 }
 
-TEST_F(TargetAdapterClientTest, GetSeedCorpusDirectories) {
-  TargetAdapterClient client(executor());
-
-  std::vector<std::string> params = {"-flags", "--but", "-no=positional-args"};
-  auto actual = client.GetSeedCorpusDirectories(params);
-  std::vector<std::string> expected;
-  EXPECT_EQ(actual, expected);
-
-  params = {"-a", "single", "--positional-arg"};
-  actual = client.GetSeedCorpusDirectories(params);
-  expected = {"single"};
-  EXPECT_EQ(actual, expected);
-
-  params = {"multiple", "positional", "args"};
-  actual = client.GetSeedCorpusDirectories(params);
-  expected = {"multiple", "positional", "args"};
-  EXPECT_EQ(actual, expected);
-
-  params = {"--includes", "empty", "", "string"};
-  actual = client.GetSeedCorpusDirectories(params);
-  expected = {"empty", "string"};
-  EXPECT_EQ(actual, expected);
-
-  params = {"--includes", "ignored", "--", "string"};
-  actual = client.GetSeedCorpusDirectories(params);
-  expected = {"ignored"};
-  EXPECT_EQ(actual, expected);
-}
-
 TEST_F(TargetAdapterClientTest, TestOneInput) {
   TargetAdapterClient client(executor());
   client.Configure(MakeOptions());

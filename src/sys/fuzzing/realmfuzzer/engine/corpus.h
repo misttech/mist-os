@@ -42,14 +42,6 @@ class Corpus final {
   // Sets options. This will reset the PRNG.
   void Configure(const OptionsPtr& options);
 
-  // Recusively walks the |root|-relative directories given by |dirs| and |Add|s the contents of the
-  // files they contain.
-  __WARN_UNUSED_RESULT zx_status_t LoadAt(const std::string& root,
-                                          const std::vector<std::string>& dirs);
-
-  // Like |LoadAt| with |root| defaulting to "/pkg".
-  __WARN_UNUSED_RESULT zx_status_t Load(const std::vector<std::string>& dirs);
-
   // Adds the input to the corpus. Returns ZX_ERR_BUFFER_TOO_SMALL if the input exceeds the max size
   // specified by the options; ZX_OK otherwise.
   __WARN_UNUSED_RESULT zx_status_t Add(Input input);

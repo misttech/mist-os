@@ -35,18 +35,6 @@ void Corpus::Configure(const OptionsPtr& options) {
   prng_.seed(options_->seed());
 }
 
-zx_status_t Corpus::LoadAt(const std::string& root, const std::vector<std::string>& dirs) {
-  for (const auto& dirname : dirs) {
-    auto status = ReadDir(files::JoinPath(root, dirname));
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-  return ZX_OK;
-}
-
-zx_status_t Corpus::Load(const std::vector<std::string>& dirs) { return LoadAt("/pkg", dirs); }
-
 zx_status_t Corpus::ReadDir(const std::string& dirname) {
   std::vector<std::string> contents;
   if (!files::ReadDirContents(dirname, &contents)) {

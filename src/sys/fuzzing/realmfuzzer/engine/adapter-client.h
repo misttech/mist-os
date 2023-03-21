@@ -30,7 +30,7 @@ class TargetAdapterClient final {
   explicit TargetAdapterClient(ExecutorPtr executor);
   ~TargetAdapterClient() = default;
 
-  // Sets options. The max input size may be increased by |LoadSeedCorpus|.
+  // Sets options.
   void Configure(const OptionsPtr& options);
 
   // FIDL binding methods.
@@ -41,9 +41,6 @@ class TargetAdapterClient final {
 
   // Gets the command-line parameters from the target adapter.
   Promise<std::vector<std::string>> GetParameters();
-
-  // Filters everything but the seed corpus directories from a list of |parameters|.
-  std::vector<std::string> GetSeedCorpusDirectories(const std::vector<std::string>& parameters);
 
   // Signals the target adapter to start a fuzzing iteration using the given |test_input|.
   // Returns a promise that completes when the target adapter indicates the fuzzing run is complete.

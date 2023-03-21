@@ -39,18 +39,6 @@ Promise<std::vector<std::string>> TargetAdapterClient::GetParameters() {
       .wrap_with(scope_);
 }
 
-std::vector<std::string> TargetAdapterClient::GetSeedCorpusDirectories(
-    const std::vector<std::string>& parameters) {
-  std::vector<std::string> seed_corpus_dirs;
-  bool ignored = false;
-  std::copy_if(parameters.begin(), parameters.end(), std::back_inserter(seed_corpus_dirs),
-               [&ignored](const std::string& parameter) {
-                 ignored |= parameter == "--";
-                 return !ignored && !parameter.empty() && parameter[0] != '-';
-               });
-  return seed_corpus_dirs;
-}
-
 Promise<> TargetAdapterClient::TestOneInput(const Input& test_input) {
   if (auto status = test_input_.Write(test_input.data(), test_input.size()); status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to write test input: " << zx_status_get_string(status);
