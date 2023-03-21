@@ -156,7 +156,6 @@ arch/arm64/sysroot/include/sys/param.h
 arch/arm64/sysroot/include/sys/poll.h
 arch/arm64/sysroot/include/sys/quota.h
 arch/arm64/sysroot/include/sys/random.h
-arch/arm64/sysroot/include/sys/reboot.h
 arch/arm64/sysroot/include/sys/reg.h
 arch/arm64/sysroot/include/sys/select.h
 arch/arm64/sysroot/include/sys/sem.h

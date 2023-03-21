@@ -233,7 +233,6 @@ sysroot_uninstrumented_libc_entries = [
         "sys/poll.h",
         "sys/quota.h",
         "sys/random.h",
-        "sys/reboot.h",
         "sys/reg.h",
         "sys/select.h",
         "sys/sem.h",
