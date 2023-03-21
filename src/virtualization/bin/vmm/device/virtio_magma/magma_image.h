@@ -5,12 +5,11 @@
 #ifndef SRC_VIRTUALIZATION_BIN_VMM_DEVICE_VIRTIO_MAGMA_MAGMA_IMAGE_H_
 #define SRC_VIRTUALIZATION_BIN_VMM_DEVICE_VIRTIO_MAGMA_MAGMA_IMAGE_H_
 
+#include <lib/magma/magma_common_defs.h>
 #include <lib/zx/eventpair.h>
 #include <lib/zx/vmo.h>
 
 #include <cstdint>
-
-#include "src/graphics/lib/magma/include/magma/magma_common_defs.h"
 
 namespace magma_image {
 

@@ -55,7 +55,7 @@ Support for display hardware is a non-goal.
 The Magma API is currently in use by three drivers in production.  The build and release processes
 for these client drivers are complicated because the API is not available in the Fuchsia SDK.
 
-For all current cases, a [client library](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/graphics/lib/magma/include/magma/magma.h)
+For all current cases, a [client library](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/magma_client/include/lib/magma/magma.h)
 is in use that facilitates integration with C code bases (C being the preferred language in Mesa,
 which provides many open source graphics drivers) and provides a convenient abstraction layer for
 virtualization.  Review and possible SDK inclusion of the client library is a future exercise.

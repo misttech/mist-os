@@ -5,7 +5,7 @@
 
 set -e
 
-if [[ ! -f src/graphics/lib/magma/include/magma/magma.h ]]; then
+if [[ ! -f sdk/lib/magma_client/include/lib/magma/magma.h ]]; then
   echo 'Please run this script from the root of your Fuchsia source tree.'
   exit 1
 fi
@@ -46,7 +46,9 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   -I zircon/system/public \
   -I $(scripts/fx get-build-dir)/linux_x64/gen/src/graphics/lib/magma/include \
   -I src/graphics/lib/magma/src \
-  -I src/graphics/lib/magma/include
+  -I src/graphics/lib/magma/include \
+  -I sdk/lib/magma_client/include/lib \
+  -I sdk/lib/magma_client/include
 
 # TODO: Figure out how to get bindgen to derive AsBytes and FromBytes.
 #       See https://github.com/rust-lang/rust-bindgen/issues/1089

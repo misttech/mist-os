@@ -4,29 +4,19 @@
 
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
-config("magma_config") {
-  include_dirs = [ "." ]
-}
-
 source_set("magma") {
-  public_configs = [ ":magma_config" ]
-
-  sources = [
-    "magma/magma.h",
-    "magma/magma_sysmem.h",
-  ]
-
-  public_deps = [ ":magma_common" ]
+  public_deps = [ "//sdk/lib/magma_client:magma_headers" ]
 }
 
 source_set("magma_common") {
-  public_configs = [ ":magma_config" ]
-
-  sources = [ "magma/magma_common_defs.h" ]
+  public_deps = [ "//sdk/lib/magma_client:magma_common" ]
 }
 
 config("msd_config") {
-  include_dirs = [ "msd" ]
+  include_dirs = [
+    "msd",
+    ".",
+  ]
 }
 
 source_set("msd_defs") {

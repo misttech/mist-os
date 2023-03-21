@@ -664,9 +664,9 @@ sdk("driver") {
     "//sdk/lib/fidl_driver:fidl_driver_sdk",
     "//sdk/lib/input_report_reader:input_report_reader_sdk",
     "//sdk/lib/inspect/component/cpp:inspect_component_cpp_sdk",
+    "//sdk/lib/magma_client:magma_client_sdk",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/devices/lib/mmio:mmio_sdk",
-    "//src/graphics/lib/magma:magma_client_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
   ]

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_COMMON_DEFS_H_
-#define SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_COMMON_DEFS_H_
+#ifndef LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_COMMON_DEFS_H_
+#define LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_COMMON_DEFS_H_
 
 #include <stdint.h>
 
@@ -336,4 +336,4 @@ typedef struct magma_image_info {
 }
 #endif
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_COMMON_DEFS_H_
+#endif  // LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_COMMON_DEFS_H_

@@ -40,7 +40,8 @@ def format_export(export):
         if (m):
             print(
                 f'Error in {export["name"]}: Argument type \"{arg["type"]}\" appears to be a struct.'
-                f' Did you mean to use \"{m.group(1)}{m.group(2)}_t{m.group(3)}\"?')
+                f' Did you mean to use \"{m.group(1)}{m.group(2)}_t{m.group(3)}\"?'
+            )
             sys.exit(-1)
     # Leading comment
     lines = [f'///\n{format_comment("brief", export["description"])}']
@@ -96,7 +97,7 @@ def top_level_docs():
 
 # Guard macro that goes at the beginning/end of the header (after license).
 def guards(begin):
-    macro = 'SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_H_'
+    macro = 'LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_H_'
     if begin:
         return f'#ifndef {macro}\n#define {macro}\n'
     return f'#endif // {macro}'
@@ -111,7 +112,9 @@ def externs(begin):
 
 # Includes list.
 def includes():
-    return ('#include "magma/magma_common_defs.h"\n' '#include <stdint.h>\n')
+    return (
+        '#include <lib/magma/magma_common_defs.h>\n'
+        '#include <stdint.h>\n')
 
 
 # Warning comment about auto-generation.

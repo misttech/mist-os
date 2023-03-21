@@ -7,6 +7,7 @@
 
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
+#include <lib/magma/magma.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/vmar.h>
 #include <zircon/types.h>
@@ -16,7 +17,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "src/graphics/lib/magma/include/magma/magma.h"
 #include "src/graphics/lib/magma/include/virtio/virtio_magma.h"
 #include "src/lib/fxl/macros.h"
 #include "src/virtualization/bin/vmm/device/device_base.h"

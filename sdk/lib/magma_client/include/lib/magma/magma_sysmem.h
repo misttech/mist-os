@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_SYSMEM_H_
-#define SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_SYSMEM_H_
+#ifndef LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_SYSMEM_H_
+#define LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_SYSMEM_H_
 
+#include <lib/magma/magma_common_defs.h>
 #include <stdint.h>
-
-#include "magma/magma_common_defs.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -305,4 +304,4 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_format_index(
 }
 #endif
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_SYSMEM_H_
+#endif  // LIB_MAGMA_CLIENT_INCLUDE_LIB_MAGMA_MAGMA_SYSMEM_H_

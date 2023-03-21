@@ -1,0 +1,39 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_static_library.gni")
+
+config("magma_include") {
+  include_dirs = [
+    "include/lib",
+    "include",
+  ]
+}
+
+source_set("magma_common") {
+  sources = [ "include/lib/magma/magma_common_defs.h" ]
+  public_configs = [ ":magma_include" ]
+}
+
+source_set("magma_headers") {
+  sources = [
+    "include/lib/magma/magma.h",
+    "include/lib/magma/magma_sysmem.h",
+  ]
+  public_deps = [ ":magma_common" ]
+  public_configs = [ ":magma_include" ]
+}
+
+sdk_static_library("magma_client") {
+  # TODO(fxbug.dev/108279): Move to partner category
+  category = "experimental"
+  sdk_name = "magma_client"
+  public = [
+    "include/lib/magma/magma.h",
+    "include/lib/magma/magma_common_defs.h",
+    "include/lib/magma/magma_sysmem.h",
+  ]
+  deps = [ "//src/graphics/lib/magma/src/libmagma:magma_client" ]
+  complete_static_lib = true
+}

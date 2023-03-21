@@ -12,13 +12,13 @@ action("magma_header_compare") {
   args = [
     rebase_path("$root_gen_dir/src/graphics/lib/magma/include/magma/magma.h",
                 root_build_dir),
-    rebase_path("//src/graphics/lib/magma/include/magma/magma.h",
+    rebase_path("//sdk/lib/magma_client/include/lib/magma/magma.h",
                 root_build_dir),
     rebase_path("$target_gen_dir/magma.h.compare_out", root_build_dir),
   ]
   inputs = [
     "$root_gen_dir/src/graphics/lib/magma/include/magma/magma.h",
-    "//src/graphics/lib/magma/include/magma/magma.h",
+    "//sdk/lib/magma_client/include/lib/magma/magma.h",
   ]
   outputs = [ "$target_gen_dir/magma.h.compare_out" ]
 }

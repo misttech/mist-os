@@ -63,12 +63,12 @@ For details on the process of building these two components, see the
 The Magma interface is a service interface provided by the Magma system driver.
 The interface is designed to be useful for implementing an accelerated graphics
 api.  It consists of
-[magma.h](/src/graphics/lib/magma/include/magma/magma.h) plus gpu specific
+[magma.h](/sdk/lib/magma_client/include/lib/magma/magma.h) plus gpu specific
 headers (example:
 [intel](/src/graphics/drivers/msd-intel-gen/include/magma_intel_gen_defs.h)).
 
 On Fuchsia, Magma includes a
-[magma_sysmem.h](/src/graphics/lib/magma/include/magma/magma_sysmem.h) header
+[magma_sysmem.h](/sdk/lib/magma_client/include/lib/magma/magma_sysmem.h) header
 that clients may use to interact with
 [sysmem](/docs/development/graphics/sysmem/concepts/sysmem.md).  The Magma
 headers and a static library that implement them are available in the Fuchsia
