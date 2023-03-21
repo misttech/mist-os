@@ -128,7 +128,6 @@
   "include/sys/statfs.h": "3ac6b81a820ff11142eb1dffff111833",
   "include/sys/statvfs.h": "e90ebbd77065ec12a0e19f1bc2297e01",
   "include/sys/stropts.h": "a1ac4ffc2c403dbd50a88a098e6a6103",
-  "include/sys/swap.h": "73e95380bebade3e5957d741301f78c7",
   "include/sys/syslog.h": "ee25b3c4ea16823478890f82c9ff3185",
   "include/sys/termios.h": "a6fd8ea87223302833a430491bd55308",
   "include/sys/time.h": "fd800b02cbd68e7fdc56f7bc5d632d54",

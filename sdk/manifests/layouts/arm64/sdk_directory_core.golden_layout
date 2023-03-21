@@ -167,7 +167,6 @@ arch/arm64/sysroot/include/sys/stat.h
 arch/arm64/sysroot/include/sys/statfs.h
 arch/arm64/sysroot/include/sys/statvfs.h
 arch/arm64/sysroot/include/sys/stropts.h
-arch/arm64/sysroot/include/sys/swap.h
 arch/arm64/sysroot/include/sys/syslog.h
 arch/arm64/sysroot/include/sys/termios.h
 arch/arm64/sysroot/include/sys/time.h
