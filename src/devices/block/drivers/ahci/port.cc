@@ -72,10 +72,12 @@ bool Port::SlotBusyLocked(uint32_t slot) {
          (commands_[slot] != nullptr) || (running_ & (1u << slot)) || (completed_ & (1u << slot));
 }
 
-zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t capabilities) {
+zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, bool has_command_queue,
+                            uint32_t max_command_tag) {
   fbl::AutoLock lock(&lock_);
   num_ = num;
-  cap_ = capabilities;
+  has_command_queue_ = has_command_queue;
+  max_command_tag_ = max_command_tag;
   bus_ = bus;
   reg_base_ = reg_base + (num * sizeof(ahci_port_reg_t));
   flags_ = kPortFlagImplemented;
@@ -310,7 +312,7 @@ bool Port::ProcessQueued() {
     }
 
     // find a free command tag
-    uint32_t max = std::min(devinfo_.max_cmd, MaxCommands());
+    uint32_t max = std::min(devinfo_.max_cmd, max_command_tag_);
     uint32_t i = 0;
     for (i = 0; i <= max; i++) {
       if (!SlotBusyLocked(i))
@@ -409,7 +411,7 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
   uint64_t count = txn->bop.rw.length;
 
   // use queued command if available
-  if (HasCommandQueue()) {
+  if (has_command_queue_) {
     if (cmd == SATA_CMD_READ_DMA_EXT) {
       cmd = SATA_CMD_READ_FPDMA_QUEUED;
     } else if (cmd == SATA_CMD_WRITE_DMA_EXT) {

@@ -158,13 +158,10 @@ struct SataTransaction {
   block_impl_queue_callback completion_cb;
   void* cookie;
 
-  zx::time timeout;
-
   uint8_t cmd;
   uint8_t device;
-
-  zx_status_t status;
   zx_handle_t pmt;
+  zx::time timeout;
 
   list_node_t node;
 };
@@ -204,7 +201,7 @@ class SataDevice : public SataDeviceType,
 
  private:
   // Invokes DdkAdd().
-  zx_status_t AddDriver();
+  zx_status_t AddDevice();
 
   // Main driver initialization.
   zx_status_t Init();

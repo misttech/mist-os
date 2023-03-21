@@ -34,7 +34,9 @@ void AhciTestFixture::TearDown() { fake_bus_.reset(); }
 void AhciTestFixture::PortEnable(Bus* bus, Port* port) {
   uint32_t cap;
   EXPECT_OK(bus->RegRead(kHbaCapabilities, &cap));
-  EXPECT_OK(port->Configure(0, bus, kHbaPorts, cap));
+  const bool has_command_queue = cap & AHCI_CAP_NCQ;
+  const uint32_t max_command_tag = (cap >> 8) & 0x1f;
+  EXPECT_OK(port->Configure(0, bus, kHbaPorts, has_command_queue, max_command_tag));
   EXPECT_OK(port->Enable());
 
   // Fake detect of device.

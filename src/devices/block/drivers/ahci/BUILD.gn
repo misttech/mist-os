@@ -89,4 +89,5 @@ source_set("shared") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
+  public_deps = [ "//zircon/system/ulib/inspect" ]
 }

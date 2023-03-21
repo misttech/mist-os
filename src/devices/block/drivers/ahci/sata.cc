@@ -27,8 +27,9 @@ namespace ahci {
 constexpr size_t kQemuMaxTransferBlocks = 1024;  // Linux kernel limit
 
 static void SataIdentifyDeviceComplete(void* cookie, zx_status_t status, block_op_t* op) {
-  SataTransaction* txn = containerof(op, SataTransaction, bop);
-  txn->status = status;
+  // Use the 32-bit command field to shuttle the status back to the callsite that's waiting on the
+  // completion. This works despite the int32_t (zx_status_t) vs. uint32_t (command) mismatch.
+  op->command = status;
   sync_completion_signal(static_cast<sync_completion_t*>(cookie));
 }
 
@@ -58,7 +59,7 @@ zx_status_t SataDevice::Init() {
   zx::vmo vmo;
   zx_status_t status = zx::vmo::create(512, 0, &vmo);
   if (status != ZX_OK) {
-    zxlogf(DEBUG, "sata: error %d allocating vmo", status);
+    zxlogf(ERROR, "sata: Failed to allocate vmo: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -76,16 +77,18 @@ zx_status_t SataDevice::Init() {
   controller_->Queue(port_, &txn);
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
 
-  if (txn.status != ZX_OK) {
-    zxlogf(ERROR, "%s: error %d in device identify", DriverName().c_str(), txn.status);
-    return txn.status;
+  status = txn.bop.command;
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: Failed IDENTIFY_DEVICE: %s", DriverName().c_str(),
+           zx_status_get_string(status));
+    return status;
   }
 
   // parse results
   SataIdentifyDeviceResponse devinfo;
   status = vmo.read(&devinfo, 0, sizeof(devinfo));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "sata: error %d in vmo_read", status);
+    zxlogf(ERROR, "sata: Failed vmo_read: %s", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
   vmo.reset();
@@ -96,46 +99,54 @@ zx_status_t SataDevice::Init() {
   SataStringFix(devinfo.firmware_rev.word, sizeof(devinfo.firmware_rev.word));
   SataStringFix(devinfo.model_id.word, sizeof(devinfo.model_id.word));
 
-  zxlogf(INFO, "%s: dev info", DriverName().c_str());
-  zxlogf(INFO, "  serial=%.*s", SATA_DEVINFO_SERIAL_LEN, devinfo.serial.string);
-  zxlogf(INFO, "  firmware rev=%.*s", SATA_DEVINFO_FW_REV_LEN, devinfo.firmware_rev.string);
-  zxlogf(INFO, "  model id=%.*s", SATA_DEVINFO_MODEL_ID_LEN, devinfo.model_id.string);
+  auto model_number = std::string(devinfo.model_id.string, sizeof(devinfo.model_id.string));
+  auto serial_number = std::string(devinfo.serial.string, sizeof(devinfo.serial.string));
+  auto firmware_rev = std::string(devinfo.firmware_rev.string, sizeof(devinfo.firmware_rev.string));
+  // Some vendors don't pad the strings with spaces (0x20). Null-terminate strings to avoid printing
+  // illegal characters.
+  model_number = std::string(model_number.c_str());
+  serial_number = std::string(serial_number.c_str());
+  firmware_rev = std::string(firmware_rev.c_str());
+  zxlogf(INFO, "Model number:  '%s'", model_number.c_str());
+  zxlogf(INFO, "Serial number: '%s'", serial_number.c_str());
+  zxlogf(INFO, "Firmware rev.: '%s'", firmware_rev.c_str());
 
-  bool is_qemu = IsModelIdQemu(devinfo.model_id.string);
+  auto inspect_device = controller_->inspect_node().CreateChild(DriverName());
+  inspect_device.RecordString("model_number", model_number);
+  inspect_device.RecordString("serial_number", serial_number);
+  inspect_device.RecordString("firmware_rev", firmware_rev);
 
-  uint16_t major = devinfo.major_version;
-  zxlogf(INFO, "  major=0x%x ", major);
-  switch (32 - __builtin_clz(major) - 1) {
+  switch (32 - __builtin_clz(devinfo.major_version) - 1) {
     case 11:
-      zxlogf(INFO, "ACS4");
+      inspect_device.RecordString("major_version", "ACS4");
       break;
     case 10:
-      zxlogf(INFO, "ACS3");
+      inspect_device.RecordString("major_version", "ACS3");
       break;
     case 9:
-      zxlogf(INFO, "ACS2");
+      inspect_device.RecordString("major_version", "ACS2");
       break;
     case 8:
-      zxlogf(INFO, "ATA8-ACS");
+      inspect_device.RecordString("major_version", "ATA8-ACS");
       break;
     case 7:
     case 6:
     case 5:
-      zxlogf(INFO, "ATA/ATAPI");
+      inspect_device.RecordString("major_version", "ATA/ATAPI");
       break;
     default:
-      zxlogf(INFO, "Obsolete");
+      inspect_device.RecordString("major_version", "Obsolete");
       break;
   }
 
   uint16_t cap = devinfo.capabilities_1;
   if (cap & (1 << 8)) {
-    zxlogf(INFO, " DMA");
+    inspect_device.RecordString("capabilities", "DMA");
   } else {
-    zxlogf(INFO, " PIO");
+    inspect_device.RecordString("capabilities", "PIO");
   }
   uint32_t max_cmd = devinfo.queue_depth;
-  zxlogf(INFO, " %u commands", max_cmd + 1);
+  inspect_device.RecordUint("max_commands", max_cmd + 1);
 
   uint32_t block_size = 512;  // default
   uint64_t block_count = 0;
@@ -145,32 +156,36 @@ zx_status_t SataDevice::Init() {
     }
     if (devinfo.command_set1_1 & (1 << 10)) {
       block_count = devinfo.lba_capacity2;
-      zxlogf(INFO, "  LBA48");
+      inspect_device.RecordString("addressing", "48-bit LBA");
     } else {
       block_count = devinfo.lba_capacity;
-      zxlogf(INFO, "  LBA");
+      inspect_device.RecordString("addressing", "28-bit LBA");
     }
-    zxlogf(INFO, " %" PRIu64 " sectors,  sector size=%u", block_count, block_size);
+    inspect_device.RecordUint("sector_count", block_count);
+    inspect_device.RecordUint("sector_size", block_size);
   } else {
-    zxlogf(INFO, "  CHS unsupported!");
+    inspect_device.RecordString("addressing", "CHS unsupported");
   }
 
   info_.block_size = block_size;
   info_.block_count = block_count;
 
-  if (devinfo.command_set2_0 & SATA_DEVINFO_CMD_SET2_0_VOLATILE_WRITE_CACHE_ENABLED) {
-    zxlogf(DEBUG, " Volatile write cache enabled");
-  }
-  if (devinfo.command_set1_0 & SATA_DEVINFO_CMD_SET1_0_VOLATILE_WRITE_CACHE_SUPPORTED) {
-    zxlogf(DEBUG, " Volatile write cache supported");
-  }
-  if (devinfo.command_set1_2 & SATA_DEVINFO_CMD_SET1_2_WRITE_DMA_FUA_EXT_SUPPORTED) {
-    zxlogf(DEBUG, " FUA command supported");
+  const bool volatile_write_cache_supported =
+      devinfo.command_set1_0 & SATA_DEVINFO_CMD_SET1_0_VOLATILE_WRITE_CACHE_SUPPORTED;
+  const bool volatile_write_cache_enabled =
+      devinfo.command_set2_0 & SATA_DEVINFO_CMD_SET2_0_VOLATILE_WRITE_CACHE_ENABLED;
+  inspect_device.RecordBool("volatile_write_cache_supported", volatile_write_cache_supported);
+  inspect_device.RecordBool("volatile_write_cache_enabled", volatile_write_cache_enabled);
+
+  const bool fua_command_supported =
+      devinfo.command_set1_2 & SATA_DEVINFO_CMD_SET1_2_WRITE_DMA_FUA_EXT_SUPPORTED;
+  if (fua_command_supported) {
     info_.flags |= BLOCK_FLAG_FUA_SUPPORT;
   }
+  inspect_device.RecordBool("fua_command_supported", fua_command_supported);
 
   uint32_t max_sg_size = SATA_MAX_BLOCK_COUNT * block_size;  // SATA cmd limit
-  if (is_qemu) {
+  if (IsModelIdQemu(devinfo.model_id.string)) {
     max_sg_size = MIN(max_sg_size, kQemuMaxTransferBlocks * block_size);
   }
   info_.max_transfer_size = MIN(AHCI_MAX_BYTES, max_sg_size);
@@ -180,6 +195,7 @@ zx_status_t SataDevice::Init() {
   di.max_cmd = max_cmd;
   controller_->SetDevInfo(port_, &di);
 
+  controller_->inspector().emplace(std::move(inspect_device));
   return ZX_OK;
 }
 
@@ -236,7 +252,7 @@ zx_status_t SataDevice::Bind(Controller* controller, uint32_t port) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  zx_status_t status = device->AddDriver();
+  zx_status_t status = device->AddDevice();
   if (status != ZX_OK) {
     return status;
   }
@@ -246,6 +262,6 @@ zx_status_t SataDevice::Bind(Controller* controller, uint32_t port) {
   return ZX_OK;
 }
 
-zx_status_t SataDevice::AddDriver() { return DdkAdd(DriverName().c_str()); }
+zx_status_t SataDevice::AddDevice() { return DdkAdd(DriverName().c_str()); }
 
 }  // namespace ahci

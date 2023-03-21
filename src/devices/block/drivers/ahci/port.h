@@ -50,7 +50,8 @@ class Port {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Port);
 
   // Configure a port for use.
-  zx_status_t Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t capabilities);
+  zx_status_t Configure(uint32_t num, Bus* bus, size_t reg_base, bool has_command_queue,
+                        uint32_t max_command_tag);
 
   uint32_t RegRead(size_t offset);
   void RegWrite(size_t offset, uint32_t val);
@@ -75,13 +76,6 @@ class Port {
   bool HandleIrq();
 
   uint32_t num() { return num_; }
-
-  // Capabilities
-  // Returns true if controller supports Native Command Queuing.
-  bool HasCommandQueue() { return cap_ & AHCI_CAP_NCQ; }
-
-  // Returns maximum number of simultaneous commands on each port.
-  uint32_t MaxCommands() { return static_cast<uint32_t>((cap_ >> 8) & 0x1f); }
 
   // These flag-access functions should require holding the port lock.
   // In their current use, they frequently access them unlocked. This
@@ -115,7 +109,10 @@ class Port {
   uint32_t num_ = 0;  // 0-based
   // Pointer to controller's bus provider. Pointer is not owned.
   Bus* bus_ = nullptr;
-  uint32_t cap_ = 0;  // Copy of controller capabilities register.
+  // Whether the controller supports Native Command Queuing.
+  bool has_command_queue_ = false;
+  // Largest command tag (= maximum number of simultaneous commands minus 1).
+  uint32_t max_command_tag_ = 0;
 
   fbl::Mutex lock_;
   uint32_t flags_ = 0;

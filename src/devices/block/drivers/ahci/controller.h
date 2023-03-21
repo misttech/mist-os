@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
 
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/time.h>
 #include <zircon/types.h>
@@ -82,6 +83,9 @@ class Controller : public ControllerDeviceType {
 
   void SignalWorker() { sync_completion_signal(&worker_completion_); }
 
+  inspect::Inspector& inspector() { return inspector_; }
+  inspect::Node& inspect_node() { return inspect_node_; }
+
   Bus* bus() { return bus_.get(); }
   Port* port(uint32_t portnr) { return &ports_[portnr]; }
 
@@ -91,12 +95,16 @@ class Controller : public ControllerDeviceType {
   int WorkerLoop();
   int IrqLoop();
 
+  // Invokes DdkAdd().
+  zx_status_t AddDevice();
+
   // Initialize controller and detect devices.
   zx_status_t Init();
 
   bool ShouldExit() __TA_EXCLUDES(lock_);
 
-  uint32_t cap_ = 0;
+  inspect::Inspector inspector_;
+  inspect::Node inspect_node_;
 
   fbl::Mutex lock_;
   bool threads_should_exit_ __TA_GUARDED(lock_) = false;
