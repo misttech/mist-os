@@ -171,7 +171,6 @@ arch/x64/sysroot/include/sys/time.h
 arch/x64/sysroot/include/sys/timeb.h
 arch/x64/sysroot/include/sys/timerfd.h
 arch/x64/sysroot/include/sys/times.h
-arch/x64/sysroot/include/sys/timex.h
 arch/x64/sysroot/include/sys/ttydefaults.h
 arch/x64/sysroot/include/sys/types.h
 arch/x64/sysroot/include/sys/ucontext.h

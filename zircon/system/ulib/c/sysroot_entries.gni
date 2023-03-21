@@ -248,7 +248,6 @@ sysroot_uninstrumented_libc_entries = [
         "sys/timeb.h",
         "sys/timerfd.h",
         "sys/times.h",
-        "sys/timex.h",
         "sys/ttydefaults.h",
         "sys/types.h",
         "sys/ucontext.h",

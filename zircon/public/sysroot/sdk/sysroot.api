@@ -132,7 +132,6 @@
   "include/sys/timeb.h": "3f3f8eb33411e3c85e1a5687314baf1c",
   "include/sys/timerfd.h": "f7c7450b5195ba71ce457cd925759c51",
   "include/sys/times.h": "999d76395a2770960a609e71c1c0b0d5",
-  "include/sys/timex.h": "a58693c8d09c24738248b3f7f61921e1",
   "include/sys/ttydefaults.h": "498fb58373a0a2b6a04c3e49c02919e7",
   "include/sys/types.h": "8191ae6f98b1a4d52c78161cced49d73",
   "include/sys/ucontext.h": "3ee90d15bb0f669ad59d261fc044e8ab",
