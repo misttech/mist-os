@@ -10,6 +10,7 @@ use std::hash::Hash;
 
 use anyhow::Context as _;
 use assert_matches::assert_matches;
+use either::Either;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_routes as fnet_routes;
@@ -24,7 +25,7 @@ use net_types::{
 };
 use netstack_testing_common::{
     interfaces,
-    realms::{Netstack, Netstack2, TestRealmExt as _, TestSandboxExt as _},
+    realms::{Netstack, Netstack2, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
 
@@ -334,7 +335,7 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
 
 // The initial IPv4 routes that are installed on the loopback interface.
-fn initial_loopback_routes_v4(
+fn initial_loopback_routes_v4<N: Netstack>(
     loopback_id: u64,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv4>> {
     [
@@ -352,14 +353,40 @@ fn initial_loopback_routes_v4(
         ),
     ]
     .into_iter()
+    // TODO(https://fxbug.dev/123108) Unify the loopback routes between
+    // Netstack2 and Netstack3
+    .chain(match N::VERSION {
+        NetstackVersion::Netstack3 => Either::Left(std::iter::once(new_installed_route(
+            net_subnet_v4!("224.0.0.0/4"),
+            loopback_id,
+            DEFAULT_INTERFACE_METRIC,
+            true,
+        ))),
+        NetstackVersion::Netstack2
+        | NetstackVersion::ProdNetstack2
+        | NetstackVersion::Netstack2WithFastUdp => Either::Right(std::iter::empty()),
+    })
 }
 
 // The initial IPv6 routes that are installed on the loopback interface.
-fn initial_loopback_routes_v6(
+fn initial_loopback_routes_v6<N: Netstack>(
     loopback_id: u64,
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv6>> {
     [new_installed_route(net_subnet_v6!("::1/128"), loopback_id, DEFAULT_INTERFACE_METRIC, true)]
         .into_iter()
+        // TODO(https://fxbug.dev/123108) Unify the loopback routes between
+        // Netstack2 and Netstack3
+        .chain(match N::VERSION {
+            NetstackVersion::Netstack3 => Either::Left(std::iter::once(new_installed_route(
+                net_subnet_v6!("ff00::/8"),
+                loopback_id,
+                DEFAULT_INTERFACE_METRIC,
+                true,
+            ))),
+            NetstackVersion::Netstack2
+            | NetstackVersion::ProdNetstack2
+            | NetstackVersion::Netstack2WithFastUdp => Either::Right(std::iter::empty()),
+        })
 }
 
 // The initial IPv4 routes that are installed on an ethernet interface.
@@ -437,14 +464,14 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         IpInvariant((loopback_id, interface_id)),
         |IpInvariant((loopback_id, interface_id))| {
             RoutesHolder(
-                initial_loopback_routes_v4(loopback_id)
+                initial_loopback_routes_v4::<N>(loopback_id)
                     .chain(initial_ethernet_routes_v4(interface_id))
                     .collect::<Vec<_>>(),
             )
         },
         |IpInvariant((loopback_id, interface_id))| {
             RoutesHolder(
-                initial_loopback_routes_v6(loopback_id)
+                initial_loopback_routes_v6::<N>(loopback_id)
                     .chain(initial_ethernet_routes_v6(interface_id))
                     .collect::<Vec<_>>(),
             )

@@ -19,6 +19,7 @@ mod filter_worker;
 mod interfaces_admin;
 mod interfaces_watcher;
 mod netdevice_worker;
+mod routes_fidl_worker;
 mod socket;
 mod stack_fidl_worker;
 mod timers;
@@ -33,6 +34,7 @@ use std::ops::DerefMut as _;
 use std::sync::Arc;
 use std::time::Duration;
 
+use either::{self, Either};
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_stack as fidl_net_stack;
@@ -81,6 +83,8 @@ use netstack3_core::{
     transport::udp,
     Ctx, NonSyncContext, SyncCtx, TimerId,
 };
+
+use crate::bindings::util::TryIntoFidlWithContext as _;
 
 /// Extends the methods available to [`DeviceId`].
 trait DeviceIdExt {
@@ -131,6 +135,7 @@ pub(crate) struct BindingsNonSyncCtxImpl {
     udp_sockets: UdpSockets,
     tcp_v4_listeners: IdMap<zx::Socket>,
     tcp_v6_listeners: IdMap<zx::Socket>,
+    route_update_dispatcher: routes_fidl_worker::RouteUpdateDispatcher,
 }
 
 impl AsRef<timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl {
@@ -449,26 +454,37 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
         &mut self,
         event: netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSyncCtxImpl>, I>,
     ) {
-        let (device, subnet, route_is_present) =
-            match event {
-                netstack3_core::ip::IpLayerEvent::RouteAdded(
-                    netstack3_core::ip::types::Entry { device, subnet, gateway: _, metric: _ },
-                ) => (device, subnet, true),
-                netstack3_core::ip::IpLayerEvent::RouteRemoved(
-                    netstack3_core::ip::types::Entry { device, subnet, gateway: _, metric: _ },
-                ) => (device, subnet, false),
-            };
-        // Interfaces watchers only care about the default route.
-        if subnet.prefix() != 0 || subnet.network() != I::UNSPECIFIED_ADDRESS {
-            return;
+        let (entry, is_route_present, route_update_fn) = match event {
+            netstack3_core::ip::IpLayerEvent::RouteAdded(entry) => {
+                (entry, true, Either::Left(routes_fidl_worker::RoutingTableUpdate::<I>::RouteAdded))
+            }
+            netstack3_core::ip::IpLayerEvent::RouteRemoved(entry) => (
+                entry,
+                false,
+                Either::Right(routes_fidl_worker::RoutingTableUpdate::<I>::RouteRemoved),
+            ),
+        };
+
+        // Maybe publish the event to the interface watchers (which only care
+        // about changes to the default route).
+        let netstack3_core::ip::types::Entry { subnet, device, gateway: _, metric: _ } = &entry;
+        if subnet.prefix() == 0 {
+            self.notify_interface_update(
+                device,
+                InterfaceUpdate::DefaultRouteChanged {
+                    version: I::VERSION,
+                    has_default_route: is_route_present,
+                },
+            )
         }
-        self.notify_interface_update(
-            &device,
-            InterfaceUpdate::DefaultRouteChanged {
-                version: I::VERSION,
-                has_default_route: route_is_present,
-            },
-        );
+
+        // Publish the event to the routes watchers.
+        let installed_route =
+            entry.try_into_fidl_with_ctx(self).expect("failed to convert route to FIDL");
+        let route_update = either::for_both!(route_update_fn, f => f(installed_route));
+        self.route_update_dispatcher
+            .notify(route_update)
+            .expect("failed to notify route update dispatcher");
     }
 }
 
@@ -848,15 +864,18 @@ impl Netstack {
 }
 
 enum Service {
-    Stack(fidl_fuchsia_net_stack::StackRequestStream),
-    Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
-    PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
-    RawSocket(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
+    DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
+    DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
+    Filter(fidl_fuchsia_net_filter::FilterRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
-    Filter(fidl_fuchsia_net_filter::FilterRequestStream),
-    DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
-    DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
+    PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
+    RawSocket(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
+    RoutesState(fidl_fuchsia_net_routes::StateRequestStream),
+    RoutesStateV4(fidl_fuchsia_net_routes::StateV4RequestStream),
+    RoutesStateV6(fidl_fuchsia_net_routes::StateV6RequestStream),
+    Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
+    Stack(fidl_fuchsia_net_stack::StackRequestStream),
     Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
 }
 
@@ -919,6 +938,9 @@ impl NetstackSeed {
             .add_fidl_service(Service::Socket)
             .add_fidl_service(Service::PacketSocket)
             .add_fidl_service(Service::RawSocket)
+            .add_fidl_service(Service::RoutesState)
+            .add_fidl_service(Service::RoutesStateV4)
+            .add_fidl_service(Service::RoutesStateV6)
             .add_fidl_service(Service::Interfaces)
             .add_fidl_service(Service::InterfacesAdmin)
             .add_fidl_service(Service::Filter)
@@ -952,6 +974,15 @@ impl NetstackSeed {
                 }
                 WorkItem::Incoming(Service::RawSocket(socket)) => {
                     socket.serve_with(|rs| socket::raw::serve(rs)).await
+                }
+                WorkItem::Incoming(Service::RoutesState(rs)) => {
+                    routes_fidl_worker::serve_state(rs).await
+                }
+                WorkItem::Incoming(Service::RoutesStateV4(rs)) => {
+                    routes_fidl_worker::serve_state_v4(rs, netstack.clone()).await
+                }
+                WorkItem::Incoming(Service::RoutesStateV6(rs)) => {
+                    routes_fidl_worker::serve_state_v6(rs, netstack.clone()).await
                 }
                 WorkItem::Incoming(Service::Interfaces(interfaces)) => {
                     interfaces

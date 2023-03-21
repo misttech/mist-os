@@ -13,6 +13,8 @@ use std::sync::{
 
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -34,7 +36,9 @@ use netstack3_core::{
     error::{ExistsError, NetstackError, NotFoundError},
     ip::{
         forwarding::AddRouteError,
-        types::{AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, RawMetric},
+        types::{
+            AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric, RawMetric,
+        },
     },
     socket::datagram::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector},
 };
@@ -1033,6 +1037,45 @@ impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
             device_id,
             next_hop,
             metric: metric,
+        })
+    }
+}
+
+impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>>
+    for Entry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>
+{
+    type Error = Never;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<fnet_routes_ext::InstalledRoute<I>, Never> {
+        let Entry { subnet, device, gateway, metric } = self;
+        let device = device.try_into_fidl_with_ctx(ctx)?;
+        let specified_metric = match metric {
+            Metric::ExplicitMetric(value) => {
+                fnet_routes::SpecifiedMetric::ExplicitMetric(value.into())
+            }
+            Metric::MetricTracksInterface(_value) => {
+                fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty)
+            }
+        };
+        Ok(fnet_routes_ext::InstalledRoute {
+            route: fnet_routes_ext::Route {
+                destination: subnet,
+                action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                    outbound_interface: device,
+                    next_hop: gateway,
+                }),
+                properties: fnet_routes_ext::RouteProperties {
+                    specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                        metric: specified_metric,
+                    },
+                },
+            },
+            effective_properties: fnet_routes_ext::EffectiveRouteProperties {
+                metric: metric.value().into(),
+            },
         })
     }
 }
