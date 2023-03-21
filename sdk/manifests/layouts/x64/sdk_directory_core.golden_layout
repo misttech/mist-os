@@ -128,7 +128,6 @@ arch/x64/sysroot/include/pwd.h
 arch/x64/sysroot/include/regex.h
 arch/x64/sysroot/include/resolv.h
 arch/x64/sysroot/include/sched.h
-arch/x64/sysroot/include/search.h
 arch/x64/sysroot/include/semaphore.h
 arch/x64/sysroot/include/setjmp.h
 arch/x64/sysroot/include/signal.h

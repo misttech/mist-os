@@ -205,7 +205,6 @@ sysroot_uninstrumented_libc_entries = [
         "regex.h",
         "resolv.h",
         "sched.h",
-        "search.h",
         "semaphore.h",
         "setjmp.h",
         "signal.h",
