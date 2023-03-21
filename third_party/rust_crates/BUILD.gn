@@ -454,7 +454,7 @@ group("miniz_oxide") {
 
 if (!(current_os == "fuchsia")) {
   group("mio") {
-    public_deps = [ ":mio-v0_8_2" ]
+    public_deps = [ ":mio-v0_8_5" ]
   }
 }
 
@@ -5972,10 +5972,10 @@ rust_library("mio-v0_7_14") {
   visibility = [ ":*" ]
 }
 
-rust_library("mio-v0_8_2") {
+rust_library("mio-v0_8_5") {
   crate_name = "mio"
-  crate_root = "//third_party/rust_crates/vendor/mio-0.8.2/src/lib.rs"
-  output_name = "mio-5562adeb1daa49e6"
+  crate_root = "//third_party/rust_crates/vendor/mio-0.8.5/src/lib.rs"
+  output_name = "mio-ccea4f015f73905"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -5988,9 +5988,7 @@ rust_library("mio-v0_8_2") {
     deps += [ ":libc-v0_2_138" ]
   }
   if (false) {
-    deps += [ ":miow-v0_3_7" ]
-    deps += [ ":ntapi-v0_3_4" ]
-    deps += [ ":winapi-v0_3_9" ]
+    deps += [ ":windows-sys-v0_42_0" ]
   }
 
   rustenv = []
@@ -5998,8 +5996,8 @@ rust_library("mio-v0_8_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=5562adeb1daa49e6",
-    "-Cextra-filename=-5562adeb1daa49e6",
+    "-Cmetadata=ccea4f015f73905",
+    "-Cextra-filename=-ccea4f015f73905",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"net\"",
     "--cfg=feature=\"os-ext\"",
@@ -6277,11 +6275,11 @@ rust_library("notify-v5_0_0") {
   deps += [ ":walkdir-v2_3_1" ]
   if (false || false || false || false) {
     deps += [ ":kqueue-v1_0_7" ]
-    deps += [ ":mio-v0_8_2" ]
+    deps += [ ":mio-v0_8_5" ]
   }
   if (current_os == "linux") {
     deps += [ ":inotify-v0_9_3" ]
-    deps += [ ":mio-v0_8_2" ]
+    deps += [ ":mio-v0_8_5" ]
   }
   if (current_os == "mac") {
     deps += [ ":fsevent-sys-v4_0_0" ]
@@ -10866,7 +10864,7 @@ rust_library("tokio-v1_19_2") {
     deps += [ ":bytes-v1_0_1" ]
     deps += [ ":libc-v0_2_138" ]
     deps += [ ":memchr-v2_4_0" ]
-    deps += [ ":mio-v0_8_2" ]
+    deps += [ ":mio-v0_8_5" ]
     deps += [ ":num_cpus-v1_13_0" ]
     deps += [ ":once_cell-v1_5_2" ]
     deps += [ ":signal-hook-registry-v1_3_0" ]
@@ -12628,7 +12626,11 @@ rust_library("windows-sys-v0_42_0") {
     "-Cextra-filename=-c774e6555c42216d",
     "--cfg=feature=\"Win32_Foundation\"",
     "--cfg=feature=\"Win32_Networking_WinSock\"",
+    "--cfg=feature=\"Win32_Security\"",
+    "--cfg=feature=\"Win32_Storage_FileSystem\"",
+    "--cfg=feature=\"Win32_System_IO\"",
     "--cfg=feature=\"Win32_System_LibraryLoader\"",
+    "--cfg=feature=\"Win32_System_Pipes\"",
     "--cfg=feature=\"Win32_System_SystemServices\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
   ]

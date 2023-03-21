@@ -275,7 +275,7 @@ hyper-rustls = { version = "0.22.1", default-features = false, features = ["rust
 indoc = "1.0.3"
 # TODO(fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
-mio = { version = "0.8.2", features = ["net", "os-ext", "os-poll"] }
+mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
 notify = { version = "5.0.0", default-features = false, features = ["macos_fsevent"] }
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.39", features = ["span-locations"] }
@@ -612,7 +612,7 @@ deps = [
   ":bytes-v1_0_1",
   ":libc-v0_2_138",
   ":memchr-v2_4_0",
-  ":mio-v0_8_2",
+  ":mio-v0_8_5",
   ":num_cpus-v1_13_0",
   ":once_cell-v1_5_2",
   ":signal-hook-registry-v1_3_0",
