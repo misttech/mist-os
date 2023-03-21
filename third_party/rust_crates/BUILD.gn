@@ -2872,7 +2872,7 @@ rust_library("crossterm-v0_19_0") {
   deps += [ ":parking_lot-v0_11_1" ]
   if (true) {
     deps += [ ":libc-v0_2_138" ]
-    deps += [ ":mio-v0_7_11" ]
+    deps += [ ":mio-v0_7_14" ]
     deps += [ ":signal-hook-v0_1_17" ]
   }
   if (false) {
@@ -5939,10 +5939,10 @@ rust_library("miniz_oxide-v0_3_6") {
   visibility = [ ":*" ]
 }
 
-rust_library("mio-v0_7_11") {
+rust_library("mio-v0_7_14") {
   crate_name = "mio"
-  crate_root = "//third_party/rust_crates/vendor/mio-0.7.11/src/lib.rs"
-  output_name = "mio-eef556696bb9a707"
+  crate_root = "//third_party/rust_crates/vendor/mio-0.7.14/src/lib.rs"
+  output_name = "mio-11280508328a7a2f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -5961,8 +5961,8 @@ rust_library("mio-v0_7_11") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=eef556696bb9a707",
-    "-Cextra-filename=-eef556696bb9a707",
+    "-Cmetadata=11280508328a7a2f",
+    "-Cextra-filename=-11280508328a7a2f",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"os-ext\"",
     "--cfg=feature=\"os-poll\"",
@@ -9921,7 +9921,7 @@ rust_library("signal-hook-v0_1_17") {
 
   deps = []
   deps += [ ":libc-v0_2_138" ]
-  deps += [ ":mio-v0_7_11" ]
+  deps += [ ":mio-v0_7_14" ]
   deps += [ ":signal-hook-registry-v1_3_0" ]
 
   rustenv = []
@@ -9936,7 +9936,7 @@ rust_library("signal-hook-v0_1_17") {
   ]
 
   aliased_deps = {
-    mio_0_7 = ":mio-v0_7_11"
+    mio_0_7 = ":mio-v0_7_14"
   }
   visibility = [ ":*" ]
 }
