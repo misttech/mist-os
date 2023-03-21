@@ -19,7 +19,7 @@ use {
     fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{LocalMirrorMarker, LocalMirrorProxy, PackageCacheMarker},
+    fidl_fuchsia_pkg::{self as fpkg, LocalMirrorMarker, LocalMirrorProxy, PackageCacheMarker},
     fuchsia_async as fasync,
     fuchsia_cobalt_builders::MetricEventExt as _,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
@@ -218,7 +218,11 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
             .download_resumption_attempts_limit(
                 structured_config.blob_download_resumption_attempts_limit.into(),
             )
-            .fetch_delivery_blob(structured_config.fetch_delivery_blob)
+            .blob_type(if structured_config.fetch_delivery_blob {
+                fpkg::BlobType::Delivery
+            } else {
+                fpkg::BlobType::Uncompressed
+            })
             .delivery_blob_fallback(structured_config.delivery_blob_fallback)
             .build(),
     );

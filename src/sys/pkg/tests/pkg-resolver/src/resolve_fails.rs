@@ -5,7 +5,7 @@ use {
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_pkg as fpkg,
     fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
     fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
-    lib::{TestEnvBuilder, EMPTY_REPO_PATH},
+    lib::{make_pkg_with_extra_blobs, TestEnvBuilder, EMPTY_REPO_PATH},
     std::sync::Arc,
 };
 
@@ -344,6 +344,33 @@ async fn missing_subpackage_meta_far_does_not_hang() {
 
     assert_eq!(
         env.resolve_package("fuchsia-pkg://test/superpackage").await.unwrap_err(),
+        fpkg::ResolveError::UnavailableBlob
+    );
+
+    env.stop().await;
+}
+
+#[fuchsia::test]
+async fn delivery_blob_not_available_no_fallback() {
+    let env = TestEnvBuilder::new().fetch_delivery_blob(true).build().await;
+
+    let pkg = make_pkg_with_extra_blobs("delivery_blob", 1).await;
+    let repo = Arc::new(
+        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .add_package(&pkg)
+            .build()
+            .await
+            .unwrap(),
+    );
+    let served_repository = Arc::clone(&repo).server().start().unwrap();
+
+    let repo_url = "fuchsia-pkg://test".parse().unwrap();
+    let repo_config = served_repository.make_repo_config(repo_url);
+
+    let () = env.proxies.repo_manager.add(repo_config.into()).await.unwrap().unwrap();
+
+    assert_eq!(
+        env.resolve_package("fuchsia-pkg://test/delivery_blob").await.unwrap_err(),
         fpkg::ResolveError::UnavailableBlob
     );
 

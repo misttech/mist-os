@@ -475,7 +475,6 @@ where
         self
     }
 
-    // TODO(fxbug.dev/118745): write tests using this.
     pub fn fetch_delivery_blob(mut self, fetch_delivery_blob: bool) -> Self {
         assert_eq!(self.fetch_delivery_blob, None);
         self.fetch_delivery_blob = Some(fetch_delivery_blob);
