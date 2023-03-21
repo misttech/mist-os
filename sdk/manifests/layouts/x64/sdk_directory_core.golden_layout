@@ -153,7 +153,6 @@ arch/x64/sysroot/include/sys/mount.h
 arch/x64/sysroot/include/sys/msg.h
 arch/x64/sysroot/include/sys/mtio.h
 arch/x64/sysroot/include/sys/param.h
-arch/x64/sysroot/include/sys/personality.h
 arch/x64/sysroot/include/sys/poll.h
 arch/x64/sysroot/include/sys/quota.h
 arch/x64/sysroot/include/sys/random.h

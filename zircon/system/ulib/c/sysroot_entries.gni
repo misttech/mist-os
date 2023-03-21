@@ -230,7 +230,6 @@ sysroot_uninstrumented_libc_entries = [
         "sys/msg.h",
         "sys/mtio.h",
         "sys/param.h",
-        "sys/personality.h",
         "sys/poll.h",
         "sys/quota.h",
         "sys/random.h",
