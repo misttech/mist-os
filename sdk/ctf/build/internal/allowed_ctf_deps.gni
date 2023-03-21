@@ -12,6 +12,8 @@ ALLOWED_CTS_DEPS = [
   "//sdk/ctf/tests/pkg/fidl/cpp:conformance_test_sources",
   "//src/sys/pkg/bin/pm:host",
   "//zircon/system/ulib/zxtest:zxtest",
+  "//third_party/googletest:gtest",
+  "//src/lib/fxl/test:gtest_main",
   "//zircon/system/ulib/fbl:fbl",
   "//sdk/lib/vulkan:vulkan",
   "//src/lib/vulkan:vulkan",

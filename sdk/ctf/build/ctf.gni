@@ -29,3 +29,7 @@ RUST_SUBPACKAGES = [
   "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",
   "//src/sys/test_runners/rust:rust-test-runner",
 ]
+GTEST_SUBPACKAGES = [
+  "//src/sys/test_runners/gtest:gtest-runner",
+  "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",
+]
