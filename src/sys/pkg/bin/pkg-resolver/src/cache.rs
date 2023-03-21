@@ -40,7 +40,7 @@ pub struct BlobFetchParams {
     header_network_timeout: Duration,
     body_network_timeout: Duration,
     download_resumption_attempts_limit: u64,
-    blob_type: fpkg::BlobType,
+    fetch_delivery_blob: bool,
     delivery_blob_fallback: bool,
 }
 
@@ -57,8 +57,8 @@ impl BlobFetchParams {
         self.download_resumption_attempts_limit
     }
 
-    pub fn blob_type(&self) -> fpkg::BlobType {
-        self.blob_type
+    pub fn fetch_delivery_blob(&self) -> bool {
+        self.fetch_delivery_blob
     }
 
     // TODO(fxbug.dev/118495): use this when implementing fallback
@@ -86,12 +86,7 @@ pub async fn cache_package<'a>(
     let (merkle, size) = if let Some(merkle_pin) = url.hash() {
         (BlobId::from(merkle_pin), None)
     } else {
-        // The size in TUF is uncompressed blob size, which won't match delivery blob size, so we
-        // shouldn't use it if fetching delivery blobs.
-        match blob_fetcher.blob_type {
-            fpkg::BlobType::Delivery => (merkle, None),
-            fpkg::BlobType::Uncompressed => (merkle, Some(size)),
-        }
+        (merkle, Some(size))
     };
 
     let meta_far_blob = BlobInfo { blob_id: merkle, length: 0 };
@@ -486,10 +481,9 @@ impl work_queue::TryMerge for FetchBlobContext {
 /// [`BlobFetcher`] are dropped, the queue will fetch all remaining blobs in
 /// the queue and terminate its output stream.
 #[derive(Clone)]
-pub struct BlobFetcher {
-    sender: work_queue::WorkSender<BlobId, FetchBlobContext, Result<(), Arc<FetchError>>>,
-    blob_type: fpkg::BlobType,
-}
+pub struct BlobFetcher(
+    work_queue::WorkSender<BlobId, FetchBlobContext, Result<(), Arc<FetchError>>>,
+);
 
 impl BlobFetcher {
     /// Creates an unbounded queue that will fetch up to  `max_concurrency`
@@ -533,10 +527,7 @@ impl BlobFetcher {
             },
         );
 
-        (
-            blob_fetch_queue.into_future(),
-            BlobFetcher { sender: blob_fetcher, blob_type: blob_fetch_params.blob_type() },
-        )
+        (blob_fetch_queue.into_future(), BlobFetcher(blob_fetcher))
     }
 
     /// Enqueue the given blob to be fetched, or attach to an existing request to
@@ -546,7 +537,7 @@ impl BlobFetcher {
         blob_id: BlobId,
         context: FetchBlobContext,
     ) -> impl Future<Output = Result<Result<(), Arc<FetchError>>, work_queue::Closed>> {
-        self.sender.push(blob_id, context)
+        self.0.push(blob_id, context)
     }
 
     /// Enqueue all the given blobs to be fetched, merging them with existing
@@ -561,7 +552,7 @@ impl BlobFetcher {
     ) -> impl Iterator<
         Item = impl Future<Output = Result<Result<(), Arc<FetchError>>, work_queue::Closed>>,
     > {
-        self.sender.push_all(entries)
+        self.0.push_all(entries)
     }
 }
 
@@ -617,7 +608,11 @@ async fn fetch_blob(
                 http_client,
                 &context.mirrors,
                 merkle,
-                blob_fetch_params.blob_type(),
+                if blob_fetch_params.fetch_delivery_blob() {
+                    fpkg::BlobType::Delivery
+                } else {
+                    fpkg::BlobType::Uncompressed
+                },
                 context.opener,
                 context.expected_len,
                 blob_fetch_params,

@@ -229,7 +229,6 @@ int usage() {
       "                                    Only valid for mkfs.\n"
       "         -s|--sandbox_decompression Run blob decompression in a sandboxed component.\n"
       "         -t|--paging_threads n      The number of threads to use in the pager\n"
-      "         -d|--allow_delivery_blobs  Allow writing delivery blobs.\n"
       "         -h|--help                  Display this message\n"
       "\n"
       "On Fuchsia, blobfs takes the block device argument by handle.\n"
@@ -262,7 +261,6 @@ zx::result<Options> ProcessArgs(int argc, char** argv, CommandFunction* func) {
         {"num_inodes", required_argument, nullptr, 'i'},
         {"sandbox_decompression", no_argument, nullptr, 's'},
         {"paging_threads", no_argument, nullptr, 't'},
-        {"allow_delivery_blobs", no_argument, nullptr, 'd'},
         {"help", no_argument, nullptr, 'h'},
         {nullptr, 0, nullptr, 0},
     };
@@ -333,9 +331,6 @@ zx::result<Options> ProcessArgs(int argc, char** argv, CommandFunction* func) {
         options.mount_options.paging_threads = *num_threads;
         break;
       }
-      case 'd':
-        options.mount_options.allow_delivery_blobs = true;
-        break;
       case 'h':
       default:
         return zx::error(usage());

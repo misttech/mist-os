@@ -34,7 +34,7 @@ impl BlobFetcher {
             "blob_download_resumption_attempts_limit",
             params.download_resumption_attempts_limit(),
         );
-        node.record_string("blob_type", format!("{:?}", params.blob_type()));
+        node.record_bool("fetch_delivery_blob", params.fetch_delivery_blob());
         node.record_bool("delivery_blob_fallback", params.delivery_blob_fallback());
         Self { queue: node.create_child("queue"), _node: node }
     }
@@ -198,7 +198,6 @@ impl<S: State> Attempt<S> {
 mod tests {
     use {
         super::*,
-        fidl_fuchsia_pkg as fpkg,
         fuchsia_inspect::{assert_data_tree, testing::AnyProperty, Inspector},
         std::time::Duration,
     };
@@ -214,7 +213,7 @@ mod tests {
                     .header_network_timeout(Duration::from_secs(0))
                     .body_network_timeout(Duration::from_secs(1))
                     .download_resumption_attempts_limit(2)
-                    .blob_type(fpkg::BlobType::Delivery)
+                    .fetch_delivery_blob(true)
                     .delivery_blob_fallback(false)
                     .build(),
             )
@@ -233,7 +232,7 @@ mod tests {
                     blob_header_timeout_seconds: 0u64,
                     blob_body_timeout_seconds: 1u64,
                     blob_download_resumption_attempts_limit: 2u64,
-                    blob_type: "Delivery",
+                    fetch_delivery_blob: true,
                     delivery_blob_fallback: false,
                     queue: {}
                 }
