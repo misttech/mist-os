@@ -225,7 +225,6 @@ sysroot_uninstrumented_libc_entries = [
         "sys/io.h",
         "sys/ioctl.h",
         "sys/ipc.h",
-        "sys/klog.h",
         "sys/mman.h",
         "sys/mount.h",
         "sys/msg.h",

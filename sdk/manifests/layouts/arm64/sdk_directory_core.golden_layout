@@ -148,7 +148,6 @@ arch/arm64/sysroot/include/sys/inotify.h
 arch/arm64/sysroot/include/sys/io.h
 arch/arm64/sysroot/include/sys/ioctl.h
 arch/arm64/sysroot/include/sys/ipc.h
-arch/arm64/sysroot/include/sys/klog.h
 arch/arm64/sysroot/include/sys/mman.h
 arch/arm64/sysroot/include/sys/mount.h
 arch/arm64/sysroot/include/sys/msg.h

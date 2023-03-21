@@ -109,7 +109,6 @@
   "include/sys/io.h": "fd8c461c91a804b926b1ba0347b3b99d",
   "include/sys/ioctl.h": "6fbe8452770bf1e786df7b86873d6d1c",
   "include/sys/ipc.h": "ae9829b8bc92124be581170781620f43",
-  "include/sys/klog.h": "77262bf8f4812d76287d24f2ea1a32fa",
   "include/sys/mman.h": "2abaee8a68ce60ab66619a52c4196757",
   "include/sys/mount.h": "d062eaf0e446ccbf7ed02b3c06c197ec",
   "include/sys/msg.h": "4ac6a29c18bdeef1c483c295817fd26c",
