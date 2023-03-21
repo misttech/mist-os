@@ -18,54 +18,17 @@
 
 #include <gtest/gtest.h>
 
+#include "src/proc/tests/chromiumos/syscalls/test_helper.h"
+
 namespace {
 
 uintptr_t stack_ptr;
 
-constexpr int kSigaltstackFailed = -1;
-constexpr int kHandlerOnSigaltStack = 1;
-constexpr int kHandlerOnMainStack = 2;
-constexpr int kRaisedSIGSEGV = 3;
-constexpr int kExitTestFailure = 4;
-constexpr int kExitTestSuccess = 5;
+constexpr int kRaisedSIGSEGV = 1;
+constexpr int kExitTestFailure = 2;
+constexpr int kExitTestSuccess = 3;
 
-void overflow_handler(int sig) {
-  stack_t current_altstack;
-  int ret = sigaltstack(nullptr, &current_altstack);
-  if (ret < 0) {
-    exit(kSigaltstackFailed);
-  }
-  if (current_altstack.ss_flags == SA_ONSTACK) {
-    exit(kHandlerOnSigaltStack);
-  } else {
-    exit(kHandlerOnMainStack);
-  }
-}
-
-int setup_overflow_altstack(void *alt_stack) {
-  stack_t ss = {
-      .ss_sp = alt_stack,
-      .ss_size = UINT64_MAX,
-  };
-  int ret = sigaltstack(&ss, nullptr);
-  if (ret < 0) {
-    return ret;
-  }
-
-  struct sigaction sa = {};
-  sa.sa_handler = overflow_handler;
-  sa.sa_flags = SA_ONSTACK;
-  ret = sigaction(SIGUSR1, &sa, nullptr);
-  if (ret < 0) {
-    return ret;
-  }
-
-  ret = raise(SIGUSR1);
-  if (ret != 0) {
-    return ret;
-  }
-  return 0;
-}
+constexpr size_t kRedzoneSize = 128;
 
 int setup_sigaltstack_at(uintptr_t base, size_t size) {
   stack_t ss = {
@@ -112,29 +75,6 @@ TEST(SignalHandling, UseSigaltstackSucceeds) {
       .ss_flags = SS_DISABLE,
   };
   ASSERT_EQ(0, sigaltstack(&ss, nullptr));
-}
-
-// Check that if the stack pointer calculation for the sigaltstack overflows,
-// the main stack is used instead.
-TEST(SignalHandling, UseMainStackOnSigaltstackOverflow) {
-  constexpr size_t kStackSize = 0x20000;
-  void *mmap1 = mmap(nullptr, kStackSize, PROT_WRITE | PROT_READ,
-                     MAP_STACK | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(MAP_FAILED, mmap1);
-  void *mmap2 = mmap(nullptr, kStackSize, PROT_WRITE | PROT_READ,
-                     MAP_STACK | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(MAP_FAILED, mmap2);
-  void *main_stack = std::min(mmap1, mmap2);
-  void *alt_stack = std::max(mmap1, mmap2);
-
-  uintptr_t main_stack_base = reinterpret_cast<uint64_t>(main_stack) + kStackSize;
-  int pid =
-      clone(setup_overflow_altstack, (void *)main_stack_base, CLONE_VFORK | SIGCHLD, alt_stack);
-  ASSERT_NE(-1, pid);
-  int status = 0;
-  pid_t wait_pid = waitpid(pid, &status, 0);
-  ASSERT_NE(-1, wait_pid);
-  EXPECT_EQ(kHandlerOnMainStack, WEXITSTATUS(status));
 }
 
 TEST(SignalHandlingDeathTest, ExitsKilledBySignal) {
@@ -469,7 +409,6 @@ TEST(SignalHandlingDeathTest, SignalAltStackUnmappedDeliversSIGSEGV) {
 }
 
 TEST(SignalHandlingDeathTest, SignalStackErrorsDeliversSIGSEGV) {
-  constexpr size_t kRedzoneSize = 128;
   std::vector<uint64_t> stack_addrs = {0x0, kRedzoneSize, kRedzoneSize + 1, UINT64_MAX,
                                        UINT64_MAX - 1};
   for (const auto stack_addr : stack_addrs) {
@@ -488,6 +427,158 @@ TEST(SignalHandlingDeathTest, SignalStackErrorsDeliversSIGSEGV) {
         }(),
         testing::KilledBySignal(SIGSEGV), "");
   }
+}
+
+constexpr size_t kSigAltStackMmapSize = 0x20000;
+
+class SigaltstackDeathTest : public testing::Test {
+ protected:
+  void SetUp() override {
+    // Map a chunk of memory for the sigaltstack, but place
+    // the sigaltstack base in the middle of the mapping,
+    // so that there is no risk of hitting unintended page faults.
+    sigaltstack_mapping_size_ = kSigAltStackMmapSize;
+    sigaltstack_mapping_ = mmap(NULL, sigaltstack_mapping_size_, PROT_READ | PROT_WRITE,
+                                MAP_ANONYMOUS | MAP_PRIVATE | MAP_STACK, -1, 0);
+    ASSERT_NE(MAP_FAILED, sigaltstack_mapping_);
+    sigaltstack_base_ =
+        reinterpret_cast<uintptr_t>(sigaltstack_mapping_) + sigaltstack_mapping_size_ / 2;
+    sigaltstack_size_ = sigaltstack_mapping_size_ / 2;
+  }
+
+  void TearDown() override { munmap(sigaltstack_mapping_, sigaltstack_mapping_size_); }
+
+  // Points to the begginning of the mmaped region for the sigaltstack.
+  void *sigaltstack_mapping_;
+  size_t sigaltstack_mapping_size_;
+
+  // Has a safe pointer to use in sigaltstack, such that there is
+  // sigaltstack_size_ mapped memory to both sides.
+  uintptr_t sigaltstack_base_;
+  size_t sigaltstack_size_;
+};
+
+TEST_F(SigaltstackDeathTest, SigaltstackExceededThrowsSIGSEGV) {
+  EXPECT_EXIT(([&]() {
+                if (setup_sigaltstack_at(sigaltstack_base_, MINSIGSTKSZ)) {
+                  exit(kExitTestFailure);
+                }
+                struct sigaction sa = {};
+                sa.sa_handler = [](int) {};
+                sa.sa_flags = SA_ONSTACK;
+
+                if (sigaction(SIGUSR1, &sa, NULL)) {
+                  exit(kExitTestFailure);
+                }
+                sa.sa_flags = 0;
+                if (sigaction(SIGSEGV, &sa, NULL)) {
+                  exit(kExitTestFailure);
+                }
+
+                uintptr_t raise_stack = sigaltstack_base_ + kRedzoneSize + 1;
+                raise_with_stack(SIGUSR1, raise_stack);
+                exit(kExitTestFailure);
+              }()),
+              testing::KilledBySignal(SIGSEGV), "");
+}
+
+TEST_F(SigaltstackDeathTest, MINSIGSTKSZIsEnough) {
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([&] {
+    ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, MINSIGSTKSZ));
+    struct sigaction sa = {};
+    sa.sa_handler = [](int) {};  // empty handler.
+    sa.sa_flags = SA_ONSTACK;
+
+    ASSERT_EQ(0, sigaction(SIGUSR1, &sa, NULL));
+
+    sa = {};
+    sa.sa_sigaction = [](int, siginfo_t *, void *) {};  // empty handler.
+    sa.sa_flags = SA_ONSTACK | SA_SIGINFO;
+
+    ASSERT_EQ(0, sigaction(SIGUSR2, &sa, NULL));
+    raise(SIGUSR1);
+    raise(SIGUSR2);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(SigaltstackDeathTest, NestedSignalsWork) {
+  ForkHelper helper;
+
+  helper.RunInForkedProcess([&] {
+    ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, sigaltstack_size_));
+    struct sigaction sa = {};
+    sa.sa_handler = [](int) { raise(SIGUSR2); };
+    sa.sa_flags = SA_ONSTACK;
+
+    ASSERT_EQ(0, sigaction(SIGUSR1, &sa, NULL));
+
+    sa = {};
+    sa.sa_sigaction = [](int, siginfo_t *, void *) {};  // empty handler.
+    sa.sa_flags = SA_ONSTACK | SA_SIGINFO;
+
+    ASSERT_EQ(0, sigaction(SIGUSR2, &sa, NULL));
+    raise(SIGUSR1);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+void *g_mmap_area;
+
+TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureIsNotResumed) {
+  // Raise an exception with a non-writable main stack.
+  // Handle the exception in the altstack by mprotecting the bad region.
+  // If the sigusr1 handler is resumed, it should exit with kExitTestFailure.
+  ForkHelper helper;
+
+  g_mmap_area = mmap(NULL, 0x10000, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+  ASSERT_NE(MAP_FAILED, g_mmap_area);
+
+  helper.RunInForkedProcess([&] {
+    ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, sigaltstack_size_));
+    struct sigaction sa = {};
+    sa.sa_handler = [](int) { exit(kExitTestFailure); };
+
+    ASSERT_EQ(0, sigaction(SIGUSR1, &sa, NULL));
+
+    sa = {};
+    sa.sa_handler = [](int) { mprotect(g_mmap_area, 0x10000, PROT_READ | PROT_WRITE); };
+    sa.sa_flags = SA_ONSTACK;
+
+    ASSERT_EQ(0, sigaction(SIGSEGV, &sa, NULL));
+    raise_with_stack(SIGUSR1, reinterpret_cast<uintptr_t>(g_mmap_area) + 0x10000);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+  munmap(g_mmap_area, 0x10000);
+}
+
+TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureCanUseMainStack) {
+  // Raise an exception with a non-writable alt stack.
+  // Handle the exception in the main stack.
+  ForkHelper helper;
+  ASSERT_EQ(0, mprotect(sigaltstack_mapping_, sigaltstack_mapping_size_, PROT_NONE));
+
+  helper.RunInForkedProcess([&] {
+    ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, sigaltstack_size_));
+    struct sigaction sa = {};
+    sa.sa_handler = [](int) { exit(kExitTestFailure); };
+    sa.sa_flags = SA_ONSTACK;
+
+    ASSERT_EQ(0, sigaction(SIGUSR1, &sa, NULL));
+
+    // Handle Sigsegv on the main stack. Resume immediately.
+    sa = {};
+    sa.sa_handler = [](int) {};
+    sa.sa_flags = 0;
+
+    ASSERT_EQ(0, sigaction(SIGSEGV, &sa, NULL));
+    raise(SIGUSR1);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 }  // namespace

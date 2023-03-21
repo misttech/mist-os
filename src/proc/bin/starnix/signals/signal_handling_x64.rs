@@ -133,16 +133,23 @@ pub fn dispatch_signal_handler(
     // the red zone.
     // https://en.wikipedia.org/wiki/Red_zone_%28computing%29
     let main_stack = registers.rsp.checked_sub(RED_ZONE_SIZE);
-    let mut stack_pointer = if (action.sa_flags & SA_ONSTACK as u64) != 0 {
+    let stack_bottom = if (action.sa_flags & SA_ONSTACK as u64) != 0 {
         match signal_state.alt_stack {
             Some(sigaltstack) => {
-                // Since the stack grows down, the size is added to the ss_sp when calculating the
-                // "bottom" of the stack.
-                if let Some(sp) = sigaltstack.ss_sp.ptr().checked_add(sigaltstack.ss_size) {
-                    Some(sp as u64)
-                } else {
-                    // Use the main stack if sigaltstack overflows.
-                    main_stack
+                match main_stack {
+                    // Only install the sigaltstack if the stack pointer is not already in it.
+                    Some(sp) if sigaltstack.contains_pointer(sp) => main_stack,
+                    _ => {
+                        // Since the stack grows down, the size is added to the ss_sp when calculating
+                        // the "bottom" of the stack.
+                        // Use the main stack if sigaltstack overflows.
+                        sigaltstack
+                            .ss_sp
+                            .ptr()
+                            .checked_add(sigaltstack.ss_size)
+                            .map(|sp| sp as u64)
+                            .or(main_stack)
+                    }
                 }
             }
             None => main_stack,
@@ -152,8 +159,18 @@ pub fn dispatch_signal_handler(
     }
     .ok_or(errno!(EINVAL))?;
 
-    stack_pointer = stack_pointer.checked_sub(SIG_STACK_SIZE as u64).ok_or(errno!(EINVAL))?;
+    let mut stack_pointer =
+        stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or(errno!(EINVAL))?;
     stack_pointer = misalign_stack_pointer(stack_pointer);
+
+    // Check that if the stack pointer is inside altstack, the entire signal stack is inside
+    // altstack.
+    if let Some(sigaltstack) = signal_state.alt_stack {
+        if sigaltstack.contains_pointer(stack_pointer) ^ sigaltstack.contains_pointer(stack_bottom)
+        {
+            return error!(EINVAL);
+        }
+    }
 
     // Write the signal stack frame at the updated stack pointer.
     task.mm.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;
