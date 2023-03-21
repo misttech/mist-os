@@ -6,6 +6,7 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
+use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryInto;
 use std::ffi::{CStr, CString};
 use std::sync::Arc;
@@ -1178,35 +1179,70 @@ impl MemoryManager {
     }
 
     pub fn snapshot_to(&self, target: &MemoryManager) -> Result<(), Errno> {
-        let state = self.state.read();
-        let mut target_state = target.state.write();
-
-        for (range, mapping) in state.mappings.iter() {
-            let vmo_info = mapping.vmo.info().map_err(impossible_error)?;
-            let target_vmo = if vmo_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED)
-                || mapping.options.contains(MappingOptions::SHARED)
-            {
-                mapping.vmo.clone()
+        fn clone_vmo(vmo: &Arc<zx::Vmo>, rights: zx::Rights) -> Result<Arc<zx::Vmo>, Errno> {
+            // TODO(fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed
+            // VMOs we can remove the hack below (which also won't be performant). For now, as a
+            // workaround, we use SNAPSHOT_AT_LEAST_ON_WRITE and then eagerly copy the whole
+            // VMO. These VMOs should generally be small.
+            let vmo_info = vmo.info().map_err(impossible_error)?;
+            let pager_backed = vmo_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
+            let cloned_vmo = if pager_backed && !rights.contains(zx::Rights::WRITE) {
+                vmo.clone()
             } else {
-                let mut vmo = mapping
-                    .vmo
+                let mut cloned_vmo = vmo
                     .create_child(
-                        zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
+                        if pager_backed {
+                            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
+                        } else {
+                            zx::VmoChildOptions::SNAPSHOT
+                        } | zx::VmoChildOptions::RESIZABLE,
                         0,
                         vmo_info.size_bytes,
                     )
-                    .map_err(Self::get_errno_for_map_err)?;
-                if mapping.permissions.contains(zx::VmarFlags::PERM_EXECUTE) {
-                    vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
+                    .map_err(MemoryManager::get_errno_for_map_err)?;
+                if pager_backed {
+                    cloned_vmo
+                        .write(
+                            &vmo.read_to_vec(0, vmo_info.size_bytes).map_err(impossible_error)?,
+                            0,
+                        )
+                        .map_err(impossible_error)?;
                 }
-                Arc::new(vmo)
+                if rights.contains(zx::Rights::EXECUTE) {
+                    cloned_vmo = cloned_vmo
+                        .replace_as_executable(&VMEX_RESOURCE)
+                        .map_err(impossible_error)?;
+                }
+                Arc::new(cloned_vmo)
             };
+
+            Ok(cloned_vmo)
+        }
+
+        let state = self.state.read();
+        let mut target_state = target.state.write();
+        let mut vmos = HashMap::<zx::Koid, Arc<zx::Vmo>>::new();
+
+        for (range, mapping) in state.mappings.iter() {
+            let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
 
             let vmo_offset = mapping.vmo_offset + (range.start - mapping.base) as u64;
             let length = range.end - range.start;
+
+            let target_vmo = if mapping.options.contains(MappingOptions::SHARED) {
+                mapping.vmo.clone()
+            } else {
+                match vmos.entry(basic_info.koid) {
+                    Entry::Occupied(o) => o.get().clone(),
+                    Entry::Vacant(v) => {
+                        v.insert(clone_vmo(&mapping.vmo, basic_info.rights)?).clone()
+                    }
+                }
+            };
+
             target_state.map(
                 range.start - target.base_addr,
-                target_vmo.clone(),
+                target_vmo,
                 vmo_offset,
                 length,
                 mapping.permissions | zx::VmarFlags::SPECIFIC,
@@ -2378,5 +2414,89 @@ mod tests {
         );
 
         assert_eq!(mm.get_mapping_count(), 1);
+    }
+
+    #[::fuchsia::test]
+    fn test_snapshot_paged_memory() {
+        use fuchsia_zircon::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
+
+        let (kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let port = Arc::new(zx::Port::create());
+        let port_clone = port.clone();
+        let pager = Arc::new(zx::Pager::create(zx::PagerOptions::empty()).expect("create failed"));
+        let pager_clone = pager.clone();
+
+        const VMO_SIZE: u64 = 128 * 1024;
+        let vmo = Arc::new(
+            pager
+                .create_vmo(zx::VmoOptions::RESIZABLE, &port, 1, VMO_SIZE)
+                .expect("create_vmo failed"),
+        );
+        let vmo_clone = vmo.clone();
+
+        // Create a thread to service the port where we will receive pager requests.
+        let thread = std::thread::spawn(move || loop {
+            let packet = port_clone.wait(zx::Time::INFINITE).expect("wait failed");
+            match packet.contents() {
+                zx::PacketContents::Pager(contents) => {
+                    if contents.command() == ZX_PAGER_VMO_READ {
+                        let range = contents.range();
+                        let source_vmo =
+                            zx::Vmo::create(range.end - range.start).expect("create failed");
+                        pager_clone
+                            .supply_pages(&vmo_clone, range, &source_vmo, 0)
+                            .expect("supply_pages failed");
+                    }
+                }
+                zx::PacketContents::User(_) => break,
+                _ => {}
+            }
+        });
+
+        let child_vmo = Arc::new(
+            vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, VMO_SIZE).unwrap(),
+        );
+
+        let vmar_flags = zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
+        let addr = mm
+            .map(
+                DesiredAddress::Hint(UserAddress::default()),
+                child_vmo,
+                0,
+                VMO_SIZE as usize,
+                vmar_flags,
+                MappingOptions::empty(),
+                None,
+            )
+            .expect("map failed");
+
+        // Write something to the source VMO.
+        vmo.write(b"foo", 0).expect("write failed");
+
+        let target = create_task(&kernel, "another-task");
+        mm.snapshot_to(&target.mm).expect("snapshot_to failed");
+
+        // Find the mapping in the target.
+        let (target_vmo, offset) =
+            target.mm.get_mapping_vmo(addr, vmar_flags).expect("get_mapping_vmo failed");
+        assert_eq!(offset, 0);
+
+        // Make sure it has what we wrote.
+        assert_eq!(&target_vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"foo");
+
+        // Write something to both source and target and make sure they are forked.
+        vmo.write(b"bar", 0).expect("write failed");
+        assert_eq!(&target_vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"foo");
+
+        target_vmo.write(b"baz", 0).expect("write failed");
+        assert_eq!(&vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"bar");
+
+        assert_eq!(&target_vmo.read_to_vec(0, 3).expect("read_to_vec failed"), b"baz");
+
+        port.queue(&zx::Packet::from_user_packet(0, 0, zx::UserPacket::from_u8_array([0; 32])))
+            .unwrap();
+        thread.join().unwrap();
     }
 }
