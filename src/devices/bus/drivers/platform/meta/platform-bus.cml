@@ -26,6 +26,7 @@
                 "fuchsia.boot.RootResource",
                 "fuchsia.device.composite.DeprecatedCompositeCreator",
                 "fuchsia.device.fs.Exporter",
+                "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.driver.framework.DeviceGroupManager",
             ],
         },
