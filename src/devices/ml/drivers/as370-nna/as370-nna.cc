@@ -4,7 +4,6 @@
 
 #include "as370-nna.h"
 
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -118,19 +117,14 @@ zx_status_t As370NnaDevice::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  ddk::RegistersProtocolClient reset(parent, "register-reset");
-  if (!reset.is_valid()) {
-    zxlogf(ERROR, "Could not get global_registers fragment");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result reset_register_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(parent,
+                                                                                  "register-reset");
+  if (reset_register_client.is_error()) {
+    return reset_register_client.status_value();
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Could not create channel %s", endpoints.status_string());
-    return endpoints.error_value();
-  }
-  reset.Connect(endpoints->server.TakeChannel());
-  auto reset_register = fidl::WireSyncClient(std::move(endpoints->client));
+  auto reset_register = fidl::WireSyncClient(std::move(reset_register_client.value()));
 
   fbl::AllocChecker ac;
 

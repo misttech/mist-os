@@ -24,7 +24,6 @@ fuchsia_driver("as370-nna-driver") {
   sources = [ "as370-nna.cc" ]
   deps = [
     ":as370_nna_bind",
-    "//sdk/banjo/fuchsia.hardware.registers:fuchsia.hardware.registers_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_cpp",
@@ -51,8 +50,6 @@ test("as370-nna-test-bin") {
   ]
   deps = [
     ":as370_nna_bind",
-    "//sdk/banjo/fuchsia.hardware.registers:fuchsia.hardware.registers_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.registers:fuchsia.hardware.registers_banjo_cpp_mock",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.verisilicon.platform:fuchsia.verisilicon.platform_cpp",
