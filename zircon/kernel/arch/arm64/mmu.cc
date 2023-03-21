@@ -1824,6 +1824,10 @@ void ArmArchVmAspace::DisableUpdates() {
 
   Guard<CriticalMutex> a{&lock_};
   updates_enabled_ = false;
+  if (!tt_virt_) {
+    // Initialization must not have succeeded.
+    return;
+  }
   AssertEmptyLocked();
 }
 
