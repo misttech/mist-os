@@ -4,8 +4,8 @@
 
 #include "src/security/lib/fcrypto/hkdf.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <stddef.h>
-#include <zircon/device/block.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 

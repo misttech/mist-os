@@ -4,7 +4,7 @@
 
 #include "src/lib/storage/vfs/cpp/transaction/transaction_handler.h"
 
-#include <zircon/device/block.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 
 #include <utility>
 

@@ -476,7 +476,7 @@ TEST(AllocatorTest, ResetFromStorageTest) {
   // Set callback which reads |bitmap_data| into each vmo block.
   transaction_manager.SetTransactionCallback(
       [&bitmap_data](const block_fifo_request_t& request, const zx::vmo& vmo) {
-        if (request.opcode == BLOCKIO_READ) {
+        if (request.opcode == BLOCK_OP_READ) {
           uint64_t vmo_size;
           zx_status_t status = vmo.get_size(&vmo_size);
           if (status != ZX_OK) {

@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
@@ -31,7 +32,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <utime.h>
-#include <zircon/device/block.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
@@ -72,7 +72,6 @@ constexpr char kFvmDriverLib[] = "fvm.cm";
 namespace {
 
 using VolumeManagerInfo = fuchsia_hardware_block_volume::wire::VolumeManagerInfo;
-using BlockName = std::array<char, BLOCK_NAME_LEN>;
 
 constexpr char kMountPath[] = "/test/minfs_test_mountpath";
 constexpr char kTestDevPath[] = "/fake/dev";
@@ -153,7 +152,7 @@ class FvmTest : public zxtest::Test {
     size_t slice_count = 1;
     const uuid::Uuid& type;
     const uuid::Uuid& guid;
-    const BlockName& name;
+    const std::string_view& name;
     uint32_t flags = 0;
   };
 
@@ -163,10 +162,9 @@ class FvmTest : public zxtest::Test {
     req.flags = request.flags;
     static_assert(sizeof(req.type) == uuid::kUuidSize);
     static_assert(sizeof(req.guid) == uuid::kUuidSize);
-    static_assert(sizeof(req.name) == std::tuple_size<BlockName>::value);
     memcpy(req.type, request.type.bytes(), sizeof(req.type));
     memcpy(req.guid, request.guid.bytes(), sizeof(req.guid));
-    memcpy(req.name, request.name.data(), sizeof(req.name));
+    req.name = fidl::StringView::FromExternal(request.name);
 
     return fs_management::FvmAllocatePartitionWithDevfs(devfs_root().get(), fvm_device().get(),
                                                         req);
@@ -269,17 +267,17 @@ constexpr uuid::Uuid kTestUniqueGuid2 = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x1
 // of Fuchsia may attempt to actually mount these
 // partitions automatically.
 
-constexpr BlockName kTestPartDataName = {'d', 'a', 't', 'a'};
+constexpr std::string_view kTestPartDataName = "data";
 constexpr uuid::Uuid kTestPartDataGuid = {
     0xAA, 0xFF, 0xBB, 0x00, 0x33, 0x44, 0x88, 0x99, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 };
 
-constexpr BlockName kTestPartBlobName = {'b', 'l', 'o', 'b'};
+constexpr std::string_view kTestPartBlobName = "blob";
 constexpr uuid::Uuid kTestPartBlobGuid = {
     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0xAA, 0xFF, 0xBB, 0x00, 0x33, 0x44, 0x88, 0x99,
 };
 
-constexpr BlockName kTestPartSystemName = {'s', 'y', 's', 't', 'e', 'm'};
+constexpr std::string_view kTestPartSystemName = "system";
 constexpr uuid::Uuid kTestPartSystemGuid = {
     0xEE, 0xFF, 0xBB, 0x00, 0x33, 0x44, 0x88, 0x99, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 };
@@ -331,7 +329,7 @@ class VmoBuf {
   ~VmoBuf() {
     if (vmo_.is_valid()) {
       block_fifo_request_t request = {
-          .opcode = BLOCKIO_CLOSE_VMO,
+          .opcode = BLOCK_OP_CLOSE_VMO,
           .group = client_->group(),
           .vmoid = vmoid_.TakeId(),
       };
@@ -387,7 +385,7 @@ void VmoClient::CheckWrite(VmoBuf& vbuf, size_t buf_off, size_t dev_off, size_t 
 
   // Write to the block device
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_WRITE,
+      .opcode = BLOCK_OP_WRITE,
       .group = group(),
       .vmoid = vbuf.vmoid_.get(),
       .length = static_cast<uint32_t>(len / block_size_),
@@ -410,7 +408,7 @@ void VmoClient::CheckRead(VmoBuf& vbuf, size_t buf_off, size_t dev_off, size_t l
 
   // Read from the block device
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_READ,
+      .opcode = BLOCK_OP_READ,
       .group = group(),
       .vmoid = vbuf.vmoid_.get(),
       .length = static_cast<uint32_t>(len / block_size_),
@@ -1083,6 +1081,13 @@ TEST_F(FvmTest, TestVPartitionShrink) {
   ValidateFVM(ramdisk_block_interface());
 }
 
+// TODO(https://fxbug.dev/124007): this type is no longer used in any APIs, but this test contains
+// references.
+using extend_request_t = struct {
+  size_t offset;  // Both in units of "slice". "0" = slice 0, "1" = slice 1, etc...
+  size_t length;
+};
+
 // Test splitting a contiguous slice extent into multiple parts
 TEST_F(FvmTest, TestVPartitionSplit) {
   constexpr uint64_t kBlockSize = 512;
@@ -1612,7 +1617,7 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousPhysical) {
   typedef struct vdata {
     fbl::unique_fd fd;
     const uuid::Uuid& guid;
-    const BlockName& name;
+    const std::string_view& name;
     size_t slices_used;
   } vdata_t;
 
@@ -1760,7 +1765,7 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousVirtual) {
   typedef struct vdata {
     fbl::unique_fd fd;
     const uuid::Uuid& guid;
-    const BlockName& name;
+    const std::string_view& name;
     size_t slices_used;
     size_t last_slice;
   } vdata_t;
@@ -2008,6 +2013,13 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   ASSERT_EQ(close(fd.release()), 0);
   FVMCheckSliceSize(fvm_device(), 64lu * (1 << 20));
 }
+
+// TODO(https://fxbug.dev/124007): this type is no longer used in any APIs, but this test contains
+// references.
+using query_request_t = struct {
+  size_t count;             // number of elements in vslice_start
+  size_t vslice_start[16];  // vslices to query from
+};
 
 void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_path,
                         const fs_management::MountOptions& mounting_options,

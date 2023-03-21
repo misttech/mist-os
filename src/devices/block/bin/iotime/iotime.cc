@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -18,7 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <zircon/device/block.h>
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -162,7 +162,7 @@ static zx::duration iotime_fifo(const char* dev, int is_read, fbl::unique_fd fd,
   auto cleanup = fit::defer([&]() { block_device->BlockDetachVmo(std::move(vmoid)); });
 
   block_fifo_request_t request = {
-      .opcode = static_cast<uint32_t>(is_read ? BLOCKIO_READ : BLOCKIO_WRITE),
+      .opcode = static_cast<uint32_t>(is_read ? BLOCK_OP_READ : BLOCK_OP_WRITE),
       .reqid = 0,
       .group = 0,
       .vmoid = vmoid.get(),

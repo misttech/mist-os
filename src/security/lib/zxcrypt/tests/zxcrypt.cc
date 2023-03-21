@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 #include <errno.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <zircon/device/block.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -307,8 +307,8 @@ void TestVmoZeroLength(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
   // Zero length is illegal for the block fifo
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_WRITE, 0, 0), ZX_ERR_INVALID_ARGS);
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_READ, 0, 0), ZX_ERR_INVALID_ARGS);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_WRITE, 0, 0), ZX_ERR_INVALID_ARGS);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_READ, 0, 0), ZX_ERR_INVALID_ARGS);
 }
 DEFINE_EACH_DEVICE(ZxcryptTest, TestVmoZeroLength)
 
@@ -352,17 +352,17 @@ void TestVmoOutOfBounds(Volume::Version version, bool fvm) {
 
   ASSERT_NO_FATAL_FAILURE(device.WriteVmo(0, 1));
 
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_WRITE, n, 1), ZX_ERR_OUT_OF_RANGE);
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_WRITE, n - 1, 2), ZX_ERR_OUT_OF_RANGE);
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_WRITE, 2, n - 1), ZX_ERR_OUT_OF_RANGE);
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_WRITE, 1, n), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_WRITE, n, 1), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_WRITE, n - 1, 2), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_WRITE, 2, n - 1), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_WRITE, 1, n), ZX_ERR_OUT_OF_RANGE);
 
   ASSERT_NO_FATAL_FAILURE(device.ReadVmo(0, 1));
 
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_READ, n, 1), ZX_ERR_OUT_OF_RANGE);
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_READ, n - 1, 2), ZX_ERR_OUT_OF_RANGE);
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_READ, 2, n - 1), ZX_ERR_OUT_OF_RANGE);
-  EXPECT_STATUS(device.block_fifo_txn(BLOCKIO_READ, 1, n), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_READ, n, 1), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_READ, n - 1, 2), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_READ, 2, n - 1), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_STATUS(device.block_fifo_txn(BLOCK_OP_READ, 1, n), ZX_ERR_OUT_OF_RANGE);
 }
 DEFINE_EACH_DEVICE(ZxcryptTest, TestVmoOutOfBounds)
 
@@ -417,7 +417,7 @@ void DISABLED_TestVmoStall(Volume::Version version, bool fvm) {
   std::unique_ptr<block_fifo_request_t[]> requests(new (&ac) block_fifo_request_t[num]);
   ASSERT_TRUE(ac.check());
   for (size_t i = 0; i < num; ++i) {
-    requests[i].opcode = (i % 2 == 0 ? BLOCKIO_WRITE : BLOCKIO_READ);
+    requests[i].opcode = (i % 2 == 0 ? BLOCK_OP_WRITE : BLOCK_OP_READ);
     requests[i].length = static_cast<uint32_t>(blks_per_req);
     requests[i].dev_offset = 0;
     requests[i].vmo_offset = 0;
@@ -463,7 +463,7 @@ void TestUnalignedVmoOffset(Volume::Version version, bool fvm) {
   ASSERT_NO_FATAL_FAILURE(device.Bind(version, fvm));
 
   block_fifo_request_t request{
-      .opcode = BLOCKIO_READ,
+      .opcode = BLOCK_OP_READ,
       .length = 2,
       .vmo_offset = 1,
       .dev_offset = 0,

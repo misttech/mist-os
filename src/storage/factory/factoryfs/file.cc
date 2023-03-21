@@ -43,7 +43,7 @@ zx_status_t File::InitFileVmo() {
   uint32_t dev_blocks =
       fbl::round_up(directory_entry_->GetDataSize(), dev_block_size) / dev_block_size;
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_READ,
+      .opcode = BLOCK_OP_READ,
       .vmoid = vmoid_.get(),
       .length = dev_blocks,
       .vmo_offset = 0,

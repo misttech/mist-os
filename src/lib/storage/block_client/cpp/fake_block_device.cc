@@ -132,8 +132,8 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
     }
 
     zx::ticks start_tick = zx::ticks::now();
-    switch (requests[i].opcode & BLOCKIO_OP_MASK) {
-      case BLOCKIO_READ: {
+    switch (requests[i].opcode & BLOCK_OP_MASK) {
+      case BLOCK_OP_READ: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
         uint8_t buffer[block_size];
@@ -157,7 +157,7 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
         UpdateStats(true, start_tick, requests[i]);
         break;
       }
-      case BLOCKIO_WRITE: {
+      case BLOCK_OP_WRITE: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
         uint8_t buffer[block_size];
@@ -187,7 +187,7 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
         UpdateStats(true, start_tick, requests[i]);
         break;
       }
-      case BLOCKIO_TRIM:
+      case BLOCK_OP_TRIM:
         UpdateStats(false, start_tick, requests[i]);
         if (!(block_info_flags_ & fuchsia_hardware_block::wire::Flag::kTrimSupport)) {
           return ZX_ERR_NOT_SUPPORTED;
@@ -199,10 +199,10 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
           return ZX_ERR_OUT_OF_RANGE;
         }
         break;
-      case BLOCKIO_FLUSH:
+      case BLOCK_OP_FLUSH:
         UpdateStats(true, start_tick, requests[i]);
         continue;
-      case BLOCKIO_CLOSE_VMO:
+      case BLOCK_OP_CLOSE_VMO:
         ZX_ASSERT(vmos_.erase(requests[i].vmoid) == 1);
         break;
       default:
@@ -284,12 +284,12 @@ zx_status_t FakeFVMBlockDevice::FifoTransaction(block_fifo_request_t* requests, 
   // Validate that the operation acts on valid slices before sending it to the underlying
   // mock device.
   for (size_t i = 0; i < count; i++) {
-    switch (requests[i].opcode & BLOCKIO_OP_MASK) {
-      case BLOCKIO_READ:
+    switch (requests[i].opcode & BLOCK_OP_MASK) {
+      case BLOCK_OP_READ:
         break;
-      case BLOCKIO_WRITE:
+      case BLOCK_OP_WRITE:
         break;
-      case BLOCKIO_TRIM:
+      case BLOCK_OP_TRIM:
         break;
       default:
         continue;

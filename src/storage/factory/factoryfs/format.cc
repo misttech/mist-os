@@ -47,7 +47,7 @@ zx_status_t WriteFilesystemToDisk(block_client::BlockDevice* device, const Super
   }
   block_fifo_request_t request = {};
   // write superblock.
-  request.opcode = BLOCKIO_WRITE;
+  request.opcode = BLOCK_OP_WRITE;
   request.vmoid = vmoid.get();
   request.length = FsToDeviceBlocks(1, block_info.block_size);
   request.vmo_offset = FsToDeviceBlocks(0, block_info.block_size);

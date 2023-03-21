@@ -67,9 +67,6 @@ zx::result<std::string> CreateFvmInstance(const std::string& device_path, size_t
 
 zx::result<std::string> CreateFvmPartition(const std::string& device_path, size_t slice_size,
                                            const FvmOptions& options) {
-  if (options.name.size() >= BLOCK_NAME_LEN)
-    return zx::error(ZX_ERR_INVALID_ARGS);
-
   // Format the raw device to support FVM, and bind the FVM driver to it.
   zx::result<std::string> fvm_disk_path_or = CreateFvmInstance(device_path, slice_size);
   if (fvm_disk_path_or.is_error()) {
@@ -83,9 +80,10 @@ zx::result<std::string> CreateFvmPartition(const std::string& device_path, size_
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  alloc_req_t request = {.slice_count = options.initial_fvm_slice_count};
-  memcpy(request.name, options.name.data(), options.name.size());
-  request.name[options.name.size()] = 0;
+  alloc_req_t request = {
+      .slice_count = options.initial_fvm_slice_count,
+      .name = fidl::StringView::FromExternal(options.name),
+  };
   memcpy(request.type, options.type ? options.type->data() : kTestPartGUID.bytes(),
          sizeof(request.type));
   memcpy(request.guid, kTestUniqueGUID.bytes(), sizeof(request.guid));

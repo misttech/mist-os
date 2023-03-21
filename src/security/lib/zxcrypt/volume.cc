@@ -6,12 +6,12 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/zircon-internal/debug.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
-#include <zircon/device/block.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/types.h>

@@ -7,7 +7,6 @@
 #include <lib/syslog/cpp/macros.h>
 #include <libgen.h>
 #include <unistd.h>
-#include <zircon/device/block.h>
 
 #include <functional>
 #include <iostream>

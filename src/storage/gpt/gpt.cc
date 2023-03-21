@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/cksum.h>
 #include <stddef.h>
@@ -13,7 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
-#include <zircon/device/block.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls.h>  // for zx_cprng_draw
 

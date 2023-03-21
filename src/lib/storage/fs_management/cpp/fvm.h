@@ -9,7 +9,6 @@
 #include <lib/zx/result.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <zircon/device/block.h>
 
 #include <string_view>
 #include <vector>
@@ -18,6 +17,19 @@
 #include <src/lib/uuid/uuid.h>
 
 #include "src/lib/storage/fs_management/cpp/format.h"
+
+// TODO(https://fxbug.dev/124007): This is a copy of
+// fuchsia.hardware.block.volume/VolumeManager.AllocatePartition. Remove.
+using alloc_req_t = struct {
+  size_t slice_count;
+  uint8_t type[fuchsia_hardware_block_partition::wire::kGuidLength];
+  uint8_t guid[fuchsia_hardware_block_partition::wire::kGuidLength];
+  fidl::StringView name;
+  // Refer to //sdk/fidl/fuchsia.hardware.block.volume/volume.fidl for options
+  // here. (Currently only `ALLOCATE_PARTITION_FLAG_INACTIVE` is defined.)
+  // Default is 0.
+  uint32_t flags;
+};
 
 namespace fs_management {
 

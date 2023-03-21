@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -23,7 +24,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <zircon/device/block.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/rights.h>
@@ -239,7 +239,7 @@ class Target {
       ZX_DEBUG_ASSERT(variant_ == Variant::kBlock && block_);
       block_fifo_request_t request;
       request.vmoid = vmoid_.TakeId();
-      request.opcode = BLOCKIO_CLOSE_VMO;
+      request.opcode = BLOCK_OP_CLOSE_VMO;
       if (zx_status_t status = block_->Transaction(&request, 1); status != ZX_OK) {
         fprintf(stderr, "Failed to detach VMO: %s\n", zx_status_get_string(status));
       }
@@ -336,7 +336,7 @@ class Target {
       case Variant::kBlock: {
         block_fifo_request_t request;
         request.vmoid = vmoid_.get();
-        request.opcode = BLOCKIO_READ;
+        request.opcode = BLOCK_OP_READ;
         request.length = nblocks;
         request.vmo_offset = 0;
         request.dev_offset = cur_block_;
@@ -386,7 +386,7 @@ class Target {
       case Variant::kBlock: {
         block_fifo_request_t request;
         request.vmoid = vmoid_.get();
-        request.opcode = BLOCKIO_WRITE;
+        request.opcode = BLOCK_OP_WRITE;
         request.length = nblocks;
         request.vmo_offset = 0;
         request.dev_offset = cur_block_;

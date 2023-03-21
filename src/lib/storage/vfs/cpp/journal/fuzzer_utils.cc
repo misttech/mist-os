@@ -3,12 +3,12 @@
 
 #include "fuzzer_utils.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/cksum.h>
 #include <lib/zx/vmo.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <zircon/device/block.h>
 
 #include <fuzzer/FuzzedDataProvider.h>
 #include <storage/buffer/blocking_ring_buffer.h>

@@ -89,6 +89,7 @@ source_set("shared") {
   deps = [
     ":block-core-bind",
     "//sdk/lib/syslog/cpp",
+    "//src/devices/lib/block",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -107,7 +108,6 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
-    "//src/devices/lib/block",
     "//src/devices/lib/dev-operation",
     "//zircon/system/ulib/storage-metrics",
   ]

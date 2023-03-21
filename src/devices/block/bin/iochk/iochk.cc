@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/zircon-internal/xorshiftrand.h>
@@ -17,7 +18,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <zircon/assert.h>
-#include <zircon/device/block.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
@@ -222,7 +222,7 @@ class BlockChecker : public Checker {
 
       GenerateBlockData(block_idx, block_size);
       block_fifo_request_t request = {
-          .opcode = BLOCKIO_WRITE,
+          .opcode = BLOCK_OP_WRITE,
           .reqid = 0,
           .group = group_,
           .vmoid = vmoid_,
@@ -246,7 +246,7 @@ class BlockChecker : public Checker {
       }
 
       block_fifo_request_t request = {
-          .opcode = BLOCKIO_READ,
+          .opcode = BLOCK_OP_READ,
           .reqid = 0,
           .group = group_,
           .vmoid = vmoid_,

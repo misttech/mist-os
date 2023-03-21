@@ -6,6 +6,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl-async/cpp/bind.h>
@@ -18,7 +19,6 @@
 #include <libgen.h>
 #include <stddef.h>
 #include <string.h>
-#include <zircon/device/block.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>

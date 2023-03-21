@@ -33,19 +33,19 @@ zx_status_t DeviceTransactionHandler::RunRequests(
       const auto& operation = operations[i].op;
       switch (operation.type) {
         case storage::OperationType::kRead:
-          request.opcode = BLOCKIO_READ;
+          request.opcode = BLOCK_OP_READ;
           break;
         case storage::OperationType::kWrite:
-          request.opcode = BLOCKIO_WRITE;
+          request.opcode = BLOCK_OP_WRITE;
           break;
         case storage::OperationType::kTrim:
-          request.opcode = BLOCKIO_TRIM;
+          request.opcode = BLOCK_OP_TRIM;
           break;
         case storage::OperationType::kWriteFua:
-          request.opcode = BLOCKIO_WRITE | BLOCKIO_FL_FORCE_ACCESS;
+          request.opcode = BLOCK_OP_WRITE | BLOCK_FL_FORCE_ACCESS;
           break;
         case storage::OperationType::kWritePreflushAndFua:
-          request.opcode = BLOCKIO_WRITE | BLOCKIO_FL_PREFLUSH | BLOCKIO_FL_FORCE_ACCESS;
+          request.opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS;
           break;
         default:
           ZX_DEBUG_ASSERT_MSG(false, "Unsupported operation");
@@ -86,7 +86,7 @@ zx_status_t DeviceTransactionHandler::RunRequests(
 }
 
 zx_status_t DeviceTransactionHandler::Flush() {
-  block_fifo_request_t request = {.opcode = BLOCKIO_FLUSH};
+  block_fifo_request_t request = {.opcode = BLOCK_OP_FLUSH};
   return GetDevice()->FifoTransaction(&request, 1);
 }
 

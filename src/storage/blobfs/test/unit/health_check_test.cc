@@ -62,7 +62,7 @@ class HealthCheckServiceTest : public testing::Test {
     storage::VmoBuffer buffer;
     ASSERT_EQ(buffer.Initialize(device.get(), 1, kBlobfsBlockSize, "test_buffer"), ZX_OK);
     block_fifo_request_t request = {
-        .opcode = BLOCKIO_READ,
+        .opcode = BLOCK_OP_READ,
         .vmoid = buffer.vmoid(),
         .length = kBlobfsBlockSize / kBlockSize,
         .vmo_offset = 0,
@@ -75,7 +75,7 @@ class HealthCheckServiceTest : public testing::Test {
     *target ^= 0xff;
 
     // Write the block back.
-    request.opcode = BLOCKIO_WRITE;
+    request.opcode = BLOCK_OP_WRITE;
     ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
 
     // Remount and try and read the blob.

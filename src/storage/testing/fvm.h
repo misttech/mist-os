@@ -6,8 +6,8 @@
 #define SRC_STORAGE_TESTING_FVM_H_
 
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/result.h>
-#include <zircon/device/block.h>
 
 #include <array>
 #include <optional>

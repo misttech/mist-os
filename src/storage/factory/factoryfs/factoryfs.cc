@@ -164,7 +164,7 @@ zx_status_t Factoryfs::InitDirectoryVmo() {
   uint32_t dev_blocks = info.directory_ent_blocks * (kFactoryfsBlockSize / dev_block_size);
 
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_READ,
+      .opcode = BLOCK_OP_READ,
       .vmoid = vmoid.get(),
       .length = dev_blocks,
       .vmo_offset = 0,

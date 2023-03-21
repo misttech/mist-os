@@ -5,7 +5,6 @@
 #ifndef SRC_STORAGE_MINFS_PENDING_WORK_H_
 #define SRC_STORAGE_MINFS_PENDING_WORK_H_
 
-#include <zircon/device/block.h>
 #include <zircon/types.h>
 
 #include <storage/buffer/block_buffer.h>

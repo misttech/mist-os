@@ -225,7 +225,7 @@ information about the device.
 There's a data structure (the `block_info_t`) that's filled out by the driver:
 
 ```c
-// from .../system/public/zircon/device/block.h:
+// from fuchsia/hardware/block/driver/c/banjo.h:
 typedef struct {
     uint64_t    block_count;        // The number of blocks in this block device
     uint32_t    block_size;         // The size of a single block

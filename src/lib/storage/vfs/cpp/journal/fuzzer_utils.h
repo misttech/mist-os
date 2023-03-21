@@ -4,12 +4,12 @@
 #ifndef SRC_LIB_STORAGE_VFS_CPP_JOURNAL_FUZZER_UTILS_H_
 #define SRC_LIB_STORAGE_VFS_CPP_JOURNAL_FUZZER_UTILS_H_
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/vmo.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <zircon/assert.h>
-#include <zircon/device/block.h>
 
 #include <map>
 

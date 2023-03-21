@@ -235,7 +235,7 @@ void TestDevice::Read(zx_off_t off, size_t len) {
 void TestDevice::Write(zx_off_t off, size_t len) { ASSERT_OK(SingleWriteBytes(off, len, off)); }
 
 void TestDevice::ReadVmo(zx_off_t off, size_t len) {
-  ASSERT_OK(block_fifo_txn(BLOCKIO_READ, off, len));
+  ASSERT_OK(block_fifo_txn(BLOCK_OP_READ, off, len));
   off *= block_size_;
   len *= block_size_;
   ASSERT_OK(vmo_read(off, len));
@@ -244,7 +244,7 @@ void TestDevice::ReadVmo(zx_off_t off, size_t len) {
 
 void TestDevice::WriteVmo(zx_off_t off, size_t len) {
   ASSERT_OK(vmo_write(off * block_size_, len * block_size_));
-  ASSERT_OK(block_fifo_txn(BLOCKIO_WRITE, off, len));
+  ASSERT_OK(block_fifo_txn(BLOCK_OP_WRITE, off, len));
 }
 
 void TestDevice::Corrupt(uint64_t blkno, key_slot_t slot) {
@@ -333,7 +333,7 @@ void TestDevice::CreateFvmPart(size_t device_size, size_t block_size) {
   for (uint8_t i = 0; i < BLOCK_GUID_LEN; ++i) {
     req.guid[i] = i;
   }
-  snprintf(req.name, BLOCK_NAME_LEN, "data");
+  req.name = "data";
   auto fvm_part_or =
       fs_management::FvmAllocatePartitionWithDevfs(devfs_root().get(), fvm_fd.get(), req);
   ASSERT_EQ(fvm_part_or.status_value(), ZX_OK);

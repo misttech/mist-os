@@ -120,7 +120,7 @@ zx::result<> BlockPartitionClient::Read(const zx::vmo& vmo, size_t size, size_t 
   }
 
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_READ,
+      .opcode = BLOCK_OP_READ,
       .group = 0,
       .vmoid = vmoid.value().TakeId(),
       .length = static_cast<uint32_t>(length),
@@ -157,7 +157,7 @@ zx::result<> BlockPartitionClient::Write(const zx::vmo& vmo, size_t vmo_size, si
   }
 
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_WRITE,
+      .opcode = BLOCK_OP_WRITE,
       .group = 0,
       .vmoid = vmoid.value().TakeId(),
       .length = static_cast<uint32_t>(length),
@@ -184,7 +184,7 @@ zx::result<> BlockPartitionClient::Trim() {
   }
 
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_TRIM,
+      .opcode = BLOCK_OP_TRIM,
       .group = 0,
       .vmoid = BLOCK_VMOID_INVALID,
       .length = static_cast<uint32_t>(block_count),
@@ -202,7 +202,7 @@ zx::result<> BlockPartitionClient::Flush() {
   }
 
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_FLUSH,
+      .opcode = BLOCK_OP_FLUSH,
       .group = 0,
       .vmoid = BLOCK_VMOID_INVALID,
       .length = 0,

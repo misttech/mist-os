@@ -106,7 +106,6 @@ sysroot_uninstrumented_libc_entries = [
       no_export = true
       headers = [
         # "zircon/device/audio.h",  (see above)
-        "zircon/device/block.h",
         "zircon/device/bt-hci.h",
         "zircon/device/intel-hda.h",
       ]

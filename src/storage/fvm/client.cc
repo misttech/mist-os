@@ -5,8 +5,8 @@
 #include "src/storage/fvm/client.h"
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <stdlib.h>
-#include <zircon/device/block.h>
 
 #include <iterator>
 

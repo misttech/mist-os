@@ -5,8 +5,8 @@
 #ifndef SRC_LIB_STORAGE_VFS_CPP_TRANSACTION_TRANSACTION_HANDLER_H_
 #define SRC_LIB_STORAGE_VFS_CPP_TRANSACTION_TRANSACTION_HANDLER_H_
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <zircon/assert.h>
-#include <zircon/device/block.h>
 
 #include <vector>
 

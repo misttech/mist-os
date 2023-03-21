@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <getopt.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
@@ -14,7 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <zircon/device/block.h>
 #include <zircon/types.h>
 
 #include <string>

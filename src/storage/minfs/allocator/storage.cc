@@ -60,11 +60,10 @@ zx::result<> PersistentStorage::Extend(PendingWork* write_transaction, WriteData
   }
 
   // Make the request to the FVM.
-  extend_request_t request;
-  request.length = data_slices_diff;
-  request.offset = metadata_.Fvm().BlocksToSlices(metadata_.DataStartBlock()) + data_slices;
+  uint64_t length = data_slices_diff;
+  uint64_t offset = metadata_.Fvm().BlocksToSlices(metadata_.DataStartBlock()) + data_slices;
 
-  zx_status_t status = device_->VolumeExtend(request.offset, request.length);
+  zx_status_t status = device_->VolumeExtend(offset, length);
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to extend volume from " << data_slices << " slices to "
                      << data_slices_new << " slices, error " << status;

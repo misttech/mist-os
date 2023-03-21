@@ -4,9 +4,9 @@
 
 #include "src/storage/minfs/inspector/minfs_inspector.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <zircon/device/block.h>
 
 #include <iostream>
 
@@ -86,7 +86,7 @@ class MinfsInspectorTest : public testing::Test {
       EXPECT_EQ(temp->BlockAttachVmo(buffer, &vmoid.GetReference(temp.get())), ZX_OK);
 
       std::vector<block_fifo_request_t> reqs = {{
-          .opcode = BLOCKIO_WRITE,
+          .opcode = BLOCK_OP_WRITE,
           .reqid = 0x0,
           .group = 0,
           .vmoid = vmoid.get(),

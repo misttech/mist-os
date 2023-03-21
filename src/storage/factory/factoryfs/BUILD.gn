@@ -74,6 +74,7 @@ fuchsia_unittest_component("factoryfs-unit") {
 test("integration_test") {
   sources = [ "integration_test.cc" ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/storage/fs_management",
     "//src/storage/testing:storage_driver_test_support",

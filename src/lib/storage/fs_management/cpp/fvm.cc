@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -24,7 +25,6 @@
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
-#include <zircon/device/block.h>
 #include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 
@@ -149,23 +149,10 @@ zx_status_t FvmAllocatePartitionImpl(int fvm_fd, const alloc_req_t& request) {
   fuchsia_hardware_block_partition::wire::Guid instance_guid;
   memcpy(instance_guid.value.data(), request.guid, BLOCK_GUID_LEN);
 
-  // TODO(fxbug.dev/52757): Add name_size to alloc_req_t.
-  //
-  // Here, we rely on request->name being a C-style string terminated by \x00,
-  // but no greater than BLOCK_NAME_LEN. Instead, we should add a name_size
-  // field to the alloc_req_t object to pass this explicitly.
-  size_t request_name_size = BLOCK_NAME_LEN;
-  for (size_t i = 0; i < BLOCK_NAME_LEN; i++) {
-    if (request.name[i] == 0) {
-      request_name_size = i;
-      break;
-    }
-  }
   fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> client(
       caller.borrow_channel());
   auto response = fidl::WireCall(client)->AllocatePartition(
-      request.slice_count, type_guid, instance_guid,
-      fidl::StringView::FromExternal(request.name, request_name_size), request.flags);
+      request.slice_count, type_guid, instance_guid, request.name, request.flags);
   if (response.status() != ZX_OK) {
     return response.status();
   }

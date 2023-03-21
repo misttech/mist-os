@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/fdio/spawn.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
-#include <zircon/device/block.h>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>

@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/completion.h>
@@ -14,7 +15,6 @@
 #include <string.h>
 #include <threads.h>
 #include <unistd.h>
-#include <zircon/device/block.h>
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -212,7 +212,7 @@ static int bio_random_thread(void* arg) {
     block_fifo_request_t req = {};
     req.reqid = next_reqid.fetch_add(1);
     req.vmoid = a->blk->vmoid.id;
-    req.opcode = a->write ? BLOCKIO_WRITE : BLOCKIO_READ;
+    req.opcode = a->write ? BLOCK_OP_WRITE : BLOCK_OP_READ;
     req.length = static_cast<uint32_t>(xfer);
     req.vmo_offset = off;
 

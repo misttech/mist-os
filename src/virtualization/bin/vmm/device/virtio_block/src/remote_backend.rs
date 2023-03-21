@@ -14,7 +14,7 @@ use {
 };
 
 /// RemoteBackend is a BlockBackend that fulfills requests by interfacing with a Fuchsia block
-/// device (see zircon/device/block.h).
+/// device (see /sdk/fidl/fuchsia.hardware.block.driver/block.fidl).
 ///
 /// This involves sharing a VMO with the block device and then sending requests over a FIFO to
 /// read/write sectors from that VMO. This implementation has the following limitations:

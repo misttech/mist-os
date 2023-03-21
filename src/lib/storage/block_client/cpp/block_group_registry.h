@@ -5,9 +5,9 @@
 #ifndef SRC_LIB_STORAGE_BLOCK_CLIENT_CPP_BLOCK_GROUP_REGISTRY_H_
 #define SRC_LIB_STORAGE_BLOCK_CLIENT_CPP_BLOCK_GROUP_REGISTRY_H_
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <pthread.h>
 #include <zircon/compiler.h>
-#include <zircon/device/block.h>
 
 #include <array>
 #include <optional>

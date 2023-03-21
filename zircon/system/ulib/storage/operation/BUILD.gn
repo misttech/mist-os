@@ -18,12 +18,14 @@ zx_library("operation") {
     "storage/operation/unbuffered_operations_builder.h",
   ]
 
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//zircon/system/ulib/zx",
+  ]
+
   if (is_fuchsia) {
     sources += [ "unbuffered_operations_builder.cc" ]
-    public_deps = [
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/zx",
-    ]
+    public_deps += [ "//zircon/system/ulib/fbl" ]
     deps += [
       "//sdk/lib/fdio",
       "//sdk/lib/fit",

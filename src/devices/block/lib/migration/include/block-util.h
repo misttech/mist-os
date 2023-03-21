@@ -17,15 +17,15 @@ inline zx_status_t IssueBlockFifoRequest(const std::string& command, uint16_t vm
                                          block_client::BlockDevice* device) {
   uint32_t opcode;
   if (command == "READ") {
-    opcode = BLOCKIO_READ;
+    opcode = BLOCK_OP_READ;
   } else if (command == "WRITE") {
-    opcode = BLOCKIO_WRITE;
+    opcode = BLOCK_OP_WRITE;
   } else if (command == "FLUSH") {
-    opcode = BLOCKIO_FLUSH;
+    opcode = BLOCK_OP_FLUSH;
   } else if (command == "TRIM") {
-    opcode = BLOCKIO_TRIM;
+    opcode = BLOCK_OP_TRIM;
   } else if (command == "CLOSE_VMO") {
-    opcode = BLOCKIO_CLOSE_VMO;
+    opcode = BLOCK_OP_CLOSE_VMO;
   } else {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -49,23 +49,23 @@ inline void SetFakeBlockDeviceHook(block_client::FakeBlockDevice* device, uint32
                                    uint32_t* trim_req_count = nullptr) {
   auto hook = [=](const block_fifo_request_t& request, const zx::vmo* vmo) {
     switch (request.opcode) {
-      case BLOCKIO_READ:
+      case BLOCK_OP_READ:
         if (read_req_count != nullptr)
           (*read_req_count)++;
         if (blocks_read != nullptr)
           (*blocks_read) += request.length;
         break;
-      case BLOCKIO_WRITE:
+      case BLOCK_OP_WRITE:
         if (write_req_count != nullptr)
           (*write_req_count)++;
         if (blocks_written != nullptr)
           (*blocks_written) += request.length;
         break;
-      case BLOCKIO_FLUSH:
+      case BLOCK_OP_FLUSH:
         if (flush_req_count != nullptr)
           (*flush_req_count)++;
         break;
-      case BLOCKIO_TRIM:
+      case BLOCK_OP_TRIM:
         if (trim_req_count != nullptr)
           (*trim_req_count)++;
         break;

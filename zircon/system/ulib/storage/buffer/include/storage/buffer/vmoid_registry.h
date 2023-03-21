@@ -5,9 +5,9 @@
 #ifndef STORAGE_BUFFER_VMOID_REGISTRY_H_
 #define STORAGE_BUFFER_VMOID_REGISTRY_H_
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
-#include <zircon/device/block.h>
 #include <zircon/types.h>
 
 namespace storage {

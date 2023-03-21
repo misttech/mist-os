@@ -19,7 +19,6 @@ sdk_source_set("public") {
     "zircon/analyzer.h",
     "zircon/boot/image.h",
     "zircon/compiler.h",
-    "zircon/device/block.h",
     "zircon/errors.h",
     "zircon/limits.h",
     "zircon/rights.h",

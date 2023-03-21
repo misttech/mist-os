@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <fuchsia/hardware/block/cpp/fidl.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/volume/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/fdio/directory.h>
@@ -95,7 +96,7 @@ zx_status_t FlashIo(const BlockDevice& device, size_t bytes_to_test, size_t tran
   size_t blksize = device.info.block_size;
   size_t vmo_byte_offset = 0;
   size_t dev_off = 0;
-  uint32_t opcode = is_write_test ? BLOCKIO_WRITE : BLOCKIO_READ;
+  uint32_t opcode = is_write_test ? BLOCK_OP_WRITE : BLOCK_OP_READ;
 
   std::queue<reqid_t> ready_to_send;
   block_fifo_request_t reqs[kMaxInFlightRequests];

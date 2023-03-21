@@ -495,7 +495,7 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
       // Check device peer closed exception
       {
         auto hook = [](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
-          if (_req.opcode == BLOCKIO_READ) {
+          if (_req.opcode == BLOCK_OP_READ) {
             return ZX_ERR_PEER_CLOSED;
           }
           return ZX_OK;
@@ -933,7 +933,7 @@ TEST_F(CheckpointTest, CpError) {
   // Set a hook to trigger an io error with any write requests on FakeBlockDevice,
   // which causes that f2fs sets the checkpoint error flag.
   auto hook = [](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
-    if (_req.opcode == BLOCKIO_WRITE) {
+    if (_req.opcode == BLOCK_OP_WRITE) {
       return ZX_ERR_IO;
     }
     return ZX_OK;
@@ -1133,7 +1133,7 @@ TEST_F(CheckpointTest, DoCheckpointDiskFail) {
   uint32_t flush_count = 0;
   uint32_t target_flush_count = 0;
   auto hook = [&](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
-    if (_req.opcode == BLOCKIO_FLUSH) {
+    if (_req.opcode == BLOCK_OP_FLUSH) {
       if (++flush_count == target_flush_count) {
         return ZX_ERR_PEER_CLOSED;
       }

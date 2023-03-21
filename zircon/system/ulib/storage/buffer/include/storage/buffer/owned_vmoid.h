@@ -5,9 +5,10 @@
 #ifndef STORAGE_BUFFER_OWNED_VMOID_H_
 #define STORAGE_BUFFER_OWNED_VMOID_H_
 
-#include <utility>
-#include <zircon/device/block.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <zircon/types.h>
+
+#include <utility>
 
 #include <storage/buffer/vmoid_registry.h>
 

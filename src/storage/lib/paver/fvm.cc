@@ -117,7 +117,7 @@ zx_status_t FlushClient(block_client::Client& client) {
   block_fifo_request_t request;
   request.group = 0;
   request.vmoid = block::wire::kVmoidInvalid;
-  request.opcode = BLOCKIO_FLUSH;
+  request.opcode = BLOCK_OP_FLUSH;
   request.length = 0;
   request.vmo_offset = 0;
   request.dev_offset = 0;
@@ -465,9 +465,9 @@ zx_status_t PreProcessPartitions(const fbl::unique_fd& fvm_fd,
         return ZX_ERR_IO;
       }
       if (ext.extent_length > ext.slice_count * hdr->slice_size) {
-        char name[BLOCK_NAME_LEN + 1];
-        name[BLOCK_NAME_LEN] = '\0';
-        memcpy(&name, parts[p].aligned_pd.name, BLOCK_NAME_LEN);
+        char name[sizeof(parts[p].aligned_pd.name) + 1];
+        name[sizeof(parts[p].aligned_pd.name)] = '\0';
+        memcpy(name, parts[p].aligned_pd.name, sizeof(parts[p].aligned_pd.name));
         ERROR("Partition(%s) extent length(%lu) must fit within allocated slice count(%lu * %lu)\n",
               name, ext.extent_length, ext.slice_count, hdr->slice_size);
         return ZX_ERR_IO;
@@ -520,8 +520,14 @@ zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(const fbl::unique
     alloc.slice_count = ext.slice_count;
     memcpy(&alloc.type, part_info.pd->type, sizeof(alloc.type));
     memcpy(&alloc.guid, uuid::Uuid::Generate().bytes(), uuid::kUuidSize);
-    memcpy(&alloc.name, part_info.pd->name, sizeof(alloc.name));
-    LOG("Allocating partition %s consisting of %zu slices\n", alloc.name, alloc.slice_count);
+    const char* name = reinterpret_cast<const char*>(part_info.pd->name);
+    alloc.name = fidl::StringView::FromExternal(name, strnlen(name, sizeof(part_info.pd->name)));
+    {
+      char name[sizeof(part_info.pd->name) + 1];
+      name[sizeof(part_info.pd->name)] = '\0';
+      memcpy(name, part_info.pd->name, sizeof(part_info.pd->name));
+      LOG("Allocating partition %s consisting of %zu slices\n", name, alloc.slice_count);
+    }
     if (auto fd_or =
             fs_management::FvmAllocatePartitionWithDevfs(devfs_root.get(), fvm_fd.get(), alloc);
         fd_or.is_error()) {
@@ -784,7 +790,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
     }
 
     block_fifo_request_t request = {
-        .opcode = BLOCKIO_WRITE,
+        .opcode = BLOCK_OP_WRITE,
         .group = 0,
         .vmoid = vmoid->TakeId(),
     };

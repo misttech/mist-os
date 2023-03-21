@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
@@ -16,7 +17,6 @@
 #include <lib/fit/defer.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <zircon/device/block.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 

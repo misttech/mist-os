@@ -79,14 +79,14 @@ TEST_P(DeviceTest, TestWriteThenRead) {
   ASSERT_EQ(vmo.write(write_buf, kVmoBlockOffset * info.block_size, sizeof(write_buf)), ZX_OK);
 
   block_fifo_request_t write_request;
-  write_request.opcode = BLOCKIO_WRITE;
+  write_request.opcode = BLOCK_OP_WRITE;
   write_request.vmoid = vmoid.get();
   write_request.length = kVmoWriteBlocks;
   write_request.vmo_offset = kVmoBlockOffset;
   write_request.dev_offset = 0;
   EXPECT_EQ(device->FifoTransaction(&write_request, 1), ZX_OK);
 
-  // "Clear" vmo, so any data in the vmo after is solely dependent on the following BLOCKIO_READ
+  // "Clear" vmo, so any data in the vmo after is solely dependent on the following BLOCK_OP_READ
   char zero_buf[kVmoBlocks * info.block_size];
   memset(zero_buf, 0, sizeof(zero_buf));
   ASSERT_EQ(vmo.write(zero_buf, 0, sizeof(zero_buf)), ZX_OK);
@@ -94,7 +94,7 @@ TEST_P(DeviceTest, TestWriteThenRead) {
   char read_buf[kVmoWriteBlocks * info.block_size];
   memset(read_buf, 0, sizeof(read_buf));
   block_fifo_request_t read_request;
-  read_request.opcode = BLOCKIO_READ;
+  read_request.opcode = BLOCK_OP_READ;
   read_request.vmoid = vmoid.get();
   read_request.length = kVmoWriteBlocks;
   read_request.vmo_offset = kVmoBlockOffset;
@@ -152,13 +152,13 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
             ZX_OK);
 
   block_fifo_request_t write_requests[2];
-  write_requests[0].opcode = BLOCKIO_WRITE;
+  write_requests[0].opcode = BLOCK_OP_WRITE;
   write_requests[0].vmoid = vmoid.get();
   write_requests[0].length = kVmoWriteBlocks;
   write_requests[0].vmo_offset = kOffsetBlocks;
   write_requests[0].dev_offset = 0;
 
-  write_requests[1].opcode = BLOCKIO_WRITE;
+  write_requests[1].opcode = BLOCK_OP_WRITE;
   write_requests[1].vmoid = vmoid.get();
   write_requests[1].length = kVmoWriteBlocks;
   write_requests[1].vmo_offset = kOffsetBlocks + kVmoWriteBlocks;
@@ -170,13 +170,13 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
   ASSERT_EQ(vmo.write(read_buf, 0, sizeof(read_buf)), ZX_OK);
 
   block_fifo_request_t read_requests[2];
-  read_requests[0].opcode = BLOCKIO_READ;
+  read_requests[0].opcode = BLOCK_OP_READ;
   read_requests[0].vmoid = vmoid.get();
   read_requests[0].length = kVmoWriteBlocks;
   read_requests[0].vmo_offset = kOffsetBlocks;
   read_requests[0].dev_offset = 0;
 
-  read_requests[1].opcode = BLOCKIO_READ;
+  read_requests[1].opcode = BLOCK_OP_READ;
   read_requests[1].vmoid = vmoid.get();
   read_requests[1].length = kVmoWriteBlocks;
   read_requests[1].vmo_offset = kOffsetBlocks + kVmoWriteBlocks;
@@ -223,13 +223,13 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   ASSERT_EQ(vmo.write(write_buf, 0, sizeof(write_buf)), ZX_OK);
 
   block_fifo_request_t requests[2];
-  requests[0].opcode = BLOCKIO_WRITE;
+  requests[0].opcode = BLOCK_OP_WRITE;
   requests[0].vmoid = vmoid.get();
   requests[0].length = kVmoBlocks;
   requests[0].vmo_offset = 0;
   requests[0].dev_offset = 0;
 
-  requests[1].opcode = BLOCKIO_FLUSH;
+  requests[1].opcode = BLOCK_OP_FLUSH;
   requests[1].vmoid = vmoid.get();
   requests[1].length = 0;
   requests[1].vmo_offset = 0;
@@ -241,7 +241,7 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   ASSERT_EQ(vmo.write(read_buf, 0, sizeof(read_buf)), ZX_OK);
 
   block_fifo_request_t read_request;
-  read_request.opcode = BLOCKIO_READ;
+  read_request.opcode = BLOCK_OP_READ;
   read_request.vmoid = vmoid.get();
   read_request.length = kVmoBlocks;
   read_request.vmo_offset = 0;
@@ -280,20 +280,20 @@ TEST_P(DeviceTest, TestInvalidGroupRequests) {
   ASSERT_NO_FATAL_FAILURE(device->BlockAttachVmo(vmo, &vmoid.GetReference(device.get())));
 
   block_fifo_request_t requests[3];
-  requests[0].opcode = BLOCKIO_FLUSH;
+  requests[0].opcode = BLOCK_OP_FLUSH;
   requests[0].vmoid = vmoid.get();
   requests[0].length = 0;
   requests[0].vmo_offset = 0;
   requests[0].dev_offset = 0;
 
   // Not a valid request
-  requests[1].opcode = BLOCKIO_CLOSE_VMO;
+  requests[1].opcode = BLOCK_OP_CLOSE_VMO;
   requests[1].vmoid = 100;
   requests[1].length = 0;
   requests[1].vmo_offset = 0;
   requests[1].dev_offset = 0;
 
-  requests[2].opcode = BLOCKIO_FLUSH;
+  requests[2].opcode = BLOCK_OP_FLUSH;
   requests[2].vmoid = vmoid.get();
   requests[2].length = 0;
   requests[2].vmo_offset = 0;

@@ -4,10 +4,10 @@
 
 #include "src/lib/storage/block_client/cpp/client.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/fifo.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
-#include <zircon/device/block.h>
 #include <zircon/types.h>
 
 #include <fbl/macros.h>
@@ -61,10 +61,10 @@ zx_status_t Client::Transaction(block_fifo_request_t* requests, size_t count) {
 
   for (size_t i = 0; i < count; i++) {
     requests[i].group = group;
-    requests[i].opcode = requests[i].opcode | BLOCKIO_GROUP_ITEM;
+    requests[i].opcode = requests[i].opcode | BLOCK_GROUP_ITEM;
   }
 
-  requests[count - 1].opcode |= BLOCKIO_GROUP_LAST;
+  requests[count - 1].opcode |= BLOCK_GROUP_LAST;
 
   if (zx_status_t status = DoWrite(requests, count); status != ZX_OK) {
     {
@@ -75,7 +75,7 @@ zx_status_t Client::Transaction(block_fifo_request_t* requests, size_t count) {
     return status;
   }
 
-  // As expected by the protocol, when we send one "BLOCKIO_GROUP_LAST" message, we
+  // As expected by the protocol, when we send one "BLOCK_GROUP_LAST" message, we
   // must read a reply message.
   zx_status_t status = ZX_OK;
   {

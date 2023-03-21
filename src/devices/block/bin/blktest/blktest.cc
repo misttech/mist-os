@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/zx/fifo.h>
@@ -17,7 +18,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <zircon/device/block.h>
 #include <zircon/syscalls.h>
 
 #include <climits>
@@ -194,7 +194,7 @@ TEST(BlkdevTests, blkdev_test_fifo_basic) {
   // Split it into two requests, spread across the disk
   block_fifo_request_t requests[] = {
       {
-          .opcode = BLOCKIO_WRITE,
+          .opcode = BLOCK_OP_WRITE,
           .group = group,
           .vmoid = vmoid,
           .length = 1,
@@ -202,7 +202,7 @@ TEST(BlkdevTests, blkdev_test_fifo_basic) {
           .dev_offset = 0,
       },
       {
-          .opcode = BLOCKIO_WRITE,
+          .opcode = BLOCK_OP_WRITE,
           .group = group,
           .vmoid = vmoid,
           .length = 2,
@@ -217,14 +217,14 @@ TEST(BlkdevTests, blkdev_test_fifo_basic) {
   std::unique_ptr<uint8_t[]> out(new uint8_t[vmo_size]());
 
   ASSERT_EQ(vmo.write(out.get(), 0, vmo_size), ZX_OK);
-  requests[0].opcode = BLOCKIO_READ;
-  requests[1].opcode = BLOCKIO_READ;
+  requests[0].opcode = BLOCK_OP_READ;
+  requests[1].opcode = BLOCK_OP_READ;
   ASSERT_EQ(block_client.Transaction(requests, std::size(requests)), ZX_OK);
   ASSERT_EQ(vmo.read(out.get(), 0, vmo_size), ZX_OK);
   ASSERT_EQ(memcmp(buf.get(), out.get(), blk_size * 3), 0, "Read data not equal to written data");
 
   // Close the current vmo
-  requests[0].opcode = BLOCKIO_CLOSE_VMO;
+  requests[0].opcode = BLOCK_OP_CLOSE_VMO;
   ASSERT_EQ(block_client.Transaction(requests, 1), ZX_OK);
 }
 
@@ -259,7 +259,7 @@ TEST(BlkdevTests, DISABLED_blkdev_test_fifo_whole_disk) {
 
   // Batch write the VMO to the blkdev
   block_fifo_request_t request = {
-      .opcode = BLOCKIO_WRITE,
+      .opcode = BLOCK_OP_WRITE,
       .group = group,
       .vmoid = vmoid,
       .length = static_cast<uint32_t>(blk_count),
@@ -272,13 +272,13 @@ TEST(BlkdevTests, DISABLED_blkdev_test_fifo_whole_disk) {
   std::unique_ptr<uint8_t[]> out(new uint8_t[vmo_size]());
 
   ASSERT_EQ(vmo.write(out.get(), 0, vmo_size), ZX_OK);
-  request.opcode = BLOCKIO_READ;
+  request.opcode = BLOCK_OP_READ;
   ASSERT_EQ(block_client.Transaction(&request, 1), ZX_OK);
   ASSERT_EQ(vmo.read(out.get(), 0, vmo_size), ZX_OK);
   ASSERT_EQ(memcmp(buf.get(), out.get(), blk_size * 3), 0, "Read data not equal to written data");
 
   // Close the current vmo
-  request.opcode = BLOCKIO_CLOSE_VMO;
+  request.opcode = BLOCK_OP_CLOSE_VMO;
   ASSERT_EQ(block_client.Transaction(&request, 1), ZX_OK);
 }
 
@@ -314,7 +314,7 @@ void WriteStripedVmoHelper(block_client::Client& block_client, const TestVmoObje
   for (size_t b = 0; b < blocks; b++) {
     requests[b].group = group;
     requests[b].vmoid = obj.vmoid.id;
-    requests[b].opcode = BLOCKIO_WRITE;
+    requests[b].opcode = BLOCK_OP_WRITE;
     requests[b].length = 1;
     requests[b].vmo_offset = b;
     requests[b].dev_offset = i + b * objs;
@@ -336,7 +336,7 @@ void ReadStripedVmoHelper(block_client::Client& block_client, const TestVmoObjec
   for (size_t b = 0; b < blocks; b++) {
     requests[b].group = group;
     requests[b].vmoid = obj.vmoid.id;
-    requests[b].opcode = BLOCKIO_READ;
+    requests[b].opcode = BLOCK_OP_READ;
     requests[b].length = 1;
     requests[b].vmo_offset = b;
     requests[b].dev_offset = i + b * objs;
@@ -357,7 +357,7 @@ void CloseVmoHelper(block_client::Client& block_client, TestVmoObject& obj, grou
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = obj.vmoid.id;
-  request.opcode = BLOCKIO_CLOSE_VMO;
+  request.opcode = BLOCK_OP_CLOSE_VMO;
   ASSERT_EQ(block_client.Transaction(&request, 1), ZX_OK);
   obj.vmo.reset();
 }
@@ -495,7 +495,7 @@ TEST(BlkdevTests, blkdev_test_fifo_bad_client_vmoid) {
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = static_cast<vmoid_t>(obj.vmoid.id + 5);
-  request.opcode = BLOCKIO_WRITE;
+  request.opcode = BLOCK_OP_WRITE;
   request.length = 1;
   request.vmo_offset = 0;
   request.dev_offset = 0;
@@ -524,7 +524,7 @@ TEST(BlkdevTests, blkdev_test_fifo_bad_client_unaligned_request) {
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = static_cast<vmoid_t>(obj.vmoid.id);
-  request.opcode = BLOCKIO_WRITE;
+  request.opcode = BLOCK_OP_WRITE;
 
   // Send a request that has zero length
   request.length = 0;
@@ -555,7 +555,7 @@ TEST(BlkdevTests, blkdev_test_fifo_bad_client_overflow) {
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = static_cast<vmoid_t>(obj.vmoid.id);
-  request.opcode = BLOCKIO_WRITE;
+  request.opcode = BLOCK_OP_WRITE;
 
   // Send a request that is barely out-of-bounds for the device
   request.length = 1;
@@ -625,13 +625,13 @@ TEST(BlkdevTests, blkdev_test_fifo_bad_client_bad_vmo) {
   block_fifo_request_t request;
   request.group = group;
   request.vmoid = static_cast<vmoid_t>(obj.vmoid.id);
-  request.opcode = BLOCKIO_WRITE;
+  request.opcode = BLOCK_OP_WRITE;
   request.length = static_cast<uint32_t>(length);
   request.vmo_offset = 0;
   request.dev_offset = 0;
   ASSERT_EQ(block_client.Transaction(&request, 1), ZX_ERR_OUT_OF_RANGE);
   // Do the same thing, but for reading
-  request.opcode = BLOCKIO_READ;
+  request.opcode = BLOCK_OP_READ;
   ASSERT_EQ(block_client.Transaction(&request, 1), ZX_ERR_OUT_OF_RANGE);
 }
 

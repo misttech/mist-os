@@ -27,7 +27,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <zircon/boot/image.h>
-#include <zircon/device/block.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/status.h>

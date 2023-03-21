@@ -22,6 +22,7 @@ zx_library("buffer") {
     "block_buffer.cc",
   ]
   deps = [ "//zircon/third_party/ulib/safemath" ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp" ]
 
   if (is_fuchsia) {
     sources += [
@@ -31,7 +32,7 @@ zx_library("buffer") {
       "ring_buffer.cc",
       "vmo_buffer.cc",
     ]
-    public_deps = [
+    public_deps += [
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/storage/operation",
@@ -48,8 +49,6 @@ zx_library("buffer") {
       "//zircon/system/ulib/storage/operation",
       "//zircon/system/ulib/zx",
     ]
-  } else {
-    public_deps = [ "//zircon/system/public" ]
   }
 }
 

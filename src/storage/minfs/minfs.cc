@@ -61,27 +61,26 @@ void FreeSlices(const Superblock* info, block_client::BlockDevice* device) {
   if ((info->flags & kMinfsFlagFVM) == 0) {
     return;
   }
-  extend_request_t request;
   const size_t kBlocksPerSlice = info->slice_size / info->BlockSize();
   if (info->ibm_slices) {
-    request.length = info->ibm_slices;
-    request.offset = kFVMBlockInodeBmStart / kBlocksPerSlice;
-    device->VolumeShrink(request.offset, request.length);
+    uint64_t length = info->ibm_slices;
+    uint64_t offset = kFVMBlockInodeBmStart / kBlocksPerSlice;
+    device->VolumeShrink(offset, length);
   }
   if (info->abm_slices) {
-    request.length = info->abm_slices;
-    request.offset = kFVMBlockDataBmStart / kBlocksPerSlice;
-    device->VolumeShrink(request.offset, request.length);
+    uint64_t length = info->abm_slices;
+    uint64_t offset = kFVMBlockDataBmStart / kBlocksPerSlice;
+    device->VolumeShrink(offset, length);
   }
   if (info->ino_slices) {
-    request.length = info->ino_slices;
-    request.offset = kFVMBlockInodeStart / kBlocksPerSlice;
-    device->VolumeShrink(request.offset, request.length);
+    uint64_t length = info->ino_slices;
+    uint64_t offset = kFVMBlockInodeStart / kBlocksPerSlice;
+    device->VolumeShrink(offset, length);
   }
   if (info->dat_slices) {
-    request.length = info->dat_slices;
-    request.offset = kFVMBlockDataStart / kBlocksPerSlice;
-    device->VolumeShrink(request.offset, request.length);
+    uint64_t length = info->dat_slices;
+    uint64_t offset = kFVMBlockDataStart / kBlocksPerSlice;
+    device->VolumeShrink(offset, length);
   }
 }
 
@@ -108,30 +107,30 @@ zx::result<> CheckSlices(const Superblock& info, size_t blocks_per_slice,
   expected_count[2] = info.ino_slices;
   expected_count[3] = info.dat_slices;
 
-  query_request_t request;
-  request.count = 4;
-  request.vslice_start[0] = kFVMBlockInodeBmStart / blocks_per_slice;
-  request.vslice_start[1] = kFVMBlockDataBmStart / blocks_per_slice;
-  request.vslice_start[2] = kFVMBlockInodeStart / blocks_per_slice;
-  request.vslice_start[3] = kFVMBlockDataStart / blocks_per_slice;
+  size_t vslices[] = {
+      kFVMBlockInodeBmStart / blocks_per_slice,
+      kFVMBlockDataBmStart / blocks_per_slice,
+      kFVMBlockInodeStart / blocks_per_slice,
+      kFVMBlockDataStart / blocks_per_slice,
+  };
 
   fuchsia_hardware_block_volume::wire::VsliceRange
       ranges[fuchsia_hardware_block_volume::wire::kMaxSliceRequests];
   size_t ranges_count;
 
-  status = device->VolumeQuerySlices(request.vslice_start, request.count, ranges, &ranges_count);
+  status = device->VolumeQuerySlices(vslices, std::size(vslices), ranges, &ranges_count);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "unable to query FVM: " << status;
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
 
-  if (ranges_count != request.count) {
-    FX_LOGS(ERROR) << "requested FVM range :" << request.count
+  if (ranges_count != std::size(vslices)) {
+    FX_LOGS(ERROR) << "requested FVM range :" << std::size(vslices)
                    << " does not match received: " << ranges_count;
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  for (uint32_t i = 0; i < request.count; i++) {
+  for (uint32_t i = 0; i < std::size(vslices); i++) {
     size_t minfs_count = expected_count[i];
     size_t fvm_count = ranges[i].count;
 
@@ -146,10 +145,9 @@ zx::result<> CheckSlices(const Superblock& info, size_t blocks_per_slice,
 
     if (repair_slices && fvm_count > minfs_count) {
       // If FVM reports more slices than we expect, try to free remainder.
-      extend_request_t shrink;
-      shrink.length = fvm_count - minfs_count;
-      shrink.offset = request.vslice_start[i] + minfs_count;
-      if ((status = device->VolumeShrink(shrink.offset, shrink.length)) != ZX_OK) {
+      uint64_t length = fvm_count - minfs_count;
+      uint64_t offset = vslices[i] + minfs_count;
+      if ((status = device->VolumeShrink(offset, length)) != ZX_OK) {
         FX_LOGS(ERROR) << "Unable to shrink to expected size, status: " << status;
         return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
       }
@@ -184,7 +182,10 @@ zx::result<> CreateFvmData(const MountOptions& options, Superblock* info,
     return zx::error(status);
   }
 
-  extend_request_t request;
+  struct {
+    size_t offset;
+    size_t length;
+  } request;
 
   // Inode allocation bitmap.
   info->ibm_slices = 1;

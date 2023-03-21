@@ -71,7 +71,7 @@ zx_status_t Bcache::BlockDetachVmo(storage::Vmoid vmoid) {
 
 zx::result<> Bcache::Sync() {
   block_fifo_request_t request = {};
-  request.opcode = BLOCKIO_FLUSH;
+  request.opcode = BLOCK_OP_FLUSH;
   return zx::make_result(device_->FifoTransaction(&request, 1));
 }
 

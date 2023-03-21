@@ -38,7 +38,7 @@ TEST(ReaderTest, Read) {
   ASSERT_EQ(vmo.write(buf.data(), 0, buf.size()), ZX_OK);
 
   block_fifo_request_t request{
-      .opcode = BLOCKIO_WRITE,
+      .opcode = BLOCK_OP_WRITE,
       .vmoid = vmoid.get(),
       .length = kBufferSize / kBlockSize,
   };

@@ -10,6 +10,7 @@ executable("biotime") {
   sources = [ "biotime.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",

@@ -4,16 +4,15 @@
 
 #include "storage/buffer/owned_vmoid.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <zircon/assert.h>
-#include <zircon/device/block.h>
 #include <zircon/status.h>
 
 #include "storage/buffer/vmoid_registry.h"
 
 namespace storage {
 
-OwnedVmoid::OwnedVmoid(storage::VmoidRegistry* vmoid_registry)
-    : vmoid_registry_(vmoid_registry) {
+OwnedVmoid::OwnedVmoid(storage::VmoidRegistry* vmoid_registry) : vmoid_registry_(vmoid_registry) {
   ZX_ASSERT(vmoid_registry_ != nullptr);
 }
 
@@ -24,9 +23,7 @@ OwnedVmoid& OwnedVmoid::operator=(OwnedVmoid&& other) {
   return *this;
 }
 
-OwnedVmoid::~OwnedVmoid() {
-  Reset();
-}
+OwnedVmoid::~OwnedVmoid() { Reset(); }
 
 zx_status_t OwnedVmoid::AttachVmo(const zx::vmo& vmo) {
   zx_status_t status;

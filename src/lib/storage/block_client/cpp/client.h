@@ -6,8 +6,8 @@
 #define SRC_LIB_STORAGE_BLOCK_CLIENT_CPP_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/fifo.h>
-#include <zircon/device/block.h>
 #include <zircon/types.h>
 
 #include <condition_variable>

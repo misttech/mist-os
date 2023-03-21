@@ -20,6 +20,8 @@
 #include <gtest/gtest.h>
 #include <storage/buffer/owned_vmoid.h>
 
+#include "src/devices/lib/block/block.h"
+
 namespace block_client {
 namespace {
 
@@ -214,7 +216,7 @@ TEST(RemoteBlockDeviceTest, WriteTransactionReadResponse) {
   ASSERT_EQ(kGoldenVmoid, vmoid.get());
 
   block_fifo_request_t request;
-  request.opcode = BLOCKIO_READ;
+  request.opcode = BLOCK_OP_READ;
   request.reqid = 1;
   request.group = 0;
   request.vmoid = vmoid.get();
@@ -336,7 +338,7 @@ TEST(RemoteBlockDeviceTest, LargeThreadCountSuceeds) {
     thread = std::thread(
         [device = device.value().get(), &mutex, &done, &condition, vmoid = vmoid.get()]() {
           block_fifo_request_t request = {};
-          request.opcode = BLOCKIO_READ;
+          request.opcode = BLOCK_OP_READ;
           request.vmoid = vmoid;
           request.length = 1;
           ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
@@ -410,7 +412,7 @@ TEST(RemoteBlockDeviceTest, NoHangForErrorsWithMultipleThreads) {
     for (auto& thread : threads) {
       thread = std::thread([device = device.get(), vmoid = vmoid.get()]() {
         block_fifo_request_t request = {};
-        request.opcode = BLOCKIO_READ;
+        request.opcode = BLOCK_OP_READ;
         request.vmoid = vmoid;
         request.length = 1;
         ASSERT_EQ(ZX_ERR_PEER_CLOSED, device->FifoTransaction(&request, 1));

@@ -39,7 +39,7 @@ zx_status_t Writer::Write(uint64_t offset, const size_t count, void* buf) {
     memcpy(buffer_.start(), buf, amount);
     buf = static_cast<uint8_t*>(buf) + amount;
     block_fifo_request_t request = {
-        .opcode = BLOCKIO_WRITE,
+        .opcode = BLOCK_OP_WRITE,
         .vmoid = vmoid_.get(),
         .length = safemath::checked_cast<uint32_t>(amount / block_size_),
         .vmo_offset = 0,

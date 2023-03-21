@@ -11,7 +11,7 @@ zx_status_t BlockDevice::BlockDetachVmo(storage::Vmoid vmoid) {
     return ZX_OK;
   }
   block_fifo_request_t request = {};
-  request.opcode = BLOCKIO_CLOSE_VMO;
+  request.opcode = BLOCK_OP_CLOSE_VMO;
   request.vmoid = vmoid.TakeId();
   return FifoTransaction(&request, 1);
 }
